@@ -182,6 +182,7 @@ message StorageReportProto {
   optional bool failed = 7 [default = false];
   optional uint64 committed = 8 [default = 0];
   optional uint64 freeSpaceToSpare = 9 [default = 0];
+  optional uint64 reserved = 10;
 }
 
 message MetadataStorageReportProto {
@@ -193,16 +194,6 @@ message MetadataStorageReportProto {
   optional bool failed = 6 [default = false];
 }
 
-/**
- * Types of recognized storage media.
- */
-enum StorageTypeProto {
-  DISK = 1;
-  SSD = 2;
-  ARCHIVE = 3;
-  RAM_DISK = 4;
-  PROVIDED = 5;
-}
 
 message ContainerReportsProto {
   repeated ContainerReplicaProto reports = 1;
@@ -231,12 +222,13 @@ message ContainerReplicaProto {
   optional int64 writeCount = 7;
   optional int64 readBytes = 8;
   optional int64 writeBytes = 9;
-  optional string finalhash = 10;
+  optional string finalhash = 10 [ deprecated = true ];
   optional int64 deleteTransactionId = 11;
   optional uint64 blockCommitSequenceId = 12;
   optional string originNodeId = 13;
   optional int32 replicaIndex = 14;
   optional bool isEmpty = 15 [default = false];
+  optional int64 dataChecksum = 16;
 }
 
 message CommandStatusReportsProto {
@@ -278,7 +270,7 @@ message ContainerAction {
 message PipelineReport {
   required PipelineID pipelineID = 1;
   required bool isLeader = 2;
-  optional uint64 bytesWritten = 3;
+  optional uint64 bytesWritten = 3 [deprecated = true];
 }
 
 message PipelineReportsProto {
@@ -329,6 +321,7 @@ message SCMCommandProto {
     finalizeNewLayoutVersionCommand = 9;
     refreshVolumeUsageInfo = 10;
     reconstructECContainersCommand = 11;
+    reconcileContainerCommand = 12;
   }
   // TODO: once we start using protoc 3.x, refactor this message using "oneof"
   required Type commandType = 1;
@@ -344,6 +337,7 @@ message SCMCommandProto {
   finalizeNewLayoutVersionCommandProto = 10;
   optional RefreshVolumeUsageCommandProto refreshVolumeUsageCommandProto = 11;
   optional ReconstructECContainersCommandProto reconstructECContainersCommandProto = 12;
+  optional ReconcileContainerCommandProto reconcileContainerCommandProto = 13;
 
 
   // If running upon Ratis, holds term of underlying RaftServer iff current
@@ -374,7 +368,10 @@ message DeletedBlocksTransaction {
   required int64 containerID = 2;
   repeated int64 localID = 3;
   // the retry time of sending deleting command to datanode.
-  required int32 count = 4;
+  // We don't have to store the retry count in DB.
+  optional int32 count = 4 [deprecated=true];
+  optional uint64 totalBlockSize = 5;
+  optional uint64 totalBlockReplicatedSize = 6;
 }
 
 // ACK message datanode sent to SCM, contains the result of
@@ -498,6 +495,15 @@ message FinalizeNewLayoutVersionCommandProto {
   required bool finalizeNewLayoutVersion = 1 [default = false];
   required LayoutVersionProto dataNodeLayoutVersion = 2;
   required int64 cmdId = 3;
+}
+
+/**
+This command asks the datanode to reconcile its copy of a container with its peer datanodes that also have a copy of
+the container.
+*/
+message ReconcileContainerCommandProto {
+  required int64 containerID = 1;
+  repeated DatanodeDetailsProto peers = 2;
 }
 
 /**

@@ -23,6 +23,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLU
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -59,6 +60,7 @@ import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -83,10 +85,8 @@ public class TestDeadNodeHandler {
   private DeadNodeHandler deadNodeHandler;
   private HealthyReadOnlyNodeHandler healthyReadOnlyNodeHandler;
   private EventPublisher publisher;
-  private EventQueue eventQueue;
   @TempDir
   private File storageDir;
-  private SCMContext scmContext;
   private DeletedBlockLog deletedBlockLog;
 
   @BeforeEach
@@ -98,15 +98,17 @@ public class TestDeadNodeHandler {
     conf.setStorageSize(OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
         10, StorageUnit.MB);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, storageDir.getPath());
-    eventQueue = new EventQueue();
+    EventQueue eventQueue = new EventQueue();
     scm = HddsTestUtils.getScm(conf);
     nodeManager = (SCMNodeManager) scm.getScmNodeManager();
-    scmContext = new SCMContext.Builder().setIsInSafeMode(true)
-        .setLeader(true).setIsPreCheckComplete(true)
-        .setSCM(scm).build();
+    SCMContext scmContext = new SCMContext.Builder()
+                                .setSafeModeStatus(SafeModeStatus.PRE_CHECKS_PASSED)
+                                .setLeader(true)
+                                .setSCM(scm).build();
     pipelineManager =
         (PipelineManagerImpl)scm.getPipelineManager();
     pipelineManager.setScmContext(scmContext);
+    scm.getReplicationManager().setScmContext(scmContext);
     PipelineProvider mockRatisProvider =
         new MockRatisPipelineProvider(nodeManager,
             pipelineManager.getStateManager(), conf);
@@ -138,12 +140,12 @@ public class TestDeadNodeHandler {
     DatanodeDetails datanode3 = MockDatanodeDetails.randomDatanodeDetails();
 
     String storagePath = tempDir.getPath()
-        .concat("/data-" + datanode1.getUuidString());
+        .concat("/data-" + datanode1.getID());
     String metaStoragePath = tempDir.getPath()
-        .concat("/metadata-" + datanode1.getUuidString());
+        .concat("/metadata-" + datanode1.getID());
 
     StorageReportProto storageOne = HddsTestUtils.createStorageReport(
-        datanode1.getUuid(), storagePath, 100 * OzoneConsts.TB,
+        datanode1.getID(), storagePath, 100 * OzoneConsts.TB,
         10 * OzoneConsts.TB, 90 * OzoneConsts.TB, null);
     MetadataStorageReportProto metaStorageOne =
         HddsTestUtils.createMetadataStorageReport(metaStoragePath,
@@ -230,8 +232,12 @@ public class TestDeadNodeHandler {
     assertFalse(
         nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
 
+    verify(publisher, times(0)).fireEvent(SCMEvents.REPLICATION_MANAGER_NOTIFY, datanode1);
+
+    clearInvocations(publisher);
+
     verify(deletedBlockLog, times(0))
-        .onDatanodeDead(datanode1.getUuid());
+        .onDatanodeDead(datanode1.getID());
 
     Set<ContainerReplica> container1Replicas = containerManager
         .getContainerReplicas(ContainerID.valueOf(container1.getContainerID()));
@@ -249,7 +255,7 @@ public class TestDeadNodeHandler {
     // Now set the node to anything other than IN_MAINTENANCE and the relevant
     // replicas should be removed
     DeleteBlocksCommand cmd = new DeleteBlocksCommand(Collections.emptyList());
-    nodeManager.addDatanodeCommand(datanode1.getUuid(), cmd);
+    nodeManager.addDatanodeCommand(datanode1.getID(), cmd);
     nodeManager.setNodeOperationalState(datanode1,
         HddsProtos.NodeOperationalState.IN_SERVICE);
     deadNodeHandler.onMessage(datanode1, publisher);
@@ -257,10 +263,10 @@ public class TestDeadNodeHandler {
     //deadNodeHandler.onMessage call will not change this
     assertFalse(
         nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
-    assertEquals(0, nodeManager.getCommandQueueCount(datanode1.getUuid(), cmd.getType()));
+    assertEquals(0, nodeManager.getCommandQueueCount(datanode1.getID(), cmd.getType()));
 
-    verify(deletedBlockLog, times(1))
-        .onDatanodeDead(datanode1.getUuid());
+    verify(publisher).fireEvent(SCMEvents.REPLICATION_MANAGER_NOTIFY, datanode1);
+    verify(deletedBlockLog).onDatanodeDead(datanode1.getID());
 
     container1Replicas = containerManager
         .getContainerReplicas(ContainerID.valueOf(container1.getContainerID()));

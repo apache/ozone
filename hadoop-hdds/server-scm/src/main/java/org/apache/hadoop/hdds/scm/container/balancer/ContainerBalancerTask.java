@@ -37,7 +37,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Queue;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -49,6 +48,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -73,7 +73,7 @@ import org.slf4j.LoggerFactory;
  */
 public class ContainerBalancerTask implements Runnable {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(ContainerBalancerTask.class);
   public static final long ABSENCE_OF_DURATION = -1L;
 
@@ -91,7 +91,6 @@ public class ContainerBalancerTask implements Runnable {
   private long sizeScheduledForMoveInLatestIteration;
   // count actual size moved in bytes
   private long sizeActuallyMovedInLatestIteration;
-  private int iterations;
   private final List<DatanodeUsageInfo> overUtilizedNodes;
   private final List<DatanodeUsageInfo> underUtilizedNodes;
   private List<DatanodeUsageInfo> withinThresholdUtilizedNodes;
@@ -99,8 +98,6 @@ public class ContainerBalancerTask implements Runnable {
   private Set<String> includeNodes;
   private ContainerBalancerConfiguration config;
   private ContainerBalancerMetrics metrics;
-  private PlacementPolicyValidateProxy placementPolicyValidateProxy;
-  private NetworkTopology networkTopology;
   private double upperLimit;
   private double lowerLimit;
   private ContainerBalancerSelectionCriteria selectionCriteria;
@@ -156,8 +153,8 @@ public class ContainerBalancerTask implements Runnable {
     this.overUtilizedNodes = new ArrayList<>();
     this.underUtilizedNodes = new ArrayList<>();
     this.withinThresholdUtilizedNodes = new ArrayList<>();
-    this.placementPolicyValidateProxy = scm.getPlacementPolicyValidateProxy();
-    this.networkTopology = scm.getClusterMap();
+    PlacementPolicyValidateProxy placementPolicyValidateProxy = scm.getPlacementPolicyValidateProxy();
+    NetworkTopology networkTopology = scm.getClusterMap();
     this.nextIterationIndex = nextIterationIndex;
     this.containerToSourceMap = new HashMap<>();
     this.containerToTargetMap = new HashMap<>();
@@ -212,10 +209,10 @@ public class ContainerBalancerTask implements Runnable {
   }
 
   private void balance() {
-    this.iterations = config.getIterations();
-    if (this.iterations == -1) {
+    int iterations = config.getIterations();
+    if (iterations == -1) {
       //run balancer infinitely
-      this.iterations = Integer.MAX_VALUE;
+      iterations = Integer.MAX_VALUE;
     }
 
     // nextIterationIndex is the iteration that balancer should start from on
@@ -329,9 +326,9 @@ public class ContainerBalancerTask implements Runnable {
                                                                          IterationResult currentIterationResult,
                                                                          long iterationDuration) {
     String currentIterationResultName = currentIterationResult == null ? null : currentIterationResult.name();
-    Map<UUID, Long> sizeEnteringDataToNodes =
+    Map<DatanodeID, Long> sizeEnteringDataToNodes =
         convertToNodeIdToTrafficMap(findTargetStrategy.getSizeEnteringNodes());
-    Map<UUID, Long> sizeLeavingDataFromNodes =
+    Map<DatanodeID, Long> sizeLeavingDataFromNodes =
         convertToNodeIdToTrafficMap(findSourceStrategy.getSizeLeavingNodes());
     IterationInfo iterationInfo = new IterationInfo(
         iterationNumber,
@@ -345,8 +342,8 @@ public class ContainerBalancerTask implements Runnable {
     return new ContainerBalancerTaskIterationStatusInfo(iterationInfo, containerMoveInfo, dataMoveInfo);
   }
 
-  private DataMoveInfo getDataMoveInfo(String currentIterationResultName, Map<UUID, Long> sizeEnteringDataToNodes,
-                                       Map<UUID, Long> sizeLeavingDataFromNodes) {
+  private DataMoveInfo getDataMoveInfo(String currentIterationResultName, Map<DatanodeID, Long> sizeEnteringDataToNodes,
+                                       Map<DatanodeID, Long> sizeLeavingDataFromNodes) {
     if (currentIterationResultName == null) {
       // For unfinished iteration
       return new DataMoveInfo(
@@ -366,7 +363,7 @@ public class ContainerBalancerTask implements Runnable {
     }
   }
 
-  private Map<UUID, Long> convertToNodeIdToTrafficMap(Map<DatanodeDetails, Long> nodeTrafficMap) {
+  private Map<DatanodeID, Long> convertToNodeIdToTrafficMap(Map<DatanodeDetails, Long> nodeTrafficMap) {
     return nodeTrafficMap
         .entrySet()
         .stream()
@@ -374,7 +371,7 @@ public class ContainerBalancerTask implements Runnable {
         .filter(datanodeDetailsLongEntry -> datanodeDetailsLongEntry.getValue() > 0)
         .collect(
             Collectors.toMap(
-                entry -> entry.getKey().getUuid(),
+                entry -> entry.getKey().getID(),
                 Map.Entry::getValue
             )
         );
@@ -506,7 +503,7 @@ public class ContainerBalancerTask implements Runnable {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Utilization for node {} with capacity {}B, used {}B, and " +
                 "remaining {}B is {}",
-            datanodeUsageInfo.getDatanodeDetails().getUuidString(),
+            datanodeUsageInfo.getDatanodeDetails(),
             datanodeUsageInfo.getScmNodeStat().getCapacity().get(),
             datanodeUsageInfo.getScmNodeStat().getScmUsed().get(),
             datanodeUsageInfo.getScmNodeStat().getRemaining().get(),
@@ -556,13 +553,13 @@ public class ContainerBalancerTask implements Runnable {
       overUtilizedNodes.forEach(entry -> {
         LOG.debug("Datanode {} {} is Over-Utilized.",
             entry.getDatanodeDetails().getHostName(),
-            entry.getDatanodeDetails().getUuid());
+            entry.getDatanodeDetails().getID());
       });
 
       underUtilizedNodes.forEach(entry -> {
         LOG.debug("Datanode {} {} is Under-Utilized.",
             entry.getDatanodeDetails().getHostName(),
-            entry.getDatanodeDetails().getUuid());
+            entry.getDatanodeDetails().getID());
       });
     }
 
@@ -683,8 +680,8 @@ public class ContainerBalancerTask implements Runnable {
             "{}B from source datanode {} to target datanode {}",
         containerID.toString(),
         containerInfo.getUsedBytes(),
-        source.getUuidString(),
-        moveSelection.getTargetNode().getUuidString());
+        source,
+        moveSelection.getTargetNode());
 
     if (moveContainer(source, moveSelection)) {
       // consider move successful for now, and update selection criteria
@@ -792,9 +789,8 @@ public class ContainerBalancerTask implements Runnable {
       if (!entry.getValue().isDone()) {
         LOG.warn("Container move timed out for container {} from source {}" +
                 " to target {}.", entry.getKey().getContainerID(),
-            containerToSourceMap.get(entry.getKey().getContainerID())
-                                .getUuidString(),
-            entry.getKey().getTargetNode().getUuidString());
+            containerToSourceMap.get(entry.getKey().getContainerID()),
+            entry.getKey().getTargetNode());
 
         entry.getValue().cancel(true);
         numCancelled += 1;
@@ -817,14 +813,14 @@ public class ContainerBalancerTask implements Runnable {
     if (sourceContainerIDSet.isEmpty()) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("ContainerBalancer could not find any candidate containers " +
-            "for datanode {}", source.getUuidString());
+            "for datanode {}", source);
       }
       return null;
     }
 
     if (LOG.isDebugEnabled()) {
       LOG.debug("ContainerBalancer is finding suitable target for source " +
-          "datanode {}", source.getUuidString());
+          "datanode {}", source);
     }
 
     ContainerMoveSelection moveSelection = null;
@@ -846,12 +842,11 @@ public class ContainerBalancerTask implements Runnable {
 
     if (moveSelection == null) {
       LOG.info("ContainerBalancer could not find a suitable target for " +
-          "source node {}.", source.getUuidString());
+          "source node {}.", source);
       return null;
     }
     LOG.info("ContainerBalancer matched source datanode {} with target " +
-            "datanode {} for container move.", source.getUuidString(),
-        moveSelection.getTargetNode().getUuidString());
+            "datanode {} for container move.", source, moveSelection.getTargetNode());
 
     return moveSelection;
   }
@@ -947,24 +942,22 @@ public class ContainerBalancerTask implements Runnable {
         if (ex != null) {
           LOG.info("Container move for container {} from source {} to " +
                   "target {} failed with exceptions.",
-              containerID.toString(),
-              source.getUuidString(),
-              moveSelection.getTargetNode().getUuidString(), ex);
+              containerID, source,
+              moveSelection.getTargetNode(), ex);
           metrics.incrementNumContainerMovesFailedInLatestIteration(1);
         } else {
           if (result == MoveManager.MoveResult.COMPLETED) {
             sizeActuallyMovedInLatestIteration +=
                 containerInfo.getUsedBytes();
             LOG.debug("Container move completed for container {} from " +
-                    "source {} to target {}", containerID,
-                source.getUuidString(),
-                moveSelection.getTargetNode().getUuidString());
+                    "source {} to target {}", containerID, source,
+                moveSelection.getTargetNode());
           } else {
             LOG.warn(
                 "Container move for container {} from source {} to target" +
                     " {} failed: {}",
-                moveSelection.getContainerID(), source.getUuidString(),
-                moveSelection.getTargetNode().getUuidString(), result);
+                moveSelection.getContainerID(), source,
+                moveSelection.getTargetNode(), result);
           }
         }
       });
@@ -1070,7 +1063,7 @@ public class ContainerBalancerTask implements Runnable {
       return 0;
     }
     SCMNodeStat aggregatedStats = new SCMNodeStat(
-        0, 0, 0, 0, 0);
+        0, 0, 0, 0, 0, 0);
     for (DatanodeUsageInfo node : nodes) {
       aggregatedStats.add(node.getScmNodeStat());
     }

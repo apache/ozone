@@ -25,6 +25,7 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.ACCESS_DENIED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_XML;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_BUCKET;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.EXPECTED_BUCKET_OWNER_HEADER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.when;
@@ -39,6 +40,7 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -48,12 +50,11 @@ import org.mockito.Mockito;
  */
 public class TestS3LifecycleConfigurationPut {
 
-  private OzoneClient clientStub;
   private BucketEndpoint bucketEndpoint;
 
   @BeforeEach
   public void setup() throws Exception {
-    clientStub = new OzoneClientStub();
+    OzoneClient clientStub = new OzoneClientStub();
     bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(clientStub)
         .build();
@@ -61,12 +62,13 @@ public class TestS3LifecycleConfigurationPut {
     BucketArgs bucketArgs = BucketArgs.newBuilder().setOwner("owner").build();
     objectStore.createVolume("s3v");
     objectStore.getS3Volume().createBucket("bucket1", bucketArgs);
+    bucketEndpoint.queryParamsForTest().set(S3Consts.QueryParams.LIFECYCLE, "");
   }
 
   @Test
   public void testLifecycleConfigurationFailWithEmptyBody() throws Exception {
     try {
-      bucketEndpoint.put("bucket1", null, "", null, null);
+      bucketEndpoint.put("bucket1", null);
       fail();
     } catch (OS3Exception ex) {
       assertEquals(HTTP_BAD_REQUEST, ex.getHttpCode());
@@ -78,7 +80,7 @@ public class TestS3LifecycleConfigurationPut {
   public void testLifecycleConfigurationFailWithNonExistentBucket()
       throws Exception {
     try {
-      bucketEndpoint.put("nonexistentbucket", null, "", null, onePrefix());
+      bucketEndpoint.put("nonexistentbucket", onePrefix());
       fail();
     } catch (OS3Exception ex) {
       assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
@@ -111,7 +113,7 @@ public class TestS3LifecycleConfigurationPut {
   @Test
   public void testPutLifecycleConfigurationWithoutStatus() throws Exception {
     try {
-      bucketEndpoint.put("bucket1", null, "", null, withoutStatus());
+      bucketEndpoint.put("bucket1", withoutStatus());
       fail("Expected an OS3Exception to be thrown");
     } catch (OS3Exception ex) {
       assertEquals(HTTP_BAD_REQUEST, ex.getHttpCode());
@@ -122,7 +124,7 @@ public class TestS3LifecycleConfigurationPut {
   private void testInvalidLifecycleConfiguration(Supplier<InputStream> inputStream,
       int expectedHttpCode, String expectedErrorCode) throws Exception {
     try {
-      bucketEndpoint.put("bucket1", null, "", null, inputStream.get());
+      bucketEndpoint.put("bucket1", inputStream.get());
       fail("Expected an OS3Exception to be thrown");
     } catch (OS3Exception ex) {
       assertEquals(expectedHttpCode, ex.getHttpCode());
@@ -142,9 +144,7 @@ public class TestS3LifecycleConfigurationPut {
           "<Expiration><Date>2023-03-03</Date></Expiration>" +
           "</Rule>" +
           "</LifecycleConfiguration>");
-
-      bucketEndpoint.put("bucket1", null, "", null,
-          new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));
+      bucketEndpoint.put("bucket1", new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)));
       fail();
     } catch (OS3Exception ex) {
       assertEquals(HTTP_BAD_REQUEST, ex.getHttpCode());
@@ -154,29 +154,24 @@ public class TestS3LifecycleConfigurationPut {
 
   @Test
   public void testPutValidLifecycleConfiguration() throws Exception {
-    assertEquals(HTTP_OK, bucketEndpoint.put(
-        "bucket1", null, "", null, onePrefix()).getStatus());
-    assertEquals(HTTP_OK, bucketEndpoint.put(
-        "bucket1", null, "", null, emptyPrefix()).getStatus());
-    assertEquals(HTTP_OK, bucketEndpoint.put(
-        "bucket1", null, "", null, oneTag()).getStatus());
-    assertEquals(HTTP_OK, bucketEndpoint.put(
-        "bucket1", null, "", null, twoTagsInAndOperator()).getStatus());
-    assertEquals(HTTP_OK, bucketEndpoint.put(
-        "bucket1", null, "", null, onePrefixTwoTagsInAndOperator()).getStatus());
-    assertEquals(HTTP_OK, bucketEndpoint.put(
-        "bucket1", null, "", null, onePrefixTwoTags()).getStatus());
+    assertEquals(HTTP_OK, bucketEndpoint.put("bucket1", onePrefix()).getStatus());
+    assertEquals(HTTP_OK, bucketEndpoint.put("bucket1", emptyPrefix()).getStatus());
+    assertEquals(HTTP_OK, bucketEndpoint.put("bucket1", oneTag()).getStatus());
+    assertEquals(HTTP_OK, bucketEndpoint.put("bucket1", twoTagsInAndOperator()).getStatus());
+    assertEquals(HTTP_OK, bucketEndpoint.put("bucket1", onePrefixTwoTagsInAndOperator()).getStatus());
+    assertEquals(HTTP_OK, bucketEndpoint.put("bucket1", onePrefixTwoTags()).getStatus());
   }
 
   @Test
   public void testPutLifecycleConfigurationFailsWithNonBucketOwner()
       throws Exception {
     HttpHeaders httpHeaders = Mockito.mock(HttpHeaders.class);
-    when(httpHeaders.getHeaderString("x-amz-expected-bucket-owner"))
+    when(httpHeaders.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER))
         .thenReturn("anotheruser");
 
     try {
-      bucketEndpoint.put("bucket1", null, "", httpHeaders, onePrefix());
+      bucketEndpoint.setHeaders(httpHeaders);
+      bucketEndpoint.put("bucket1", onePrefix());
       fail();
     } catch (OS3Exception ex) {
       assertEquals(HTTP_FORBIDDEN, ex.getHttpCode());
@@ -223,7 +218,6 @@ public class TestS3LifecycleConfigurationPut {
         "</LifecycleConfiguration>");
     return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
   }
-
 
   private static InputStream withoutFilter() {
     String xml =
@@ -520,7 +514,4 @@ public class TestS3LifecycleConfigurationPut {
 
     return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
   }
-
-
-
 }

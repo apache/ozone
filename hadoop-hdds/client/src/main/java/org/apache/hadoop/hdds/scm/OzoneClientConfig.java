@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm;
 
 import com.google.common.base.Preconditions;
+import java.time.Duration;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
@@ -83,6 +84,15 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private boolean datastreamPipelineMode = true;
 
+  @Config(key = "ozone.client.datastream.sync.size",
+      defaultValue = "0B",
+      type = ConfigType.SIZE,
+      description = "The minimum size of written data before forcing the datanodes " +
+          "in the pipeline to flush the pending data to underlying storage." +
+          " If set to zero or negative, the client will not force the datanodes to flush.",
+      tags = ConfigTag.CLIENT)
+  private int dataStreamSyncSize = 0;
+
   @Config(key = "ozone.client.stream.buffer.increment",
       defaultValue = "0B",
       type = ConfigType.SIZE,
@@ -112,6 +122,13 @@ public class OzoneClientConfig {
           + "happens by all servers.",
       tags = ConfigTag.CLIENT)
   private long streamBufferMaxSize = 32 * 1024 * 1024;
+
+  @Config(key = "ozone.client.stream.readblock.enable",
+      defaultValue = "false",
+      type = ConfigType.BOOLEAN,
+      description = "Allow ReadBlock to stream all the readChunk in one request.",
+      tags = ConfigTag.CLIENT)
+  private boolean streamReadBlock = false;
 
   @Config(key = "ozone.client.max.retries",
       defaultValue = "5",
@@ -151,7 +168,7 @@ public class OzoneClientConfig {
       description = "The checksum type [NONE/ CRC32/ CRC32C/ SHA256/ MD5] "
           + "determines which algorithm would be used to compute checksum for "
           + "chunk data. Default checksum type is CRC32.",
-      tags = { ConfigTag.CLIENT, ConfigTag.CRYPTO_COMPLIANCE })
+      tags = {ConfigTag.CLIENT, ConfigTag.CRYPTO_COMPLIANCE})
   private String checksumType = ChecksumType.CRC32.name();
 
   @Config(key = "ozone.client.bytes.per.checksum",
@@ -160,7 +177,7 @@ public class OzoneClientConfig {
       description = "Checksum will be computed for every bytes per checksum "
           + "number of bytes and stored sequentially. The minimum value for "
           + "this config is 8KB.",
-      tags = { ConfigTag.CLIENT, ConfigTag.CRYPTO_COMPLIANCE })
+      tags = {ConfigTag.CLIENT, ConfigTag.CRYPTO_COMPLIANCE})
   private int bytesPerChecksum = 16 * 1024;
 
   @Config(key = "ozone.client.verify.checksum",
@@ -194,7 +211,7 @@ public class OzoneClientConfig {
 
   @Config(key = "ozone.client.ec.reconstruct.stripe.read.pool.limit",
       defaultValue = "30",
-      description = "Thread pool max size for parallelly read" +
+      description = "Thread pool max size for parallel read" +
           " available ec chunks to reconstruct the whole stripe.",
       tags = ConfigTag.CLIENT)
   // For the largest recommended EC policy rs-10-4-1024k,
@@ -205,7 +222,7 @@ public class OzoneClientConfig {
 
   @Config(key = "ozone.client.ec.reconstruct.stripe.write.pool.limit",
       defaultValue = "30",
-      description = "Thread pool max size for parallelly write" +
+      description = "Thread pool max size for parallel write" +
           " available ec chunks to reconstruct the whole stripe.",
       tags = ConfigTag.CLIENT)
   private int ecReconstructStripeWritePoolLimit = 10 * 3;
@@ -274,6 +291,27 @@ public class OzoneClientConfig {
       tags = ConfigTag.CLIENT)
   private int maxConcurrentWritePerKey = 1;
 
+  @Config(key = "ozone.client.stream.read.pre-read-size",
+      defaultValue = "33554432",
+      type = ConfigType.LONG,
+      tags = {ConfigTag.CLIENT},
+      description = "Extra bytes to prefetch during streaming reads.")
+  private long streamReadPreReadSize = 32L << 20;
+
+  @Config(key = "ozone.client.stream.read.response-data-size",
+      defaultValue = "1048576",
+      type = ConfigType.INT,
+      tags = {ConfigTag.CLIENT},
+      description = "Chunk size of streaming read responses from datanodes.")
+  private int streamReadResponseDataSize = 1 << 20;
+
+  @Config(key = "ozone.client.stream.read.timeout",
+      defaultValue = "10s",
+      type = ConfigType.TIME,
+      tags = {ConfigTag.CLIENT},
+      description = "Timeout for receiving streaming read responses.")
+  private Duration streamReadTimeout = Duration.ofSeconds(10);
+
   @PostConstruct
   public void validate() {
     Preconditions.checkState(streamBufferSize > 0);
@@ -327,6 +365,33 @@ public class OzoneClientConfig {
         LOG.debug("Final ozone.client.key.write.concurrency = {}", maxConcurrentWritePerKey);
       }
       // Note: ozone.fs.hsync.enabled is enforced by OzoneFSUtils#canEnableHsync, not here
+    }
+    // Validate streaming read configurations.
+    // Ensure pre-read size is non-negative. If it's invalid, reset to a sane default.
+    if (streamReadPreReadSize < 0) {
+      LOG.warn("Invalid ozone.client.stream.read.pre-read-size = {}. " +
+              "Resetting to default 32MB.",
+          streamReadPreReadSize);
+      streamReadPreReadSize = 32L << 20; // 32MB
+    }
+
+    // Ensure response data size is positive.
+    if (streamReadResponseDataSize <= 0) {
+      LOG.warn("Invalid ozone.client.stream.read.response-data-size = {}. " +
+              "Resetting to default 1MB.",
+          streamReadResponseDataSize);
+      streamReadResponseDataSize = 1 << 20; // 1MB
+    }
+
+    // Ensure stream read timeout is a positive duration.
+    Duration defaultTimeout = Duration.ofSeconds(10);
+    if (streamReadTimeout == null
+        || streamReadTimeout.isZero()
+        || streamReadTimeout.isNegative()) {
+      LOG.warn("Invalid ozone.client.stream.read.timeout = {}. " +
+              "Resetting to default {}.",
+          streamReadTimeout, defaultTimeout);
+      streamReadTimeout = defaultTimeout;
     }
   }
 
@@ -514,6 +579,10 @@ public class OzoneClientConfig {
     this.datastreamPipelineMode = datastreamPipelineMode;
   }
 
+  public int getDataStreamSyncSize() {
+    return dataStreamSyncSize;
+  }
+
   public void setHBaseEnhancementsAllowed(boolean isHBaseEnhancementsEnabled) {
     this.hbaseEnhancementsAllowed = isHBaseEnhancementsEnabled;
   }
@@ -536,6 +605,38 @@ public class OzoneClientConfig {
 
   public int getMaxConcurrentWritePerKey() {
     return this.maxConcurrentWritePerKey;
+  }
+
+  public boolean isStreamReadBlock() {
+    return streamReadBlock;
+  }
+
+  public void setStreamReadBlock(boolean streamReadBlock) {
+    this.streamReadBlock = streamReadBlock;
+  }
+
+  public long getStreamReadPreReadSize() {
+    return streamReadPreReadSize;
+  }
+
+  public int getStreamReadResponseDataSize() {
+    return streamReadResponseDataSize;
+  }
+
+  public Duration getStreamReadTimeout() {
+    return streamReadTimeout;
+  }
+
+  public void setStreamReadPreReadSize(long streamReadPreReadSize) {
+    this.streamReadPreReadSize = streamReadPreReadSize;
+  }
+
+  public void setStreamReadResponseDataSize(int streamReadResponseDataSize) {
+    this.streamReadResponseDataSize = streamReadResponseDataSize;
+  }
+
+  public void setStreamReadTimeout(Duration streamReadTimeout) {
+    this.streamReadTimeout = streamReadTimeout;
   }
 
   /**

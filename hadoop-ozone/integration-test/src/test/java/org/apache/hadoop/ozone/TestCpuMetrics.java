@@ -24,6 +24,7 @@ import java.io.IOException;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
+import okhttp3.ResponseBody;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.Test;
@@ -51,7 +52,9 @@ public abstract class TestCpuMetrics implements NonHATests.TestCase {
     // when
     Response metricsResponse = httpClient.newCall(prometheusMetricsRequest)
         .execute();
-    String metricsResponseBodyContent = metricsResponse.body().string();
+    ResponseBody body = metricsResponse.body();
+    assertThat(body).isNotNull();
+    String metricsResponseBodyContent = body.string();
 
     // then
     assertThat(metricsResponseBodyContent)

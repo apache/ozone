@@ -33,13 +33,13 @@ import java.time.Clock;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
-import java.util.UUID;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
@@ -91,7 +91,6 @@ public class TestContainerPlacement {
   private SequenceIdGenerator sequenceIdGen;
   private OzoneConfiguration conf;
   private PipelineManager pipelineManager;
-  private NodeManager nodeManager;
 
   @BeforeEach
   public void setUp() throws Exception {
@@ -101,7 +100,7 @@ public class TestContainerPlacement {
     scmhaManager = SCMHAManagerStub.getInstance(true);
     sequenceIdGen = new SequenceIdGenerator(
         conf, scmhaManager, SCMDBDefinition.SEQUENCE_ID.getTable(dbStore));
-    nodeManager = new MockNodeManager(true, 10);
+    NodeManager nodeManager = new MockNodeManager(true, 10);
     pipelineManager = new MockPipelineManager(dbStore,
         scmhaManager, nodeManager);
     pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
@@ -159,7 +158,7 @@ public class TestContainerPlacement {
         scmhaManager, sequenceIdGen, pipelineManager,
         SCMDBDefinition.CONTAINERS.getTable(dbStore),
         new ContainerReplicaPendingOps(
-            Clock.system(ZoneId.systemDefault())));
+            Clock.system(ZoneId.systemDefault()), null));
   }
 
   /**
@@ -191,7 +190,7 @@ public class TestContainerPlacement {
     XceiverClientManager xceiverClientManager = null;
     try {
       for (DatanodeDetails datanodeDetails : datanodes) {
-        UUID dnId = datanodeDetails.getUuid();
+        DatanodeID dnId = datanodeDetails.getID();
         DatanodeInfo datanodeInfo = scmNodeManager.getNodeStateManager()
             .getNode(datanodeDetails.getID());
         StorageContainerDatanodeProtocolProtos.StorageReportProto report =
@@ -242,7 +241,6 @@ public class TestContainerPlacement {
     } catch (NodeNotFoundException e) {
       throw new RuntimeException(e);
     } finally {
-      IOUtils.closeQuietly(containerManager);
       IOUtils.closeQuietly(scmNodeManager);
       if (xceiverClientManager != null) {
         xceiverClientManager.close();

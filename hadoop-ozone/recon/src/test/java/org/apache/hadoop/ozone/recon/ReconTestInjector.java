@@ -36,16 +36,20 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconFileMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconContainerMetadataManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconFileMetadataManagerImpl;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconGlobalStatsManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
 import org.apache.ratis.util.Preconditions;
 
@@ -173,6 +177,12 @@ public class ReconTestInjector {
           bind(ReconContainerMetadataManager.class)
               .to(ReconContainerMetadataManagerImpl.class)
                   .in(Singleton.class);
+          bind(ReconFileMetadataManager.class)
+              .to(ReconFileMetadataManagerImpl.class)
+                  .in(Singleton.class);
+          bind(ReconGlobalStatsManager.class)
+              .to(ReconGlobalStatsManagerImpl.class)
+                  .in(Singleton.class);
           bind(ReconNamespaceSummaryManager.class)
                   .to(ReconNamespaceSummaryManagerImpl.class)
                   .in(Singleton.class);
@@ -222,7 +232,6 @@ public class ReconTestInjector {
         "http://localhost:6666");
     return configuration;
   }
-
 
   /**
    * Builder for Recon Test Injector.

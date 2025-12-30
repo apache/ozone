@@ -17,13 +17,13 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
@@ -267,7 +267,7 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
-  public void addDatanodeCommand(UUID dnId, SCMCommand<?> command) {
+  public void addDatanodeCommand(DatanodeID datanodeID, SCMCommand<?> command) {
   }
 
   /**
@@ -310,7 +310,7 @@ public class SimpleMockNodeManager implements NodeManager {
    * @return The count of commands queued, or zero if none.
    */
   @Override
-  public int getCommandQueueCount(UUID dnID, SCMCommandProto.Type cmdType) {
+  public int getCommandQueueCount(DatanodeID dnID, SCMCommandProto.Type cmdType) {
     return 0;
   }
 
@@ -339,12 +339,18 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
-  public List<SCMCommand<?>> getCommandQueue(UUID dnID) {
+  public List<SCMCommand<?>> getCommandQueue(DatanodeID dnID) {
     return null;
   }
 
   @Override
   public DatanodeDetails getNode(DatanodeID id) {
+    return null;
+  }
+
+  @Nullable
+  @Override
+  public DatanodeInfo getDatanodeInfo(DatanodeDetails datanodeDetails) {
     return null;
   }
 

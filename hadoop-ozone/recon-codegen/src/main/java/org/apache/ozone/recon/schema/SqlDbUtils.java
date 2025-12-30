@@ -47,6 +47,21 @@ public final class SqlDbUtils {
   private static final Logger LOG =
       LoggerFactory.getLogger(SqlDbUtils.class);
 
+  /**
+   * Helper function to check if table exists through JOOQ.
+   */
+  public static final BiPredicate<Connection, String> TABLE_EXISTS_CHECK =
+      (conn, tableName) -> {
+        try {
+          DSL.using(conn).select(count()).from(tableName).execute();
+        } catch (DataAccessException ex) {
+          LOG.debug(ex.getMessage());
+          return false;
+        }
+        LOG.info("{} table already exists, skipping creation.", tableName);
+        return true;
+      };
+
   private SqlDbUtils() {
   }
 
@@ -81,21 +96,6 @@ public final class SqlDbUtils {
       }
     };
   }
-
-  /**
-   * Helper function to check if table exists through JOOQ.
-   */
-  public static final BiPredicate<Connection, String> TABLE_EXISTS_CHECK =
-      (conn, tableName) -> {
-        try {
-          DSL.using(conn).select(count()).from(tableName).execute();
-        } catch (DataAccessException ex) {
-          LOG.debug(ex.getMessage());
-          return false;
-        }
-        LOG.info("{} table already exists, skipping creation.", tableName);
-        return true;
-      };
 
   /**
    * Utility method to list all user-defined tables in the database.

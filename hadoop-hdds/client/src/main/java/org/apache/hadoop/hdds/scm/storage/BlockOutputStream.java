@@ -31,6 +31,7 @@ import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -84,7 +85,7 @@ import org.slf4j.LoggerFactory;
  * through to the container.
  */
 public class BlockOutputStream extends OutputStream {
-  public static final Logger LOG =
+  static final Logger LOG =
       LoggerFactory.getLogger(BlockOutputStream.class);
   public static final String EXCEPTION_MSG =
       "Unexpected Storage Container Exception: ";
@@ -573,10 +574,10 @@ public class BlockOutputStream extends OutputStream {
     long flushPos = totalWriteChunkLength;
     final List<ChunkBuffer> byteBufferList;
     if (!force) {
-      Preconditions.checkNotNull(bufferList);
+      Objects.requireNonNull(bufferList, "bufferList == null");
       byteBufferList = bufferList;
       bufferList = null;
-      Preconditions.checkNotNull(byteBufferList);
+      Objects.requireNonNull(byteBufferList, "byteBufferList == null");
     } else {
       byteBufferList = null;
     }
@@ -819,7 +820,6 @@ public class BlockOutputStream extends OutputStream {
     }
   }
 
-
   public IOException setIoException(Throwable e) {
     IOException ioe = getIoException();
     if (ioe == null) {
@@ -946,10 +946,10 @@ public class BlockOutputStream extends OutputStream {
         containerBlockData.addChunks(chunkInfo);
       }
       if (putBlockPiggybacking) {
-        Preconditions.checkNotNull(bufferList);
+        Objects.requireNonNull(bufferList, "bufferList == null");
         byteBufferList = bufferList;
         bufferList = null;
-        Preconditions.checkNotNull(byteBufferList);
+        Objects.requireNonNull(byteBufferList, "byteBufferList == null");
 
         blockData = containerBlockData.build();
         LOG.debug("piggyback chunk list {}", blockData);
@@ -1245,6 +1245,7 @@ public class BlockOutputStream extends OutputStream {
    */
   private static class FlushRuntimeException extends RuntimeException {
     private final IOException cause;
+
     FlushRuntimeException(IOException cause) {
       this.cause = cause;
     }

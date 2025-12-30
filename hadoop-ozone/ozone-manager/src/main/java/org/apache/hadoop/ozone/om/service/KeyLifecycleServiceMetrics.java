@@ -35,31 +35,6 @@ public final class KeyLifecycleServiceMetrics {
       KeyLifecycleServiceMetrics.class.getSimpleName();
   private MetricsRegistry registry;
 
-  private KeyLifecycleServiceMetrics() {
-    this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
-  }
-
-  public MetricsRegistry getRegistry() {
-    return registry;
-  }
-
-  /**
-   * Creates and returns KeyLifecycleServiceMetrics instance.
-   *
-   * @return KeyLifecycleServiceMetrics
-   */
-  public static KeyLifecycleServiceMetrics create() {
-    return DefaultMetricsSystem.instance().register(METRICS_SOURCE_NAME,
-        "Metrics tracking the lifecycle service in the OM",
-        new KeyLifecycleServiceMetrics());
-  }
-  /**
-   * Unregister the metrics instance.
-   */
-  public static void unregister() {
-    DefaultMetricsSystem.instance().unregisterSource(METRICS_SOURCE_NAME);
-  }
-
   @Metric("Total no. of tasks skipped due to previous round task of this bucket has not finished")
   private MutableGaugeLong numSkippedTask;
   @Metric("Total no. of tasks finished successfully")
@@ -87,6 +62,32 @@ public final class KeyLifecycleServiceMetrics {
   private MutableGaugeLong sizeKeyDeleted;
   @Metric("Total size of keys renamed")
   private MutableGaugeLong sizeKeyRenamed;
+
+  private KeyLifecycleServiceMetrics() {
+    this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
+  }
+
+  public MetricsRegistry getRegistry() {
+    return registry;
+  }
+
+  /**
+   * Creates and returns KeyLifecycleServiceMetrics instance.
+   *
+   * @return KeyLifecycleServiceMetrics
+   */
+  public static KeyLifecycleServiceMetrics create() {
+    return DefaultMetricsSystem.instance().register(METRICS_SOURCE_NAME,
+        "Metrics tracking the lifecycle service in the OM",
+        new KeyLifecycleServiceMetrics());
+  }
+
+  /**
+   * Unregister the metrics instance.
+   */
+  public static void unregister() {
+    DefaultMetricsSystem.instance().unregisterSource(METRICS_SOURCE_NAME);
+  }
 
   public void incrNumSkippedTask() {
     numSkippedTask.incr();

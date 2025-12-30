@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.assertOMException;
 import static org.apache.hadoop.ozone.om.helpers.OMLCUtils.getOmLCAndOperatorBuilder;
@@ -184,7 +183,7 @@ class TestOmLCRule {
         .setBucket("bucket")
         .setRules(rules);
 
-    assertOMException(() -> config.build().valid(), INVALID_REQUEST, "Duplicate rule IDs found");
+    assertOMException(() -> config.buildAndValid(), INVALID_REQUEST, "Duplicate rule IDs found");
   }
 
   @Test

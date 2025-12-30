@@ -40,10 +40,6 @@ public final class S3ErrorTable {
   private static final Logger LOG = LoggerFactory.getLogger(
       S3ErrorTable.class);
 
-  private S3ErrorTable() {
-    //No one should construct this object.
-  }
-
   public static final OS3Exception INVALID_URI = new OS3Exception("InvalidURI",
       "Couldn't parse the specified URI.", HTTP_BAD_REQUEST);
 
@@ -154,9 +150,26 @@ public final class S3ErrorTable {
       HTTP_FORBIDDEN
   );
 
+  public static final OS3Exception INVALID_STORAGE_CLASS = new OS3Exception(
+      "InvalidStorageClass", "The storage class that you specified is not valid. " +
+      "Provide a supported storage class[STANDARD|REDUCED_REDUNDANCY|STANDARD_IA] or " +
+      "a valid custom EC storage config for if using STANDARD_IA.",
+      HTTP_BAD_REQUEST);
+
+  public static final OS3Exception BUCKET_OWNER_MISMATCH = new OS3Exception(
+      "Access Denied", "User doesn't have permission to access this resource due to a " +
+      "bucket ownership mismatch.", HTTP_FORBIDDEN);
+
   public static final OS3Exception NO_SUCH_LIFECYCLE_CONFIGURATION =
       new OS3Exception("NoSuchLifecycleConfiguration",
-      "The specified lifecycle configurations does not exist", HTTP_NOT_FOUND);
+          "The specified lifecycle configurations does not exist", HTTP_NOT_FOUND);
+
+  private static Function<Exception, OS3Exception> generateInternalError =
+      e -> new OS3Exception("InternalError", e.getMessage(), HTTP_INTERNAL_ERROR);
+
+  private S3ErrorTable() {
+    //No one should construct this object.
+  }
 
   public static OS3Exception newError(OS3Exception e, String resource) {
     return newError(e, resource, null);
@@ -181,9 +194,6 @@ public final class S3ErrorTable {
     }
     return err;
   }
-
-  private static Function<Exception, OS3Exception> generateInternalError = e ->
-      new OS3Exception("InternalError", e.getMessage(), HTTP_INTERNAL_ERROR);
 
   public static OS3Exception getInternalError(Exception e) {
     return generateInternalError.apply(e);

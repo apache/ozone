@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.ratis;
 
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
-import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.S3_SECRET_TABLE;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
@@ -72,6 +71,36 @@ public final class OzoneManagerDoubleBuffer {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneManagerDoubleBuffer.class);
+
+  private Queue<Entry> currentBuffer;
+  private Queue<Entry> readyBuffer;
+  /**
+   * Limit the number of un-flushed transactions for {@link OzoneManagerStateMachine}.
+   */
+  private final Semaphore unFlushedTransactions;
+
+  /** To flush the buffers. */
+  private final Daemon daemon;
+  /** Is the {@link #daemon} running? */
+  private final AtomicBoolean isRunning = new AtomicBoolean(false);
+  private final AtomicBoolean isPaused = new AtomicBoolean(false);
+  /** Notify flush operations are completed by the {@link #daemon}. */
+  private final FlushNotifier flushNotifier;
+
+  private final OMMetadataManager omMetadataManager;
+
+  private final Consumer<TermIndex> updateLastAppliedIndex;
+
+  private final S3SecretManager s3SecretManager;
+
+  private final boolean isTracingEnabled;
+
+  private final OzoneManagerDoubleBufferMetrics metrics = OzoneManagerDoubleBufferMetrics.create();
+
+  /** Accumulative count (for testing and debug only). */
+  private final AtomicLong flushedTransactionCount = new AtomicLong();
+  /** The number of flush iterations (for testing and debug only). */
+  private final AtomicLong flushIterations = new AtomicLong();
 
   /** Entry for {@link #currentBuffer} and {@link #readyBuffer}. */
   private static class Entry {
@@ -160,35 +189,6 @@ public final class OzoneManagerDoubleBuffer {
     return permits > 0 ? new Semaphore(permits) : null;
   }
 
-  private Queue<Entry> currentBuffer;
-  private Queue<Entry> readyBuffer;
-  /**
-   * Limit the number of un-flushed transactions for {@link OzoneManagerStateMachine}.
-   */
-  private final Semaphore unFlushedTransactions;
-
-  /** To flush the buffers. */
-  private final Daemon daemon;
-  /** Is the {@link #daemon} running? */
-  private final AtomicBoolean isRunning = new AtomicBoolean(false);
-  /** Notify flush operations are completed by the {@link #daemon}. */
-  private final FlushNotifier flushNotifier;
-
-  private final OMMetadataManager omMetadataManager;
-
-  private final Consumer<TermIndex> updateLastAppliedIndex;
-
-  private final S3SecretManager s3SecretManager;
-
-  private final boolean isTracingEnabled;
-
-  private final OzoneManagerDoubleBufferMetrics metrics = OzoneManagerDoubleBufferMetrics.create();
-
-  /** Accumulative count (for testing and debug only). */
-  private final AtomicLong flushedTransactionCount = new AtomicLong();
-  /** The number of flush iterations (for testing and debug only). */
-  private final AtomicLong flushIterations = new AtomicLong();
-
   private OzoneManagerDoubleBuffer(Builder b) {
     this.currentBuffer = new ConcurrentLinkedQueue<>();
     this.readyBuffer = new ConcurrentLinkedQueue<>();
@@ -210,6 +210,22 @@ public final class OzoneManagerDoubleBuffer {
     isRunning.set(true);
     daemon.start();
     return this;
+  }
+
+  @VisibleForTesting
+  public void pause() {
+    synchronized (this) {
+      isPaused.set(true);
+      this.notifyAll();
+    }
+  }
+
+  @VisibleForTesting
+  public void unpause() {
+    synchronized (this) {
+      isPaused.set(false);
+      this.notifyAll();
+    }
   }
 
   /**
@@ -278,6 +294,18 @@ public final class OzoneManagerDoubleBuffer {
   @VisibleForTesting
   public void flushTransactions() {
     while (isRunning.get() && canFlush()) {
+      // Check if paused
+      synchronized (this) {
+        while (isPaused.get() && isRunning.get()) {
+          try {
+            this.wait();
+          } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+            return;
+          }
+        }
+      }
+
       flushCurrentBuffer();
     }
   }
@@ -473,7 +501,7 @@ public final class OzoneManagerDoubleBuffer {
       Collections.sort(epochs);
       omMetadataManager.getTable(tableName).cleanupCache(epochs);
       // Check if the table is S3SecretTable, if yes, then clear the cache.
-      if (tableName.equals(S3_SECRET_TABLE.getName())) {
+      if (tableName.equals(OMDBDefinition.S3_SECRET_TABLE_DEF.getName())) {
         s3SecretManager.clearS3Cache(epochs);
       }
     });
@@ -613,21 +641,6 @@ public final class OzoneManagerDoubleBuffer {
   }
 
   static class FlushNotifier {
-    static class Entry {
-      private final CompletableFuture<Integer> future = new CompletableFuture<>();
-      private int count;
-
-      private CompletableFuture<Integer> await() {
-        count++;
-        return future;
-      }
-
-      private int complete() {
-        Preconditions.assertTrue(future.complete(count));
-        return future.join();
-      }
-    }
-
     /** The size of the map is at most two since it uses {@link #flushCount} + 2 in {@link #await()} .*/
     private final Map<Integer, Entry> flushFutures = new TreeMap<>();
     private int awaitCount;
@@ -651,6 +664,21 @@ public final class OzoneManagerDoubleBuffer {
       }
       LOG.debug("notifyFlush {}, awaitCount: {} -> {}", flush, await, awaitCount);
       return await;
+    }
+
+    static class Entry {
+      private final CompletableFuture<Integer> future = new CompletableFuture<>();
+      private int count;
+
+      private CompletableFuture<Integer> await() {
+        count++;
+        return future;
+      }
+
+      private int complete() {
+        Preconditions.assertTrue(future.complete(count));
+        return future.join();
+      }
     }
   }
 }

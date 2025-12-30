@@ -20,10 +20,10 @@ package org.apache.hadoop.ozone.client;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 
-import com.google.common.base.Preconditions;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
+import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -31,7 +31,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.LeakDetector;
-import org.apache.hadoop.ipc.RemoteException;
+import org.apache.hadoop.ipc_.RemoteException;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
@@ -50,13 +50,12 @@ public final class OzoneClientFactory {
   private static final Logger LOG = LoggerFactory.getLogger(
       OzoneClientFactory.class);
 
+  private static final LeakDetector OZONE_CLIENT_LEAK_DETECTOR = new LeakDetector("OzoneClientObject");
+
   /**
    * Private constructor, class is not meant to be initialized.
    */
   private OzoneClientFactory() { }
-
-  private static final LeakDetector OZONE_CLIENT_LEAK_DETECTOR =
-      new LeakDetector("OzoneClientObject");
 
   public static UncheckedAutoCloseable track(AutoCloseable object) {
     final Class<?> clazz = object.getClass();
@@ -65,11 +64,6 @@ public final class OzoneClientFactory {
         () -> HddsUtils.reportLeak(clazz,
             HddsUtils.formatStackTrace(stackTrace, 4), LOG));
   }
-
-  public static Logger getLogger() {
-    return LOG;
-  }
-
 
   /**
    * Constructs and return an OzoneClient with default configuration.
@@ -102,9 +96,9 @@ public final class OzoneClientFactory {
   public static OzoneClient getRpcClient(String omHost, Integer omRpcPort,
       MutableConfigurationSource config)
       throws IOException {
-    Preconditions.checkNotNull(omHost);
-    Preconditions.checkNotNull(omRpcPort);
-    Preconditions.checkNotNull(config);
+    Objects.requireNonNull(omHost, "omHost == null");
+    Objects.requireNonNull(omRpcPort, "omRpcPort == null");
+    Objects.requireNonNull(config, "config == null");
     OmUtils.resolveOmHost(omHost, omRpcPort);
     config.set(OZONE_OM_ADDRESS_KEY, omHost + ":" + omRpcPort);
     return getRpcClient(getClientProtocol(config), config);
@@ -125,8 +119,8 @@ public final class OzoneClientFactory {
    */
   public static OzoneClient getRpcClient(String omServiceId,
       ConfigurationSource config) throws IOException {
-    Preconditions.checkNotNull(omServiceId);
-    Preconditions.checkNotNull(config);
+    Objects.requireNonNull(omServiceId, "omServiceId == null");
+    Objects.requireNonNull(config, "config == null");
     if (OmUtils.isOmHAServiceId(config, omServiceId)) {
       return getRpcClient(getClientProtocol(config, omServiceId), config);
     } else {
@@ -149,7 +143,7 @@ public final class OzoneClientFactory {
    */
   public static OzoneClient getRpcClient(ConfigurationSource config)
       throws IOException {
-    Preconditions.checkNotNull(config);
+    Objects.requireNonNull(config, "config == null");
 
     // Doing this explicitly so that when service ids are defined in the
     // configuration, we don't fall back to default ozone.om.address defined
@@ -191,7 +185,7 @@ public final class OzoneClientFactory {
    */
   public static OzoneClient getOzoneClient(Configuration conf,
       Token<OzoneTokenIdentifier> token) throws IOException {
-    Preconditions.checkNotNull(token, "Null token is not allowed");
+    Objects.requireNonNull(token, "Null token is not allowed");
     OzoneTokenIdentifier tokenId = new OzoneTokenIdentifier();
     ByteArrayInputStream buf = new ByteArrayInputStream(
         token.getIdentifier());

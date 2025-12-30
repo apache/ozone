@@ -275,7 +275,6 @@ public final class OzoneFSUtils {
     return childParent == parentParent;
   }
 
-
   /**
    * Verifies whether the childKey is an immediate path under the given
    * parentKey.

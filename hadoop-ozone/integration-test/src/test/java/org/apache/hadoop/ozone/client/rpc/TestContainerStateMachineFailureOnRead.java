@@ -62,7 +62,6 @@ import org.apache.ratis.grpc.server.GrpcLogAppender;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test to verify pipeline is closed on readStateMachine failure.
@@ -134,7 +133,7 @@ public class TestContainerStateMachineFailureOnRead {
     }
   }
 
-  @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 300000)
+  @Test
   @SuppressWarnings("squid:S3655")
   public void testReadStateMachineFailureClosesPipeline() throws Exception {
     // Stop one follower datanode

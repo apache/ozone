@@ -42,12 +42,12 @@ import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ListRecon
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ListReconfigurePropertiesResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.StartReconfigureRequestProto;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
-import org.apache.hadoop.ipc.ProtobufHelper;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.ProtocolMetaInterface;
-import org.apache.hadoop.ipc.ProtocolTranslator;
-import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.ipc.RpcClientUtil;
+import org.apache.hadoop.ipc_.ProtobufHelper;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
+import org.apache.hadoop.ipc_.ProtocolMetaInterface;
+import org.apache.hadoop.ipc_.ProtocolTranslator;
+import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.ipc_.RpcClientUtil;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
@@ -62,7 +62,7 @@ import org.slf4j.LoggerFactory;
 @InterfaceStability.Stable
 public class ReconfigureProtocolClientSideTranslatorPB implements
     ProtocolMetaInterface, ReconfigureProtocol, ProtocolTranslator {
-  public static final Logger LOG = LoggerFactory
+  private static final Logger LOG = LoggerFactory
       .getLogger(ReconfigureProtocolClientSideTranslatorPB.class);
 
   private static final RpcController NULL_CONTROLLER = null;

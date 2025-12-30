@@ -77,14 +77,16 @@ message ScmContainerLocationRequest {
   optional GetContainerCountRequestProto getContainerCountRequest = 38;
   optional GetContainerReplicasRequestProto getContainerReplicasRequest = 39;
   optional ReplicationManagerReportRequestProto replicationManagerReportRequest = 40;
-  optional ResetDeletedBlockRetryCountRequestProto resetDeletedBlockRetryCountRequest = 41;
+  optional ResetDeletedBlockRetryCountRequestProto resetDeletedBlockRetryCountRequest = 41 [deprecated=true];
   optional TransferLeadershipRequestProto transferScmLeadershipRequest = 42;
-  optional GetFailedDeletedBlocksTxnRequestProto getFailedDeletedBlocksTxnRequest = 43;
+  optional GetFailedDeletedBlocksTxnRequestProto getFailedDeletedBlocksTxnRequest = 43 [deprecated=true];
   optional DecommissionScmRequestProto decommissionScmRequest = 44;
   optional SingleNodeQueryRequestProto singleNodeQueryRequest = 45;
   optional GetContainersOnDecomNodeRequestProto getContainersOnDecomNodeRequest = 46;
   optional GetMetricsRequestProto getMetricsRequest = 47;
   optional ContainerBalancerStatusInfoRequestProto containerBalancerStatusInfoRequest = 48;
+  optional ReconcileContainerRequestProto reconcileContainerRequest = 49;
+  optional GetDeletedBlocksTxnSummaryRequestProto getDeletedBlocksTxnSummaryRequest = 50;
 }
 
 message ScmContainerLocationResponse {
@@ -133,14 +135,16 @@ message ScmContainerLocationResponse {
   optional GetContainerCountResponseProto getContainerCountResponse = 38;
   optional GetContainerReplicasResponseProto getContainerReplicasResponse = 39;
   optional ReplicationManagerReportResponseProto getReplicationManagerReportResponse = 40;
-  optional ResetDeletedBlockRetryCountResponseProto resetDeletedBlockRetryCountResponse = 41;
+  optional ResetDeletedBlockRetryCountResponseProto resetDeletedBlockRetryCountResponse = 41 [deprecated=true];
   optional TransferLeadershipResponseProto transferScmLeadershipResponse = 42;
-  optional GetFailedDeletedBlocksTxnResponseProto getFailedDeletedBlocksTxnResponse = 43;
+  optional GetFailedDeletedBlocksTxnResponseProto getFailedDeletedBlocksTxnResponse = 43 [deprecated=true];
   optional DecommissionScmResponseProto decommissionScmResponse = 44;
   optional SingleNodeQueryResponseProto singleNodeQueryResponse = 45;
   optional GetContainersOnDecomNodeResponseProto getContainersOnDecomNodeResponse = 46;
   optional GetMetricsResponseProto getMetricsResponse = 47;
   optional ContainerBalancerStatusInfoResponseProto containerBalancerStatusInfoResponse = 48;
+  optional ReconcileContainerResponseProto reconcileContainerResponse = 49;
+  optional GetDeletedBlocksTxnSummaryResponseProto getDeletedBlocksTxnSummaryResponse = 50;
 
   enum Status {
     OK = 1;
@@ -196,6 +200,8 @@ enum Type {
   GetContainersOnDecomNode = 42;
   GetMetrics = 43;
   GetContainerBalancerStatusInfo = 44;
+  ReconcileContainer = 45;
+  GetDeletedBlocksTransactionSummary = 46;
 }
 
 /**
@@ -203,10 +209,11 @@ enum Type {
 */
 message ContainerRequestProto {
   // Ozone only support replication of either 1 or 3.
-  required ReplicationFactor replicationFactor = 2;
+  optional ReplicationFactor replicationFactor = 2;
   required ReplicationType  replicationType = 3;
   required string owner = 4;
   optional string traceID = 5;
+  optional ECReplicationConfig ecReplicationConfig = 6;
 }
 
 /**
@@ -541,6 +548,13 @@ message ResetDeletedBlockRetryCountResponseProto {
   required int32 resetCount = 1;
 }
 
+message GetDeletedBlocksTxnSummaryRequestProto {
+}
+
+message GetDeletedBlocksTxnSummaryResponseProto {
+  optional DeletedBlocksTransactionSummary summary = 1;
+}
+
 message FinalizeScmUpgradeRequestProto {
   required string upgradeClientId = 1;
 }
@@ -672,6 +686,13 @@ message GetMetricsRequestProto {
 
 message GetMetricsResponseProto {
   optional string metricsJson = 1;
+}
+
+message ReconcileContainerRequestProto {
+  required int64 containerID = 1;
+}
+
+message ReconcileContainerResponseProto {
 }
 
 /**

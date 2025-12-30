@@ -59,8 +59,6 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
     xmlPrefixToSkipCompare.add("ipc.client.rpc-timeout.ms");
     xmlPropsToSkipCompare.add("ozone.om.leader.election.minimum.timeout" +
         ".duration"); // Deprecated config
-    configurationPropsToSkipCompare
-        .add(ScmConfig.ConfigStrings.HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION);
     // Currently replication and type configs moved to server side.
     configurationPropsToSkipCompare
         .add(OzoneConfigKeys.OZONE_REPLICATION);
@@ -86,12 +84,12 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         HddsConfigKeys.HDDS_X509_GRACE_DURATION_TOKEN_CHECKS_ENABLED,
         OMConfigKeys.OZONE_OM_NODES_KEY,
         OMConfigKeys.OZONE_OM_DECOMMISSIONED_NODES_KEY,
+        OMConfigKeys.OZONE_OM_LISTENER_NODES_KEY,
         ScmConfigKeys.OZONE_SCM_NODES_KEY,
         ScmConfigKeys.OZONE_SCM_ADDRESS_KEY,
         ScmConfigKeys.OZONE_CHUNK_READ_NETTY_CHUNKED_NIO_FILE_KEY,
         OMConfigKeys.OZONE_FS_TRASH_INTERVAL_KEY,
         OMConfigKeys.OZONE_FS_TRASH_CHECKPOINT_INTERVAL_KEY,
-        OMConfigKeys.OZONE_OM_S3_GPRC_SERVER_ENABLED,
         OMConfigKeys.OZONE_OM_FEATURES_DISABLED,
         OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS,
         OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE,
@@ -101,7 +99,6 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         OzoneConfigKeys.OZONE_RECOVERING_CONTAINER_TIMEOUT,
         OzoneConfigKeys.OZONE_GPRC_METRICS_PERCENTILES_INTERVALS_KEY,
         ReconConfigKeys.RECON_SCM_CONFIG_PREFIX,
-        ReconConfigKeys.OZONE_RECON_ADDRESS_KEY,
         ReconConfigKeys.OZONE_RECON_DATANODE_ADDRESS_KEY,
         ReconConfigKeys.OZONE_RECON_DATANODE_BIND_HOST_KEY,
         ReconConfigKeys.OZONE_RECON_PROMETHEUS_HTTP_ENDPOINT,
@@ -127,6 +124,7 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
         OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER,
         OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD,
         OMConfigKeys.OZONE_THREAD_NUMBER_DIR_DELETION,
+        OMConfigKeys.OZONE_THREAD_NUMBER_KEY_DELETION,
         ScmConfigKeys.OZONE_SCM_PIPELINE_PLACEMENT_IMPL_KEY,
         ScmConfigKeys.OZONE_SCM_HA_PREFIX,
         S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED,

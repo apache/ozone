@@ -19,8 +19,8 @@ package org.apache.hadoop.ozone.om.request.snapshot;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.SNAPSHOT_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.SNAPSHOT_LOCK;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAPSHOT;
 
 import java.io.IOException;
@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
+import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
@@ -108,9 +109,11 @@ public class OMSnapshotRenameRequest extends OMClientRequest {
     return omRequestBuilder.build();
   }
 
-
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    OMMetrics omMetrics = ozoneManager.getMetrics();
+    omMetrics.incNumSnapshotRenames();
+
     boolean acquiredBucketLock = false;
     boolean acquiredSnapshotOldLock = false;
     boolean acquiredSnapshotNewLock = false;
@@ -154,7 +157,7 @@ public class OMSnapshotRenameRequest extends OMClientRequest {
       String snapshotNewTableKey = SnapshotInfo.getTableKey(volumeName, bucketName, snapshotNewName);
 
       if (omMetadataManager.getSnapshotInfoTable().isExist(snapshotNewTableKey)) {
-        throw new OMException("Snapshot with name " + snapshotNewName + "already exist",
+        throw new OMException("Snapshot with name " + snapshotNewName + " already exist",
             FILE_ALREADY_EXISTS);
       }
 
@@ -201,6 +204,7 @@ public class OMSnapshotRenameRequest extends OMClientRequest {
           omResponse.build(), snapshotOldTableKey, snapshotNewTableKey, snapshotOldInfo);
 
     } catch (IOException | InvalidPathException ex) {
+      omMetrics.incNumSnapshotRenameFails();
       exception = ex;
       omClientResponse = new OMSnapshotRenameResponse(
           createErrorOMResponse(omResponse, exception));

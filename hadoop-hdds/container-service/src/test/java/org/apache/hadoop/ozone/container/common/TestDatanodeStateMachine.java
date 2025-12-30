@@ -40,16 +40,18 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.states.DatanodeState;
 import org.apache.hadoop.ozone.container.common.states.datanode.InitDatanodeState;
 import org.apache.hadoop.ozone.container.common.states.datanode.RunningDatanodeState;
+import org.apache.hadoop.ozone.container.common.volume.CapacityVolumeChoosingPolicy;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -68,7 +70,6 @@ public class TestDatanodeStateMachine {
   // Changing it to 1, as current code checks for multiple scm directories,
   // and fail if exists
   private static final int SCM_SERVER_COUNT = 1;
-  private List<String> serverAddresses;
   private List<RPC.Server> scmServers;
   private List<ScmTestMock> mockServers;
   private ExecutorService executorService;
@@ -87,7 +88,7 @@ public class TestDatanodeStateMachine {
         true);
     conf.setBoolean(
         OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
-    serverAddresses = new ArrayList<>();
+    List<String> serverAddresses = new ArrayList<>();
     scmServers = new ArrayList<>();
     mockServers = new ArrayList<>();
     for (int x = 0; x < SCM_SERVER_COUNT; x++) {
@@ -204,6 +205,8 @@ public class TestDatanodeStateMachine {
     ContainerUtils.writeDatanodeDetailsTo(datanodeDetails, idPath, conf);
     try (DatanodeStateMachine stateMachine =
              new DatanodeStateMachine(datanodeDetails, conf)) {
+      VolumeChoosingPolicy volumeChoosingPolicy = stateMachine.getVolumeChoosingPolicy();
+      assertEquals(CapacityVolumeChoosingPolicy.class, volumeChoosingPolicy.getClass());
       DatanodeStateMachine.DatanodeStates currentState =
           stateMachine.getContext().getState();
       assertEquals(DatanodeStateMachine.DatanodeStates.INIT,
@@ -402,6 +405,26 @@ public class TestDatanodeStateMachine {
         fail("Unexpected exception found");
       }
     });
+  }
+
+  @Test
+  public void testStateMachineThreadPriority() throws Exception {
+    DatanodeDetails datanodeDetails = getNewDatanodeDetails();
+    DatanodeDetails.Port port = DatanodeDetails.newStandalonePort(
+        OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
+    datanodeDetails.setPort(port);
+    try (DatanodeStateMachine stateMachine =
+             new DatanodeStateMachine(datanodeDetails, conf)) {
+      stateMachine.startDaemon();
+
+      // Wait for CmdProcessThread to initialize
+      GenericTestUtils.waitFor(()
+          ->  stateMachine.getCmdProcessThread() != null, 100, 3000);
+      Thread stateMachineThread = stateMachine.getStateMachineThread();
+      Thread cmdProcessThread = stateMachine.getCmdProcessThread();
+      // stateMachineThread priority is higher than cmdProcessThread
+      assertTrue(stateMachineThread.getPriority() > cmdProcessThread.getPriority());
+    }
   }
 
   private DatanodeDetails getNewDatanodeDetails() {

@@ -18,11 +18,11 @@
 package org.apache.hadoop.hdds.server.events;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
@@ -33,6 +33,7 @@ import org.apache.hadoop.ozone.lease.LeaseAlreadyExistException;
 import org.apache.hadoop.ozone.lease.LeaseExpiredException;
 import org.apache.hadoop.ozone.lease.LeaseManager;
 import org.apache.hadoop.ozone.lease.LeaseNotFoundException;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,7 +77,7 @@ public abstract class EventWatcher<TIMEOUT_PAYLOAD extends
     this.completionEvent = completionEvent;
     this.leaseManager = leaseManager;
     this.metrics = new EventWatcherMetrics();
-    Preconditions.checkNotNull(name);
+    Objects.requireNonNull(name, "name == null");
     if (name.equals("")) {
       name = getClass().getSimpleName();
     }
@@ -116,7 +117,7 @@ public abstract class EventWatcher<TIMEOUT_PAYLOAD extends
                                              EventPublisher publisher) {
     metrics.incrementTrackedEvents();
     long identifier = payload.getId();
-    startTrackingTimes.put(identifier, System.currentTimeMillis());
+    startTrackingTimes.put(identifier, Time.monotonicNow());
 
     trackedEventsByID.put(identifier, payload);
     trackedEvents.add(payload);
@@ -139,7 +140,7 @@ public abstract class EventWatcher<TIMEOUT_PAYLOAD extends
     if (trackedEvents.remove(payload)) {
       metrics.incrementCompletedEvents();
       long originalTime = startTrackingTimes.remove(id);
-      metrics.updateFinishingTime(System.currentTimeMillis() - originalTime);
+      metrics.updateFinishingTime(Time.monotonicNow() - originalTime);
       onFinished(publisher, payload);
     }
   }
@@ -153,7 +154,6 @@ public abstract class EventWatcher<TIMEOUT_PAYLOAD extends
     onTimeout(publisher, payload);
     return null;
   }
-
 
   /**
    * Check if a specific payload is in-progress.

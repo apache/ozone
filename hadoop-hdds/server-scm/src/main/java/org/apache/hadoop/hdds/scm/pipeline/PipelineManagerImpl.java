@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -53,13 +54,17 @@ import org.apache.hadoop.hdds.scm.ha.BackgroundSCMService;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.utils.db.CodecException;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -382,40 +387,39 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   @Override
-  public void addContainerToPipeline(
-      PipelineID pipelineID, ContainerID containerID) throws IOException {
+  public void addContainerToPipeline(PipelineID pipelineID, ContainerID containerID)
+      throws PipelineNotFoundException, InvalidPipelineStateException {
     // should not lock here, since no ratis operation happens.
     stateManager.addContainerToPipeline(pipelineID, containerID);
   }
 
   @Override
-  public void addContainerToPipelineSCMStart(
-      PipelineID pipelineID, ContainerID containerID) throws IOException {
+  public void addContainerToPipelineSCMStart(PipelineID pipelineID, ContainerID containerID)
+      throws PipelineNotFoundException {
     // should not lock here, since no ratis operation happens.
     stateManager.addContainerToPipelineForce(pipelineID, containerID);
   }
 
   @Override
-  public void removeContainerFromPipeline(
-      PipelineID pipelineID, ContainerID containerID) throws IOException {
+  public void removeContainerFromPipeline(PipelineID pipelineID, ContainerID containerID) {
     // should not lock here, since no ratis operation happens.
     stateManager.removeContainerFromPipeline(pipelineID, containerID);
   }
 
   @Override
-  public NavigableSet<ContainerID> getContainersInPipeline(
-      PipelineID pipelineID) throws IOException {
+  public NavigableSet<ContainerID> getContainersInPipeline(PipelineID pipelineID) throws PipelineNotFoundException {
     return stateManager.getContainers(pipelineID);
   }
 
   @Override
-  public int getNumberOfContainers(PipelineID pipelineID) throws IOException {
+  public int getNumberOfContainers(PipelineID pipelineID) throws PipelineNotFoundException {
     return stateManager.getNumberOfContainers(pipelineID);
   }
 
   @Override
   public void openPipeline(PipelineID pipelineId)
       throws IOException {
+    long startNanos = Time.monotonicNowNanos();
     HddsProtos.PipelineID pipelineIdProtobuf = pipelineId.getProtobuf();
     acquireWriteLock();
     final Pipeline pipeline;
@@ -431,6 +435,7 @@ public class PipelineManagerImpl implements PipelineManager {
     } finally {
       releaseWriteLock();
     }
+    metrics.updatePipelineCreationLatencyNs(startNanos);
     metrics.incNumPipelineCreated();
     metrics.createPerPipelineMetrics(pipeline);
   }
@@ -443,7 +448,7 @@ public class PipelineManagerImpl implements PipelineManager {
    */
   protected void removePipeline(Pipeline pipeline)
       throws IOException {
-    pipelineFactory.close(pipeline.getType(), pipeline);
+    // Removing the pipeline from SCM.
     HddsProtos.PipelineID pipelineID = pipeline.getId().getProtobuf();
     acquireWriteLock();
     try {
@@ -454,6 +459,8 @@ public class PipelineManagerImpl implements PipelineManager {
     } finally {
       releaseWriteLock();
     }
+    // Firing pipeline close command to datanode.
+    pipelineFactory.close(pipeline.getType(), pipeline);
     LOG.info("Pipeline {} removed.", pipeline);
     metrics.incNumPipelineDestroyed();
   }
@@ -481,20 +488,6 @@ public class PipelineManagerImpl implements PipelineManager {
       eventPublisher.fireEvent(SCMEvents.CLOSE_CONTAINER, containerID);
       LOG.info("Container {} closed for pipeline={}", containerID, pipelineId);
     }
-  }
-
-  /**
-   * put pipeline in CLOSED state.
-   * @param pipeline - ID of the pipeline.
-   * @param onTimeout - whether to remove pipeline after some time.
-   * @throws IOException throws exception in case of failure
-   * @deprecated Do not use this method, onTimeout is not honored.
-   */
-  @Override
-  @Deprecated
-  public void closePipeline(Pipeline pipeline, boolean onTimeout)
-          throws IOException {
-    closePipeline(pipeline.getId());
   }
 
   /**
@@ -541,8 +534,7 @@ public class PipelineManagerImpl implements PipelineManager {
     List<Pipeline> pipelinesWithStaleIpOrHostname =
             getStalePipelines(datanodeDetails);
     if (pipelinesWithStaleIpOrHostname.isEmpty()) {
-      LOG.debug("No stale pipelines for datanode {}",
-              datanodeDetails.getUuidString());
+      LOG.debug("No stale pipelines for datanode {}", datanodeDetails);
       return;
     }
     LOG.info("Found {} stale pipelines",
@@ -561,16 +553,15 @@ public class PipelineManagerImpl implements PipelineManager {
 
   @VisibleForTesting
   List<Pipeline> getStalePipelines(DatanodeDetails datanodeDetails) {
-    List<Pipeline> pipelines = getPipelines();
-    return pipelines.stream()
-            .filter(p -> p.getNodes().stream()
-                    .anyMatch(n -> n.getUuid()
-                            .equals(datanodeDetails.getUuid())
-                            && (!n.getIpAddress()
-                            .equals(datanodeDetails.getIpAddress())
-                            || !n.getHostName()
-                            .equals(datanodeDetails.getHostName()))))
-            .collect(Collectors.toList());
+    return getPipelines().stream()
+        .filter(p -> p.getNodes().stream().anyMatch(n -> sameIdDifferentHostOrAddress(n, datanodeDetails)))
+        .collect(Collectors.toList());
+  }
+
+  static boolean sameIdDifferentHostOrAddress(DatanodeDetails left, DatanodeDetails right) {
+    return left.getID().equals(right.getID())
+        && (!left.getIpAddress().equals(right.getIpAddress())
+        ||  !left.getHostName().equals(right.getHostName()));
   }
 
   /**
@@ -642,6 +633,20 @@ public class PipelineManagerImpl implements PipelineManager {
       }
     }
     return false;
+  }
+
+  @Override
+  public boolean hasEnoughSpace(Pipeline pipeline, long containerSize) {
+    for (DatanodeDetails node : pipeline.getNodes()) {
+      if (!(node instanceof DatanodeInfo)) {
+        node = nodeManager.getDatanodeInfo(node);
+      }
+      if (!SCMCommonPlacementPolicy.hasEnoughSpace(node, 0, containerSize, null)) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   /**
@@ -799,7 +804,7 @@ public class PipelineManagerImpl implements PipelineManager {
 
   @Override
   public void reinitialize(Table<PipelineID, Pipeline> pipelineStore)
-      throws IOException {
+      throws RocksDatabaseException, DuplicatedPipelineIdException, CodecException {
     stateManager.reinitialize(pipelineStore);
   }
 
@@ -914,12 +919,8 @@ public class PipelineManagerImpl implements PipelineManager {
         metrics.incNumPipelineContainSameDatanodes();
         //TODO remove until pipeline allocation is proved equally distributed.
         for (Pipeline overlapPipeline : overlapPipelines) {
-          LOG.info("Pipeline: " + pipeline.getId().toString() +
-              " contains same datanodes as previous pipelines: " +
-              overlapPipeline.getId().toString() + " nodeIds: " +
-              pipeline.getNodes().get(0).getUuid().toString() +
-              ", " + pipeline.getNodes().get(1).getUuid().toString() +
-              ", " + pipeline.getNodes().get(2).getUuid().toString());
+          LOG.info("{} and {} have exactly the same set of datanodes: {}",
+              pipeline.getId(), overlapPipeline.getId(), pipeline.getNodeSet());
         }
       }
       return;

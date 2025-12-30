@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
 import static org.apache.hadoop.ozone.om.OMUpgradeTestUtils.waitForFinalization;
-import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.maxLayoutVersion;
@@ -51,7 +50,6 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -72,7 +70,6 @@ import org.junit.jupiter.params.provider.MethodSource;
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-@Timeout(300)
 class TestOMBucketLayoutUpgrade {
 
   private static final int PRE_UPGRADE = 100;
@@ -90,7 +87,7 @@ class TestOMBucketLayoutUpgrade {
   @BeforeAll
   void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION, fromLayoutVersion);
+    conf.setInt(OMStorage.TESTING_INIT_LAYOUT_VERSION_KEY, fromLayoutVersion);
     String omServiceId = UUID.randomUUID().toString();
     MiniOzoneHAClusterImpl.Builder builder = MiniOzoneCluster.newHABuilder(conf);
     builder.setOMServiceId(omServiceId)
@@ -195,7 +192,7 @@ class TestOMBucketLayoutUpgrade {
    */
   private String createBucketWithLayout(BucketLayout bucketLayout)
       throws Exception {
-    String bucketName = RandomStringUtils.randomAlphabetic(10).toLowerCase();
+    String bucketName = RandomStringUtils.secure().nextAlphabetic(10).toLowerCase();
     omClient.createBucket(
         new OmBucketInfo.Builder()
             .setVolumeName(VOLUME_NAME)

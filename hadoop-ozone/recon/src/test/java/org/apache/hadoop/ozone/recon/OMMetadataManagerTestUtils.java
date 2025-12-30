@@ -21,10 +21,10 @@ import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanode
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_DIRS;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.BUCKET_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.DIRECTORY_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
@@ -67,6 +67,7 @@ public final class OMMetadataManagerTestUtils {
 
   public static final String TEST_USER = "TestUser";
   private static OzoneConfiguration configuration;
+
   private OMMetadataManagerTestUtils() {
   }
 
@@ -144,7 +145,7 @@ public final class OMMetadataManagerTestUtils {
     reconOMMetaMgr.start(configuration);
 
     reconOMMetaMgr.updateOmDB(
-        checkpoint.getCheckpointLocation().toFile());
+        checkpoint.getCheckpointLocation().toFile(), true);
     return reconOMMetaMgr;
   }
 
@@ -382,7 +383,6 @@ public final class OMMetadataManagerTestUtils {
         .put(openKey, omKeyInfo);
   }
 
-
   /**
    * Writes deleted key information to the Ozone Manager metadata table.
    * @param omMetadataManager the Ozone Manager metadata manager
@@ -408,7 +408,7 @@ public final class OMMetadataManagerTestUtils {
     // Get the Ozone key for the first deleted key
     String omKey = omMetadataManager.getOzoneKey(volName,
         bucketName, keyNames.get(0));
-    RepeatedOmKeyInfo repeatedKeyInfo = new RepeatedOmKeyInfo(infos);
+    RepeatedOmKeyInfo repeatedKeyInfo = new RepeatedOmKeyInfo(infos, 1);
     // Put the deleted key information into the deleted table
     omMetadataManager.getDeletedTable().put(omKey, repeatedKeyInfo);
   }
@@ -445,7 +445,7 @@ public final class OMMetadataManagerTestUtils {
     String omKey = omMetadataManager.getOzonePathKey(volumeObjectId,
             bucketObjectId, parentObjectId, dirName);
     omMetadataManager.getDirectoryTable().put(omKey,
-            new OmDirectoryInfo.Builder()
+            OmDirectoryInfo.newBuilder()
                     .setName(dirName)
                     .setObjectID(objectId)
                     .setParentObjectID(parentObjectId)

@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
-import com.google.common.base.Preconditions;
+import java.util.Objects;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -129,13 +129,13 @@ public final class SCMUpgradeFinalizationContext {
     }
 
     public SCMUpgradeFinalizationContext build() {
-      Preconditions.checkNotNull(scmContext);
-      Preconditions.checkNotNull(pipelineManager);
-      Preconditions.checkNotNull(nodeManager);
-      Preconditions.checkNotNull(storage);
-      Preconditions.checkNotNull(versionManager);
-      Preconditions.checkNotNull(conf);
-      Preconditions.checkNotNull(finalizationStateManager);
+      Objects.requireNonNull(scmContext, "scmContext == null");
+      Objects.requireNonNull(pipelineManager, "pipelineManager == null");
+      Objects.requireNonNull(nodeManager, "nodeManager == null");
+      Objects.requireNonNull(storage, "storage == null");
+      Objects.requireNonNull(versionManager, "versionManager == null");
+      Objects.requireNonNull(conf, "conf == null");
+      Objects.requireNonNull(finalizationStateManager, "finalizationStateManager == null");
       return new SCMUpgradeFinalizationContext(this);
     }
   }

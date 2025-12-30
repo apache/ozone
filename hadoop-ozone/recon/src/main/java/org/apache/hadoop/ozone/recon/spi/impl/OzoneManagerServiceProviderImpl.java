@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPO
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_SNAPSHOT_DB;
+import static org.apache.hadoop.ozone.recon.ReconConstants.STAGING;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_REQUEST_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_CONNECTION_TIMEOUT;
@@ -53,6 +54,7 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -87,13 +89,16 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Service
 import org.apache.hadoop.ozone.recon.ReconContext;
 import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.ozone.recon.TarExtractor;
 import org.apache.hadoop.ozone.recon.metrics.OzoneManagerSyncMetrics;
+import org.apache.hadoop.ozone.recon.metrics.ReconSyncMetrics;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 import org.apache.hadoop.ozone.recon.tasks.OMDBUpdatesHandler;
 import org.apache.hadoop.ozone.recon.tasks.OMUpdateEventBatch;
 import org.apache.hadoop.ozone.recon.tasks.ReconOmTask;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskReInitializationEvent;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.hadoop.security.SecurityUtil;
@@ -125,6 +130,7 @@ public class OzoneManagerServiceProviderImpl
   private ReconTaskController reconTaskController;
   private ReconUtils reconUtils;
   private OzoneManagerSyncMetrics metrics;
+  private ReconSyncMetrics reconSyncMetrics;
 
   private final long deltaUpdateLimit;
   private final long omDBLagThreshold;
@@ -134,6 +140,7 @@ public class OzoneManagerServiceProviderImpl
   private ThreadFactory threadFactory;
   private ReconContext reconContext;
   private ReconTaskStatusUpdaterManager taskStatusUpdaterManager;
+  private TarExtractor tarExtractor;
 
   /**
    * OM Snapshot related task names.
@@ -213,6 +220,7 @@ public class OzoneManagerServiceProviderImpl
     this.ozoneManagerClient = ozoneManagerClient;
     this.configuration = configuration;
     this.metrics = OzoneManagerSyncMetrics.create();
+    this.reconSyncMetrics = ReconSyncMetrics.create();
     this.deltaUpdateLimit = deltaUpdateLimits;
     this.isSyncDataFromOMRunning = new AtomicBoolean();
     this.threadNamePrefix =
@@ -220,10 +228,13 @@ public class OzoneManagerServiceProviderImpl
     this.threadFactory =
         new ThreadFactoryBuilder().setNameFormat(threadNamePrefix + "SyncOM-%d")
             .build();
+    // Number of parallel workers
+    int omDBTarProcessorThreadCount = Math.max(64, Runtime.getRuntime().availableProcessors());
     this.reconContext = reconContext;
     this.taskStatusUpdaterManager = taskStatusUpdaterManager;
     this.omDBLagThreshold = configuration.getLong(RECON_OM_DELTA_UPDATE_LAG_THRESHOLD,
         RECON_OM_DELTA_UPDATE_LAG_THRESHOLD_DEFAULT);
+    this.tarExtractor = new TarExtractor(omDBTarProcessorThreadCount, threadNamePrefix);
   }
 
   @Override
@@ -236,9 +247,12 @@ public class OzoneManagerServiceProviderImpl
     LOG.info("Starting Ozone Manager Service Provider.");
     scheduler = Executors.newScheduledThreadPool(1, threadFactory);
     try {
+      tarExtractor.start();
       omMetadataManager.start(configuration);
     } catch (IOException ioEx) {
       LOG.error("Error starting Recon OM Metadata Manager.", ioEx);
+      reconContext.updateHealthStatus(new AtomicBoolean(false));
+      reconContext.updateErrors(ReconContext.ErrorCode.INTERNAL_ERROR);
     } catch (RuntimeException runtimeException) {
       LOG.warn("Unexpected runtime error starting Recon OM Metadata Manager.", runtimeException);
       LOG.warn("Trying to delete existing recon OM snapshot DB and fetch new one.");
@@ -257,6 +271,7 @@ public class OzoneManagerServiceProviderImpl
         throw new RuntimeException(runtimeException);
       }
     }
+    reconTaskController.updateOMMetadataManager(omMetadataManager);
     reconTaskController.start();
     long initialDelay = configuration.getTimeDuration(
         OZONE_RECON_OM_SNAPSHOT_TASK_INITIAL_DELAY,
@@ -273,6 +288,8 @@ public class OzoneManagerServiceProviderImpl
     // lastUpdatedSeqNumber number for any of the OM task, then just run reprocess for such tasks.
     ReconTaskStatusUpdater deltaTaskStatusUpdater =
         taskStatusUpdaterManager.getTaskStatusUpdater(OmSnapshotTaskName.OmDeltaRequest.name());
+    ReconTaskStatusUpdater fullSnapshotReconTaskUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(
+        OmSnapshotTaskName.OmSnapshotRequest.name());
 
     Map<String, ReconOmTask> reconOmTaskMap = reconTaskController.getRegisteredTasks()
         .entrySet()
@@ -298,9 +315,26 @@ public class OzoneManagerServiceProviderImpl
                 taskStatusUpdaterManager.getTaskStatusUpdater(taskName).getLastUpdatedSeqNumber());
 
           });
+      LOG.info("Re-initializing all tasks again (not just above failed delta tasks) based on updated OM DB snapshot " +
+          "and last updated sequence number because fresh staging DB needs to be created for all tasks.");
+      // Reinitialize tasks that are listening.
+      LOG.info("Queueing async reinitialization events during startup.");
+      ReconTaskController.ReInitializationResult result = reconTaskController.queueReInitializationEvent(
+          ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_TRIGGER);
+      if (result != ReconTaskController.ReInitializationResult.SUCCESS) {
+        LOG.error(
+            "Failed to queue reinitialization event for manual trigger at startup (result: {}), " +
+                "failing the snapshot operation", result);
+        metrics.incrNumSnapshotRequestsFailed();
+        fullSnapshotReconTaskUpdater.setLastTaskRunStatus(-1);
+        fullSnapshotReconTaskUpdater.recordRunCompletion();
+        reconContext.updateHealthStatus(new AtomicBoolean(false));
+        reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
+        throw new RuntimeException("Failed to queue reinitialization event for manual trigger at startup");
+      }
     }
-    reconTaskController.reInitializeTasks(omMetadataManager, reconOmTaskMap);
     startSyncDataFromOM(initialDelay);
+    LOG.info("Ozone Manager Service Provider is started.");
   }
 
   private void startSyncDataFromOM(long initialDelay) {
@@ -329,7 +363,19 @@ public class OzoneManagerServiceProviderImpl
   }
 
   private void stopSyncDataFromOMThread() {
-    scheduler.shutdownNow();
+    scheduler.shutdown();
+    try {
+      if (!scheduler.awaitTermination(30, TimeUnit.SECONDS)) {
+        scheduler.shutdownNow();
+        if (!scheduler.awaitTermination(5, TimeUnit.SECONDS)) {
+          LOG.error("OM sync scheduler failed to terminate");
+        }
+      }
+    } catch (InterruptedException e) {
+      scheduler.shutdownNow();
+      Thread.currentThread().interrupt();
+    }
+    tarExtractor.stop();
     LOG.debug("Shutdown the OM DB sync scheduler.");
   }
 
@@ -341,6 +387,7 @@ public class OzoneManagerServiceProviderImpl
       // immediately.
       stopSyncDataFromOMThread();
       scheduler = Executors.newScheduledThreadPool(1, threadFactory);
+      tarExtractor.start();
       startSyncDataFromOM(0L);
       return true;
     } else {
@@ -355,7 +402,9 @@ public class OzoneManagerServiceProviderImpl
     reconTaskController.stop();
     omMetadataManager.stop();
     scheduler.shutdownNow();
+    tarExtractor.stop();
     metrics.unRegister();
+    reconSyncMetrics.unRegister();
     connectionFactory.destroy();
   }
 
@@ -393,28 +442,57 @@ public class OzoneManagerServiceProviderImpl
    * @return DBCheckpoint instance.
    */
   @VisibleForTesting
-  DBCheckpoint getOzoneManagerDBSnapshot() {
-    String snapshotFileName = RECON_OM_SNAPSHOT_DB + "_" +
-        System.currentTimeMillis();
-    File targetFile = new File(omSnapshotDBParentDir, snapshotFileName +
-        ".tar");
+  public DBCheckpoint getOzoneManagerDBSnapshot() {
+    String snapshotFileName = RECON_OM_SNAPSHOT_DB + "_" + System.currentTimeMillis();
+    Path untarredDbDir = Paths.get(omSnapshotDBParentDir.getAbsolutePath(), snapshotFileName);
+
+    // Before fetching full snapshot again and create a new OM DB snapshot directory, check and delete
+    // any existing OM DB snapshot directories under recon om db dir location and delete all such
+    // om db snapshot dirs including the last known om db snapshot dir returned by reconUtils.getLastKnownDB
+    File lastKnownDB = reconUtils.getLastKnownDB(omSnapshotDBParentDir, RECON_OM_SNAPSHOT_DB);
+    if (lastKnownDB != null) {
+      boolean existingOmSnapshotDBDeleted = FileUtils.deleteQuietly(lastKnownDB);
+      if (existingOmSnapshotDBDeleted) {
+        LOG.info("Successfully deleted existing OM DB snapshot directory: {}",
+            lastKnownDB.getAbsolutePath());
+      } else {
+        LOG.warn("Failed to delete existing OM DB snapshot directory: {}",
+            lastKnownDB.getAbsolutePath());
+      }
+    }
+
+    // Now below cleanup operation will even remove any left over staging dirs in recon om db dir location which
+    // may be left due to any previous partial extraction of tar entries and during copy sst files process by
+    // tarExtractor.extractTar
+    File[] leftOverStagingDirs = omSnapshotDBParentDir.listFiles(f -> f.getName().startsWith(STAGING));
+    if (leftOverStagingDirs != null) {
+      for (File stagingDir : leftOverStagingDirs) {
+        LOG.warn("Cleaning up leftover staging folder from failed extraction: {}", stagingDir.getAbsolutePath());
+        boolean stagingDirDeleted = FileUtils.deleteQuietly(stagingDir);
+        if (stagingDirDeleted) {
+          LOG.info("Successfully deleted leftover staging folder: {}", stagingDir.getAbsolutePath());
+        } else {
+          LOG.warn("Failed to delete leftover staging folder: {}", stagingDir.getAbsolutePath());
+        }
+      }
+    }
+
     try {
       SecurityUtil.doAsLoginUser(() -> {
         try (InputStream inputStream = reconUtils.makeHttpCall(
-            connectionFactory, getOzoneManagerSnapshotUrl(),
-            isOmSpnegoEnabled()).getInputStream()) {
-          FileUtils.copyInputStreamToFile(inputStream, targetFile);
+            connectionFactory, getOzoneManagerSnapshotUrl(), isOmSpnegoEnabled()).getInputStream()) {
+          tarExtractor.extractTar(inputStream, untarredDbDir);
+        } catch (IOException | InterruptedException e) {
+          reconContext.updateHealthStatus(new AtomicBoolean(false));
+          reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
+          throw new RuntimeException("Error while extracting OM DB Snapshot TAR.", e);
         }
         return null;
       });
-      // Untar the checkpoint file.
-      Path untarredDbDir = Paths.get(omSnapshotDBParentDir.getAbsolutePath(), snapshotFileName);
-      reconUtils.untarCheckpointFile(targetFile, untarredDbDir);
-
-      // Validate the presence of required SST files
+      // Validate extracted files
       File[] sstFiles = untarredDbDir.toFile().listFiles((dir, name) -> name.endsWith(".sst"));
-      if (sstFiles == null || sstFiles.length == 0) {
-        LOG.warn("No SST files found in the OM snapshot directory: {}", untarredDbDir);
+      if (sstFiles != null && sstFiles.length > 0) {
+        LOG.info("Number of SST files found in the OM snapshot directory: {} - {}", untarredDbDir, sstFiles.length);
       }
 
       List<String> sstFileNames = Arrays.stream(sstFiles)
@@ -428,11 +506,9 @@ public class OzoneManagerServiceProviderImpl
       reconContext.getErrors().remove(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
       return new RocksDBCheckpoint(untarredDbDir);
     } catch (IOException e) {
-      LOG.error("Unable to obtain Ozone Manager DB Snapshot. ", e);
+      LOG.error("Unable to obtain Ozone Manager DB Snapshot.", e);
       reconContext.updateHealthStatus(new AtomicBoolean(false));
       reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
-    } finally {
-      FileUtils.deleteQuietly(targetFile);
     }
     return null;
   }
@@ -445,32 +521,50 @@ public class OzoneManagerServiceProviderImpl
   boolean updateReconOmDBWithNewSnapshot() throws IOException {
     // Check permissions of the Recon DB directory
     checkAndValidateReconDbPermissions();
+
+    // Track full DB fetch request
+    reconSyncMetrics.incrFullDBFetchRequests();
+
     // Obtain the current DB snapshot from OM and
     // update the in house OM metadata managed DB instance.
     long startTime = Time.monotonicNow();
     DBCheckpoint dbSnapshot = getOzoneManagerDBSnapshot();
-    metrics.updateSnapshotRequestLatency(Time.monotonicNow() - startTime);
+    long fullDBLatency = Time.monotonicNow() - startTime;
+
+    reconSyncMetrics.updateFullDBRequestLatency(fullDBLatency);
 
     if (dbSnapshot == null) {
       LOG.error("Failed to obtain a valid DB snapshot from Ozone Manager. This could be due to " +
           "missing SST files or other fetch issues.");
+      reconSyncMetrics.incrSnapshotDownloadFailures();
       return false;
     }
 
     if (dbSnapshot.getCheckpointLocation() == null) {
       LOG.error("Snapshot checkpoint location is null, indicating a failure to properly fetch or " +
           "store the snapshot.");
+      reconSyncMetrics.incrSnapshotDownloadFailures();
       return false;
     }
 
     LOG.info("Attempting to update Recon OM DB with new snapshot located at: {}",
         dbSnapshot.getCheckpointLocation());
     try {
-      omMetadataManager.updateOmDB(dbSnapshot.getCheckpointLocation().toFile());
+      // Calculate snapshot size
+      File snapshotDir = dbSnapshot.getCheckpointLocation().toFile();
+      long snapshotSize = FileUtils.sizeOfDirectory(snapshotDir);
+      reconSyncMetrics.incrSnapshotSizeBytes(snapshotSize);
+
+      omMetadataManager.updateOmDB(snapshotDir, true);
+
+      // Track successful snapshot download
+      reconSyncMetrics.incrSnapshotDownloadSuccess();
+
       LOG.info("Successfully updated Recon OM DB with new snapshot.");
       return true;
     } catch (IOException e) {
       LOG.error("Unable to refresh Recon OM DB Snapshot.", e);
+      reconSyncMetrics.incrSnapshotDownloadFailures();
       return false;
     }
   }
@@ -518,34 +612,70 @@ public class OzoneManagerServiceProviderImpl
   ImmutablePair<Boolean, Long> innerGetAndApplyDeltaUpdatesFromOM(long fromSequenceNumber,
                                                                   OMDBUpdatesHandler omdbUpdatesHandler)
       throws IOException, RocksDBException {
+    // Track delta fetch operation
+    long deltaFetchStartTime = Time.monotonicNow();
+
     DBUpdatesRequest dbUpdatesRequest = DBUpdatesRequest.newBuilder()
         .setSequenceNumber(fromSequenceNumber)
         .setLimitCount(deltaUpdateLimit)
         .build();
     DBUpdates dbUpdates = ozoneManagerClient.getDBUpdates(dbUpdatesRequest);
+
+    // Update delta fetch duration
+    long deltaFetchDuration = Time.monotonicNow() - deltaFetchStartTime;
+    reconSyncMetrics.updateDeltaFetchDuration(deltaFetchDuration);
+
     int numUpdates = 0;
     long latestSequenceNumberOfOM = -1L;
     if (null != dbUpdates && dbUpdates.getCurrentSequenceNumber() != -1) {
+      // Delta fetch succeeded
+      reconSyncMetrics.incrDeltaFetchSuccess();
+
       latestSequenceNumberOfOM = dbUpdates.getLatestSequenceNumber();
       RDBStore rocksDBStore = (RDBStore) omMetadataManager.getStore();
       final RocksDatabase rocksDB = rocksDBStore.getDb();
       numUpdates = dbUpdates.getData().size();
       if (numUpdates > 0) {
         metrics.incrNumUpdatesInDeltaTotal(numUpdates);
+
+        // Track delta data fetch size
+        long totalDataSize = 0;
+        for (byte[] data : dbUpdates.getData()) {
+          totalDataSize += data.length;
+        }
+        reconSyncMetrics.incrDeltaDataFetchSize(totalDataSize);
       }
-      for (byte[] data : dbUpdates.getData()) {
-        try (ManagedWriteBatch writeBatch = new ManagedWriteBatch(data)) {
-          // Events gets populated in events list in OMDBUpdatesHandler with call back for put/delete/update
-          writeBatch.iterate(omdbUpdatesHandler);
-          // Commit the OM DB transactions in recon rocks DB and sync here.
-          try (RDBBatchOperation rdbBatchOperation =
-                   new RDBBatchOperation(writeBatch)) {
-            try (ManagedWriteOptions wOpts = new ManagedWriteOptions()) {
-              rdbBatchOperation.commit(rocksDB, wOpts);
+
+      // Track delta apply (conversion + DB apply combined)
+      long deltaApplyStartTime = Time.monotonicNow();
+
+      try {
+        for (byte[] data : dbUpdates.getData()) {
+          try (ManagedWriteBatch writeBatch = new ManagedWriteBatch(data)) {
+            // Events gets populated in events list in OMDBUpdatesHandler with call back for put/delete/update
+            writeBatch.iterate(omdbUpdatesHandler);
+            // Commit the OM DB transactions in recon rocks DB and sync here.
+            try (RDBBatchOperation rdbBatchOperation =
+                     RDBBatchOperation.newAtomicOperation(writeBatch)) {
+              try (ManagedWriteOptions wOpts = new ManagedWriteOptions()) {
+                rdbBatchOperation.commit(rocksDB, wOpts);
+              }
             }
           }
         }
+
+        // Update delta apply duration (successful)
+        long deltaApplyDuration = Time.monotonicNow() - deltaApplyStartTime;
+        reconSyncMetrics.updateDeltaApplyDuration(deltaApplyDuration);
+
+      } catch (RocksDBException | IOException e) {
+        // Track delta apply failures
+        reconSyncMetrics.incrDeltaApplyFailures();
+        throw e;
       }
+    } else {
+      // Delta fetch failed
+      reconSyncMetrics.incrDeltaFetchFailures();
     }
     long lag = latestSequenceNumberOfOM == -1 ? 0 :
         latestSequenceNumberOfOM - getCurrentOMDBSequenceNumber();
@@ -571,6 +701,7 @@ public class OzoneManagerServiceProviderImpl
    * @return true or false if sync operation between Recon and OM was successful or failed.
    */
   @VisibleForTesting
+  @SuppressWarnings("methodlength")
   public boolean syncDataFromOM() {
     ReconTaskStatusUpdater fullSnapshotReconTaskUpdater = taskStatusUpdaterManager.getTaskStatusUpdater(
         OmSnapshotTaskName.OmSnapshotRequest.name());
@@ -617,9 +748,62 @@ public class OzoneManagerServiceProviderImpl
               fullSnapshotReconTaskUpdater.setLastUpdatedSeqNumber(getCurrentOMDBSequenceNumber());
               deltaReconTaskStatusUpdater.recordRunCompletion();
               fullSnapshotReconTaskUpdater.updateDetails();
+              // Update the current OM metadata manager in task controller
+              reconTaskController.updateOMMetadataManager(omMetadataManager);
+
               // Pass on DB update events to tasks that are listening.
               reconTaskController.consumeOMEvents(new OMUpdateEventBatch(
                   omdbUpdatesHandler.getEvents(), omdbUpdatesHandler.getLatestSequenceNumber()), omMetadataManager);
+
+              // Check if task reinitialization is needed due to buffer overflow or task failures
+              boolean bufferOverflowed = reconTaskController.hasEventBufferOverflowed();
+              boolean tasksFailed = reconTaskController.hasTasksFailed();
+
+              if (bufferOverflowed || tasksFailed) {
+                ReconTaskReInitializationEvent.ReInitializationReason reason = bufferOverflowed ?
+                    ReconTaskReInitializationEvent.ReInitializationReason.BUFFER_OVERFLOW :
+                    ReconTaskReInitializationEvent.ReInitializationReason.TASK_FAILURES;
+
+                LOG.warn("Detected condition for task reinitialization: {}, queueing async reinitialization event",
+                    reason);
+
+                markDeltaTaskStatusAsFailed(deltaReconTaskStatusUpdater);
+
+                // Queue async reinitialization event - checkpoint creation and retry logic is handled internally
+                ReconTaskController.ReInitializationResult result =
+                    reconTaskController.queueReInitializationEvent(reason);
+
+                //TODO: Create a metric to track this event buffer overflow or task failure event
+                boolean triggerFullSnapshot =
+                    Optional.ofNullable(result)
+                        .map(r -> {
+                          switch (r) {
+                          case MAX_RETRIES_EXCEEDED:
+                            LOG.warn(
+                                "Reinitialization queue failures exceeded maximum retries, triggering full snapshot " +
+                                    "fallback");
+                            return true;
+
+                          case RETRY_LATER:
+                            LOG.debug("Reinitialization event queueing will be retried in next iteration");
+                            return false;
+
+                          default:
+                            LOG.info("Reinitialization event successfully queued");
+                            return false;
+                          }
+                        })
+                        .orElseGet(() -> {
+                          LOG.error(
+                              "ReInitializationResult is null, something went wrong in queueing reinitialization " +
+                                  "event");
+                          return true;
+                        });
+
+                if (triggerFullSnapshot) {
+                  fullSnapshot = true;
+                }
+              }
               currentSequenceNumber = getCurrentOMDBSequenceNumber();
               LOG.debug("Updated current sequence number: {}", currentSequenceNumber);
               loopCount++;
@@ -627,16 +811,13 @@ public class OzoneManagerServiceProviderImpl
               LOG.error("OM DB Delta update sync thread was interrupted and delta sync failed.");
               // We are updating the table even if it didn't run i.e. got interrupted beforehand
               // to indicate that a task was supposed to run, but it didn't.
-              deltaReconTaskStatusUpdater.setLastTaskRunStatus(-1);
-              deltaReconTaskStatusUpdater.recordRunCompletion();
+              markDeltaTaskStatusAsFailed(deltaReconTaskStatusUpdater);
               Thread.currentThread().interrupt();
               // Since thread is interrupted, we do not fall back to snapshot sync.
               // Return with sync failed status.
               return false;
             } catch (Exception e) {
-              metrics.incrNumDeltaRequestsFailed();
-              deltaReconTaskStatusUpdater.setLastTaskRunStatus(-1);
-              deltaReconTaskStatusUpdater.recordRunCompletion();
+              markDeltaTaskStatusAsFailed(deltaReconTaskStatusUpdater);
               LOG.warn("Unable to get and apply delta updates from OM: {}, falling back to full snapshot",
                   e.getMessage());
               fullSnapshot = true;
@@ -651,45 +832,7 @@ public class OzoneManagerServiceProviderImpl
 
         if (fullSnapshot) {
           try {
-            metrics.incrNumSnapshotRequests();
-            LOG.info("Obtaining full snapshot from Ozone Manager");
-
-            // Similarly if the interrupt was signalled in between,
-            // we should check before starting snapshot sync.
-            if (Thread.currentThread().isInterrupted()) {
-              throw new InterruptedException("Thread interrupted during snapshot sync.");
-            }
-
-            // Update local Recon OM DB to new snapshot.
-            fullSnapshotReconTaskUpdater.recordRunStart();
-            boolean success = updateReconOmDBWithNewSnapshot();
-            // Update timestamp of successful delta updates query.
-            if (success) {
-              // Keeping last updated sequence number for both full and delta tasks to be same
-              // because sequence number of DB denotes and points to same OM DB copy of Recon,
-              // even though two different tasks are updating the DB at different conditions, but
-              // it tells the sync state with actual OM DB for the same Recon OM DB copy.
-              fullSnapshotReconTaskUpdater.setLastUpdatedSeqNumber(getCurrentOMDBSequenceNumber());
-              deltaReconTaskStatusUpdater.setLastUpdatedSeqNumber(getCurrentOMDBSequenceNumber());
-              fullSnapshotReconTaskUpdater.setLastTaskRunStatus(0);
-              fullSnapshotReconTaskUpdater.recordRunCompletion();
-              deltaReconTaskStatusUpdater.updateDetails();
-
-              // Reinitialize tasks that are listening.
-              LOG.info("Calling reprocess on Recon tasks.");
-              reconTaskController.reInitializeTasks(omMetadataManager, null);
-
-              // Update health status in ReconContext
-              reconContext.updateHealthStatus(new AtomicBoolean(true));
-              reconContext.getErrors().remove(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
-            } else {
-              metrics.incrNumSnapshotRequestsFailed();
-              fullSnapshotReconTaskUpdater.setLastTaskRunStatus(-1);
-              fullSnapshotReconTaskUpdater.recordRunCompletion();
-              // Update health status in ReconContext
-              reconContext.updateHealthStatus(new AtomicBoolean(false));
-              reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
-            }
+            executeFullSnapshot(fullSnapshotReconTaskUpdater, deltaReconTaskStatusUpdater);
           } catch (InterruptedException intEx) {
             LOG.error("OM DB Snapshot update sync thread was interrupted.");
             fullSnapshotReconTaskUpdater.setLastTaskRunStatus(-1);
@@ -716,6 +859,70 @@ public class OzoneManagerServiceProviderImpl
       return false;
     }
     return true;
+  }
+
+  private void markDeltaTaskStatusAsFailed(ReconTaskStatusUpdater deltaReconTaskStatusUpdater) {
+    metrics.incrNumDeltaRequestsFailed();
+    deltaReconTaskStatusUpdater.setLastTaskRunStatus(-1);
+    deltaReconTaskStatusUpdater.recordRunCompletion();
+  }
+
+  private void executeFullSnapshot(ReconTaskStatusUpdater fullSnapshotReconTaskUpdater,
+                         ReconTaskStatusUpdater deltaReconTaskStatusUpdater) throws InterruptedException, IOException {
+    metrics.incrNumSnapshotRequests();
+    LOG.info("Obtaining full snapshot from Ozone Manager");
+
+    // Similarly if the interrupt was signalled in between,
+    // we should check before starting snapshot sync.
+    if (Thread.currentThread().isInterrupted()) {
+      throw new InterruptedException("Thread interrupted during snapshot sync.");
+    }
+
+    // Update local Recon OM DB to new snapshot.
+    fullSnapshotReconTaskUpdater.recordRunStart();
+    boolean success = updateReconOmDBWithNewSnapshot();
+    // Update timestamp of successful delta updates query.
+    if (success) {
+      // Keeping last updated sequence number for both full and delta tasks to be same
+      // because sequence number of DB denotes and points to same OM DB copy of Recon,
+      // even though two different tasks are updating the DB at different conditions, but
+      // it tells the sync state with actual OM DB for the same Recon OM DB copy.
+      fullSnapshotReconTaskUpdater.setLastUpdatedSeqNumber(getCurrentOMDBSequenceNumber());
+      deltaReconTaskStatusUpdater.setLastUpdatedSeqNumber(getCurrentOMDBSequenceNumber());
+      fullSnapshotReconTaskUpdater.setLastTaskRunStatus(0);
+      fullSnapshotReconTaskUpdater.recordRunCompletion();
+      deltaReconTaskStatusUpdater.updateDetails();
+
+      // Update the current OM metadata manager in task controller
+      reconTaskController.updateOMMetadataManager(omMetadataManager);
+
+      // Reinitialize tasks that are listening.
+      LOG.info("Queueing async reinitialization event instead of blocking call");
+      ReconTaskController.ReInitializationResult result = reconTaskController.queueReInitializationEvent(
+          ReconTaskReInitializationEvent.ReInitializationReason.MANUAL_TRIGGER);
+      if (result != ReconTaskController.ReInitializationResult.SUCCESS) {
+        LOG.error(
+            "Failed to queue reinitialization event for manual trigger (result: {}), failing the snapshot operation",
+            result);
+        metrics.incrNumSnapshotRequestsFailed();
+        fullSnapshotReconTaskUpdater.setLastTaskRunStatus(-1);
+        fullSnapshotReconTaskUpdater.recordRunCompletion();
+        reconContext.updateHealthStatus(new AtomicBoolean(false));
+        reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
+        return;
+      }
+
+      // Update health status in ReconContext
+      reconContext.updateHealthStatus(new AtomicBoolean(true));
+      reconContext.getErrors().remove(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
+    } else {
+      metrics.incrNumSnapshotRequestsFailed();
+      fullSnapshotReconTaskUpdater.setLastTaskRunStatus(-1);
+      fullSnapshotReconTaskUpdater.recordRunCompletion();
+      // Update health status in ReconContext
+      reconContext.updateHealthStatus(new AtomicBoolean(false));
+      reconContext.updateErrors(ReconContext.ErrorCode.GET_OM_DB_SNAPSHOT_FAILED);
+    }
   }
 
   private void printOMDBMetaInfo() {
@@ -785,8 +992,10 @@ public class OzoneManagerServiceProviderImpl
     return metrics;
   }
 
-  public static Logger getLogger() {
-    return LOG;
+  @VisibleForTesting
+  public TarExtractor getTarExtractor() {
+    return tarExtractor;
   }
+
 }
 

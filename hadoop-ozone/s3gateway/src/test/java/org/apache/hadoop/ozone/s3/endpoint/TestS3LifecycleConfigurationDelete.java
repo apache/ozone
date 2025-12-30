@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -38,24 +39,24 @@ import org.junit.jupiter.api.Test;
  * Testing for DeleteBucketLifecycleConfiguration.
  */
 public class TestS3LifecycleConfigurationDelete {
-  private OzoneClient clientStub;
   private BucketEndpoint bucketEndpoint;
 
   @BeforeEach
   public void setup() throws Exception {
-    clientStub = new OzoneClientStub();
+    OzoneClient clientStub = new OzoneClientStub();
     bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(clientStub)
         .build();
     ObjectStore objectStore = clientStub.getObjectStore();
     objectStore.createS3Bucket("bucket1");
+    bucketEndpoint.queryParamsForTest().set(S3Consts.QueryParams.LIFECYCLE, "");
   }
 
   @Test
   public void testDeleteNonExistentLifecycleConfiguration()
       throws Exception {
     try {
-      bucketEndpoint.delete("bucket1", "");
+      bucketEndpoint.delete("bucket1");
       fail();
     } catch (OS3Exception ex) {
       assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
@@ -67,15 +68,14 @@ public class TestS3LifecycleConfigurationDelete {
   @Test
   public void testDeleteLifecycleConfiguration() throws Exception {
     String bucketName = "bucket1";
-    bucketEndpoint.put(bucketName, null, "", null, getBody());
-    Response r = bucketEndpoint.delete(bucketName, "");
+    bucketEndpoint.put(bucketName, getBody());
+    Response r = bucketEndpoint.delete(bucketName);
 
     assertEquals(HTTP_NO_CONTENT, r.getStatus());
 
     try {
       // Make sure it was deleted.
-      bucketEndpoint.get(bucketName, null, null, null, 0, null, null,
-          null, null, null, null, null, 0, "", null);
+      bucketEndpoint.get(bucketName);
       fail();
     } catch (OS3Exception ex) {
       assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());

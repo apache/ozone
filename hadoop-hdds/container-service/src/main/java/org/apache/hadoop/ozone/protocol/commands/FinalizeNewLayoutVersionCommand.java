@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.protocol.commands;
 
-import com.google.common.base.Preconditions;
+import java.util.Objects;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.FinalizeNewLayoutVersionCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -67,7 +67,7 @@ public class FinalizeNewLayoutVersionCommand
 
   public static  FinalizeNewLayoutVersionCommand getFromProtobuf(
       FinalizeNewLayoutVersionCommandProto finalizeProto) {
-    Preconditions.checkNotNull(finalizeProto);
+    Objects.requireNonNull(finalizeProto, "finalizeProto == null");
     return new FinalizeNewLayoutVersionCommand(
         finalizeProto.getFinalizeNewLayoutVersion(),
         finalizeProto.getDataNodeLayoutVersion(), finalizeProto.getCmdId());
@@ -78,7 +78,7 @@ public class FinalizeNewLayoutVersionCommand
     StringBuilder sb = new StringBuilder();
     sb.append(getType())
         .append(": cmdID: ").append(getId())
-        .append(", encodedToken: \"").append(getEncodedToken()).append("\"")
+        .append(", encodedToken: \"").append(getEncodedToken()).append('"')
         .append(", term: ").append(getTerm())
         .append(", deadlineMsSinceEpoch: ").append(getDeadline())
         .append(", finalizeUpgrade: ").append(finalizeUpgrade)

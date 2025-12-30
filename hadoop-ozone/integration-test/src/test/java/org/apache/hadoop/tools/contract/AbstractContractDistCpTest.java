@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.tools.contract;
 
-import static org.apache.hadoop.fs.CommonConfigurationKeys.IOSTATISTICS_LOGGING_LEVEL_INFO;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.createFile;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.dataset;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.skip;
@@ -102,16 +101,6 @@ public abstract class AbstractContractDistCpTest
    */
   protected static final int DEFAULT_WIDTH = 2;
 
-  /**
-   * The timeout value is extended over the default so that large updates
-   * are allowed to take time, especially to remote stores.
-   * @return the current test timeout
-   */
-  @Override
-  protected int getTestTimeoutMillis() {
-    return 15  * 60 * 1000;
-  }
-
   private Configuration conf;
   private FileSystem localFS, remoteFS;
   private Path localDir, remoteDir;
@@ -134,10 +123,6 @@ public abstract class AbstractContractDistCpTest
 
   private Path inputFile5;
 
-  private Path outputDir;
-
-  private Path outputSubDir1;
-
   private Path outputSubDir2;
 
   private Path outputSubDir4;
@@ -151,6 +136,16 @@ public abstract class AbstractContractDistCpTest
   private Path outputFile4;
 
   private Path inputDirUnderOutputDir;
+
+  /**
+   * The timeout value is extended over the default so that large updates
+   * are allowed to take time, especially to remote stores.
+   * @return the current test timeout
+   */
+  @Override
+  protected int getTestTimeoutMillis() {
+    return 15  * 60 * 1000;
+  }
 
   @Override
   protected Configuration createConfiguration() {
@@ -188,7 +183,7 @@ public abstract class AbstractContractDistCpTest
   @Override
   public void teardown() throws Exception {
     // if remote FS supports IOStatistics log it.
-    logIOStatisticsAtLevel(LOG, IOSTATISTICS_LOGGING_LEVEL_INFO, getRemoteFS());
+    logIOStatisticsAtLevel(LOG, "info", getRemoteFS());
     super.teardown();
   }
 
@@ -207,10 +202,10 @@ public abstract class AbstractContractDistCpTest
    * @param path path to set up
    */
   protected void initOutputFields(final Path path) {
-    outputDir = new Path(path, "outputDir");
+    Path outputDir = new Path(path, "outputDir");
     inputDirUnderOutputDir = new Path(outputDir, "inputDir");
     outputFile1 = new Path(inputDirUnderOutputDir, "file1");
-    outputSubDir1 = new Path(inputDirUnderOutputDir, "subDir1");
+    Path outputSubDir1 = new Path(inputDirUnderOutputDir, "subDir1");
     outputFile2 = new Path(outputSubDir1, "file2");
     outputSubDir2 = new Path(inputDirUnderOutputDir, "subDir2/subDir2");
     outputFile3 = new Path(outputSubDir2, "file3");
@@ -399,7 +394,6 @@ public abstract class AbstractContractDistCpTest
     return inputFileNew1;
   }
 
-
   @Test
   public void testTrackDeepDirectoryStructureToRemote() throws Exception {
     describe("copy a deep directory structure from local to remote");
@@ -435,7 +429,7 @@ public abstract class AbstractContractDistCpTest
             .withDirectWrite(shouldUseDirectWrite())
             .withOverwrite(false)));
 
-    lsR("tracked udpate", remoteFS, destDir);
+    lsR("tracked update", remoteFS, destDir);
     // new file went over
     Path outputFileNew1 = new Path(outputSubDir2, "newfile1");
     ContractTestUtils.assertIsFile(remoteFS, outputFileNew1);
@@ -828,6 +822,7 @@ public abstract class AbstractContractDistCpTest
                     Collections.singletonList(srcDir), destDir)
                     .withDirectWrite(true)));
   }
+
   /**
    * Run distcp srcDir destDir.
    * @param srcDir local source directory

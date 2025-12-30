@@ -40,6 +40,6 @@ services:
   s3g:
     <<: *s3g-virtual-host-config
     extra_hosts:
-      - "bucket1.s3g.internal=172.25.0.114"
+      - "bucket1.s3g.internal=172.25.0.120"
   recon:
     <<: *s3g-virtual-host-config

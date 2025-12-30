@@ -34,7 +34,6 @@ import org.junit.jupiter.api.Test;
  */
 public abstract class AbstractContractConcatTest extends AbstractFSContractTestBase {
 
-  private Path testPath;
   private Path srcFile;
   private Path zeroByteFile;
   private Path target;
@@ -46,7 +45,7 @@ public abstract class AbstractContractConcatTest extends AbstractFSContractTestB
     skipIfUnsupported(SUPPORTS_CONCAT);
 
     //delete the test directory
-    testPath = path("test");
+    Path testPath = path("test");
     srcFile = new Path(testPath, "small.txt");
     zeroByteFile = new Path(testPath, "zero.txt");
     target = new Path(testPath, "target");

@@ -17,9 +17,10 @@
 
 package org.apache.hadoop.ozone.om.request.s3.tagging;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Map;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -31,6 +32,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -106,15 +108,18 @@ public class S3DeleteObjectTaggingRequestWithFSO extends S3DeleteObjectTaggingRe
       }
 
       OmKeyInfo omKeyInfo = keyStatus.getKeyInfo();
+      // Reverting back the full path to key name
+      // Eg: a/b/c/d/e/file1 -> file1
+      omKeyInfo.setKeyName(OzoneFSUtils.getFileName(keyName));
       final long volumeId = omMetadataManager.getVolumeId(volumeName);
       final long bucketId = omMetadataManager.getBucketId(volumeName, bucketName);
       final String dbKey = omMetadataManager.getOzonePathKey(volumeId, bucketId,
           omKeyInfo.getParentObjectID(), omKeyInfo.getFileName());
 
-      // Clear / delete the tags
-      omKeyInfo.getTags().clear();
-      // Set the UpdateId to the current transactionLogIndex
-      omKeyInfo.setUpdateID(trxnLogIndex);
+      omKeyInfo = omKeyInfo.toBuilder()
+          .setTags(Collections.emptyMap())
+          .setUpdateID(trxnLogIndex)
+          .build();
 
       // Note: Key modification time is not changed because S3 last modified
       // time only changes when there are changes in the object content

@@ -45,6 +45,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
@@ -64,6 +66,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.metadata.DeleteTransactionStore;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlockCommandStatus;
 import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
@@ -78,7 +81,7 @@ import org.slf4j.LoggerFactory;
  */
 public class DeleteBlocksCommandHandler implements CommandHandler {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(DeleteBlocksCommandHandler.class);
 
   private final ContainerSet containerSet;
@@ -188,15 +191,19 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       this.container = container;
       this.connectionManager = connectionManager;
     }
+
     public DeleteBlocksCommand getCmd() {
       return this.cmd;
     }
+
     public StateContext getContext() {
       return this.context;
     }
+
     public OzoneContainer getContainer() {
       return this.container;
     }
+
     public SCMConnectionManager getConnectionManager() {
       return this.connectionManager;
     }
@@ -208,6 +215,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   public static final class DeleteBlockTransactionExecutionResult {
     private final DeleteBlockTransactionResult result;
     private final boolean lockAcquisitionFailed;
+
     public DeleteBlockTransactionExecutionResult(
         DeleteBlockTransactionResult result, boolean lockAcquisitionFailed) {
       this.result = result;
@@ -328,6 +336,10 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
                 "container={}, TXID={}", tx.getContainerID(), tx.getTxID(), e);
         Thread.currentThread().interrupt();
         txResultBuilder.setContainerID(containerId).setSuccess(false);
+      } catch (Exception e) {
+        LOG.error("Unexpected exception while deleting blocks for " +
+                "container={}, TXID={}", tx.getContainerID(), tx.getTxID(), e);
+        txResultBuilder.setContainerID(containerId).setSuccess(false);
       }
       return new DeleteBlockTransactionExecutionResult(
           txResultBuilder.build(), lockAcquisitionFailed);
@@ -339,6 +351,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     ContainerBlocksDeletionACKProto blockDeletionACK = null;
     long startTime = Time.monotonicNow();
     boolean cmdExecuted = false;
+    int successCount = 0, failedCount = 0;
     try {
       // move blocks to deleting state.
       // this is a metadata update, the actual deletion happens in another
@@ -370,25 +383,27 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
 
       ContainerBlocksDeletionACKProto.Builder resultBuilder =
           ContainerBlocksDeletionACKProto.newBuilder().addAllResults(results);
-      resultBuilder.setDnId(cmd.getContext().getParent().getDatanodeDetails()
-          .getUuid().toString());
+      resultBuilder.setDnId(cmd.getContext().getParent().getDatanodeDetails().getUuidString());
       blockDeletionACK = resultBuilder.build();
 
       // Send ACK back to SCM as long as meta updated
       // TODO Or we should wait until the blocks are actually deleted?
       if (!containerBlocks.isEmpty()) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Sending following block deletion ACK to SCM");
-          for (DeleteBlockTransactionResult result : blockDeletionACK
-              .getResultsList()) {
-            boolean success = result.getSuccess();
-            LOG.debug("TxId = {} : ContainerId = {} : {}",
-                result.getTxID(), result.getContainerID(), success);
-            if (success) {
-              blockDeleteMetrics.incrProcessedTransactionSuccessCount(1);
-            } else {
-              blockDeleteMetrics.incrProcessedTransactionFailCount(1);
-            }
+
+        for (DeleteBlockTransactionResult result : blockDeletionACK.getResultsList()) {
+          boolean success = result.getSuccess();
+
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("TxId = {} : ContainerId = {} : {}", result.getTxID(),
+                result.getContainerID(), success);
+          }
+
+          if (success) {
+            ++successCount;
+            blockDeleteMetrics.incrProcessedTransactionSuccessCount(1);
+          } else {
+            ++failedCount;
+            blockDeleteMetrics.incrProcessedTransactionFailCount(1);
           }
         }
       }
@@ -408,6 +423,8 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       updateCommandStatus(cmd.getContext(), cmd.getCmd(), statusUpdater, LOG);
       long endTime = Time.monotonicNow();
       this.opsLatencyMs.add(endTime - startTime);
+      LOG.info("Sending deletion ACK to SCM, successTransactionCount = {}," +
+          "failedTransactionCount = {}, time elapsed = {}", successCount, failedCount, opsLatencyMs);
       invocationCount++;
     }
   }
@@ -470,8 +487,10 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       try {
         DeleteBlockTransactionExecutionResult result = f.get();
         handler.accept(result);
-      } catch (InterruptedException | ExecutionException e) {
+      } catch (ExecutionException e) {
         LOG.error("task failed.", e);
+      } catch (InterruptedException e) {
+        LOG.error("task interrupted.", e);
         Thread.currentThread().interrupt();
       }
     });
@@ -627,10 +646,20 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
               containerData.getPendingDeleteBlockCountKey(),
               pendingDeleteBlocks);
 
-      // update pending deletion blocks count and delete transaction ID in
-      // in-memory container status
+      // Update pending deletion blocks count, blocks bytes and delete transaction ID in in-memory container status.
+      // Persist pending bytes only if the feature is finalized.
+      if (VersionedDatanodeFeatures.isFinalized(
+          HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION) && delTX.hasTotalBlockSize()) {
+        long pendingBytes = containerData.getBlockPendingDeletionBytes();
+        pendingBytes += delTX.getTotalBlockSize();
+        metadataTable
+            .putWithBatch(batchOperation,
+                containerData.getPendingDeleteBlockBytesKey(),
+                pendingBytes);
+      }
+      containerData.incrPendingDeletionBlocks(newDeletionBlocks,
+          delTX.hasTotalBlockSize() ? delTX.getTotalBlockSize() : 0);
       containerData.updateDeleteTransactionId(delTX.getTxID());
-      containerData.incrPendingDeletionBlocks(newDeletionBlocks);
     }
   }
 
@@ -642,7 +671,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       if (metrics != null) {
         metrics.incOutOfOrderDeleteBlockTransactionCount();
       }
-      LOG.info(String.format("Delete blocks for containerId: %d"
+      LOG.debug(String.format("Delete blocks for containerId: %d"
               + " is received out of order, %d < %d", containerId, delTX.getTxID(),
           containerData.getDeleteTransactionId()));
     } else if (delTX.getTxID() == containerData.getDeleteTransactionId()) {
@@ -735,22 +764,6 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   }
 
   public void setPoolSize(int size) {
-    if (size <= 0) {
-      throw new IllegalArgumentException("Pool size must be positive.");
-    }
-
-    int currentCorePoolSize = executor.getCorePoolSize();
-
-    // In ThreadPoolExecutor, maximumPoolSize must always be greater than or
-    // equal to the corePoolSize. We must make sure this invariant holds when
-    // changing the pool size. Therefore, we take into account whether the
-    // new size is greater or smaller than the current core pool size.
-    if (size > currentCorePoolSize) {
-      executor.setMaximumPoolSize(size);
-      executor.setCorePoolSize(size);
-    } else {
-      executor.setCorePoolSize(size);
-      executor.setMaximumPoolSize(size);
-    }
+    HddsServerUtil.setPoolSize(executor, size, LOG);
   }
 }

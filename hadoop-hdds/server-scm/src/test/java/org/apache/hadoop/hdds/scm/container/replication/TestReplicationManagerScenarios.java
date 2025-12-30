@@ -43,7 +43,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -51,6 +50,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -89,7 +89,7 @@ import org.junit.jupiter.params.provider.MethodSource;
  */
 
 public class TestReplicationManagerScenarios {
-  private static final Map<String, UUID> ORIGINS = new HashMap<>();
+  private static final Map<String, DatanodeID> ORIGINS = new HashMap<>();
   private static final Map<String, DatanodeDetails> DATANODE_ALIASES
       = new HashMap<>();
   private static final Map<DatanodeDetails, NodeStatus> NODE_STATUS_MAP
@@ -100,10 +100,9 @@ public class TestReplicationManagerScenarios {
   private Map<ContainerID, Set<ContainerReplica>> containerReplicaMap;
   private Set<ContainerInfo> containerInfoSet;
   private ContainerReplicaPendingOps containerReplicaPendingOps;
-  private Set<Pair<UUID, SCMCommand<?>>> commandsSent;
+  private Set<Pair<DatanodeID, SCMCommand<?>>> commandsSent;
 
   private OzoneConfiguration configuration;
-  private ReplicationManager replicationManager;
   private ContainerManager containerManager;
   private PlacementPolicy ratisPlacementPolicy;
   private PlacementPolicy ecPlacementPolicy;
@@ -184,7 +183,7 @@ public class TestReplicationManagerScenarios {
     }).when(nodeManager).addDatanodeCommand(any(), any());
 
     clock = new TestClock(Instant.now(), ZoneId.systemDefault());
-    containerReplicaPendingOps = new ContainerReplicaPendingOps(clock);
+    containerReplicaPendingOps = new ContainerReplicaPendingOps(clock, null);
 
     when(containerManager.getContainerReplicas(any(ContainerID.class))).thenAnswer(
         invocation -> {
@@ -222,6 +221,7 @@ public class TestReplicationManagerScenarios {
 
   private ReplicationManager createReplicationManager() throws IOException {
     return new ReplicationManager(
+        configuration.getObject(ReplicationManager.ReplicationManagerConfiguration.class),
         configuration,
         containerManager,
         ratisPlacementPolicy,
@@ -238,8 +238,8 @@ public class TestReplicationManagerScenarios {
     };
   }
 
-  protected static UUID getOrCreateOrigin(String origin) {
-    return ORIGINS.computeIfAbsent(origin, (k) -> UUID.randomUUID());
+  protected static DatanodeID getOrCreateOrigin(String origin) {
+    return ORIGINS.computeIfAbsent(origin, k -> DatanodeID.randomID());
   }
 
   private static Stream<Scenario> getTestScenarios() {
@@ -250,7 +250,7 @@ public class TestReplicationManagerScenarios {
     for (PendingReplica r : scenario.getPendingReplicas()) {
       if (r.getType() == ContainerReplicaOp.PendingOpType.ADD) {
         containerReplicaPendingOps.scheduleAddReplica(container.containerID(), r.getDatanodeDetails(),
-            r.getReplicaIndex(), null, Long.MAX_VALUE);
+            r.getReplicaIndex(), null, Long.MAX_VALUE, 5L, clock.millis());
       } else if (r.getType() == ContainerReplicaOp.PendingOpType.DELETE) {
         containerReplicaPendingOps.scheduleDeleteReplica(container.containerID(), r.getDatanodeDetails(),
             r.getReplicaIndex(), null, Long.MAX_VALUE);
@@ -261,14 +261,14 @@ public class TestReplicationManagerScenarios {
   @ParameterizedTest
   @MethodSource("getTestScenarios")
   public void testAllScenarios(Scenario scenario) throws IOException {
-    ReplicationManagerReport repReport = new ReplicationManagerReport();
     ReplicationQueue repQueue = new ReplicationQueue();
     ReplicationManager.ReplicationManagerConfiguration conf =
         new ReplicationManager.ReplicationManagerConfiguration();
     conf.setMaintenanceRemainingRedundancy(scenario.getEcMaintenanceRedundancy());
     conf.setMaintenanceReplicaMinimum(scenario.getRatisMaintenanceMinimum());
     configuration.setFromObject(conf);
-    replicationManager = createReplicationManager();
+    ReplicationManager replicationManager = createReplicationManager();
+    ReplicationManagerReport repReport = new ReplicationManagerReport(conf.getContainerSampleLimit());
 
     ContainerInfo containerInfo = scenario.buildContainerInfo();
     loadPendingOps(containerInfo, scenario);
@@ -296,7 +296,7 @@ public class TestReplicationManagerScenarios {
     assertExpectedCommands(scenario, scenario.getCheckCommands());
     commandsSent.clear();
 
-    ReplicationManagerReport roReport = new ReplicationManagerReport();
+    ReplicationManagerReport roReport = new ReplicationManagerReport(conf.getContainerSampleLimit());
     replicationManager.checkContainerStatus(containerInfo, roReport);
     assertEquals(0, commandsSent.size());
     assertExpectations(scenario, roReport);
@@ -331,11 +331,11 @@ public class TestReplicationManagerScenarios {
     // datanodes.
     for (ExpectedCommands expectedCommand : expectedCommands) {
       boolean found = false;
-      for (Pair<UUID, SCMCommand<?>> command : commandsSent) {
+      for (Pair<DatanodeID, SCMCommand<?>> command : commandsSent) {
         if (command.getRight().getType() == expectedCommand.getType()) {
           if (expectedCommand.hasExpectedDatanode()) {
             // We need to assert against the command the datanode is sent to
-            DatanodeDetails commandDatanode = findDatanodeFromUUID(command.getKey());
+            DatanodeDetails commandDatanode = findDatanode(command.getKey());
             if (commandDatanode != null && expectedCommand.isTargetExpected(commandDatanode)) {
               found = true;
               commandsSent.remove(command);
@@ -353,9 +353,9 @@ public class TestReplicationManagerScenarios {
     }
   }
 
-  private DatanodeDetails findDatanodeFromUUID(UUID uuid) {
+  private DatanodeDetails findDatanode(DatanodeID uuid) {
     for (DatanodeDetails dn : DATANODE_ALIASES.values()) {
-      if (dn.getUuid().equals(uuid)) {
+      if (dn.getID().equals(uuid)) {
         return dn;
       }
     }
@@ -382,7 +382,7 @@ public class TestReplicationManagerScenarios {
     private long used = 10;
     private boolean isEmpty = false;
     private String origin;
-    private UUID originId;
+    private DatanodeID originId;
 
     public void setContainerId(long containerId) {
       this.containerId = containerId;
@@ -481,7 +481,7 @@ public class TestReplicationManagerScenarios {
       if (origin != null) {
         originId = getOrCreateOrigin(origin);
       } else {
-        originId = UUID.randomUUID();
+        originId = DatanodeID.randomID();
       }
     }
   }

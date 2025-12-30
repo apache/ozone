@@ -45,7 +45,7 @@ public class TestGDPRSymmetricKey {
   @Test
   public void testKeyGenerationWithValidInput() throws Exception {
     GDPRSymmetricKey gkey = new GDPRSymmetricKey(
-        RandomStringUtils.randomAlphabetic(16),
+        RandomStringUtils.secure().nextAlphabetic(16),
         OzoneConsts.GDPR_ALGORITHM_NAME);
 
     assertTrue(gkey.getCipher().getAlgorithm()
@@ -58,7 +58,7 @@ public class TestGDPRSymmetricKey {
   @Test
   public void testKeyGenerationWithInvalidInput() throws Exception {
     IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
-        () -> new GDPRSymmetricKey(RandomStringUtils.randomAlphabetic(5), OzoneConsts.GDPR_ALGORITHM_NAME));
+        () -> new GDPRSymmetricKey(RandomStringUtils.secure().nextAlphabetic(5), OzoneConsts.GDPR_ALGORITHM_NAME));
     assertTrue(e.getMessage().equalsIgnoreCase("Secret must be exactly 16 characters"));
   }
 }

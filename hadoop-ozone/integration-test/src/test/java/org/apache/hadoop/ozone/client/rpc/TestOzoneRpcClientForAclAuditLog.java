@@ -92,13 +92,6 @@ public class TestOzoneRpcClientForAclAuditLog {
   private static StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   *
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   @BeforeAll
   public static void init() throws Exception {
     System.setProperty("log4j.configurationFile", "auditlog.properties");
@@ -114,11 +107,6 @@ public class TestOzoneRpcClientForAclAuditLog {
     emptyAuditLog();
   }
 
-  /**
-   * Create a MiniOzoneCluster for testing.
-   * @param conf Configurations to start the cluster.
-   * @throws Exception
-   */
   private static void startCluster(OzoneConfiguration conf) throws Exception {
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
@@ -175,7 +163,7 @@ public class TestOzoneRpcClientForAclAuditLog {
 
     String userName = ugi.getUserName();
     String adminName = ugi.getUserName();
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setAdmin(adminName)
@@ -223,7 +211,7 @@ public class TestOzoneRpcClientForAclAuditLog {
 
     String userName = "bilbo";
     String adminName = "bilbo";
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setAdmin(adminName)

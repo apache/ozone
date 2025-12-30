@@ -55,6 +55,8 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -105,7 +107,7 @@ public class TestOzoneTokenIdentifier {
         new Text("rm"), new Text("client"));
     tokenId.setOmCertSerialId("123");
     LOG.info("Unsigned token {} is {}", tokenId,
-        verifyTokenAsymmetric(tokenId, RandomUtils.nextBytes(128), cert));
+        verifyTokenAsymmetric(tokenId, RandomUtils.secure().randomBytes(128), cert));
 
   }
 
@@ -142,9 +144,9 @@ public class TestOzoneTokenIdentifier {
 
   OzoneTokenIdentifier generateTestToken() {
     OzoneTokenIdentifier tokenIdentifier = new OzoneTokenIdentifier(
-        new Text(RandomStringUtils.randomAlphabetic(6)),
-        new Text(RandomStringUtils.randomAlphabetic(5)),
-        new Text(RandomStringUtils.randomAlphabetic(4)));
+        new Text(RandomStringUtils.secure().nextAlphabetic(6)),
+        new Text(RandomStringUtils.secure().nextAlphabetic(5)),
+        new Text(RandomStringUtils.secure().nextAlphabetic(4)));
     tokenIdentifier.setOmCertSerialId("123");
     return tokenIdentifier;
   }
@@ -193,7 +195,6 @@ public class TestOzoneTokenIdentifier {
     testSymmetricTokenPerfHelper(hmacSHA1, 64);
     testSymmetricTokenPerfHelper(hmacSHA256, 1024);
   }
-
 
   public void testSymmetricTokenPerfHelper(String hmacAlgorithm, int keyLen) {
     final int testTokenCount = 1000;
@@ -252,7 +253,6 @@ public class TestOzoneTokenIdentifier {
     }
   }
 
-
   public OzoneTokenIdentifier getIdentifierInst() {
     OzoneTokenIdentifier id = new OzoneTokenIdentifier();
     id.setOwner(new Text("User1"));
@@ -284,10 +284,13 @@ public class TestOzoneTokenIdentifier {
     assertEquals(idEncode, idDecode);
   }
 
-  @Test
-  void testTokenPersistence() throws IOException {
+  @ParameterizedTest
+  @CsvSource({"true", "false"})
+  void testTokenPersistence(boolean isOMServiceIdGiven) throws IOException {
     OzoneTokenIdentifier idWrite = getIdentifierInst();
-    idWrite.setOmServiceId("defaultServiceId");
+    if (isOMServiceIdGiven) {
+      idWrite.setOmServiceId("defaultServiceId");
+    }
 
     byte[] oldIdBytes = idWrite.getBytes();
     Codec<OzoneTokenIdentifier> idCodec = TokenIdentifierCodec.get();

@@ -46,15 +46,6 @@ public final class OMPolicyProvider extends PolicyProvider {
   private static final Supplier<OMPolicyProvider> SUPPLIER =
       MemoizedSupplier.valueOf(OMPolicyProvider::new);
 
-  private OMPolicyProvider() {
-  }
-
-  @Private
-  @Unstable
-  public static OMPolicyProvider getInstance() {
-    return SUPPLIER.get();
-  }
-
   private static final List<Service> OM_SERVICES =
       Arrays.asList(
           new Service(OZONE_OM_SECURITY_CLIENT_PROTOCOL_ACL,
@@ -66,6 +57,15 @@ public final class OMPolicyProvider extends PolicyProvider {
           new Service(OZONE_SECURITY_RECONFIGURE_PROTOCOL_ACL,
               ReconfigureProtocol.class)
       );
+
+  private OMPolicyProvider() {
+  }
+
+  @Private
+  @Unstable
+  public static OMPolicyProvider getInstance() {
+    return SUPPLIER.get();
+  }
 
   @Override
   public Service[] getServices() {

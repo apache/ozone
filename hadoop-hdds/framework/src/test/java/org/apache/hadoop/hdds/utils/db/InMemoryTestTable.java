@@ -18,20 +18,36 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import java.io.File;
-import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import java.util.NavigableMap;
+import java.util.concurrent.ConcurrentSkipListMap;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 
 /**
  * InMemory Table implementation for tests.
  */
-public final class InMemoryTestTable<KEY, VALUE> implements Table<KEY, VALUE> {
-  private final Map<KEY, VALUE> map = new ConcurrentHashMap<>();
+public class InMemoryTestTable<KEY, VALUE> implements Table<KEY, VALUE> {
+  private final NavigableMap<KEY, VALUE> map;
+  private final String name;
 
-  @Override
-  public void close() {
+  public InMemoryTestTable() {
+    this("");
+  }
+
+  public InMemoryTestTable(Map<KEY, VALUE> map) {
+    this(map, "");
+  }
+
+  public InMemoryTestTable(String name) {
+    this(Collections.emptyMap(), name);
+  }
+
+  public InMemoryTestTable(Map<KEY, VALUE> map, String name) {
+    this.map = new ConcurrentSkipListMap<>(map);
+    this.map.putAll(map);
+    this.name = name;
   }
 
   @Override
@@ -76,22 +92,17 @@ public final class InMemoryTestTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   @Override
   public void deleteRange(KEY beginKey, KEY endKey) {
-    throw new UnsupportedOperationException();
+    map.subMap(beginKey, endKey).clear();
   }
 
   @Override
-  public TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator() {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator(KEY prefix) {
+  public KeyValueIterator<KEY, VALUE> iterator(KEY prefix, IteratorType type) {
     throw new UnsupportedOperationException();
   }
 
   @Override
   public String getName() {
-    return "";
+    return name;
   }
 
   @Override
@@ -100,15 +111,8 @@ public final class InMemoryTestTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
-  public List<? extends KeyValue<KEY, VALUE>> getRangeKVs(KEY startKey, int count, KEY prefix,
-                                                          MetadataKeyFilters.MetadataKeyFilter... filters)
-      throws IOException, IllegalArgumentException {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public List<? extends KeyValue<KEY, VALUE>> getSequentialRangeKVs(KEY startKey, int count, KEY prefix,
-                                                                    MetadataKeyFilters.MetadataKeyFilter... filters) {
+  public List<KeyValue<KEY, VALUE>> getRangeKVs(
+      KEY startKey, int count, KEY prefix, KeyPrefixFilter filter, boolean isSequential) {
     throw new UnsupportedOperationException();
   }
 
@@ -125,5 +129,9 @@ public final class InMemoryTestTable<KEY, VALUE> implements Table<KEY, VALUE> {
   @Override
   public void loadFromFile(File externalFile) {
     throw new UnsupportedOperationException();
+  }
+
+  public NavigableMap<KEY, VALUE> getMap() {
+    return map;
   }
 }

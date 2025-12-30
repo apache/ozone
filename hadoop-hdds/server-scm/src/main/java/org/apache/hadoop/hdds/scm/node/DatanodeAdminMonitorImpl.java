@@ -72,6 +72,8 @@ import org.slf4j.LoggerFactory;
  */
 public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
+  private static final Logger LOG = LoggerFactory.getLogger(DatanodeAdminMonitorImpl.class);
+
   private EventPublisher eventQueue;
   private NodeManager nodeManager;
   private ReplicationManager replicationManager;
@@ -85,6 +87,12 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   private long trackedRecommission = 0;
   private long unClosedContainers = 0;
   private long underReplicatedContainers = 0;
+
+  private Map<String, ContainerStateInWorkflow> containerStateByHost;
+
+  // The number of containers for each of under replicated and unhealthy
+  // that will be logged in detail each time a node is checked.
+  private final int containerDetailsLoggingLimit;
 
   /**
    * Inner class for snapshot of Datanode ContainerState in
@@ -129,14 +137,6 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
       this.containersReplicatedOnNode.put("UnClosed", Collections.unmodifiableList(unClosed));
     }
   }
-
-  private Map<String, ContainerStateInWorkflow> containerStateByHost;
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(DatanodeAdminMonitorImpl.class);
-  // The number of containers for each of under replicated and unhealthy
-  // that will be logged in detail each time a node is checked.
-  private final int containerDetailsLoggingLimit;
 
   public DatanodeAdminMonitorImpl(
       OzoneConfiguration conf,
@@ -438,7 +438,8 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
           continue;
         }
 
-        ReplicationManagerReport report = new ReplicationManagerReport();
+        ReplicationManagerReport report = new ReplicationManagerReport(
+            replicationManager.getConfig().getContainerSampleLimit());
         replicationManager.checkContainerStatus(replicaSet.getContainer(), report);
         boolean replicatedOK = report.getStat(ReplicationManagerReport.HealthState.UNDER_REPLICATED) == 0;
 
@@ -499,7 +500,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     sb.append(replicas.stream()
         .map(Object::toString)
         .collect(Collectors.joining(",")));
-    sb.append("}");
+    sb.append('}');
     return sb.toString();
   }
 

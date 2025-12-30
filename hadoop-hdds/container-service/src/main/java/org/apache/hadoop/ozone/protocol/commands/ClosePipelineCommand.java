@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.protocol.commands;
 
-import com.google.common.base.Preconditions;
+import java.util.Objects;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ClosePipelineCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -59,11 +59,9 @@ public class ClosePipelineCommand
     return builder.build();
   }
 
-  public static ClosePipelineCommand getFromProtobuf(
-      ClosePipelineCommandProto createPipelineProto) {
-    Preconditions.checkNotNull(createPipelineProto);
-    return new ClosePipelineCommand(createPipelineProto.getCmdId(),
-        PipelineID.getFromProtobuf(createPipelineProto.getPipelineID()));
+  public static ClosePipelineCommand getFromProtobuf(ClosePipelineCommandProto proto) {
+    Objects.requireNonNull(proto, "proto == null");
+    return new ClosePipelineCommand(proto.getCmdId(), PipelineID.getFromProtobuf(proto.getPipelineID()));
   }
 
   public PipelineID getPipelineID() {
@@ -75,7 +73,7 @@ public class ClosePipelineCommand
     StringBuilder sb = new StringBuilder();
     sb.append(getType())
         .append(": cmdID: ").append(getId())
-        .append(", encodedToken: \"").append(getEncodedToken()).append("\"")
+        .append(", encodedToken: \"").append(getEncodedToken()).append('"')
         .append(", term: ").append(getTerm())
         .append(", deadlineMsSinceEpoch: ").append(getDeadline())
         .append(", pipelineID: ").append(getPipelineID());

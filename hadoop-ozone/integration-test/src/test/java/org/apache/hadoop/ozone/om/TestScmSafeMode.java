@@ -68,18 +68,17 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Test Ozone Manager operation in distributed handler scenario.
  */
-@Timeout(300)
 @Unhealthy("HDDS-3260")
 public class TestScmSafeMode {
 
@@ -93,14 +92,6 @@ public class TestScmSafeMode {
   private StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true and
-   * OZONE_HANDLER_TYPE_KEY = "distributed"
-   *
-   * @throws IOException
-   */
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
@@ -119,9 +110,6 @@ public class TestScmSafeMode {
         .getStorageContainerLocationClient();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);
@@ -141,9 +129,9 @@ public class TestScmSafeMode {
         .getStorageContainerManager().getContainerManager().getContainers();
     GenericTestUtils.waitFor(() -> containers.size() >= 3, 100, 1000);
 
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
-    String keyName = "key" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
+    String keyName = "key" + RandomStringUtils.secure().nextNumeric(5);
 
     ObjectStore store = client.getObjectStore();
     store.createVolume(volumeName);
@@ -246,8 +234,7 @@ public class TestScmSafeMode {
     });
     cluster.stop();
 
-    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-        .captureLogs(SCMSafeModeManager.getLogger());
+    LogCapturer logCapturer = LogCapturer.captureLogs(SCMSafeModeManager.getLogger());
     logCapturer.clearOutput();
 
     cluster = builder.build();

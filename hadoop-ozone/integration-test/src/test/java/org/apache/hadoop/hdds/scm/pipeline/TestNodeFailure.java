@@ -18,11 +18,12 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.fail;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
@@ -31,6 +32,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -46,11 +48,8 @@ public class TestNodeFailure {
   private static PipelineManager pipelineManager;
   private static int timeForFailure;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   *
-   * @throws IOException
-   */
+  private static final String FLOOD_TOKEN = "pipeline Action CLOSE";
+
   @BeforeAll
   public static void init() throws Exception {
     final OzoneConfiguration conf = new OzoneConfiguration();
@@ -79,9 +78,6 @@ public class TestNodeFailure {
         .getFollowerSlownessTimeout();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public static void shutdown() {
     if (cluster != null) {
@@ -91,6 +87,7 @@ public class TestNodeFailure {
 
   @Test
   public void testPipelineFail() {
+    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer.captureLogs(XceiverServerRatis.class);
     ratisPipelines.forEach(pipeline -> {
       try {
         waitForPipelineCreation(pipeline.getId());
@@ -107,6 +104,9 @@ public class TestNodeFailure {
         fail("Test Failed: " + e.getMessage());
       }
     });
+    logCapturer.stopCapturing();
+    int occurrences = StringUtils.countMatches(logCapturer.getOutput(), FLOOD_TOKEN);
+    assertThat(occurrences).isEqualTo(2);
   }
 
   /**

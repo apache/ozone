@@ -46,6 +46,8 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
   public static final String SOURCE_NAME =
       S3GatewayMetrics.class.getSimpleName();
 
+  // TODO: https://issues.apache.org/jira/browse/HDDS-13555
+  @SuppressWarnings("PMD.SingularField")
   private MetricsRegistry registry;
   private static S3GatewayMetrics instance;
 
@@ -64,7 +66,6 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
   private @Metric MutableCounterLong listMultipartUploadsSuccess;
   private @Metric MutableCounterLong listMultipartUploadsFailure;
   private @Metric MutableCounterLong listKeyCount;
-
 
   // RootEndpoint
   private @Metric MutableCounterLong listS3BucketsSuccess;
@@ -421,7 +422,9 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
     deleteObjectTaggingFailure.snapshot(recordBuilder, true);
     deleteObjectTaggingFailureLatencyNs.snapshot(recordBuilder, true);
     putObjectAclSuccess.snapshot(recordBuilder, true);
+    putObjectAclSuccessLatencyNs.snapshot(recordBuilder, true);
     putObjectAclFailure.snapshot(recordBuilder, true);
+    putObjectAclFailureLatencyNs.snapshot(recordBuilder, true);
   }
 
   // INC and UPDATE

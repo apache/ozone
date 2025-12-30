@@ -151,6 +151,17 @@ message KeyValue {
 }
 
 /**
+ * Types of storage media.
+ */
+enum StorageTypeProto {
+  DISK = 1;
+  SSD = 2;
+  ARCHIVE = 3;
+  RAM_DISK = 4;
+  PROVIDED = 5;
+}
+
+/**
  * Type of the node.
  */
 enum NodeType {
@@ -189,6 +200,8 @@ message Node {
     required DatanodeDetailsProto nodeID = 1;
     repeated NodeState nodeStates = 2;
     repeated NodeOperationalState nodeOperationalStates = 3;
+    optional int32 totalVolumeCount = 4;
+    optional int32 healthyVolumeCount = 5;
 }
 
 message NodePool {
@@ -204,6 +217,7 @@ message DatanodeUsageInfoProto {
     optional int64 committed = 6;
     optional int64 freeSpaceToSpare = 7;
     optional int64 pipelineCount = 8;
+    optional int64 reserved = 9;
 }
 
 /**
@@ -436,6 +450,7 @@ message ContainerReplicaHistoryProto {
     required int64 lastSeenTime = 3;
     required int64 bcsId = 4;
     optional string state = 5;
+    optional int64 dataChecksum = 6;
 }
 
 message SCMContainerReplicaProto {
@@ -447,6 +462,7 @@ message SCMContainerReplicaProto {
     required int64 keyCount = 6;
     required int64 bytesUsed = 7;
     optional int64 replicaIndex = 8;
+    optional int64 dataChecksum = 9;
 }
 
 message KeyContainerIDList {
@@ -463,6 +479,7 @@ message ReplicationManagerReportProto {
     required int64 timestamp = 1;
     repeated KeyIntValue stat = 2;
     repeated KeyContainerIDList statSample = 3;
+    optional int32 sampleLimit = 4 [default = 100];
 }
 
 message ContainerBalancerConfigurationProto {
@@ -499,11 +516,19 @@ message DeletedBlocksTransactionInfo {
     optional int32 count = 4;
 }
 
+message DeletedBlocksTransactionSummary {
+    optional uint64 totalTransactionCount = 1;
+    optional uint64 totalBlockCount = 2;
+    optional uint64 totalBlockSize = 3;
+    optional uint64 totalBlockReplicatedSize = 4;
+}
+
 message CompactionFileInfoProto {
     optional string fileName = 1;
     optional string startKey = 2;
     optional string endKey = 3;
     optional string columnFamily = 4;
+    optional bool pruned = 5;
 }
 
 message CompactionLogEntryProto {

@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.container.common.utils;
 
-import java.io.IOException;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 
@@ -32,7 +31,7 @@ public class RawDB extends DBHandle {
   }
 
   @Override
-  public void close() throws IOException {
+  public void close() {
     // NOTE: intend to do nothing on close
     // With schema v3, block operations on a single container should not
     // close the whole db handle.

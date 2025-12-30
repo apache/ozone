@@ -23,10 +23,13 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getECContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getReplicas;
+import static org.apache.hadoop.hdds.scm.container.TestContainerReportHandler.createMatchingDataChecksumForReplica;
+import static org.apache.hadoop.hdds.scm.container.TestContainerReportHandler.createUniqueDataChecksumForReplica;
 import static org.apache.hadoop.hdds.scm.container.TestContainerReportHandler.getContainerReportsProto;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
@@ -100,13 +103,11 @@ public class TestIncrementalContainerReportHandler {
   private ContainerManager containerManager;
   private ContainerStateManager containerStateManager;
   private EventPublisher publisher;
-  private HDDSLayoutVersionManager versionManager;
   private SCMContext scmContext = SCMContext.emptyContext();
   private PipelineManager pipelineManager;
   @TempDir
   private File testDir;
   private DBStore dbStore;
-  private SCMHAManager scmhaManager;
 
   @BeforeEach
   public void setup() throws IOException, InvalidStateTransitionException,
@@ -118,13 +119,13 @@ public class TestIncrementalContainerReportHandler {
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
     SCMStorageConfig storageConfig = new SCMStorageConfig(conf);
-    this.versionManager = mock(HDDSLayoutVersionManager.class);
+    HDDSLayoutVersionManager versionManager = mock(HDDSLayoutVersionManager.class);
     when(versionManager.getMetadataLayoutVersion()).thenReturn(maxLayoutVersion());
     when(versionManager.getSoftwareLayoutVersion()).thenReturn(maxLayoutVersion());
     this.nodeManager =
         new SCMNodeManager(conf, storageConfig, eventQueue, clusterMap,
             scmContext, versionManager);
-    scmhaManager = SCMHAManagerStub.getInstance(true);
+    SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
     dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
 
     pipelineManager =
@@ -137,7 +138,7 @@ public class TestIncrementalContainerReportHandler {
         .setContainerStore(SCMDBDefinition.CONTAINERS.getTable(dbStore))
         .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
         .setContainerReplicaPendingOps(new ContainerReplicaPendingOps(
-            Clock.system(ZoneId.systemDefault())))
+            Clock.system(ZoneId.systemDefault()), null))
         .build();
 
     this.publisher = mock(EventPublisher.class);
@@ -185,13 +186,11 @@ public class TestIncrementalContainerReportHandler {
 
   @AfterEach
   public void tearDown() throws Exception {
-    containerStateManager.close();
     nodeManager.close();
     if (dbStore != null) {
       dbStore.close();
     }
   }
-
 
   @Test
   public void testClosingToClosed() throws IOException, TimeoutException {
@@ -619,6 +618,140 @@ public class TestIncrementalContainerReportHandler {
     }
   }
 
+  @Test
+  public void testWithNoContainerDataChecksum() throws Exception {
+    final IncrementalContainerReportHandler reportHandler = new IncrementalContainerReportHandler(nodeManager,
+        containerManager, scmContext);
+
+    final int numNodes = 3;
+
+    // Create a container which will have one replica on each datanode.
+    final ContainerInfo container = getContainer(LifeCycleState.CLOSED);
+    ContainerID contID = container.containerID();
+
+    List<DatanodeDetails> datanodes = new ArrayList<>();
+    for (int i = 0; i < numNodes; i++) {
+      DatanodeDetails dn = randomDatanodeDetails();
+      nodeManager.register(dn, null, null);
+      datanodes.add(dn);
+    }
+
+    containerStateManager.addContainer(container.getProtobuf());
+
+    getReplicas(contID, ContainerReplicaProto.State.CLOSED, 0, datanodes)
+        .forEach(containerStateManager::updateContainerReplica);
+
+    // Container manager should now be aware of 3 replicas of each container.
+    assertEquals(numNodes, containerManager.getContainerReplicas(contID).size());
+
+    // All replicas should start with an empty data checksum in SCM.
+    boolean contOneDataChecksumsEmpty = containerManager.getContainerReplicas(contID).stream()
+        .allMatch(r -> r.getDataChecksum() == 0);
+    assertTrue(contOneDataChecksumsEmpty, "Replicas of container one should not yet have any data checksums.");
+
+    // Send a report to SCM from one datanode that still does not have a data checksum.
+    for (DatanodeDetails dn: datanodes) {
+      final IncrementalContainerReportProto dnReportProto = getIncrementalContainerReportProto(
+          contID, ContainerReplicaProto.State.CLOSED, dn.getUuidString());
+      final IncrementalContainerReportFromDatanode dnReport = new IncrementalContainerReportFromDatanode(dn,
+          dnReportProto);
+      reportHandler.onMessage(dnReport, publisher);
+    }
+
+    // Regardless of which datanode sent the report, none of them have checksums, so all replica's data checksums
+    // should remain empty.
+    boolean containerDataChecksumEmpty = containerManager.getContainerReplicas(contID).stream()
+        .allMatch(r -> r.getDataChecksum() == 0);
+    assertTrue(containerDataChecksumEmpty, "Replicas of the container should not have any data checksums.");
+  }
+
+  @Test
+  public void testWithContainerDataChecksum() throws Exception {
+    final IncrementalContainerReportHandler reportHandler = new IncrementalContainerReportHandler(nodeManager,
+        containerManager, scmContext);
+
+    final int numNodes = 3;
+
+    // Create a container which will have one replica on each datanode.
+    final ContainerInfo container = getContainer(LifeCycleState.CLOSED);
+    ContainerID contID = container.containerID();
+
+    List<DatanodeDetails> datanodes = new ArrayList<>();
+    for (int i = 0; i < numNodes; i++) {
+      DatanodeDetails dn = randomDatanodeDetails();
+      nodeManager.register(dn, null, null);
+      datanodes.add(dn);
+    }
+
+    containerStateManager.addContainer(container.getProtobuf());
+
+    getReplicas(contID, ContainerReplicaProto.State.CLOSED, 0, datanodes)
+        .forEach(containerStateManager::updateContainerReplica);
+
+    // Container manager should now be aware of 3 replicas of each container.
+    assertEquals(3, containerManager.getContainerReplicas(contID).size());
+
+    // All replicas should start with a zero data checksum in SCM.
+    boolean dataChecksumsEmpty = containerManager.getContainerReplicas(contID).stream()
+        .allMatch(r -> r.getDataChecksum() == 0);
+    assertTrue(dataChecksumsEmpty, "Replicas of container one should not yet have any data checksums.");
+
+    // For each datanode, send a container report with a mismatched checksum.
+    for (DatanodeDetails dn: datanodes) {
+      IncrementalContainerReportProto dnReportProto = getIncrementalContainerReportProto(
+          contID, ContainerReplicaProto.State.CLOSED, dn.getUuidString());
+      ContainerReplicaProto replicaWithChecksum = dnReportProto.getReport(0).toBuilder()
+          .setDataChecksum(createUniqueDataChecksumForReplica(contID, dn.getUuidString()))
+          .build();
+      IncrementalContainerReportProto reportWithChecksum = dnReportProto.toBuilder()
+          .clearReport()
+          .addReport(replicaWithChecksum)
+          .build();
+      final IncrementalContainerReportFromDatanode dnReport = new IncrementalContainerReportFromDatanode(dn,
+          reportWithChecksum);
+      reportHandler.onMessage(dnReport, publisher);
+    }
+
+    // All the replicas should have different checksums.
+    // Since the containers don't have any data in this test, different checksums are based on container ID and
+    // datanode ID.
+    int numReplicasChecked = 0;
+    for (ContainerReplica replica: containerManager.getContainerReplicas(contID)) {
+      long expectedChecksum = createUniqueDataChecksumForReplica(
+          contID, replica.getDatanodeDetails().getUuidString());
+      assertEquals(expectedChecksum, replica.getDataChecksum());
+      numReplicasChecked++;
+    }
+    assertEquals(numNodes, numReplicasChecked);
+
+    // For each datanode, send a container report with a matching checksum.
+    // This simulates reconciliation running.
+    for (DatanodeDetails dn: datanodes) {
+      IncrementalContainerReportProto dnReportProto = getIncrementalContainerReportProto(
+          contID, ContainerReplicaProto.State.CLOSED, dn.getUuidString());
+      ContainerReplicaProto replicaWithChecksum = dnReportProto.getReport(0).toBuilder()
+          .setDataChecksum(createMatchingDataChecksumForReplica(contID))
+          .build();
+      IncrementalContainerReportProto reportWithChecksum = dnReportProto.toBuilder()
+          .clearReport()
+          .addReport(replicaWithChecksum)
+          .build();
+      IncrementalContainerReportFromDatanode dnReport = new IncrementalContainerReportFromDatanode(dn,
+          reportWithChecksum);
+      reportHandler.onMessage(dnReport, publisher);
+    }
+
+    // All the replicas should now have matching checksums.
+    // Since the containers don't have any data in this test, the matching checksums are based on container ID only.
+    numReplicasChecked = 0;
+    for (ContainerReplica replica: containerManager.getContainerReplicas(contID)) {
+      long expectedChecksum = createMatchingDataChecksumForReplica(contID);
+      assertEquals(expectedChecksum, replica.getDataChecksum());
+      numReplicasChecked++;
+    }
+    assertEquals(numNodes, numReplicasChecked);
+  }
+
   private static IncrementalContainerReportProto
       getIncrementalContainerReportProto(ContainerReplicaProto replicaProto) {
     final IncrementalContainerReportProto.Builder crBuilder =
@@ -650,7 +783,6 @@ public class TestIncrementalContainerReportHandler {
                     .setContainerID(containerId.getId())
                     .setState(state)
                     .setOriginNodeId(originNodeId)
-                    .setFinalhash("e16cc9d6024365750ed8dbd194ea46d2")
                     .setSize(5368709120L)
                     .setUsed(2000000000L)
                     .setKeyCount(100000000L)

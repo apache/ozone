@@ -17,13 +17,12 @@
 
 package org.apache.hadoop.ozone.om.request.bucket.acl;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.List;
 import java.util.Map;
-import java.util.function.BiPredicate;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -38,6 +37,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.util.AclOp;
 import org.apache.hadoop.ozone.om.request.util.ObjectParser;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.bucket.acl.OMBucketAclResponse;
@@ -52,10 +52,9 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
  */
 public abstract class OMBucketAclRequest extends OMClientRequest {
 
-  private final BiPredicate<List<OzoneAcl>, OmBucketInfo> omBucketAclOp;
+  private final AclOp omBucketAclOp;
 
-  public OMBucketAclRequest(OMRequest omRequest,
-      BiPredicate<List<OzoneAcl>, OmBucketInfo> aclOp) {
+  public OMBucketAclRequest(OMRequest omRequest, AclOp aclOp) {
     super(omRequest);
     omBucketAclOp = aclOp;
   }
@@ -105,8 +104,9 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
         throw new OMException(OMException.ResultCodes.BUCKET_NOT_FOUND);
       }
 
-      operationResult = omBucketAclOp.test(ozoneAcls, omBucketInfo);
-      omBucketInfo.setUpdateID(transactionLogIndex);
+      OmBucketInfo.Builder builder = omBucketInfo.toBuilder();
+
+      operationResult = omBucketAclOp.test(ozoneAcls, builder.acls());
 
       if (operationResult) {
         // Update the modification time when updating ACLs of Bucket.
@@ -121,8 +121,10 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
           modificationTime = getOmRequest().getRemoveAclRequest()
               .getModificationTime();
         }
-        omBucketInfo = omBucketInfo.toBuilder()
-            .setModificationTime(modificationTime).build();
+        omBucketInfo = builder
+            .setUpdateID(transactionLogIndex)
+            .setModificationTime(modificationTime)
+            .build();
 
         // update cache.
         omMetadataManager.getBucketTable().addCacheEntry(
@@ -169,7 +171,6 @@ public abstract class OMBucketAclRequest extends OMClientRequest {
    * @return path name
    */
   abstract String getPath();
-
 
   /**
    * Get the Bucket object Info from the request.

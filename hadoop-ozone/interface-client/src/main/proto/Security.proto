@@ -22,7 +22,6 @@
  * for what changes are allowed for a *stable* .proto interface.
  */
 
-//Use ozone specific security proto until start using hadoop-thirdparty shaded protobuf everywhere.
 syntax = "proto2";
 option java_package = "org.apache.hadoop.ozone.security.proto";
 option java_outer_classname = "SecurityProtos";

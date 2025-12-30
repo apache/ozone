@@ -38,7 +38,9 @@ import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientVersion;
 
@@ -49,8 +51,8 @@ public class MockPipelineManager implements PipelineManager {
 
   private final PipelineStateManager stateManager;
 
-  public MockPipelineManager(DBStore dbStore, SCMHAManager scmhaManager,
-                             NodeManager nodeManager) throws IOException {
+  public MockPipelineManager(DBStore dbStore, SCMHAManager scmhaManager, NodeManager nodeManager)
+      throws RocksDatabaseException, CodecException, DuplicatedPipelineIdException {
     stateManager = PipelineStateManagerImpl
         .newBuilder().setNodeManager(nodeManager)
         .setRatisServer(scmhaManager.getRatisServer())
@@ -89,8 +91,7 @@ public class MockPipelineManager implements PipelineManager {
 
   @Override
   public Pipeline buildECPipeline(ReplicationConfig replicationConfig,
-      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
-      throws IOException {
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes) {
     final List<DatanodeDetails> nodes = Stream.generate(
             MockDatanodeDetails::randomDatanodeDetails)
         .limit(replicationConfig.getRequiredNodes())
@@ -197,34 +198,29 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public void addContainerToPipeline(final PipelineID pipelineID,
-                                     final ContainerID containerID)
-      throws IOException {
+  public void addContainerToPipeline(final PipelineID pipelineID, final ContainerID containerID)
+      throws PipelineNotFoundException, InvalidPipelineStateException {
     stateManager.addContainerToPipeline(pipelineID, containerID);
   }
 
   @Override
-  public void addContainerToPipelineSCMStart(
-          PipelineID pipelineID, ContainerID containerID) throws IOException {
+  public void addContainerToPipelineSCMStart(PipelineID pipelineID, ContainerID containerID)
+      throws PipelineNotFoundException {
     stateManager.addContainerToPipelineForce(pipelineID, containerID);
   }
 
   @Override
-  public void removeContainerFromPipeline(final PipelineID pipelineID,
-                                          final ContainerID containerID)
-      throws IOException {
+  public void removeContainerFromPipeline(PipelineID pipelineID, ContainerID containerID) {
     stateManager.removeContainerFromPipeline(pipelineID, containerID);
   }
 
   @Override
-  public NavigableSet<ContainerID> getContainersInPipeline(
-      final PipelineID pipelineID) throws IOException {
+  public NavigableSet<ContainerID> getContainersInPipeline(PipelineID pipelineID) throws PipelineNotFoundException {
     return stateManager.getContainers(pipelineID);
   }
 
   @Override
-  public int getNumberOfContainers(final PipelineID pipelineID)
-      throws IOException {
+  public int getNumberOfContainers(final PipelineID pipelineID) throws PipelineNotFoundException {
     return getContainersInPipeline(pipelineID).size();
   }
 
@@ -236,20 +232,14 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public void closePipeline(final Pipeline pipeline, final boolean onTimeout)
+  public void closePipeline(final PipelineID pipelineId)
       throws IOException {
-    stateManager.updatePipelineState(pipeline.getId().getProtobuf(),
+    stateManager.updatePipelineState(pipelineId.getProtobuf(),
         HddsProtos.PipelineState.PIPELINE_CLOSED);
   }
 
   @Override
-  public void closePipeline(PipelineID pipelineID) throws IOException {
-
-  }
-
-  @Override
-  public void deletePipeline(PipelineID pipelineID) throws IOException {
-
+  public void deletePipeline(PipelineID pipelineID) {
   }
 
   @Override
@@ -288,8 +278,7 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public void activatePipeline(final PipelineID pipelineID)
-      throws IOException {
+  public void activatePipeline(final PipelineID pipelineID) {
   }
 
   @Override
@@ -305,9 +294,7 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public void reinitialize(Table<PipelineID, Pipeline> pipelineStore)
-      throws IOException {
-
+  public void reinitialize(Table<PipelineID, Pipeline> pipelineStore) {
   }
 
   @Override
@@ -321,8 +308,7 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public void close() throws IOException {
-
+  public void close() {
   }
 
   @Override
@@ -352,6 +338,11 @@ public class MockPipelineManager implements PipelineManager {
 
   @Override
   public boolean isPipelineCreationFrozen() {
+    return false;
+  }
+
+  @Override
+  public boolean hasEnoughSpace(Pipeline pipeline, long containerSize) {
     return false;
   }
 }

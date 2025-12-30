@@ -24,6 +24,7 @@ import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -55,6 +56,9 @@ import org.slf4j.LoggerFactory;
  */
 public final class ECKeyOutputStream extends KeyOutputStream
     implements KeyMetadataAware {
+
+  private static final Logger LOG = LoggerFactory.getLogger(KeyOutputStream.class);
+
   private OzoneClientConfig config;
   private ECChunkBuffers ecChunkBufferCache;
   private final BlockingQueue<ECChunkBuffers> ecStripeQueue;
@@ -74,14 +78,6 @@ public final class ECKeyOutputStream extends KeyOutputStream
    * This is essential for operations like S3 put to ensure atomicity.
    */
   private boolean atomicKeyCreation;
-
-  private enum StripeWriteStatus {
-    SUCCESS,
-    FAILED
-  }
-
-  public static final Logger LOG =
-      LoggerFactory.getLogger(KeyOutputStream.class);
 
   private volatile boolean closed;
   private volatile boolean closing;
@@ -399,7 +395,7 @@ public final class ECKeyOutputStream extends KeyOutputStream
   private void handleException(BlockOutputStreamEntry streamEntry,
       IOException exception) throws IOException {
     Throwable t = HddsClientUtils.checkForException(exception);
-    Preconditions.checkNotNull(t);
+    Objects.requireNonNull(t, "t == null");
     boolean containerExclusionException = checkIfContainerToExclude(t);
     if (containerExclusionException) {
       getBlockOutputStreamEntryPool().getExcludeList().addPipeline(streamEntry.getPipeline().getId());
@@ -643,6 +639,7 @@ public final class ECKeyOutputStream extends KeyOutputStream
 
   private static class CheckpointDummyStripe extends ECChunkBuffers {
     private final long version;
+
     CheckpointDummyStripe(long version) {
       super();
       this.version = version;
@@ -728,5 +725,10 @@ public final class ECKeyOutputStream extends KeyOutputStream
         }
       }
     }
+  }
+
+  private enum StripeWriteStatus {
+    SUCCESS,
+    FAILED
   }
 }

@@ -17,21 +17,18 @@
 
 package org.apache.hadoop.ozone.om.ratis.utils;
 
-import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.om.OzoneManagerUtils.getBucketLayout;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.protobuf.ServiceException;
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.server.ServerUtils;
@@ -481,7 +478,7 @@ public final class OzoneManagerRatisUtils {
     String storageDir = conf.get(OMConfigKeys.OZONE_OM_RATIS_STORAGE_DIR);
 
     if (Strings.isNullOrEmpty(storageDir)) {
-      storageDir = ServerUtils.getDefaultRatisDirectory(conf);
+      storageDir = ServerUtils.getDefaultRatisDirectory(conf, NodeType.OM);
     }
     return storageDir;
   }
@@ -492,13 +489,9 @@ public final class OzoneManagerRatisUtils {
   public static String getOMRatisSnapshotDirectory(ConfigurationSource conf) {
     String snapshotDir = conf.get(OZONE_OM_RATIS_SNAPSHOT_DIR);
 
-    // If ratis snapshot directory is not set, fall back to ozone.metadata.dir.
+    // If ratis snapshot directory is not set, fall back to default component-specific location.
     if (Strings.isNullOrEmpty(snapshotDir)) {
-      LOG.warn("{} is not configured. Falling back to {} config",
-          OZONE_OM_RATIS_SNAPSHOT_DIR, OZONE_METADATA_DIRS);
-      File metaDirPath = ServerUtils.getOzoneMetaDirPath(conf);
-      snapshotDir = Paths.get(metaDirPath.getPath(),
-          OZONE_RATIS_SNAPSHOT_DIR).toString();
+      snapshotDir = ServerUtils.getDefaultRatisSnapshotDirectory(conf, NodeType.OM);
     }
     return snapshotDir;
   }

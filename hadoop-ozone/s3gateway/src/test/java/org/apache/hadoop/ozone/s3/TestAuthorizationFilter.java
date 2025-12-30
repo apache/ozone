@@ -62,10 +62,6 @@ public class TestAuthorizationFilter {
 
   private AuthorizationFilter authorizationFilter = new AuthorizationFilter();
 
-  private MultivaluedMap<String, String> headerMap;
-  private MultivaluedMap<String, String> queryMap;
-  private MultivaluedMap<String, String> pathParamsMap;
-
   private static final String DATETIME = StringToSignProducer.TIME_FORMATTER.
       format(LocalDateTime.now());
 
@@ -267,9 +263,9 @@ public class TestAuthorizationFilter {
       String method, String authHeader, String contentMd5,
       String host, String amzContentSha256, String date, String contentType,
       String path) throws URISyntaxException {
-    headerMap = new MultivaluedHashMap<>();
-    queryMap = new MultivaluedHashMap<>();
-    pathParamsMap = new MultivaluedHashMap<>();
+    MultivaluedMap<String, String> headerMap = new MultivaluedHashMap<>();
+    MultivaluedMap<String, String> queryMap = new MultivaluedHashMap<>();
+    MultivaluedMap<String, String> pathParamsMap = new MultivaluedHashMap<>();
 
     System.err.println("Testing: " + authHeader);
     headerMap.putSingle(AUTHORIZATION_HEADER, authHeader);

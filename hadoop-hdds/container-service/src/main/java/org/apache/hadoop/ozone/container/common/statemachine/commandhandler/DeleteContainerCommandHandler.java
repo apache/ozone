@@ -75,6 +75,7 @@ public class DeleteContainerCommandHandler implements CommandHandler {
         DeleteContainerCommandHandler.class.getSimpleName());
     this.opsLatencyMs = registry.newRate(SCMCommandProto.Type.deleteContainerCommand + "Ms");
   }
+
   @Override
   public void handle(final SCMCommand<?> command,
                      final OzoneContainer ozoneContainer,

@@ -24,6 +24,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.impl.BlockDeletingService;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 
@@ -43,7 +44,7 @@ class BlockDeletingServiceTestImpl extends BlockDeletingService {
   BlockDeletingServiceTestImpl(OzoneContainer container,
       int serviceInterval, ConfigurationSource conf) {
     super(container, serviceInterval, SERVICE_TIMEOUT_IN_MILLISECONDS,
-        TimeUnit.MILLISECONDS, 10, conf);
+        TimeUnit.MILLISECONDS, 10, conf, new ContainerChecksumTreeManager(conf));
   }
 
   @VisibleForTesting

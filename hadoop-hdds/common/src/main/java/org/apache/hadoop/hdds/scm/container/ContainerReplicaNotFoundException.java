@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+
 /**
  * Signals that a ContainerReplica is missing from the Container in
  * ContainerManager.
@@ -28,18 +30,16 @@ public class ContainerReplicaNotFoundException extends ContainerException {
    * as its error detail message.
    */
   public ContainerReplicaNotFoundException() {
-    super(ResultCodes.CONTAINER_REPLICA_NOT_FOUND);
+    this(null, null);
   }
 
-  /**
-   * Constructs an {@code ContainerReplicaNotFoundException} with the
-   * specified detail message.
-   *
-   * @param message
-   *        The detail message (which is saved for later retrieval
-   *        by the {@link #getMessage()} method)
-   */
+  /** Required by {@link org.apache.hadoop.ipc_.RemoteException#unwrapRemoteException()}. */
   public ContainerReplicaNotFoundException(String message) {
     super(message, ResultCodes.CONTAINER_REPLICA_NOT_FOUND);
+  }
+
+  public ContainerReplicaNotFoundException(ContainerID container, DatanodeDetails datanode) {
+    super("Replica not found for container " + container + " and datanode " + datanode,
+        ResultCodes.CONTAINER_REPLICA_NOT_FOUND);
   }
 }

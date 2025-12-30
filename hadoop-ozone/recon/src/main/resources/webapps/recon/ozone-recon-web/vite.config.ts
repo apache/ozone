@@ -29,6 +29,9 @@ function pathResolve(dir: string) {
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  // This "base" path determines the import locations for other files. By default it is '/' which causes all files to be
+  // fetched from a root URL. However in case of proxy we need to get this value relative to a base, hence it is set to empty string
+  base: "",
   plugins: [
     react({
       devTarget: "es2015" //SWC by default bypasses the build target, set dev target explicitly

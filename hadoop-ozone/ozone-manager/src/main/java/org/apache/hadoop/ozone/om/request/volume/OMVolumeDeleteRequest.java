@@ -17,12 +17,12 @@
 
 package org.apache.hadoop.ozone.om.request.volume;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.USER_LOCK;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.USER_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.util.Objects;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -63,7 +63,7 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
 
     DeleteVolumeRequest deleteVolumeRequest =
         getOmRequest().getDeleteVolumeRequest();
-    Preconditions.checkNotNull(deleteVolumeRequest);
+    Objects.requireNonNull(deleteVolumeRequest, "deleteVolumeRequest == null");
 
     String volume = deleteVolumeRequest.getVolumeName();
 

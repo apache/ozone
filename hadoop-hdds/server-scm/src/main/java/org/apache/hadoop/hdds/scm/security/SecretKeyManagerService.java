@@ -42,7 +42,7 @@ import org.slf4j.LoggerFactory;
  * A background service running in SCM to maintain the SecretKeys lifecycle.
  */
 public class SecretKeyManagerService implements SCMService, Runnable {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(SecretKeyManagerService.class);
 
   private static final String SERVICE_NAME =
@@ -51,7 +51,6 @@ public class SecretKeyManagerService implements SCMService, Runnable {
   private final SCMContext scmContext;
   private final SecretKeyManager secretKeyManager;
   private final SecretKeyConfig secretKeyConfig;
-
 
   /**
    * SCMService related variables.

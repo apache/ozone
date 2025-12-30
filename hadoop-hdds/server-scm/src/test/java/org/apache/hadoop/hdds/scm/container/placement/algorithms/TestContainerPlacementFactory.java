@@ -63,8 +63,6 @@ import org.junit.jupiter.api.Test;
  * Test for scm container placement factory.
  */
 public class TestContainerPlacementFactory {
-  // network topology cluster
-  private NetworkTopology cluster;
   // datanodes array list
   private List<DatanodeDetails> datanodes = new ArrayList<>();
   private List<DatanodeInfo> dnInfos = new ArrayList<>();
@@ -72,8 +70,6 @@ public class TestContainerPlacementFactory {
   private static final long STORAGE_CAPACITY = 100L;
   // configuration
   private OzoneConfiguration conf;
-  // node manager
-  private NodeManager nodeManager;
 
   @BeforeEach
   public void setup() {
@@ -91,7 +87,8 @@ public class TestContainerPlacementFactory {
     NodeSchema[] schemas = new NodeSchema[]
         {ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA};
     NodeSchemaManager.getInstance().init(schemas, true);
-    cluster = new NetworkTopologyImpl(NodeSchemaManager.getInstance());
+    // network topology cluster
+    NetworkTopology cluster = new NetworkTopologyImpl(NodeSchemaManager.getInstance());
 
     // build datanodes, and network topology
     String rack = "/rack";
@@ -105,11 +102,11 @@ public class TestContainerPlacementFactory {
           UpgradeUtils.defaultLayoutVersionProto());
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
-          datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
+          datanodeInfo.getID(), "/data1-" + datanodeInfo.getID(),
           STORAGE_CAPACITY, 0, 100L, null);
       MetadataStorageReportProto metaStorage1 =
           HddsTestUtils.createMetadataStorageReport(
-          "/metadata1-" + datanodeInfo.getUuidString(),
+          "/metadata1-" + datanodeInfo.getID(),
           STORAGE_CAPACITY, 0, 100L, null);
       datanodeInfo.updateStorageReports(
           new ArrayList<>(Arrays.asList(storage1)));
@@ -122,26 +119,27 @@ public class TestContainerPlacementFactory {
     }
 
     StorageReportProto storage2 = HddsTestUtils.createStorageReport(
-        dnInfos.get(2).getUuid(),
-        "/data1-" + dnInfos.get(2).getUuidString(),
+        dnInfos.get(2).getID(),
+        "/data1-" + dnInfos.get(2).getID(),
         STORAGE_CAPACITY, 90L, 10L, null);
     dnInfos.get(2).updateStorageReports(
         new ArrayList<>(Arrays.asList(storage2)));
     StorageReportProto storage3 = HddsTestUtils.createStorageReport(
-        dnInfos.get(3).getUuid(),
-        "/data1-" + dnInfos.get(3).getUuidString(),
+        dnInfos.get(3).getID(),
+        "/data1-" + dnInfos.get(3).getID(),
         STORAGE_CAPACITY, 80L, 20L, null);
     dnInfos.get(3).updateStorageReports(
         new ArrayList<>(Arrays.asList(storage3)));
     StorageReportProto storage4 = HddsTestUtils.createStorageReport(
-        dnInfos.get(4).getUuid(),
-        "/data1-" + dnInfos.get(4).getUuidString(),
+        dnInfos.get(4).getID(),
+        "/data1-" + dnInfos.get(4).getID(),
         STORAGE_CAPACITY, 70L, 30L, null);
     dnInfos.get(4).updateStorageReports(
         new ArrayList<>(Arrays.asList(storage4)));
 
     // create mock node manager
-    nodeManager = mock(NodeManager.class);
+    // node manager
+    NodeManager nodeManager = mock(NodeManager.class);
     when(nodeManager.getNodes(NodeStatus.inServiceHealthy()))
         .thenReturn(new ArrayList<>(datanodes));
     for (DatanodeInfo dn: dnInfos) {

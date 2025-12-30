@@ -138,8 +138,36 @@ import org.slf4j.LoggerFactory;
  *    Then, WriteChunk commit and CreateContainer will be executed in the same order.
  */
 public class ContainerStateMachine extends BaseStateMachine {
-  static final Logger LOG =
-      LoggerFactory.getLogger(ContainerStateMachine.class);
+  static final Logger LOG = LoggerFactory.getLogger(ContainerStateMachine.class);
+
+  private final SimpleStateMachineStorage storage = new SimpleStateMachineStorage();
+  private final ContainerDispatcher dispatcher;
+  private final ContainerController containerController;
+  private final XceiverServerRatis ratisServer;
+  private final NavigableMap<Long, WriteFutures> writeChunkFutureMap;
+
+  private final long writeChunkWaitMaxNs;
+
+  // keeps track of the containers created per pipeline
+  private final Map<Long, Long> container2BCSIDMap;
+  private final TaskQueueMap containerTaskQueues = new TaskQueueMap();
+  private final ExecutorService executor;
+  private final List<ThreadPoolExecutor> chunkExecutors;
+  private final Map<Long, Long> applyTransactionCompletionMap;
+  private final Set<Long> unhealthyContainers;
+  private final Cache<Long, ByteString> stateMachineDataCache;
+  private final AtomicBoolean stateMachineHealthy;
+
+  private final Semaphore applyTransactionSemaphore;
+  private final boolean waitOnBothFollowers;
+  private final HddsDatanodeService datanodeService;
+  private static Semaphore semaphore = new Semaphore(1);
+  private final AtomicBoolean peersValidated;
+
+  /**
+   * CSM metrics.
+   */
+  private final CSMMetrics metrics;
 
   static class TaskQueueMap {
     private final Map<Long, TaskQueue> map = new HashMap<>();
@@ -216,35 +244,6 @@ public class ContainerStateMachine extends BaseStateMachine {
       return startTime;
     }
   }
-
-  private final SimpleStateMachineStorage storage =
-      new SimpleStateMachineStorage();
-  private final ContainerDispatcher dispatcher;
-  private final ContainerController containerController;
-  private final XceiverServerRatis ratisServer;
-  private final NavigableMap<Long, WriteFutures> writeChunkFutureMap;
-  private final long writeChunkWaitMaxNs;
-
-  // keeps track of the containers created per pipeline
-  private final Map<Long, Long> container2BCSIDMap;
-  private final TaskQueueMap containerTaskQueues = new TaskQueueMap();
-  private final ExecutorService executor;
-  private final List<ThreadPoolExecutor> chunkExecutors;
-  private final Map<Long, Long> applyTransactionCompletionMap;
-  private final Set<Long> unhealthyContainers;
-  private final Cache<Long, ByteString> stateMachineDataCache;
-  private final AtomicBoolean stateMachineHealthy;
-
-  private final Semaphore applyTransactionSemaphore;
-  private final boolean waitOnBothFollowers;
-  private final HddsDatanodeService datanodeService;
-  private static Semaphore semaphore = new Semaphore(1);
-  private final AtomicBoolean peersValidated;
-
-  /**
-   * CSM metrics.
-   */
-  private final CSMMetrics metrics;
 
   @SuppressWarnings("parameternumber")
   public ContainerStateMachine(HddsDatanodeService hddsDatanodeService, RaftGroupId gid,
@@ -378,6 +377,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       dispatcher.buildMissingContainerSetAndValidate(container2BCSIDMap);
     }
   }
+
   /**
    * As a part of taking snapshot with Ratis StateMachine, it will persist
    * the existing container set in the snapshotFile.
@@ -582,7 +582,8 @@ public class ContainerStateMachine extends BaseStateMachine {
     try {
       validateLongRunningWrite();
     } catch (StorageContainerException e) {
-      return completeExceptionally(e);
+      ContainerCommandResponseProto result = ContainerUtils.logAndReturnError(LOG, e, requestProto);
+      return CompletableFuture.completedFuture(result::toByteString);
     }
     final WriteChunkRequestProto write = requestProto.getWriteChunk();
     RaftServer server = ratisServer.getServer();
@@ -631,8 +632,11 @@ public class ContainerStateMachine extends BaseStateMachine {
             // see the stateMachine is marked unhealthy by other parallel thread
             unhealthyContainers.add(write.getBlockID().getContainerID());
             stateMachineHealthy.set(false);
-            raftFuture.completeExceptionally(e);
-            throw e;
+            StorageContainerException sce = new StorageContainerException("Failed to write chunk data",
+                e, ContainerProtos.Result.CONTAINER_INTERNAL_ERROR);
+            ContainerCommandResponseProto result = ContainerUtils.logAndReturnError(LOG, sce, requestProto);
+            raftFuture.complete(result::toByteString);
+            return result;
           } finally {
             // Remove the future once it finishes execution from the
             writeChunkFutureMap.remove(entryIndex);
@@ -657,8 +661,6 @@ public class ContainerStateMachine extends BaseStateMachine {
         // After concurrent flushes are allowed on the same key, chunk file inconsistencies can happen and
         // that should not crash the pipeline.
         && r.getResult() != ContainerProtos.Result.CHUNK_FILE_INCONSISTENCY) {
-      StorageContainerException sce =
-          new StorageContainerException(r.getMessage(), r.getResult());
       LOG.error(getGroupId() + ": writeChunk writeStateMachineData failed: blockId" +
           write.getBlockID() + " logIndex " + entryIndex + " chunkName " +
           write.getChunkData().getChunkName() + " Error message: " +
@@ -669,7 +671,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       // handling the entry for the write chunk in cache.
       stateMachineHealthy.set(false);
       unhealthyContainers.add(write.getBlockID().getContainerID());
-      raftFuture.completeExceptionally(sce);
+      raftFuture.complete(r::toByteString);
     } else {
       metrics.incNumBytesWrittenCount(
           requestProto.getWriteChunk().getChunkData().getLen());
@@ -876,9 +878,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     }
 
     // assert that the response has data in it.
-    Preconditions
-        .checkNotNull(data, "read chunk data is null for chunk: %s",
-            chunkInfo);
+    Objects.requireNonNull(data, () -> "data == null for " + TextFormat.shortDebugString(chunkInfo));
     Preconditions.checkState(data.size() == chunkInfo.getLen(),
         "read chunk len=%s does not match chunk expected len=%s for chunk:%s",
         data.size(), chunkInfo.getLen(), chunkInfo);
@@ -1265,8 +1265,10 @@ public class ContainerStateMachine extends BaseStateMachine {
 
   @Override
   public void notifyLogFailed(Throwable t, LogEntryProto failedEntry) {
-    LOG.error("{}: {} {}", getGroupId(), TermIndex.valueOf(failedEntry),
-        toStateMachineLogEntryString(failedEntry.getStateMachineLogEntry()), t);
+    String stateMachineLogEntry = failedEntry == null
+        ? "null"
+        : toStateMachineLogEntryString(failedEntry.getStateMachineLogEntry());
+    LOG.error("{}: {} {}", getGroupId(), TermIndex.valueOf(failedEntry), stateMachineLogEntry, t);
     ratisServer.handleNodeLogFailure(getGroupId(), t);
   }
 

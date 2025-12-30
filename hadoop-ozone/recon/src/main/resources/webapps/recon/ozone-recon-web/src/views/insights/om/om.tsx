@@ -19,19 +19,20 @@
 import React from 'react';
 import moment from 'moment';
 import filesize from 'filesize';
-import { Table, Tabs, Menu, Dropdown, Tooltip } from 'antd';
-import { MenuProps } from 'antd/es/menu';
-import { TablePaginationConfig } from 'antd/es/table';
-import { FunnelPlotFilled, InfoCircleOutlined } from '@ant-design/icons';
-import { ActionMeta, ValueType } from "react-select";
+import {Dropdown, Menu, Table, Tabs, Tooltip} from 'antd';
+import {MenuProps} from 'antd/es/menu';
+import {TablePaginationConfig} from 'antd/es/table';
+import {FunnelPlotFilled, InfoCircleOutlined} from '@ant-design/icons';
+import {ActionMeta, ValueType} from "react-select";
 import CreatableSelect from "react-select/creatable";
 
-import { ColumnSearch } from '@/utils/columnSearch';
-import { showDataFetchError, byteToSize } from '@/utils/common';
-import { AxiosGetHelper, cancelRequests } from '@/utils/axiosRequestHelper';
-import { IOption } from "@/components/multiSelect/multiSelect";
+import {ColumnSearch} from '@/utils/columnSearch';
+import {byteToSize, showDataFetchError} from '@/utils/common';
+import {AxiosGetHelper, cancelRequests} from '@/utils/axiosRequestHelper';
+import {IOption} from "@/components/multiSelect/multiSelect";
 
 import './om.less';
+import { ReplicationInfo } from '@/v2/types/insights.types';
 
 
 const size = filesize.partial({ standard: 'iec' });
@@ -86,6 +87,7 @@ interface IKeyResponse {
   Volume: string;
   Bucket: string;
   Key: string;
+  CompletePath: string;
   DataSize: number;
   Versions: number[];
   Blocks: object;
@@ -113,6 +115,12 @@ const KEY_TABLE_COLUMNS = [
     title: 'Key',
     dataIndex: 'Key',
     key: 'Key'
+  },
+  {
+    title: 'Path',
+    dataIndex: 'CompletePath',
+    key: 'CompletePath',
+    width: '270px'
   },
   {
     title: 'Size',
@@ -193,34 +201,29 @@ const OPEN_KEY_TAB_COLUMNS = [
     }
   },
   {
-    title: 'Replication Factor',
+    title: 'Replication Type',
     dataIndex: 'replicationInfo',
-    key: 'replicationfactor',
-    render: (replicationInfo: any) => (
+    key: 'replicationtype',
+    render: (replicationInfo: ReplicationInfo) => (
       <div>
-        {
-          <div >
-            {Object.values(replicationInfo)[0]}
-          </div>
-        }
+        {replicationInfo.replicationType}
       </div>
     )
   },
   {
-    title: 'Replication Type',
+    title: 'Replication Factor',
     dataIndex: 'replicationInfo',
-    key: 'replicationtype',
-    render: (replicationInfo: any) => (
+    key: 'replicationfactor',
+    render: (replicationInfo: ReplicationInfo) => (
       <div>
         {
-          <div >
-            {Object.values(replicationInfo)[2]}
-          </div>
+          (replicationInfo.replicationType === "RATIS")
+          ? replicationInfo.replicationFactor
+          : `${replicationInfo.codec}-${replicationInfo.data}-${replicationInfo.parity}`
         }
       </div>
     )
   }
-
 ];
 
 const PENDING_TAB_COLUMNS = [
@@ -541,7 +544,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       this.setState({
         loading: false,
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   };
 
@@ -587,7 +590,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       this.setState({
         loading: false
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
 
   };
@@ -646,7 +649,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       this.setState({
         loading: false,
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   };
 
@@ -723,7 +726,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       this.setState({
         loading: false
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   };
 
@@ -757,7 +760,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       this.setState({
         loading: false,
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   };
 
@@ -828,13 +831,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
             expandedRowData: Object.assign({}, expandedRowData, { [record.containerId]: expandedRowState })
           };
         });
-        if (error.name === "CanceledError") {
-          showDataFetchError(cancelRowExpandSignal.signal.reason)
-        }
-        else {
-          console.log(error);
-          showDataFetchError(error.toString());
-        }
+        showDataFetchError(error);
       });
     }
     else {

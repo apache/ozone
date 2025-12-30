@@ -18,10 +18,13 @@
 package org.apache.hadoop.ozone.container.keyvalue.interfaces;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.List;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 
 /**
  * BlockManager is for performing key related operations on the container.
@@ -48,6 +51,18 @@ public interface BlockManager {
    */
   long putBlock(Container container, BlockData data, boolean endOfBlock)
       throws IOException;
+
+  /**
+   * Persists the block data for a closed container. The block data should have all the chunks and bcsId.
+   * Overwrites the block if it already exists, The container's used bytes should be updated by the caller with
+   * {@link ChunkManager#writeChunk(Container, BlockID, ChunkInfo, ByteBuffer, DispatcherContext)}.
+   *
+   * @param container      - Container for which block data need to be persisted.
+   * @param data           - Block Data to be persisted (BlockData should have the chunks).
+   * @param overwriteBcsId - To overwrite bcsId of the container.
+   */
+  long putBlockForClosedContainer(Container container, BlockData data, boolean overwriteBcsId)
+          throws IOException;
 
   /**
    * Gets an existing block.
@@ -78,6 +93,15 @@ public interface BlockManager {
    */
   List<BlockData> listBlock(Container container, long startLocalID, int count)
       throws IOException;
+
+  /**
+   * Check if a block exists in the container.
+   *
+   * @param container - Container from which blocks need to be listed.
+   * @param blockID - BlockID of the Block.
+   * @return True if block exists, false otherwise.
+   */
+  boolean blockExists(Container container, BlockID blockID) throws IOException;
 
   /**
    * Returns last committed length of the block.

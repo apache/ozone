@@ -358,6 +358,7 @@ public final class ContainerBalancerMetrics {
       long valueToAdd) {
     numContainerMovesFailedInLatestIteration.incr(valueToAdd);
   }
+
   public void resetNumContainerMovesFailedInLatestIteration() {
     numContainerMovesFailedInLatestIteration.incr(
         -getNumContainerMovesFailedInLatestIteration());

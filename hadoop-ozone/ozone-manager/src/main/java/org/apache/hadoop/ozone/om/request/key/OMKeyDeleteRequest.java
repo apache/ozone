@@ -19,13 +19,13 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import static org.apache.hadoop.ozone.OzoneConsts.DELETED_HSYNC_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -44,7 +44,6 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
-import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -56,6 +55,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -77,14 +77,13 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     DeleteKeyRequest deleteKeyRequest = super.preExecute(ozoneManager)
         .getDeleteKeyRequest();
-    Preconditions.checkNotNull(deleteKeyRequest);
+    Objects.requireNonNull(deleteKeyRequest, "deleteKeyRequest == null");
 
     OzoneManagerProtocolProtos.KeyArgs keyArgs = deleteKeyRequest.getKeyArgs();
     String keyPath = keyArgs.getKeyName();
 
     OmUtils.verifyKeyNameWithSnapshotReservedWordForDeletion(keyPath);
-    keyPath = validateAndNormalizeKey(ozoneManager.getEnableFileSystemPaths(),
-        keyPath, getBucketLayout());
+    keyPath = normalizeKeyPath(ozoneManager.getEnableFileSystemPaths(), keyPath, getBucketLayout());
 
     OzoneManagerProtocolProtos.KeyArgs.Builder newKeyArgs =
         keyArgs.toBuilder().setModificationTime(Time.now()).setKeyName(keyPath);
@@ -148,7 +147,9 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
       }
 
       // Set the UpdateID to current transactionLogIndex
-      omKeyInfo.setUpdateID(trxnLogIndex);
+      omKeyInfo = omKeyInfo.toBuilder()
+          .setUpdateID(trxnLogIndex)
+          .build();
 
       // Update table cache. Put a tombstone entry
       omMetadataManager.getKeyTable(getBucketLayout()).addCacheEntry(
@@ -160,8 +161,10 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
           getBucketInfo(omMetadataManager, volumeName, bucketName);
 
       long quotaReleased = sumBlockLengths(omKeyInfo);
-      omBucketInfo.incrUsedBytes(-quotaReleased);
-      omBucketInfo.incrUsedNamespace(-1L);
+      // Empty entries won't be added to deleted table so this key shouldn't get added to snapshotUsed space.
+      boolean isKeyNonEmpty = !OmKeyInfo.isKeyEmpty(omKeyInfo);
+      omBucketInfo.decrUsedBytes(quotaReleased, isKeyNonEmpty);
+      omBucketInfo.decrUsedNamespace(1L, isKeyNonEmpty);
       OmKeyInfo deletedOpenKeyInfo = null;
 
       // If omKeyInfo has hsync metadata, delete its corresponding open key as well
@@ -172,7 +175,8 @@ public class OMKeyDeleteRequest extends OMKeyRequest {
         dbOpenKey = omMetadataManager.getOpenKey(volumeName, bucketName, keyName, hsyncClientId);
         OmKeyInfo openKeyInfo = openKeyTable.get(dbOpenKey);
         if (openKeyInfo != null) {
-          openKeyInfo.getMetadata().put(DELETED_HSYNC_KEY, "true");
+          openKeyInfo = openKeyInfo.withMetadataMutations(
+              metadata -> metadata.put(DELETED_HSYNC_KEY, "true"));
           openKeyTable.addCacheEntry(dbOpenKey, openKeyInfo, trxnLogIndex);
           deletedOpenKeyInfo = openKeyInfo;
         } else {

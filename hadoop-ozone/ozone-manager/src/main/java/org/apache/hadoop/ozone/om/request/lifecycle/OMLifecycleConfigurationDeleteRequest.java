@@ -15,10 +15,9 @@
  * limitations under the License.
  */
 
-
 package org.apache.hadoop.ozone.om.request.lifecycle;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
 import java.io.IOException;
 import java.util.Map;

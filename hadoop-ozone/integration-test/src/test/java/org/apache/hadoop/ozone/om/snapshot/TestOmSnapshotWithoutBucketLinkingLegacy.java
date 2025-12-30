@@ -19,12 +19,9 @@ package org.apache.hadoop.ozone.om.snapshot;
 
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.LEGACY;
 
-import org.junit.jupiter.api.Timeout;
-
 /**
  * Test OmSnapshot for Legacy bucket type.
  */
-@Timeout(300)
 public class TestOmSnapshotWithoutBucketLinkingLegacy extends TestOmSnapshot {
 
   public TestOmSnapshotWithoutBucketLinkingLegacy() throws Exception {

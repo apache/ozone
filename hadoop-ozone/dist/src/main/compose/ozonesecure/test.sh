@@ -17,6 +17,8 @@
 
 #suite:secure
 
+set -u -o pipefail
+
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
@@ -33,6 +35,7 @@ execute_command_in_container kms hadoop key create ${OZONE_BUCKET_KEY_NAME}
 
 execute_robot_test scm kinit.robot
 
+execute_robot_test scm cli/ozone-insight.robot
 execute_robot_test scm basic
 
 execute_robot_test scm security

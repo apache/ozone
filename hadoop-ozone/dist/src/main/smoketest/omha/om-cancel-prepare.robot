@@ -20,8 +20,9 @@ Library             String
 Library             BuiltIn
 Resource            ../commonlib.robot
 Test Timeout        5 minutes
+Suite Setup         Run Keywords       Generate volume and bucket names
+...    AND          Get Security Enabled From Config
 Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
-Suite Setup         Generate volume and bucket names
 
 ** Keywords ***
 Generate volume and bucket names

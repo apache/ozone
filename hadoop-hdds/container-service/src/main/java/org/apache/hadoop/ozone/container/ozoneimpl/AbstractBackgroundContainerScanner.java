@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
  * Base class for scheduled scanners on a Datanode.
  */
 public abstract class AbstractBackgroundContainerScanner implements Runnable {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(AbstractBackgroundContainerScanner.class);
 
   private final long dataScanInterval;

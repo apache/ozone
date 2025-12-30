@@ -27,23 +27,6 @@ import org.apache.ozone.lib.util.Check;
  */
 @InterfaceAudience.Private
 public class XException extends Exception {
-
-  /**
-   * Interface to define error codes.
-   */
-  public interface ERROR {
-
-    /**
-     * Returns the template for the error.
-     *
-     * @return the template for the error, the template must be in JDK
-     *         <code>MessageFormat</code> syntax (using {#} positional
-     *         parameters).
-     */
-    String getTemplate();
-
-  }
-
   private ERROR error;
 
   /**
@@ -99,7 +82,7 @@ public class XException extends Exception {
     if (template == null) {
       StringBuilder sb = new StringBuilder();
       for (int i = 0; i < args.length; i++) {
-        sb.append(" {").append(i).append("}");
+        sb.append(" {").append(i).append('}');
       }
       template = sb.deleteCharAt(0).toString();
     }
@@ -124,4 +107,17 @@ public class XException extends Exception {
     return throwable;
   }
 
+  /**
+   * Interface to define error codes.
+   */
+  public interface ERROR {
+    /**
+     * Returns the template for the error.
+     *
+     * @return the template for the error, the template must be in JDK
+     *         <code>MessageFormat</code> syntax (using {#} positional
+     *         parameters).
+     */
+    String getTemplate();
+  }
 }

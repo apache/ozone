@@ -121,7 +121,7 @@ public class TestSCMNodeMetrics {
     long nrProcessed = getCounter("NumNodeReportProcessed");
 
     StorageReportProto storageReport =
-        HddsTestUtils.createStorageReport(registeredDatanode.getUuid(), "/tmp",
+        HddsTestUtils.createStorageReport(registeredDatanode.getID(), "/tmp",
             100, 10, 90, null);
     NodeReportProto nodeReport = NodeReportProto.newBuilder()
         .addStorageReport(storageReport).build();
@@ -142,7 +142,7 @@ public class TestSCMNodeMetrics {
         MockDatanodeDetails.randomDatanodeDetails();
 
     StorageReportProto storageReport = HddsTestUtils.createStorageReport(
-        randomDatanode.getUuid(), "/tmp", 100, 10, 90, null);
+        randomDatanode.getID(), "/tmp", 100, 10, 90, null);
 
     NodeReportProto nodeReport = NodeReportProto.newBuilder()
         .addStorageReport(storageReport).build();
@@ -160,7 +160,7 @@ public class TestSCMNodeMetrics {
   public void testNodeCountAndInfoMetricsReported() throws Exception {
 
     StorageReportProto storageReport = HddsTestUtils.createStorageReport(
-        registeredDatanode.getUuid(), "/tmp", 100, 10, 90, null);
+        registeredDatanode.getID(), "/tmp", 100, 10, 90, null);
     NodeReportProto nodeReport = NodeReportProto.newBuilder()
         .addStorageReport(storageReport).build();
 
@@ -225,6 +225,9 @@ public class TestSCMNodeMetrics {
     assertGauge("DecommissionedSSDRemaining", 0L,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
     assertGauge("AllNodes", 1,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    // The DN has no metadata volumes, so hasEnoughSpace() returns false indicating the DN is out of space.
+    assertGauge("NonWritableNodes", 1,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
     assertGauge("TotalCapacity", 100L,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));

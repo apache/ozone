@@ -22,6 +22,8 @@ import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaO
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -32,11 +34,12 @@ import static org.mockito.Mockito.when;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
@@ -61,18 +64,20 @@ public class TestContainerReplicaPendingOps {
   private long deadline;
   private SCMCommand<?> addCmd;
   private SCMCommand<?> deleteCmd;
+  private static final long FIVE_GB_CONTAINER_SIZE = 5L * 1024 * 1024 * 1024;
+  private static final long THREE_GB_CONTAINER_SIZE = 3L * 1024 * 1024 * 1024;
+  private ReplicationManager.ReplicationManagerConfiguration rmConf;
 
   @BeforeEach
   public void setup() {
     clock = new TestClock(Instant.now(), ZoneOffset.UTC);
     deadline = clock.millis() + 10000; // Current time plus 10 seconds
-    pendingOps = new ContainerReplicaPendingOps(clock);
 
-    ConfigurationSource conf = new OzoneConfiguration();
-    ReplicationManager.ReplicationManagerConfiguration rmConf = conf
-        .getObject(ReplicationManager.ReplicationManagerConfiguration.class);
+    OzoneConfiguration conf = new OzoneConfiguration();
+    rmConf = conf.getObject(ReplicationManager.ReplicationManagerConfiguration.class);
     ReplicationManager rm = mock(ReplicationManager.class);
     when(rm.getConfig()).thenReturn(rmConf);
+    pendingOps = new ContainerReplicaPendingOps(clock, rmConf);
     metrics = ReplicationManagerMetrics.create(rm);
     pendingOps.setReplicationMetrics(metrics);
     dn1 = MockDatanodeDetails.randomDatanodeDetails();
@@ -99,7 +104,8 @@ public class TestContainerReplicaPendingOps {
 
   @Test
   public void testClear() {
-    pendingOps.scheduleAddReplica(ContainerID.valueOf(1), dn1, 0, addCmd, deadline);
+    pendingOps.scheduleAddReplica(ContainerID.valueOf(1), dn1, 0, addCmd, deadline,
+        FIVE_GB_CONTAINER_SIZE, clock.millis());
     pendingOps.scheduleDeleteReplica(ContainerID.valueOf(2), dn1, 0, deleteCmd, deadline);
 
     assertEquals(1, pendingOps.getPendingOpCount(ContainerReplicaOp.PendingOpType.ADD));
@@ -116,16 +122,25 @@ public class TestContainerReplicaPendingOps {
 
   @Test
   public void testCanAddReplicasForAdd() {
-    pendingOps.scheduleAddReplica(ContainerID.valueOf(1), dn1, 0, addCmd, deadline);
-    pendingOps.scheduleAddReplica(ContainerID.valueOf(1), dn2, 0, addCmd, deadline);
-    pendingOps.scheduleAddReplica(ContainerID.valueOf(1), dn3, 0, addCmd, deadline);
+    pendingOps.scheduleAddReplica(ContainerID.valueOf(1), dn1, 0, addCmd, deadline,
+        FIVE_GB_CONTAINER_SIZE, clock.millis());
+    pendingOps.scheduleAddReplica(ContainerID.valueOf(1), dn2, 0, addCmd, deadline,
+        FIVE_GB_CONTAINER_SIZE, clock.millis());
+    pendingOps.scheduleAddReplica(ContainerID.valueOf(1), dn3, 0, addCmd, deadline,
+        FIVE_GB_CONTAINER_SIZE, clock.millis());
     // Duplicate for DN2
-    pendingOps.scheduleAddReplica(ContainerID.valueOf(1), dn2, 0, addCmd, deadline + 1);
+    pendingOps.scheduleAddReplica(
+        ContainerID.valueOf(1), dn2, 0, addCmd, deadline + 1,
+        FIVE_GB_CONTAINER_SIZE, clock.millis());
     // Not a duplicate for DN2 as different index. Should not happen in practice as it is not valid to have 2 indexes
     // on the same node.
-    pendingOps.scheduleAddReplica(ContainerID.valueOf(1), dn2, 1, addCmd, deadline);
-    pendingOps.scheduleAddReplica(ContainerID.valueOf(2), dn1, 1, addCmd, deadline);
-    pendingOps.scheduleAddReplica(ContainerID.valueOf(2), dn1, 1, addCmd, deadline + 1);
+    pendingOps.scheduleAddReplica(ContainerID.valueOf(1), dn2, 1, addCmd, deadline,
+        FIVE_GB_CONTAINER_SIZE, clock.millis());
+    pendingOps.scheduleAddReplica(ContainerID.valueOf(2), dn1, 1, addCmd, deadline,
+        THREE_GB_CONTAINER_SIZE, clock.millis());
+    pendingOps.scheduleAddReplica(
+        ContainerID.valueOf(2), dn1, 1, addCmd, deadline + 1,
+        THREE_GB_CONTAINER_SIZE, clock.millis());
 
     List<ContainerReplicaOp> ops =
         pendingOps.getPendingOps(ContainerID.valueOf(1));
@@ -185,9 +200,11 @@ public class TestContainerReplicaPendingOps {
   @Test
   public void testCompletingOps() {
     pendingOps.scheduleDeleteReplica(ContainerID.valueOf(1), dn1, 0, deleteCmd, deadline);
-    pendingOps.scheduleAddReplica(ContainerID.valueOf(1), dn1, 0, addCmd, deadline);
+    pendingOps.scheduleAddReplica(ContainerID.valueOf(1), dn1, 0, addCmd, deadline,
+        FIVE_GB_CONTAINER_SIZE, clock.millis());
     pendingOps.scheduleDeleteReplica(ContainerID.valueOf(1), dn2, 0, deleteCmd, deadline);
-    pendingOps.scheduleAddReplica(ContainerID.valueOf(1), dn3, 0, addCmd, deadline);
+    pendingOps.scheduleAddReplica(ContainerID.valueOf(1), dn3, 0, addCmd, deadline,
+        FIVE_GB_CONTAINER_SIZE, clock.millis());
     pendingOps.scheduleDeleteReplica(ContainerID.valueOf(2), dn1, 1, deleteCmd, deadline);
 
     List<ContainerReplicaOp> ops =
@@ -218,9 +235,11 @@ public class TestContainerReplicaPendingOps {
   @Test
   public void testRemoveSpecificOp() {
     pendingOps.scheduleDeleteReplica(ContainerID.valueOf(1), dn1, 0, deleteCmd, deadline);
-    pendingOps.scheduleAddReplica(ContainerID.valueOf(1), dn1, 0, addCmd, deadline);
+    pendingOps.scheduleAddReplica(ContainerID.valueOf(1), dn1, 0, addCmd, deadline,
+        FIVE_GB_CONTAINER_SIZE, clock.millis());
     pendingOps.scheduleDeleteReplica(ContainerID.valueOf(1), dn2, 0, deleteCmd, deadline);
-    pendingOps.scheduleAddReplica(ContainerID.valueOf(1), dn3, 0, addCmd, deadline);
+    pendingOps.scheduleAddReplica(ContainerID.valueOf(1), dn3, 0, addCmd, deadline,
+        FIVE_GB_CONTAINER_SIZE, clock.millis());
     pendingOps.scheduleDeleteReplica(ContainerID.valueOf(2), dn1, 1, deleteCmd, deadline);
 
     ContainerID cid = ContainerID.valueOf(1);
@@ -241,11 +260,14 @@ public class TestContainerReplicaPendingOps {
     long laterExpiry =  clock.millis() + 2000;
     long latestExpiry = clock.millis() + 3000;
     pendingOps.scheduleDeleteReplica(ContainerID.valueOf(1), dn1, 0, deleteCmd, expiry);
-    pendingOps.scheduleAddReplica(ContainerID.valueOf(1), dn1, 0, addCmd, expiry);
+    pendingOps.scheduleAddReplica(ContainerID.valueOf(1), dn1, 0, addCmd, expiry,
+        FIVE_GB_CONTAINER_SIZE, clock.millis());
     pendingOps.scheduleDeleteReplica(ContainerID.valueOf(1), dn2, 0, deleteCmd, laterExpiry);
-    pendingOps.scheduleAddReplica(ContainerID.valueOf(1), dn3, 0, addCmd, laterExpiry);
+    pendingOps.scheduleAddReplica(ContainerID.valueOf(1), dn3, 0, addCmd, laterExpiry,
+        FIVE_GB_CONTAINER_SIZE, clock.millis());
     pendingOps.scheduleDeleteReplica(ContainerID.valueOf(2), dn1, 1, deleteCmd, latestExpiry);
-    pendingOps.scheduleAddReplica(ContainerID.valueOf(2), dn1, 1, addCmd, latestExpiry);
+    pendingOps.scheduleAddReplica(ContainerID.valueOf(2), dn1, 1, addCmd, latestExpiry,
+        FIVE_GB_CONTAINER_SIZE, clock.millis());
 
     List<ContainerReplicaOp> ops =
         pendingOps.getPendingOps(ContainerID.valueOf(1));
@@ -302,10 +324,13 @@ public class TestContainerReplicaPendingOps {
   public void testReplicationMetrics() {
     long expiry = clock.millis() + 1000;
     pendingOps.scheduleDeleteReplica(ContainerID.valueOf(1), dn1, 1, deleteCmd, expiry);
-    pendingOps.scheduleAddReplica(ContainerID.valueOf(1), dn1, 2, addCmd, expiry);
+    pendingOps.scheduleAddReplica(ContainerID.valueOf(1), dn1, 2, addCmd, expiry,
+        FIVE_GB_CONTAINER_SIZE, clock.millis());
     pendingOps.scheduleDeleteReplica(ContainerID.valueOf(2), dn2, 1, deleteCmd, expiry);
-    pendingOps.scheduleAddReplica(ContainerID.valueOf(2), dn3, 1, addCmd, expiry);
-    pendingOps.scheduleAddReplica(ContainerID.valueOf(3), dn3, 0, addCmd, expiry);
+    pendingOps.scheduleAddReplica(ContainerID.valueOf(2), dn3, 1, addCmd, expiry,
+        THREE_GB_CONTAINER_SIZE, clock.millis());
+    pendingOps.scheduleAddReplica(ContainerID.valueOf(3), dn3, 0, addCmd, expiry,
+        THREE_GB_CONTAINER_SIZE, clock.millis());
     pendingOps.scheduleDeleteReplica(ContainerID.valueOf(4), dn3, 0, deleteCmd, expiry);
 
     // InFlight Replication and Deletion
@@ -328,10 +353,13 @@ public class TestContainerReplicaPendingOps {
 
     expiry = clock.millis() + 1000;
     pendingOps.scheduleDeleteReplica(ContainerID.valueOf(3), dn1, 2, deleteCmd, expiry);
-    pendingOps.scheduleAddReplica(ContainerID.valueOf(3), dn1, 3, addCmd, expiry);
+    pendingOps.scheduleAddReplica(ContainerID.valueOf(3), dn1, 3, addCmd, expiry,
+        FIVE_GB_CONTAINER_SIZE, clock.millis());
     pendingOps.scheduleDeleteReplica(ContainerID.valueOf(4), dn2, 2, deleteCmd, expiry);
-    pendingOps.scheduleAddReplica(ContainerID.valueOf(4), dn3, 4, addCmd, expiry);
-    pendingOps.scheduleAddReplica(ContainerID.valueOf(5), dn3, 0, addCmd, expiry);
+    pendingOps.scheduleAddReplica(ContainerID.valueOf(4), dn3, 4, addCmd, expiry,
+        THREE_GB_CONTAINER_SIZE, clock.millis());
+    pendingOps.scheduleAddReplica(ContainerID.valueOf(5), dn3, 0, addCmd, expiry,
+        THREE_GB_CONTAINER_SIZE, clock.millis());
     pendingOps.scheduleDeleteReplica(ContainerID.valueOf(6), dn3, 0, deleteCmd, expiry);
 
     // InFlight Replication and Deletion. Previous Inflight should be
@@ -375,7 +403,7 @@ public class TestContainerReplicaPendingOps {
 
     // schedule an ADD and a DELETE
     ContainerID containerID = ContainerID.valueOf(1);
-    pendingOps.scheduleAddReplica(containerID, dn1, 0, addCmd, deadline);
+    pendingOps.scheduleAddReplica(containerID, dn1, 0, addCmd, deadline, FIVE_GB_CONTAINER_SIZE, clock.millis());
     ContainerReplicaOp addOp = pendingOps.getPendingOps(containerID).get(0);
     pendingOps.scheduleDeleteReplica(containerID, dn1, 0, deleteCmd, deadline);
 
@@ -392,7 +420,7 @@ public class TestContainerReplicaPendingOps {
 
     // now, test notification on expiration
     pendingOps.scheduleDeleteReplica(containerID, dn1, 0, deleteCmd, deadline);
-    pendingOps.scheduleAddReplica(containerID, dn2, 0, addCmd, deadline);
+    pendingOps.scheduleAddReplica(containerID, dn2, 0, addCmd, deadline, FIVE_GB_CONTAINER_SIZE, clock.millis());
     for (ContainerReplicaOp op : pendingOps.getPendingOps(containerID)) {
       if (op.getOpType() == ADD) {
         addOp = op;
@@ -415,7 +443,7 @@ public class TestContainerReplicaPendingOps {
 
     // schedule ops
     pendingOps.scheduleDeleteReplica(containerID, dn1, 0, deleteCmd, deadline);
-    pendingOps.scheduleAddReplica(containerID, dn2, 0, addCmd, deadline);
+    pendingOps.scheduleAddReplica(containerID, dn2, 0, addCmd, deadline, FIVE_GB_CONTAINER_SIZE, clock.millis());
 
     // register subscriber
     ContainerReplicaPendingOpsSubscriber subscriber1 = mock(
@@ -434,7 +462,7 @@ public class TestContainerReplicaPendingOps {
     ContainerID containerID = ContainerID.valueOf(1);
 
     // schedule ops
-    pendingOps.scheduleAddReplica(containerID, dn2, 0, addCmd, deadline);
+    pendingOps.scheduleAddReplica(containerID, dn2, 0, addCmd, deadline, FIVE_GB_CONTAINER_SIZE, clock.millis());
 
     // register subscriber
     ContainerReplicaPendingOpsSubscriber subscriber1 = mock(
@@ -442,11 +470,116 @@ public class TestContainerReplicaPendingOps {
     pendingOps.registerSubscriber(subscriber1);
 
     clock.fastForward(1000);
-    pendingOps.scheduleAddReplica(containerID, dn2, 0, addCmd, deadline + 1);
+    pendingOps.scheduleAddReplica(containerID, dn2, 0, addCmd, deadline + 1,
+        FIVE_GB_CONTAINER_SIZE, clock.millis());
     // no entries have expired, so there should be zero interactions with the
     // subscriber
     verifyNoMoreInteractions(subscriber1);
   }
 
+  /**
+   * Tests that ContainerReplicaPendingOps correctly tracks how much size (of containers) is being moved to a target
+   * Datanode because of pending ADD ops. This size should be correctly added and reduced when ADD ops are triggered
+   * and completed.
+   */
+  @Test
+  public void testScheduledSizeIsCorrectlyTrackedAndCompleted() {
+    final long eventTimeout = rmConf.getEventTimeout();
+    long now = clock.millis();
+    pendingOps.scheduleAddReplica(ContainerID.valueOf(1), dn1, 0, addCmd,
+        now + eventTimeout, FIVE_GB_CONTAINER_SIZE, clock.millis());
 
+    // Assert that containerSizeScheduled has the correct size
+    ConcurrentHashMap<DatanodeID, ContainerReplicaPendingOps.SizeAndTime> scheduled =
+        pendingOps.getContainerSizeScheduled();
+    assertEquals(1, scheduled.size());
+    assertEquals(FIVE_GB_CONTAINER_SIZE, scheduled.get(dn1.getID()).getSize());
+
+    // Schedule a second op for the same datanode
+    pendingOps.scheduleAddReplica(ContainerID.valueOf(2), dn1, 0, addCmd,
+        now + eventTimeout, THREE_GB_CONTAINER_SIZE, clock.millis());
+    assertEquals(FIVE_GB_CONTAINER_SIZE + THREE_GB_CONTAINER_SIZE, scheduled.get(dn1.getID()).getSize());
+
+    // Complete the first op
+    pendingOps.completeAddReplica(ContainerID.valueOf(1), dn1, 0);
+    assertEquals(THREE_GB_CONTAINER_SIZE, scheduled.get(dn1.getID()).getSize());
+
+    // Complete the second op
+    pendingOps.completeAddReplica(ContainerID.valueOf(2), dn1, 0);
+    assertNull(scheduled.get(dn1.getID()));
+  }
+
+  /**
+   * When an ADD op (container replication) expires, the map in ContainerReplicaPendingOps should be modified
+   * correctly. The entry should be removed if ReplicationManagerConfiguration#eventTimemout milliseconds have passed
+   * since the entry's lastUpdatedTime.
+   */
+  @Test
+  public void testScheduledSizeIsCorrectlyTrackedAndExpired() {
+    final long eventTimeout = rmConf.getEventTimeout();
+
+    long now = clock.millis();
+    pendingOps.scheduleAddReplica(ContainerID.valueOf(3), dn2, 0, addCmd,
+        now + eventTimeout, FIVE_GB_CONTAINER_SIZE, clock.millis());
+    ConcurrentHashMap<DatanodeID, ContainerReplicaPendingOps.SizeAndTime>
+        scheduled = pendingOps.getContainerSizeScheduled();
+    assertEquals(FIVE_GB_CONTAINER_SIZE, scheduled.get(dn2.getID()).getSize());
+    assertEquals(now, scheduled.get(dn2.getID()).getLastUpdatedTime());
+
+    // Advance clock so the op expires
+    clock.fastForward(eventTimeout + 1);
+    pendingOps.removeExpiredEntries();
+    // The entry should be removed from the map after expiration
+    assertNull(scheduled.get(dn2.getID()));
+  }
+
+  /**
+   * Tests that only the size of containers with expired ops is reduced from the map tracking size of pending ops.
+   * For example, if target Datanode DN1 has two pending ADD ops 10GB + 15GB, and the first op expires, then only
+   * 10GB should be subtracted.
+   */
+  @Test
+  public void testOnlyExpiredOpSizeIsRemovedFromSizeScheduledMap() {
+    final long eventTimeout = rmConf.getEventTimeout();
+    long now = clock.millis();
+    // Schedule first op
+    pendingOps.scheduleAddReplica(ContainerID.valueOf(4), dn2, 0, addCmd,
+        now + eventTimeout, FIVE_GB_CONTAINER_SIZE, clock.millis());
+    //  another replication scheduled for dn1 to receive a container - just testing that this entry isn't removed or
+    //  modified when other entries expire or are modified
+    pendingOps.scheduleAddReplica((ContainerID.valueOf(2)), dn1, 2, addCmd,
+        now + eventTimeout * 10, THREE_GB_CONTAINER_SIZE, clock.millis());
+    ConcurrentHashMap<DatanodeID, ContainerReplicaPendingOps.SizeAndTime>
+        scheduled = pendingOps.getContainerSizeScheduled();
+    assertEquals(FIVE_GB_CONTAINER_SIZE, scheduled.get(dn2.getID()).getSize());
+    assertEquals(THREE_GB_CONTAINER_SIZE, scheduled.get(dn1.getID()).getSize());
+    assertEquals(now, scheduled.get(dn2.getID()).getLastUpdatedTime());
+    assertEquals(now, scheduled.get(dn1.getID()).getLastUpdatedTime());
+
+    clock.fastForward(eventTimeout - 1);
+    long updateTime = clock.millis();
+
+    // Schedule second op for dn2, which should update the lastUpdatedTime
+    pendingOps.scheduleAddReplica(ContainerID.valueOf(5), dn2, 1, addCmd,
+        updateTime + eventTimeout, THREE_GB_CONTAINER_SIZE, clock.millis());
+    assertEquals(FIVE_GB_CONTAINER_SIZE + THREE_GB_CONTAINER_SIZE, scheduled.get(dn2.getID()).getSize());
+    assertEquals(THREE_GB_CONTAINER_SIZE, scheduled.get(dn1.getID()).getSize());
+    assertEquals(updateTime, scheduled.get(dn2.getID()).getLastUpdatedTime());
+    assertEquals(now, scheduled.get(dn1.getID()).getLastUpdatedTime());
+
+    // Advance clock to expire the first op but not the second for dn2
+    clock.set(Instant.ofEpochMilli(now + eventTimeout + 1));
+    pendingOps.removeExpiredEntries();
+
+    // Assert the entry for dn2 still exists, but with reduced size
+    assertNotNull(scheduled.get(dn2.getID()));
+    assertEquals(THREE_GB_CONTAINER_SIZE, scheduled.get(dn2.getID()).getSize());
+    assertEquals(THREE_GB_CONTAINER_SIZE, scheduled.get(dn1.getID()).getSize());
+
+    // Advance clock again to expire the second op for dn2
+    clock.set(Instant.ofEpochMilli(updateTime + eventTimeout + 1));
+    pendingOps.removeExpiredEntries();
+    assertNull(scheduled.get(dn2.getID()));
+    assertEquals(THREE_GB_CONTAINER_SIZE, scheduled.get(dn1.getID()).getSize());
+  }
 }

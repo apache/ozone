@@ -48,20 +48,16 @@ import org.junit.jupiter.api.Test;
 public class TestNodeDecommissionMetrics {
   private NodeDecommissionMetrics metrics;
   private SimpleMockNodeManager nodeManager;
-  private OzoneConfiguration conf;
   private DatanodeAdminMonitorImpl monitor;
-  private DatanodeAdminMonitorTestUtil
-          .DatanodeAdminHandler startAdminHandler;
   private ReplicationManager repManager;
   private EventQueue eventQueue;
 
-
   @BeforeEach
   public void setup() {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     eventQueue = new EventQueue();
-    startAdminHandler = new DatanodeAdminMonitorTestUtil
-        .DatanodeAdminHandler();
+    DatanodeAdminMonitorTestUtil.DatanodeAdminHandler startAdminHandler = new DatanodeAdminMonitorTestUtil
+                                                                                  .DatanodeAdminHandler();
     eventQueue.addHandler(SCMEvents.START_ADMIN_ON_NODE, startAdminHandler);
     nodeManager = new SimpleMockNodeManager();
     repManager = mock(ReplicationManager.class);

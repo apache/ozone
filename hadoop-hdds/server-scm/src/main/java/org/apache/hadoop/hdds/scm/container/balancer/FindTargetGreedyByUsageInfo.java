@@ -36,7 +36,7 @@ import org.slf4j.LoggerFactory;
  * target with the lowest space usage.
  */
 public class FindTargetGreedyByUsageInfo extends AbstractFindTargetGreedy {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(FindTargetGreedyByUsageInfo.class);
 
   public FindTargetGreedyByUsageInfo(

@@ -18,7 +18,6 @@
 package org.apache.hadoop.fs.ozone;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.commons.lang3.RandomStringUtils.randomAlphabetic;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CHUNK_SIZE_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
@@ -37,6 +36,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.DoubleStream;
 import java.util.stream.Stream;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileChecksum;
@@ -57,7 +57,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.util.StringUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -65,7 +64,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 /**
  * Test FileChecksum API.
  */
-@Timeout(300)
 public class TestOzoneFileChecksum {
 
   private static final boolean[] TOPOLOGY_AWARENESS = new boolean[] {
@@ -85,9 +83,6 @@ public class TestOzoneFileChecksum {
   private OzoneConfiguration conf;
   private MiniOzoneCluster cluster = null;
   private FileSystem fs;
-  private RootedOzoneFileSystem ofs;
-  private BasicRootedOzoneClientAdapterImpl adapter;
-  private String rootPath;
   private OzoneClient client;
 
   @BeforeEach
@@ -101,7 +96,7 @@ public class TestOzoneFileChecksum {
         .build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
-    rootPath = String.format("%s://%s/",
+    String rootPath = String.format("%s://%s/",
         OzoneConsts.OZONE_OFS_URI_SCHEME, conf.get(OZONE_OM_ADDRESS_KEY));
     String disableCache = String.format("fs.%s.impl.disable.cache",
         OzoneConsts.OZONE_OFS_URI_SCHEME);
@@ -128,8 +123,8 @@ public class TestOzoneFileChecksum {
 
     conf.setInt("ozone.client.bytes.per.checksum", (int) (checksumSizeInMB * 1024 * 1024));
     fs = FileSystem.get(conf);
-    ofs = (RootedOzoneFileSystem) fs;
-    adapter = (BasicRootedOzoneClientAdapterImpl) ofs.getAdapter();
+    RootedOzoneFileSystem ofs = (RootedOzoneFileSystem) fs;
+    BasicRootedOzoneClientAdapterImpl adapter = (BasicRootedOzoneClientAdapterImpl) ofs.getAdapter();
     String volumeName = UUID.randomUUID().toString();
     String legacyBucket = UUID.randomUUID().toString();
     String ecBucketName = UUID.randomUUID().toString();
@@ -155,7 +150,7 @@ public class TestOzoneFileChecksum {
     Map<Integer, String> replicatedChecksums = new HashMap<>();
 
     for (int dataLen : dataSizes) {
-      byte[] data = randomAlphabetic(dataLen).getBytes(UTF_8);
+      byte[] data = RandomStringUtils.secure().nextAlphabetic(dataLen).getBytes(UTF_8);
 
       try (OutputStream file = adapter.createFile(volumeName + "/"
           + legacyBucket + "/test" + dataLen, (short) 3, true, false)) {

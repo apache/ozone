@@ -38,7 +38,6 @@ import org.junit.jupiter.api.Test;
 public class TestBucketDelete {
 
   private String bucketName = OzoneConsts.BUCKET;
-  private OzoneClient clientStub;
   private ObjectStore objectStoreStub;
   private BucketEndpoint bucketEndpoint;
 
@@ -46,7 +45,7 @@ public class TestBucketDelete {
   public void setup() throws Exception {
 
     //Create client stub and object store stub.
-    clientStub = new OzoneClientStub();
+    OzoneClient clientStub = new OzoneClientStub();
     objectStoreStub = clientStub.getObjectStore();
 
     clientStub.getObjectStore().createS3Bucket(bucketName);
@@ -55,13 +54,11 @@ public class TestBucketDelete {
     bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(clientStub)
         .build();
-
-
   }
 
   @Test
   public void testBucketEndpoint() throws Exception {
-    Response response = bucketEndpoint.delete(bucketName, null);
+    Response response = bucketEndpoint.delete(bucketName);
     assertEquals(HttpStatus.SC_NO_CONTENT, response.getStatus());
 
   }
@@ -69,7 +66,7 @@ public class TestBucketDelete {
   @Test
   public void testDeleteWithNoSuchBucket() throws Exception {
     try {
-      bucketEndpoint.delete("unknownbucket", null);
+      bucketEndpoint.delete("unknownbucket");
     } catch (OS3Exception ex) {
       assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), ex.getCode());
       assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getErrorMessage(),
@@ -79,13 +76,12 @@ public class TestBucketDelete {
     fail("testDeleteWithNoSuchBucket failed");
   }
 
-
   @Test
   public void testDeleteWithBucketNotEmpty() throws Exception {
     try {
       ObjectStoreStub stub = (ObjectStoreStub) objectStoreStub;
       stub.setBucketEmptyStatus(bucketName, false);
-      bucketEndpoint.delete(bucketName, null);
+      bucketEndpoint.delete(bucketName);
     } catch (OS3Exception ex) {
       assertEquals(S3ErrorTable.BUCKET_NOT_EMPTY.getCode(), ex.getCode());
       assertEquals(S3ErrorTable.BUCKET_NOT_EMPTY.getErrorMessage(),

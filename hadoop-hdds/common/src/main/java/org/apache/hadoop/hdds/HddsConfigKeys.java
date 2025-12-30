@@ -27,10 +27,18 @@ public final class HddsConfigKeys {
       "hdds.heartbeat.interval";
   public static final String HDDS_HEARTBEAT_INTERVAL_DEFAULT =
       "30s";
+  public static final String HDDS_INITIAL_HEARTBEAT_INTERVAL =
+      "hdds.heartbeat.initial-interval";
+  public static final String HDDS_INITIAL_HEARTBEAT_INTERVAL_DEFAULT =
+      "2s";
   public static final String HDDS_RECON_HEARTBEAT_INTERVAL =
-      "hdds.recon.heartbeat.interval";
+      "hdds.heartbeat.recon.interval";
   public static final String HDDS_RECON_HEARTBEAT_INTERVAL_DEFAULT =
       "60s";
+  public static final String HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL =
+      "hdds.heartbeat.recon.initial-interval";
+  public static final String HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL_DEFAULT =
+      "2s";
   public static final String HDDS_NODE_REPORT_INTERVAL =
       "hdds.node.report.interval";
   public static final String HDDS_NODE_REPORT_INTERVAL_DEFAULT =
@@ -72,7 +80,7 @@ public final class HddsConfigKeys {
   public static final boolean HDDS_SCM_SAFEMODE_ENABLED_DEFAULT = true;
   public static final String HDDS_SCM_SAFEMODE_MIN_DATANODE =
       "hdds.scm.safemode.min.datanode";
-  public static final int HDDS_SCM_SAFEMODE_MIN_DATANODE_DEFAULT = 1;
+  public static final int HDDS_SCM_SAFEMODE_MIN_DATANODE_DEFAULT = 3;
 
   public static final String
       HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT =
@@ -80,11 +88,6 @@ public final class HddsConfigKeys {
 
   public static final String
       HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT = "5m";
-
-  public static final String HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK =
-      "hdds.scm.safemode.pipeline-availability.check";
-  public static final boolean
-      HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK_DEFAULT = true;
 
   public static final String HDDS_SCM_SAFEMODE_PIPELINE_CREATION =
       "hdds.scm.safemode.pipeline.creation";
@@ -116,6 +119,9 @@ public final class HddsConfigKeys {
   // In any real cluster where performance matters, the SCM, OM and DN
   // metadata locations must be configured explicitly.
   public static final String OZONE_METADATA_DIRS = "ozone.metadata.dirs";
+
+  public static final String DATANODE_DB_CONFIG_PATH = "hdds.datanode.db.config.path";
+  public static final String DATANODE_DB_CONFIG_PATH_DEFAULT = "";
 
   public static final String HDDS_PROMETHEUS_ENABLED =
       "hdds.prometheus.endpoint.enabled";
@@ -252,7 +258,7 @@ public final class HddsConfigKeys {
 
   public static final String HDDS_SECRET_KEY_EXPIRY_DURATION =
       "hdds.secret.key.expiry.duration";
-  public static final String HDDS_SECRET_KEY_EXPIRY_DURATION_DEFAULT = "7d";
+  public static final String HDDS_SECRET_KEY_EXPIRY_DURATION_DEFAULT = "9d";
 
   public static final String HDDS_SECRET_KEY_ROTATE_DURATION =
       "hdds.secret.key.rotate.duration";
@@ -267,12 +273,6 @@ public final class HddsConfigKeys {
       "hdds.secret.key.rotate.check.duration";
   public static final String HDDS_SECRET_KEY_ROTATE_CHECK_DURATION_DEFAULT
       = "10m";
-
-  /**
-   * Do not instantiate.
-   */
-  private HddsConfigKeys() {
-  }
 
   // Enable TLS for GRPC clients/server in ozone.
   public static final String HDDS_GRPC_TLS_ENABLED = "hdds.grpc.tls.enabled";
@@ -423,4 +423,7 @@ public final class HddsConfigKeys {
   public static final String HDDS_METRICS_PERCENTILES_INTERVALS_KEY =
       "hdds.metrics.percentiles.intervals";
 
+  /** Do not instantiate. */
+  private HddsConfigKeys() {
+  }
 }

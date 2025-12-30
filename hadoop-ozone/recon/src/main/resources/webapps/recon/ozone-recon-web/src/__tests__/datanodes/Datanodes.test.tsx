@@ -16,21 +16,16 @@
  * limitations under the License.
  */
 import React from 'react';
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor
-} from '@testing-library/react';
+import {fireEvent, render, screen, waitFor} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { rest } from "msw";
-import { vi } from 'vitest';
+import {rest} from "msw";
+import {vi} from 'vitest';
 
 import Datanodes from '@/v2/pages/datanodes/datanodes';
 import * as commonUtils from '@/utils/common';
-import { datanodeServer } from '@tests/mocks/datanodeMocks/datanodeServer';
-import { datanodeLocators, searchInputLocator } from '@tests//locators/locators';
-import { waitForDNTable } from '@tests/utils/datanodes.utils';
+import {datanodeServer} from '@tests/mocks/datanodeMocks/datanodeServer';
+import {datanodeLocators, searchInputLocator} from '@tests//locators/locators';
+import {waitForDNTable} from '@tests/utils/datanodes.utils';
 
 // Mock utility functions
 vi.spyOn(commonUtils, 'showDataFetchError');

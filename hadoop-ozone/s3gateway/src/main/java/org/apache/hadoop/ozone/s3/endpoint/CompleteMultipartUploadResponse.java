@@ -22,6 +22,7 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 
 /**
  * Complete Multipart Upload request response.
@@ -29,7 +30,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 
 @XmlAccessorType(XmlAccessType.FIELD)
 @XmlRootElement(name = "CompleteMultipartUploadResult", namespace =
-    "http://s3.amazonaws.com/doc/2006-03-01/")
+    S3Consts.S3_XML_NAMESPACE)
 public class CompleteMultipartUploadResponse {
 
   @XmlElement(name = "Location")

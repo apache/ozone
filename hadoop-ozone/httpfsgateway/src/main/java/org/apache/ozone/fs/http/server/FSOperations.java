@@ -76,6 +76,7 @@ public final class FSOperations {
   private FSOperations() {
     // not called
   }
+
   /**
    * Set the buffer size. The size is set during the initialization of
    * HttpFSServerWebApp.
@@ -1344,6 +1345,7 @@ public final class FSOperations {
   public static class FSTrashRoot
       implements FileSystemAccess.FileSystemExecutor<JSONObject> {
     private Path path;
+
     public FSTrashRoot(String path) {
       this.path = new Path(path);
     }

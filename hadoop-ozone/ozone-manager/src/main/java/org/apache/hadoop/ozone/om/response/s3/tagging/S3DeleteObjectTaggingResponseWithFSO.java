@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.response.s3.tagging;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.FILE_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;

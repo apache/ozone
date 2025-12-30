@@ -30,12 +30,12 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
@@ -56,11 +56,10 @@ public class TestQuasiClosedStuckOverReplicationHandler {
   private static final RatisReplicationConfig RATIS_REPLICATION_CONFIG = RatisReplicationConfig.getInstance(THREE);
   private ContainerInfo container;
   private ReplicationManager replicationManager;
-  private ReplicationManagerMetrics metrics;
   private Set<Pair<DatanodeDetails, SCMCommand<?>>> commandsSent;
   private QuasiClosedStuckOverReplicationHandler handler;
-  private UUID origin1 = UUID.randomUUID();
-  private UUID origin2 = UUID.randomUUID();
+  private final DatanodeID origin1 = DatanodeID.randomID();
+  private final DatanodeID origin2 = DatanodeID.randomID();
 
   @BeforeEach
   void setup() throws NodeNotFoundException,
@@ -74,7 +73,7 @@ public class TestQuasiClosedStuckOverReplicationHandler {
     when(replicationManager.getConfig())
         .thenReturn(ozoneConfiguration.getObject(
             ReplicationManager.ReplicationManagerConfiguration.class));
-    metrics = ReplicationManagerMetrics.create(replicationManager);
+    ReplicationManagerMetrics metrics = ReplicationManagerMetrics.create(replicationManager);
     when(replicationManager.getMetrics()).thenReturn(metrics);
 
     /*
@@ -119,8 +118,13 @@ public class TestQuasiClosedStuckOverReplicationHandler {
         Pair.of(origin2, HddsProtos.NodeOperationalState.IN_SERVICE),
         Pair.of(origin2, HddsProtos.NodeOperationalState.IN_SERVICE));
     List<ContainerReplicaOp> pendingOps = new ArrayList<>();
-    pendingOps.add(ContainerReplicaOp.create(
-        ContainerReplicaOp.PendingOpType.DELETE, MockDatanodeDetails.randomDatanodeDetails(), 0));
+    pendingOps.add(new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.DELETE,
+        MockDatanodeDetails.randomDatanodeDetails(),
+        0,
+        null,
+        Long.MAX_VALUE,
+        0));
 
     int count = handler.processAndSendCommands(replicas, pendingOps, getOverReplicatedHealthResult(), 1);
     assertEquals(0, count);
@@ -159,7 +163,6 @@ public class TestQuasiClosedStuckOverReplicationHandler {
         handler.processAndSendCommands(replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 1));
     assertEquals(1, commandsSent.size());
   }
-
 
   private ContainerHealthResult.OverReplicatedHealthResult getOverReplicatedHealthResult() {
     ContainerHealthResult.OverReplicatedHealthResult

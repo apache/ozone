@@ -22,8 +22,8 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_CONTAINER
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_FILE_SIZE;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_VOLUME;
 import static org.apache.ozone.recon.schema.generated.tables.ContainerCountBySizeTable.CONTAINER_COUNT_BY_SIZE;
-import static org.apache.ozone.recon.schema.generated.tables.FileCountBySizeTable.FILE_COUNT_BY_SIZE;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -34,15 +34,17 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator;
 import org.apache.hadoop.ozone.recon.ReconUtils;
+import org.apache.hadoop.ozone.recon.spi.ReconFileMetadataManager;
+import org.apache.hadoop.ozone.recon.tasks.FileSizeCountKey;
 import org.apache.ozone.recon.schema.UtilizationSchemaDefinition;
 import org.apache.ozone.recon.schema.generated.tables.daos.ContainerCountBySizeDao;
-import org.apache.ozone.recon.schema.generated.tables.daos.FileCountBySizeDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.ContainerCountBySize;
 import org.apache.ozone.recon.schema.generated.tables.pojos.FileCountBySize;
 import org.jooq.DSLContext;
 import org.jooq.Record1;
-import org.jooq.Record3;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,19 +55,19 @@ import org.slf4j.LoggerFactory;
 @Produces(MediaType.APPLICATION_JSON)
 public class UtilizationEndpoint {
 
-  private FileCountBySizeDao fileCountBySizeDao;
   private UtilizationSchemaDefinition utilizationSchemaDefinition;
   private ContainerCountBySizeDao containerCountBySizeDao;
+  private ReconFileMetadataManager reconFileMetadataManager;
   private static final Logger LOG = LoggerFactory
       .getLogger(UtilizationEndpoint.class);
+
   @Inject
-  public UtilizationEndpoint(FileCountBySizeDao fileCountBySizeDao,
-                             ContainerCountBySizeDao containerCountBySizeDao,
-                             UtilizationSchemaDefinition
-                                 utilizationSchemaDefinition) {
+  public UtilizationEndpoint(ContainerCountBySizeDao containerCountBySizeDao,
+                             UtilizationSchemaDefinition utilizationSchemaDefinition,
+                             ReconFileMetadataManager reconFileMetadataManager) {
     this.utilizationSchemaDefinition = utilizationSchemaDefinition;
-    this.fileCountBySizeDao = fileCountBySizeDao;
     this.containerCountBySizeDao = containerCountBySizeDao;
+    this.reconFileMetadataManager = reconFileMetadataManager;
   }
 
   /**
@@ -82,31 +84,55 @@ public class UtilizationEndpoint {
       @QueryParam(RECON_QUERY_FILE_SIZE)
           long fileSize
   ) {
-    DSLContext dslContext = utilizationSchemaDefinition.getDSLContext();
-    List<FileCountBySize> resultSet;
-    if (volume != null && bucket != null && fileSize > 0) {
-      Record3<String, String, Long> recordToFind = dslContext
-          .newRecord(FILE_COUNT_BY_SIZE.VOLUME,
-              FILE_COUNT_BY_SIZE.BUCKET,
-              FILE_COUNT_BY_SIZE.FILE_SIZE)
-          .value1(volume)
-          .value2(bucket)
-          .value3(fileSize);
-      FileCountBySize record = fileCountBySizeDao.findById(recordToFind);
-      resultSet = record != null ?
-          Collections.singletonList(record) : Collections.emptyList();
-    } else if (volume != null && bucket != null) {
-      resultSet = dslContext.select().from(FILE_COUNT_BY_SIZE)
-          .where(FILE_COUNT_BY_SIZE.VOLUME.eq(volume))
-          .and(FILE_COUNT_BY_SIZE.BUCKET.eq(bucket))
-          .fetchInto(FileCountBySize.class);
-    } else if (volume != null) {
-      resultSet = fileCountBySizeDao.fetchByVolume(volume);
-    } else {
-      // fetch all records
-      resultSet = fileCountBySizeDao.findAll();
+    List<FileCountBySize> resultSet = new ArrayList<>();
+    try {
+      Table<FileSizeCountKey, Long> fileCountTable = reconFileMetadataManager.getFileCountTable();
+      
+      if (volume != null && bucket != null && fileSize > 0) {
+        // Query for specific volume, bucket, and file size
+        FileSizeCountKey key = new FileSizeCountKey(volume, bucket, fileSize);
+        Long count = fileCountTable.get(key);
+        if (count != null && count > 0) {
+          FileCountBySize record = new FileCountBySize();
+          record.setVolume(volume);
+          record.setBucket(bucket);
+          record.setFileSize(fileSize);
+          record.setCount(count);
+          resultSet.add(record);
+        }
+      } else {
+        // Use iterator to scan through all records and filter
+        try (KeyValueIterator<FileSizeCountKey, Long> iterator = fileCountTable.iterator()) {
+          while (iterator.hasNext()) {
+            Table.KeyValue<FileSizeCountKey, Long> entry = iterator.next();
+            FileSizeCountKey key = entry.getKey();
+            Long count = entry.getValue();
+            
+            // Apply filters
+            boolean matches = true;
+            if (volume != null && !volume.equals(key.getVolume())) {
+              matches = false;
+            }
+            if (bucket != null && !bucket.equals(key.getBucket())) {
+              matches = false;
+            }
+            
+            if (matches && count != null && count > 0) {
+              FileCountBySize record = new FileCountBySize();
+              record.setVolume(key.getVolume());
+              record.setBucket(key.getBucket());
+              record.setFileSize(key.getFileSizeUpperBound());
+              record.setCount(count);
+              resultSet.add(record);
+            }
+          }
+        }
+      }
+      return Response.ok(resultSet).build();
+    } catch (Exception e) {
+      LOG.error("Error retrieving file counts from RocksDB", e);
+      return Response.status(Response.Status.INTERNAL_SERVER_ERROR).build();
     }
-    return Response.ok(resultSet).build();
   }
 
   /**

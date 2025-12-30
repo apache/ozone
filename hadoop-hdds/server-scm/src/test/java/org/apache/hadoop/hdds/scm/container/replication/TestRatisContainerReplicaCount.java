@@ -415,7 +415,7 @@ class TestRatisContainerReplicaCount {
           .setContainerID(ContainerID.valueOf(1))
           .setContainerState(OPEN)
           .setDatanodeDetails(dn)
-          .setOriginNodeId(dn.getUuid())
+          .setOriginNodeId(dn.getID())
           .setSequenceId(1)
           .build();
       replica.remove(r);
@@ -568,8 +568,8 @@ class TestRatisContainerReplicaCount {
     replicas.add(unhealthyReplica);
 
     List<ContainerReplicaOp> ops = new ArrayList<>();
-    ops.add(ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.DELETE,
-        unhealthyReplica.getDatanodeDetails(), 0));
+    ops.add(new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.DELETE,
+        unhealthyReplica.getDatanodeDetails(), 0, null, System.currentTimeMillis(), 0));
     RatisContainerReplicaCount withoutUnhealthy =
         new RatisContainerReplicaCount(container, replicas, ops, 2, false);
     validate(withoutUnhealthy, true, 0, false, false);
@@ -656,8 +656,8 @@ class TestRatisContainerReplicaCount {
         createReplicas(container.containerID(), UNHEALTHY, 0, 0);
     replicas.addAll(unhealthyReplicas);
     List<ContainerReplicaOp> ops = new ArrayList<>();
-    ops.add(ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.DELETE,
-        unhealthyReplicas.iterator().next().getDatanodeDetails(), 0));
+    ops.add(new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.DELETE,
+        unhealthyReplicas.iterator().next().getDatanodeDetails(), 0, null, System.currentTimeMillis(), 0));
 
     RatisContainerReplicaCount withoutUnhealthy =
         new RatisContainerReplicaCount(container, replicas, ops, 2, false);
@@ -841,7 +841,7 @@ class TestRatisContainerReplicaCount {
           .setContainerID(ContainerID.valueOf(1))
           .setContainerState(State.CLOSED)
           .setDatanodeDetails(dn)
-          .setOriginNodeId(dn.getUuid())
+          .setOriginNodeId(dn.getID())
           .setSequenceId(1)
           .build());
     }
@@ -850,7 +850,7 @@ class TestRatisContainerReplicaCount {
 
   private ContainerInfo createContainer(HddsProtos.LifeCycleState state) {
     return new ContainerInfo.Builder()
-        .setContainerID(ContainerID.valueOf(1).getId())
+        .setContainerID(1)
         .setState(state)
         .build();
   }

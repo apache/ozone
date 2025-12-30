@@ -21,10 +21,11 @@ Library             Collections
 Resource            ../commonlib.robot
 Resource            ../ozone-lib/shell.robot
 
+Suite Setup         Get Security Enabled From Config
+
 Test Timeout        20 minutes
 
 *** Variables ***
-${SECURITY_ENABLED}                 false
 ${HOST}                             datanode1
 ${VOLUME}                           volume1
 ${BUCKET}                           bucket1
@@ -149,7 +150,7 @@ All container is closed
 
 Get Datanode Ozone Used Bytes Info
     [arguments]             ${uuid}
-    ${output} =    Execute    export DATANODES=$(ozone admin datanode list --json) && for datanode in $(echo "$\{DATANODES\}" | jq -r '.[].datanodeDetails.uuid'); do ozone admin datanode usageinfo --uuid=$\{datanode\} --json | jq '{(.[0].datanodeDetails.uuid) : .[0].ozoneUsed}'; done | jq -s add
+    ${output} =    Execute    export DATANODES=$(ozone admin datanode list --json) && for datanode in $(echo "$\{DATANODES\}" | jq -r '.[].id'); do ozone admin datanode usageinfo --uuid=$\{datanode\} --json | jq '{(.[0].datanodeDetails.uuid) : .[0].ozoneUsed}'; done | jq -s add
     ${result} =    Execute    echo '${output}' | jq '. | to_entries | .[] | select(.key == "${uuid}") | .value'
     [return]          ${result}
 

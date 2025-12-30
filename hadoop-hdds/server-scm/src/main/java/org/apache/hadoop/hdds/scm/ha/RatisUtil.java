@@ -57,7 +57,6 @@ public final class RatisUtil {
   private RatisUtil() {
   }
 
-
   /**
    * Constructs new Raft Properties instance using {@link ConfigurationSource}.
    *
@@ -91,7 +90,7 @@ public final class RatisUtil {
   public static void setRaftStorageDir(final RaftProperties properties,
       final ConfigurationSource conf) {
     RaftServerConfigKeys.setStorageDir(properties, Collections
-        .singletonList(new File(SCMHAUtils.getRatisStorageDir(conf))));
+        .singletonList(new File(SCMHAUtils.getSCMRatisDirectory(conf))));
   }
 
   /**
@@ -138,6 +137,8 @@ public final class RatisUtil {
                             OZONE_SCM_HA_RATIS_NODE_FAILURE_TIMEOUT_DEFAULT,
                     TimeUnit.MILLISECONDS),
             TimeUnit.MILLISECONDS));
+    RatisHelper.setFirstElectionTimeoutDuration(
+        ozoneConf, properties, ScmConfigKeys.OZONE_SCM_HA_RATIS_SERVER_RPC_FIRST_ELECTION_TIMEOUT);
   }
 
   /**
@@ -195,6 +196,7 @@ public final class RatisUtil {
             ozoneConf.getInt(ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_GAP,
                     ScmConfigKeys.OZONE_SCM_HA_RAFT_LOG_PURGE_GAP_DEFAULT));
     Log.setSegmentCacheNumMax(properties, 2);
+
     return logAppenderQueueByteLimit;
   }
 

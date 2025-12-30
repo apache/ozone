@@ -116,14 +116,13 @@ public class TestStorageVolumeHealthChecks {
     verifyFullVolumeHealthWithDiskReadWriteStatus(builder, true, false);
   }
 
-
   public void verifyFullVolumeHealthWithDiskReadWriteStatus(StorageVolume.Builder<?> builder, boolean... checkResult)
       throws Exception {
 
     for (boolean result : checkResult) {
       StorageVolume volume = builder.build();
 
-      VolumeUsage usage = volume.getVolumeUsage().get();
+      VolumeUsage usage = volume.getVolumeUsage();
       DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
       int minimumDiskSpace = dnConf.getVolumeHealthCheckFileSize() * 2;
       // Keep remaining space as just less than double of VolumeHealthCheckFileSize.

@@ -642,7 +642,7 @@ public class TestECBlockInputStream {
       }
       position += toRead;
       return toRead;
-    };
+    }
 
     @Override
     protected int readWithStrategy(ByteReaderStrategy strategy) throws

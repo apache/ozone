@@ -136,8 +136,6 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
             omMetadataManager.getDeletedTable()));
   }
 
-
-
   @Test
   // similar to testAddDBToBatch(), but omBucketInfo is null
   public void testAddDBToBatchWithNullBucketInfo() throws Exception {
@@ -248,7 +246,7 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
     String bucketName = UUID.randomUUID().toString();
     String keyName = getKeyName();
 
-    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+    OmBucketInfo bucketInfo = OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
     createParentPath(volumeName, bucketName);
 
@@ -259,7 +257,7 @@ public class TestS3MultipartUploadCompleteResponseWithFSO
         .setParentObjectID(parentID)
         .setUpdateID(8)
         .build();
-    RepeatedOmKeyInfo prevKeys = new RepeatedOmKeyInfo(prevKey);
+    RepeatedOmKeyInfo prevKeys = new RepeatedOmKeyInfo(prevKey, bucketInfo.getObjectID());
     String ozoneKey = omMetadataManager
         .getOzoneKey(prevKey.getVolumeName(),
             prevKey.getBucketName(), prevKey.getFileName());

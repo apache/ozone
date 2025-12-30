@@ -112,7 +112,7 @@ public class OzoneCryptoInputStream extends CryptoInputStream
       LOG.debug("OzoneCryptoInputStream for key: {} part: {} read {} bytes " +
               "instead of {} bytes to account for Crypto buffer boundary. " +
               "Client buffer will be copied with read data from position {}" +
-              "upto position {}, discarding the extra bytes read to " +
+              "up to position {}, discarding the extra bytes read to " +
               "maintain Crypto buffer boundary limits", keyName, partIndex,
           actualNumBytesRead, numBytesRead, readPositionAdjustedBy,
           actualNumBytesRead - readPositionAdjustedBy);

@@ -19,8 +19,12 @@ package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
@@ -62,6 +66,7 @@ public class CreatePipelineCommandHandler implements CommandHandler {
 
   private final Executor executor;
   private final MutableRate opsLatencyMs;
+  private final Set<UUID> pipelinesInProgress;
 
   /**
    * Constructs a createPipelineCommand handler.
@@ -79,6 +84,7 @@ public class CreatePipelineCommandHandler implements CommandHandler {
     MetricsRegistry registry = new MetricsRegistry(
         CreatePipelineCommandHandler.class.getSimpleName());
     this.opsLatencyMs = registry.newRate(SCMCommandProto.Type.createPipelineCommand + "Ms");
+    this.pipelinesInProgress = ConcurrentHashMap.newKeySet();
   }
 
   /**
@@ -92,56 +98,72 @@ public class CreatePipelineCommandHandler implements CommandHandler {
   @Override
   public void handle(SCMCommand<?> command, OzoneContainer ozoneContainer,
       StateContext context, SCMConnectionManager connectionManager) {
-    queuedCount.incrementAndGet();
-    CompletableFuture.runAsync(() -> {
-      invocationCount.incrementAndGet();
-      final long startTime = Time.monotonicNow();
-      final DatanodeDetails dn = context.getParent()
-          .getDatanodeDetails();
-      final CreatePipelineCommand createCommand =
-          (CreatePipelineCommand) command;
-      final PipelineID pipelineID = createCommand.getPipelineID();
-      final HddsProtos.PipelineID pipelineIdProto = pipelineID.getProtobuf();
-      final List<DatanodeDetails> peers = createCommand.getNodeList();
-      final List<Integer> priorityList = createCommand.getPriorityList();
+    final CreatePipelineCommand createCommand = (CreatePipelineCommand) command;
+    final PipelineID pipelineID = createCommand.getPipelineID();
+    final UUID pipelineUUID = pipelineID.getId();
+    
+    // Check if this pipeline is already being processed
+    if (!pipelinesInProgress.add(pipelineUUID)) {
+      LOG.debug("Create Pipeline command for pipeline {} is already in progress, " +
+          "skipping duplicate command.", pipelineID);
+      return;
+    }
+    
+    try {
+      queuedCount.incrementAndGet();
+      CompletableFuture.runAsync(() -> {
+        invocationCount.incrementAndGet();
+        final long startTime = Time.monotonicNow();
+        final DatanodeDetails dn = context.getParent().getDatanodeDetails();
+        final HddsProtos.PipelineID pipelineIdProto = pipelineID.getProtobuf();
+        final List<DatanodeDetails> peers = createCommand.getNodeList();
+        final List<Integer> priorityList = createCommand.getPriorityList();
 
-      try {
-        XceiverServerSpi server = ozoneContainer.getWriteChannel();
-        if (!server.isExist(pipelineIdProto)) {
-          final RaftGroupId groupId = RaftGroupId.valueOf(pipelineID.getId());
-          final RaftGroup group =
-              RatisHelper.newRaftGroup(groupId, peers, priorityList);
-          server.addGroup(pipelineIdProto, peers, priorityList);
-          peers.stream().filter(
-              d -> !d.getUuid().equals(dn.getUuid()))
-              .forEach(d -> {
-                final RaftPeer peer = RatisHelper.toRaftPeer(d);
-                try (RaftClient client = newRaftClient.apply(peer,
-                    ozoneContainer.getTlsClientConfig())) {
-                  client.getGroupManagementApi(peer.getId()).add(group);
-                } catch (AlreadyExistsException ae) {
-                  // do not log
-                } catch (IOException ioe) {
-                  LOG.warn("Add group failed for {}", d, ioe);
-                }
-              });
-          LOG.info("Created Pipeline {} {} {}.",
-              createCommand.getReplicationType(), createCommand.getFactor(),
-              pipelineID);
+        try {
+          XceiverServerSpi server = ozoneContainer.getWriteChannel();
+          if (!server.isExist(pipelineIdProto)) {
+            final RaftGroupId groupId = RaftGroupId.valueOf(pipelineID.getId());
+            final RaftGroup group =
+                RatisHelper.newRaftGroup(groupId, peers, priorityList);
+            server.addGroup(pipelineIdProto, peers, priorityList);
+            peers.stream().filter(d -> !d.getID().equals(dn.getID()))
+                .forEach(d -> {
+                  final RaftPeer peer = RatisHelper.toRaftPeer(d);
+                  try (RaftClient client = newRaftClient.apply(peer,
+                      ozoneContainer.getTlsClientConfig())) {
+                    client.getGroupManagementApi(peer.getId()).add(group);
+                  } catch (AlreadyExistsException ae) {
+                    // do not log
+                  } catch (IOException ioe) {
+                    LOG.warn("Add group failed for {}", d, ioe);
+                  }
+                });
+            LOG.info("Created Pipeline {} {} {}.",
+                createCommand.getReplicationType(), createCommand.getFactor(),
+                pipelineID);
+          }
+        } catch (IOException e) {
+          // The server.addGroup may exec after a getGroupManagementApi call
+          // from another peer, so we may got an AlreadyExistsException.
+          if (!(e.getCause() instanceof AlreadyExistsException)) {
+            LOG.error("Can't create pipeline {} {} {}",
+                createCommand.getReplicationType(),
+                createCommand.getFactor(), pipelineID, e);
+          }
+        } finally {
+          long endTime = Time.monotonicNow();
+          this.opsLatencyMs.add(endTime - startTime);
         }
-      } catch (IOException e) {
-        // The server.addGroup may exec after a getGroupManagementApi call
-        // from another peer, so we may got an AlreadyExistsException.
-        if (!(e.getCause() instanceof AlreadyExistsException)) {
-          LOG.error("Can't create pipeline {} {} {}",
-              createCommand.getReplicationType(),
-              createCommand.getFactor(), pipelineID, e);
-        }
-      } finally {
-        long endTime = Time.monotonicNow();
-        this.opsLatencyMs.add(endTime - startTime);
-      }
-    }, executor).whenComplete((v, e) -> queuedCount.decrementAndGet());
+      }, executor).whenComplete((v, e) -> {
+        queuedCount.decrementAndGet();
+        pipelinesInProgress.remove(pipelineUUID);
+      });
+    } catch (RejectedExecutionException ex) {
+      queuedCount.decrementAndGet();
+      pipelinesInProgress.remove(pipelineUUID);
+      LOG.warn("Create Pipeline command for pipeline {} is rejected as " +
+          "command queue has reached max size.", pipelineID);
+    }
   }
 
   /**

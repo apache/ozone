@@ -98,6 +98,10 @@ public final class S3GatewayConfigKeys {
   public static final String OZONE_S3G_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY
       = "ozone.s3g.metrics.percentiles.intervals.seconds";
 
+  // S3 ListObjects max-keys limit (default: 1000, AWS compatible)
+  public static final String OZONE_S3G_LIST_MAX_KEYS_LIMIT = "ozone.s3g.list.max.keys.limit";
+  public static final int OZONE_S3G_LIST_MAX_KEYS_LIMIT_DEFAULT = 1000;
+
   /**
    * Never constructed.
    */

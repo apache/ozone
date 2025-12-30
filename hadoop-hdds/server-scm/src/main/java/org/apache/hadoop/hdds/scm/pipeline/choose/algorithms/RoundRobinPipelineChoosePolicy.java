@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
  */
 public class RoundRobinPipelineChoosePolicy implements PipelineChoosePolicy {
 
-  public static final Logger LOG = LoggerFactory.getLogger(RoundRobinPipelineChoosePolicy.class);
+  private static final Logger LOG = LoggerFactory.getLogger(RoundRobinPipelineChoosePolicy.class);
 
   // Stores the index of the next pipeline to be returned.
   private int nextPipelineIndex = 0;

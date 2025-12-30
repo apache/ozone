@@ -29,7 +29,6 @@ public class OmDeleteKeys {
 
   private List<String> keyNames;
 
-
   public OmDeleteKeys(String volume, String bucket, List<String> keyNames) {
     this.volume = volume;
     this.bucket = bucket;

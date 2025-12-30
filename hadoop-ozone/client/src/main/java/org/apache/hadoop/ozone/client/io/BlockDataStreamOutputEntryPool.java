@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -47,7 +48,7 @@ import org.slf4j.LoggerFactory;
  */
 public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(BlockDataStreamOutputEntryPool.class);
 
   private final List<BlockDataStreamOutputEntry> streamEntries;
@@ -112,7 +113,7 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
   }
 
   private void addKeyLocationInfo(OmKeyLocationInfo subKeyInfo) {
-    Preconditions.checkNotNull(subKeyInfo.getPipeline());
+    Objects.requireNonNull(subKeyInfo.getPipeline(), "subKeyInfo.getPipeline() == null");
     BlockDataStreamOutputEntry.Builder builder =
         new BlockDataStreamOutputEntry.Builder()
             .setBlockID(subKeyInfo.getBlockID())
@@ -220,6 +221,7 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
     return streamEntries.stream().mapToLong(
         BlockDataStreamOutputEntry::getCurrentPosition).sum();
   }
+
   /**
    * Contact OM to get a new block. Set the new block with the index (e.g.
    * first block has index = 0, second has index = 1 etc.)
@@ -236,7 +238,6 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
         omClient.allocateBlock(keyArgs, openID, excludeList);
     addKeyLocationInfo(subKeyInfo);
   }
-
 
   void commitKey(long offset) throws IOException {
     if (keyArgs != null) {
@@ -276,7 +277,7 @@ public class BlockDataStreamOutputEntryPool implements KeyMetadataAware {
       currentStreamIndex++;
     }
     if (streamEntries.size() <= currentStreamIndex) {
-      Preconditions.checkNotNull(omClient);
+      Objects.requireNonNull(omClient, "omClient == null");
       // allocate a new block, if a exception happens, log an error and
       // throw exception to the caller directly, and the write fails.
       allocateNewBlock();

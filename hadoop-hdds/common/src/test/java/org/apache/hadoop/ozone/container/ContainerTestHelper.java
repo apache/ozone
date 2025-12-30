@@ -18,18 +18,26 @@
 package org.apache.hadoop.ozone.container;
 
 import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
-import com.google.common.base.Preconditions;
 import jakarta.annotation.Nonnull;
+import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -230,7 +238,6 @@ public final class ContainerTestHelper {
     return request.build();
   }
 
-
   public static ContainerCommandRequestProto getReadSmallFileRequest(
       Pipeline pipeline, ContainerProtos.PutBlockRequestProto putKey)
       throws Exception {
@@ -292,7 +299,6 @@ public final class ContainerTestHelper {
       long containerID, Pipeline pipeline) throws IOException {
     return getCreateContainerRequest(containerID, pipeline, ContainerProtos.ContainerDataProto.State.OPEN);
   }
-
 
   /**
    * Returns a create container command for test purposes. There are a bunch of
@@ -532,7 +538,7 @@ public final class ContainerTestHelper {
   public static ContainerCommandRequestProto getDeleteContainer(
       Pipeline pipeline, long containerID, boolean forceDelete)
       throws IOException {
-    Preconditions.checkNotNull(pipeline);
+    Objects.requireNonNull(pipeline, "pipeline == null");
     ContainerProtos.DeleteContainerRequestProto deleteRequest =
         ContainerProtos.DeleteContainerRequestProto.newBuilder().
             setForceDelete(forceDelete).build();
@@ -675,5 +681,45 @@ public final class ContainerTestHelper {
     }
 
     return builder.build();
+  }
+
+  /**
+   * Overwrite the file with random bytes.
+   */
+  public static void corruptFile(File file) {
+    try {
+      final int length = (int) file.length();
+
+      Path path = file.toPath();
+      final byte[] original = IOUtils.readFully(Files.newInputStream(path), length);
+
+      // Corrupt the last byte and middle bytes of the block. The scanner should log this as two errors.
+      final byte[] corruptedBytes = Arrays.copyOf(original, length);
+      corruptedBytes[length - 1] = (byte) (original[length - 1] << 1);
+      corruptedBytes[length / 2] = (byte) (original[length / 2] << 1);
+
+      Files.write(path, corruptedBytes,
+          StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.SYNC);
+
+      assertThat(IOUtils.readFully(Files.newInputStream(path), length))
+          .isEqualTo(corruptedBytes)
+          .isNotEqualTo(original);
+    } catch (IOException ex) {
+      // Fail the test.
+      throw new UncheckedIOException(ex);
+    }
+  }
+
+  /**
+   * Truncate the file to 0 bytes in length.
+   */
+  public static void truncateFile(File file) {
+    try {
+      Files.write(file.toPath(), new byte[0], StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.SYNC);
+      assertEquals(0, file.length());
+    } catch (IOException ex) {
+      // Fail the test.
+      throw new UncheckedIOException(ex);
+    }
   }
 }

@@ -49,6 +49,10 @@ public class OMKeySetAclRequestWithFSO extends OMKeyAclRequestWithFSO {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeySetAclRequestWithFSO.class);
 
+  private String path;
+  private List<OzoneAcl> ozoneAcls;
+  private OzoneObj obj;
+
   @Override
   public OzoneManagerProtocolProtos.OMRequest preExecute(
       OzoneManager ozoneManager) throws IOException {
@@ -60,10 +64,6 @@ public class OMKeySetAclRequestWithFSO extends OMKeyAclRequestWithFSO {
     return getOmRequest().toBuilder().setSetAclRequest(setAclRequestBuilder)
         .setUserInfo(getUserInfo()).build();
   }
-
-  private String path;
-  private List<OzoneAcl> ozoneAcls;
-  private OzoneObj obj;
 
   public OMKeySetAclRequestWithFSO(
       OzoneManagerProtocolProtos.OMRequest omReq, BucketLayout bucketLayout) {
@@ -129,9 +129,9 @@ public class OMKeySetAclRequestWithFSO extends OMKeyAclRequestWithFSO {
   }
 
   @Override
-  boolean apply(OmKeyInfo omKeyInfo, long trxnLogIndex) {
+  boolean apply(OmKeyInfo.Builder builder, long trxnLogIndex) {
     // No need to check not null here, this will be never called with null.
-    return omKeyInfo.setAcls(ozoneAcls);
+    return builder.acls().set(ozoneAcls);
   }
 
   @Override

@@ -34,7 +34,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import org.apache.commons.collections.iterators.LoopingIterator;
+import org.apache.commons.collections4.iterators.LoopingIterator;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -88,7 +88,6 @@ public class BackgroundPipelineCreator implements SCMService {
   private final AtomicBoolean running = new AtomicBoolean(false);
   private final long intervalInMillis;
   private final Clock clock;
-
 
   BackgroundPipelineCreator(PipelineManager pipelineManager,
       ConfigurationSource conf, SCMContext scmContext, Clock clock) {

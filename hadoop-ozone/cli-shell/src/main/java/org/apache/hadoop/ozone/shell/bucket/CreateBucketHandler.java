@@ -57,28 +57,6 @@ public class CreateBucketHandler extends BucketHandler {
               " user if not specified")
   private String ownerName;
 
-  private static class LayoutConverter implements CommandLine.ITypeConverter<BucketLayout> {
-    @Override
-    public BucketLayout convert(String value) {
-      if (value == null) {
-        return null;
-      }
-      switch (value) {
-      case "fso":
-        return BucketLayout.FILE_SYSTEM_OPTIMIZED;
-      case "obs":
-        return BucketLayout.OBJECT_STORE;
-      default:
-        for (BucketLayout candidate : BucketLayout.values()) {
-          if (candidate.name().equalsIgnoreCase(value)) {
-            return candidate;
-          }
-        }
-        throw new IllegalArgumentException("Unknown bucket layout: " + value);
-      }
-    }
-  }
-
   @Option(names = { "--layout", "-l" }, converter = LayoutConverter.class,
           description = "Allowed Bucket Layouts: fso (for file system optimized buckets FILE_SYSTEM_OPTIMIZED), " +
                   "obs (for object store optimized OBJECT_STORE) and legacy (LEGACY is Deprecated)")
@@ -147,6 +125,28 @@ public class CreateBucketHandler extends BucketHandler {
     if (isVerbose()) {
       OzoneBucket bucket = vol.getBucket(bucketName);
       printObjectAsJson(bucket);
+    }
+  }
+
+  private static class LayoutConverter implements CommandLine.ITypeConverter<BucketLayout> {
+    @Override
+    public BucketLayout convert(String value) {
+      if (value == null) {
+        return null;
+      }
+      switch (value) {
+      case "fso":
+        return BucketLayout.FILE_SYSTEM_OPTIMIZED;
+      case "obs":
+        return BucketLayout.OBJECT_STORE;
+      default:
+        for (BucketLayout candidate : BucketLayout.values()) {
+          if (candidate.name().equalsIgnoreCase(value)) {
+            return candidate;
+          }
+        }
+        throw new IllegalArgumentException("Unknown bucket layout: " + value);
+      }
     }
   }
 }

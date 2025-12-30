@@ -19,10 +19,6 @@ package org.apache.hadoop.hdds.server.events;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import org.apache.hadoop.hdds.utils.MetricsUtil;
-import org.apache.hadoop.metrics2.annotation.Metric;
-import org.apache.hadoop.metrics2.annotation.Metrics;
-import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,7 +27,6 @@ import org.slf4j.LoggerFactory;
  *
  * @param <P> the payload type of events
  */
-@Metrics(context = "EventQueue")
 public class SingleThreadExecutor<P> implements EventExecutor<P> {
 
   private static final String EVENT_QUEUE = "EventQueue";
@@ -40,20 +35,8 @@ public class SingleThreadExecutor<P> implements EventExecutor<P> {
       LoggerFactory.getLogger(SingleThreadExecutor.class);
 
   private final String name;
-
   private final ExecutorService executor;
-
-  @Metric
-  private MutableCounterLong queued;
-
-  @Metric
-  private MutableCounterLong done;
-
-  @Metric
-  private MutableCounterLong failed;
-
-  @Metric
-  private MutableCounterLong scheduled;
+  private final EventExecutorMetrics metrics;
 
   /**
    * Create SingleThreadExecutor.
@@ -63,8 +46,7 @@ public class SingleThreadExecutor<P> implements EventExecutor<P> {
    */
   public SingleThreadExecutor(String name, String threadNamePrefix) {
     this.name = name;
-    MetricsUtil.registerDynamic(this, EVENT_QUEUE + name,
-        "Event Executor metrics ", "EventQueue");
+    this.metrics = new EventExecutorMetrics(EVENT_QUEUE + name, "Event Executor metrics");
 
     executor = Executors.newSingleThreadExecutor(
         runnable -> {
@@ -77,42 +59,43 @@ public class SingleThreadExecutor<P> implements EventExecutor<P> {
   @Override
   public void onMessage(EventHandler<P> handler, P message, EventPublisher
       publisher) {
-    queued.incr();
+    metrics.incrementQueued();
     executor.execute(() -> {
-      scheduled.incr();
+      metrics.incrementScheduled();
       try {
         handler.onMessage(message, publisher);
-        done.incr();
+        metrics.incrementDone();
       } catch (Exception ex) {
         LOG.error("Error on execution message {}", message, ex);
-        failed.incr();
+        metrics.incrementFailed();
       }
     });
   }
 
   @Override
   public long failedEvents() {
-    return failed.value();
+    return metrics.getFailed();
   }
 
   @Override
   public long successfulEvents() {
-    return done.value();
+    return metrics.getDone();
   }
 
   @Override
   public long queuedEvents() {
-    return queued.value();
+    return metrics.getQueued();
   }
 
   @Override
   public long scheduledEvents() {
-    return scheduled.value();
+    return metrics.getScheduled();
   }
 
   @Override
   public void close() {
     executor.shutdown();
+    metrics.unregister();
   }
 
   @Override

@@ -49,9 +49,11 @@ import org.apache.ozone.test.GenericTestUtils;
 /**
  * Tests for {@link KeyValueContainerMetadataInspector}.
  */
-public class TestKeyValueContainerMetadataInspector
-    extends TestKeyValueContainerIntegrityChecks {
+public class TestKeyValueContainerMetadataInspector extends TestKeyValueContainerIntegrityChecks {
   private static final long CONTAINER_ID = 102;
+
+  static final DeletedBlocksTransactionGeneratorForTesting GENERATOR =
+      new DeletedBlocksTransactionGeneratorForTesting();
 
   @ContainerTestVersionInfo.ContainerTest
   public void testRunDisabled(ContainerTestVersionInfo versionInfo)
@@ -192,9 +194,6 @@ public class TestKeyValueContainerMetadataInspector
       return transactions;
     }
   }
-
-  static final DeletedBlocksTransactionGeneratorForTesting GENERATOR
-      = new DeletedBlocksTransactionGeneratorForTesting();
 
   @ContainerTestVersionInfo.ContainerTest
   public void testCorrectDeleteWithTransaction(
@@ -412,7 +411,6 @@ public class TestKeyValueContainerMetadataInspector
 
     assertTrue(matchFound);
   }
-
 
   public void setDBBlockAndByteCounts(KeyValueContainerData containerData,
       long blockCount, long byteCount) throws Exception {

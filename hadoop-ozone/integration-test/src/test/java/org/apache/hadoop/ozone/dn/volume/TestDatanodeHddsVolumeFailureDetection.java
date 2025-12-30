@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.dn.volume;
 
-import static java.util.Collections.emptyMap;
 import static org.apache.commons.io.IOUtils.readFully;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
@@ -31,7 +30,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
@@ -46,6 +44,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -64,16 +63,13 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.dn.DatanodeTestUtils;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * This class tests datanode can detect failed volumes.
  */
-@Timeout(300)
 class TestDatanodeHddsVolumeFailureDetection {
-
   private static final int KEY_SIZE = 128;
 
   @ParameterizedTest
@@ -118,7 +114,6 @@ class TestDatanodeHddsVolumeFailureDetection {
 
           // should trigger checkVolumeAsync and
           // a failed volume should be detected
-          DatanodeTestUtils.waitForCheckVolume(volSet, 1L);
           DatanodeTestUtils.waitForHandleFailedVolume(volSet, 1);
         } finally {
           // restore for cleanup
@@ -166,7 +161,6 @@ class TestDatanodeHddsVolumeFailureDetection {
 
         // should trigger CheckVolumeAsync and
         // a failed volume should be detected
-        DatanodeTestUtils.waitForCheckVolume(volSet, 1L);
         DatanodeTestUtils.waitForHandleFailedVolume(volSet, 1);
       } finally {
         // restore for cleanup
@@ -230,8 +224,75 @@ class TestDatanodeHddsVolumeFailureDetection {
 
           // should trigger CheckVolumeAsync and
           // a failed volume should be detected
-          DatanodeTestUtils.waitForCheckVolume(volSet, 1L);
           DatanodeTestUtils.waitForHandleFailedVolume(volSet, 1);
+        } finally {
+          // restore all
+          DatanodeTestUtils.restoreBadVolume(vol0);
+          DatanodeTestUtils.restoreDataDirFromFailure(dbDir);
+        }
+      }
+    }
+  }
+
+  /**
+   * {@link HddsVolume#check(Boolean)} will capture the failures injected by this test and not allow the
+   * test to reach the helper method {@link HddsVolume#checkDbHealth}.
+   * As a workaround, we test the helper method directly.
+   * As we test the helper method directly, we cannot test for schemas older than V3.
+   *
+   * @param schemaV3
+   * @throws Exception
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {true})
+  void corruptDbFileWithoutDbHandleCacheInvalidation(boolean schemaV3) throws Exception {
+    try (MiniOzoneCluster cluster = newCluster(schemaV3)) {
+      try (OzoneClient client = cluster.newClient()) {
+        OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client);
+
+        // write a file, will create container1
+        String keyName = UUID.randomUUID().toString();
+        long containerId = createKey(bucket, keyName);
+
+        // close container1
+        HddsDatanodeService dn = cluster.getHddsDatanodes().get(0);
+        OzoneContainer oc = dn.getDatanodeStateMachine().getContainer();
+        Container<?> c1 = oc.getContainerSet().getContainer(containerId);
+        c1.close();
+
+        // create container2, and container1 is kicked out of cache
+        OzoneConfiguration conf = cluster.getConf();
+        try (ScmClient scmClient = new ContainerOperationClient(conf)) {
+          ContainerWithPipeline c2 = scmClient.createContainer(
+              ReplicationType.STAND_ALONE, ReplicationFactor.ONE,
+              OzoneConsts.OZONE);
+          assertEquals(c2.getContainerInfo().getState(), LifeCycleState.OPEN);
+        }
+
+        // corrupt db by rename dir->file
+        File dbDir;
+        if (schemaV3) {
+          dbDir = new File(((KeyValueContainerData) (c1.getContainerData()))
+              .getDbFile().getAbsolutePath());
+        } else {
+          File metadataDir = new File(c1.getContainerFile().getParent());
+          dbDir = new File(metadataDir, "1" + OzoneConsts.DN_CONTAINER_DB);
+        }
+
+        MutableVolumeSet volSet = oc.getVolumeSet();
+        HddsVolume vol0 = (HddsVolume) volSet.getVolumesList().get(0);
+
+        try {
+          DatanodeTestUtils.injectDataDirFailure(dbDir);
+          // simulate bad volume by removing write permission on root dir
+          // refer to HddsVolume.check()
+          DatanodeTestUtils.simulateBadVolume(vol0);
+
+          // one volume health check got automatically executed when the cluster started
+          // the second health should log the rocksdb failure but return a healthy-volume status
+          assertEquals(VolumeCheckResult.HEALTHY, vol0.checkDbHealth(dbDir));
+          // the third health check should log the rocksdb failure and return a failed-volume status
+          assertEquals(VolumeCheckResult.FAILED, vol0.checkDbHealth(dbDir));
         } finally {
           // restore all
           DatanodeTestUtils.restoreBadVolume(vol0);
@@ -266,7 +327,7 @@ class TestDatanodeHddsVolumeFailureDetection {
     DatanodeConfiguration dnConf =
         ozoneConfig.getObject(DatanodeConfiguration.class);
     dnConf.setFailedDataVolumesTolerated(1);
-    dnConf.setDiskCheckMinGap(Duration.ofSeconds(5));
+    dnConf.setDiskCheckMinGap(Duration.ofSeconds(0));
     ozoneConfig.setFromObject(dnConf);
     MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(ozoneConfig)
         .setNumDatanodes(1)
@@ -279,13 +340,10 @@ class TestDatanodeHddsVolumeFailureDetection {
 
   private static long createKey(OzoneBucket bucket, String key)
       throws IOException {
-    byte[] bytes = RandomUtils.nextBytes(KEY_SIZE);
+    byte[] bytes = RandomUtils.secure().randomBytes(KEY_SIZE);
     RatisReplicationConfig replication =
         RatisReplicationConfig.getInstance(ReplicationFactor.ONE);
-    try (OutputStream out = bucket.createKey(key, bytes.length, replication,
-        emptyMap())) {
-      out.write(bytes);
-    }
+    TestDataUtil.createKey(bucket, key, replication, bytes);
     OzoneKeyDetails keyDetails = bucket.getKey(key);
     assertEquals(key, keyDetails.getName());
     return keyDetails.getOzoneKeyLocations().get(0).getContainerID();

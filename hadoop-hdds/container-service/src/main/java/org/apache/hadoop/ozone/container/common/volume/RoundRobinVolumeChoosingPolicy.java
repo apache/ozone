@@ -22,7 +22,6 @@ import static org.apache.hadoop.ozone.container.common.volume.VolumeChoosingUtil
 
 import java.io.IOException;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 import org.slf4j.Logger;
@@ -34,14 +33,14 @@ import org.slf4j.LoggerFactory;
  */
 public class RoundRobinVolumeChoosingPolicy implements VolumeChoosingPolicy {
 
-  public static final Logger LOG = LoggerFactory.getLogger(
+  private static final Logger LOG = LoggerFactory.getLogger(
       RoundRobinVolumeChoosingPolicy.class);
 
   // Stores the index of the next volume to be returned.
-  private AtomicInteger nextVolumeIndex = new AtomicInteger(0);
+  private int nextVolumeIndex = 0;
 
   @Override
-  public HddsVolume chooseVolume(List<HddsVolume> volumes,
+  public synchronized HddsVolume chooseVolume(List<HddsVolume> volumes,
       long maxContainerSize) throws IOException {
 
     // No volumes available to choose from
@@ -53,8 +52,7 @@ public class RoundRobinVolumeChoosingPolicy implements VolumeChoosingPolicy {
 
     // since volumes could've been removed because of the failure
     // make sure we are not out of bounds
-    int nextIndex = nextVolumeIndex.get();
-    int currentVolumeIndex = nextIndex < volumes.size() ? nextIndex : 0;
+    int currentVolumeIndex = nextVolumeIndex < volumes.size() ? nextVolumeIndex : 0;
 
     int startVolumeIndex = currentVolumeIndex;
 
@@ -67,7 +65,8 @@ public class RoundRobinVolumeChoosingPolicy implements VolumeChoosingPolicy {
 
       if (hasEnoughSpace) {
         logIfSomeVolumesOutOfSpace(filter, LOG);
-        nextVolumeIndex.compareAndSet(nextIndex, currentVolumeIndex);
+        nextVolumeIndex = currentVolumeIndex;
+        volume.incCommittedBytes(maxContainerSize);
         return volume;
       }
 

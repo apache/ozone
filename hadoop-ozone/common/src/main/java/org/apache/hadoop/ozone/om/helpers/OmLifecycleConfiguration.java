@@ -48,10 +48,6 @@ public final class OmLifecycleConfiguration extends WithObjectID
       OmLifecycleConfiguration::getProtobuf,
       OmLifecycleConfiguration.class);
 
-  public static Codec<OmLifecycleConfiguration> getCodec() {
-    return CODEC;
-  }
-
   // Ref: https://docs.aws.amazon.com/AmazonS3/latest/userguide/intro-lifecycle-rules.html#intro-lifecycle-rule-id
   public static final int LC_MAX_RULES = 1000;
   private final String volume;
@@ -60,6 +56,10 @@ public final class OmLifecycleConfiguration extends WithObjectID
   private final BucketLayout bucketLayout;
   private final long creationTime;
   private final List<OmLCRule> rules;
+
+  public static Codec<OmLifecycleConfiguration> getCodec() {
+    return CODEC;
+  }
 
   private OmLifecycleConfiguration() {
     throw new UnsupportedOperationException("Default constructor is not supported. Use Builder.");
@@ -188,11 +188,7 @@ public final class OmLifecycleConfiguration extends WithObjectID
 
   @Override
   public OmLifecycleConfiguration copyObject() {
-    try {
-      return toBuilder().build();
-    } catch (OMException e) {
-      throw new RuntimeException(e);
-    }
+    return toBuilder().buildObject();
   }
 
   public LifecycleConfiguration getProtobuf() {
@@ -217,12 +213,12 @@ public final class OmLifecycleConfiguration extends WithObjectID
   }
 
   public static OmLifecycleConfiguration getFromProtobuf(
-      LifecycleConfiguration lifecycleConfiguration) throws OMException {
-    return getBuilderFromProtobuf(lifecycleConfiguration).build();
+      LifecycleConfiguration lifecycleConfiguration) {
+    return getBuilderFromProtobuf(lifecycleConfiguration).buildObject();
   }
 
   public static OmLifecycleConfiguration.Builder getBuilderFromProtobuf(
-      LifecycleConfiguration lifecycleConfiguration) throws OMException {
+      LifecycleConfiguration lifecycleConfiguration) {
     List<OmLCRule> rulesList = new ArrayList<>();
     BucketLayout layout = BucketLayout.fromProto(lifecycleConfiguration.getBucketLayout());
     for (LifecycleRule lifecycleRule : lifecycleConfiguration.getRulesList()) {
@@ -253,7 +249,7 @@ public final class OmLifecycleConfiguration extends WithObjectID
   /**
    * Builder of OmLifecycleConfiguration.
    */
-  public static class Builder extends WithObjectID.Builder {
+  public static class Builder extends WithObjectID.Builder<OmLifecycleConfiguration> {
     private String volume = "";
     private String bucket = "";
     private Long bucketObjectID;
@@ -315,12 +311,13 @@ public final class OmLifecycleConfiguration extends WithObjectID
       return this;
     }
 
-    public OmLifecycleConfiguration build() throws OMException {
+    @Override
+    public OmLifecycleConfiguration buildObject() {
       return new OmLifecycleConfiguration(this);
     }
 
     public OmLifecycleConfiguration buildAndValid() throws OMException {
-      OmLifecycleConfiguration omLifecycleConfiguration = build();
+      OmLifecycleConfiguration omLifecycleConfiguration = buildObject();
       omLifecycleConfiguration.valid();
       return omLifecycleConfiguration;
     }

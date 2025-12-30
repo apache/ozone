@@ -82,9 +82,6 @@ public class SCMStateMachine extends BaseStateMachine {
   private final boolean isInitialized;
   private ExecutorService installSnapshotExecutor;
 
-  // The atomic variable RaftServerImpl#inProgressInstallSnapshotRequest
-  // ensures serializable between notifyInstallSnapshotFromLeader()
-  // and reinitialize().
   private DBCheckpoint installingDBCheckpoint = null;
   private List<ManagedSecretKey> installingSecretKeys = null;
 
@@ -170,7 +167,9 @@ public class SCMStateMachine extends BaseStateMachine {
       if (scm.isInSafeMode() && refreshedAfterLeaderReady.get()) {
         scm.getScmSafeModeManager().refreshAndValidate();
       }
-      transactionBuffer.updateLatestTrxInfo(TransactionInfo.valueOf(TermIndex.valueOf(trx.getLogEntry())));
+      final TermIndex appliedTermIndex = TermIndex.valueOf(trx.getLogEntry());
+      transactionBuffer.updateLatestTrxInfo(TransactionInfo.valueOf(appliedTermIndex));
+      updateLastAppliedTermIndex(appliedTermIndex);
     } catch (Exception ex) {
       applyTransactionFuture.completeExceptionally(ex);
       ExitUtils.terminate(1, ex.getMessage(), ex, StateMachine.LOG);
@@ -362,13 +361,15 @@ public class SCMStateMachine extends BaseStateMachine {
       // 1. Refresh Safemode rules state.
       // 2. Start DN Rpc server.
       if (!refreshedAfterLeaderReady.get()) {
-        scm.getScmSafeModeManager().refresh();
-        scm.getDatanodeProtocolServer().start();
-
         refreshedAfterLeaderReady.set(true);
+        scm.getScmSafeModeManager().refreshAndValidate();
       }
       currentLeaderTerm.set(-1L);
     }
+  }
+
+  public boolean isRefreshedAfterLeaderReady() {
+    return refreshedAfterLeaderReady.get();
   }
 
   @Override
@@ -400,7 +401,7 @@ public class SCMStateMachine extends BaseStateMachine {
 
   @Override
   public void reinitialize() throws IOException {
-    Preconditions.checkNotNull(installingDBCheckpoint);
+    requireNonNull(installingDBCheckpoint, "installingDBCheckpoint == null");
     DBCheckpoint checkpoint = installingDBCheckpoint;
     List<ManagedSecretKey> secretKeys = installingSecretKeys;
 

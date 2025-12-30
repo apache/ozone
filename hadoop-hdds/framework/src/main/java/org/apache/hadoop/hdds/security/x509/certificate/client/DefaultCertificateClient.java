@@ -788,7 +788,6 @@ public abstract class DefaultCertificateClient implements CertificateClient {
     }
   }
 
-
   /**
    * Recover the state if needed.
    * */
@@ -1355,7 +1354,7 @@ public abstract class DefaultCertificateClient implements CertificateClient {
   }
 
   public synchronized void startCertificateRenewerService() {
-    Preconditions.checkNotNull(getCertificate(),
+    Objects.requireNonNull(getCertificate(),
         "Component certificate should not be empty");
     // Schedule task to refresh certificate before it expires
     Duration gracePeriod = securityConfig.getRenewalGracePeriod();

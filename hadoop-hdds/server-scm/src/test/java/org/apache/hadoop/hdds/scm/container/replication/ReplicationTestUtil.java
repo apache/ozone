@@ -32,13 +32,13 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -121,7 +121,7 @@ public final class ReplicationTestUtil {
       DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
       replicas.add(createContainerReplica(containerID, i, IN_SERVICE,
           replicaState, keyCount, bytesUsed,
-          dn, dn.getUuid()));
+          dn, dn.getID()));
     }
     return replicas;
   }
@@ -130,7 +130,7 @@ public final class ReplicationTestUtil {
       ContainerID containerID, ContainerReplicaProto.State replicaState,
       int... indexes) {
     Set<ContainerReplica> replicas = new HashSet<>();
-    UUID originNodeId = MockDatanodeDetails.randomDatanodeDetails().getUuid();
+    final DatanodeID originNodeId = DatanodeID.randomID();
     for (int i : indexes) {
       replicas.add(createContainerReplica(
           containerID, i, IN_SERVICE, replicaState, 123L, 1234L,
@@ -138,6 +138,7 @@ public final class ReplicationTestUtil {
     }
     return replicas;
   }
+
   public static ContainerReplica createEmptyContainerReplica(ContainerID containerID,
       int replicaIndex, HddsProtos.NodeOperationalState opState,
       ContainerReplicaProto.State replicaState) {
@@ -145,14 +146,14 @@ public final class ReplicationTestUtil {
         = MockDatanodeDetails.randomDatanodeDetails();
     return createContainerReplica(containerID, replicaIndex, opState,
         replicaState, 0L, 0L,
-        datanodeDetails, datanodeDetails.getUuid());
+        datanodeDetails, datanodeDetails.getID());
   }
 
   public static Set<ContainerReplica> createReplicasWithOriginAndOpState(
       ContainerID containerID, ContainerReplicaProto.State replicaState,
-      Pair<UUID, HddsProtos.NodeOperationalState>... nodes) {
+      Pair<DatanodeID, HddsProtos.NodeOperationalState>... nodes) {
     Set<ContainerReplica> replicas = new HashSet<>();
-    for (Pair<UUID, HddsProtos.NodeOperationalState> i : nodes) {
+    for (Pair<DatanodeID, HddsProtos.NodeOperationalState> i : nodes) {
       replicas.add(createContainerReplica(
           containerID, 0, i.getRight(), replicaState, 123L, 1234L,
           MockDatanodeDetails.randomDatanodeDetails(), i.getLeft()));
@@ -167,7 +168,7 @@ public final class ReplicationTestUtil {
         = MockDatanodeDetails.randomDatanodeDetails();
     return createContainerReplica(containerID, replicaIndex, opState,
         replicaState, 123L, 1234L,
-        datanodeDetails, datanodeDetails.getUuid());
+        datanodeDetails, datanodeDetails.getID());
   }
 
   public static ContainerReplica createContainerReplica(ContainerID containerID,
@@ -177,14 +178,14 @@ public final class ReplicationTestUtil {
         = MockDatanodeDetails.randomDatanodeDetails();
     return createContainerReplica(containerID, replicaIndex, opState,
         replicaState, 123L, 1234L,
-        datanodeDetails, datanodeDetails.getUuid(), seqId);
+        datanodeDetails, datanodeDetails.getID(), seqId);
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   public static ContainerReplica createContainerReplica(ContainerID containerID,
       int replicaIndex, HddsProtos.NodeOperationalState opState,
       ContainerReplicaProto.State replicaState, long keyCount, long bytesUsed,
-      DatanodeDetails datanodeDetails, UUID originNodeId) {
+      DatanodeDetails datanodeDetails, DatanodeID originNodeId) {
     ContainerReplica.ContainerReplicaBuilder builder
         = ContainerReplica.newBuilder();
     datanodeDetails.setPersistedOpState(opState);
@@ -204,7 +205,7 @@ public final class ReplicationTestUtil {
   public static ContainerReplica createContainerReplica(ContainerID containerID,
       int replicaIndex, HddsProtos.NodeOperationalState opState,
       ContainerReplicaProto.State replicaState, long keyCount, long bytesUsed,
-      DatanodeDetails datanodeDetails, UUID originNodeId, long seqId) {
+      DatanodeDetails datanodeDetails, DatanodeID originNodeId, long seqId) {
     ContainerReplica.ContainerReplicaBuilder builder
         = ContainerReplica.newBuilder();
     datanodeDetails.setPersistedOpState(opState);

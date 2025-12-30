@@ -144,9 +144,6 @@ public class TestECKeyOutputStream {
         .applyTo(configuration);
   }
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   */
   @BeforeAll
   protected static void init() throws Exception {
     chunkSize = 1024 * 1024;
@@ -168,9 +165,6 @@ public class TestECKeyOutputStream {
     initInputChunks();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);
@@ -198,7 +192,8 @@ public class TestECKeyOutputStream {
     OzoneClient client1 = null;
     try (MockedStatic<Handler> mockedHandler = Mockito.mockStatic(Handler.class, Mockito.CALLS_REAL_METHODS)) {
       Map<String, Handler> handlers = new HashMap<>();
-      mockedHandler.when(() -> Handler.getHandlerForContainerType(any(), any(), any(), any(), any(), any(), any()))
+      mockedHandler.when(() -> Handler
+              .getHandlerForContainerType(any(), any(), any(), any(), any(), any(), any(), any(), any()))
           .thenAnswer(i -> {
             Handler handler = Mockito.spy((Handler) i.callRealMethod());
             handlers.put(handler.getDatanodeId(), handler);
@@ -440,7 +435,7 @@ public class TestECKeyOutputStream {
     PipelineManager pm =
         cluster.getStorageContainerManager().getPipelineManager();
     for (Pipeline p : pm.getPipelines(repConfig)) {
-      pm.closePipeline(p, true);
+      pm.closePipeline(p.getId());
     }
 
     String keyName = UUID.randomUUID().toString();

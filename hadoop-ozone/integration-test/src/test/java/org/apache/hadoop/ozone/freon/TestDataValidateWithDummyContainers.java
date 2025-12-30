@@ -17,14 +17,12 @@
 
 package org.apache.hadoop.ozone.freon;
 
-import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +31,6 @@ import org.slf4j.LoggerFactory;
  * Data validation is disabled in RandomKeyGenerator.
  */
 
-@Timeout(value = 300, unit = TimeUnit.SECONDS)
 public class TestDataValidateWithDummyContainers
     extends TestDataValidate {
   private static final Logger LOG =

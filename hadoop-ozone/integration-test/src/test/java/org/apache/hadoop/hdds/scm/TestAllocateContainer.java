@@ -20,7 +20,11 @@ package org.apache.hadoop.hdds.scm;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -31,13 +35,11 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test allocate container calls.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
 public abstract class TestAllocateContainer implements NonHATests.TestCase {
 
   private OzoneConfiguration conf;
@@ -74,5 +76,24 @@ public abstract class TestAllocateContainer implements NonHATests.TestCase {
         storageContainerLocationClient.allocateContainer(
             SCMTestUtils.getReplicationType(conf),
             SCMTestUtils.getReplicationFactor(conf), null));
+  }
+
+  @Test
+  public void testAllocateRatis() throws Exception {
+    testAllocateContainer(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
+  }
+  
+  @Test
+  public void testAllocateEC() throws Exception {
+    ECReplicationConfig ecReplicationConfig = new ECReplicationConfig(3, 2);
+    testAllocateContainer(ecReplicationConfig);
+  }
+
+  private void testAllocateContainer(ReplicationConfig replicationConfig) throws Exception {
+    ContainerWithPipeline container =
+        storageContainerLocationClient.allocateContainer(replicationConfig, OzoneConsts.OZONE);
+
+    assertNotNull(container);
+    assertNotNull(container.getPipeline().getFirstNode());
   }
 }

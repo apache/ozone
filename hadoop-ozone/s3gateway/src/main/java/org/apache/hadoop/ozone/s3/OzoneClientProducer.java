@@ -22,10 +22,6 @@ import javax.annotation.PreDestroy;
 import javax.enterprise.context.RequestScoped;
 import javax.enterprise.inject.Produces;
 import javax.inject.Inject;
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.container.ContainerRequestContext;
-import javax.ws.rs.core.Context;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,42 +38,17 @@ public class OzoneClientProducer {
   private OzoneClient client;
 
   @Inject
-  private OzoneConfiguration ozoneConfiguration;
-
-  @Context
-  private ContainerRequestContext context;
+  private OzoneClientCache clientCache;
 
   @Produces
-  public synchronized OzoneClient createClient() throws WebApplicationException,
-      IOException {
-    ozoneConfiguration.set("ozone.om.group.rights", "NONE");
-    client = getClient(ozoneConfiguration);
+  public OzoneClient createClient() {
+    client = clientCache.getClient();
     return client;
   }
 
   @PreDestroy
   public void destroy() throws IOException {
+    LOG.debug("{}: Clearing thread-local auth", this);
     client.getObjectStore().getClientProxy().clearThreadLocalS3Auth();
-  }
-
-  private OzoneClient getClient(OzoneConfiguration config)
-      throws IOException {
-    OzoneClient ozoneClient = null;
-    try {
-      ozoneClient =
-          OzoneClientCache.getOzoneClientInstance(ozoneConfiguration);
-    } catch (Exception e) {
-      // For any other critical errors during object creation throw Internal
-      // error.
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Error during Client Creation: ", e);
-      }
-      throw e;
-    }
-    return ozoneClient;
-  }
-
-  public synchronized void setOzoneConfiguration(OzoneConfiguration config) {
-    this.ozoneConfiguration = config;
   }
 }

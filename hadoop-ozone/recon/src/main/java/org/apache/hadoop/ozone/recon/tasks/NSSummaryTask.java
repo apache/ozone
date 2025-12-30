@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon.tasks;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -34,15 +35,16 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.inject.Inject;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 
 /**
  * Task to query data from OMDB and write into Recon RocksDB.
@@ -69,11 +71,25 @@ public class NSSummaryTask implements ReconOmTask {
   private static final Logger LOG =
       LoggerFactory.getLogger(NSSummaryTask.class);
 
+  // Unified control for all NSS tree rebuild operations
+  private static final AtomicReference<RebuildState> REBUILD_STATE =
+      new AtomicReference<>(RebuildState.IDLE);
+
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private final ReconOMMetadataManager reconOMMetadataManager;
+  private final OzoneConfiguration ozoneConfiguration;
   private final NSSummaryTaskWithFSO nsSummaryTaskWithFSO;
   private final NSSummaryTaskWithLegacy nsSummaryTaskWithLegacy;
   private final NSSummaryTaskWithOBS nsSummaryTaskWithOBS;
+
+  /**
+   * Rebuild state enum to track NSSummary tree rebuild status.
+   */
+  public enum RebuildState {
+    IDLE,     // No rebuild in progress
+    RUNNING,  // Rebuild currently in progress
+    FAILED    // Last rebuild failed
+  }
 
   @Inject
   public NSSummaryTask(ReconNamespaceSummaryManager
@@ -84,6 +100,7 @@ public class NSSummaryTask implements ReconOmTask {
                        ozoneConfiguration) {
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.reconOMMetadataManager = reconOMMetadataManager;
+    this.ozoneConfiguration = ozoneConfiguration;
     long nsSummaryFlushToDBMaxThreshold = ozoneConfiguration.getLong(
         OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD,
         OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT);
@@ -99,8 +116,25 @@ public class NSSummaryTask implements ReconOmTask {
   }
 
   @Override
+  public NSSummaryTask getStagedTask(ReconOMMetadataManager stagedOmMetadataManager, DBStore stagedReconDbStore)
+      throws IOException {
+    ReconNamespaceSummaryManager stagedNsSummaryManager =
+        reconNamespaceSummaryManager.getStagedNsSummaryManager(stagedReconDbStore);
+    return new NSSummaryTask(stagedNsSummaryManager, stagedOmMetadataManager, ozoneConfiguration);
+  }
+
+  @Override
   public String getTaskName() {
     return "NSSummaryTask";
+  }
+
+  /**
+   * Get the current rebuild state of NSSummary tree.
+   * 
+   * @return current RebuildState
+   */
+  public static RebuildState getRebuildState() {
+    return REBUILD_STATE.get();
   }
 
   /**
@@ -165,17 +199,48 @@ public class NSSummaryTask implements ReconOmTask {
 
   @Override
   public TaskResult reprocess(OMMetadataManager omMetadataManager) {
+    // Unified control for all NSS tree rebuild operations
+    RebuildState currentState = REBUILD_STATE.get();
+    if (currentState == RebuildState.RUNNING) {
+      LOG.info("NSSummary tree rebuild is already in progress, skipping duplicate request.");
+      return buildTaskResult(false);
+    }
+
+    if (!REBUILD_STATE.compareAndSet(currentState, RebuildState.RUNNING)) {
+      // Check if another thread successfully started the rebuild
+      if (REBUILD_STATE.get() == RebuildState.RUNNING) {
+        LOG.info("Rebuild already in progress by another thread, returning success");
+        return buildTaskResult(true);
+      }
+      LOG.info("Failed to acquire rebuild lock, unknown state");
+      return buildTaskResult(false);
+    }
+
+    LOG.info("Starting NSSummary tree reprocess with unified control...");
+    long startTime = System.nanoTime(); // Record start time
+    
+    try {
+      return executeReprocess(omMetadataManager, startTime);
+    } catch (Exception e) {
+      LOG.error("NSSummary reprocess failed with exception.", e);
+      REBUILD_STATE.set(RebuildState.FAILED);
+      return buildTaskResult(false);
+    }
+  }
+
+  /**
+   * Execute the actual reprocess operation with proper state management.
+   */
+  protected TaskResult executeReprocess(OMMetadataManager omMetadataManager, long startTime) {
     // Initialize a list of tasks to run in parallel
     Collection<Callable<Boolean>> tasks = new ArrayList<>();
-
-    long startTime = System.nanoTime(); // Record start time
 
     try {
       // reinit Recon RocksDB's namespace CF.
       reconNamespaceSummaryManager.clearNSSummaryTable();
     } catch (IOException ioEx) {
-      LOG.error("Unable to clear NSSummary table in Recon DB. ",
-          ioEx);
+      LOG.error("Unable to clear NSSummary table in Recon DB. ", ioEx);
+      REBUILD_STATE.set(RebuildState.FAILED);
       return buildTaskResult(false);
     }
 
@@ -190,20 +255,44 @@ public class NSSummaryTask implements ReconOmTask {
     ThreadFactory threadFactory = new ThreadFactoryBuilder()
         .setNameFormat("Recon-NSSummaryTask-%d")
         .build();
-    ExecutorService executorService = Executors.newFixedThreadPool(2,
+    ExecutorService executorService = Executors.newFixedThreadPool(3,
         threadFactory);
+    boolean success = false;
     try {
       results = executorService.invokeAll(tasks);
       for (Future<Boolean> result : results) {
         if (result.get().equals(false)) {
+          LOG.error("NSSummary reprocess failed for one of the sub-tasks.");
+          REBUILD_STATE.set(RebuildState.FAILED);
           return buildTaskResult(false);
         }
       }
-    } catch (InterruptedException | ExecutionException ex) {
-      LOG.error("Error while reprocessing NSSummary table in Recon DB.", ex);
+      success = true;
+
+    } catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
+      LOG.error("NSSummaryTask was interrupted.", ex);
+      REBUILD_STATE.set(RebuildState.FAILED);
+      return buildTaskResult(false);
+    } catch (ExecutionException ex) {
+      LOG.error("Error while reprocessing NSSummary table in Recon DB.", ex.getCause());
+      REBUILD_STATE.set(RebuildState.FAILED);
       return buildTaskResult(false);
     } finally {
       executorService.shutdown();
+      // Deterministic resource cleanup with timeout
+      try {
+        // get() ensures the work is done. awaitTermination ensures the workers are also verifiably gone.
+        // It turns an asynchronous shutdown into a synchronous, deterministic one
+        if (!executorService.awaitTermination(5, TimeUnit.MINUTES)) {
+          LOG.warn("Executor service for NSSummaryTask did not terminate in the specified time.");
+          executorService.shutdownNow();
+        }
+      } catch (InterruptedException ex) {
+        LOG.error("NSSummaryTask executor service termination was interrupted.", ex);
+        executorService.shutdownNow();
+        Thread.currentThread().interrupt();
+      }
 
       long endTime = System.nanoTime();
       // Convert to milliseconds
@@ -211,10 +300,46 @@ public class NSSummaryTask implements ReconOmTask {
           TimeUnit.NANOSECONDS.toMillis(endTime - startTime);
 
       // Log performance metrics
-      LOG.debug("Task execution time: {} milliseconds", durationInMillis);
+      LOG.info("NSSummary reprocess execution time: {} milliseconds", durationInMillis);
+      
+      // Reset state to IDLE on successful completion
+      if (success) {
+        REBUILD_STATE.set(RebuildState.IDLE);
+        LOG.info("NSSummary tree reprocess completed successfully with unified control.");
+      }
     }
 
     return buildTaskResult(true);
   }
 
+  /**
+   * Build a TaskResult with the given success status.
+   */
+  @Override
+  public TaskResult buildTaskResult(boolean success) {
+    return new TaskResult.Builder()
+        .setTaskName(getTaskName())
+        .setTaskSuccess(success)
+        .build();
+  }
+
+  /**
+   * Reset rebuild state to IDLE. This is primarily for testing purposes.
+   */
+  @VisibleForTesting
+  public static void resetRebuildState() {
+    REBUILD_STATE.set(RebuildState.IDLE);
+  }
+
+  /**
+   * Set rebuild state to FAILED. This is primarily for testing purposes.
+   */
+  @VisibleForTesting
+  public static void setRebuildStateToFailed() {
+    REBUILD_STATE.set(RebuildState.FAILED);
+  }
+
+  public ReconNamespaceSummaryManager getReconNamespaceSummaryManager() {
+    return reconNamespaceSummaryManager;
+  }
 }

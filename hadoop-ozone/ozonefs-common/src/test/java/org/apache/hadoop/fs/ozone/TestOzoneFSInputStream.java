@@ -78,7 +78,7 @@ public class TestOzoneFSInputStream {
       IntFunction<ByteBuffer> bufferConstructor,
       int streamLength, int bufferCapacity,
       int bufferPosition) throws IOException {
-    final byte[] source = RandomUtils.nextBytes(streamLength);
+    final byte[] source = RandomUtils.secure().randomBytes(streamLength);
     final InputStream input = new ByteArrayInputStream(source);
     final OzoneFSInputStream subject = createTestSubject(input);
 

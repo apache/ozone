@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.ratis;
 
 import java.util.Objects;
 import java.util.function.Supplier;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
@@ -36,6 +37,10 @@ import org.apache.ratis.util.JavaUtils;
  * for {@link ContainerCommandRequestProto}.
  */
 public final class ContainerCommandRequestMessage implements Message {
+  private final ContainerCommandRequestProto header;
+  private final ByteString data;
+  private final Supplier<ByteString> contentSupplier = JavaUtils.memoize(this::buildContent);
+
   public static ContainerCommandRequestMessage toMessage(
       ContainerCommandRequestProto request, String traceId) {
     final ContainerCommandRequestProto.Builder b
@@ -90,11 +95,6 @@ public final class ContainerCommandRequestMessage implements Message {
     return b.build();
   }
 
-  private final ContainerCommandRequestProto header;
-  private final ByteString data;
-  private final Supplier<ByteString> contentSupplier
-      = JavaUtils.memoize(this::buildContent);
-
   private ContainerCommandRequestMessage(
       ContainerCommandRequestProto header, ByteString data) {
     this.header = Objects.requireNonNull(header, "header == null");
@@ -115,6 +115,6 @@ public final class ContainerCommandRequestMessage implements Message {
 
   @Override
   public String toString() {
-    return header + ", data.size=" + data.size();
+    return HddsUtils.processForDebug(header) + ", data.size=" + data.size();
   }
 }

@@ -26,14 +26,17 @@ import java.io.FileNotFoundException;
 import java.net.URL;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /** Test the node schema loader. */
-@Timeout(2)
 public class TestNodeSchemaLoader {
+
+  /**
+   * Test cases that do not use the parameters should be executed only once.
+   */
+  private static final String VALID_SCHEMA_FILE = "good.xml";
 
   /**
    * Parameterized test cases for various error conditions.
@@ -70,12 +73,6 @@ public class TestNodeSchemaLoader {
         () -> NodeSchemaLoader.getInstance().loadSchemaFromFile(filePath));
     assertMessageContains(e.getMessage(), errMsg, schemaFile);
   }
-
-  /**
-   * Test cases that do not use the parameters, should be executed only once.
-   */
-
-  private static final String VALID_SCHEMA_FILE = "good.xml";
 
   @Test
   public void testGood() throws Exception {

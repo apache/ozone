@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_TAG;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.AWS_TAG_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CONFIG_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_KEY_LENGTH_LIMIT;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_NUM_LIMIT;
@@ -40,6 +41,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.PostConstruct;
@@ -50,6 +52,7 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
@@ -57,7 +60,6 @@ import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import org.apache.hadoop.ozone.audit.AuditLoggerType;
 import org.apache.hadoop.ozone.audit.AuditMessage;
-import org.apache.hadoop.ozone.audit.Auditor;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKey;
@@ -67,6 +69,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.s3.RequestIdentifier;
+import org.apache.hadoop.ozone.s3.commontypes.RequestParameters;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
@@ -81,28 +84,49 @@ import org.slf4j.LoggerFactory;
 /**
  * Basic helpers for all the REST endpoints.
  */
-public abstract class EndpointBase implements Auditor {
+public abstract class EndpointBase {
 
   protected static final String ETAG_CUSTOM = "etag-custom";
 
   @Inject
-  private OzoneClient client;
+  private OzoneConfiguration ozoneConfiguration;
+
   @Inject
-  private SignatureInfo signatureInfo;
+  private OzoneClient client;
+  @SuppressWarnings("checkstyle:VisibilityModifier")
+  @Inject
+  protected SignatureInfo signatureInfo;
   @Inject
   private RequestIdentifier requestIdentifier;
 
   private S3Auth s3Auth;
+
   @Context
   private ContainerRequestContext context;
 
-  private Set<String> excludeMetadataFields =
-      new HashSet<>(Arrays.asList(OzoneConsts.GDPR_FLAG));
+  @Context
+  private HttpHeaders headers;
+
+  // initialized in @PostConstruct
+  private RequestParameters.MultivaluedMapImpl queryParams;
+
+  private final Set<String> excludeMetadataFields =
+      new HashSet<>(Arrays.asList(OzoneConsts.GDPR_FLAG, STORAGE_CONFIG_HEADER));
   private static final Logger LOG =
       LoggerFactory.getLogger(EndpointBase.class);
 
   protected static final AuditLogger AUDIT =
       new AuditLogger(AuditLoggerType.S3GLOGGER);
+
+  /** Read-only access to query parameters. */
+  protected RequestParameters queryParams() {
+    return queryParams;
+  }
+
+  /** For setting multiple values use {@link #getContext()}. */
+  public RequestParameters.Mutable queryParamsForTest() {
+    return queryParams;
+  }
 
   protected OzoneBucket getBucket(OzoneVolume volume, String bucketName)
       throws OS3Exception, IOException {
@@ -131,6 +155,7 @@ public abstract class EndpointBase implements Auditor {
    */
   @PostConstruct
   public void initialization() {
+    queryParams = RequestParameters.of(context.getUriInfo().getQueryParameters());
     // Note: userPrincipal is initialized to be the same value as accessId,
     //  could be updated later in RpcClient#getS3Volume
     s3Auth = new S3Auth(signatureInfo.getStringToSign(),
@@ -236,11 +261,12 @@ public abstract class EndpointBase implements Auditor {
    * buckets if bucket prefix is null.
    *
    * @param prefix Bucket prefix to match
+   * @param volumeProcessor Volume processor to operate on volume
    * @return {@code Iterator<OzoneBucket>}
    */
-  protected Iterator<? extends OzoneBucket> listS3Buckets(String prefix)
+  protected Iterator<? extends OzoneBucket> listS3Buckets(String prefix, Consumer<OzoneVolume> volumeProcessor)
       throws IOException, OS3Exception {
-    return iterateBuckets(volume -> volume.listBuckets(prefix));
+    return iterateBuckets(volume -> volume.listBuckets(prefix), volumeProcessor);
   }
 
   /**
@@ -254,15 +280,18 @@ public abstract class EndpointBase implements Auditor {
    * @return {@code Iterator<OzoneBucket>}
    */
   protected Iterator<? extends OzoneBucket> listS3Buckets(String prefix,
-      String previousBucket) throws IOException, OS3Exception {
-    return iterateBuckets(volume -> volume.listBuckets(prefix, previousBucket));
+      String previousBucket, Consumer<OzoneVolume> volumeProcessor) throws IOException, OS3Exception {
+    return iterateBuckets(volume -> volume.listBuckets(prefix, previousBucket), volumeProcessor);
   }
 
   private Iterator<? extends OzoneBucket> iterateBuckets(
-      Function<OzoneVolume, Iterator<? extends OzoneBucket>> query)
+      Function<OzoneVolume, Iterator<? extends OzoneBucket>> query,
+      Consumer<OzoneVolume> ownerSetter)
       throws IOException, OS3Exception {
     try {
-      return query.apply(getVolume());
+      OzoneVolume volume = getVolume();
+      ownerSetter.accept(volume);
+      return query.apply(volume);
     } catch (OMException e) {
       if (e.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
         return Collections.emptyIterator();
@@ -291,8 +320,8 @@ public abstract class EndpointBase implements Auditor {
 
     Set<String> customMetadataKeys = requestHeaders.keySet().stream()
             .filter(k -> {
-              if (k.startsWith(CUSTOM_METADATA_HEADER_PREFIX) &&
-                      !excludeMetadataFields.contains(
+              if (k.toLowerCase().startsWith(CUSTOM_METADATA_HEADER_PREFIX) &&
+                  !excludeMetadataFields.contains(
                         k.substring(
                           CUSTOM_METADATA_HEADER_PREFIX.length()))) {
                 return true;
@@ -441,8 +470,8 @@ public abstract class EndpointBase implements Auditor {
     return Collections.unmodifiableMap(tags);
   }
 
-  private AuditMessage.Builder auditMessageBaseBuilder(AuditAction op,
-      Map<String, String> auditMap) {
+  protected AuditMessage.Builder auditMessageFor(AuditAction op) {
+    Map<String, String> auditMap = getAuditParameters();
     auditMap.put("x-amz-request-id", requestIdentifier.getRequestId());
     auditMap.put("x-amz-id-2", requestIdentifier.getAmzId());
     
@@ -460,40 +489,46 @@ public abstract class EndpointBase implements Auditor {
     return builder;
   }
 
-  @Override
-  public AuditMessage buildAuditMessageForSuccess(AuditAction op,
-      Map<String, String> auditMap) {
-    AuditMessage.Builder builder = auditMessageBaseBuilder(op, auditMap)
+  protected AuditMessage.Builder auditMessageForSuccess(AuditAction op) {
+    return auditMessageFor(op)
         .withResult(AuditEventStatus.SUCCESS);
-    return builder.build();
   }
 
-  public AuditMessage buildAuditMessageForSuccess(AuditAction op,
-      Map<String, String> auditMap, PerformanceStringBuilder performance) {
-    AuditMessage.Builder builder = auditMessageBaseBuilder(op, auditMap)
-        .withResult(AuditEventStatus.SUCCESS);
-    builder.setPerformance(performance);
-    return builder.build();
-  }
-
-  @Override
-  public AuditMessage buildAuditMessageForFailure(AuditAction op,
-      Map<String, String> auditMap, Throwable throwable) {
-    AuditMessage.Builder builder = auditMessageBaseBuilder(op, auditMap)
+  protected AuditMessage.Builder auditMessageForFailure(AuditAction op, Throwable throwable) {
+    return auditMessageFor(op)
         .withResult(AuditEventStatus.FAILURE)
         .withException(throwable);
-    return builder.build();
   }
-
 
   @VisibleForTesting
   public void setClient(OzoneClient ozoneClient) {
     this.client = ozoneClient;
   }
 
+  protected ContainerRequestContext getContext() {
+    return context;
+  }
+
+  void setContext(ContainerRequestContext context) {
+    this.context = context;
+  }
+
+  protected HttpHeaders getHeaders() {
+    return headers;
+  }
+
+  void setHeaders(HttpHeaders headers) {
+    this.headers = headers;
+  }
+
   @VisibleForTesting
   public void setRequestIdentifier(RequestIdentifier requestIdentifier) {
     this.requestIdentifier = requestIdentifier;
+  }
+
+  @VisibleForTesting
+  public void setSignatureInfo(SignatureInfo signatureInfo) {
+    this.signatureInfo = signatureInfo;
   }
 
   public OzoneClient getClient() {
@@ -502,6 +537,14 @@ public abstract class EndpointBase implements Auditor {
 
   protected ClientProtocol getClientProtocol() {
     return getClient().getProxy();
+  }
+
+  void setOzoneConfiguration(OzoneConfiguration conf) {
+    ozoneConfiguration = conf;
+  }
+
+  protected OzoneConfiguration getOzoneConfiguration() {
+    return ozoneConfiguration;
   }
 
   @VisibleForTesting
@@ -513,14 +556,28 @@ public abstract class EndpointBase implements Auditor {
     return AuditUtils.getAuditParameters(context);
   }
 
+  protected void auditWriteSuccess(AuditAction action, PerformanceStringBuilder perf) {
+    AUDIT.logWriteSuccess(auditMessageForSuccess(action).setPerformance(perf).build());
+  }
+
+  protected void auditWriteSuccess(AuditAction action) {
+    AUDIT.logWriteSuccess(auditMessageForSuccess(action).build());
+  }
+
+  protected void auditReadSuccess(AuditAction action, PerformanceStringBuilder perf) {
+    AUDIT.logReadSuccess(auditMessageForSuccess(action).setPerformance(perf).build());
+  }
+
+  protected void auditReadSuccess(AuditAction action) {
+    AUDIT.logReadSuccess(auditMessageForSuccess(action).build());
+  }
+
   protected void auditWriteFailure(AuditAction action, Throwable ex) {
-    AUDIT.logWriteFailure(
-        buildAuditMessageForFailure(action, getAuditParameters(), ex));
+    AUDIT.logWriteFailure(auditMessageForFailure(action, ex).build());
   }
 
   protected void auditReadFailure(AuditAction action, Exception ex) {
-    AUDIT.logReadFailure(
-        buildAuditMessageForFailure(action, getAuditParameters(), ex));
+    AUDIT.logReadFailure(auditMessageForFailure(action, ex).build());
   }
 
   protected boolean isAccessDenied(OMException ex) {
@@ -528,5 +585,4 @@ public abstract class EndpointBase implements Auditor {
     return result == ResultCodes.PERMISSION_DENIED
         || result == ResultCodes.INVALID_TOKEN;
   }
-
 }

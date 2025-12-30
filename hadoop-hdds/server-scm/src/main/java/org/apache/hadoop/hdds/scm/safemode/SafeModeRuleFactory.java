@@ -19,11 +19,14 @@ package org.apache.hadoop.hdds.scm.safemode;
 
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 
 /**
@@ -31,15 +34,13 @@ import org.apache.hadoop.hdds.server.events.EventQueue;
  */
 public final class SafeModeRuleFactory {
 
-
   private final ConfigurationSource config;
   private final SCMContext scmContext;
   private final EventQueue eventQueue;
 
-  // TODO: Remove dependency on safeModeManager (HDDS-11797)
-  private final SCMSafeModeManager safeModeManager;
   private final PipelineManager pipelineManager;
   private final ContainerManager containerManager;
+  private final NodeManager nodeManager;
 
   private final List<SafeModeExitRule<?>> safeModeRules;
   private final List<SafeModeExitRule<?>> preCheckRules;
@@ -49,40 +50,51 @@ public final class SafeModeRuleFactory {
   private SafeModeRuleFactory(final ConfigurationSource config,
                               final SCMContext scmContext,
                               final EventQueue eventQueue,
-                              final SCMSafeModeManager safeModeManager,
                               final PipelineManager pipelineManager,
-                              final ContainerManager containerManager) {
+                              final ContainerManager containerManager,
+                              final NodeManager nodeManager) {
     this.config = config;
     this.scmContext = scmContext;
     this.eventQueue = eventQueue;
-    this.safeModeManager = safeModeManager;
     this.pipelineManager = pipelineManager;
     this.containerManager = containerManager;
+    this.nodeManager = nodeManager;
     this.safeModeRules = new ArrayList<>();
     this.preCheckRules = new ArrayList<>();
-    loadRules();
   }
 
-  private void loadRules() {
+  public void addSafeModeManager(SCMSafeModeManager safeModeManager) {
+    loadRules(safeModeManager);
+  }
+
+  private void loadRules(SCMSafeModeManager safeModeManager) {
     // TODO: Use annotation to load the rules. (HDDS-11730)
-    SafeModeExitRule<?> containerRule = new ContainerSafeModeRule(eventQueue, 
+    SafeModeExitRule<?> ratisContainerRule = new RatisContainerSafeModeRule(eventQueue,
+        config, containerManager, safeModeManager);
+    SafeModeExitRule<?> ecContainerRule = new ECContainerSafeModeRule(eventQueue,
         config, containerManager, safeModeManager);
     SafeModeExitRule<?> datanodeRule = new DataNodeSafeModeRule(eventQueue, 
-        config, safeModeManager);
+        config, nodeManager, safeModeManager);
 
-    safeModeRules.add(containerRule);
+    safeModeRules.add(ratisContainerRule);
+    safeModeRules.add(ecContainerRule);
     safeModeRules.add(datanodeRule);
 
     preCheckRules.add(datanodeRule);
 
-    // TODO: Move isRuleEnabled check to the Rule implementation. (HDDS-11799)
-    if (config.getBoolean(
-        HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK,
-        HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK_DEFAULT)
-        && pipelineManager != null) {
+    OzoneStorageContainerManager ozoneScm = scmContext.getScm();
+    if (ozoneScm instanceof StorageContainerManager) {
+      StorageContainerManager scm = (StorageContainerManager) ozoneScm;
+      SCMHAManager scmHAManager = scm.getScmHAManager();
+      if (scmHAManager != null && scmHAManager.getRatisServer() != null) {
+        safeModeRules.add(new StateMachineReadyRule(eventQueue, safeModeManager,
+            scmHAManager.getRatisServer().getSCMStateMachine()));
+      }
+    }
 
-      safeModeRules.add(new HealthyPipelineSafeModeRule(eventQueue, pipelineManager, 
-          safeModeManager, config, scmContext));
+    if (pipelineManager != null) {
+      safeModeRules.add(new HealthyPipelineSafeModeRule(eventQueue, pipelineManager,
+          safeModeManager, config, scmContext, nodeManager));
       safeModeRules.add(new OneReplicaPipelineSafeModeRule(eventQueue, pipelineManager,
           safeModeManager, config));
     }
@@ -102,11 +114,11 @@ public final class SafeModeRuleFactory {
       final ConfigurationSource config,
       final SCMContext scmContext,
       final EventQueue eventQueue,
-      final SCMSafeModeManager safeModeManager,
       final PipelineManager pipelineManager,
-      final ContainerManager containerManager) {
+      final ContainerManager containerManager,
+      final NodeManager nodeManager) {
     instance = new SafeModeRuleFactory(config, scmContext, eventQueue,
-          safeModeManager, pipelineManager, containerManager);
+          pipelineManager, containerManager, nodeManager);
   }
 
   public List<SafeModeExitRule<?>> getSafeModeRules() {
@@ -115,5 +127,13 @@ public final class SafeModeRuleFactory {
 
   public List<SafeModeExitRule<?>> getPreCheckRules() {
     return preCheckRules;
+  }
+
+  public <T extends SafeModeExitRule<?>> T getSafeModeRule(Class<T> ruleClass) {
+    return safeModeRules.stream()
+        .filter(r -> ruleClass.isAssignableFrom(r.getClass()))
+        .map(ruleClass::cast)
+        .findFirst()
+        .orElse(null);
   }
 }

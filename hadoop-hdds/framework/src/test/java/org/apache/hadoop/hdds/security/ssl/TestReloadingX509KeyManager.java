@@ -34,13 +34,12 @@ import org.junit.jupiter.api.Test;
  */
 public class TestReloadingX509KeyManager {
   private final LogCapturer reloaderLog =
-      LogCapturer.captureLogs(ReloadingX509KeyManager.LOG);
-  private static OzoneConfiguration conf;
+      LogCapturer.captureLogs(ReloadingX509KeyManager.class);
   private static CertificateClientTestImpl caClient;
 
   @BeforeAll
   public static void setUp() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     caClient = new CertificateClientTestImpl(conf);
   }
 

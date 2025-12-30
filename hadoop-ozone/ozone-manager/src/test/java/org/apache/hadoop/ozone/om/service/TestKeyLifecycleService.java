@@ -2010,7 +2010,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
     }
   }
 
-  private static String uniqueObjectName(String prefix) {
+  public static String uniqueObjectName(String prefix) {
     return prefix + OBJECT_COUNTER.getAndIncrement();
   }
 }

@@ -49,6 +49,8 @@ abstract class TestInputStreamBase {
   static final int BLOCK_SIZE = 2 * MAX_FLUSH_SIZE;   // 8MB
   static final int BYTES_PER_CHECKSUM = 256 * 1024;   // 256KB
 
+  private MiniOzoneCluster cluster;
+
   protected static MiniOzoneCluster newCluster() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
 
@@ -89,8 +91,6 @@ abstract class TestInputStreamBase {
     cluster.getHddsDatanodes().forEach(dn -> dn.getConf().setEnum(OZONE_SCM_CONTAINER_LAYOUT_KEY, layout));
     closeContainers();
   }
-
-  private MiniOzoneCluster cluster;
 
   protected MiniOzoneCluster getCluster() {
     return cluster;

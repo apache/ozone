@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.request.lifecycle;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -147,12 +147,12 @@ public class OMLifecycleConfigurationSetRequest extends OMClientRequest {
 
       OmLifecycleConfiguration.Builder lcBuilder =
           OmLifecycleConfiguration.getBuilderFromProtobuf(lifecycleConfiguration);
+      lcBuilder.setUpdateID(transactionLogIndex);
       OmLifecycleConfiguration omLifecycleConfiguration =
           lcBuilder.setBucketObjectID(bucketInfo.getObjectID()).build();
       omLifecycleConfiguration.valid();
       auditMap = omLifecycleConfiguration.toAuditMap();
 
-      omLifecycleConfiguration.setUpdateID(transactionLogIndex);
       metadataManager.getLifecycleConfigurationTable().addCacheEntry(
           new CacheKey<>(bucketKey),
           CacheValue.get(transactionLogIndex, omLifecycleConfiguration));

@@ -39,11 +39,10 @@ import org.junit.jupiter.api.Test;
  */
 public class TestSCMSnapshot {
   private static MiniOzoneCluster cluster;
-  private static OzoneConfiguration conf;
 
   @BeforeAll
   public static void setup() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL, "10s");
     conf.setLong(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_THRESHOLD, 1L);
     cluster = MiniOzoneCluster

@@ -38,7 +38,7 @@ import org.slf4j.LoggerFactory;
 public class DeletingContainerHandler extends AbstractCheck {
   private final ReplicationManager replicationManager;
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(DeletingContainerHandler.class);
 
   public DeletingContainerHandler(ReplicationManager replicationManager) {
@@ -98,7 +98,7 @@ public class DeletingContainerHandler extends AbstractCheck {
           } catch (NotLeaderException e) {
             LOG.warn("Failed to delete empty replica with index {} for " +
                     "container {} on datanode {}", rp.getReplicaIndex(),
-                cID, rp.getDatanodeDetails().getUuidString(), e);
+                cID, rp.getDatanodeDetails(), e);
           }
         });
     return true;

@@ -17,9 +17,9 @@
 
 package org.apache.hadoop.ozone.om.response.s3.tenant;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.PRINCIPAL_TO_ACCESS_IDS_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.S3_SECRET_TABLE;
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TENANT_ACCESS_ID_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.PRINCIPAL_TO_ACCESS_IDS_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.S3_SECRET_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.TENANT_ACCESS_ID_TABLE;
 
 import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nonnull;

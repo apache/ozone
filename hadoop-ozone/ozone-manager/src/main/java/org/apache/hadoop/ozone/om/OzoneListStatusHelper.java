@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 
 import com.google.common.base.Preconditions;
@@ -27,6 +28,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
@@ -50,15 +52,6 @@ import org.slf4j.LoggerFactory;
  * Helper class for fetching List Status for a path.
  */
 public class OzoneListStatusHelper {
-  /**
-   * Interface to get the File Status for a path.
-   */
-  @FunctionalInterface
-  public interface GetFileStatusHelper {
-    OzoneFileStatus apply(OmKeyArgs args, String clientAddress,
-                          boolean skipFileNotFoundError) throws IOException;
-  }
-
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneListStatusHelper.class);
 
@@ -79,10 +72,19 @@ public class OzoneListStatusHelper {
     this.omDefaultReplication = omDefaultReplication;
   }
 
+  /**
+   * Interface to get the File Status for a path.
+   */
+  @FunctionalInterface
+  public interface GetFileStatusHelper {
+    OzoneFileStatus apply(OmKeyArgs args, String clientAddress,
+                          boolean skipFileNotFoundError) throws IOException;
+  }
+
   public Collection<OzoneFileStatus> listStatusFSO(OmKeyArgs args,
       String startKey, long numEntries, String clientAddress,
       boolean allowPartialPrefixes) throws IOException {
-    Preconditions.checkNotNull(args, "Key args can not be null");
+    Objects.requireNonNull(args, "Key args can not be null");
     final String volumeName = args.getVolumeName();
     final String bucketName = args.getBucketName();
     String keyName = args.getKeyName();
@@ -263,8 +265,7 @@ public class OzoneListStatusHelper {
       return null;
     }
     Object value = entry.getValue();
-    boolean isDir =
-        OmMetadataManagerImpl.DIRECTORY_TABLE.equals(entry.getTableName());
+    final boolean isDir = DIRECTORY_TABLE.equals(entry.getTableName());
     OmKeyInfo keyInfo;
     if (isDir) {
       Preconditions.checkArgument(value instanceof OmDirectoryInfo);
@@ -277,7 +278,6 @@ public class OzoneListStatusHelper {
     } else {
       Preconditions.checkArgument(value instanceof OmKeyInfo);
       keyInfo = (OmKeyInfo) value;
-      keyInfo.setFileName(keyInfo.getKeyName());
       String fullKeyPath = OMFileRequest.getAbsolutePath(prefixPath,
           keyInfo.getKeyName());
       keyInfo.setKeyName(fullKeyPath);
@@ -299,7 +299,7 @@ public class OzoneListStatusHelper {
         .build();
     OzoneFileStatus fileStatusInfo = getStatusHelper.apply(startKeyArgs,
         null, false);
-    Preconditions.checkNotNull(fileStatusInfo);
+    Objects.requireNonNull(fileStatusInfo, "fileStatusInfo == null");
     startKeyParentId = getId(fileStatusInfo, omBucketInfo);
     final long volumeId = volumeInfo.getObjectID();
     final long bucketId = omBucketInfo.getObjectID();

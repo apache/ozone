@@ -23,9 +23,13 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_LIST_KEYS_SHALLOW_ENABLED;
 import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_LIST_KEYS_SHALLOW_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_LIST_MAX_KEYS_LIMIT;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_LIST_MAX_KEYS_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.ENCODING_TYPE;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.EXPECTED_BUCKET_OWNER_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapInQuotes;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -37,9 +41,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import javax.inject.Inject;
+import javax.annotation.PostConstruct;
 import javax.ws.rs.DELETE;
-import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.HEAD;
 import javax.ws.rs.POST;
@@ -49,14 +52,13 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.audit.AuditEventStatus;
+import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneKey;
@@ -77,6 +79,7 @@ import org.apache.hadoop.ozone.s3.endpoint.S3BucketAcl.Grant;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.ContinueToken;
+import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.apache.hadoop.ozone.s3.util.S3StorageType;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.util.Time;
@@ -90,13 +93,13 @@ import org.slf4j.LoggerFactory;
 @Path("/{bucket}")
 public class BucketEndpoint extends EndpointBase {
 
+  private static final String BUCKET = "bucket";
+
   private static final Logger LOG =
       LoggerFactory.getLogger(BucketEndpoint.class);
 
   private boolean listKeysShallowEnabled;
-
-  @Inject
-  private OzoneConfiguration ozoneConfiguration;
+  private int maxKeysLimit = 1000;
 
   /**
    * Rest endpoint to list objects in a specific bucket.
@@ -105,26 +108,22 @@ public class BucketEndpoint extends EndpointBase {
    * for more details.
    */
   @GET
-  @SuppressWarnings({"parameternumber", "methodlength"})
+  @SuppressWarnings("methodlength")
   public Response get(
-      @PathParam("bucket") String bucketName,
-      @QueryParam("delimiter") String delimiter,
-      @QueryParam("encoding-type") String encodingType,
-      @QueryParam("marker") String marker,
-      @DefaultValue("1000") @QueryParam("max-keys") int maxKeys,
-      @QueryParam("prefix") String prefix,
-      @QueryParam("continuation-token") String continueToken,
-      @QueryParam("start-after") String startAfter,
-      @QueryParam("uploads") String uploads,
-      @QueryParam("acl") String aclMarker,
-      @QueryParam("key-marker") String keyMarker,
-      @QueryParam("upload-id-marker") String uploadIdMarker,
-      @DefaultValue("1000") @QueryParam("max-uploads") int maxUploads,
-      @QueryParam("lifecycle") String lifecycleMarker,
-      @Context HttpHeaders hh) throws OS3Exception, IOException {
+      @PathParam(BUCKET) String bucketName
+  ) throws OS3Exception, IOException {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.GET_BUCKET;
     PerformanceStringBuilder perf = new PerformanceStringBuilder();
+
+    final String continueToken = queryParams().get(QueryParams.CONTINUATION_TOKEN);
+    final String delimiter = queryParams().get(QueryParams.DELIMITER);
+    final String encodingType = queryParams().get(QueryParams.ENCODING_TYPE);
+    final String marker = queryParams().get(QueryParams.MARKER);
+    int maxKeys = queryParams().getInt(QueryParams.MAX_KEYS, 1000);
+    final int maxUploads = queryParams().getInt(QueryParams.MAX_UPLOADS, 1000);
+    String prefix = queryParams().get(QueryParams.PREFIX);
+    String startAfter = queryParams().get(QueryParams.START_AFTER);
 
     Iterator<? extends OzoneKey> ozoneKeyIterator = null;
     ContinueToken decodedToken =
@@ -132,24 +131,30 @@ public class BucketEndpoint extends EndpointBase {
     OzoneBucket bucket = null;
 
     try {
+      final String lifecycleMarker = queryParams().get(QueryParams.LIFECYCLE);
       if (lifecycleMarker != null) {
         s3GAction = S3GAction.GET_BUCKET_LIFECYCLE;
-        return getBucketLifecycleConfiguration(bucketName, hh);
+        return getBucketLifecycleConfiguration(bucketName);
       }
 
+      final String aclMarker = queryParams().get(QueryParams.ACL);
       if (aclMarker != null) {
         s3GAction = S3GAction.GET_ACL;
         S3BucketAcl result = getAcl(bucketName);
         getMetrics().updateGetAclSuccessStats(startNanos);
-        AUDIT.logReadSuccess(
-            buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
+        auditReadSuccess(s3GAction);
         return Response.ok(result, MediaType.APPLICATION_XML_TYPE).build();
       }
 
+      final String uploads = queryParams().get(QueryParams.UPLOADS);
       if (uploads != null) {
         s3GAction = S3GAction.LIST_MULTIPART_UPLOAD;
+        final String uploadIdMarker = queryParams().get(QueryParams.UPLOAD_ID_MARKER);
+        final String keyMarker = queryParams().get(QueryParams.KEY_MARKER);
         return listMultipartUploads(bucketName, prefix, keyMarker, uploadIdMarker, maxUploads);
       }
+
+      maxKeys = validateMaxKeys(maxKeys);
 
       if (prefix == null) {
         prefix = "";
@@ -171,11 +176,12 @@ public class BucketEndpoint extends EndpointBase {
           && OZONE_URI_DELIMITER.equals(delimiter);
 
       bucket = getBucket(bucketName);
+      S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
+
       ozoneKeyIterator = bucket.listKeys(prefix, prevKey, shallow);
 
     } catch (OMException ex) {
-      AUDIT.logReadFailure(
-          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
+      auditReadFailure(s3GAction, ex);
       getMetrics().updateGetBucketFailureStats(startNanos);
       if (isAccessDenied(ex)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
@@ -187,8 +193,7 @@ public class BucketEndpoint extends EndpointBase {
       }
     } catch (Exception ex) {
       getMetrics().updateGetBucketFailureStats(startNanos);
-      AUDIT.logReadFailure(
-          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
+      auditReadFailure(s3GAction, ex);
       throw ex;
     }
 
@@ -224,53 +229,55 @@ public class BucketEndpoint extends EndpointBase {
     }
     String lastKey = null;
     int count = 0;
-    while (ozoneKeyIterator != null && ozoneKeyIterator.hasNext()) {
-      OzoneKey next = ozoneKeyIterator.next();
-      if (bucket != null && bucket.getBucketLayout().isFileSystemOptimized() &&
-          StringUtils.isNotEmpty(prefix) &&
-          !next.getName().startsWith(prefix)) {
-        // prefix has delimiter but key don't have
-        // example prefix: dir1/ key: dir123
-        continue;
-      }
-      if (startAfter != null && count == 0 && Objects.equals(startAfter, next.getName())) {
-        continue;
-      }
-      String relativeKeyName = next.getName().substring(prefix.length());
+    if (maxKeys > 0) {
+      while (ozoneKeyIterator != null && ozoneKeyIterator.hasNext()) {
+        OzoneKey next = ozoneKeyIterator.next();
+        if (bucket != null && bucket.getBucketLayout().isFileSystemOptimized() &&
+            StringUtils.isNotEmpty(prefix) &&
+            !next.getName().startsWith(prefix)) {
+          // prefix has delimiter but key don't have
+          // example prefix: dir1/ key: dir123
+          continue;
+        }
+        if (startAfter != null && count == 0 && Objects.equals(startAfter, next.getName())) {
+          continue;
+        }
+        String relativeKeyName = next.getName().substring(prefix.length());
 
-      int depth = StringUtils.countMatches(relativeKeyName, delimiter);
-      if (!StringUtils.isEmpty(delimiter)) {
-        if (depth > 0) {
-          // means key has multiple delimiters in its value.
-          // ex: dir/dir1/dir2, where delimiter is "/" and prefix is dir/
-          String dirName = relativeKeyName.substring(0, relativeKeyName
-              .indexOf(delimiter));
-          if (!dirName.equals(prevDir)) {
-            response.addPrefix(EncodingTypeObject.createNullable(
-                prefix + dirName + delimiter, encodingType));
-            prevDir = dirName;
+        int depth = StringUtils.countMatches(relativeKeyName, delimiter);
+        if (!StringUtils.isEmpty(delimiter)) {
+          if (depth > 0) {
+            // means key has multiple delimiters in its value.
+            // ex: dir/dir1/dir2, where delimiter is "/" and prefix is dir/
+            String dirName = relativeKeyName.substring(0, relativeKeyName
+                .indexOf(delimiter));
+            if (!dirName.equals(prevDir)) {
+              response.addPrefix(EncodingTypeObject.createNullable(
+                  prefix + dirName + delimiter, encodingType));
+              prevDir = dirName;
+              count++;
+            }
+          } else if (relativeKeyName.endsWith(delimiter)) {
+            // means or key is same as prefix with delimiter at end and ends with
+            // delimiter. ex: dir/, where prefix is dir and delimiter is /
+            response.addPrefix(
+                EncodingTypeObject.createNullable(relativeKeyName, encodingType));
+            count++;
+          } else {
+            // means our key is matched with prefix if prefix is given and it
+            // does not have any common prefix.
+            addKey(response, next);
             count++;
           }
-        } else if (relativeKeyName.endsWith(delimiter)) {
-          // means or key is same as prefix with delimiter at end and ends with
-          // delimiter. ex: dir/, where prefix is dir and delimiter is /
-          response.addPrefix(
-              EncodingTypeObject.createNullable(relativeKeyName, encodingType));
-          count++;
         } else {
-          // means our key is matched with prefix if prefix is given and it
-          // does not have any common prefix.
           addKey(response, next);
           count++;
         }
-      } else {
-        addKey(response, next);
-        count++;
-      }
 
-      if (count == maxKeys) {
-        lastKey = next.getName();
-        break;
+        if (count == maxKeys) {
+          lastKey = next.getName();
+          break;
+        }
       }
     }
 
@@ -278,7 +285,7 @@ public class BucketEndpoint extends EndpointBase {
 
     if (count < maxKeys) {
       response.setTruncated(false);
-    } else if (ozoneKeyIterator.hasNext()) {
+    } else if (ozoneKeyIterator.hasNext() && lastKey != null) {
       response.setTruncated(true);
       ContinueToken nextToken = new ContinueToken(lastKey, prevDir);
       response.setNextToken(nextToken.encodeToString());
@@ -295,36 +302,43 @@ public class BucketEndpoint extends EndpointBase {
     getMetrics().incListKeyCount(keyCount);
     perf.appendCount(keyCount);
     perf.appendOpLatencyNanos(opLatencyNs);
-    AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction,
-        getAuditParameters(), perf));
+    auditReadSuccess(s3GAction, perf);
     response.setKeyCount(keyCount);
     return Response.ok(response).build();
   }
 
+  private int validateMaxKeys(int maxKeys) throws OS3Exception {
+    if (maxKeys < 0) {
+      throw newError(S3ErrorTable.INVALID_ARGUMENT, "maxKeys must be >= 0");
+    }
+
+    return Math.min(maxKeys, maxKeysLimit);
+  }
+
   @PUT
-  public Response put(@PathParam("bucket") String bucketName,
-                      @QueryParam("acl") String aclMarker,
-                      @QueryParam("lifecycle") String lifecycleMarker,
-                      @Context HttpHeaders httpHeaders,
-                      InputStream body) throws IOException, OS3Exception {
+  public Response put(
+      @PathParam(BUCKET) String bucketName,
+      InputStream body
+  ) throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.CREATE_BUCKET;
 
     try {
+      final String lifecycleMarker = queryParams().get(QueryParams.LIFECYCLE);
       if (lifecycleMarker != null) {
         s3GAction = S3GAction.PUT_BUCKET_LIFECYCLE;
-        return putBucketLifecycleConfiguration(bucketName, httpHeaders, body);
+        return putBucketLifecycleConfiguration(bucketName, body);
       }
+
+      final String aclMarker = queryParams().get(QueryParams.ACL);
       if (aclMarker != null) {
         s3GAction = S3GAction.PUT_ACL;
-        Response response =  putAcl(bucketName, httpHeaders, body);
-        AUDIT.logWriteSuccess(
-            buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
+        Response response =  putAcl(bucketName, body);
+        auditWriteSuccess(s3GAction);
         return response;
       }
       String location = createS3Bucket(bucketName);
-      AUDIT.logWriteSuccess(
-          buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
+      auditWriteSuccess(s3GAction);
       getMetrics().updateCreateBucketSuccessStats(startNanos);
       return Response.status(HttpStatus.SC_OK).header("Location", location)
           .build();
@@ -336,8 +350,7 @@ public class BucketEndpoint extends EndpointBase {
       }
       throw exception;
     } catch (Exception ex) {
-      AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
+      auditWriteFailure(s3GAction, ex);
       throw ex;
     }
   }
@@ -350,9 +363,11 @@ public class BucketEndpoint extends EndpointBase {
       int maxUploads)
       throws OS3Exception, IOException {
 
-    if (maxUploads < 1 || maxUploads > 1000) {
+    if (maxUploads < 1) {
       throw newError(S3ErrorTable.INVALID_ARGUMENT, "max-uploads",
-          new Exception("max-uploads must be between 1 and 1000"));
+          new Exception("max-uploads must be positive"));
+    } else {
+      maxUploads = Math.min(maxUploads, 1000);
     }
 
     long startNanos = Time.monotonicNowNanos();
@@ -361,6 +376,7 @@ public class BucketEndpoint extends EndpointBase {
     OzoneBucket bucket = getBucket(bucketName);
 
     try {
+      S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
       OzoneMultipartUploadList ozoneMultipartUploadList =
           bucket.listMultipartUploads(prefix, keyMarker, uploadIdMarker, maxUploads);
 
@@ -381,22 +397,18 @@ public class BucketEndpoint extends EndpointBase {
               upload.getCreationTime(),
               S3StorageType.fromReplicationConfig(upload.getReplicationConfig())
           )));
-      AUDIT.logReadSuccess(buildAuditMessageForSuccess(s3GAction,
-          getAuditParameters()));
+      auditReadSuccess(s3GAction);
       getMetrics().updateListMultipartUploadsSuccessStats(startNanos);
       return Response.ok(result).build();
     } catch (OMException exception) {
-      AUDIT.logReadFailure(
-          buildAuditMessageForFailure(s3GAction, getAuditParameters(),
-              exception));
+      auditReadFailure(s3GAction, exception);
       getMetrics().updateListMultipartUploadsFailureStats(startNanos);
       if (isAccessDenied(exception)) {
         throw newError(S3ErrorTable.ACCESS_DENIED, prefix, exception);
       }
       throw exception;
     } catch (Exception ex) {
-      AUDIT.logReadFailure(
-          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
+      auditReadFailure(s3GAction, ex);
       throw ex;
     }
   }
@@ -408,19 +420,18 @@ public class BucketEndpoint extends EndpointBase {
    * for more details.
    */
   @HEAD
-  public Response head(@PathParam("bucket") String bucketName)
+  public Response head(@PathParam(BUCKET) String bucketName)
       throws OS3Exception, IOException {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.HEAD_BUCKET;
     try {
-      getBucket(bucketName);
-      AUDIT.logReadSuccess(
-          buildAuditMessageForSuccess(s3GAction, getAuditParameters()));
+      OzoneBucket bucket = getBucket(bucketName);
+      S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
+      auditReadSuccess(s3GAction);
       getMetrics().updateHeadBucketSuccessStats(startNanos);
       return Response.ok().build();
     } catch (Exception e) {
-      AUDIT.logReadFailure(
-          buildAuditMessageForFailure(s3GAction, getAuditParameters(), e));
+      auditReadFailure(s3GAction, e);
       throw e;
     }
   }
@@ -432,21 +443,25 @@ public class BucketEndpoint extends EndpointBase {
    * for more details.
    */
   @DELETE
-  public Response delete(@PathParam("bucket") String bucketName,
-                         @QueryParam("lifecycle") String lifecycleMarker)
+  public Response delete(@PathParam(BUCKET) String bucketName)
       throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.DELETE_BUCKET;
 
     try {
+      final String lifecycleMarker = queryParams().get(QueryParams.LIFECYCLE);
       if (lifecycleMarker != null) {
         s3GAction = S3GAction.DELETE_BUCKET_LIFECYCLE;
-        return deleteBucketLifecycleConfiguration(bucketName, null);
+        return deleteBucketLifecycleConfiguration(bucketName);
+      }
+
+      if (S3Owner.hasBucketOwnershipVerificationConditions(getHeaders())) {
+        OzoneBucket bucket = getBucket(bucketName);
+        S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
       }
       deleteS3Bucket(bucketName);
     } catch (OMException ex) {
-      AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
+      auditWriteFailure(s3GAction, ex);
       getMetrics().updateDeleteBucketFailureStats(startNanos);
       if (ex.getResult() == ResultCodes.BUCKET_NOT_EMPTY) {
         throw newError(S3ErrorTable.BUCKET_NOT_EMPTY, bucketName, ex);
@@ -458,13 +473,11 @@ public class BucketEndpoint extends EndpointBase {
         throw ex;
       }
     } catch (Exception ex) {
-      AUDIT.logWriteFailure(
-          buildAuditMessageForFailure(s3GAction, getAuditParameters(), ex));
+      auditWriteFailure(s3GAction, ex);
       throw ex;
     }
 
-    AUDIT.logWriteSuccess(buildAuditMessageForSuccess(s3GAction,
-        getAuditParameters()));
+    auditWriteSuccess(s3GAction);
     getMetrics().updateDeleteBucketSuccessStats(startNanos);
     return Response
         .status(HttpStatus.SC_NO_CONTENT)
@@ -480,10 +493,11 @@ public class BucketEndpoint extends EndpointBase {
    */
   @POST
   @Produces(MediaType.APPLICATION_XML)
-  public MultiDeleteResponse multiDelete(@PathParam("bucket") String bucketName,
-                                         @QueryParam("delete") String delete,
-                                         MultiDeleteRequest request)
-      throws OS3Exception, IOException {
+  public MultiDeleteResponse multiDelete(
+      @PathParam(BUCKET) String bucketName,
+      @QueryParam(QueryParams.DELETE) String delete,
+      MultiDeleteRequest request
+  ) throws OS3Exception, IOException {
     S3GAction s3GAction = S3GAction.MULTI_DELETE;
 
     OzoneBucket bucket = getBucket(bucketName);
@@ -497,6 +511,7 @@ public class BucketEndpoint extends EndpointBase {
       }
       long startNanos = Time.monotonicNowNanos();
       try {
+        S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
         undeletedKeyResultMap = bucket.deleteKeys(deleteKeys, true);
         for (DeleteObject d : request.getObjects()) {
           ErrorInfo error = undeletedKeyResultMap.get(d.getKey());
@@ -522,15 +537,16 @@ public class BucketEndpoint extends EndpointBase {
       }
     }
 
-    Map<String, String> auditMap = getAuditParameters();
-    auditMap.put("failedDeletes", deleteKeys.toString());
+    AuditMessage.Builder message = auditMessageFor(s3GAction);
+    message.getParams().put("failedDeletes", deleteKeys.toString());
+
     if (!result.getErrors().isEmpty()) {
-      AUDIT.logWriteFailure(buildAuditMessageForFailure(s3GAction,
-          auditMap, new Exception("MultiDelete Exception")));
+      AUDIT.logWriteFailure(message.withResult(AuditEventStatus.FAILURE)
+          .withException(new Exception("MultiDelete Exception")).build());
     } else {
-      AUDIT.logWriteSuccess(
-          buildAuditMessageForSuccess(s3GAction, auditMap));
+      AUDIT.logWriteSuccess(message.withResult(AuditEventStatus.SUCCESS).build());
     }
+
     return result;
   }
 
@@ -545,10 +561,8 @@ public class BucketEndpoint extends EndpointBase {
     S3BucketAcl result = new S3BucketAcl();
     try {
       OzoneBucket bucket = getBucket(bucketName);
-      OzoneVolume volume = getVolume();
-      // TODO: use bucket owner instead of volume owner here once bucket owner
-      // TODO: is supported.
-      S3Owner owner = new S3Owner(volume.getOwner(), volume.getOwner());
+      S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
+      S3Owner owner = S3Owner.of(bucket.getOwner());
       result.setOwner(owner);
 
       // TODO: remove this duplication avoid logic when ACCESS and DEFAULT scope
@@ -586,17 +600,18 @@ public class BucketEndpoint extends EndpointBase {
    * <p>
    * see: https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketAcl.html
    */
-  public Response putAcl(String bucketName, HttpHeaders httpHeaders,
+  public Response putAcl(String bucketName,
                          InputStream body) throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
-    String grantReads = httpHeaders.getHeaderString(S3Acl.GRANT_READ);
-    String grantWrites = httpHeaders.getHeaderString(S3Acl.GRANT_WRITE);
-    String grantReadACP = httpHeaders.getHeaderString(S3Acl.GRANT_READ_CAP);
-    String grantWriteACP = httpHeaders.getHeaderString(S3Acl.GRANT_WRITE_CAP);
-    String grantFull = httpHeaders.getHeaderString(S3Acl.GRANT_FULL_CONTROL);
+    String grantReads = getHeaders().getHeaderString(S3Acl.GRANT_READ);
+    String grantWrites = getHeaders().getHeaderString(S3Acl.GRANT_WRITE);
+    String grantReadACP = getHeaders().getHeaderString(S3Acl.GRANT_READ_CAP);
+    String grantWriteACP = getHeaders().getHeaderString(S3Acl.GRANT_WRITE_CAP);
+    String grantFull = getHeaders().getHeaderString(S3Acl.GRANT_FULL_CONTROL);
 
     try {
       OzoneBucket bucket = getBucket(bucketName);
+      S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
       OzoneVolume volume = getVolume();
 
       List<OzoneAcl> ozoneAclListOnBucket = new ArrayList<>();
@@ -755,28 +770,22 @@ public class BucketEndpoint extends EndpointBase {
     keyMetadata.setSize(next.getDataSize());
     String eTag = next.getMetadata().get(ETAG);
     if (eTag != null) {
-      keyMetadata.setETag(ObjectEndpoint.wrapInQuotes(eTag));
+      keyMetadata.setETag(wrapInQuotes(eTag));
     }
-    if (next.getReplicationType().toString().equals(ReplicationType
-        .STAND_ALONE.toString())) {
-      keyMetadata.setStorageClass(S3StorageType.REDUCED_REDUNDANCY.toString());
-    } else {
-      keyMetadata.setStorageClass(S3StorageType.STANDARD.toString());
-    }
+    keyMetadata.setStorageClass(S3StorageType.fromReplicationConfig(
+        next.getReplicationConfig()).toString());
     keyMetadata.setLastModified(next.getModificationTime());
-    String ownerName = next.getOwner();
-    String displayName = ownerName;
-    // Use ownerName to fill displayName
-    keyMetadata.setOwner(new S3Owner(ownerName, displayName));
+    String displayName = next.getOwner();
+    keyMetadata.setOwner(S3Owner.of(displayName));
     response.addKey(keyMetadata);
   }
 
-  private void verifyBucketOwner(String bucketName, HttpHeaders httpHeaders)
-      throws OS3Exception {
+  private void verifyBucketOwner(String bucketName) throws OS3Exception {
+    HttpHeaders httpHeaders = getHeaders();
     if (httpHeaders == null) {
       return;
     }
-    String expectedBucketOwner = httpHeaders.getHeaderString("x-amz-expected-bucket-owner");
+    String expectedBucketOwner = httpHeaders.getHeaderString(EXPECTED_BUCKET_OWNER_HEADER);
     if (expectedBucketOwner == null || expectedBucketOwner.isEmpty()) {
       return;
     }
@@ -794,11 +803,9 @@ public class BucketEndpoint extends EndpointBase {
     }
   }
 
-
-  public Response putBucketLifecycleConfiguration(
-      String bucketName, HttpHeaders httpHeaders, InputStream body)
+  public Response putBucketLifecycleConfiguration(String bucketName, InputStream body)
       throws IOException, OS3Exception {
-    verifyBucketOwner(bucketName, httpHeaders);
+    verifyBucketOwner(bucketName);
     S3LifecycleConfiguration s3LifecycleConfiguration;
     OzoneBucket ozoneBucket = getBucket(bucketName);
     try {
@@ -821,9 +828,8 @@ public class BucketEndpoint extends EndpointBase {
     return Response.ok().build();
   }
 
-  public Response getBucketLifecycleConfiguration(String bucketName, HttpHeaders httpHeaders)
-      throws IOException, OS3Exception {
-    verifyBucketOwner(bucketName, httpHeaders);
+  public Response getBucketLifecycleConfiguration(String bucketName) throws IOException, OS3Exception {
+    verifyBucketOwner(bucketName);
     OzoneLifecycleConfiguration ozoneLifecycleConfiguration =
         getLifecycleConfiguration(bucketName);
     return Response.ok(S3LifecycleConfiguration.fromOzoneLifecycleConfiguration(
@@ -844,9 +850,8 @@ public class BucketEndpoint extends EndpointBase {
     }
   }
 
-  public Response deleteBucketLifecycleConfiguration(String bucketName, HttpHeaders httpHeaders)
-      throws IOException, OS3Exception {
-    verifyBucketOwner(bucketName, httpHeaders);
+  public Response deleteBucketLifecycleConfiguration(String bucketName) throws IOException, OS3Exception {
+    verifyBucketOwner(bucketName);
     deleteLifecycleConfiguration(bucketName);
     return Response.noContent().build();
   }
@@ -865,9 +870,13 @@ public class BucketEndpoint extends EndpointBase {
   }
 
   @Override
+  @PostConstruct
   public void init() {
-    listKeysShallowEnabled = ozoneConfiguration.getBoolean(
+    listKeysShallowEnabled = getOzoneConfiguration().getBoolean(
         OZONE_S3G_LIST_KEYS_SHALLOW_ENABLED,
         OZONE_S3G_LIST_KEYS_SHALLOW_ENABLED_DEFAULT);
+    maxKeysLimit = getOzoneConfiguration().getInt(
+        OZONE_S3G_LIST_MAX_KEYS_LIMIT,
+        OZONE_S3G_LIST_MAX_KEYS_LIMIT_DEFAULT);
   }
 }

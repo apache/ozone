@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.repair.om;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.ozone.test.IntLambda.withTextFromSystemIn;
@@ -32,6 +33,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -39,7 +41,6 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -49,6 +50,8 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.repair.OzoneRepair;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -58,6 +61,7 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
@@ -70,7 +74,7 @@ import picocli.CommandLine;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class TestFSORepairTool {
 
-  public static final Logger LOG = LoggerFactory.getLogger(TestFSORepairTool.class);
+  private static final Logger LOG = LoggerFactory.getLogger(TestFSORepairTool.class);
   private static final int ORDER_DRY_RUN = 1;
   //private static final int ORDER_REPAIR_SOME = 2; // TODO add test case
   private static final int ORDER_REPAIR_ALL = 3;
@@ -86,6 +90,7 @@ public class TestFSORepairTool {
   private static FSORepairTool.Report vol2Report;
   private static FSORepairTool.Report fullReport;
   private static FSORepairTool.Report emptyReport;
+  private static FSORepairTool.Report unreachableReport;
 
   private static GenericTestUtils.PrintStreamCapturer out;
   private static GenericTestUtils.PrintStreamCapturer err;
@@ -111,11 +116,13 @@ public class TestFSORepairTool {
     FSORepairTool.Report report2 = buildDisconnectedTree("vol2", "bucket1", 10);
     FSORepairTool.Report report3 = buildConnectedTree("vol2", "bucket2", 10);
     FSORepairTool.Report report4 = buildEmptyTree();
+    FSORepairTool.Report report5 = buildTreeWithUnreachableObjects("vol-unreachable", "bucket-unreachable", 5);
 
     vol1Report = new FSORepairTool.Report(report1);
     vol2Report = new FSORepairTool.Report(report2, report3);
-    fullReport = new FSORepairTool.Report(report1, report2, report3, report4);
+    fullReport = new FSORepairTool.Report(report1, report2, report3, report4, report5);
     emptyReport = new FSORepairTool.Report(report4);
+    unreachableReport = new FSORepairTool.Report(report5);
 
     client = OzoneClientFactory.getRpcClient(conf);
     ObjectStore store = client.getObjectStore();
@@ -157,6 +164,24 @@ public class TestFSORepairTool {
   }
 
   /**
+   * Test to verify that if parent is in deletedDirectoryTable then its
+   * children should be marked unreachable, not unreferenced.
+   */
+  @Order(ORDER_DRY_RUN)
+  @Test
+  public void testUnreachableObjectsWithParentInDeletedTable() {
+    String expectedOutput = serializeReport(unreachableReport);
+
+    int exitCode = dryRun("-v", "/vol-unreachable", "-b", "bucket-unreachable");
+    assertEquals(0, exitCode);
+
+    String cliOutput = out.getOutput();
+    String reportOutput = extractRelevantSection(cliOutput);
+
+    assertEquals(expectedOutput, reportOutput);
+  }
+
+  /**
    * Test to check a connected tree with one bucket.
    * The output remains the same in debug and repair mode as the tree is connected.
    */
@@ -166,7 +191,7 @@ public class TestFSORepairTool {
   void testConnectedTreeOneBucket(boolean dryRun) {
     String expectedOutput = serializeReport(vol1Report);
 
-    int exitCode = execute(dryRun, "-v", "/vol1", "-b", "bucket1");
+    int exitCode = execute(dbPath, dryRun, "-v", "/vol1", "-b", "bucket1");
     assertEquals(0, exitCode, err.getOutput());
 
     String cliOutput = out.getOutput();
@@ -288,6 +313,25 @@ public class TestFSORepairTool {
     assertEquals(expectedOutput, reportOutput);
   }
 
+  @Order(ORDER_DRY_RUN)
+  @Test
+  public void testAlternateOmDbDirName(@TempDir java.nio.file.Path tempDir) throws Exception {
+    File original = new File(dbPath);
+    File backup = tempDir.resolve("om-db-backup").toFile();
+
+    FileUtils.copyDirectory(original, backup);
+
+    out.reset();
+    String expectedOutput = serializeReport(fullReport);
+    int exitCode = execute(backup.getPath(), true);
+
+    assertEquals(0, exitCode, err.getOutput());
+
+    String cliOutput = out.getOutput();
+    String reportOutput = extractRelevantSection(cliOutput);
+    assertEquals(expectedOutput, reportOutput);
+  }
+
   /**
    * Test in repair mode. This test ensures that:
    * - The initial repair correctly resolves unreferenced objects.
@@ -304,7 +348,7 @@ public class TestFSORepairTool {
     String cliOutput = out.getOutput();
     String reportOutput = extractRelevantSection(cliOutput);
     assertEquals(expectedOutput, reportOutput);
-    assertThat(cliOutput).contains("Unreferenced:\n\tDirectories: 1\n\tFiles: 3\n\tBytes: 30");
+    assertThat(cliOutput).contains("Unreferenced (Orphaned):\n\tDirectories: 1\n\tFiles: 3\n\tBytes: 30");
   }
 
   @Order(ORDER_REPAIR_ALL_AGAIN)
@@ -313,7 +357,7 @@ public class TestFSORepairTool {
     int exitCode = repair();
     assertEquals(0, exitCode);
     String cliOutput = out.getOutput();
-    assertThat(cliOutput).contains("Unreferenced:\n\tDirectories: 0\n\tFiles: 0\n\tBytes: 0");
+    assertThat(cliOutput).contains("Unreferenced (Orphaned):\n\tDirectories: 0\n\tFiles: 0\n\tBytes: 0");
   }
 
   /**
@@ -324,26 +368,28 @@ public class TestFSORepairTool {
   public void validateClusterAfterRestart() throws Exception {
     cluster.getOzoneManager().restart();
 
-    // 4 volumes (/s3v, /vol1, /vol2, /vol-empty)
-    assertEquals(4, countTableEntries(cluster.getOzoneManager().getMetadataManager().getVolumeTable()));
-    // 6 buckets (vol1/bucket1, vol2/bucket1, vol2/bucket2, vol-empty/bucket-empty, vol/legacy-bucket, vol1/obs-bucket)
-    assertEquals(6, countTableEntries(cluster.getOzoneManager().getMetadataManager().getBucketTable()));
-    // 1 directory is unreferenced and moved to the deletedDirTable during repair mode.
-    assertEquals(1, countTableEntries(cluster.getOzoneManager().getMetadataManager().getDeletedDirTable()));
+    // 5 volumes (/s3v, /vol1, /vol2, /vol-empty, /vol-unreachable)
+    assertEquals(5, countTableEntries(cluster.getOzoneManager().getMetadataManager().getVolumeTable()));
+    // 7 buckets (vol1/bucket1, vol2/bucket1, vol2/bucket2, vol-empty/bucket-empty, vol/legacy-bucket, vol1/obs-bucket,
+    // /vol-unreachable/bucket-unreachable)
+    assertEquals(7, countTableEntries(cluster.getOzoneManager().getMetadataManager().getBucketTable()));
+    // 1 directory is unreferenced and moved to the deletedDirTable during repair mode
+    // 1 is moved to deletedDirTable for testing
+    assertEquals(2, countTableEntries(cluster.getOzoneManager().getMetadataManager().getDeletedDirTable()));
     // 3 files are unreferenced and moved to the deletedTable during repair mode.
     assertEquals(3, countTableEntries(cluster.getOzoneManager().getMetadataManager().getDeletedTable()));
   }
 
   private int repair(String... args) {
-    return execute(false, args);
+    return execute(dbPath, false, args);
   }
 
   private int dryRun(String... args) {
-    return execute(true, args);
+    return execute(dbPath, true, args);
   }
 
-  private int execute(boolean dryRun, String... args) {
-    List<String> argList = new ArrayList<>(Arrays.asList("om", "fso-tree", "--db", dbPath));
+  private int execute(String effectiveDbPath, boolean dryRun, String... args) {
+    List<String> argList = new ArrayList<>(Arrays.asList("om", "fso-tree", "--db", effectiveDbPath));
     if (dryRun) {
       argList.add("--dry-run");
     }
@@ -355,7 +401,7 @@ public class TestFSORepairTool {
 
   private <K, V> int countTableEntries(Table<K, V> table) throws Exception {
     int count = 0;
-    try (TableIterator<K, ? extends Table.KeyValue<K, V>> iterator = table.iterator()) {
+    try (Table.KeyValueIterator<K, V> iterator = table.iterator()) {
       while (iterator.hasNext()) {
         iterator.next();
         count++;
@@ -375,17 +421,17 @@ public class TestFSORepairTool {
   private String serializeReport(FSORepairTool.Report report) {
     return String.format(
         "Reachable:%n\tDirectories: %d%n\tFiles: %d%n\tBytes: %d%n" +
-        "Unreachable:%n\tDirectories: %d%n\tFiles: %d%n\tBytes: %d%n" +
-        "Unreferenced:%n\tDirectories: %d%n\tFiles: %d%n\tBytes: %d",
+        "Unreachable (Pending to delete):%n\tDirectories: %d%n\tFiles: %d%n\tBytes: %d%n" +
+        "Unreferenced (Orphaned):%n\tDirectories: %d%n\tFiles: %d%n\tBytes: %d",
         report.getReachable().getDirs(),
         report.getReachable().getFiles(),
         report.getReachable().getBytes(),
-        report.getUnreachable().getDirs(),
-        report.getUnreachable().getFiles(),
-        report.getUnreachable().getBytes(),
-        report.getUnreferenced().getDirs(),
-        report.getUnreferenced().getFiles(),
-        report.getUnreferenced().getBytes()
+        report.getPendingToDelete().getDirs(),
+        report.getPendingToDelete().getFiles(),
+        report.getPendingToDelete().getBytes(),
+        report.getOrphaned().getDirs(),
+        report.getOrphaned().getFiles(),
+        report.getOrphaned().getBytes()
     );
   }
 
@@ -437,15 +483,88 @@ public class TestFSORepairTool {
     fs.mkdirs(new Path("/vol-empty/bucket-empty"));
     FSORepairTool.ReportStatistics reachableCount =
             new FSORepairTool.ReportStatistics(0, 0, 0);
-    FSORepairTool.ReportStatistics unreachableCount =
+    FSORepairTool.ReportStatistics pendingToDeleteCount =
             new FSORepairTool.ReportStatistics(0, 0, 0);
-    FSORepairTool.ReportStatistics unreferencedCount =
+    FSORepairTool.ReportStatistics orphanedCount =
             new FSORepairTool.ReportStatistics(0, 0, 0);
     return new FSORepairTool.Report.Builder()
         .setReachable(reachableCount)
-        .setUnreachable(unreachableCount)
-        .setUnreferenced(unreferencedCount)
+        .setPendingToDelete(pendingToDeleteCount)
+        .setOrphaned(orphanedCount)
         .build();
+  }
+
+  private static FSORepairTool.Report buildTreeWithUnreachableObjects(String volume, String bucket, int fileSize)
+      throws Exception {
+    Path bucketPath = new Path("/" + volume + "/" + bucket);
+    // Create a parent directory that will be moved to deleted directory table
+    Path parentToDelete = new Path(bucketPath, "parentToDelete");
+    Path childDir = new Path(parentToDelete, "childDir");
+    Path file1 = new Path(parentToDelete, "file1.txt");
+    Path file2 = new Path(childDir, "file2.txt");
+    
+    Path reachableDir = new Path(bucketPath, "reachableDir");
+    Path reachableFile = new Path(reachableDir, "reachableFile.txt");
+    
+    fs.mkdirs(childDir);
+    fs.mkdirs(reachableDir);
+
+    // Content to put in every file.
+    String data = new String(new char[fileSize]);
+
+    FSDataOutputStream stream = fs.create(file1);
+    stream.write(data.getBytes(StandardCharsets.UTF_8));
+    stream.close();
+    stream = fs.create(file2);
+    stream.write(data.getBytes(StandardCharsets.UTF_8));
+    stream.close();
+    stream = fs.create(reachableFile);
+    stream.write(data.getBytes(StandardCharsets.UTF_8));
+    stream.close();
+    
+    // Simulate parent deletion by moving parentToDelete to deleted directory table
+    // This makes childDir, file1 and file2 unreachable
+    moveDirectoryToDeletedTable(volume, bucket, "parentToDelete");
+
+    FSORepairTool.ReportStatistics reachableCount = 
+        new FSORepairTool.ReportStatistics(1, 1, fileSize);
+    FSORepairTool.ReportStatistics pendingToDeleteCount =
+        new FSORepairTool.ReportStatistics(1, 2, fileSize * 2L);
+    FSORepairTool.ReportStatistics orphanedCount =
+        new FSORepairTool.ReportStatistics(0, 0, 0);
+    return new FSORepairTool.Report.Builder()
+        .setReachable(reachableCount)
+        .setPendingToDelete(pendingToDeleteCount)
+        .setOrphaned(orphanedCount)
+        .build();
+  }
+
+  /**
+   * Move a directory from directory table to deleted directory table.
+   * This is used to verify unreachable objects.
+   */
+  private static void moveDirectoryToDeletedTable(String volumeName, String bucketName, String dirName) 
+      throws Exception {
+    Table<String, OmDirectoryInfo> dirTable = cluster.getOzoneManager().getMetadataManager().getDirectoryTable();
+    Table<String, OmKeyInfo> deletedDirTable = cluster.getOzoneManager().getMetadataManager().getDeletedDirTable();
+    
+    try (Table.KeyValueIterator<String, OmDirectoryInfo> iterator = dirTable.iterator()) {
+      while (iterator.hasNext()) {
+        Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
+        String key = entry.getKey();
+        OmDirectoryInfo dirInfo = entry.getValue();
+        
+        // Find the directory by name, remove from directory table and add to deleted directory table
+        if (key.contains(dirName) && dirInfo.getName().equals(dirName)) {
+          dirTable.delete(key);
+          String deleteDirKeyName = key + OM_KEY_PREFIX + dirInfo.getObjectID();
+          // Convert directory to OmKeyInfo for the deleted table
+          OmKeyInfo dirAsKeyInfo = OMFileRequest.getOmKeyInfo(volumeName, bucketName, dirInfo, dirInfo.getName());
+          deletedDirTable.put(deleteDirKeyName, dirAsKeyInfo);
+          break;
+        }
+      }
+    }
   }
 
   private static void assertConnectedTreeReadable(String volume, String bucket) throws IOException {
@@ -471,7 +590,7 @@ public class TestFSORepairTool {
 
   /**
    * Creates a tree with 1 reachable directory, 1 reachable file, 1
-   * unreachable directory, and 3 unreachable files.
+   * unreferenced directory, and 3 unreferenced files.
    */
   private static FSORepairTool.Report buildDisconnectedTree(String volume, String bucket, int fileSize)
         throws Exception {
@@ -483,21 +602,21 @@ public class TestFSORepairTool {
 
     assertDisconnectedTreePartiallyReadable(volume, bucket);
 
-    // dir1 does not count towards the unreachable directories the tool
+    // dir1 does not count towards the orphaned directories the tool
     // will see. It was deleted completely so the tool will never see it.
     FSORepairTool.ReportStatistics reachableCount =
             new FSORepairTool.ReportStatistics(1, 1, fileSize);
-    FSORepairTool.ReportStatistics unreferencedCount =
+    FSORepairTool.ReportStatistics orphanedCount =
             new FSORepairTool.ReportStatistics(1, 3, fileSize * 3L);
     return new FSORepairTool.Report.Builder()
         .setReachable(reachableCount)
-        .setUnreferenced(unreferencedCount)
+        .setOrphaned(orphanedCount)
         .build();
   }
 
   private static void disconnectDirectory(String dirName) throws Exception {
     Table<String, OmDirectoryInfo> dirTable = cluster.getOzoneManager().getMetadataManager().getDirectoryTable();
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>> iterator = dirTable.iterator()) {
+    try (Table.KeyValueIterator<String, OmDirectoryInfo> iterator = dirTable.iterator()) {
       while (iterator.hasNext()) {
         Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
         String key = entry.getKey();

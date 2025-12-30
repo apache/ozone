@@ -29,7 +29,6 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLU
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
 
-import com.google.common.base.Preconditions;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -41,8 +40,9 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.fs.BlockLocation;
@@ -81,6 +81,7 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.OzoneClientUtils;
 import org.apache.hadoop.ozone.client.OzoneKey;
 import org.apache.hadoop.ozone.client.OzoneSnapshot;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -119,7 +120,7 @@ import org.slf4j.LoggerFactory;
 public class BasicRootedOzoneClientAdapterImpl
     implements OzoneClientAdapter {
 
-  static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(BasicRootedOzoneClientAdapterImpl.class);
 
   private OzoneClient ozoneClient;
@@ -283,8 +284,8 @@ public class BasicRootedOzoneClientAdapterImpl
    */
   private OzoneBucket getBucket(String volumeStr, String bucketStr,
       boolean createIfNotExist) throws IOException {
-    Preconditions.checkNotNull(volumeStr);
-    Preconditions.checkNotNull(bucketStr);
+    Objects.requireNonNull(volumeStr, "volumeStr == null");
+    Objects.requireNonNull(bucketStr, "bucketStr == null");
 
     if (bucketStr.isEmpty()) {
       // throw FileNotFoundException in this case to make Hadoop common happy
@@ -683,19 +684,20 @@ public class BasicRootedOzoneClientAdapterImpl
    * valid bucket path or valid snapshot path.
    * Throws exception in case of failure.
    */
-  private FileStatusAdapter getFileStatusForKeyOrSnapshot(OFSPath ofsPath, URI uri, Path qualifiedPath, String userName)
+  private FileStatusAdapter getFileStatusForKeyOrSnapshot(
+      OFSPath ofsPath, URI uri, Path qualifiedPath, String userName)
       throws IOException {
-    String volumeName = ofsPath.getVolumeName();
-    String bucketName = ofsPath.getBucketName();
     String key = ofsPath.getKeyName();
     try {
+      OzoneBucket bucket = getBucket(ofsPath, false);
       if (ofsPath.isSnapshotPath()) {
-        OzoneVolume volume = objectStore.getVolume(volumeName);
-        OzoneBucket bucket = getBucket(volumeName, bucketName, false);
-        return getFileStatusAdapterWithSnapshotIndicator(volume, bucket, uri);
+        OzoneVolume volume = objectStore.getVolume(ofsPath.getVolumeName());
+        return getFileStatusAdapterWithSnapshotIndicator(
+            volume, bucket, uri);
       } else {
-        OzoneFileStatus status = proxy.getOzoneFileStatus(volumeName, bucketName, key);
-        return toFileStatusAdapter(status, userName, uri, qualifiedPath, ofsPath.getNonKeyPath());
+        OzoneFileStatus status = bucket.getFileStatus(key);
+        return toFileStatusAdapter(status, userName, uri, qualifiedPath,
+            ofsPath.getNonKeyPath());
       }
     } catch (OMException e) {
       if (e.getResult() == OMException.ResultCodes.FILE_NOT_FOUND) {
@@ -1072,7 +1074,7 @@ public class BasicRootedOzoneClientAdapterImpl
         owner,
         null,
         getBlockLocations(null),
-        false,
+        keyInfo.isEncrypted(),
         OzoneClientUtils.isKeyErasureCode(keyInfo)
     );
   }
@@ -1367,7 +1369,7 @@ public class BasicRootedOzoneClientAdapterImpl
           getSnapshotDiffReportOnceComplete(fromSnapshot, toSnapshot, volume,
               bucket, "");
       aggregated = report;
-      while (!report.getToken().isEmpty()) {
+      while (StringUtils.isNotEmpty(report.getToken())) {
         LOG.info(
             "Total Snapshot Diff length between snapshot {} and {} exceeds"
                 + " max page size, Performing another" +

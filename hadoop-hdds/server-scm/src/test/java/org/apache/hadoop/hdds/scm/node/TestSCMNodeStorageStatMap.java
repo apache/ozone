@@ -35,6 +35,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.NodeReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
@@ -133,7 +134,7 @@ public class TestSCMNodeStorageStatMap {
     SCMNodeStorageStatMap map = new SCMNodeStorageStatMap(conf);
     map.insertNewDatanode(key, reportSet);
     assertTrue(map.isKnownDatanode(key));
-    UUID storageId = UUID.randomUUID();
+    DatanodeID storageId = DatanodeID.randomID();
     String path = tempFile.getPath().concat("/" + storageId);
     StorageLocationReport report = reportSet.iterator().next();
     long reportCapacity = report.getCapacity();
@@ -155,7 +156,7 @@ public class TestSCMNodeStorageStatMap {
     assertEquals(SCMNodeStorageStatMap.ReportStatus.ALL_IS_WELL, result.getStatus());
 
     reportList.add(HddsTestUtils
-        .createStorageReport(UUID.randomUUID(), path, reportCapacity,
+        .createStorageReport(DatanodeID.randomID(), path, reportCapacity,
             reportCapacity, 0, null));
     result = map.processNodeReport(key, HddsTestUtils.createNodeReport(
         reportList, Collections.emptyList()));

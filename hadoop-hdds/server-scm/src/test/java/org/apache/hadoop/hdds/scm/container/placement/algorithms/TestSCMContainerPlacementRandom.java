@@ -64,11 +64,11 @@ public class TestSCMContainerPlacementRandom {
           UpgradeUtils.defaultLayoutVersionProto());
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
-          datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
+          datanodeInfo.getID(), "/data1-" + datanodeInfo.getID(),
           100L, 0, 100L, null);
       MetadataStorageReportProto metaStorage1 =
           HddsTestUtils.createMetadataStorageReport(
-              "/metadata1-" + datanodeInfo.getUuidString(),
+              "/metadata1-" + datanodeInfo.getID(),
               100L, 0, 100L, null);
       datanodeInfo.updateStorageReports(
           new ArrayList<>(Arrays.asList(storage1)));
@@ -79,8 +79,8 @@ public class TestSCMContainerPlacementRandom {
     }
 
     StorageReportProto storage2 = HddsTestUtils.createStorageReport(
-        datanodes.get(2).getUuid(),
-        "/data1-" + datanodes.get(2).getUuidString(),
+        datanodes.get(2).getID(),
+        "/data1-" + datanodes.get(2).getID(),
         100L, 90L, 10L, null);
     datanodes.get(2).updateStorageReports(
         new ArrayList<>(Arrays.asList(storage2)));
@@ -170,11 +170,11 @@ public class TestSCMContainerPlacementRandom {
           UpgradeUtils.defaultLayoutVersionProto());
 
       StorageReportProto storage1 = HddsTestUtils.createStorageReport(
-          datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
+          datanodeInfo.getID(), "/data1-" + datanodeInfo.getID(),
           100L, 0, 100L, null);
       MetadataStorageReportProto metaStorage1 =
           HddsTestUtils.createMetadataStorageReport(
-              "/metadata1-" + datanodeInfo.getUuidString(),
+              "/metadata1-" + datanodeInfo.getID(),
               100L, 0, 100L, null);
       datanodeInfo.updateStorageReports(
           new ArrayList<>(Arrays.asList(storage1)));
@@ -185,15 +185,15 @@ public class TestSCMContainerPlacementRandom {
     }
 
     StorageReportProto storage1 = HddsTestUtils.createStorageReport(
-        datanodes.get(1).getUuid(),
-        "/data1-" + datanodes.get(1).getUuidString(),
+        datanodes.get(1).getID(),
+        "/data1-" + datanodes.get(1).getID(),
         100L, 90L, 10L, null);
     datanodes.get(1).updateStorageReports(
         new ArrayList<>(Arrays.asList(storage1)));
 
     MetadataStorageReportProto metaStorage2 =
         HddsTestUtils.createMetadataStorageReport(
-            "/metadata1-" + datanodes.get(2).getUuidString(),
+            "/metadata1-" + datanodes.get(2).getID(),
             100L, 90, 10L, null);
     datanodes.get(2).updateMetaDataStorageReports(
         new ArrayList<>(Arrays.asList(metaStorage2)));

@@ -165,8 +165,7 @@ public final class OmLCExpiration implements OmLCAction {
     return LifecycleAction.newBuilder().setExpiration(builder).build();
   }
 
-  public static OmLCExpiration getFromProtobuf(
-      LifecycleExpiration lifecycleExpiration) throws OMException {
+  public static OmLCExpiration getFromProtobuf(LifecycleExpiration lifecycleExpiration) {
     OmLCExpiration.Builder builder = new Builder();
 
     if (lifecycleExpiration.hasDate()) {
@@ -204,7 +203,7 @@ public final class OmLCExpiration implements OmLCAction {
       return this;
     }
 
-    public OmLCExpiration build() throws OMException {
+    public OmLCExpiration build() {
       return new OmLCExpiration(this);
     }
   }

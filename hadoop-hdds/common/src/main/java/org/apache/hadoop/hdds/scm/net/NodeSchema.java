@@ -18,47 +18,11 @@
 package org.apache.hadoop.hdds.scm.net;
 
 import java.util.List;
-import org.apache.hadoop.HadoopIllegalArgumentException;
 
 /**
  * Network topology schema to housekeeper relevant information.
  */
 public final class NodeSchema {
-  /**
-   * Network topology layer type enum definition.
-   */
-  public enum LayerType {
-    ROOT("Root", NetConstants.INNER_NODE_COST_DEFAULT),
-    INNER_NODE("InnerNode", NetConstants.INNER_NODE_COST_DEFAULT),
-    LEAF_NODE("Leaf", NetConstants.NODE_COST_DEFAULT);
-
-    private final String description;
-    // default cost
-    private final int cost;
-
-    LayerType(String description, int cost) {
-      this.description = description;
-      this.cost = cost;
-    }
-
-    @Override
-    public String toString() {
-      return description;
-    }
-
-    public int getCost() {
-      return cost;
-    }
-    public static LayerType getType(String typeStr) {
-      for (LayerType type: LayerType.values()) {
-        if (typeStr.equalsIgnoreCase(type.toString())) {
-          return type;
-        }
-      }
-      return null;
-    }
-  }
-
   // default cost
   private int cost;
   // layer Type, mandatory property
@@ -101,7 +65,7 @@ public final class NodeSchema {
 
     public NodeSchema build() {
       if (type == null) {
-        throw new HadoopIllegalArgumentException("Type is mandatory for a " +
+        throw new IllegalArgumentException("Type is mandatory for a " +
             "network topology node layer definition");
       }
       if (cost == -1) {
@@ -168,6 +132,7 @@ public final class NodeSchema {
   public int getCost() {
     return this.cost;
   }
+
   public void setCost(int cost) {
     this.cost = cost;
   }
@@ -178,5 +143,41 @@ public final class NodeSchema {
 
   public List<NodeSchema> getSublayer() {
     return sublayer;
+  }
+
+  /**
+   * Network topology layer type enum definition.
+   */
+  public enum LayerType {
+    ROOT("Root", NetConstants.INNER_NODE_COST_DEFAULT),
+    INNER_NODE("InnerNode", NetConstants.INNER_NODE_COST_DEFAULT),
+    LEAF_NODE("Leaf", NetConstants.NODE_COST_DEFAULT);
+
+    private final String description;
+    // default cost
+    private final int cost;
+
+    LayerType(String description, int cost) {
+      this.description = description;
+      this.cost = cost;
+    }
+
+    @Override
+    public String toString() {
+      return description;
+    }
+
+    public int getCost() {
+      return cost;
+    }
+
+    public static LayerType getType(String typeStr) {
+      for (LayerType type: LayerType.values()) {
+        if (typeStr.equalsIgnoreCase(type.toString())) {
+          return type;
+        }
+      }
+      return null;
+    }
   }
 }

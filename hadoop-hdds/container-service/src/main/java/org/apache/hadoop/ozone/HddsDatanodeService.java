@@ -19,9 +19,12 @@ package org.apache.hadoop.ozone;
 
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTP;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NODES_KEY;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_DATANODE_PLUGINS_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS;
 import static org.apache.hadoop.ozone.common.Storage.StorageState.INITIALIZED;
 import static org.apache.hadoop.ozone.conf.OzoneServiceConfig.DEFAULT_SHUTDOWN_HOOK_PRIORITY;
@@ -32,22 +35,33 @@ import static org.apache.hadoop.util.ExitUtil.terminate;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.management.ObjectName;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -69,6 +83,9 @@ import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine.DatanodeStates;
+import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
+import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.DeleteBlocksCommandHandler;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
@@ -121,6 +138,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
   private HddsDatanodeClientProtocolServer clientProtocolServer;
   private OzoneAdmins admins;
   private ReconfigurationHandler reconfigurationHandler;
+  private String scmServiceId;
 
   //Constructor for DataNode PluginService
   public HddsDatanodeService() { }
@@ -160,10 +178,6 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
       LOG.error("Exception in HddsDatanodeService.", e);
       terminate(1, e);
     }
-  }
-
-  public static Logger getLogger() {
-    return LOG;
   }
 
   @Override
@@ -208,6 +222,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
     start();
   }
 
+  @SuppressWarnings("methodlength")
   public void start() {
     serviceRuntimeInfo = new DNMXBeanImpl(HddsVersionInfo.HDDS_VERSION_INFO) {
       @Override
@@ -234,12 +249,11 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
       datanodeDetails.setRevision(
           HddsVersionInfo.HDDS_VERSION_INFO.getRevision());
       TracingUtil.initTracing(
-          "HddsDatanodeService." + datanodeDetails.getUuidString()
-              .substring(0, 8), conf);
+          "HddsDatanodeService." + datanodeDetails.getID(), conf);
       LOG.info("HddsDatanodeService {}", datanodeDetails);
       // Authenticate Hdds Datanode service if security is enabled
       if (OzoneSecurityUtil.isSecurityEnabled(conf)) {
-        component = "dn-" + datanodeDetails.getUuidString();
+        component = "dn-" + datanodeDetails.getID();
         secConf = new SecurityConfig(conf);
 
         if (SecurityUtil.getAuthenticationMethod(conf).equals(
@@ -289,8 +303,20 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
                   this::reconfigBlockDeleteThreadMax)
               .register(OZONE_BLOCK_DELETING_SERVICE_WORKERS,
                   this::reconfigDeletingServiceWorkers)
+              .register(OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
+                  this::reconfigBlockDeletingServiceInterval)
+              .register(OZONE_BLOCK_DELETING_SERVICE_TIMEOUT,
+                  this::reconfigBlockDeletingServiceTimeout)
               .register(REPLICATION_STREAMS_LIMIT_KEY,
                   this::reconfigReplicationStreamsLimit);
+
+      scmServiceId = HddsUtils.getScmServiceId(conf);
+      if (scmServiceId != null) {
+        reconfigurationHandler.register(OZONE_SCM_NODES_KEY + "." + scmServiceId,
+            this::reconfigScmNodes);
+      }
+
+      reconfigurationHandler.setReconfigurationCompleteCallback(reconfigurationHandler.defaultLoggingCallback());
 
       datanodeStateMachine = new DatanodeStateMachine(this, datanodeDetails, conf,
           dnCertClient, secretKeyClient, this::terminateDatanode,
@@ -307,7 +333,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
         }
 
         if (policy.isHttpsEnabled()) {
-          int httpsPort = httpServer.getHttpAddress().getPort();
+          int httpsPort = httpServer.getHttpsAddress().getPort();
           datanodeDetails.setPort(DatanodeDetails.newPort(HTTPS, httpsPort));
           serviceRuntimeInfo.setHttpsPort(String.valueOf(httpsPort));
         }
@@ -425,7 +451,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
   private DatanodeDetails initializeDatanodeDetails()
       throws IOException {
     String idFilePath = HddsServerUtil.getDatanodeIdFilePath(conf);
-    Preconditions.checkNotNull(idFilePath);
+    Objects.requireNonNull(idFilePath, "idFilePath == null");
     File idFile = new File(idFilePath);
     DatanodeDetails details;
     if (idFile.exists()) {
@@ -450,7 +476,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
   private void persistDatanodeDetails(DatanodeDetails dnDetails)
       throws IOException {
     String idFilePath = HddsServerUtil.getDatanodeIdFilePath(conf);
-    Preconditions.checkNotNull(idFilePath);
+    Objects.requireNonNull(idFilePath,  "idFilePath == null");
     File idFile = new File(idFilePath);
     ContainerUtils.writeDatanodeDetailsTo(dnDetails, idFile, conf);
   }
@@ -649,8 +675,6 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
   }
 
   private String reconfigBlockDeleteThreadMax(String value) {
-    getConf().set(HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX, value);
-
     DeleteBlocksCommandHandler handler =
         (DeleteBlocksCommandHandler) getDatanodeStateMachine()
             .getCommandDispatcher().getDeleteBlocksCommandHandler();
@@ -659,19 +683,129 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
   }
 
   private String reconfigDeletingServiceWorkers(String value) {
-    getConf().set(OZONE_BLOCK_DELETING_SERVICE_WORKERS, value);
-
-    getDatanodeStateMachine().getContainer().getBlockDeletingService()
-        .setPoolSize(Integer.parseInt(value));
+    Preconditions.checkArgument(Integer.parseInt(value) >= 0,
+        OZONE_BLOCK_DELETING_SERVICE_WORKERS + " cannot be negative.");
     return value;
   }
 
   private String reconfigReplicationStreamsLimit(String value) {
-    getConf().set(REPLICATION_STREAMS_LIMIT_KEY, value);
-
     getDatanodeStateMachine().getContainer().getReplicationServer()
         .setPoolSize(Integer.parseInt(value));
     return value;
+  }
+
+  private String reconfigBlockDeletingServiceInterval(String value) {
+    return value;
+  }
+
+  private String reconfigBlockDeletingServiceTimeout(String value) {
+    return value;
+  }
+
+  /**
+   * Reconfigure the SCM nodes configuration which will trigger the creation and removal of
+   * SCM connections based on the difference between the old and the new SCM nodes configuration.
+   * <p>
+   * The assumption is that the SCM node address configurations exists for all the involved node IDs
+   * This is because reconfiguration can only support one configuration field at a time
+   * @param value The new configuration value for "ozone.scm.nodes.SERVICEID"
+   * @return new configuration for "ozone.scm.nodes.SERVICEID" which reflects the SCMs that the datanode has
+   *         is not connected to.
+   */
+  private String reconfigScmNodes(String value) {
+    if (StringUtils.isBlank(value)) {
+      throw new IllegalArgumentException("Reconfiguration failed since setting the empty SCM nodes " +
+          "configuration is not allowed");
+    }
+    Set<String> previousNodeIds = new HashSet<>(HddsUtils.getSCMNodeIds(getConf(), scmServiceId));
+    Set<String> newScmNodeIds = Stream.of(ConfigurationSource.getTrimmedStringsFromValue(value))
+        .collect(Collectors.toSet());
+
+    if (newScmNodeIds.isEmpty()) {
+      throw new IllegalArgumentException("Reconfiguration failed since setting the empty SCM nodes " +
+          "configuration is not allowed");
+    }
+
+    Set<String> scmNodesIdsToAdd = Sets.difference(newScmNodeIds, previousNodeIds);
+    Set<String> scmNodesIdsToRemove = Sets.difference(previousNodeIds, newScmNodeIds);
+
+    // We should only update configuration with the SCMs that are actually added / removed
+    // If there is partial reconfiguration (e.g. one successful add and one failed add),
+    // we want to be able to retry on the failed node reconfiguration.
+    // If we don't handle this, the subsequent reconfiguration will not work since the node
+    // configuration is already exists / removed.
+    Set<String> effectiveScmNodeIds = new HashSet<>(previousNodeIds);
+
+    LOG.info("Reconfiguring SCM nodes for service ID {} with new SCM nodes {} and remove SCM nodes {}",
+        scmServiceId, scmNodesIdsToAdd, scmNodesIdsToRemove);
+
+    Collection<Pair<String, InetSocketAddress>> scmToAdd = HddsServerUtil.getSCMAddressForDatanodes(
+        getConf(), scmServiceId, scmNodesIdsToAdd);
+    if (scmToAdd == null) {
+      throw new IllegalStateException("Reconfiguration failed to get SCM address to add due to wrong configuration");
+    }
+    Collection<Pair<String, InetSocketAddress>> scmToRemove = HddsServerUtil.getSCMAddressForDatanodes(
+        getConf(), scmServiceId, scmNodesIdsToRemove);
+    if (scmToRemove == null) {
+      throw new IllegalArgumentException(
+          "Reconfiguration failed to get SCM address to remove due to wrong configuration");
+    }
+
+    StateContext context = datanodeStateMachine.getContext();
+    SCMConnectionManager connectionManager = datanodeStateMachine.getConnectionManager();
+
+    // Assert that the datanode is in RUNNING state since
+    // 1. If the datanode state is INIT, there might be concurrent connection manager operations
+    //    that might cause unpredictable behaviors
+    // 2. If the datanode state is SHUTDOWN, it means that datanode is shutting down and there is no need
+    //    to reconfigure the connections.
+    if (!DatanodeStates.RUNNING.equals(context.getState())) {
+      throw new IllegalStateException("Reconfiguration failed since the datanode the current state" +
+          context.getState().toString() + " is not in RUNNING state");
+    }
+
+    // Add the new SCM servers
+    for (Pair<String, InetSocketAddress> pair : scmToAdd) {
+      String scmNodeId = pair.getLeft();
+      InetSocketAddress scmAddress = pair.getRight();
+      if (scmAddress.isUnresolved()) {
+        LOG.warn("Reconfiguration failed to add SCM address {} for SCM service {} since it can't " +
+            "be resolved, skipping", scmAddress, scmServiceId);
+        continue;
+      }
+      try {
+        connectionManager.addSCMServer(scmAddress, context.getThreadNamePrefix());
+        context.addEndpoint(scmAddress);
+        effectiveScmNodeIds.add(scmNodeId);
+        LOG.info("Reconfiguration successfully add SCM address {} for SCM service {}", scmAddress, scmServiceId);
+      } catch (IOException e) {
+        LOG.error("Reconfiguration failed to add SCM address {} for SCM service {}", scmAddress, scmServiceId, e);
+      }
+    }
+
+    // Remove the old SCM server
+    for (Pair<String, InetSocketAddress> pair : scmToRemove) {
+      String scmNodeId = pair.getLeft();
+      InetSocketAddress scmAddress = pair.getRight();
+      try {
+        connectionManager.removeSCMServer(scmAddress);
+        context.removeEndpoint(scmAddress);
+        effectiveScmNodeIds.remove(scmNodeId);
+        LOG.info("Reconfiguration successfully remove SCM address {} for SCM service {}",
+            scmAddress, scmServiceId);
+      } catch (IOException e) {
+        LOG.error("Reconfiguration failed to remove SCM address {} for SCM service {}", scmAddress, scmServiceId, e);
+      }
+    }
+
+    // Resize the executor pool size to (number of SCMs + 1 Recon)
+    // Refer to DatanodeStateMachine#getEndPointTaskThreadPoolSize
+    datanodeStateMachine.resizeExecutor(connectionManager.getNumOfConnections());
+
+    // TODO: In the future, we might also do some assertions on the SCM
+    //  - The SCM cannot be a leader since this causes the datanode to disappear
+    //  - The SCM should be decommissioned
+    return String.join(",", effectiveScmNodeIds);
   }
 
   /**

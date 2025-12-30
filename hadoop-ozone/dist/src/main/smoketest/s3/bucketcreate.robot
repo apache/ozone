@@ -63,3 +63,11 @@ Test buckets named like web endpoints
         Create bucket with name    ${name}
         Put object to bucket    bucket=${name}    key=testkey    path=${path}
     END
+
+Check bucket ownership verification
+    [tags]    bucket-ownership-verification
+    ${bucket} =           Create bucket
+    ${correct_owner} =    Get bucket owner    ${bucket}
+
+    Execute AWSS3APICli with bucket owner check        put-bucket-acl --bucket ${bucket} --grant-full-control id=${correct_owner}  ${correct_owner}
+    Execute AWSS3APICli with bucket owner check        get-bucket-acl --bucket ${bucket}    ${correct_owner}

@@ -69,7 +69,6 @@ public class ObjectDBInfo {
     this.setMetadata(omPrefixInfo.getMetadata());
   }
 
-
   public Map<String, String> getMetadata() {
     return metadata;
   }

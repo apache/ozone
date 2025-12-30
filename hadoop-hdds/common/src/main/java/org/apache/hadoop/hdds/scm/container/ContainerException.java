@@ -29,19 +29,10 @@ public class ContainerException extends SCMException {
    * Constructs a {@code ContainerException} with {@code null}
    * as its result code. <p>
    * Required for Unwrapping {@code RemoteException}. Used by
-   * {@link org.apache.hadoop.ipc.RemoteException#unwrapRemoteException()}
+   * {@link org.apache.hadoop.ipc_.RemoteException#unwrapRemoteException()}
    */
   public ContainerException(String message) {
     super(message);
-  }
-
-  /**
-   * Constructs an {@code ContainerException} with {@code null}
-   * as its error detail message.
-   * @param resultCode ResultCode for the exception
-   */
-  public ContainerException(ResultCodes resultCode) {
-    super(resultCode);
   }
 
   /**

@@ -72,13 +72,6 @@ public class TestCloseContainerByPipeline {
   private static OzoneClient client;
   private static ObjectStore objectStore;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
@@ -97,9 +90,6 @@ public class TestCloseContainerByPipeline {
     objectStore.getVolume("test").createBucket("test");
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);
@@ -154,7 +144,7 @@ public class TestCloseContainerByPipeline {
     command.setTerm(
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     cluster.getStorageContainerManager().getScmNodeManager()
-        .addDatanodeCommand(datanodeDetails.getUuid(), command);
+        .addDatanodeCommand(datanodeDetails.getID(), command);
     GenericTestUtils
         .waitFor(() -> isContainerClosed(cluster, containerID, datanodeDetails),
             500, 5 * 1000);
@@ -202,7 +192,7 @@ public class TestCloseContainerByPipeline {
     command.setTerm(
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     cluster.getStorageContainerManager().getScmNodeManager()
-        .addDatanodeCommand(datanodeDetails.getUuid(), command);
+        .addDatanodeCommand(datanodeDetails.getID(), command);
 
     //double check if it's really closed (waitFor also throws an exception)
     // TODO: change the below line after implementing QUASI_CLOSED to CLOSED
@@ -213,7 +203,7 @@ public class TestCloseContainerByPipeline {
     assertTrue(isContainerClosed(cluster, containerID, datanodeDetails));
 
     cluster.getStorageContainerManager().getPipelineManager()
-        .closePipeline(pipeline, false);
+        .closePipeline(pipeline.getId());
     Thread.sleep(5000);
     // Pipeline close should not affect a container in CLOSED state
     assertTrue(isContainerClosed(cluster, containerID, datanodeDetails));
@@ -257,7 +247,7 @@ public class TestCloseContainerByPipeline {
       command.setTerm(cluster.getStorageContainerManager()
           .getScmContext().getTermOfLeader());
       cluster.getStorageContainerManager().getScmNodeManager()
-          .addDatanodeCommand(details.getUuid(), command);
+          .addDatanodeCommand(details.getID(), command);
       int index = cluster.getHddsDatanodeIndex(details);
       Container dnContainer = cluster.getHddsDatanodes().get(index)
           .getDatanodeStateMachine().getContainer().getContainerSet()
@@ -317,7 +307,7 @@ public class TestCloseContainerByPipeline {
 
     // close the pipeline
     cluster.getStorageContainerManager()
-        .getPipelineManager().closePipeline(pipeline, false);
+        .getPipelineManager().closePipeline(pipeline.getId());
 
     // All the containers in OPEN or CLOSING state should transition to
     // QUASI-CLOSED after pipeline close
@@ -334,7 +324,7 @@ public class TestCloseContainerByPipeline {
     command.setTerm(
         cluster.getStorageContainerManager().getScmContext().getTermOfLeader());
     cluster.getStorageContainerManager().getScmNodeManager()
-        .addDatanodeCommand(datanodeDetails.getUuid(), command);
+        .addDatanodeCommand(datanodeDetails.getID(), command);
     GenericTestUtils
         .waitFor(() -> isContainerClosed(
             cluster, containerID, datanodeDetails), 500, 5 * 1000);

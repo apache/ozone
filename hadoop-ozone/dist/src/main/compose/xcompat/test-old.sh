@@ -17,6 +17,8 @@
 
 #suite:compat-old
 
+set -u -o pipefail
+
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
@@ -26,5 +28,6 @@ source "${COMPOSE_DIR}/lib.sh"
 # old cluster with clients: same version and current version
 for cluster_version in ${old_versions}; do
   export OZONE_VERSION=${cluster_version}
-  COMPOSE_FILE=old-cluster.yaml:clients.yaml test_cross_compatibility ${cluster_version} ${current_version}
+  export COMPOSE_FILE=old-cluster.yaml:clients.yaml
+  test_cross_compatibility ${cluster_version} ${current_version}
 done

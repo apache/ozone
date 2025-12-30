@@ -25,7 +25,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
@@ -64,39 +63,25 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests Exception handling by Ozone Client by set flush delay.
  */
-@Timeout(300)
 public class TestFailureHandlingByClientFlushDelay {
+  private static final int CHUNK_SIZE = 100;
+  private static final int FLUSH_SIZE = 2 * CHUNK_SIZE;
+  private static final int MAX_FLUSH_SIZE = 2 * FLUSH_SIZE;
+  private static final int BLOCK_SIZE = 4 * CHUNK_SIZE;
 
   private MiniOzoneCluster cluster;
-  private OzoneConfiguration conf;
   private OzoneClient client;
   private ObjectStore objectStore;
-  private int chunkSize;
-  private int flushSize;
-  private int maxFlushSize;
-  private int blockSize;
   private String volumeName;
   private String bucketName;
   private String keyString;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   private void init() throws Exception {
-    conf = new OzoneConfiguration();
-    chunkSize = 100;
-    flushSize = 2 * chunkSize;
-    maxFlushSize = 2 * flushSize;
-    blockSize = 4 * chunkSize;
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 100, TimeUnit.SECONDS);
 
     RatisClientConfig ratisClientConfig =
@@ -132,10 +117,10 @@ public class TestFailureHandlingByClientFlushDelay {
         "/rack1");
 
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
-        .setBlockSize(blockSize)
-        .setChunkSize(chunkSize)
-        .setStreamBufferFlushSize(flushSize)
-        .setStreamBufferMaxSize(maxFlushSize)
+        .setBlockSize(BLOCK_SIZE)
+        .setChunkSize(CHUNK_SIZE)
+        .setStreamBufferFlushSize(FLUSH_SIZE)
+        .setStreamBufferMaxSize(MAX_FLUSH_SIZE)
         .applyTo(conf);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -156,9 +141,6 @@ public class TestFailureHandlingByClientFlushDelay {
     init();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);
@@ -171,44 +153,44 @@ public class TestFailureHandlingByClientFlushDelay {
   public void testPipelineExclusionWithPipelineFailure() throws Exception {
     startCluster();
     String keyName = UUID.randomUUID().toString();
-    OzoneOutputStream key =
-        createKey(keyName, ReplicationType.RATIS, blockSize);
     String data = ContainerTestHelper
-        .getFixedLengthString(keyString,  chunkSize);
+        .getFixedLengthString(keyString, CHUNK_SIZE);
 
-    // get the name of a valid container
-    KeyOutputStream keyOutputStream =
-        assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
-    List<BlockOutputStreamEntry> streamEntryList =
-        keyOutputStream.getStreamEntries();
+    BlockID blockId;
+    try (OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS, BLOCK_SIZE)) {
+      // get the name of a valid container
+      KeyOutputStream keyOutputStream =
+          assertInstanceOf(KeyOutputStream.class, key.getOutputStream());
+      List<BlockOutputStreamEntry> streamEntryList =
+          keyOutputStream.getStreamEntries();
 
-    // Assert that 1 block will be preallocated
-    assertEquals(1, streamEntryList.size());
-    key.write(data.getBytes(UTF_8));
-    key.flush();
-    long containerId = streamEntryList.get(0).getBlockID().getContainerID();
-    BlockID blockId = streamEntryList.get(0).getBlockID();
-    ContainerInfo container =
-        cluster.getStorageContainerManager().getContainerManager()
-            .getContainer(ContainerID.valueOf(containerId));
-    Pipeline pipeline =
-        cluster.getStorageContainerManager().getPipelineManager()
-            .getPipeline(container.getPipelineID());
-    List<DatanodeDetails> datanodes = pipeline.getNodes();
+      // Assert that 1 block will be preallocated
+      assertEquals(1, streamEntryList.size());
+      key.write(data.getBytes(UTF_8));
+      key.flush();
+      long containerId = streamEntryList.get(0).getBlockID().getContainerID();
+      blockId = streamEntryList.get(0).getBlockID();
+      ContainerInfo container =
+          cluster.getStorageContainerManager().getContainerManager()
+              .getContainer(ContainerID.valueOf(containerId));
+      Pipeline pipeline =
+          cluster.getStorageContainerManager().getPipelineManager()
+              .getPipeline(container.getPipelineID());
+      List<DatanodeDetails> datanodes = pipeline.getNodes();
 
-    // Two nodes, next write will hit AlreadyClosedException , the pipeline
-    // will be added in the exclude list
-    cluster.shutdownHddsDatanode(datanodes.get(0));
-    cluster.shutdownHddsDatanode(datanodes.get(1));
+      // Two nodes, next write will hit AlreadyClosedException , the pipeline
+      // will be added in the exclude list
+      cluster.shutdownHddsDatanode(datanodes.get(0));
+      cluster.shutdownHddsDatanode(datanodes.get(1));
 
-    key.write(data.getBytes(UTF_8));
-    key.flush();
-    assertThat(keyOutputStream.getExcludeList().getContainerIds()).isEmpty();
-    assertThat(keyOutputStream.getExcludeList().getDatanodes()).isEmpty();
-    assertThat(keyOutputStream.getExcludeList().getDatanodes()).isEmpty();
-    key.write(data.getBytes(UTF_8));
-    // The close will just write to the buffer
-    key.close();
+      key.write(data.getBytes(UTF_8));
+      key.flush();
+      assertThat(keyOutputStream.getExcludeList().getContainerIds()).isEmpty();
+      assertThat(keyOutputStream.getExcludeList().getDatanodes()).isEmpty();
+      assertThat(keyOutputStream.getExcludeList().getDatanodes()).isEmpty();
+      key.write(data.getBytes(UTF_8));
+      // The close will just write to the buffer
+    }
 
     OmKeyArgs keyArgs = new OmKeyArgs.Builder().setVolumeName(volumeName)
         .setBucketName(bucketName)

@@ -42,7 +42,7 @@ spec:
         livenessProbe:
           httpGet:
             path: /
-            port: 9878
+            port: 19878
           initialDelaySeconds: 30
         envFrom:
         - configMapRef:

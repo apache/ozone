@@ -48,10 +48,6 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
       ContainerInfo::getProtobuf,
       ContainerInfo.class);
 
-  public static Codec<ContainerInfo> getCodec() {
-    return CODEC;
-  }
-
   private HddsProtos.LifeCycleState state;
   // The wall-clock ms since the epoch at which the current state enters.
   private Instant stateEnterTime;
@@ -105,6 +101,10 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
     clock = b.clock;
   }
 
+  public static Codec<ContainerInfo> getCodec() {
+    return CODEC;
+  }
+
   public static ContainerInfo fromProtobuf(HddsProtos.ContainerInfoProto info) {
     ContainerInfo.Builder builder = new ContainerInfo.Builder();
     final ReplicationConfig config = ReplicationConfig
@@ -118,8 +118,7 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
         .setContainerID(info.getContainerID())
         .setDeleteTransactionId(info.getDeleteTransactionId())
         .setReplicationConfig(config)
-        .setSequenceId(info.getSequenceId())
-        .build();
+        .setSequenceId(info.getSequenceId());
 
     if (info.hasPipelineID()) {
       builder.setPipelineID(PipelineID.getFromProtobuf(info.getPipelineID()));

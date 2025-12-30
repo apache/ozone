@@ -29,8 +29,9 @@ import org.apache.hadoop.hdds.conf.ReconfigurableConfig;
  */
 @ConfigGroup(prefix = "hdds.scm")
 public class ScmConfig extends ReconfigurableConfig {
+  public static final String HDDS_SCM_UNKNOWN_CONTAINER_ACTION = "hdds.scm.unknown-container.action";
 
-  @Config(key = "kerberos.principal",
+  @Config(key = "hdds.scm.kerberos.principal",
       type = ConfigType.STRING,
       defaultValue = "",
       tags = { ConfigTag.SECURITY, ConfigTag.OZONE },
@@ -38,7 +39,7 @@ public class ScmConfig extends ReconfigurableConfig {
   )
   private String principal;
 
-  @Config(key = "kerberos.keytab.file",
+  @Config(key = "hdds.scm.kerberos.keytab.file",
       type = ConfigType.STRING,
       defaultValue = "",
       tags = { ConfigTag.SECURITY, ConfigTag.OZONE },
@@ -47,7 +48,7 @@ public class ScmConfig extends ReconfigurableConfig {
   )
   private String keytab;
 
-  @Config(key = "unknown-container.action",
+  @Config(key = "hdds.scm.unknown-container.action",
       type = ConfigType.STRING,
       defaultValue = "WARN",
       tags = { ConfigTag.SCM, ConfigTag.MANAGEMENT },
@@ -103,7 +104,7 @@ public class ScmConfig extends ReconfigurableConfig {
 
   @Config(key = "hdds.scm.block.deletion.per-interval.max",
       type = ConfigType.INT,
-      defaultValue = "100000",
+      defaultValue = "500000",
       reconfigurable = true,
       tags = { ConfigTag.SCM, ConfigTag.DELETION},
       description =
@@ -127,16 +128,19 @@ public class ScmConfig extends ReconfigurableConfig {
   )
   private Duration blockDeletionInterval = Duration.ofSeconds(60);
 
-  @Config(key = "init.default.layout.version",
-      defaultValue = "-1",
+  @Config(key = "hdds.scm.block.deletion.txn.dn.commit.map.limit",
+      defaultValue = "5000000",
       type = ConfigType.INT,
-      tags = { ConfigTag.SCM, ConfigTag.UPGRADE },
+      tags = { ConfigTag.SCM },
       description =
-          " Default Layout Version to init the SCM with. Intended to be used " +
-              "in tests to finalize from an older version of SCM to the " +
-              "latest. By default, SCM init uses the highest layout version."
+          " This value indicates the size of the transactionToDNsCommitMap after which" +
+              " we will skip one round of scm block deleting interval."
   )
-  private int defaultLayoutVersionOnInit = -1;
+  private int transactionToDNsCommitMapLimit = 5000000;
+
+  public int getTransactionToDNsCommitMapLimit() {
+    return transactionToDNsCommitMapLimit;
+  }
 
   public Duration getBlockDeletionInterval() {
     return blockDeletionInterval;
@@ -149,7 +153,6 @@ public class ScmConfig extends ReconfigurableConfig {
   public void setKerberosPrincipal(String kerberosPrincipal) {
     this.principal = kerberosPrincipal;
   }
-
 
   public void setKerberosKeytab(String kerberosKeytab) {
     this.keytab = kerberosKeytab;
@@ -195,10 +198,6 @@ public class ScmConfig extends ReconfigurableConfig {
     return blockDeletionLimit;
   }
 
-  public int getScmDefaultLayoutVersionOnInit() {
-    return defaultLayoutVersionOnInit;
-  }
-
   /**
    * Configuration strings class.
    * required for SCMSecurityProtocol where the KerberosInfo references
@@ -207,14 +206,7 @@ public class ScmConfig extends ReconfigurableConfig {
    * {@code @KerberosInfo(serverPrincipal = ScmConfigKeys.HDDS_SCM_KERBEROS_PRINCIPAL_KEY)}
    */
   public static class ConfigStrings {
-    public static final String HDDS_SCM_KERBEROS_PRINCIPAL_KEY =
-          "hdds.scm.kerberos.principal";
-    public static final String HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY =
-          "hdds.scm.kerberos.keytab.file";
-    public static final String HDDS_SCM_INIT_DEFAULT_LAYOUT_VERSION =
-        "hdds.scm.init.default.layout.version";
+    public static final String HDDS_SCM_KERBEROS_PRINCIPAL_KEY = "hdds.scm.kerberos.principal";
+    public static final String HDDS_SCM_KERBEROS_KEYTAB_FILE_KEY = "hdds.scm.kerberos.keytab.file";
   }
-
-  public static final String HDDS_SCM_UNKNOWN_CONTAINER_ACTION =
-      "hdds.scm.unknown-container.action";
 }

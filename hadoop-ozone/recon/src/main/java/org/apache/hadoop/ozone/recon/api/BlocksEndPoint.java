@@ -36,11 +36,10 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.recon.api.types.ContainerBlocksInfoWrapper;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
@@ -101,39 +100,24 @@ public class BlocksEndPoint {
     }
     Map<String, List<ContainerBlocksInfoWrapper>>
         containerStateBlockInfoListMap = new HashMap<>();
-    try (
-        Table<Long,
-            StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction>
-            deletedBlocksTXTable = DELETED_BLOCKS.getTable(this.scmDBStore);
-        TableIterator<Long, ? extends Table.KeyValue<Long,
-            StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction>>
-            deletedBlocksTableIterator = deletedBlocksTXTable.iterator()) {
+    try (Table.KeyValueIterator<Long, DeletedBlocksTransaction> i = DELETED_BLOCKS.getTable(scmDBStore).iterator()) {
       boolean skipPrevKey = false;
-      Long seekKey = prevKey;
       if (prevKey > 0) {
         skipPrevKey = true;
-        Table.KeyValue<Long,
-            StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction>
-            seekKeyValue =
-            deletedBlocksTableIterator.seek(seekKey);
+        final Table.KeyValue<Long, DeletedBlocksTransaction> seekKeyValue = i.seek(prevKey);
         // check if RocksDB was able to seek correctly to the given key prefix
         // if not, then return empty result
         if (seekKeyValue == null) {
           return Response.ok(containerStateBlockInfoListMap).build();
         }
       }
-      while (deletedBlocksTableIterator.hasNext()) {
-        Table.KeyValue<Long,
-            StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction>
-            kv = deletedBlocksTableIterator.next();
-        Long key = kv.getKey();
-        StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction
-            deletedBlocksTransaction =
-            kv.getValue();
+      while (i.hasNext()) {
+        final Table.KeyValue<Long, DeletedBlocksTransaction> kv = i.next();
         // skip the prev key if prev key is present
-        if (skipPrevKey && key.equals(prevKey)) {
+        if (skipPrevKey && kv.getKey().equals(prevKey)) {
           continue;
         }
+        final DeletedBlocksTransaction deletedBlocksTransaction = kv.getValue();
         long containerID = deletedBlocksTransaction.getContainerID();
         String containerState =
             containerManager.getContainer(ContainerID.valueOf(containerID))

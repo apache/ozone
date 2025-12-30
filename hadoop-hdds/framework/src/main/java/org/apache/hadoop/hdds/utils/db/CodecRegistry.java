@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
@@ -31,6 +30,9 @@ import org.apache.commons.lang3.ClassUtils;
  * This class is immutable.
  */
 public final class CodecRegistry {
+
+  private final CodecMap valueCodecs;
+
   /** To build {@link CodecRegistry}. */
   public static class Builder {
     private final Map<Class<?>, Codec<?>> codecs = new HashMap<>();
@@ -78,8 +80,6 @@ public final class CodecRegistry {
     }
   }
 
-  private final CodecMap valueCodecs;
-
   private CodecRegistry(Map<Class<?>, Codec<?>> valueCodecs) {
     this.valueCodecs = new CodecMap(valueCodecs);
   }
@@ -122,7 +122,7 @@ public final class CodecRegistry {
    * @return byte array to store it ini the kv store.
    */
   public <T> byte[] asRawData(T object) throws IOException {
-    Preconditions.checkNotNull(object,
+    Objects.requireNonNull(object,
         "Null value shouldn't be persisted in the database");
     Codec<T> codec = getCodec(object);
     return codec.toPersistedFormat(object);

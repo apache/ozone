@@ -55,7 +55,6 @@ public class TestReconLayoutVersionManager {
   private ReconLayoutVersionManager layoutVersionManager;
   private MockedStatic<ReconLayoutFeature> mockedEnum;
   private MockedStatic<ReconUpgradeAction.UpgradeActionType> mockedEnumUpgradeActionType;
-  private ReconStorageContainerManagerFacade scmFacadeMock;
   private DataSource mockDataSource;
   private Connection mockConnection;
 
@@ -80,15 +79,16 @@ public class TestReconLayoutVersionManager {
     when(feature2.getAction(ReconUpgradeAction.UpgradeActionType.FINALIZE))
         .thenReturn(Optional.of(action2));
 
+    // Common mocks for all tests
+    ReconStorageContainerManagerFacade scmFacadeMock = mock(ReconStorageContainerManagerFacade.class);
+    mockDataSource = mock(DataSource.class);
+    mockConnection = mock(Connection.class);
+
     // Define the custom features to be returned
     mockedEnum.when(ReconLayoutFeature::values).thenReturn(new ReconLayoutFeature[]{feature1, feature2});
 
-    layoutVersionManager = new ReconLayoutVersionManager(schemaVersionTableManager, mock(ReconContext.class));
-
-    // Common mocks for all tests
-    scmFacadeMock = mock(ReconStorageContainerManagerFacade.class);
-    mockDataSource = mock(DataSource.class);
-    mockConnection = mock(Connection.class);
+    layoutVersionManager = new ReconLayoutVersionManager(schemaVersionTableManager, mock(ReconContext.class),
+        mockDataSource);
 
     when(scmFacadeMock.getDataSource()).thenReturn(mockDataSource);
     when(mockDataSource.getConnection()).thenReturn(mockConnection);
@@ -125,7 +125,7 @@ public class TestReconLayoutVersionManager {
   @Test
   public void testFinalizeLayoutFeaturesWithMockedValues() throws SQLException {
     // Execute the method under test
-    layoutVersionManager.finalizeLayoutFeatures(scmFacadeMock);
+    layoutVersionManager.finalizeLayoutFeatures();
 
     // Verify that schema versions are updated for our custom features
     verify(schemaVersionTableManager, times(1))
@@ -160,7 +160,7 @@ public class TestReconLayoutVersionManager {
     mockedEnum.when(ReconLayoutFeature::values).thenReturn(new ReconLayoutFeature[]{});
 
     // Execute the method under test
-    layoutVersionManager.finalizeLayoutFeatures(scmFacadeMock);
+    layoutVersionManager.finalizeLayoutFeatures();
 
     // Verify that no schema version updates were attempted
     verify(schemaVersionTableManager, never()).updateSchemaVersion(anyInt(), any(Connection.class));
@@ -181,7 +181,7 @@ public class TestReconLayoutVersionManager {
     ReconUpgradeAction action1 = mock(ReconUpgradeAction.class);
 
     // Simulate an exception being thrown during the upgrade action execution
-    doThrow(new RuntimeException("Upgrade failed")).when(action1).execute(scmFacadeMock);
+    doThrow(new RuntimeException("Upgrade failed")).when(action1).execute(mockDataSource);
     when(feature1.getAction(ReconUpgradeAction.UpgradeActionType.FINALIZE))
         .thenReturn(Optional.of(action1));
 
@@ -190,7 +190,7 @@ public class TestReconLayoutVersionManager {
 
     // Execute the layout feature finalization
     try {
-      layoutVersionManager.finalizeLayoutFeatures(scmFacadeMock);
+      layoutVersionManager.finalizeLayoutFeatures();
     } catch (Exception e) {
       // Exception is expected, so it's fine to catch and ignore it here
     }
@@ -228,7 +228,7 @@ public class TestReconLayoutVersionManager {
 
     // Execute the layout feature finalization
     try {
-      layoutVersionManager.finalizeLayoutFeatures(scmFacadeMock);
+      layoutVersionManager.finalizeLayoutFeatures();
     } catch (Exception e) {
       // Exception is expected, so it's fine to catch and ignore it here
     }
@@ -272,13 +272,13 @@ public class TestReconLayoutVersionManager {
     mockedEnum.when(ReconLayoutFeature::values).thenReturn(new ReconLayoutFeature[]{feature2, feature3, feature1});
 
     // Execute the layout feature finalization
-    layoutVersionManager.finalizeLayoutFeatures(scmFacadeMock);
+    layoutVersionManager.finalizeLayoutFeatures();
 
     // Verify that the actions were executed in the correct order using InOrder
     InOrder inOrder = inOrder(action1, action2, action3);
-    inOrder.verify(action1).execute(scmFacadeMock); // Should be executed first
-    inOrder.verify(action2).execute(scmFacadeMock); // Should be executed second
-    inOrder.verify(action3).execute(scmFacadeMock); // Should be executed third
+    inOrder.verify(action1).execute(mockDataSource); // Should be executed first
+    inOrder.verify(action2).execute(mockDataSource); // Should be executed second
+    inOrder.verify(action3).execute(mockDataSource); // Should be executed third
   }
 
   /**
@@ -293,7 +293,7 @@ public class TestReconLayoutVersionManager {
     mockedEnum.when(ReconLayoutFeature::values).thenReturn(new ReconLayoutFeature[]{});
 
     // Execute the method under test
-    layoutVersionManager.finalizeLayoutFeatures(scmFacadeMock);
+    layoutVersionManager.finalizeLayoutFeatures();
 
     // Verify that no schema version updates were attempted
     verify(schemaVersionTableManager, never()).updateSchemaVersion(anyInt(), eq(mockConnection));
@@ -326,7 +326,7 @@ public class TestReconLayoutVersionManager {
     mockedEnum.when(ReconLayoutFeature::values).thenReturn(new ReconLayoutFeature[]{feature1, feature2});
 
     // Finalize the first two features.
-    layoutVersionManager.finalizeLayoutFeatures(scmFacadeMock);
+    layoutVersionManager.finalizeLayoutFeatures();
 
     // Verify that the schema versions for the first two features were updated
     verify(schemaVersionTableManager, times(1)).updateSchemaVersion(1, mockConnection);
@@ -345,17 +345,17 @@ public class TestReconLayoutVersionManager {
     when(schemaVersionTableManager.getCurrentSchemaVersion()).thenReturn(2);
 
     // Finalize again, but only feature 3 should be finalized.
-    layoutVersionManager.finalizeLayoutFeatures(scmFacadeMock);
+    layoutVersionManager.finalizeLayoutFeatures();
 
     // Verify that the schema version for feature 3 was updated
     verify(schemaVersionTableManager, times(1)).updateSchemaVersion(3, mockConnection);
 
     // Verify that action1 and action2 were not executed again.
-    verify(action1, times(1)).execute(scmFacadeMock);
-    verify(action2, times(1)).execute(scmFacadeMock);
+    verify(action1, times(1)).execute(mockDataSource);
+    verify(action2, times(1)).execute(mockDataSource);
 
     // Verify that the upgrade action for feature 3 was executed.
-    verify(action3, times(1)).execute(scmFacadeMock);
+    verify(action3, times(1)).execute(mockDataSource);
   }
 
 }

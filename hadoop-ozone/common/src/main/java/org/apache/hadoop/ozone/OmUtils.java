@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone;
 import static org.apache.hadoop.hdds.HddsUtils.getHostName;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
+import static org.apache.hadoop.ozone.OzoneConsts.DOUBLE_SLASH_OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
@@ -33,6 +34,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_BIND_HOST_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_BIND_PORT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_LISTENER_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_PORT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
@@ -84,7 +86,7 @@ import org.slf4j.LoggerFactory;
  * communication.
  */
 public final class OmUtils {
-  public static final Logger LOG = LoggerFactory.getLogger(OmUtils.class);
+  private static final Logger LOG = LoggerFactory.getLogger(OmUtils.class);
   private static final SecureRandom SRAND = new SecureRandom();
   private static byte[] randomBytes = new byte[32];
 
@@ -273,6 +275,8 @@ public final class OmUtils {
     case TransferLeadership:
     case SetSafeMode:
     case PrintCompactionLogDag:
+      // printCompactionLogDag is deprecated by HDDS-12053,
+      // keeping it here for compatibility
     case GetSnapshotInfo:
     case GetObjectTagging:
     case GetQuotaRepairStatus:
@@ -383,6 +387,22 @@ public final class OmUtils {
   }
 
   /**
+   * Returns active OM node IDs that are not listener nodes for the given service
+   * ID.
+   *
+   * @param conf        Configuration source
+   * @param omServiceId OM service ID
+   * @return Collection of active non-listener node IDs
+   */
+  public static Collection<String> getActiveNonListenerOMNodeIds(
+      ConfigurationSource conf, String omServiceId) {
+    Collection<String> nodeIds = getActiveOMNodeIds(conf, omServiceId);
+    Collection<String> listenerNodeIds = getListenerOMNodeIds(conf, omServiceId);
+    nodeIds.removeAll(listenerNodeIds);
+    return nodeIds;
+  }
+
+  /**
    * Returns a collection of configured nodeId's that are to be decommissioned.
    * Aggregate results from both config keys - with and without serviceId
    * suffix. If ozone.om.service.ids contains a single service ID, then a config
@@ -402,6 +422,17 @@ public final class OmUtils {
           conf.getTrimmedStringCollection(OZONE_OM_DECOMMISSIONED_NODES_KEY));
     }
     return decommissionedNodeIds;
+  }
+
+  /**
+   * Get a collection of listener omNodeIds for the given omServiceId.
+   */
+  public static Collection<String> getListenerOMNodeIds(ConfigurationSource conf,
+      String omServiceId) {
+    String listenerNodesKey = ConfUtils.addKeySuffixes(
+        OZONE_OM_LISTENER_NODES_KEY, omServiceId);
+    return conf.getTrimmedStringCollection(
+        listenerNodesKey);
   }
 
   /**
@@ -505,6 +536,7 @@ public final class OmUtils {
    * repeatedOmKeyInfo instance.
    * 3. Set the updateID to the transactionLogIndex.
    * @param keyInfo args supplied by client
+   * @param bucketId bucket id
    * @param trxnLogIndex For Multipart keys, this is the transactionLogIndex
    *                     of the MultipartUploadAbort request which needs to
    *                     be set as the updateID of the partKeyInfos.
@@ -512,25 +544,27 @@ public final class OmUtils {
    *                     the same updateID as is in keyInfo.
    * @return {@link RepeatedOmKeyInfo}
    */
-  public static RepeatedOmKeyInfo prepareKeyForDelete(OmKeyInfo keyInfo,
+  public static RepeatedOmKeyInfo prepareKeyForDelete(long bucketId, OmKeyInfo keyInfo,
       long trxnLogIndex) {
+    OmKeyInfo.Builder builder = keyInfo.toBuilder();
     // If this key is in a GDPR enforced bucket, then before moving
     // KeyInfo to deletedTable, remove the GDPR related metadata and
     // FileEncryptionInfo from KeyInfo.
     if (Boolean.parseBoolean(
             keyInfo.getMetadata().get(OzoneConsts.GDPR_FLAG))
     ) {
-      keyInfo.getMetadata().remove(OzoneConsts.GDPR_FLAG);
-      keyInfo.getMetadata().remove(OzoneConsts.GDPR_ALGORITHM);
-      keyInfo.getMetadata().remove(OzoneConsts.GDPR_SECRET);
-      keyInfo.clearFileEncryptionInfo();
+      builder.metadata().remove(OzoneConsts.GDPR_FLAG);
+      builder.metadata().remove(OzoneConsts.GDPR_ALGORITHM);
+      builder.metadata().remove(OzoneConsts.GDPR_SECRET);
+    
+      builder.setFileEncryptionInfo(null);
     }
 
     // Set the updateID
-    keyInfo.setUpdateID(trxnLogIndex);
+    builder.setUpdateID(trxnLogIndex);
 
     //The key doesn't exist in deletedTable, so create a new instance.
-    return new RepeatedOmKeyInfo(keyInfo);
+    return new RepeatedOmKeyInfo(builder.build(), bucketId);
   }
 
   /**
@@ -541,7 +575,7 @@ public final class OmUtils {
     try {
       HddsClientUtils.verifyResourceName(volumeName, "volume", isStrictS3);
     } catch (IllegalArgumentException e) {
-      throw new OMException("Invalid volume name: " + volumeName,
+      throw new OMException(e.getMessage(),
           OMException.ResultCodes.INVALID_VOLUME_NAME);
     }
   }
@@ -554,7 +588,7 @@ public final class OmUtils {
     try {
       HddsClientUtils.verifyResourceName(bucketName, "bucket", isStrictS3);
     } catch (IllegalArgumentException e) {
-      throw new OMException("Invalid bucket name: " + bucketName,
+      throw new OMException(e.getMessage(),
           OMException.ResultCodes.INVALID_BUCKET_NAME);
     }
   }
@@ -765,7 +799,7 @@ public final class OmUtils {
     if (!StringUtils.isBlank(keyName)) {
       String normalizedKeyName;
       if (keyName.startsWith(OM_KEY_PREFIX)) {
-        normalizedKeyName = new Path(keyName).toUri().getPath();
+        normalizedKeyName = new Path(normalizeLeadingSlashes(keyName)).toUri().getPath();
       } else {
         normalizedKeyName = new Path(OM_KEY_PREFIX + keyName)
             .toUri().getPath();
@@ -780,6 +814,20 @@ public final class OmUtils {
       return normalizedKeyName.substring(1);
     }
 
+    return keyName;
+  }
+
+  /**
+   * Normalizes paths by replacing multiple leading slashes with a single slash.
+   */
+  private static String normalizeLeadingSlashes(String keyName) {
+    if (keyName.startsWith(DOUBLE_SLASH_OM_KEY_PREFIX)) {
+      int index = 0;
+      while (index < keyName.length() && keyName.charAt(index) == OM_KEY_PREFIX.charAt(0)) {
+        index++;
+      }
+      return OM_KEY_PREFIX + keyName.substring(index);
+    }
     return keyName;
   }
 
@@ -824,7 +872,6 @@ public final class OmUtils {
     return normalizedPath.toString();
   }
 
-
   /**
    * For a given service ID, return list of configured OM hosts.
    * @param conf configuration
@@ -862,6 +909,9 @@ public final class OmUtils {
     Collection<String> decommissionedNodeIds = getDecommissionedNodeIds(conf,
             ConfUtils.addKeySuffixes(OZONE_OM_DECOMMISSIONED_NODES_KEY,
                     omServiceId));
+    Collection<String> listenerNodeIds = conf.getTrimmedStringCollection(
+        ConfUtils.addKeySuffixes(OZONE_OM_LISTENER_NODES_KEY,
+            omServiceId));
     if (omNodeIds.isEmpty()) {
       // If there are no nodeIds present, return empty list
       return Collections.emptyList();
@@ -879,6 +929,9 @@ public final class OmUtils {
         }
         if (decommissionedNodeIds.contains(omNodeDetails.getNodeId())) {
           omNodeDetails.setDecommissioningState();
+        }
+        if (listenerNodeIds.contains(omNodeDetails.getNodeId())) {
+          omNodeDetails.setRatisListener();
         }
         omNodesList.add(omNodeDetails);
       } catch (IOException e) {
@@ -910,10 +963,10 @@ public final class OmUtils {
     }
     printString.append(omList.get(0).getOMPrintInfo());
     for (int i = 1; i < omList.size(); i++) {
-      printString.append(",")
+      printString.append(',')
           .append(omList.get(i).getOMPrintInfo());
     }
-    printString.append("]");
+    printString.append(']');
     return printString.toString();
   }
 

@@ -17,12 +17,14 @@
 
 package org.apache.hadoop.ozone.debug.replicas;
 
-import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 
 /**
- * Functional interface for implementing a key verifier.
+ * Functional interface for implementing a block verifier.
  */
-@FunctionalInterface
 public interface ReplicaVerifier {
-  void verifyKey(OzoneKeyDetails keyDetails);
+  BlockVerificationResult verifyBlock(DatanodeDetails datanode, OmKeyLocationInfo keyLocation);
+
+  String getType();
 }

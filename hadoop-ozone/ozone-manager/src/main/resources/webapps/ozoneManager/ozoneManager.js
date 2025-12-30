@@ -115,6 +115,28 @@
         },
         controller: function ($http) {
             var ctrl = this;
+            ctrl.Date = Date;
+
+            ctrl.formatBytes = function(bytes, decimals) {
+               if(bytes == 0) return '0 Bytes';
+               var k = 1024, // or 1024 for binary
+                   dm = decimals + 1 || 3,
+                   sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'],
+                   i = Math.floor(Math.log(bytes) / Math.log(k));
+               return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+            }
+
+            ctrl.convertMsToTime = function(ms) {
+              let seconds = (ms / 1000).toFixed(1);
+              let minutes = (ms / (1000 * 60)).toFixed(1);
+              let hours = (ms / (1000 * 60 * 60)).toFixed(1);
+              let days = (ms / (1000 * 60 * 60 * 24)).toFixed(1);
+              if (seconds < 60) return seconds + " Seconds";
+              else if (minutes < 60) return minutes + " Minutes";
+              else if (hours < 24) return hours + " Hours";
+              else return days + " Days"
+            };
+
             $http.get("jmx?qry=Ratis:service=RaftServer,group=*,id=*")
                 .then(function (result) {
                     ctrl.role = result.data.beans[0];
@@ -129,19 +151,18 @@
                 .then(function (result) {
                     ctrl.elapsedTime = result.data.beans[0];
                     if(ctrl.elapsedTime.Value != -1){
-                        ctrl.elapsedTime.Value = convertMsToTime(ctrl.elapsedTime.Value);
+                        ctrl.elapsedTime.Value = ctrl.convertMsToTime(ctrl.elapsedTime.Value);
+                    }
+                });
+
+            // Add JMX query to fetch DeletingServiceMetrics data
+            $http.get("jmx?qry=Hadoop:service=OzoneManager,name=DeletingServiceMetrics")
+                .then(function (result) {
+                    if (result.data.beans && result.data.beans.length > 0) {
+                        // Merge the DeletingServiceMetrics data into the existing overview.jmx object
+                        ctrl.overview.jmx = {...ctrl.overview.jmx, ...result.data.beans[0]};
                     }
                 });
         }
     });
-        function convertMsToTime(ms) {
-          let seconds = (ms / 1000).toFixed(1);
-          let minutes = (ms / (1000 * 60)).toFixed(1);
-          let hours = (ms / (1000 * 60 * 60)).toFixed(1);
-          let days = (ms / (1000 * 60 * 60 * 24)).toFixed(1);
-          if (seconds < 60) return seconds + " Seconds";
-          else if (minutes < 60) return minutes + " Minutes";
-          else if (hours < 24) return hours + " Hours";
-          else return days + " Days"
-        }
 })();

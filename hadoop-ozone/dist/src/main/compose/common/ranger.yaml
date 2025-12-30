@@ -1,0 +1,51 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Apache Ranger
+#
+# This requires Apache Ranger source to be available in $RANGER_SOURCE_DIR.
+
+services:
+  ranger-db:
+    image: ${RANGER_DB_IMAGE}:${RANGER_DB_IMAGE_VERSION}
+    hostname: ranger-db
+    dns_search: .
+    environment:
+      POSTGRES_PASSWORD: "rangerR0cks!"
+    volumes:
+      - ${RANGER_SOURCE_DIR}/dev-support/ranger-docker/config/init_postgres.sh:/docker-entrypoint-initdb.d/init_postgres.sh
+    healthcheck:
+      test: 'su -c "pg_isready -q" postgres'
+      interval: 10s
+      timeout: 2s
+      retries: 30
+
+  ranger:
+    image: ${RANGER_IMAGE}:${RANGER_IMAGE_VERSION}
+    hostname: ranger
+    dns_search: .
+    ports:
+      - 6080:6080
+    depends_on:
+      ranger-db:
+        condition: service_healthy
+    environment:
+      RANGER_DB_TYPE: postgres
+      RANGER_VERSION:
+    healthcheck:
+      test: 'grep "Successfully retrieved .*dev_ozone" /var/log/ranger/ranger-admin*log'
+      interval: 2s
+      retries: 60

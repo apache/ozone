@@ -19,15 +19,16 @@ package org.apache.hadoop.hdds.scm.server;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
@@ -36,7 +37,6 @@ import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -134,8 +134,7 @@ public final class SCMCertStore implements CertificateStore {
       BatchOperation batchOperation, Table<BigInteger,
       X509Certificate> certTable) throws IOException {
     List<X509Certificate> removedCerts = new ArrayList<>();
-    try (TableIterator<BigInteger, ? extends Table.KeyValue<BigInteger,
-        X509Certificate>> certsIterator = certTable.iterator()) {
+    try (Table.KeyValueIterator<BigInteger, X509Certificate> certsIterator = certTable.iterator()) {
       Date now = new Date();
       while (certsIterator.hasNext()) {
         Table.KeyValue<BigInteger, X509Certificate> certEntry =
@@ -160,27 +159,18 @@ public final class SCMCertStore implements CertificateStore {
   public List<X509Certificate> listCertificate(NodeType role,
       BigInteger startSerialID, int count)
       throws IOException {
-    List<X509Certificate> results = new ArrayList<>();
-    String errorMessage = "Fail to list certificate from SCM metadata store";
-    Preconditions.checkNotNull(startSerialID);
+    Objects.requireNonNull(startSerialID, "startSerialID == null");
 
     if (startSerialID.longValue() == 0) {
       startSerialID = null;
     }
 
-    for (Table.KeyValue<BigInteger, X509Certificate> kv : getValidCertTableList(role, startSerialID, count)) {
-      try {
-        X509Certificate cert = kv.getValue();
-        results.add(cert);
-      } catch (IOException e) {
-        LOG.error(errorMessage, e);
-        throw new SCMSecurityException(errorMessage);
-      }
-    }
-    return results;
+    return getValidCertTableList(role, startSerialID, count).stream()
+        .map(Table.KeyValue::getValue)
+        .collect(Collectors.toList());
   }
 
-  private List<? extends Table.KeyValue<BigInteger, X509Certificate>>
+  private List<Table.KeyValue<BigInteger, X509Certificate>>
       getValidCertTableList(NodeType role, BigInteger startSerialID, int count)
       throws IOException {
     // Implemented for role SCM and CertType VALID_CERTS.
@@ -212,7 +202,6 @@ public final class SCMCertStore implements CertificateStore {
 
     private SCMMetadataStore metadataStore;
     private SCMRatisServer scmRatisServer;
-
 
     public Builder setMetadaStore(SCMMetadataStore scmMetadataStore) {
       this.metadataStore = scmMetadataStore;

@@ -72,6 +72,8 @@ import org.junit.jupiter.params.provider.CsvSource;
  */
 public class TestOMKeyCommitRequest extends TestOMKeyRequest {
 
+  private static final int DEFAULT_COMMIT_BLOCK_SIZE = 5;
+
   private String parentDir;
 
   @Test
@@ -235,15 +237,13 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
             .map(OmKeyLocationInfo::getFromProtobuf)
             .collect(Collectors.toList());
 
+    List<OzoneAcl> acls = Collections.singletonList(OzoneAcl.parseAcl("user:foo:rw"));
     OmKeyInfo.Builder omKeyInfoBuilder = OMRequestTestUtils.createOmKeyInfo(
         volumeName, bucketName, keyName, replicationConfig, new OmKeyLocationInfoGroup(version, new ArrayList<>()));
     omKeyInfoBuilder.setExpectedDataGeneration(1L);
-    OmKeyInfo omKeyInfo = omKeyInfoBuilder.build();
-    omKeyInfo.appendNewBlocks(allocatedLocationList, false);
-    List<OzoneAcl> acls = Collections.singletonList(OzoneAcl.parseAcl("user:foo:rw"));
-    omKeyInfo.addAcl(acls.get(0));
+    omKeyInfoBuilder.addAcl(acls.get(0));
 
-    String openKey = addKeyToOpenKeyTable(allocatedLocationList, omKeyInfo);
+    String openKey = addKeyToOpenKeyTable(allocatedLocationList, omKeyInfoBuilder);
     OmKeyInfo openKeyInfo = openKeyTable.get(openKey);
     assertNotNull(openKeyInfo);
     assertEquals(acls, openKeyInfo.getAcls());
@@ -283,15 +283,15 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
   public void testValidateAndUpdateCacheWithUncommittedBlocks()
       throws Exception {
 
-    // allocated block list
+    // Allocated block list (5 blocks)
     List<KeyLocation> allocatedKeyLocationList = getKeyLocation(5);
 
     List<OmKeyLocationInfo> allocatedBlockList = allocatedKeyLocationList
         .stream().map(OmKeyLocationInfo::getFromProtobuf)
         .collect(Collectors.toList());
 
-    // committed block list, with three blocks different with the allocated
-    List<KeyLocation> committedKeyLocationList = getKeyLocation(3);
+    // Commit only the first 3 allocated blocks
+    List<KeyLocation> committedKeyLocationList = allocatedKeyLocationList.subList(0, 3);
 
     OMRequest modifiedOmRequest = doPreExecute(createCommitKeyRequest(
         committedKeyLocationList, false));
@@ -330,7 +330,8 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     // This is the first time to commit key, only the allocated but uncommitted
     // blocks should be deleted.
     assertEquals(1, toDeleteKeyList.size());
-    assertEquals(2, toDeleteKeyList.values().stream()
+    assertEquals(allocatedKeyLocationList.size() - committedKeyLocationList.size(),
+        toDeleteKeyList.values().stream()
         .findFirst().get().cloneOmKeyInfoList().get(0).getKeyLocationVersions()
         .get(0).getLocationList().size());
 
@@ -635,9 +636,11 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
 
   @Test
   public void testValidateAndUpdateCacheOnOverwrite() throws Exception {
+    testValidateAndUpdateCache();
+
+    // This is used to generate the pseudo object ID for the suffix in deletedTable for uniqueness
     when(ozoneManager.getObjectIdFromTxId(anyLong())).thenAnswer(tx ->
         OmUtils.getObjectIdFromTxId(2, tx.getArgument(0)));
-    testValidateAndUpdateCache();
 
     // Become a new client and set next version number
     clientID = Time.now();
@@ -709,6 +712,108 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     assertThat(key).doesNotEndWith(String.valueOf(omKeyInfoList.get(0).getObjectID()));
   }
 
+  @Test
+  public void testValidateAndUpdateCacheOnOverwriteWithUncommittedBlocks() throws Exception {
+    // Do a normal commit key (this will allocate 5 blocks
+    testValidateAndUpdateCache();
+
+    // This is used to generate the pseudo object ID for the suffix in deletedTable for uniqueness
+    when(ozoneManager.getObjectIdFromTxId(anyLong())).thenAnswer(tx ->
+        OmUtils.getObjectIdFromTxId(2, tx.getArgument(0)));
+
+    // Prepare the key to overwrite
+    // Become a new client and set next version number
+    clientID = Time.now();
+    version += 1;
+
+    String ozoneKey = getOzonePathKey();
+    // Previous key should be there in key table, as validateAndUpdateCache is called.
+    OmKeyInfo originalKeyInfo =
+        omMetadataManager.getKeyTable(getBucketLayout())
+            .get(ozoneKey);
+
+    assertNotNull(originalKeyInfo);
+    // Previously committed version
+    assertEquals(0L, originalKeyInfo.getLatestVersionLocations().getVersion());
+
+    // Allocate the subsequent 5 blocks (this should not include the initial 5 blocks from the original key)
+    List<KeyLocation> allocatedKeyLocationList = getKeyLocation(10).subList(5, 10);
+
+    List<OmKeyLocationInfo> allocatedBlockList = allocatedKeyLocationList
+        .stream().map(OmKeyLocationInfo::getFromProtobuf)
+        .collect(Collectors.toList());
+
+    // Commit only the first 3 allocated blocks (the other 2 blocks are uncommitted)
+    List<KeyLocation> committedKeyLocationList = allocatedKeyLocationList.subList(0, 3);
+
+    List<OmKeyLocationInfo> committedBlockList = committedKeyLocationList
+        .stream().map(OmKeyLocationInfo::getFromProtobuf)
+        .collect(Collectors.toList());
+
+    OMRequest modifiedOmRequest = doPreExecute(createCommitKeyRequest(committedKeyLocationList, false));
+
+    OMKeyCommitRequest omKeyCommitRequest = getOmKeyCommitRequest(modifiedOmRequest);
+
+    addKeyToOpenKeyTable(allocatedBlockList);
+
+    OMClientResponse omClientResponse =
+        omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 102L);
+
+    assertEquals(OK, omClientResponse.getOMResponse().getStatus());
+
+    // New entry should be created in key Table.
+    OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(omKeyCommitRequest.getBucketLayout()).get(ozoneKey);
+
+    assertNotNull(omKeyInfo);
+    assertEquals(version, omKeyInfo.getLatestVersionLocations().getVersion());
+    // DB keyInfo format
+    verifyKeyName(omKeyInfo);
+
+    // Check modification time
+    CommitKeyRequest commitKeyRequest = modifiedOmRequest.getCommitKeyRequest();
+    assertEquals(commitKeyRequest.getKeyArgs().getModificationTime(), omKeyInfo.getModificationTime());
+
+    // Check block location.
+    List<OmKeyLocationInfo> locationInfoListFromCommitKeyRequest =
+        commitKeyRequest.getKeyArgs().getKeyLocationsList().stream().map(OmKeyLocationInfo::getFromProtobuf)
+            .collect(Collectors.toList());
+
+    assertEquals(locationInfoListFromCommitKeyRequest, omKeyInfo.getLatestVersionLocations().getLocationList());
+    assertEquals(committedBlockList, omKeyInfo.getLatestVersionLocations().getLocationList());
+    assertEquals(1, omKeyInfo.getKeyLocationVersions().size());
+
+    Map<String, RepeatedOmKeyInfo> toDeleteKeyList
+        = ((OMKeyCommitResponse) omClientResponse).getKeysToDelete();
+
+    // Both the overwritten key and the uncommitted blocks should be deleted
+    // Both uses the same key (unlike MPU part commit request)
+    assertEquals(1, toDeleteKeyList.size());
+    List<OmKeyInfo> keysToDelete = toDeleteKeyList.values().stream()
+        .findFirst().get().cloneOmKeyInfoList();
+    assertEquals(2, keysToDelete.size());
+    OmKeyInfo overwrittenKey = keysToDelete.get(0);
+    OmKeyInfo uncommittedPseudoKey = keysToDelete.get(1);
+    assertEquals(DEFAULT_COMMIT_BLOCK_SIZE, overwrittenKey.getLatestVersionLocations().getLocationList().size());
+    assertEquals(allocatedKeyLocationList.size() - committedKeyLocationList.size(),
+        uncommittedPseudoKey.getLatestVersionLocations().getLocationList().size());
+
+    // flush response content to db
+    BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation();
+    ((OMKeyCommitResponse) omClientResponse).addToDBBatch(omMetadataManager, batchOperation);
+    omMetadataManager.getStore().commitBatchOperation(batchOperation);
+
+    // verify deleted keys are stored in the deletedTable
+    String deletedKey = omMetadataManager.getOzoneKey(volumeName, omKeyInfo.getBucketName(), keyName);
+    List<? extends Table.KeyValue<String, RepeatedOmKeyInfo>> rangeKVs
+        = omMetadataManager.getDeletedTable().getRangeKVs(null, 100, deletedKey);
+    assertThat(rangeKVs.size()).isGreaterThan(0);
+    Table.KeyValue<String, RepeatedOmKeyInfo> keyValue = rangeKVs.get(0);
+    String key = keyValue.getKey();
+    List<OmKeyInfo> omKeyInfoList = keyValue.getValue().getOmKeyInfoList();
+    assertEquals(2, omKeyInfoList.size());
+    assertThat(key).doesNotEndWith(String.valueOf(omKeyInfoList.get(0).getObjectID()));
+  }
+
   /**
    * This method calls preExecute and verify the modified request.
    * @param originalOMRequest
@@ -763,7 +868,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
   }
 
   private OMRequest createCommitKeyRequest(boolean isHsync) {
-    return createCommitKeyRequest(getKeyLocation(5), isHsync);
+    return createCommitKeyRequest(getKeyLocation(DEFAULT_COMMIT_BLOCK_SIZE), isHsync);
   }
 
   /**
@@ -828,7 +933,10 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
   }
 
   @Nonnull
-  protected String addKeyToOpenKeyTable(List<OmKeyLocationInfo> locationList, OmKeyInfo keyInfo) throws Exception {
+  protected String addKeyToOpenKeyTable(List<OmKeyLocationInfo> locationList, OmKeyInfo.Builder keyInfoBuilder)
+      throws Exception {
+    OmKeyInfo keyInfo = keyInfoBuilder.build();
+    keyInfo.appendNewBlocks(locationList, false);
     OMRequestTestUtils.addKeyToTable(true, false, keyInfo, clientID, 0, omMetadataManager);
 
     return omMetadataManager.getOpenKey(volumeName, bucketName,

@@ -41,7 +41,7 @@ public class TestChunkStreams {
 
   @Test
   public void testReadGroupInputStream() throws Exception {
-    String dataString = RandomStringUtils.randomAscii(500);
+    String dataString = RandomStringUtils.secure().nextAscii(500);
     try (KeyInputStream groupInputStream =
              new KeyInputStream("key", createInputStreams(dataString))) {
 
@@ -55,7 +55,7 @@ public class TestChunkStreams {
 
   @Test
   public void testErrorReadGroupInputStream() throws Exception {
-    String dataString = RandomStringUtils.randomAscii(500);
+    String dataString = RandomStringUtils.secure().nextAscii(500);
     try (KeyInputStream groupInputStream =
              new KeyInputStream("key", createInputStreams(dataString))) {
       byte[] resBuf = new byte[600];

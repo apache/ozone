@@ -42,12 +42,12 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.ipc.RemoteException;
+import org.apache.hadoop.ipc_.RemoteException;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -68,12 +68,10 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Base class for Ozone Manager HA tests.
  */
-@Timeout(300)
 public abstract class TestOzoneManagerHA {
 
   private static MiniOzoneHAClusterImpl cluster = null;
@@ -88,7 +86,6 @@ public abstract class TestOzoneManagerHA {
   private static final long SNAPSHOT_THRESHOLD = 50;
   private static final Duration RETRY_CACHE_DURATION = Duration.ofSeconds(30);
   private static OzoneClient client;
-
 
   public MiniOzoneHAClusterImpl getCluster() {
     return cluster;
@@ -130,13 +127,6 @@ public abstract class TestOzoneManagerHA {
     return RETRY_CACHE_DURATION;
   }
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
@@ -183,9 +173,6 @@ public abstract class TestOzoneManagerHA {
     objectStore = client.getObjectStore();
   }
 
-  /**
-   * Shutdown MiniDFSCluster after all tests of a class have run.
-   */
   @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);
@@ -200,13 +187,13 @@ public abstract class TestOzoneManagerHA {
    * @return the key name.
    */
   public static String createKey(OzoneBucket ozoneBucket) throws IOException {
-    String keyName = "key" + RandomStringUtils.randomNumeric(5);
+    String keyName = "key" + RandomStringUtils.secure().nextNumeric(5);
     createKey(ozoneBucket, keyName);
     return keyName;
   }
 
   public static void createKey(OzoneBucket ozoneBucket, String keyName) throws IOException {
-    String data = "data" + RandomStringUtils.randomNumeric(5);
+    String data = "data" + RandomStringUtils.secure().nextNumeric(5);
     OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(keyName, data.length(), ReplicationType.RATIS,
         ReplicationFactor.ONE, new HashMap<>());
     ozoneOutputStream.write(data.getBytes(UTF_8), 0, data.length());
@@ -214,7 +201,7 @@ public abstract class TestOzoneManagerHA {
   }
 
   public static String createPrefixName() {
-    return "prefix" + RandomStringUtils.randomNumeric(5) + OZONE_URI_DELIMITER;
+    return "prefix" + RandomStringUtils.secure().nextNumeric(5) + OZONE_URI_DELIMITER;
   }
 
   public static void createPrefix(OzoneObj prefixObj) throws IOException {
@@ -222,8 +209,8 @@ public abstract class TestOzoneManagerHA {
   }
 
   protected OzoneBucket setupBucket() throws Exception {
-    String userName = "user" + RandomStringUtils.randomNumeric(5);
-    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
+    String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
+    String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
     String volumeName = "volume" + UUID.randomUUID();
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
@@ -250,9 +237,9 @@ public abstract class TestOzoneManagerHA {
   }
 
   protected OzoneBucket linkBucket(OzoneBucket srcBuk) throws Exception {
-    String userName = "user" + RandomStringUtils.randomNumeric(5);
-    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
-    String linkedVolName = "volume-link-" + RandomStringUtils.randomNumeric(5);
+    String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
+    String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
+    String linkedVolName = "volume-link-" + RandomStringUtils.secure().nextNumeric(5);
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)
@@ -304,9 +291,9 @@ public abstract class TestOzoneManagerHA {
    * Create a volume and test its attribute.
    */
   protected void createVolumeTest(boolean checkSuccess) throws Exception {
-    String userName = "user" + RandomStringUtils.randomNumeric(5);
-    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+    String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
+    String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)
@@ -378,7 +365,7 @@ public abstract class TestOzoneManagerHA {
 
     try (OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName)) {
       byte[] fileContent = new byte[data.getBytes(UTF_8).length];
-      ozoneInputStream.read(fileContent);
+      IOUtils.readFully(ozoneInputStream, fileContent);
       assertEquals(data, new String(fileContent, UTF_8));
     }
 
@@ -394,9 +381,9 @@ public abstract class TestOzoneManagerHA {
   }
 
   protected void createKeyTest(boolean checkSuccess) throws Exception {
-    String userName = "user" + RandomStringUtils.randomNumeric(5);
-    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+    String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
+    String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)
@@ -430,7 +417,7 @@ public abstract class TestOzoneManagerHA {
 
       try (OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName)) {
         byte[] fileContent = new byte[value.getBytes(UTF_8).length];
-        ozoneInputStream.read(fileContent);
+        IOUtils.readFully(ozoneInputStream, fileContent);
         assertEquals(value, new String(fileContent, UTF_8));
       }
 

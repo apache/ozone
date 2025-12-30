@@ -39,6 +39,7 @@ public interface PlacementPolicy {
             favoredNodes, nodesRequired, metadataSizeRequired,
             dataSizeRequired);
   }
+
   /**
    * Given an initial set of datanodes and the size required,
    * return set of datanodes that satisfy the nodes and size requirement.

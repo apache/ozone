@@ -21,14 +21,12 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.helpers.OzoneAclUtil.getDefaultAclList;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -47,6 +45,7 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
+import org.apache.hadoop.ozone.om.helpers.AclListBuilder;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -54,7 +53,6 @@ import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
-import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -67,6 +65,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateB
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.util.Time;
@@ -83,8 +82,11 @@ public class OMBucketCreateRequest extends OMClientRequest {
   public OMBucketCreateRequest(OMRequest omRequest) {
     super(omRequest);
   }
+
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+
+    super.preExecute(ozoneManager);
 
     // Get original request.
     CreateBucketRequest createBucketRequest =
@@ -93,6 +95,22 @@ public class OMBucketCreateRequest extends OMClientRequest {
     // Verify resource name
     OmUtils.validateBucketName(bucketInfo.getBucketName(),
         ozoneManager.isStrictS3());
+
+    // ACL check during preExecute
+    if (ozoneManager.getAclsEnabled()) {
+      try {
+        checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
+            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE,
+            bucketInfo.getVolumeName(), bucketInfo.getBucketName(), null);
+      } catch (IOException ex) {
+        // Ensure audit log captures preExecute failures
+        markForAudit(ozoneManager.getAuditLogger(),
+            buildAuditMessage(OMAction.CREATE_BUCKET,
+                buildVolumeAuditMap(bucketInfo.getVolumeName()), ex,
+                getOmRequest().getUserInfo()));
+        throw ex;
+      }
+    }
 
     validateMaxBucket(ozoneManager);
 
@@ -205,13 +223,6 @@ public class OMBucketCreateRequest extends OMClientRequest {
     OMClientResponse omClientResponse = null;
 
     try {
-      // check Acl
-      if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE,
-            volumeName, bucketName, null);
-      }
-
       mergeOmLockDetails(
           metadataManager.getLock().acquireReadLock(VOLUME_LOCK, volumeName));
       acquiredVolumeLock = getOmLockDetails().isLockAcquired();
@@ -241,17 +252,21 @@ public class OMBucketCreateRequest extends OMClientRequest {
       }
 
       // Add objectID and updateID
-      omBucketInfo.setObjectID(
-          ozoneManager.getObjectIdFromTxId(transactionLogIndex));
-      omBucketInfo.setUpdateID(transactionLogIndex);
+      OmBucketInfo.Builder builder = omBucketInfo.toBuilder()
+          .setObjectID(ozoneManager.getObjectIdFromTxId(transactionLogIndex))
+          .setUpdateID(transactionLogIndex);
 
-      addDefaultAcls(omBucketInfo, omVolumeArgs, ozoneManager);
+      addDefaultAcls(builder.acls(), omVolumeArgs, ozoneManager);
+
+      omBucketInfo = builder.build();
 
       // check namespace quota
       checkQuotaInNamespace(omVolumeArgs, 1L);
 
       // update used namespace for volume
-      omVolumeArgs.incrUsedNamespace(1L);
+      omVolumeArgs = omVolumeArgs.toBuilder()
+          .incrUsedNamespace(1L)
+          .build();
 
       // Update table cache.
       metadataManager.getVolumeTable().addCacheEntry(new CacheKey<>(volumeKey),
@@ -311,30 +326,23 @@ public class OMBucketCreateRequest extends OMClientRequest {
         .getDefaultReplicationConfig().hasEcReplicationConfig();
   }
 
-
   /**
    * Add default acls for bucket. These acls are inherited from volume
    * default acl list.
-   *
-   * @param omBucketInfo
-   * @param omVolumeArgs
    */
-  private void addDefaultAcls(OmBucketInfo omBucketInfo,
+  private void addDefaultAcls(AclListBuilder bucketAcls,
       OmVolumeArgs omVolumeArgs, OzoneManager ozoneManager) throws OMException {
-    List<OzoneAcl> acls = new ArrayList<>();
     // Add default acls
-    acls.addAll(getDefaultAclList(createUGIForApi(), ozoneManager.getConfiguration()));
-    if (omBucketInfo.getAcls() != null) {
-      // Add acls for bucket creator.
-      acls.addAll(omBucketInfo.getAcls());
+    List<OzoneAcl> defaultAclList = getDefaultAclList(createUGIForApi(), ozoneManager.getConfig());
+    if (ozoneManager.getConfig().ignoreClientACLs()) {
+      bucketAcls.set(defaultAclList);
+    } else {
+      bucketAcls.addAll(defaultAclList);
     }
 
     // Add default acls from volume.
     List<OzoneAcl> defaultVolumeAcls = omVolumeArgs.getDefaultAcls();
-    OzoneAclUtil.inheritDefaultAcls(acls, defaultVolumeAcls, ACCESS);
-    // Remove the duplicates
-    acls = acls.stream().distinct().collect(Collectors.toList());
-    omBucketInfo.setAcls(acls);
+    OzoneAclUtil.inheritDefaultAcls(bucketAcls, defaultVolumeAcls, ACCESS);
   }
 
   /**

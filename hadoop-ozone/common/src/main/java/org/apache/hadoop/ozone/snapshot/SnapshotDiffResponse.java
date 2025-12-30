@@ -26,44 +26,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Snapsho
  */
 public class SnapshotDiffResponse {
 
-  /**
-   * Snapshot diff job status enum.
-   */
-  public enum JobStatus {
-    QUEUED,
-    IN_PROGRESS,
-    DONE,
-    REJECTED,
-    FAILED,
-    CANCELLED;
-
-    public JobStatusProto toProtobuf() {
-      return JobStatusProto.valueOf(this.name());
-    }
-
-    public static JobStatus fromProtobuf(JobStatusProto jobStatusProto) {
-      return JobStatus.valueOf(jobStatusProto.name());
-    }
-  }
-  /**
-   * Snapshot diff job sub-status enum.
-   */
-  public enum SubStatus {
-    SST_FILE_DELTA_DAG_WALK,
-    SST_FILE_DELTA_FULL_DIFF,
-    OBJECT_ID_MAP_GEN_OBS,
-    OBJECT_ID_MAP_GEN_FSO,
-    DIFF_REPORT_GEN;
-
-    public static SubStatus fromProtoBuf(OzoneManagerProtocolProtos.SnapshotDiffResponse.SubStatus subStatusProto) {
-      return SubStatus.valueOf(subStatusProto.name());
-    }
-
-    public OzoneManagerProtocolProtos.SnapshotDiffResponse.SubStatus toProtoBuf() {
-      return OzoneManagerProtocolProtos.SnapshotDiffResponse.SubStatus.valueOf(this.name());
-    }
-  }
-
   private final SnapshotDiffReportOzone snapshotDiffReport;
   private final JobStatus jobStatus;
   private final long waitTimeInMs;
@@ -152,5 +114,44 @@ public class SnapshotDiffResponse {
       }
     }
     return str.toString();
+  }
+
+  /**
+   * Snapshot diff job status enum.
+   */
+  public enum JobStatus {
+    QUEUED,
+    IN_PROGRESS,
+    DONE,
+    REJECTED,
+    FAILED,
+    CANCELLED;
+
+    public JobStatusProto toProtobuf() {
+      return JobStatusProto.valueOf(this.name());
+    }
+
+    public static JobStatus fromProtobuf(JobStatusProto jobStatusProto) {
+      return JobStatus.valueOf(jobStatusProto.name());
+    }
+  }
+
+  /**
+   * Snapshot diff job sub-status enum.
+   */
+  public enum SubStatus {
+    SST_FILE_DELTA_DAG_WALK,
+    SST_FILE_DELTA_FULL_DIFF,
+    OBJECT_ID_MAP_GEN_OBS,
+    OBJECT_ID_MAP_GEN_FSO,
+    DIFF_REPORT_GEN;
+
+    public static SubStatus fromProtoBuf(OzoneManagerProtocolProtos.SnapshotDiffResponse.SubStatus subStatusProto) {
+      return SubStatus.valueOf(subStatusProto.name());
+    }
+
+    public OzoneManagerProtocolProtos.SnapshotDiffResponse.SubStatus toProtoBuf() {
+      return OzoneManagerProtocolProtos.SnapshotDiffResponse.SubStatus.valueOf(this.name());
+    }
   }
 }

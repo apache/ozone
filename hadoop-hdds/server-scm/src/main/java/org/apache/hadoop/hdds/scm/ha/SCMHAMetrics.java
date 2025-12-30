@@ -33,36 +33,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 @Metrics(about = "SCM HA metrics", context = OzoneConsts.OZONE)
 public final class SCMHAMetrics implements MetricsSource {
 
-  /**
-   * Metrics value holder.
-   */
-  private static final class SCMHAMetricsInfo {
-
-    private static final MetricsInfo SCM_MANAGER_HA_LEADER_STATE =
-        Interns.info("SCMHALeaderState", "Leader active " +
-            "state of SCM node (1 leader, 0 follower");
-    private static final MetricsInfo NODE_ID = Interns.info("NodeId",
-        "SCM node Id");
-    private int scmHALeaderState;
-    private String nodeId;
-
-    public int getScmHALeaderState() {
-      return scmHALeaderState;
-    }
-
-    public void setScmHALeaderState(int scmHALeaderState) {
-      this.scmHALeaderState = scmHALeaderState;
-    }
-
-    public String getNodeId() {
-      return nodeId;
-    }
-
-    public void setNodeId(String nodeId) {
-      this.nodeId = nodeId;
-    }
-  }
-
   private static final String SOURCE_NAME = SCMHAMetrics.class.getSimpleName();
   private final SCMHAMetricsInfo scmHAMetricsInfo = new SCMHAMetricsInfo();
   private final String currNodeId;
@@ -114,4 +84,33 @@ public final class SCMHAMetrics implements MetricsSource {
     return scmHAMetricsInfo.getScmHALeaderState();
   }
 
+  /**
+   * Metrics value holder.
+   */
+  private static final class SCMHAMetricsInfo {
+
+    private static final MetricsInfo SCM_MANAGER_HA_LEADER_STATE =
+        Interns.info("SCMHALeaderState", "Leader active " +
+            "state of SCM node (1 leader, 0 follower");
+    private static final MetricsInfo NODE_ID = Interns.info("NodeId",
+        "SCM node Id");
+    private int scmHALeaderState;
+    private String nodeId;
+
+    public int getScmHALeaderState() {
+      return scmHALeaderState;
+    }
+
+    public void setScmHALeaderState(int scmHALeaderState) {
+      this.scmHALeaderState = scmHALeaderState;
+    }
+
+    public String getNodeId() {
+      return nodeId;
+    }
+
+    public void setNodeId(String nodeId) {
+      this.nodeId = nodeId;
+    }
+  }
 }

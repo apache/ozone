@@ -65,7 +65,6 @@ import org.junit.jupiter.api.Test;
 public class TestDatanodeAdminMonitor {
 
   private SimpleMockNodeManager nodeManager;
-  private OzoneConfiguration conf;
   private DatanodeAdminMonitorImpl monitor;
   private DatanodeAdminMonitorTestUtil
           .DatanodeAdminHandler startAdminHandler;
@@ -74,7 +73,7 @@ public class TestDatanodeAdminMonitor {
 
   @BeforeEach
   public void setup() throws IOException, AuthenticationException {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
 
     eventQueue = new EventQueue();
     startAdminHandler = new DatanodeAdminMonitorTestUtil
@@ -257,7 +256,7 @@ public class TestDatanodeAdminMonitor {
         ReplicationTestUtil.createContainerReplica(containerID, 0,
             dn1.getPersistedOpState(), State.UNHEALTHY,
             container.getNumberOfKeys(), container.getUsedBytes(), dn1,
-            dn1.getUuid(), container.getSequenceId());
+            dn1.getID(), container.getSequenceId());
     replicas.add(unhealthy);
     nodeManager.setContainers(dn1, ImmutableSet.of(containerID));
 
@@ -321,7 +320,7 @@ public class TestDatanodeAdminMonitor {
         ReplicationTestUtil.createContainerReplica(containerID, 0,
             dn1.getPersistedOpState(), State.UNHEALTHY,
             container.getNumberOfKeys(), container.getUsedBytes(), dn1,
-            dn1.getUuid(), container.getSequenceId());
+            dn1.getID(), container.getSequenceId());
     replicas.add(unhealthy);
     nodeManager.setContainers(dn1, ImmutableSet.of(containerID));
 

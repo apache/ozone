@@ -18,11 +18,12 @@
 package org.apache.hadoop.ozone.om.request.s3.tagging;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -63,7 +64,7 @@ public class S3DeleteObjectTaggingRequest extends OMKeyRequest {
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     DeleteObjectTaggingRequest deleteObjectTaggingRequest =
         super.preExecute(ozoneManager).getDeleteObjectTaggingRequest();
-    Preconditions.checkNotNull(deleteObjectTaggingRequest);
+    Objects.requireNonNull(deleteObjectTaggingRequest, "deleteObjectTaggingRequest == null");
 
     KeyArgs keyArgs = deleteObjectTaggingRequest.getKeyArgs();
 
@@ -127,9 +128,11 @@ public class S3DeleteObjectTaggingRequest extends OMKeyRequest {
       }
 
       // Clear / delete the tags
-      omKeyInfo.getTags().clear();
       // Set the UpdateID to the current transactionLogIndex
-      omKeyInfo.setUpdateID(trxnLogIndex);
+      omKeyInfo = omKeyInfo.toBuilder()
+          .setTags(Collections.emptyMap())
+          .setUpdateID(trxnLogIndex)
+          .build();
 
       // Note: Key modification time is not changed because S3 last modified
       // time only changes when there are changes in the object content

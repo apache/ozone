@@ -23,6 +23,6 @@ if [ "$ARG" != "--restart" ]; then
     sudo /usr/sbin/sshd -E /tmp/sshd.log
 fi
 
-export HADOOP_LOG_DIR=/var/log/hadoop
-export HADOOP_CONF_DIR=/etc/hadoop
+export OZONE_LOG_DIR=/var/log/hadoop
+export OZONE_CONF_DIR=/etc/hadoop
 /opt/hadoop/bin/ozone --daemon start om

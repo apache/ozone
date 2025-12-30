@@ -172,7 +172,7 @@ public class TestOMKeyDeleteRequest extends TestOMKeyRequest {
     return createDeleteKeyRequest(keyName);
   }
 
-  private OMRequest createDeleteKeyRequest(String testKeyName) {
+  protected OMRequest createDeleteKeyRequest(String testKeyName) {
     KeyArgs keyArgs = KeyArgs.newBuilder().setBucketName(bucketName)
         .setVolumeName(volumeName).setKeyName(testKeyName).build();
 

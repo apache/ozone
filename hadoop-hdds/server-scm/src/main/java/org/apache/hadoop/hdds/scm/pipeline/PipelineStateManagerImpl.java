@@ -17,11 +17,11 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.NavigableSet;
+import java.util.Objects;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -32,6 +32,8 @@ import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.utils.db.CodecException;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.slf4j.Logger;
@@ -43,7 +45,7 @@ import org.slf4j.LoggerFactory;
  * state. All the read and write operations in PipelineStateMap are protected
  * by a read write lock.
  */
-public class PipelineStateManagerImpl implements PipelineStateManager {
+public final class PipelineStateManagerImpl implements PipelineStateManager {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(PipelineStateManagerImpl.class);
@@ -57,29 +59,25 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
   // See https://issues.apache.org/jira/browse/HDDS-4560
   private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
-  public PipelineStateManagerImpl(
+  private PipelineStateManagerImpl(
       Table<PipelineID, Pipeline> pipelineStore, NodeManager nodeManager,
-      DBTransactionBuffer buffer) throws IOException {
+      DBTransactionBuffer buffer) {
     this.pipelineStateMap = new PipelineStateMap();
     this.nodeManager = nodeManager;
     this.pipelineStore = pipelineStore;
     this.transactionBuffer = buffer;
-    initialize();
   }
 
-  private void initialize() throws IOException {
-    if (pipelineStore == null || nodeManager == null) {
-      throw new IOException("PipelineStore cannot be null");
-    }
+  private void initialize() throws RocksDatabaseException, CodecException, DuplicatedPipelineIdException {
+    Objects.requireNonNull(pipelineStore, "pipelineStore == null");
+    Objects.requireNonNull(nodeManager, "nodeManager == null");
     if (pipelineStore.isEmpty()) {
       LOG.info("No pipeline exists in current db");
       return;
     }
-    try (TableIterator<PipelineID,
-        ? extends Table.KeyValue<PipelineID, Pipeline>> iterator =
-             pipelineStore.iterator()) {
+    try (TableIterator<PipelineID, Pipeline> iterator = pipelineStore.valueIterator()) {
       while (iterator.hasNext()) {
-        Pipeline pipeline = iterator.next().getValue();
+        final Pipeline pipeline = iterator.next();
         pipelineStateMap.addPipeline(pipeline);
         nodeManager.addPipeline(pipeline);
       }
@@ -88,7 +86,7 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
 
   @Override
   public void addPipeline(HddsProtos.Pipeline pipelineProto)
-      throws IOException {
+      throws DuplicatedPipelineIdException, RocksDatabaseException, CodecException {
     Pipeline pipeline = Pipeline.getFromProtobuf(pipelineProto);
     lock.writeLock().lock();
     try {
@@ -104,9 +102,8 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
   }
 
   @Override
-  public void addContainerToPipeline(
-      PipelineID pipelineId, ContainerID containerID)
-      throws IOException {
+  public void addContainerToPipeline(PipelineID pipelineId, ContainerID containerID)
+      throws PipelineNotFoundException, InvalidPipelineStateException {
     lock.writeLock().lock();
     try {
       pipelineStateMap.addContainerToPipeline(pipelineId, containerID);
@@ -116,9 +113,8 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
   }
 
   @Override
-  public void addContainerToPipelineForce(
-          PipelineID pipelineId, ContainerID containerID)
-          throws IOException {
+  public void addContainerToPipelineForce(PipelineID pipelineId, ContainerID containerID)
+      throws PipelineNotFoundException {
     lock.writeLock().lock();
     try {
       pipelineStateMap.addContainerToPipelineSCMStart(pipelineId, containerID);
@@ -147,7 +143,6 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
       lock.readLock().unlock();
     }
   }
-
 
   @Override
   public List<Pipeline> getPipelines(
@@ -207,8 +202,7 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
   }
 
   @Override
-  public NavigableSet<ContainerID> getContainers(PipelineID pipelineID)
-      throws IOException {
+  public NavigableSet<ContainerID> getContainers(PipelineID pipelineID) throws PipelineNotFoundException {
     lock.readLock().lock();
     try {
       return pipelineStateMap.getContainers(pipelineID);
@@ -218,7 +212,7 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
   }
 
   @Override
-  public int getNumberOfContainers(PipelineID pipelineID) throws IOException {
+  public int getNumberOfContainers(PipelineID pipelineID) throws PipelineNotFoundException {
     lock.readLock().lock();
     try {
       return pipelineStateMap.getNumberOfContainers(pipelineID);
@@ -229,7 +223,7 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
 
   @Override
   public void removePipeline(HddsProtos.PipelineID pipelineIDProto)
-      throws IOException {
+      throws InvalidPipelineStateException, RocksDatabaseException, CodecException {
     PipelineID pipelineID = PipelineID.getFromProtobuf(pipelineIDProto);
     try {
       Pipeline pipeline;
@@ -250,8 +244,7 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
   }
 
   @Override
-  public void removeContainerFromPipeline(
-      PipelineID pipelineID, ContainerID containerID) throws IOException {
+  public void removeContainerFromPipeline(PipelineID pipelineID, ContainerID containerID) {
     try {
       lock.writeLock().lock();
       try {
@@ -275,9 +268,8 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
   }
 
   @Override
-  public void updatePipelineState(
-      HddsProtos.PipelineID pipelineIDProto, HddsProtos.PipelineState newState)
-      throws IOException {
+  public void updatePipelineState(HddsProtos.PipelineID pipelineIDProto, HddsProtos.PipelineState newState)
+      throws RocksDatabaseException, CodecException {
     PipelineID pipelineID = PipelineID.getFromProtobuf(pipelineIDProto);
     Pipeline.PipelineState newPipelineState =
         Pipeline.PipelineState.fromProtobuf(newState);
@@ -305,15 +297,10 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
   }
 
   @Override
-  public void close() throws Exception {
+  public void close() {
     lock.writeLock().lock();
     try {
-      if (pipelineStore != null) {
-        pipelineStore.close();
-        pipelineStore = null;
-      }
-    } catch (Exception ex) {
-      LOG.error("Pipeline store close failed", ex);
+      pipelineStore = null;
     } finally {
       lock.writeLock().unlock();
     }
@@ -321,16 +308,15 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
 
   @Override
   public void reinitialize(Table<PipelineID, Pipeline> store)
-      throws IOException {
+      throws RocksDatabaseException, DuplicatedPipelineIdException, CodecException {
     lock.writeLock().lock();
     try {
-      pipelineStore.close();
       this.pipelineStateMap = new PipelineStateMap();
       this.pipelineStore = store;
       initialize();
     } catch (Exception ex) {
       LOG.error("PipelineManager reinitialization close failed", ex);
-      throw new IOException(ex);
+      throw ex;
     } finally {
       lock.writeLock().unlock();
     }
@@ -371,12 +357,12 @@ public class PipelineStateManagerImpl implements PipelineStateManager {
       return this;
     }
 
-    public PipelineStateManager build() throws IOException {
-      Preconditions.checkNotNull(pipelineStore);
+    public PipelineStateManager build() throws RocksDatabaseException, DuplicatedPipelineIdException, CodecException {
+      Objects.requireNonNull(pipelineStore, "pipelineStore == null");
 
-      final PipelineStateManager pipelineStateManager =
-          new PipelineStateManagerImpl(
-              pipelineStore, nodeManager, transactionBuffer);
+      final PipelineStateManagerImpl pipelineStateManager = new PipelineStateManagerImpl(
+          pipelineStore, nodeManager, transactionBuffer);
+      pipelineStateManager.initialize();
 
       return scmRatisServer.getProxyHandler(RequestType.PIPELINE,
           PipelineStateManager.class, pipelineStateManager);

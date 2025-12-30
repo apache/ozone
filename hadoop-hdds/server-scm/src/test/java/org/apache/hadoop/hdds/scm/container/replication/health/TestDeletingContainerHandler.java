@@ -62,7 +62,7 @@ public class TestDeletingContainerHandler {
   private DeletingContainerHandler deletingContainerHandler;
   private ECReplicationConfig ecReplicationConfig;
   private RatisReplicationConfig ratisReplicationConfig;
-
+  private ReplicationManager.ReplicationManagerConfiguration rmConf;
 
   @BeforeEach
   public void setup() throws IOException {
@@ -71,7 +71,7 @@ public class TestDeletingContainerHandler {
     ratisReplicationConfig = RatisReplicationConfig.getInstance(
         HddsProtos.ReplicationFactor.THREE);
     replicationManager = mock(ReplicationManager.class);
-
+    rmConf = mock(ReplicationManager.ReplicationManagerConfiguration.class);
     doNothing().when(replicationManager).updateContainerState(any(ContainerID.class),
         any(HddsProtos.LifeCycleEvent.class));
 
@@ -94,7 +94,7 @@ public class TestDeletingContainerHandler {
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
@@ -112,7 +112,7 @@ public class TestDeletingContainerHandler {
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
@@ -134,7 +134,6 @@ public class TestDeletingContainerHandler {
     cleanupIfNoReplicaExist(ecReplicationConfig, 1);
   }
 
-
   private void cleanupIfNoReplicaExist(
       ReplicationConfig replicationConfig, int times) {
     clearInvocations(replicationManager);
@@ -144,7 +143,7 @@ public class TestDeletingContainerHandler {
     Set<ContainerReplica> containerReplicas = new HashSet<>();
     ContainerCheckRequest.Builder builder = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas);
 
@@ -176,8 +175,8 @@ public class TestDeletingContainerHandler {
             ContainerReplicaProto.State.CLOSED, 0, 0, 0);
     List<ContainerReplicaOp> pendingOps = new ArrayList<>();
     containerReplicas.forEach(r -> pendingOps.add(
-        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.DELETE,
-            r.getDatanodeDetails(), r.getReplicaIndex())));
+        new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.DELETE,
+            r.getDatanodeDetails(), r.getReplicaIndex(), null, Long.MAX_VALUE, 0)));
     verifyDeleteCommandCount(containerInfo, containerReplicas, pendingOps, 0);
 
     //EC container
@@ -188,8 +187,8 @@ public class TestDeletingContainerHandler {
             ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4, 5);
     pendingOps.clear();
     containerReplicas.forEach(r -> pendingOps.add(
-        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.DELETE,
-            r.getDatanodeDetails(), r.getReplicaIndex())));
+        new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.DELETE,
+            r.getDatanodeDetails(), r.getReplicaIndex(), null, Long.MAX_VALUE, 0)));
     verifyDeleteCommandCount(containerInfo, containerReplicas, pendingOps, 0);
 
   }
@@ -209,8 +208,8 @@ public class TestDeletingContainerHandler {
             ContainerReplicaProto.State.CLOSED, 0, 0, 0);
     List<ContainerReplicaOp> pendingOps = new ArrayList<>();
     containerReplicas.stream().limit(2).forEach(replica -> pendingOps.add(
-        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.DELETE,
-            replica.getDatanodeDetails(), replica.getReplicaIndex())));
+        new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.DELETE,
+            replica.getDatanodeDetails(), replica.getReplicaIndex(), null, Long.MAX_VALUE, 0)));
     verifyDeleteCommandCount(containerInfo, containerReplicas, pendingOps, 1);
 
     //EC container
@@ -221,8 +220,8 @@ public class TestDeletingContainerHandler {
             ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4, 5);
     pendingOps.clear();
     containerReplicas.stream().limit(3).forEach(replica -> pendingOps.add(
-        ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.DELETE,
-            replica.getDatanodeDetails(), replica.getReplicaIndex())));
+        new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.DELETE,
+            replica.getDatanodeDetails(), replica.getReplicaIndex(), null, Long.MAX_VALUE, 0)));
     //since one delete command is end when testing ratis container, so
     //here should be 1+2 = 3 times
     verifyDeleteCommandCount(containerInfo, containerReplicas, pendingOps, 3);
@@ -254,7 +253,7 @@ public class TestDeletingContainerHandler {
                                    int times) throws NotLeaderException {
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(pendingOps)
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();

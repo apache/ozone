@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -45,7 +46,7 @@ public class TestOMFailoverProxyProvider {
   private static final String OM_SERVICE_ID = "om-service-test1";
   private static final String NODE_ID_BASE_STR = "omNode-";
   private static final String DUMMY_NODE_ADDR = "0.0.0.0:8080";
-  private HadoopRpcOMFailoverProxyProvider provider;
+  private HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> provider;
   private long waitBetweenRetries;
   private int numNodes = 3;
   private OzoneConfiguration config;
@@ -65,7 +66,7 @@ public class TestOMFailoverProxyProvider {
     }
     config.set(ConfUtils.addKeySuffixes(OZONE_OM_NODES_KEY, OM_SERVICE_ID),
         allNodeIds.toString());
-    provider = new HadoopRpcOMFailoverProxyProvider(config,
+    provider = new HadoopRpcOMFailoverProxyProvider<>(config,
         UserGroupInformation.getCurrentUser(), OM_SERVICE_ID,
         OzoneManagerProtocolPB.class);
   }
@@ -141,6 +142,38 @@ public class TestOMFailoverProxyProvider {
   }
 
   /**
+   * Ensure listener nodes are excluded from provider's proxy list.
+   */
+  @Test
+  public void testExcludesListenerNodes() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    StringJoiner allNodeIds = new StringJoiner(",");
+    for (int i = 1; i <= numNodes; i++) {
+      String nodeId = NODE_ID_BASE_STR + i;
+      conf.set(ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY, OM_SERVICE_ID,
+          nodeId), DUMMY_NODE_ADDR);
+      allNodeIds.add(nodeId);
+    }
+    conf.set(ConfUtils.addKeySuffixes(OZONE_OM_NODES_KEY, OM_SERVICE_ID),
+        allNodeIds.toString());
+    // Mark one of the nodes as listener (omNode-2)
+    String listenerNode = NODE_ID_BASE_STR + 2;
+    conf.set(ConfUtils.addKeySuffixes(
+        org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_LISTENER_NODES_KEY,
+        OM_SERVICE_ID), listenerNode);
+
+    try (HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> providerWithListeners =
+             new HadoopRpcOMFailoverProxyProvider<>(conf,
+                 UserGroupInformation.getCurrentUser(), OM_SERVICE_ID,
+                 OzoneManagerProtocolPB.class)) {
+      // Verify listener node is not included in proxy map
+      assertTrue(providerWithListeners.getOMProxyInfoMap().containsKey(NODE_ID_BASE_STR + 1));
+      assertTrue(providerWithListeners.getOMProxyInfoMap().containsKey(NODE_ID_BASE_STR + 3));
+      assertFalse(providerWithListeners.getOMProxyInfoMap().containsKey(listenerNode));
+    }
+  }
+
+  /**
    * Failover to next node and wait time should be same as waitTimeAfter.
    */
   private void failoverToNextNode(int numNextNodeFailoverTimes,
@@ -184,17 +217,17 @@ public class TestOMFailoverProxyProvider {
     }
     ozoneConf.set(ConfUtils.addKeySuffixes(OZONE_OM_NODES_KEY, OM_SERVICE_ID),
         allNodeIds.toString());
-    HadoopRpcOMFailoverProxyProvider prov =
-        new HadoopRpcOMFailoverProxyProvider(ozoneConf,
-            UserGroupInformation.getCurrentUser(),
-            OM_SERVICE_ID,
-            OzoneManagerProtocolPB.class);
+    try (HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> prov =
+             new HadoopRpcOMFailoverProxyProvider<>(ozoneConf,
+                 UserGroupInformation.getCurrentUser(),
+                 OM_SERVICE_ID,
+                 OzoneManagerProtocolPB.class)) {
+      Text dtService = prov.getCurrentProxyDelegationToken();
 
-    Text dtService = prov.getCurrentProxyDelegationToken();
-
-    Collections.sort(nodeAddrs);
-    String expectedDtService = String.join(",", nodeAddrs);
-    assertEquals(expectedDtService, dtService.toString());
+      Collections.sort(nodeAddrs);
+      String expectedDtService = String.join(",", nodeAddrs);
+      assertEquals(expectedDtService, dtService.toString());
+    }
   }
 
 }

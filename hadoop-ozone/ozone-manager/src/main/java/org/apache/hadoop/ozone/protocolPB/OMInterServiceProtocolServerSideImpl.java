@@ -59,6 +59,7 @@ public class OMInterServiceProtocolServerSideImpl implements
         .setOMNodeId(request.getNodeId())
         .setHostAddress(request.getHostAddress())
         .setRatisPort(request.getRatisPort())
+        .setIsListener(request.getIsListener())
         .build();
 
     try {

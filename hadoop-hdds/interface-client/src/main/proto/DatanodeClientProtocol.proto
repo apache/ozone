@@ -77,6 +77,8 @@ package hadoop.hdds.datanode;
  *  18. CopyContainer - Copies a container from a remote machine.
  *
  *  19. FinalizeBlock - Finalize block request from client.
+ *
+ *  20. ReadBlock - Allows us to read a block.
  */
 
 enum Type {
@@ -105,9 +107,10 @@ enum Type {
 
   StreamInit = 19;
   StreamWrite = 20;
-
   FinalizeBlock = 21;
   Echo = 22;
+  GetContainerChecksumInfo = 23;
+  ReadBlock = 24;
 }
 
 
@@ -158,6 +161,7 @@ enum Result {
   EXPORT_CONTAINER_METADATA_FAILED = 45;
   IMPORT_CONTAINER_METADATA_FAILED = 46;
   BLOCK_ALREADY_FINALIZED = 47;
+  CONTAINER_ID_MISMATCH = 48;
 }
 
 /**
@@ -214,9 +218,10 @@ message ContainerCommandRequestProto {
 
   optional   string encodedToken = 23;
   optional   uint32 version = 24;
-
   optional   FinalizeBlockRequestProto finalizeBlock = 25;
   optional   EchoRequestProto echo = 26;
+  optional   GetContainerChecksumInfoRequestProto getContainerChecksumInfo = 27;
+  optional   ReadBlockRequestProto readBlock = 28;
 }
 
 message ContainerCommandResponseProto {
@@ -245,11 +250,11 @@ message ContainerCommandResponseProto {
 
   optional   PutSmallFileResponseProto putSmallFile = 19;
   optional   GetSmallFileResponseProto getSmallFile = 20;
-
   optional   GetCommittedBlockLengthResponseProto getCommittedBlockLength = 21;
-
   optional   FinalizeBlockResponseProto finalizeBlock = 22;
   optional   EchoResponseProto echo = 23;
+  optional   GetContainerChecksumInfoResponseProto getContainerChecksumInfo = 24;
+  optional   ReadBlockResponseProto readBlock = 25;
 }
 
 message ContainerDataProto {
@@ -393,6 +398,19 @@ message ListBlockResponseProto {
   repeated BlockData blockData = 1;
 }
 
+message ReadBlockRequestProto {
+  required DatanodeBlockID blockID = 1;
+  required uint64 offset = 2;
+  optional uint64 length = 3;
+  optional uint32 responseDataSize = 4;
+}
+
+message ReadBlockResponseProto {
+  required ChecksumData checksumData = 1;
+  required uint64 offset = 2;
+  required bytes data = 3;
+}
+
 message EchoRequestProto {
   optional bytes payload = 1;
   optional int32 payloadSizeResp = 2;
@@ -404,6 +422,14 @@ message EchoResponseProto {
   optional bytes payload = 1;
 }
 
+message GetContainerChecksumInfoRequestProto {
+  optional int64 containerID = 1;
+}
+
+message GetContainerChecksumInfoResponseProto {
+  optional int64 containerID = 1;
+  optional bytes containerChecksumInfo = 2;
+}
 // Chunk Operations
 
 message ChunkInfo {
@@ -541,9 +567,35 @@ message SendContainerRequest {
   required bytes data = 3;
   optional int64 checksum = 4;
   optional CopyContainerCompressProto compression = 5;
+  optional int64 size = 6;
 }
 
 message SendContainerResponse {
+}
+
+// Each chunk contains multiple checksums. This message aggregates them into one checksum for the whole chunk.
+message ChunkMerkleTree {
+  optional int64 offset = 1;
+  optional int64 length = 2;
+  optional int64 dataChecksum = 3;
+  optional bool checksumMatches = 4;
+}
+
+message BlockMerkleTree {
+  optional int64 blockID = 1;
+  optional int64 dataChecksum = 2;
+  repeated ChunkMerkleTree chunkMerkleTree = 3;
+  optional bool deleted = 4;
+}
+
+message ContainerMerkleTree {
+  optional int64 dataChecksum = 1;
+  repeated BlockMerkleTree blockMerkleTree = 2;
+}
+
+message ContainerChecksumInfo {
+  optional int64 containerID = 1;
+  optional ContainerMerkleTree containerMerkleTree = 2;
 }
 
 service XceiverClientProtocolService {
@@ -557,4 +609,9 @@ service IntraDatanodeProtocolService {
   // An intradatanode service to copy the raw container data between nodes
   rpc download (CopyContainerRequestProto) returns (stream CopyContainerResponseProto);
   rpc upload (stream SendContainerRequest) returns (SendContainerResponse);
+}
+
+message ContainerCreateInfo {
+    required ContainerDataProto.State state = 1;
+    optional int32 replicaIndex = 2 [default = -1];
 }

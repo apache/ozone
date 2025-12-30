@@ -20,8 +20,7 @@ package org.apache.hadoop.ozone.recon.tasks;
 import java.io.IOException;
 import java.util.Map;
 import org.apache.commons.lang3.tuple.Triple;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 
 /**
  * Interface for handling PUT, DELETE and UPDATE events for size-related
@@ -82,20 +81,18 @@ public interface OmTableHandler {
 
   /**
    * Returns a triple with the total count of records (left), total unreplicated
-   * size (middle), and total replicated size (right) in the given iterator.
+   * size (middle), and total replicated size (right) for the given table.
    * Increments count for each record and adds the dataSize if a record's value
    * is an instance of OmKeyInfo,RepeatedOmKeyInfo.
-   * If the iterator is null, returns (0, 0, 0).
    *
-   * @param iterator The iterator over the table to be iterated.
+   * @param tableName The name of the table to process.
+   * @param omMetadataManager The OM metadata manager to get the table.
    * @return A Triple with three Long values representing the count,
    * unReplicated size and replicated size.
    * @throws IOException If an I/O error occurs during the iterator traversal.
    */
-  Triple<Long, Long, Long> getTableSizeAndCount(
-      TableIterator<String, ? extends Table.KeyValue<String, ?>> iterator)
-      throws IOException;
-
+  Triple<Long, Long, Long> getTableSizeAndCount(String tableName, 
+      OMMetadataManager omMetadataManager) throws IOException;
 
   /**
    * Returns the count key for the given table.

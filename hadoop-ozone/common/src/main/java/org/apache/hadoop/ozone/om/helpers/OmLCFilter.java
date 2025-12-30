@@ -15,7 +15,6 @@
  * limitations under the License.
  */
 
-
 package org.apache.hadoop.ozone.om.helpers;
 
 import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.isValidKeyPath;
@@ -57,7 +56,6 @@ public final class OmLCFilter {
     this.tagKey = builder.tagKey;
     this.tagValue = builder.tagValue;
   }
-
 
   /**
    * Validates the OmLCFilter.
@@ -166,7 +164,7 @@ public final class OmLCFilter {
     return filterBuilder.build();
   }
 
-  public static OmLCFilter getFromProtobuf(LifecycleFilter lifecycleFilter, BucketLayout layout) throws OMException {
+  public static OmLCFilter getFromProtobuf(LifecycleFilter lifecycleFilter, BucketLayout layout) {
     OmLCFilter.Builder builder = new Builder();
 
     if (lifecycleFilter.hasPrefix()) {
@@ -222,7 +220,7 @@ public final class OmLCFilter {
       return this;
     }
 
-    public OmLCFilter build() throws OMException {
+    public OmLCFilter build() {
       return new OmLCFilter(this);
     }
   }

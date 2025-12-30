@@ -38,13 +38,11 @@ import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test cases to verify the metrics exposed by SCMPipelineManager.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
 public abstract class TestSCMPipelineMetrics implements NonHATests.TestCase {
 
   private MiniOzoneCluster cluster;

@@ -36,7 +36,7 @@ import org.slf4j.LoggerFactory;
  * For CRC32/CRC32C, each checksum takes 4 bytes. Thus each block chunk has 4 MB / 16 KB * 4 B = 1 KB of checksum data.
  */
 public class ChecksumCache {
-  public static final Logger LOG = LoggerFactory.getLogger(ChecksumCache.class);
+  private static final Logger LOG = LoggerFactory.getLogger(ChecksumCache.class);
 
   private final int bytesPerChecksum;
   private final List<ByteString> checksums;

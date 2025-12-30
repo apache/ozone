@@ -45,6 +45,7 @@ public class ContainerHealthStatus {
 
   private final ContainerInfo container;
   private final int replicaDelta;
+  private final Set<ContainerReplica> replicas;
   private final Set<ContainerReplica> healthyReplicas;
   private final Set<ContainerReplica> healthyAvailReplicas;
   private final ContainerPlacementStatus placementStatus;
@@ -62,6 +63,7 @@ public class ContainerHealthStatus {
     this.reconContainerMetadataManager = reconContainerMetadataManager;
     this.container = container;
     int repFactor = container.getReplicationConfig().getRequiredNodes();
+    this.replicas = replicas;
     this.healthyReplicas = replicas
         .stream()
         .filter(r -> !r.getState()
@@ -158,6 +160,13 @@ public class ContainerHealthStatus {
     return numKeys == 0;
   }
 
+  public boolean areChecksumsMismatched() {
+    return !replicas.isEmpty() && replicas.stream()
+            .map(ContainerReplica::getChecksums)
+            .distinct()
+            .count() != 1;
+  }
+
   private ContainerPlacementStatus getPlacementStatus(
       PlacementPolicy policy, int repFactor) {
     List<DatanodeDetails> dns = healthyReplicas.stream()
@@ -180,19 +189,19 @@ public class ContainerHealthStatus {
   }
 
   private ContainerReplicaCount getContainerReplicaCountInstance(
-      OzoneConfiguration conf, Set<ContainerReplica> replicas) {
+      OzoneConfiguration conf, Set<ContainerReplica> containerReplicas) {
     ReplicationManager.ReplicationManagerConfiguration rmConf = conf.getObject(
         ReplicationManager.ReplicationManagerConfiguration.class);
     boolean isEC = container.getReplicationConfig()
                        .getReplicationType() == HddsProtos.ReplicationType.EC;
     return isEC ?
                new ECContainerReplicaCount(container,
-                   replicas, new ArrayList<>(),
+                   containerReplicas, new ArrayList<>(),
                    rmConf.getMaintenanceRemainingRedundancy()) :
                // This class ignores unhealthy replicas,
                // therefore set 'considerUnhealthy' to false.
                new RatisContainerReplicaCount(container,
-                   replicas, new ArrayList<>(),
+                   containerReplicas, new ArrayList<>(),
                    rmConf.getMaintenanceReplicaMinimum(), false);
   }
 }

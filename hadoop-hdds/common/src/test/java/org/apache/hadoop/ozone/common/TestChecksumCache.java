@@ -26,14 +26,11 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Test class for {@link ChecksumCache}.
  */
 class TestChecksumCache {
-  public static final Logger LOG = LoggerFactory.getLogger(TestChecksumCache.class);
 
   @ParameterizedTest
   @EnumSource(ChecksumType.class)

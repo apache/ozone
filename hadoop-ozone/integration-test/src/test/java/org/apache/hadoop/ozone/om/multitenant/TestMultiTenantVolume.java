@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.multitenant;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_ENABLED;
-import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.isDone;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.isStarting;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -43,6 +42,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
+import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
@@ -76,7 +76,7 @@ public class TestMultiTenantVolume {
     conf.setBoolean(
         OMMultiTenantManagerImpl.OZONE_OM_TENANT_DEV_SKIP_RANGER, true);
     conf.setBoolean(OZONE_OM_MULTITENANCY_ENABLED, true);
-    conf.setInt(OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION, OMLayoutFeature.INITIAL_VERSION.layoutVersion());
+    conf.setInt(OMStorage.TESTING_INIT_LAYOUT_VERSION_KEY, OMLayoutFeature.INITIAL_VERSION.layoutVersion());
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
         .withoutDatanodes();
     cluster = builder.build();
@@ -311,7 +311,9 @@ public class TestMultiTenantVolume {
           OMException.class,
           () -> store.createTenant(tenantId));
 
-      assertThat(e.getMessage()).contains("Invalid volume name: " + tenantId);
+      assertThat(e.getMessage())
+          .contains("unsupported character")
+          .contains("_");
     }
   }
 }

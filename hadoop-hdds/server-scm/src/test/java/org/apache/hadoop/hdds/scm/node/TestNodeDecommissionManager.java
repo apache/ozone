@@ -67,7 +67,6 @@ import org.mockito.Mockito;
 public class TestNodeDecommissionManager {
 
   private NodeDecommissionManager decom;
-  private StorageContainerManager scm;
   private SCMNodeManager nodeManager;
   private ContainerManager containerManager;
   private OzoneConfiguration conf;
@@ -77,8 +76,8 @@ public class TestNodeDecommissionManager {
   void setup(@TempDir File dir) throws Exception {
     conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, dir.getAbsolutePath());
-    scm = HddsTestUtils.getScm(conf);
-    nodeManager = (SCMNodeManager)scm.getScmNodeManager();
+    StorageContainerManager scm = HddsTestUtils.getScm(conf);
+    nodeManager = (SCMNodeManager) scm.getScmNodeManager();
     containerManager = mock(ContainerManager.class);
     decom = new NodeDecommissionManager(conf, nodeManager, containerManager,
         SCMContext.emptyContext(), new EventQueue(), null);
@@ -101,6 +100,7 @@ public class TestNodeDecommissionManager {
     id++;
     return builder.build();
   }
+
   private ContainerInfo getMockContainer(ReplicationConfig rep, ContainerID conId) {
     ContainerInfo.Builder builder = new ContainerInfo.Builder()
         .setReplicationConfig(rep)

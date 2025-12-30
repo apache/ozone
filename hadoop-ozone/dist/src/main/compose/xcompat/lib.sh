@@ -19,12 +19,12 @@ COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 basename=$(basename ${COMPOSE_DIR})
 
-current_version="${OZONE_CURRENT_VERSION}"
-# TODO: debug acceptance test failures for client versions 1.0.0 on secure clusters
-old_versions="1.1.0 1.2.1 1.3.0 1.4.0 1.4.1" # container is needed for each version in clients.yaml
-
 # shellcheck source=hadoop-ozone/dist/src/main/compose/testlib.sh
 source "${COMPOSE_DIR}/../testlib.sh"
+
+current_version="${OZONE_CURRENT_VERSION}"
+# TODO: debug acceptance test failures for client versions 1.0.0 on secure clusters
+old_versions="1.1.0 1.2.1 1.3.0 1.4.1 2.0.0" # container is needed for each version in clients.yaml
 
 export SECURITY_ENABLED=true
 : ${OZONE_BUCKET_KEY_NAME:=key1}
@@ -73,6 +73,15 @@ _read() {
     compatibility/read.robot
 }
 
+_test_checkpoint_compatibility() {
+  _kinit
+  execute_robot_test ${container} -N "xcompat-cluster-${cluster_version}-client-${client_version}-checkpoint" \
+    -v CLIENT_VERSION:${client_version} \
+    -v CLUSTER_VERSION:${cluster_version} \
+    -v TEST_DATA_DIR:/testdata \
+    compatibility/checkpoint.robot
+}
+
 test_cross_compatibility() {
   echo "Starting ${cluster_version} cluster with COMPOSE_FILE=${COMPOSE_FILE}"
 
@@ -106,6 +115,35 @@ test_cross_compatibility() {
       client _read ${data_version}
     done
   done
+
+  # Add checkpoint compatibility tests (only for clusters that support checkpoint endpoints)
+  # Skip checkpoint tests for very old clusters that don't have the endpoints
+  if [[ "${cluster_version}" < "2.0.0" ]]; then
+    echo "Skipping checkpoint compatibility tests for cluster ${cluster_version} (checkpoint endpoints not available)"
+  else
+    echo ""
+    echo "=========================================="
+    echo "Running checkpoint compatibility tests"
+    echo "=========================================="
+    
+    # Test 2.0.0 client (if available)
+    for client_version in "$@"; do
+      if [[ "${client_version}" == "2.0.0" ]]; then
+        echo "Testing 2.0.0 client against ${cluster_version} cluster"
+        client _test_checkpoint_compatibility
+        break  # Only test 2.0 once
+      fi
+    done
+    
+    # Test current client (if different from 2.0.0 and available)
+    for client_version in "$@"; do
+      if [[ "${client_version}" == "${current_version}" ]]; then
+        echo "Testing ${current_version} client against ${cluster_version} cluster"
+        client _test_checkpoint_compatibility
+        break  # Only test current version once
+      fi
+    done
+  fi
 
   KEEP_RUNNING=false stop_docker_env
 }

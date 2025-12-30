@@ -41,30 +41,22 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Tests unhealthy container functionality in the {@link KeyValueContainer}
  * class.
  */
-@Timeout(600)
 public class TestKeyValueContainerMarkUnhealthy {
-  public static final Logger LOG = LoggerFactory.getLogger(
-      TestKeyValueContainerMarkUnhealthy.class);
 
   @TempDir
   private Path folder;
 
-  private OzoneConfiguration conf;
   private String scmId = UUID.randomUUID().toString();
   private VolumeSet volumeSet;
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
   private KeyValueContainerData keyValueContainerData;
   private KeyValueContainer keyValueContainer;
-  private UUID datanodeId;
 
   private ContainerLayoutVersion layout;
 
@@ -74,8 +66,8 @@ public class TestKeyValueContainerMarkUnhealthy {
   }
 
   public void setup() throws Exception {
-    conf = new OzoneConfiguration();
-    datanodeId = UUID.randomUUID();
+    OzoneConfiguration conf = new OzoneConfiguration();
+    UUID datanodeId = UUID.randomUUID();
     String dataDir = Files.createDirectory(
         folder.resolve("data")).toAbsolutePath().toString();
     HddsVolume hddsVolume = new HddsVolume.Builder(dataDir)

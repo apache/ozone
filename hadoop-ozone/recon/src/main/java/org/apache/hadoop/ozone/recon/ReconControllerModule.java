@@ -51,11 +51,15 @@ import org.apache.hadoop.ozone.recon.scm.ReconStorageConfig;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconFileMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconContainerMetadataManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconFileMetadataManagerImpl;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconGlobalStatsManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTaskFSO;
@@ -69,7 +73,6 @@ import org.apache.hadoop.ozone.recon.tasks.ReconTaskController;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskControllerImpl;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.ozone.recon.schema.ReconSqlDbConfig;
 import org.apache.ozone.recon.schema.generated.tables.daos.ClusterGrowthDailyDao;
 import org.apache.ozone.recon.schema.generated.tables.daos.ContainerCountBySizeDao;
 import org.apache.ozone.recon.schema.generated.tables.daos.FileCountBySizeDao;
@@ -102,6 +105,10 @@ public class ReconControllerModule extends AbstractModule {
     bind(ContainerHealthSchemaManager.class).in(Singleton.class);
     bind(ReconContainerMetadataManager.class)
         .to(ReconContainerMetadataManagerImpl.class).in(Singleton.class);
+    bind(ReconFileMetadataManager.class)
+        .to(ReconFileMetadataManagerImpl.class).in(Singleton.class);
+    bind(ReconGlobalStatsManager.class)
+        .to(ReconGlobalStatsManagerImpl.class).in(Singleton.class);
     bind(ReconNamespaceSummaryManager.class)
         .to(ReconNamespaceSummaryManagerImpl.class).in(Singleton.class);
     bind(OzoneManagerServiceProvider.class)

@@ -122,7 +122,7 @@ public class TestOzoneNativeAuthorizer {
   public void createAll(
       String keyName, String prefixName, ACLType userRight,
       ACLType groupRight, boolean expectedResult) throws IOException {
-    int randomInt = RandomUtils.nextInt();
+    int randomInt = RandomUtils.secure().randomInt();
     this.vol = "vol" + randomInt;
     this.buck = "bucket" + randomInt;
     this.key = keyName + randomInt;
@@ -310,7 +310,6 @@ public class TestOzoneNativeAuthorizer {
     resetAclsAndValidateAccess(prefixObj, ANONYMOUS, writeClient);
   }
 
-
   private void setVolumeAcl(List<OzoneAcl> ozoneAcls) throws IOException {
     OzoneNativeAclTestUtil.setVolumeAcl(metadataManager, vol, ozoneAcls);
   }
@@ -336,7 +335,7 @@ public class TestOzoneNativeAuthorizer {
     String group = (!testUgi.getGroups().isEmpty()) ?
         testUgi.getGroups().get(0) : "";
 
-    RequestContext.Builder builder = new RequestContext.Builder()
+    RequestContext.Builder builder = RequestContext.newBuilder()
         .setClientUgi(testUgi)
         .setAclType(accessType);
 
@@ -427,7 +426,7 @@ public class TestOzoneNativeAuthorizer {
               + " name:" + (accessType == USER ? user : group));
 
           // Randomize next type.
-          int type = RandomUtils.nextInt(0, 3);
+          int type = RandomUtils.secure().randomInt(0, 3);
           ACLIdentityType identityType = ACLIdentityType.values()[type];
           // Add remaining acls one by one and then check access.
           OzoneAcl addAcl = OzoneAcl.of(identityType,

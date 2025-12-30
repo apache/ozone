@@ -21,8 +21,8 @@ Test Timeout        2 minute
 
 
 *** Variables ***
-${testuser}          testuser
+${USER}          testuser
 
 *** Test Cases ***
 Kinit
-   Kinit test user     ${testuser}     ${testuser}.keytab
+   Kinit test user     ${USER}     ${USER}.keytab

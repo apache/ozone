@@ -22,7 +22,7 @@ const Volumes = lazy(() => import('@/v2/pages/volumes/volumes'))
 const Buckets = lazy(() => import('@/v2/pages/buckets/buckets'));
 const Datanodes = lazy(() => import('@/v2/pages/datanodes/datanodes'));
 const Pipelines = lazy(() => import('@/v2/pages/pipelines/pipelines'));
-const DiskUsage = lazy(() => import('@/v2/pages/diskUsage/diskUsage'));
+const NamespaceUsage = lazy(() => import('@/v2/pages/namespaceUsage/namespaceUsage'));
 const Containers = lazy(() => import('@/v2/pages/containers/containers'));
 const Insights = lazy(() => import('@/v2/pages/insights/insights'));
 const OMDBInsights = lazy(() => import('@/v2/pages/insights/omInsights'));
@@ -51,8 +51,8 @@ export const routesV2 = [
     component: Pipelines
   },
   {
-    path: '/DiskUsage',
-    component: DiskUsage
+    path: '/NamespaceUsage',
+    component: NamespaceUsage
   },
   {
     path: '/Containers',

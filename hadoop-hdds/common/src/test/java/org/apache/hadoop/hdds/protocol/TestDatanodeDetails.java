@@ -51,6 +51,7 @@ public class TestDatanodeDetails {
         subject.toProto(VERSION_HANDLES_UNKNOWN_DN_PORTS.toProtoValue());
     assertPorts(protoV1, ALL_PORTS);
   }
+
   @Test
   void testRequiredPortsProto() {
     DatanodeDetails subject = MockDatanodeDetails.randomDatanodeDetails();

@@ -31,7 +31,7 @@ public class ManagedBlockBasedTableConfig extends BlockBasedTableConfig {
   public synchronized ManagedBlockBasedTableConfig closeAndSetBlockCache(
       Cache blockCache) {
     Cache previous = blockCacheHolder;
-    if (previous.isOwningHandle()) {
+    if (previous != null && previous.isOwningHandle()) {
       previous.close();
     }
     return setBlockCache(blockCache);

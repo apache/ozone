@@ -19,10 +19,11 @@ package org.apache.hadoop.ozone;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HTTP_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_INITIAL_HEARTBEAT_INTERVAL;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_DU_RESERVED;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_REST_HTTP_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.HddsDatanodeService.TESTING_DATANODE_VERSION_CURRENT;
 import static org.apache.hadoop.ozone.HddsDatanodeService.TESTING_DATANODE_VERSION_INITIAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT;
@@ -31,6 +32,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATAN
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_SERVER_PORT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_RATIS_LEADER_FIRST_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.anyHostWithFreePort;
 import static org.apache.ozone.test.GenericTestUtils.PortAllocator.getFreePort;
 
@@ -79,7 +81,7 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
 
     Path baseDir = Paths.get(Objects.requireNonNull(conf.get(OZONE_METADATA_DIRS)), "datanode-" + i);
 
-    Path metaDir = baseDir.resolve("meta");
+    Path metaDir = baseDir.resolve("ozone-metadata");
     Files.createDirectories(metaDir);
     dnConf.set(OZONE_METADATA_DIRS, metaDir.toString());
 
@@ -114,12 +116,13 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
     if (currentVersion != null) {
       dnConf.setInt(TESTING_DATANODE_VERSION_CURRENT, currentVersion.toProtoValue());
     }
-
+    dnConf.set(HDDS_RATIS_LEADER_FIRST_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY, "1s");
+    dnConf.set(HDDS_INITIAL_HEARTBEAT_INTERVAL, "500ms");
+    dnConf.set(HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL, "500ms");
     return dnConf;
   }
 
   private void configureDatanodePorts(ConfigurationTarget conf) {
-    conf.set(HDDS_REST_HTTP_ADDRESS_KEY, anyHostWithFreePort());
     conf.set(HDDS_DATANODE_HTTP_ADDRESS_KEY, anyHostWithFreePort());
     conf.set(HDDS_DATANODE_CLIENT_ADDRESS_KEY, anyHostWithFreePort());
     conf.setInt(HDDS_CONTAINER_IPC_PORT, getFreePort());

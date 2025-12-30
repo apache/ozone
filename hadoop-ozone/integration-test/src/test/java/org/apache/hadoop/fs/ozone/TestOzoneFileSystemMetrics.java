@@ -40,13 +40,11 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test OM Metrics for OzoneFileSystem operations.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
 public abstract class TestOzoneFileSystemMetrics implements NonHATests.TestCase {
 
   private OzoneClient client;
@@ -108,11 +106,11 @@ public abstract class TestOzoneFileSystemMetrics implements NonHATests.TestCase 
         .getOzoneManager().getMetrics().getNumKeys();
 
     int fileLen = 30 * 1024 * 1024;
-    byte[] data = string2Bytes(RandomStringUtils.randomAlphanumeric(fileLen));
+    byte[] data = string2Bytes(RandomStringUtils.secure().nextAlphanumeric(fileLen));
 
-    Path parentDir = new Path("/" + RandomStringUtils.randomAlphanumeric(5));
+    Path parentDir = new Path("/" + RandomStringUtils.secure().nextAlphanumeric(5));
     Path filePath = new Path(parentDir,
-        RandomStringUtils.randomAlphanumeric(5));
+        RandomStringUtils.secure().nextAlphanumeric(5));
 
     switch (op) {
     case Key:

@@ -22,8 +22,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 
 /**
@@ -32,7 +32,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
  */
 class DatanodeDeletedBlockTransactions {
   // A list of TXs mapped to a certain datanode ID.
-  private final Map<UUID, List<DeletedBlocksTransaction>> transactions =
+  private final Map<DatanodeID, List<DeletedBlocksTransaction>> transactions =
       new HashMap<>();
   // counts blocks deleted across datanodes. Blocks deleted will be counted
   // for all the replicas and may not be unique.
@@ -41,7 +41,7 @@ class DatanodeDeletedBlockTransactions {
   DatanodeDeletedBlockTransactions() {
   }
 
-  void addTransactionToDN(UUID dnID, DeletedBlocksTransaction tx) {
+  void addTransactionToDN(DatanodeID dnID, DeletedBlocksTransaction tx) {
     transactions.computeIfAbsent(dnID, k -> new LinkedList<>()).add(tx);
     blocksDeleted += tx.getLocalIDCount();
     if (SCMBlockDeletingService.LOG.isDebugEnabled()) {
@@ -51,7 +51,7 @@ class DatanodeDeletedBlockTransactions {
     }
   }
 
-  Map<UUID, List<DeletedBlocksTransaction>> getDatanodeTransactionMap() {
+  Map<DatanodeID, List<DeletedBlocksTransaction>> getDatanodeTransactionMap() {
     return transactions;
   }
 
@@ -59,13 +59,21 @@ class DatanodeDeletedBlockTransactions {
     return blocksDeleted;
   }
 
-  List<String> getTransactionIDList(UUID dnId) {
+  List<String> getTransactionIDList(DatanodeID dnId) {
     return Optional.ofNullable(transactions.get(dnId))
         .orElse(new LinkedList<>())
         .stream()
         .map(DeletedBlocksTransaction::getTxID)
         .map(String::valueOf)
         .collect(Collectors.toList());
+  }
+
+  public int getNumberOfBlocksForDatanode(DatanodeID dnId) {
+    return Optional.ofNullable(transactions.get(dnId))
+        .orElse(new LinkedList<>())
+        .stream()
+        .mapToInt(DeletedBlocksTransaction::getLocalIDCount)
+        .sum();
   }
 
   boolean isEmpty() {

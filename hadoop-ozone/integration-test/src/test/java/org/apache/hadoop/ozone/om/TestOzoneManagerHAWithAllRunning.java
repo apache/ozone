@@ -77,6 +77,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientReply;
@@ -208,8 +209,8 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
 
   private OzoneVolume createAndCheckVolume(String volumeName)
       throws Exception {
-    String userName = "user" + RandomStringUtils.randomNumeric(5);
-    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
+    String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
+    String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)
         .setAdmin(adminName)
@@ -229,7 +230,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
 
   @Test
   public void testAllVolumeOperations() throws Exception {
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
 
     createAndCheckVolume(volumeName);
 
@@ -243,11 +244,10 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
         () -> objectStore.deleteVolume(volumeName));
   }
 
-
   @Test
   public void testAllBucketOperations() throws Exception {
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "volume" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "volume" + RandomStringUtils.secure().nextNumeric(5);
 
     OzoneVolume retVolume = createAndCheckVolume(volumeName);
 
@@ -398,7 +398,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
 
   @Test
   public void testReadRequest() throws Exception {
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
     ObjectStore objectStore = getObjectStore();
     objectStore.createVolume(volumeName);
 
@@ -471,8 +471,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
     String volumeName = randomUUID().toString();
 
 
-    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-        .captureLogs(OMVolumeCreateRequest.getLogger());
+    LogCapturer logCapturer = LogCapturer.captureLogs(OMVolumeCreateRequest.class);
 
     OzoneManagerProtocolProtos.UserInfo userInfo =
         OzoneManagerProtocolProtos.UserInfo.newBuilder()
@@ -661,7 +660,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
   void testAddPrefixAcl() throws Exception {
     OzoneBucket ozoneBucket = setupBucket();
     String remoteUserName = "remoteUser";
-    String prefixName = RandomStringUtils.randomAlphabetic(5) + "/";
+    String prefixName = RandomStringUtils.secure().nextAlphabetic(5) + "/";
     OzoneAcl defaultUserAcl = OzoneAcl.of(USER, remoteUserName,
         DEFAULT, READ);
 
@@ -674,7 +673,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
   void testRemovePrefixAcl() throws Exception {
     OzoneBucket ozoneBucket = setupBucket();
     String remoteUserName = "remoteUser";
-    String prefixName = RandomStringUtils.randomAlphabetic(5) + "/";
+    String prefixName = RandomStringUtils.secure().nextAlphabetic(5) + "/";
     OzoneAcl userAcl = OzoneAcl.of(USER, remoteUserName,
         ACCESS, READ);
     OzoneAcl userAcl1 = OzoneAcl.of(USER, "remote",
@@ -706,7 +705,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
   void testSetPrefixAcl() throws Exception {
     OzoneBucket ozoneBucket = setupBucket();
     String remoteUserName = "remoteUser";
-    String prefixName = RandomStringUtils.randomAlphabetic(5) + "/";
+    String prefixName = RandomStringUtils.secure().nextAlphabetic(5) + "/";
     OzoneAcl defaultUserAcl = OzoneAcl.of(USER, remoteUserName,
         DEFAULT, READ);
 
@@ -744,8 +743,8 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
     OzoneBucket linkedBucket = linkBucket(srcBucket);
     OzoneObj linkObj = buildBucketObj(linkedBucket);
     OzoneObj srcObj = buildBucketObj(srcBucket);
-    // As by default create will add some default acls in RpcClient.
-    List<OzoneAcl> acls = getObjectStore().getAcl(linkObj);
+    // choose from src's ACLs to avoid trying to remove OzoneAcl#LINK_BUCKET_DEFAULT_ACL
+    List<OzoneAcl> acls = getObjectStore().getAcl(srcObj);
     assertFalse(acls.isEmpty());
     // Remove an existing acl.
     boolean removeAcl = getObjectStore().removeAcl(linkObj, acls.get(0));
@@ -1079,10 +1078,10 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
 
   @Test
   void testOMRatisSnapshot() throws Exception {
-    String userName = "user" + RandomStringUtils.randomNumeric(5);
-    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "bucket" + RandomStringUtils.randomNumeric(5);
+    String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
+    String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "bucket" + RandomStringUtils.secure().nextNumeric(5);
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)

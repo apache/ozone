@@ -156,7 +156,7 @@ public final class OmLifecycleRuleAndOperator {
       return this;
     }
 
-    public OmLifecycleRuleAndOperator build() throws OMException {
+    public OmLifecycleRuleAndOperator build() {
       return new OmLifecycleRuleAndOperator(this);
     }
   }
@@ -182,7 +182,7 @@ public final class OmLifecycleRuleAndOperator {
   }
 
   public static OmLifecycleRuleAndOperator getFromProtobuf(LifecycleRuleAndOperator andOperator,
-      BucketLayout layout) throws OMException {
+      BucketLayout layout) {
     OmLifecycleRuleAndOperator.Builder builder = new OmLifecycleRuleAndOperator.Builder();
 
     if (andOperator.hasPrefix()) {

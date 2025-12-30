@@ -79,9 +79,9 @@ public class TestStatisticsUpdate {
     DatanodeDetails datanode2 = MockDatanodeDetails.randomDatanodeDetails();
 
     StorageReportProto storageOne = HddsTestUtils.createStorageReport(
-        datanode1.getUuid(), datanode1.getUuidString(), 100, 10, 90, null);
+        datanode1.getID(), datanode1.getUuidString(), 100, 10, 90, null);
     StorageReportProto storageTwo = HddsTestUtils.createStorageReport(
-        datanode2.getUuid(), datanode2.getUuidString(), 200, 20, 180, null);
+        datanode2.getID(), datanode2.getUuidString(), 200, 20, 180, null);
 
     nodeManager.register(datanode1,
         HddsTestUtils.createNodeReport(Arrays.asList(storageOne),

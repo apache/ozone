@@ -20,11 +20,11 @@
 
 # HTTPFS config directory
 #
-# export HTTPFS_CONFIG=${HADOOP_CONF_DIR}
+# export HTTPFS_CONFIG=${OZONE_CONF_DIR}
 
 # HTTPFS log directory
 #
-# export HTTPFS_LOG=${HADOOP_LOG_DIR}
+# export HTTPFS_LOG=${OZONE_LOG_DIR}
 
 # HTTPFS temporary directory
 #

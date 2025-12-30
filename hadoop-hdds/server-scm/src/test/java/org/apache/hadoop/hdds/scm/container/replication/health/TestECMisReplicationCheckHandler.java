@@ -52,6 +52,7 @@ import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacem
 import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationQueue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -75,7 +76,9 @@ public class TestECMisReplicationCheckHandler {
     handler = new ECMisReplicationCheckHandler(placementPolicy);
     repConfig = new ECReplicationConfig(3, 2);
     repQueue = new ReplicationQueue();
-    report = new ReplicationManagerReport();
+    ReplicationManager.ReplicationManagerConfiguration rmConf =
+        mock(ReplicationManager.ReplicationManagerConfiguration.class);
+    report = new ReplicationManagerReport(rmConf.getContainerSampleLimit());
     int maintenanceRedundancy = 2;
     requestBuilder = new ContainerCheckRequest.Builder()
         .setReplicationQueue(repQueue)
@@ -172,8 +175,8 @@ public class TestECMisReplicationCheckHandler {
     });
 
     List<ContainerReplicaOp> pending = new ArrayList<>();
-    pending.add(ContainerReplicaOp.create(
-        ADD, MockDatanodeDetails.randomDatanodeDetails(), 1));
+    pending.add(new ContainerReplicaOp(
+        ADD, MockDatanodeDetails.randomDatanodeDetails(), 1, null, Long.MAX_VALUE, 0));
 
     Set<ContainerReplica> replicas =  createReplicas(container.containerID(),
         Pair.of(IN_SERVICE, 1), Pair.of(IN_SERVICE, 2),
@@ -229,8 +232,8 @@ public class TestECMisReplicationCheckHandler {
             State.UNHEALTHY);
     replicas.add(unhealthyReplica);
     List<ContainerReplicaOp> pending = new ArrayList<>();
-    pending.add(ContainerReplicaOp.create(
-        DELETE, unhealthyReplica.getDatanodeDetails(), 1));
+    pending.add(new ContainerReplicaOp(
+        DELETE, unhealthyReplica.getDatanodeDetails(), 1, null, Long.MAX_VALUE, 0));
 
     ContainerCheckRequest request = requestBuilder
         .setContainerReplicas(replicas)

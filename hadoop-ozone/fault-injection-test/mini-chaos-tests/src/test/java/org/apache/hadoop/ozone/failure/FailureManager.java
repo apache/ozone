@@ -43,6 +43,7 @@ public class FailureManager {
   private final List<Failures> failures;
   private ScheduledFuture scheduledFuture;
   private final ScheduledExecutorService executorService;
+
   public FailureManager(MiniOzoneChaosCluster cluster,
                         Configuration conf,
                         Set<Class<? extends Failures>> clazzes) {
@@ -89,10 +90,10 @@ public class FailureManager {
   }
 
   public static boolean isFastRestart() {
-    return RandomUtils.nextBoolean();
+    return RandomUtils.secure().randomBoolean();
   }
 
   public static int getBoundedRandomIndex(int size) {
-    return RandomUtils.nextInt(0, size);
+    return RandomUtils.secure().randomInt(0, size);
   }
 }

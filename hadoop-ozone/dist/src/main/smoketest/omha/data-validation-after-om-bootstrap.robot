@@ -17,6 +17,7 @@
 Documentation       Smoke test for validating snapshot data after om bootstrap.
 Resource            ../commonlib.robot
 Test Timeout        5 minutes
+Suite Setup         Get Security Enabled From Config
 Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
 
 *** Variables ***
@@ -28,10 +29,11 @@ ${SNAP_2}
 ${KEY_PREFIX}
 ${KEY_1}
 ${KEY_2}
+${IS_FOLLOWER}  true
 
 *** Keywords ***
 Number of checkpoints equals 2
-    ${checkpoints} =    Execute                 ls -lah /data/metadata/db.snapshots/checkpointState | grep 'om.db-' | wc -l
+    ${checkpoints} =    Execute                 ls -lah /data/metadata/db.snapshots/checkpointState | grep -v '.yaml' | grep 'om.db-' | wc -l
                         Should be true          ${checkpoints} == 2
 
 Check current leader is different than OM
@@ -41,8 +43,15 @@ Check current leader is different than OM
 
 Transfer leadership to OM
     [arguments]         ${new_leader}
-    ${result} =         Execute                 ozone admin om transfer --service-id=omservice -n ${new_leader}
-                        Should Contain          ${result}               Transfer leadership successfully
+    ${status}    ${result} =    Run Keyword And Ignore Error
+    ...                   Execute    ozone admin om transfer --service-id=omservice -n ${new_leader}
+
+    Run Keyword If      '${IS_FOLLOWER}' == 'true'
+    ...                       Should Be Equal As Strings    ${status}    PASS
+    ...                       AND    Should Contain    ${result}    Transfer leadership successfully
+    ...            ELSE
+    ...                       Should Be Equal As Strings    ${status}    FAIL
+    ...                       AND    Should Contain    ${result}    not in Follower role
 
 Check snapshots on OM
     [arguments]         ${volume}               ${bucket}           ${snap_1}       ${snap_2}

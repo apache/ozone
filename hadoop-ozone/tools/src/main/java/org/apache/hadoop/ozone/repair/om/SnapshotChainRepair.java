@@ -30,6 +30,8 @@ import java.util.Set;
 import java.util.UUID;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedConfigOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.ozone.debug.RocksDBUtils;
@@ -49,6 +51,7 @@ import picocli.CommandLine;
 @CommandLine.Command(
     name = "chain",
     description = "CLI to update global and path previous snapshot for a snapshot in case snapshot chain is corrupted."
+        + " OM should be stopped for this tool."
 )
 public class SnapshotChainRepair extends RepairTool {
 
@@ -83,10 +86,13 @@ public class SnapshotChainRepair extends RepairTool {
 
   @Override
   public void execute() throws Exception {
+    ManagedConfigOptions configOptions = new ManagedConfigOptions();
+    ManagedDBOptions dbOptions = new ManagedDBOptions();
     List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
-    List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(dbPath);
+    List<ColumnFamilyDescriptor> cfDescList = new ArrayList<>();
 
-    try (ManagedRocksDB db = ManagedRocksDB.open(dbPath, cfDescList, cfHandleList)) {
+    try (ManagedRocksDB db = ManagedRocksDB.openWithLatestOptions(
+        configOptions, dbOptions, dbPath, cfDescList, cfHandleList)) {
       ColumnFamilyHandle snapshotInfoCfh = RocksDBUtils.getColumnFamilyHandle(SNAPSHOT_INFO_TABLE, cfHandleList);
       if (snapshotInfoCfh == null) {
         error("%s is not in a column family in DB for the given path.", SNAPSHOT_INFO_TABLE);
@@ -153,6 +159,8 @@ public class SnapshotChainRepair extends RepairTool {
           "Make sure that Ozone entity (OM, SCM or DN) is not running for the give dbPath and current host.");
       LOG.error(exception.toString());
     } finally {
+      IOUtils.closeQuietly(configOptions);
+      IOUtils.closeQuietly(dbOptions);
       IOUtils.closeQuietly(cfHandleList);
     }
   }

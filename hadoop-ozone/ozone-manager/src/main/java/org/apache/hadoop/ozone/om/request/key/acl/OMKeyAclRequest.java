@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.key.acl;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
@@ -106,8 +106,8 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
         throw new OMException(OMException.ResultCodes.KEY_NOT_FOUND);
       }
 
-      operationResult = apply(omKeyInfo, trxnLogIndex);
-      omKeyInfo.setUpdateID(trxnLogIndex);
+      OmKeyInfo.Builder builder = omKeyInfo.toBuilder();
+      operationResult = apply(builder, trxnLogIndex);
 
       // Update the modification time when updating ACLs of Key.
       long modificationTime = omKeyInfo.getModificationTime();
@@ -123,7 +123,11 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
         modificationTime = getOmRequest().getRemoveAclRequest()
             .getModificationTime();
       }
-      omKeyInfo.setModificationTime(modificationTime);
+
+      omKeyInfo = builder
+          .setModificationTime(modificationTime)
+          .setUpdateID(trxnLogIndex)
+          .build();
 
       // update cache.
       omMetadataManager.getKeyTable(getBucketLayout())
@@ -242,10 +246,10 @@ public abstract class OMKeyAclRequest extends OMClientRequest {
   /**
    * Apply the acl operation, if successfully completed returns true,
    * else false.
-   * @param omKeyInfo
+   * @param builder
    * @param trxnLogIndex
    */
-  abstract boolean apply(OmKeyInfo omKeyInfo, long trxnLogIndex);
+  abstract boolean apply(OmKeyInfo.Builder builder, long trxnLogIndex);
 
   public void setBucketLayout(BucketLayout bucketLayout) {
     this.bucketLayout = bucketLayout;

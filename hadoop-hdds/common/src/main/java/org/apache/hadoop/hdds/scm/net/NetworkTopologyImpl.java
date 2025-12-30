@@ -36,7 +36,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,7 +48,7 @@ import org.slf4j.LoggerFactory;
  * manages traffic in/out of data centers or racks.
  */
 public class NetworkTopologyImpl implements NetworkTopology {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(NetworkTopologyImpl.class);
 
   /** The Inner node crate factory. */
@@ -893,18 +893,18 @@ public class NetworkTopologyImpl implements NetworkTopology {
     StringBuilder tree = new StringBuilder();
     tree.append("Level: ");
     tree.append(maxLevel);
-    tree.append("\n");
+    tree.append('\n');
     netlock.readLock().lock();
     try {
       // print the number of leaves
       int numOfLeaves = clusterTree.getNumOfLeaves();
       tree.append("Number of leaves:");
       tree.append(numOfLeaves);
-      tree.append("\n");
+      tree.append('\n');
       // print all nodes
       for (int i = 0; i < numOfLeaves; i++) {
         tree.append(clusterTree.getLeaf(i).getNetworkFullPath());
-        tree.append("\n");
+        tree.append('\n');
       }
     } finally {
       netlock.readLock().unlock();

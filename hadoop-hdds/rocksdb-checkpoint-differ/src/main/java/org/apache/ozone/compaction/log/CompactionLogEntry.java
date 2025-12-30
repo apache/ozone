@@ -18,7 +18,6 @@
 package org.apache.ozone.compaction.log;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -39,10 +38,6 @@ public final class CompactionLogEntry implements
       CompactionLogEntry::getProtobuf,
       CompactionLogEntry.class);
 
-  public static Codec<CompactionLogEntry> getCodec() {
-    return CODEC;
-  }
-
   private final long dbSequenceNumber;
   private final long compactionTime;
   private final List<CompactionFileInfo> inputFileInfoList;
@@ -60,6 +55,10 @@ public final class CompactionLogEntry implements
     this.inputFileInfoList = inputFileInfoList;
     this.outputFileInfoList = outputFileInfoList;
     this.compactionReason = compactionReason;
+  }
+
+  public static Codec<CompactionLogEntry> getCodec() {
+    return CODEC;
   }
 
   public List<CompactionFileInfo> getInputFileInfoList() {
@@ -129,31 +128,42 @@ public final class CompactionLogEntry implements
         inputFileInfoList, outputFileInfoList, compactionReason);
   }
 
+  public Builder toBuilder() {
+    Builder builder = new Builder(this.getDbSequenceNumber(), this.getCompactionTime(),
+        this.getInputFileInfoList(), this.getOutputFileInfoList());
+    String reason = this.getCompactionReason();
+    if (this.getCompactionReason() != null) {
+      builder.setCompactionReason(reason);
+    }
+    return builder;
+  }
+
   /**
    * Builder of CompactionLogEntry.
    */
   public static class Builder {
     private final long dbSequenceNumber;
     private final long compactionTime;
-    private final List<CompactionFileInfo> inputFileInfoList;
+    private List<CompactionFileInfo> inputFileInfoList;
     private final List<CompactionFileInfo> outputFileInfoList;
     private String compactionReason;
 
     public Builder(long dbSequenceNumber, long compactionTime,
                    List<CompactionFileInfo> inputFileInfoList,
                    List<CompactionFileInfo> outputFileInfoList) {
-      Preconditions.checkNotNull(inputFileInfoList,
-          "inputFileInfoList is required parameter.");
-      Preconditions.checkNotNull(outputFileInfoList,
-          "outputFileInfoList is required parameter.");
       this.dbSequenceNumber = dbSequenceNumber;
       this.compactionTime = compactionTime;
-      this.inputFileInfoList = inputFileInfoList;
-      this.outputFileInfoList = outputFileInfoList;
+      this.inputFileInfoList = Objects.requireNonNull(inputFileInfoList, "inputFileInfoList == null");
+      this.outputFileInfoList = Objects.requireNonNull(outputFileInfoList, "outputFileInfoList == null");
     }
 
     public Builder setCompactionReason(String compactionReason) {
       this.compactionReason = compactionReason;
+      return this;
+    }
+
+    public Builder updateInputFileInfoList(List<CompactionFileInfo> fileInfoList) {
+      this.inputFileInfoList = fileInfoList;
       return this;
     }
 

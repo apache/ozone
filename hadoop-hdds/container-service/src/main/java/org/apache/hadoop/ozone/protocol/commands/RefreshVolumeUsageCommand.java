@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.protocol.commands;
 
-import com.google.common.base.Preconditions;
+import java.util.Objects;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.RefreshVolumeUsageCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 
@@ -51,7 +51,7 @@ public class RefreshVolumeUsageCommand
 
   public static RefreshVolumeUsageCommand getFromProtobuf(
       RefreshVolumeUsageCommandProto refreshVolumeUsageProto) {
-    Preconditions.checkNotNull(refreshVolumeUsageProto);
+    Objects.requireNonNull(refreshVolumeUsageProto);
     return new RefreshVolumeUsageCommand();
   }
 
@@ -60,7 +60,7 @@ public class RefreshVolumeUsageCommand
     StringBuilder sb = new StringBuilder();
     sb.append(getType())
         .append(": cmdID: ").append(getId())
-        .append(", encodedToken: \"").append(getEncodedToken()).append("\"")
+        .append(", encodedToken: \"").append(getEncodedToken()).append('"')
         .append(", term: ").append(getTerm())
         .append(", deadlineMsSinceEpoch: ").append(getDeadline());
     return sb.toString();

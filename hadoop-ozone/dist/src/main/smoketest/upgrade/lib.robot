@@ -17,23 +17,9 @@
 Documentation       Keywords for Upgrade Tests
 Library             OperatingSystem
 Resource            ../lib/os.robot
+Resource            ../admincli/lib.resource
 
 *** Keywords ***
-Get OM Service ID
-    ${service_id} =     Get Environment Variable    OM_SERVICE_ID    ${EMPTY}
-    RETURN    ${service_id}
-
-
-Get OM Service Param
-    ${service_id} =     Get OM Service ID
-
-    IF    '${service_id}' == ''
-        RETURN    --service-host om
-    ELSE
-        RETURN    --service-id '${service_id}'
-    END
-
-
 OM Finalization Status
     ${param} =     Get OM Service Param
     ${result} =    Execute      ozone admin om finalizationstatus ${param}

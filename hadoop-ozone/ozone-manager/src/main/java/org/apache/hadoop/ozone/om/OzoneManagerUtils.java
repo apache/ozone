@@ -86,8 +86,6 @@ public final class OzoneManagerUtils {
         OMException.ResultCodes.BUCKET_NOT_FOUND);
   }
 
-
-
   /**
    * Get bucket layout for the given volume and bucket name.
    *

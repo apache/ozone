@@ -108,6 +108,7 @@ public class TestStreamingServer {
     assertArrayEquals(CONTENT, targetContent);
 
   }
+
   @Test
   public void failedStream() throws Exception {
     Files.createDirectories(sourceDir.resolve(SUBDIR));
@@ -156,6 +157,44 @@ public class TestStreamingServer {
     //THEN: compare the files
     //exception is expected
 
+  }
+
+  @Test
+  public void testChannelLeakOnTimeoutWithoutClose() throws Exception {
+    Files.createDirectories(sourceDir.resolve(SUBDIR));
+    Files.write(sourceDir.resolve(SUBDIR).resolve("file1"), CONTENT);
+
+    try (StreamingServer server = new StreamingServer(
+        new DirectoryServerSource(sourceDir) {
+          @Override
+          public Map<String, Path> getFilesToStream(String id)
+              throws InterruptedException {
+            // Delay to cause timeout
+            Thread.sleep(3000L);
+            return super.getFilesToStream(id);
+          }
+        }, 0)) {
+      server.start();
+
+      // Create client WITHOUT try-with-resources to simulate resource leak
+      StreamingClient client = new StreamingClient("localhost", server.getPort(),
+          new DirectoryServerDestination(destDir));
+
+      try {
+        client.stream(SUBDIR, 1L, TimeUnit.SECONDS);
+        // Should not reach here
+        throw new AssertionError("Expected exception, but none was thrown");
+      } catch (StreamingException e) {
+        String message = e.getMessage();
+        if (!message.contains("timed out") && !message.contains("timeout")) {
+          throw new AssertionError(
+              "Expected timeout exception, but got: " + message + ". " +
+              "This indicates the bug: await() returned false but we didn't check it. " +
+              "Channel may be leaking.");
+        }
+      }
+      client.close();
+    }
   }
 
   private void streamDir(String subdir) {

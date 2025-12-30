@@ -34,6 +34,9 @@ import java.util.List;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -56,14 +59,12 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * This class tests container operations (TODO currently only supports create)
  * from cblock clients.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
 public abstract class TestContainerOperations implements NonHATests.TestCase {
 
   private static final int CONTAINER_LIST_LIMIT = 1;
@@ -96,7 +97,7 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
     // call create Container again
     BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
     byte[] data =
-        RandomStringUtils.random(RandomUtils.nextInt(0, 1024)).getBytes(UTF_8);
+        RandomStringUtils.secure().next(RandomUtils.secure().randomInt(0, 1024)).getBytes(UTF_8);
     ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
         ContainerTestHelper
             .getWriteChunkRequest(container.getPipeline(), blockID,
@@ -190,19 +191,16 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
 
   @Test
   public void testDatanodeUsageInfoContainerCount() throws Exception {
-    List<DatanodeDetails> dnList = cluster().getStorageContainerManager()
-            .getScmNodeManager()
-            .getAllNodes();
+    NodeManager nodeManager = cluster().getStorageContainerManager().getScmNodeManager();
+    List<? extends DatanodeDetails> dnList = nodeManager.getAllNodes();
 
     for (DatanodeDetails dn : dnList) {
-      final int expected = cluster().getStorageContainerManager().getScmNodeManager().getContainers(dn).size();
-
       List<HddsProtos.DatanodeUsageInfoProto> usageInfoList =
               storageClient.getDatanodeUsageInfo(
                       dn.getIpAddress(), dn.getUuidString());
 
       assertEquals(1, usageInfoList.size());
-      assertEquals(expected, usageInfoList.get(0).getContainerCount());
+      assertEquals(nodeManager.getContainers(dn).size(), usageInfoList.get(0).getContainerCount());
     }
   }
 
@@ -266,5 +264,22 @@ public abstract class TestContainerOperations implements NonHATests.TestCase {
     } finally {
       nm.setNodeOperationalState(node, originalState);
     }
+  }
+
+  @Test
+  public void testCreateRatis() throws Exception {
+    testCreateContainer(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
+  }
+
+  @Test
+  public void testCreateEC() throws Exception {
+    ECReplicationConfig ecConfig = new ECReplicationConfig(3, 2);
+    testCreateContainer(ecConfig);
+  }
+
+  private void testCreateContainer(ReplicationConfig replicationConfig) throws Exception {
+    ContainerWithPipeline container = storageClient.createContainer(replicationConfig, OzoneConsts.OZONE);
+    assertEquals(container.getContainerInfo().getContainerID(),
+        storageClient.getContainer(container.getContainerInfo().getContainerID()).getContainerID());
   }
 }

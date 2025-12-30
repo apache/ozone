@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerException;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
@@ -91,23 +92,31 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
       closeContainers(datanodeDetails, publisher);
       destroyPipelines(datanodeDetails);
 
+      boolean isNodeInMaintenance = nodeManager.getNodeStatus(datanodeDetails).isInMaintenance();
+
       // Remove the container replicas associated with the dead node unless it
       // is IN_MAINTENANCE
-      if (!nodeManager.getNodeStatus(datanodeDetails).isInMaintenance()) {
+      if (!isNodeInMaintenance) {
         removeContainerReplicas(datanodeDetails);
       }
-      
+
+      // Notify ReplicationManager
+      if (!isNodeInMaintenance) {
+        LOG.debug("Notifying ReplicationManager about dead node: {}",
+            datanodeDetails);
+        publisher.fireEvent(SCMEvents.REPLICATION_MANAGER_NOTIFY, datanodeDetails);
+      }
+
       // remove commands in command queue for the DN
       final List<SCMCommand<?>> cmdList = nodeManager.getCommandQueue(
-          datanodeDetails.getUuid());
+          datanodeDetails.getID());
       LOG.info("Clearing command queue of size {} for DN {}",
           cmdList.size(), datanodeDetails);
 
       // remove DeleteBlocksCommand associated with the dead node unless it
       // is IN_MAINTENANCE
-      if (deletedBlockLog != null &&
-          !nodeManager.getNodeStatus(datanodeDetails).isInMaintenance()) {
-        deletedBlockLog.onDatanodeDead(datanodeDetails.getUuid());
+      if (deletedBlockLog != null && !isNodeInMaintenance) {
+        deletedBlockLog.onDatanodeDead(datanodeDetails.getID());
       }
 
       //move dead datanode out of ClusterNetworkTopology

@@ -136,6 +136,14 @@ public interface MultiTenantAccessController {
       Acl otherAcl = (Acl) other;
       return isAllowed() == otherAcl.isAllowed() && acl == otherAcl.acl;
     }
+
+    @Override
+    public String toString() {
+      return "Acl{" +
+          "isAllowed=" + isAllowed +
+          ", acl=" + acl +
+          '}';
+    }
   }
 
   /**
@@ -203,6 +211,18 @@ public interface MultiTenantAccessController {
           Objects.equals(getUsersMap(), role.getUsersMap()) &&
           Objects.equals(getDescription(), role.getDescription()) &&
           roleIdsMatch;
+    }
+
+    @Override
+    public String toString() {
+      return "Role{" +
+          "id=" + id +
+          ", name='" + name + '\'' +
+          ", usersMap=" + usersMap +
+          ", rolesMap=" + rolesMap +
+          ", description='" + description + '\'' +
+          ", createdByUser='" + createdByUser + '\'' +
+          '}';
     }
 
     public String getCreatedByUser() {
@@ -400,6 +420,22 @@ public interface MultiTenantAccessController {
           Objects.equals(getUserAcls(), policy.getUserAcls()) &&
           Objects.equals(getRoleAcls(), policy.getRoleAcls()) &&
           Objects.equals(getLabels(), policy.getLabels());
+    }
+
+    @Override
+    public String toString() {
+      return "Policy{" +
+          "id=" + id +
+          ", name='" + name + '\'' +
+          ", volumes=" + volumes +
+          ", buckets=" + buckets +
+          ", keys=" + keys +
+          ", description='" + description + '\'' +
+          ", userAcls=" + userAcls +
+          ", roleAcls=" + roleAcls +
+          ", labels=" + labels +
+          ", isEnabled=" + isEnabled +
+          '}';
     }
 
     public boolean isEnabled() {

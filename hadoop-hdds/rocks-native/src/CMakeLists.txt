@@ -20,7 +20,7 @@
 # CMake configuration.
 #
 
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 2.8...3.31)
 add_definitions(-D_GLIBCXX_USE_CXX11_ABI=0)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")

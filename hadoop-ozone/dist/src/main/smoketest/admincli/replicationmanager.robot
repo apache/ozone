@@ -17,7 +17,7 @@
 Documentation       Test ozone admin replicationmanager command
 Library             BuiltIn
 Resource            ../commonlib.robot
-Suite Setup         Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
+Suite Setup         Kinit test user     testuser     testuser.keytab
 Test Timeout        5 minutes
 
 *** Variables ***

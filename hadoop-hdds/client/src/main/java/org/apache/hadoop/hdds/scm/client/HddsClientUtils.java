@@ -17,11 +17,11 @@
 
 package org.apache.hadoop.hdds.scm.client;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -48,6 +48,14 @@ import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
 @InterfaceAudience.Public
 @InterfaceStability.Unstable
 public final class HddsClientUtils {
+  static final int MAX_BUCKET_NAME_LENGTH_IN_LOG =
+      2 * OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH;
+
+  private static final String VALID_LENGTH_MESSAGE = String.format(
+      "valid length is %d-%d characters",
+      OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH,
+      OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH);
+
   private static final List<Class<? extends Exception>> EXCEPTION_LIST =
       ImmutableList.<Class<? extends Exception>>builder()
           .add(TimeoutException.class)
@@ -68,10 +76,26 @@ public final class HddsClientUtils {
       throw new IllegalArgumentException(resType + " name is null");
     }
 
-    if (resName.length() < OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH ||
-        resName.length() > OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH) {
+    if (resName.length() < OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH) {
       throw new IllegalArgumentException(resType +
-          " length is illegal, " + "valid length is 3-63 characters");
+          " name '" + resName + "' is too short, " +
+          VALID_LENGTH_MESSAGE);
+    }
+
+    if (resName.length() > OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH) {
+      String nameToReport;
+
+      if (resName.length() > MAX_BUCKET_NAME_LENGTH_IN_LOG) {
+        nameToReport = String.format(
+            "%s...",
+            resName.substring(0, MAX_BUCKET_NAME_LENGTH_IN_LOG));
+      } else {
+        nameToReport = resName;
+      }
+
+      throw new IllegalArgumentException(resType +
+          " name '" + nameToReport + "' is too long, " +
+          VALID_LENGTH_MESSAGE);
     }
 
     if (resName.charAt(0) == '.' || resName.charAt(0) == '-') {
@@ -150,9 +174,6 @@ public final class HddsClientUtils {
    * @throws IllegalArgumentException
    */
   public static void verifyResourceName(String resName, String resType, boolean isStrictS3) {
-
-    doNameChecks(resName, resType);
-
     boolean isIPv4 = true;
     char prev = (char) 0;
 
@@ -169,6 +190,8 @@ public final class HddsClientUtils {
       throw new IllegalArgumentException(resType +
           " name cannot be an IPv4 address or all numeric");
     }
+
+    doNameChecks(resName, resType);
   }
 
   /**
@@ -196,7 +219,7 @@ public final class HddsClientUtils {
    */
   public static <T> void checkNotNull(T... references) {
     for (T ref: references) {
-      Preconditions.checkNotNull(ref);
+      Objects.requireNonNull(ref, "ref == null");
     }
   }
 
@@ -230,7 +253,6 @@ public final class HddsClientUtils {
         .getObject(RatisClientConfig.RaftConfig.class)
         .getMaxOutstandingRequests();
   }
-
 
   // This will return the underlying exception after unwrapping
   // the exception to see if it matches with expected exception

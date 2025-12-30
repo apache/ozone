@@ -21,13 +21,14 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 
 /**
  * Response for Initiate Multipart Upload request.
  */
 @XmlAccessorType(XmlAccessType.FIELD)
 @XmlRootElement(name = "InitiateMultipartUploadResult",
-    namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+    namespace = S3Consts.S3_XML_NAMESPACE)
 public class MultipartUploadInitiateResponse {
 
   @XmlElement(name = "Bucket")

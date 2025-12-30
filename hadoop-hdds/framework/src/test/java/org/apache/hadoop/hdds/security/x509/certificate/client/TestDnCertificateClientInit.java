@@ -56,9 +56,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 public class TestDnCertificateClientInit {
 
   private KeyPair keyPair;
-  private String certSerialId = "3284792342234";
   private DNCertificateClient dnCertificateClient;
-  private HDDSKeyGenerator keyGenerator;
   @TempDir
   private Path metaDirPath;
   private SecurityConfig securityConfig;
@@ -84,10 +82,10 @@ public class TestDnCertificateClientInit {
     OzoneConfiguration config = new OzoneConfiguration();
     config.set(HDDS_METADATA_DIR_NAME, metaDirPath.toString());
     securityConfig = new SecurityConfig(config);
-    keyGenerator = new HDDSKeyGenerator(securityConfig);
+    HDDSKeyGenerator keyGenerator = new HDDSKeyGenerator(securityConfig);
     keyPair = keyGenerator.generateKey();
     x509Certificate = getX509Certificate();
-    certSerialId = x509Certificate.getSerialNumber().toString();
+    String certSerialId = x509Certificate.getSerialNumber().toString();
     DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
     dnCertificateClient =
         new DNCertificateClient(
@@ -102,7 +100,6 @@ public class TestDnCertificateClientInit {
     dnCertificateClient.close();
     dnCertificateClient = null;
   }
-
 
   @ParameterizedTest
   @MethodSource("parameters")

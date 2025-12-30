@@ -17,9 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.Objects;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
@@ -40,8 +39,7 @@ import org.slf4j.LoggerFactory;
  */
 public class FinalizationStateManagerImpl implements FinalizationStateManager {
 
-  @VisibleForTesting
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(FinalizationStateManagerImpl.class);
 
   private Table<String, String> finalizationStore;
@@ -230,7 +228,6 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
       throws IOException {
     checkpointLock.writeLock().lock();
     try {
-      this.finalizationStore.close();
       this.finalizationStore = newFinalizationStore;
       initialize();
 
@@ -326,9 +323,9 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
     }
 
     public FinalizationStateManager build() throws IOException {
-      Preconditions.checkNotNull(finalizationStore);
-      Preconditions.checkNotNull(transactionBuffer);
-      Preconditions.checkNotNull(upgradeFinalizer);
+      Objects.requireNonNull(finalizationStore, "finalizationStore == null");
+      Objects.requireNonNull(transactionBuffer, "transactionBuffer == null");
+      Objects.requireNonNull(upgradeFinalizer, "upgradeFinalizer == null");
 
       return scmRatisServer.getProxyHandler(SCMRatisProtocol.RequestType.FINALIZE,
         FinalizationStateManager.class, new FinalizationStateManagerImpl(this));

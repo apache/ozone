@@ -33,16 +33,15 @@ import org.junit.jupiter.api.Test;
  */
 public class TestOzoneDelegationTokenSelector {
 
-
   @Test
   public void testTokenSelector() {
 
     // set dummy details for identifier and password in token.
     byte[] identifier =
-        RandomStringUtils.randomAlphabetic(10)
+        RandomStringUtils.secure().nextAlphabetic(10)
             .getBytes(StandardCharsets.UTF_8);
     byte[] password =
-        RandomStringUtils.randomAlphabetic(10)
+        RandomStringUtils.secure().nextAlphabetic(10)
             .getBytes(StandardCharsets.UTF_8);
 
     Token<OzoneTokenIdentifier> tokenIdentifierToken =
@@ -77,10 +76,7 @@ public class TestOzoneDelegationTokenSelector {
 
   }
 
-
   private Text getService() {
     return new Text("om1:9862,om2:9862,om3:9862");
   }
-
-
 }

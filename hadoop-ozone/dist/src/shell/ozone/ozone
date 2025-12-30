@@ -1,19 +1,21 @@
 #!/usr/bin/env bash
 
+#
 # Licensed to the Apache Software Foundation (ASF) under one or more
-# contributor license agreements.  See the NOTICE file distributed with
+# contributor license agreements. See the NOTICE file distributed with
 # this work for additional information regarding copyright ownership.
 # The ASF licenses this file to You under the Apache License, Version 2.0
 # (the "License"); you may not use this file except in compliance with
-# the License.  You may obtain a copy of the License at
+# the License. You may obtain a copy of the License at
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
+#      http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+#
 
 # The name of the script being executed.
 OZONE_SHELL_EXECNAME="ozone"
@@ -37,6 +39,7 @@ function ozone_usage
   ozone_add_option "--validate (continue)" "validates if all jars as indicated in the corresponding OZONE_RUN_ARTIFACT_NAME classpath file are present, command execution shall continue post validation failure if 'continue' is passed"
 
   ozone_add_subcommand "classpath" client "prints the class path needed for running ozone commands"
+  ozone_add_subcommand "completion" client "generate autocompletion script for bash/zsh"
   ozone_add_subcommand "datanode" daemon "run a HDDS datanode"
   ozone_add_subcommand "envvars" client "display computed Hadoop environment variables"
   ozone_add_subcommand "daemonlog" admin "get/set the log level for each daemon"
@@ -97,12 +100,16 @@ function ozonecmd_case
         exit -1
       fi
     ;;
+    completion)
+      OZONE_CLASSNAME=org.apache.hadoop.ozone.utils.AutoCompletion;
+      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+    ;;
     datanode)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
       ozone_deprecate_envvar HDDS_DN_OPTS OZONE_DATANODE_OPTS
       OZONE_DATANODE_OPTS="${RATIS_OPTS} ${OZONE_DATANODE_OPTS}"
       OZONE_DATANODE_OPTS="-Dlog4j.configurationFile=${OZONE_CONF_DIR}/dn-audit-log4j2.properties,${OZONE_CONF_DIR}/dn-container-log4j2.properties ${OZONE_DATANODE_OPTS}"
-      OZONE_DATANODE_OPTS="-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector ${OZONE_DATANODE_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
+      OZONE_DATANODE_OPTS="${OZONE_DATANODE_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_CLASSNAME=org.apache.hadoop.ozone.HddsDatanodeService
       OZONE_RUN_ARTIFACT_NAME="ozone-datanode"
     ;;
@@ -121,7 +128,7 @@ function ozonecmd_case
     freon)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.freon.Freon
       OZONE_FREON_OPTS="${OZONE_FREON_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
-      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-freon"
     ;;
     getconf)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.conf.OzoneGetConf;
@@ -133,7 +140,7 @@ function ozonecmd_case
       ozone_deprecate_envvar HDFS_OM_OPTS OZONE_OM_OPTS
       OZONE_OM_OPTS="${RATIS_OPTS} ${OZONE_OM_OPTS}"
       OZONE_OM_OPTS="${OZONE_OM_OPTS} -Dlog4j.configurationFile=${OZONE_CONF_DIR}/om-audit-log4j2.properties"
-      OZONE_OM_OPTS="-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector ${OZONE_OM_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
+      OZONE_OM_OPTS="${OZONE_OM_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-manager"
     ;;
     sh | shell)
@@ -152,7 +159,7 @@ function ozonecmd_case
       ozone_deprecate_envvar HDFS_STORAGECONTAINERMANAGER_OPTS OZONE_SCM_OPTS
       OZONE_SCM_OPTS="${RATIS_OPTS} ${OZONE_SCM_OPTS}"
       OZONE_SCM_OPTS="${OZONE_SCM_OPTS} -Dlog4j.configurationFile=${OZONE_CONF_DIR}/scm-audit-log4j2.properties"
-      OZONE_SCM_OPTS="-Dlog4j2.contextSelector=org.apache.logging.log4j.core.async.AsyncLoggerContextSelector ${OZONE_SCM_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
+      OZONE_SCM_OPTS="${OZONE_SCM_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="hdds-server-scm"
     ;;
     s3g)
@@ -188,7 +195,7 @@ function ozonecmd_case
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     daemonlog)
-      OZONE_CLASSNAME=org.apache.hadoop.log.LogLevel
+      OZONE_CLASSNAME=org.apache.hadoop.hdds.utils.LogLevel
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
     insight)
@@ -210,7 +217,7 @@ function ozonecmd_case
     admin)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.admin.OzoneAdmin
       OZONE_ADMIN_OPTS="${OZONE_ADMIN_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
-      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-cli-admin"
     ;;
     debug)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.debug.OzoneDebug
@@ -263,8 +270,7 @@ function ozone_suppress_shell_log
 {
   if [[ "${OZONE_RUN_ARTIFACT_NAME}" =~ ozone-cli-.* ]] \
       || [[ "${OZONE_RUN_ARTIFACT_NAME}" == "ozone-tools" ]]; then
-    if [[ "${OZONE_CLASSNAME}" != "org.apache.hadoop.ozone.freon.Freon" ]] \
-        && [[ -z "${OZONE_ORIGINAL_LOGLEVEL}" ]] \
+    if [[ -z "${OZONE_ORIGINAL_LOGLEVEL}" ]] \
         && [[ -z "${OZONE_ORIGINAL_ROOT_LOGGER}" ]]; then
       OZONE_LOGLEVEL=OFF
       OZONE_ROOT_LOGGER="${OZONE_LOGLEVEL},console"
@@ -333,6 +339,7 @@ ozone_suppress_shell_log
 ozone_assemble_classpath
 
 ozone_add_client_opts
+ozone_add_server_opts
 
 if [[ ${OZONE_WORKER_MODE} = true ]]; then
   ozone_worker_mode_execute "${OZONE_HOME}/bin/ozone" "${OZONE_USER_PARAMS[@]}"

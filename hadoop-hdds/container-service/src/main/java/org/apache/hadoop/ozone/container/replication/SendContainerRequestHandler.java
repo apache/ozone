@@ -29,9 +29,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContai
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
-import org.apache.hadoop.ozone.container.common.volume.AvailableSpaceFilter;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.util.DiskChecker;
 import org.apache.ratis.grpc.util.ZeroCopyMessageMarshaller;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
@@ -56,6 +54,7 @@ class SendContainerRequestHandler
   private Path path;
   private CopyContainerCompression compression;
   private final ZeroCopyMessageMarshaller<SendContainerRequest> marshaller;
+  private long spaceToReserve = 0;
 
   SendContainerRequestHandler(
       ContainerImporter importer,
@@ -86,17 +85,12 @@ class SendContainerRequestHandler
 
       if (containerId == -1) {
         containerId = req.getContainerID();
-        volume = importer.chooseNextVolume();
-        // Increment committed bytes and verify if it doesn't cross the space left.
-        volume.incCommittedBytes(importer.getDefaultContainerSize() * 2);
-        // Already committed bytes increased above, so required space is not required here in AvailableSpaceFilter
-        AvailableSpaceFilter filter = new AvailableSpaceFilter(0);
-        if (!filter.test(volume)) {
-          volume.incCommittedBytes(-importer.getDefaultContainerSize() * 2);
-          LOG.warn("Container {} import was unsuccessful, due to no space left", containerId);
-          volume = null;
-          throw new DiskChecker.DiskOutOfSpaceException("No more available volumes");
-        }
+        
+        // Use container size if available, otherwise fall back to default
+        spaceToReserve = importer.getSpaceToReserve(
+            req.hasSize() ? req.getSize() : null);
+
+        volume = importer.chooseNextVolume(spaceToReserve);
 
         Path dir = ContainerImporter.getUntarDirectory(volume);
         Files.createDirectories(dir);
@@ -129,8 +123,8 @@ class SendContainerRequestHandler
       deleteTarball();
       responseObserver.onError(t);
     } finally {
-      if (volume != null) {
-        volume.incCommittedBytes(-importer.getDefaultContainerSize() * 2);
+      if (volume != null && spaceToReserve > 0) {
+        volume.incCommittedBytes(-spaceToReserve);
       }
     }
   }
@@ -158,8 +152,8 @@ class SendContainerRequestHandler
         responseObserver.onError(t);
       }
     } finally {
-      if (volume != null) {
-        volume.incCommittedBytes(-importer.getDefaultContainerSize() * 2);
+      if (volume != null && spaceToReserve > 0) {
+        volume.incCommittedBytes(-spaceToReserve);
       }
     }
   }

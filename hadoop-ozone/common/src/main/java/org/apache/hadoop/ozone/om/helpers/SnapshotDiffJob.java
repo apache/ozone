@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.helpers;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;
 import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
@@ -35,10 +36,6 @@ public class SnapshotDiffJob {
 
   private static final Codec<SnapshotDiffJob> CODEC =
       new SnapshotDiffJobCodec();
-
-  public static Codec<SnapshotDiffJob> getCodec() {
-    return CODEC;
-  }
 
   private long creationTime;
   private String jobId;
@@ -93,6 +90,10 @@ public class SnapshotDiffJob {
     this.reason = StringUtils.EMPTY;
     this.subStatus = subStatus;
     this.keysProcessedPct = keysProcessedPct;
+  }
+
+  public static Codec<SnapshotDiffJob> getCodec() {
+    return CODEC;
   }
 
   public String getJobId() {
@@ -258,10 +259,9 @@ public class SnapshotDiffJob {
   }
 
   public SnapshotDiffJobProto toProtoBuf() {
-    return SnapshotDiffJobProto.newBuilder()
+    SnapshotDiffJobProto.Builder builder = SnapshotDiffJobProto.newBuilder()
         .setCreationTime(creationTime)
         .setJobId(jobId)
-        .setStatus(status.toProtobuf())
         .setVolume(volume)
         .setBucket(bucket)
         .setFromSnapshot(fromSnapshot)
@@ -269,17 +269,26 @@ public class SnapshotDiffJob {
         .setForceFullDiff(forceFullDiff)
         .setDisableNativeDiff(disableNativeDiff)
         .setTotalDiffEntries(totalDiffEntries)
-        .setSubStatus(subStatus.toProtoBuf())
-        .setKeysProcessedPct(keysProcessedPct)
-        .build();
+        .setKeysProcessedPct(keysProcessedPct);
+    if (status != null) {
+      builder.setStatus(status.toProtobuf());
+    }
+    if (subStatus != null) {
+      builder.setSubStatus(subStatus.toProtoBuf());
+    }
+    return builder.build();
   }
 
   public static SnapshotDiffJob getFromProtoBuf(
       SnapshotDiffJobProto diffJobProto) {
+    JobStatus status = (diffJobProto.hasStatus()) ?
+        JobStatus.fromProtobuf(diffJobProto.getStatus()) : null;
+    SubStatus subStatus = (diffJobProto.hasSubStatus()) ?
+        SubStatus.fromProtoBuf(diffJobProto.getSubStatus()) : null;
     return new SnapshotDiffJob(
         diffJobProto.getCreationTime(),
         diffJobProto.getJobId(),
-        JobStatus.fromProtobuf(diffJobProto.getStatus()),
+        status,
         diffJobProto.getVolume(),
         diffJobProto.getBucket(),
         diffJobProto.getFromSnapshot(),
@@ -287,7 +296,7 @@ public class SnapshotDiffJob {
         diffJobProto.getForceFullDiff(),
         diffJobProto.getDisableNativeDiff(),
         diffJobProto.getTotalDiffEntries(),
-        SubStatus.fromProtoBuf(diffJobProto.getSubStatus()),
+        subStatus,
         diffJobProto.getKeysProcessedPct());
   }
 
@@ -307,15 +316,19 @@ public class SnapshotDiffJob {
     }
 
     @Override
-    public byte[] toPersistedFormat(SnapshotDiffJob object)
-        throws IOException {
-      return MAPPER.writeValueAsBytes(object);
+    public byte[] toPersistedFormat(SnapshotDiffJob object) {
+      return object.toProtoBuf().toByteArray();
     }
 
     @Override
-    public SnapshotDiffJob fromPersistedFormat(byte[] rawData)
-        throws IOException {
-      return MAPPER.readValue(rawData, SnapshotDiffJob.class);
+    public SnapshotDiffJob fromPersistedFormatImpl(byte[] rawData) throws IOException {
+      try {
+        SnapshotDiffJobProto proto = SnapshotDiffJobProto.parseFrom(rawData);
+        return SnapshotDiffJob.getFromProtoBuf(proto);
+      } catch (InvalidProtocolBufferException e) {
+        // the rawData was in old format, fallback to the old implementation
+        return MAPPER.readValue(rawData, SnapshotDiffJob.class);
+      }
     }
 
     @Override

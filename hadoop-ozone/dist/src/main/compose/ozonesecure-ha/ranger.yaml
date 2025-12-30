@@ -1,0 +1,65 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+x-om-ranger-config:
+  &om-ranger-config
+    environment:
+      OZONE_MANAGER_CLASSPATH: "/opt/ranger/ozone-plugin/lib/libext/*:/opt/ozone/conf"
+      OZONE-SITE.XML_ozone.acl.authorizer.class: "org.apache.ranger.authorization.ozone.authorizer.RangerOzoneAuthorizer"
+      OZONE-SITE.XML_ozone.om.multitenancy.enabled: "true"
+      OZONE-SITE.XML_ozone.om.ranger.https-address: "http://ranger:6080"
+      OZONE-SITE.XML_ozone.om.ranger.https.admin.api.user: "admin"
+      OZONE-SITE.XML_ozone.om.ranger.https.admin.api.passwd: "rangerR0cks!"
+      OZONE-SITE.XML_ozone.om.ranger.service: "dev_ozone"
+      OZONE-SITE.XML_ozone.om.tenant.dev.skip.ranger: "false"
+      RANGER-OZONE-SECURITY.XML_ranger.plugin.ozone.forceNonKerberos: "true"
+      RANGER-OZONE-SECURITY.XML_ranger.plugin.ozone.policy.rest.url: "http://ranger:6080"
+      RANGER-OZONE-SECURITY.XML_ranger.plugin.ozone.policy.rest.client.username: "hdfs"
+      RANGER-OZONE-SECURITY.XML_ranger.plugin.ozone.policy.rest.client.password: "hdfs"
+      RANGER-OZONE-SECURITY.XML_ranger.plugin.ozone.service.name: "dev_ozone"
+    volumes:
+      - ../..:/opt/hadoop
+      - ../_keytabs:/etc/security/keytabs
+      - ./krb5.conf:/etc/krb5.conf
+      - ${RANGER_OZONE_PLUGIN_DIR}:/opt/ranger/ozone-plugin
+    tmpfs:
+      - /opt/ozone/conf
+    command: bash -c "sudo --preserve-env /opt/ranger/ozone-plugin/enable-ozone-plugin.sh && /opt/hadoop/bin/ozone om"
+
+services:
+  om1:
+    <<: *om-ranger-config
+    depends_on:
+      ranger:
+        condition: service_healthy
+  om2:
+    <<: *om-ranger-config
+    depends_on:
+      ranger:
+        condition: service_healthy
+  om3:
+    <<: *om-ranger-config
+    depends_on:
+      ranger:
+        condition: service_healthy
+  ranger:
+    networks:
+      ozone_net:
+        ipv4_address: 172.25.0.200
+  ranger-db:
+    networks:
+      ozone_net:
+        ipv4_address: 172.25.0.201

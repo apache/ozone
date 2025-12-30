@@ -49,7 +49,6 @@ import org.junit.jupiter.params.provider.MethodSource;
  */
 public class TestOMKeysDeleteRequest extends TestOMKeyRequest {
 
-
   private List<String> deleteKeyList;
   private OMRequest omRequest;
   private static final int KEY_COUNT = 10;

@@ -54,6 +54,7 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineFactory;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
+import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
@@ -78,7 +79,6 @@ public class TestReconPipelineManager {
   private OzoneConfiguration conf;
   private SCMStorageConfig scmStorageConfig;
   private DBStore store;
-  private HDDSLayoutVersionManager versionManager;
   private SCMHAManager scmhaManager;
   private SCMContext scmContext;
 
@@ -129,7 +129,7 @@ public class TestReconPipelineManager {
 
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
-    this.versionManager = mock(HDDSLayoutVersionManager.class);
+    HDDSLayoutVersionManager versionManager = mock(HDDSLayoutVersionManager.class);
     when(versionManager.getMetadataLayoutVersion())
         .thenReturn(maxLayoutVersion());
     when(versionManager.getSoftwareLayoutVersion())
@@ -148,8 +148,9 @@ public class TestReconPipelineManager {
       StorageContainerManager mock = mock(StorageContainerManager.class);
       when(mock.getScmNodeDetails())
           .thenReturn(mock(SCMNodeDetails.class));
-      scmContext = new SCMContext.Builder().setIsInSafeMode(true)
-              .setLeader(true).setIsPreCheckComplete(true)
+      scmContext = new SCMContext.Builder()
+              .setSafeModeStatus(SCMSafeModeManager.SafeModeStatus.PRE_CHECKS_PASSED)
+              .setLeader(true)
               .setSCM(mock).build();
       reconPipelineManager.setScmContext(scmContext);
       reconPipelineManager.addPipeline(validPipeline);
@@ -182,7 +183,7 @@ public class TestReconPipelineManager {
     Pipeline pipeline = getRandomPipeline();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
-    this.versionManager = mock(HDDSLayoutVersionManager.class);
+    HDDSLayoutVersionManager versionManager = mock(HDDSLayoutVersionManager.class);
     when(versionManager.getMetadataLayoutVersion())
         .thenReturn(maxLayoutVersion());
     when(versionManager.getSoftwareLayoutVersion())
@@ -209,7 +210,7 @@ public class TestReconPipelineManager {
     Pipeline pipeline = getRandomPipeline();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
-    versionManager = mock(HDDSLayoutVersionManager.class);
+    HDDSLayoutVersionManager versionManager = mock(HDDSLayoutVersionManager.class);
     when(versionManager.getMetadataLayoutVersion()).thenReturn(maxLayoutVersion());
     when(versionManager.getSoftwareLayoutVersion()).thenReturn(maxLayoutVersion());
     NodeManager nodeManager =
@@ -229,7 +230,6 @@ public class TestReconPipelineManager {
       reconPipelineManager.addPipeline(pipeline);
     }, "Exception was thrown when adding a duplicate pipeline.");
   }
-
 
   @Test
   public void testStubbedReconPipelineFactory() throws IOException {

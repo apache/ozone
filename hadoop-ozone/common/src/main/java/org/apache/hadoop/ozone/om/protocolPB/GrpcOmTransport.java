@@ -48,7 +48,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.ipc.RemoteException;
+import org.apache.hadoop.ipc_.RemoteException;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
@@ -66,7 +66,7 @@ import org.slf4j.LoggerFactory;
  * Grpc transport for grpc between s3g and om.
  */
 public class GrpcOmTransport implements OmTransport {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(GrpcOmTransport.class);
 
   private static final String CLIENT_NAME = "GrpcOmTransport";
@@ -85,14 +85,14 @@ public class GrpcOmTransport implements OmTransport {
   private final int maxSize;
   private SecurityConfig secConfig;
 
-  public static void setCaCerts(List<X509Certificate> x509Certificates) {
-    caCerts = x509Certificates;
-  }
-
   private RetryPolicy retryPolicy;
   private int failoverCount = 0;
   private GrpcOMFailoverProxyProvider<OzoneManagerProtocolPB>
       omFailoverProxyProvider;
+
+  public static void setCaCerts(List<X509Certificate> x509Certificates) {
+    caCerts = x509Certificates;
+  }
 
   public GrpcOmTransport(ConfigurationSource conf,
                           UserGroupInformation ugi, String omServiceId)
@@ -322,7 +322,7 @@ public class GrpcOmTransport implements OmTransport {
    */
   @ConfigGroup(prefix = "ozone.om.grpc")
   public static final class GrpcOmTransportConfig {
-    @Config(key = "port", defaultValue = "8981",
+    @Config(key = "ozone.om.grpc.port", defaultValue = "8981",
         description = "Port used for"
             + " the GrpcOmTransport OzoneManagerServiceGrpc server",
         tags = {ConfigTag.MANAGEMENT})

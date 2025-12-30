@@ -30,27 +30,8 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
  * This class emits table level cache metrics.
  */
 public final class TableCacheMetrics implements MetricsSource {
-  private enum MetricsInfos implements MetricsInfo {
-    TableName("Table Name."),
-    Size("Size of the cache."),
-    HitCount("Number of time the lookup methods return a cached value."),
-    MissCount("Number of times the requested value is not in the cache."),
-    IterationCount("Number of times the table cache is iterated through.");
 
-    private final String desc;
-
-    MetricsInfos(String desc) {
-      this.desc = desc;
-    }
-
-    @Override
-    public String description() {
-      return desc;
-    }
-  }
-
-  public static final String SOURCE_NAME =
-      TableCacheMetrics.class.getSimpleName();
+  public static final String SOURCE_NAME = TableCacheMetrics.class.getSimpleName();
 
   private final TableCache<?, ?> cache;
   private final String tableName;
@@ -88,5 +69,24 @@ public final class TableCacheMetrics implements MetricsSource {
   public void unregister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(getSourceName());
+  }
+
+  private enum MetricsInfos implements MetricsInfo {
+    TableName("Table Name."),
+    Size("Size of the cache."),
+    HitCount("Number of time the lookup methods return a cached value."),
+    MissCount("Number of times the requested value is not in the cache."),
+    IterationCount("Number of times the table cache is iterated through.");
+
+    private final String desc;
+
+    MetricsInfos(String desc) {
+      this.desc = desc;
+    }
+
+    @Override
+    public String description() {
+      return desc;
+    }
   }
 }

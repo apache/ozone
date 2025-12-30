@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.protocol.commands;
 
-import com.google.common.base.Preconditions;
+import java.util.Objects;
 import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CloseContainerCommandProto;
@@ -67,7 +67,7 @@ public class CloseContainerCommand
 
   public static CloseContainerCommand getFromProtobuf(
       CloseContainerCommandProto closeContainerProto) {
-    Preconditions.checkNotNull(closeContainerProto);
+    Objects.requireNonNull(closeContainerProto, "closeContainerProto == null");
     return new CloseContainerCommand(closeContainerProto.getCmdId(),
         PipelineID.getFromProtobuf(closeContainerProto.getPipelineID()),
         closeContainerProto.getForce());
@@ -90,7 +90,7 @@ public class CloseContainerCommand
     StringBuilder sb = new StringBuilder();
     sb.append(getType())
         .append(": cmdID: ").append(getId())
-        .append(", encodedToken: \"").append(getEncodedToken()).append("\"")
+        .append(", encodedToken: \"").append(getEncodedToken()).append('"')
         .append(", term: ").append(getTerm())
         .append(", deadlineMsSinceEpoch: ").append(getDeadline())
         .append(", containerID: ").append(getContainerID())

@@ -50,9 +50,9 @@ import org.apache.hadoop.hdds.scm.proxy.SCMSecurityProtocolFailoverProxyProvider
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.retry.RetryProxy;
-import org.apache.hadoop.ipc.ProtobufHelper;
-import org.apache.hadoop.ipc.ProtocolTranslator;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc_.ProtobufHelper;
+import org.apache.hadoop.ipc_.ProtocolTranslator;
+import org.apache.hadoop.ipc_.RPC;
 
 /**
  * This class is the client-side translator that forwards requests for
@@ -114,6 +114,7 @@ public class SCMSecurityProtocolClientSideTranslatorPB implements
     }
     return resp;
   }
+
   /**
    * Closes this stream and releases any system resources associated
    * with it. If the stream is already closed then invoking this

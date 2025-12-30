@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory;
  * Utilities for buffers.
  */
 public final class BufferUtils {
-  public static final Logger LOG = LoggerFactory.getLogger(BufferUtils.class);
+  private static final Logger LOG = LoggerFactory.getLogger(BufferUtils.class);
 
   private static final ByteBuffer[] EMPTY_BYTE_BUFFER_ARRAY = {};
 

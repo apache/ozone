@@ -17,14 +17,18 @@
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone</artifactId>
-    <version>2.1.0-SNAPSHOT</version>
+    <version>2.2.0-SNAPSHOT</version>
   </parent>
   <artifactId>ozone-interface-storage</artifactId>
-  <version>2.1.0-SNAPSHOT</version>
+  <version>2.2.0-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>Apache Ozone Storage Interface</name>
   <description>Apache Ozone Storage Interface</description>
   <dependencies>
+    <dependency>
+      <groupId>com.github.stephenc.jcip</groupId>
+      <artifactId>jcip-annotations</artifactId>
+    </dependency>
     <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
@@ -64,6 +68,11 @@
 
     <!-- Test dependencies -->
     <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-common</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-common</artifactId>
       <type>test-jar</type>
@@ -82,55 +91,21 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
         <configuration>
-          <annotationProcessorPaths>
-            <path>
-              <groupId>org.apache.ozone</groupId>
-              <artifactId>hdds-config</artifactId>
-              <version>${hdds.version}</version>
-            </path>
-          </annotationProcessorPaths>
-          <annotationProcessors>
-            <annotationProcessor>org.apache.hadoop.hdds.conf.ConfigFileGenerator</annotationProcessor>
-          </annotationProcessors>
+          <proc>none</proc>
         </configuration>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-enforcer-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>ban-annotations</id>
-            <!-- override default restriction from root POM -->
-            <configuration>
-              <rules>
-                <restrictImports>
-                  <reason>Only selected annotation processors are enabled, see configuration of maven-compiler-plugin.</reason>
-                  <bannedImports>
-                    <bannedImport>org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator</bannedImport>
-                    <bannedImport>org.apache.hadoop.hdds.scm.metadata.Replicate</bannedImport>
-                    <bannedImport>org.kohsuke.MetaInfServices</bannedImport>
-                  </bannedImports>
-                </restrictImports>
-              </rules>
-            </configuration>
-          </execution>
-        </executions>
       </plugin>
       <plugin>
         <groupId>org.xolstice.maven.plugins</groupId>
         <artifactId>protobuf-maven-plugin</artifactId>
-        <version>${protobuf-maven-plugin.version}</version>
-        <extensions>true</extensions>
         <executions>
           <execution>
-            <id>compile-protoc</id>
+            <id>compile-proto-${protobuf.version}</id>
             <goals>
               <goal>compile</goal>
               <goal>test-compile</goal>
             </goals>
             <configuration>
-              <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
-              <protocArtifact>com.google.protobuf:protoc:${proto2.hadooprpc.protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
+              <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
             </configuration>
           </execution>
         </executions>

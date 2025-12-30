@@ -43,7 +43,6 @@ import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests for RatisPipelineUtils.
@@ -75,7 +74,7 @@ public class TestRatisPipelineCreateAndDestroy {
     cluster.shutdown();
   }
 
-  @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 180000)
+  @Test
   public void testAutomaticPipelineCreationOnPipelineDestroy()
       throws Exception {
     int numOfDatanodes = 6;
@@ -90,13 +89,13 @@ public class TestRatisPipelineCreateAndDestroy {
         .getPipelines(RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), Pipeline.PipelineState.OPEN);
     for (Pipeline pipeline : pipelines) {
-      pipelineManager.closePipeline(pipeline, false);
+      pipelineManager.closePipeline(pipeline.getId());
     }
     // make sure two pipelines are created
     waitForPipelines(2);
   }
 
-  @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 180000)
+  @Test
   public void testAutomaticPipelineCreationDisablingFactorONE()
       throws Exception {
     conf.setBoolean(OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE, false);
@@ -112,14 +111,14 @@ public class TestRatisPipelineCreateAndDestroy {
         .getPipelines(RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), Pipeline.PipelineState.OPEN);
     for (Pipeline pipeline : pipelines) {
-      pipelineManager.closePipeline(pipeline, false);
+      pipelineManager.closePipeline(pipeline.getId());
     }
 
     // make sure two pipelines are created
     waitForPipelines(2);
   }
 
-  @Test @Timeout(unit = TimeUnit.MILLISECONDS, value = 180000)
+  @Test
   public void testPipelineCreationOnNodeRestart() throws Exception {
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL,
         5, TimeUnit.SECONDS);
@@ -145,7 +144,7 @@ public class TestRatisPipelineCreateAndDestroy {
         pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE)),
         "pipeline creation should fail after shutting down pipeline");
-    assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_HEALTHY_NODES, ioe.getResult());
+    assertEquals(SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE, ioe.getResult());
 
     // make sure pipelines is destroyed
     waitForPipelines(0);
@@ -155,7 +154,7 @@ public class TestRatisPipelineCreateAndDestroy {
 
     // destroy the existing pipelines
     for (Pipeline pipeline : pipelines) {
-      pipelineManager.closePipeline(pipeline, false);
+      pipelineManager.closePipeline(pipeline.getId());
     }
 
     if (cluster.getStorageContainerManager()

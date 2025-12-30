@@ -25,7 +25,6 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableGaugeFloat;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
-import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
@@ -38,29 +37,11 @@ public final class OzoneManagerSyncMetrics {
   private static final String SOURCE_NAME =
       OzoneManagerSyncMetrics.class.getSimpleName();
 
-  private OzoneManagerSyncMetrics() {
-  }
-
-  public static OzoneManagerSyncMetrics create() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    return ms.register(SOURCE_NAME,
-        "Recon Ozone Manager Sync Metrics",
-        new OzoneManagerSyncMetrics());
-  }
-
-  public void unRegister() {
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
-  }
-
   @Metric(about = "Number of OM snapshot requests made by Recon.")
   private MutableCounterLong numSnapshotRequests;
 
   @Metric(about = "Number of OM snapshot requests that failed.")
   private MutableCounterLong numSnapshotRequestsFailed;
-
-  @Metric(about = "OM snapshot request latency")
-  private MutableRate snapshotRequestLatency;
 
   @Metric(about = "Number of OM delta requests made by Recon that had " +
       "at least 1 update in the response.")
@@ -78,16 +59,27 @@ public final class OzoneManagerSyncMetrics {
   @Metric(about = "The lag of sequence number between Recon and OM")
   private MutableGaugeLong sequenceNumberLag;
 
+  private OzoneManagerSyncMetrics() {
+  }
+
+  public static OzoneManagerSyncMetrics create() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    return ms.register(SOURCE_NAME,
+        "Recon Ozone Manager Sync Metrics",
+        new OzoneManagerSyncMetrics());
+  }
+
+  public void unRegister() {
+    MetricsSystem ms = DefaultMetricsSystem.instance();
+    ms.unregisterSource(SOURCE_NAME);
+  }
+
   public void incrNumSnapshotRequests() {
     this.numSnapshotRequests.incr();
   }
 
   public void incrNumSnapshotRequestsFailed() {
     this.numSnapshotRequestsFailed.incr();
-  }
-
-  public void updateSnapshotRequestLatency(long time) {
-    this.snapshotRequestLatency.add(time);
   }
 
   public void incrNumDeltaRequestsFailed() {
@@ -112,10 +104,6 @@ public final class OzoneManagerSyncMetrics {
 
   public long getNumSnapshotRequestsFailed() {
     return numSnapshotRequestsFailed.value();
-  }
-
-  MutableRate getSnapshotRequestLatency() {
-    return snapshotRequestLatency;
   }
 
   public long getNumDeltaRequestsFailed() {

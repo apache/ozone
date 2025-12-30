@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.createOmKeyInfo;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -25,6 +26,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.framework;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -38,8 +40,11 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
@@ -48,6 +53,7 @@ import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OmSnapshotInternalMetrics;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
@@ -76,6 +82,7 @@ public class TestSnapshotRequestAndResponse {
 
   private OzoneManager ozoneManager;
   private OMMetrics omMetrics;
+  private OmSnapshotInternalMetrics omSnapshotIntMetrics;
   private OmMetadataManagerImpl omMetadataManager;
   private BatchOperation batchOperation;
   private OmSnapshotManager omSnapshotManager;
@@ -102,6 +109,10 @@ public class TestSnapshotRequestAndResponse {
 
   public OMMetrics getOmMetrics() {
     return omMetrics;
+  }
+
+  public OmSnapshotInternalMetrics getOmSnapshotIntMetrics() {
+    return omSnapshotIntMetrics;
   }
 
   public OmSnapshotManager getOmSnapshotManager() {
@@ -132,18 +143,20 @@ public class TestSnapshotRequestAndResponse {
   public void baseSetup() throws Exception {
     ozoneManager = mock(OzoneManager.class);
     omMetrics = OMMetrics.create();
+    omSnapshotIntMetrics = OmSnapshotInternalMetrics.create();
     OzoneConfiguration ozoneConfiguration = new OzoneConfiguration();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         testDir.getAbsolutePath());
     ozoneConfiguration.set(OzoneConfigKeys.OZONE_METADATA_DIRS,
         testDir.getAbsolutePath());
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
-        ozoneManager);
+    omMetadataManager = spy(new OmMetadataManagerImpl(ozoneConfiguration,
+        ozoneManager));
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
     when(ozoneManager.resolveBucketLink(any(Pair.class), any(OMClientRequest.class)))
         .thenAnswer(i -> new ResolvedBucket(i.getArgument(0),
             i.getArgument(0), "dummyBucketOwner", BucketLayout.FILE_SYSTEM_OPTIMIZED));
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
+    when(ozoneManager.getOmSnapshotIntMetrics()).thenReturn(omSnapshotIntMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.isFilesystemSnapshotEnabled()).thenReturn(true);
     when(ozoneManager.isAdmin(any())).thenReturn(isAdmin);
@@ -159,12 +172,20 @@ public class TestSnapshotRequestAndResponse {
     AuditLogger auditLogger = mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
+
+    AuditMessage mockAuditMessage = mock(AuditMessage.class);
+    when(mockAuditMessage.getOp()).thenReturn("MOCK_OP");
+    when(ozoneManager.buildAuditMessageForSuccess(any(), any())).thenReturn(mockAuditMessage);
+    when(ozoneManager.buildAuditMessageForFailure(any(), any(), any())).thenReturn(mockAuditMessage);
+
     batchOperation = omMetadataManager.getStore().initBatchOperation();
 
     volumeName = UUID.randomUUID().toString();
     bucketName = UUID.randomUUID().toString();
     OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
         omMetadataManager);
+    when(ozoneManager.getDefaultReplicationConfig())
+        .thenReturn(RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
     omSnapshotManager = new OmSnapshotManager(ozoneManager);
     when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
   }
@@ -172,6 +193,7 @@ public class TestSnapshotRequestAndResponse {
   @AfterEach
   public void stop() {
     omMetrics.unRegister();
+    omSnapshotIntMetrics.unregister();
     framework().clearInlineMocks();
     if (batchOperation != null) {
       batchOperation.close();
@@ -191,6 +213,8 @@ public class TestSnapshotRequestAndResponse {
     // Add to batch and commit to DB.
     try (BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation()) {
       omClientResponse.addToDBBatch(omMetadataManager, batchOperation);
+      omMetadataManager.getTransactionInfoTable().putWithBatch(batchOperation, TRANSACTION_INFO_KEY,
+          TransactionInfo.valueOf(1, 1));
       omMetadataManager.getStore().commitBatchOperation(batchOperation);
     }
 
@@ -202,7 +226,7 @@ public class TestSnapshotRequestAndResponse {
     RDBStore store = (RDBStore) omMetadataManager.getStore();
     String checkpointPrefix = store.getDbLocation().getName();
     Path snapshotDirPath = Paths.get(store.getSnapshotsParentDir(),
-        checkpointPrefix + snapshotInfo.getCheckpointDir());
+        checkpointPrefix + SnapshotInfo.getCheckpointDirName(snapshotInfo.getSnapshotId(), 0));
     // Check the DB is still there
     assertTrue(Files.exists(snapshotDirPath));
     return snapshotDirPath;
@@ -253,5 +277,4 @@ public class TestSnapshotRequestAndResponse {
         })
         .collect(Collectors.toList());
   }
-
 }

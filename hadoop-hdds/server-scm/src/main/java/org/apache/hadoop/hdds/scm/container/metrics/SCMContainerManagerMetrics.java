@@ -43,7 +43,6 @@ public final class SCMContainerManagerMetrics {
   private @Metric MutableCounterLong numFailureDeleteContainers;
   private @Metric MutableCounterLong numListContainerOps;
 
-
   private @Metric MutableCounterLong numContainerReportsProcessedSuccessful;
   private @Metric MutableCounterLong numContainerReportsProcessedFailed;
   private @Metric MutableCounterLong numICRReportsProcessedSuccessful;

@@ -49,9 +49,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
@@ -74,7 +71,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.recon.api.ServiceNotReadyException;
 import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
 import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
@@ -95,13 +91,21 @@ import org.slf4j.LoggerFactory;
 @Singleton
 public class ReconUtils {
 
-  public ReconUtils() {
-  }
-
   private static Logger log = LoggerFactory.getLogger(
       ReconUtils.class);
 
-  private static AtomicBoolean rebuildTriggered = new AtomicBoolean(false);
+  public ReconUtils() {
+  }
+
+  /**
+   * Get the current rebuild state of NSSummary tree.
+   * Delegates to NSSummaryTask's unified control mechanism.
+   * 
+   * @return current RebuildState from NSSummaryTask
+   */
+  public static org.apache.hadoop.ozone.recon.tasks.NSSummaryTask.RebuildState getNSSummaryRebuildState() {
+    return org.apache.hadoop.ozone.recon.tasks.NSSummaryTask.getRebuildState();
+  }
 
   public static File getReconScmDbDir(ConfigurationSource conf) {
     return new ReconUtils().getReconDbDir(conf, OZONE_RECON_SCM_DB_DIR);
@@ -173,10 +177,9 @@ public class ReconUtils {
     Archiver.extract(tarFile, destPath);
   }
 
-
   /**
    * Constructs the full path of a key from its OmKeyInfo using a bottom-up approach, starting from the leaf node.
-   *
+   * <p>
    * The method begins with the leaf node (the key itself) and recursively prepends parent directory names, fetched
    * via NSSummary objects, until reaching the parent bucket (parentId is -1). It effectively builds the path from
    * bottom to top, finally prepending the volume and bucket names to complete the full path. If the directory structure
@@ -185,39 +188,37 @@ public class ReconUtils {
    *
    * @param omKeyInfo The OmKeyInfo object for the key
    * @return The constructed full path of the key as a String, or an empty string if a rebuild is in progress and
-   *         the path cannot be constructed at this time.
+   * the path cannot be constructed at this time.
    * @throws IOException
    */
   public static String constructFullPath(OmKeyInfo omKeyInfo,
-                                         ReconNamespaceSummaryManager reconNamespaceSummaryManager,
-                                         ReconOMMetadataManager omMetadataManager)  throws IOException {
+                                         ReconNamespaceSummaryManager reconNamespaceSummaryManager) throws IOException {
     return constructFullPath(omKeyInfo.getKeyName(), omKeyInfo.getParentObjectID(), omKeyInfo.getVolumeName(),
-        omKeyInfo.getBucketName(), reconNamespaceSummaryManager, omMetadataManager);
+        omKeyInfo.getBucketName(), reconNamespaceSummaryManager);
   }
 
   /**
    * Constructs the full path of a key from its key name and parent ID using a bottom-up approach, starting from the
    * leaf node.
-   *
+   * <p>
    * The method begins with the leaf node (the key itself) and recursively prepends parent directory names, fetched
    * via NSSummary objects, until reaching the parent bucket (parentId is -1). It effectively builds the path from
    * bottom to top, finally prepending the volume and bucket names to complete the full path. If the directory structure
    * is currently being rebuilt (indicated by the rebuildTriggered flag), this method returns an empty string to signify
    * that path construction is temporarily unavailable.
    *
-   * @param keyName The name of the key
+   * @param keyName         The name of the key
    * @param initialParentId The parent ID of the key
-   * @param volumeName The name of the volume
-   * @param bucketName The name of the bucket
+   * @param volumeName      The name of the volume
+   * @param bucketName      The name of the bucket
    * @return The constructed full path of the key as a String, or an empty string if a rebuild is in progress and
-   *         the path cannot be constructed at this time.
+   * the path cannot be constructed at this time.
    * @throws IOException
    */
   public static String constructFullPath(String keyName, long initialParentId, String volumeName, String bucketName,
-                                         ReconNamespaceSummaryManager reconNamespaceSummaryManager,
-                                         ReconOMMetadataManager omMetadataManager) throws IOException {
+                                         ReconNamespaceSummaryManager reconNamespaceSummaryManager) throws IOException {
     StringBuilder fullPath = constructFullPathPrefix(initialParentId, volumeName, bucketName,
-        reconNamespaceSummaryManager, omMetadataManager);
+        reconNamespaceSummaryManager);
     if (fullPath.length() == 0) {
       return "";
     }
@@ -225,11 +226,10 @@ public class ReconUtils {
     return fullPath.toString();
   }
 
-
   /**
    * Constructs the prefix path to a key from its key name and parent ID using a bottom-up approach, starting from the
    * leaf node.
-   *
+   * <p>
    * The method begins with the leaf node (the key itself) and recursively prepends parent directory names, fetched
    * via NSSummary objects, until reaching the parent bucket (parentId is -1). It effectively builds the path from
    * bottom to top, finally prepending the volume and bucket names to complete the full path. If the directory structure
@@ -237,36 +237,31 @@ public class ReconUtils {
    * that path construction is temporarily unavailable.
    *
    * @param initialParentId The parent ID of the key
-   * @param volumeName The name of the volume
-   * @param bucketName The name of the bucket
+   * @param volumeName      The name of the volume
+   * @param bucketName      The name of the bucket
    * @return A StringBuilder containing the constructed prefix path of the key, or an empty string builder if a rebuild
-   *         is in progress.
+   * is in progress.
    * @throws IOException
    */
   public static StringBuilder constructFullPathPrefix(long initialParentId, String volumeName,
-      String bucketName, ReconNamespaceSummaryManager reconNamespaceSummaryManager,
-      ReconOMMetadataManager omMetadataManager) throws IOException {
+      String bucketName, ReconNamespaceSummaryManager reconNamespaceSummaryManager) throws IOException {
+
     StringBuilder fullPath = new StringBuilder();
     long parentId = initialParentId;
     boolean isDirectoryPresent = false;
 
+    List<String> pathSegments = new ArrayList<>();
     while (parentId != 0) {
       NSSummary nsSummary = reconNamespaceSummaryManager.getNSSummary(parentId);
       if (nsSummary == null) {
         log.warn("NSSummary tree is currently being rebuilt or the directory could be in the progress of " +
             "deletion, returning empty string for path construction.");
-        throw new ServiceNotReadyException("Service is initializing. Please try again later.");
-      }
-      if (nsSummary.getParentId() == -1) {
-        if (rebuildTriggered.compareAndSet(false, true)) {
-          triggerRebuild(reconNamespaceSummaryManager, omMetadataManager);
-        }
-        log.warn("NSSummary tree is currently being rebuilt, returning empty string for path construction.");
-        throw new ServiceNotReadyException("Service is initializing. Please try again later.");
+        fullPath.setLength(0);
+        return fullPath;
       }
       // On the last pass, dir-name will be empty and parent will be zero, indicating the loop should end.
       if (!nsSummary.getDirName().isEmpty()) {
-        fullPath.insert(0, nsSummary.getDirName() + OM_KEY_PREFIX);
+        pathSegments.add(nsSummary.getDirName());
       }
 
       // Move to the parent ID of the current directory
@@ -274,8 +269,14 @@ public class ReconUtils {
       isDirectoryPresent = true;
     }
 
-    // Prepend the volume and bucket to the constructed path
-    fullPath.insert(0, volumeName + OM_KEY_PREFIX + bucketName + OM_KEY_PREFIX);
+    fullPath.append(volumeName).append(OM_KEY_PREFIX)
+        .append(bucketName).append(OM_KEY_PREFIX);
+
+    // Build the components in a list, then reverse and join once
+    for (int i = pathSegments.size() - 1; i >= 0; i--) {
+      fullPath.append(pathSegments.get(i)).append(OM_KEY_PREFIX);
+    }
+
     // TODO - why is this needed? It seems lke it should handle double slashes in the path name,
     //        but its not clear how they get there. This normalize call is quite expensive as it
     //        creates several objects (URI, PATH, back to string). There was a bug fixed above
@@ -283,9 +284,11 @@ public class ReconUtils {
     //        bucket name, but with that fixed, it seems like this should not be needed. All tests
     //        pass without it for key listing.
     if (isDirectoryPresent) {
-      String path = fullPath.toString();
-      fullPath.setLength(0);
-      fullPath.append(OmUtils.normalizeKey(path, true));
+      if (fullPath.indexOf("//") >= 0) {
+        String path = fullPath.toString();
+        fullPath.setLength(0);
+        fullPath.append(OmUtils.normalizeKey(path, true));
+      }
     }
     return fullPath;
   }
@@ -384,27 +387,6 @@ public class ReconUtils {
     return prevKeyPrefix;
   }
 
-  private static void triggerRebuild(ReconNamespaceSummaryManager reconNamespaceSummaryManager,
-                                     ReconOMMetadataManager omMetadataManager) {
-    ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
-      Thread t = new Thread(r);
-      t.setName("RebuildNSSummaryThread");
-      return t;
-    });
-
-    executor.submit(() -> {
-      long startTime = System.currentTimeMillis();
-      log.info("Rebuilding NSSummary tree...");
-      try {
-        reconNamespaceSummaryManager.rebuildNSSummaryTree(omMetadataManager);
-      } finally {
-        long endTime = System.currentTimeMillis();
-        log.info("NSSummary tree rebuild completed in {} ms.", endTime - startTime);
-      }
-    });
-    executor.shutdown();
-  }
-
   /**
    * Make HTTP GET call on the URL and return HttpURLConnection instance.
    *
@@ -433,6 +415,7 @@ public class ReconUtils {
    */
   public File getLastKnownDB(File reconDbDir, String fileNamePrefix) {
     String lastKnownSnapshotFileName = null;
+    File lastKnownSnapshotFile = null;
     long lastKnonwnSnapshotTs = Long.MIN_VALUE;
     if (reconDbDir != null) {
       File[] snapshotFiles = reconDbDir.listFiles((dir, name) ->
@@ -447,8 +430,17 @@ public class ReconUtils {
             }
             long snapshotTimestamp = Long.parseLong(fileNameSplits[1]);
             if (lastKnonwnSnapshotTs < snapshotTimestamp) {
+              if (lastKnownSnapshotFile != null) {
+                try {
+                  FileUtils.forceDelete(lastKnownSnapshotFile);
+                } catch (IOException e) {
+                  log.warn("Error deleting existing om db snapshot directory: {}",
+                      lastKnownSnapshotFile.getAbsolutePath());
+                }
+              }
               lastKnonwnSnapshotTs = snapshotTimestamp;
               lastKnownSnapshotFileName = fileName;
+              lastKnownSnapshotFile = snapshotFile;
             }
           } catch (NumberFormatException nfEx) {
             log.warn("Unknown file found in Recon DB dir : {}", fileName);
@@ -559,7 +551,6 @@ public class ReconUtils {
     int binIndex = getContainerSizeBinIndex(containerSize);
     return (long) Math.pow(2, (29 + binIndex));
   }
-
 
   public static int getFileSizeBinIndex(long fileSize) {
     Preconditions.checkArgument(fileSize >= 0,
@@ -855,5 +846,35 @@ public class ReconUtils {
       pathBuilder.append(OM_KEY_PREFIX).append(id);
     }
     return pathBuilder.toString();
+  }
+
+  public static Map<String, Object> getMetricsData(List<Map<String, Object>> metrics, String beanName) {
+    if (metrics == null || StringUtils.isEmpty(beanName)) {
+      return null;
+    }
+    for (Map<String, Object> item :metrics) {
+      if (beanName.equals(item.get("name"))) {
+        return item;
+      }
+    }
+    return null;
+  }
+
+  public static long extractLongMetricValue(Map<String, Object> metrics, String keyName) {
+    if (metrics == null || StringUtils.isEmpty(keyName)) {
+      return  -1;
+    }
+    Object value = metrics.get(keyName);
+    if (value instanceof Number) {
+      return ((Number) value).longValue();
+    }
+    if (value instanceof String) {
+      try {
+        return Long.parseLong((String) value);
+      } catch (NumberFormatException e) {
+        log.error("Failed to parse long value for key: {} with value: {}", keyName, value, e);
+      }
+    }
+    return -1;
   }
 }

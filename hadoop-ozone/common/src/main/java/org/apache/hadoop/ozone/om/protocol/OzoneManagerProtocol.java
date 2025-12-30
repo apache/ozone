@@ -58,7 +58,6 @@ import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.helpers.S3VolumeContext;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfo;
 import org.apache.hadoop.ozone.om.helpers.ServiceInfoEx;
-import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
@@ -73,6 +72,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Prepare
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSelector;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
@@ -104,7 +104,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
   /**
    * Changes the owner of a volume.
    * @param volume  - Name of the volume.
@@ -117,7 +116,6 @@ public interface OzoneManagerProtocol
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
   }
-
 
   /**
    * Changes the Quota on a volume.
@@ -132,7 +130,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
   /**
    * Checks if the specified user can access this volume.
    * @param volume - volume
@@ -145,7 +142,6 @@ public interface OzoneManagerProtocol
       throws IOException {
     throw new UnsupportedOperationException("This operation is not supported.");
   }
-
 
   /**
    * Gets the volume information.
@@ -164,7 +160,6 @@ public interface OzoneManagerProtocol
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
   }
-
 
   /**
    * Lists volumes accessible by a specific user.
@@ -199,7 +194,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
   /**
    * Gets the bucket information.
    * @param volumeName - Volume name.
@@ -231,7 +225,6 @@ public interface OzoneManagerProtocol
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
   }
-
 
   /**
    * Open the given key and return an open key session.
@@ -340,7 +333,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
   /**
    * Rename existing keys within a bucket.
    * @param omRenameKeys Includes volume, bucket, and fromKey toKey name map
@@ -352,7 +344,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
   /**
    * Deletes an existing key.
    *
@@ -363,7 +354,6 @@ public interface OzoneManagerProtocol
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
   }
-
 
   /**
    * Deletes existing key/keys. This interface supports delete
@@ -393,7 +383,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
   /**
    * Deletes an existing empty bucket from volume.
    * @param volume - Name of the volume.
@@ -404,7 +393,6 @@ public interface OzoneManagerProtocol
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
   }
-
 
   /**
    * Returns a list of buckets represented by {@link OmBucketInfo}
@@ -552,8 +540,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
-
   /**
    * Commit Multipart upload part file.
    * @param omKeyArgs
@@ -566,7 +552,6 @@ public interface OzoneManagerProtocol
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
   }
-
 
   /**
    * Complete Multipart upload Request.
@@ -582,7 +567,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
   /**
    * Abort multipart upload.
    * @param omKeyArgs
@@ -592,7 +576,6 @@ public interface OzoneManagerProtocol
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
   }
-
 
   /**
    * Returns list of parts of a multipart upload key.
@@ -640,7 +623,7 @@ public interface OzoneManagerProtocol
       throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach");
-  };
+  }
 
   /**
    * Set secret key for accessId.
@@ -779,10 +762,10 @@ public interface OzoneManagerProtocol
    * @return message which tells the image name, parent dir and OM leader
    * node information.
    */
+  @Deprecated
   default String printCompactionLogDag(String fileNamePrefix, String graphType)
       throws IOException {
-    throw new UnsupportedOperationException("OzoneManager does not require " +
-        "this to be implemented");
+    throw new UnsupportedOperationException("This API has been deprecated.");
   }
 
   /**
@@ -851,14 +834,19 @@ public interface OzoneManagerProtocol
    * @param volumeName Name of the volume to which the snapshotted bucket belong
    * @param bucketName Name of the bucket to which the snapshots belong
    * @param jobStatus JobStatus to be used to filter the snapshot diff jobs
+   * @param listAllStatus Option to specify whether to list all jobs regardless of status
+   * @param prevSnapshotDiffJob list snapshot diff jobs after this snapshot diff job.
+   * @param maxListResult maximum entries to be returned from the startSnapshotDiffJob.
    * @return a list of SnapshotDiffJob objects
    * @throws IOException in case there is a failure while getting a response.
    */
-  default List<SnapshotDiffJob> listSnapshotDiffJobs(String volumeName,
-                                                     String bucketName,
-                                                     String jobStatus,
-                                                     boolean listAll)
-      throws IOException {
+  default ListSnapshotDiffJobResponse listSnapshotDiffJobs(
+      String volumeName,
+      String bucketName,
+      String jobStatus,
+      boolean listAllStatus,
+      String prevSnapshotDiffJob,
+      int maxListResult) throws IOException {
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented");
   }
@@ -924,7 +912,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
   /**
    * OzoneFS api to creates an output stream for a file.
    *
@@ -944,7 +931,6 @@ public interface OzoneManagerProtocol
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
   }
-
 
   /**
    * OzoneFS api to lookup for a file.
@@ -1025,7 +1011,6 @@ public interface OzoneManagerProtocol
         "this to be implemented, as write requests use a new approach.");
   }
 
-
   /**
    * Remove acl for Ozone object. Return true if acl is removed successfully
    * else false.
@@ -1038,7 +1023,6 @@ public interface OzoneManagerProtocol
     throw new UnsupportedOperationException("OzoneManager does not require " +
         "this to be implemented, as write requests use a new approach.");
   }
-
 
   /**
    * Acls to be set for given Ozone object. This operations reset ACL for
@@ -1139,6 +1123,7 @@ public interface OzoneManagerProtocol
       throws IOException;
 
   UUID refetchSecretKey() throws IOException;
+
   /**
    * Enter, leave, or get safe mode.
    *

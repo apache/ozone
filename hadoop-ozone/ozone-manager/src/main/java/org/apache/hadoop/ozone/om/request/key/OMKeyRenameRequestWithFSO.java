@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om.request.key;
 import static org.apache.hadoop.ozone.OmUtils.normalizeKey;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.RENAME_OPEN_FILE;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
@@ -296,19 +296,21 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     String bucketKey = metadataMgr.getBucketKey(
         fromKeyValue.getVolumeName(), fromKeyValue.getBucketName());
 
-    fromKeyValue.setUpdateID(trxnLogIndex);
+    OmKeyInfo.Builder fromKeyBuilder = fromKeyValue.toBuilder()
+        .setUpdateID(trxnLogIndex);
     // Set toFileName
-    fromKeyValue.setKeyName(toKeyFileName);
-    fromKeyValue.setFileName(toKeyFileName);
+    fromKeyBuilder.setKeyName(toKeyFileName);
     // Set toKeyObjectId
     if (toKeyParent != null) {
-      fromKeyValue.setParentObjectID(toKeyParent.getObjectID());
+      fromKeyBuilder.setParentObjectID(toKeyParent.getObjectID());
     } else {
       omBucketInfo = metadataMgr.getBucketTable().get(bucketKey);
-      fromKeyValue.setParentObjectID(omBucketInfo.getObjectID());
+      fromKeyBuilder.setParentObjectID(omBucketInfo.getObjectID());
     }
+    fromKeyValue = fromKeyBuilder.build();
+
     // Set modification time
-    setModificationTime(ommm, omBucketInfo, toKeyParent, volumeId, bucketId,
+    omBucketInfo = setModificationTime(ommm, omBucketInfo, toKeyParent, volumeId, bucketId,
         modificationTime, dirTable, trxnLogIndex);
     fromKeyParent = OMFileRequest.getKeyParentDir(fromKeyValue.getVolumeName(),
         fromKeyValue.getBucketName(), fromKeyName, ozoneManager, metadataMgr);
@@ -316,7 +318,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
       // Get omBucketInfo only when needed to reduce unnecessary DB IO
       omBucketInfo = metadataMgr.getBucketTable().get(bucketKey);
     }
-    setModificationTime(ommm, omBucketInfo, fromKeyParent, volumeId,
+    omBucketInfo = setModificationTime(ommm, omBucketInfo, fromKeyParent, volumeId,
         bucketId, modificationTime, dirTable, trxnLogIndex);
 
     // destination dbKeyName
@@ -353,7 +355,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
-  private void setModificationTime(OMMetadataManager omMetadataManager,
+  private OmBucketInfo setModificationTime(OMMetadataManager omMetadataManager,
       OmBucketInfo bucketInfo, OmKeyInfo keyParent,
       long volumeId, long bucketId, long modificationTime,
       Table<String, OmDirectoryInfo> dirTable, long trxnLogIndex)
@@ -367,20 +369,24 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
       dirTable.addCacheEntry(new CacheKey<>(dbToKeyParent),
           CacheValue.get(trxnLogIndex,
               OMFileRequest.getDirectoryInfo(keyParent)));
-    } else {
-      // For FSO a bucket is root of the filesystem, so rename an
-      // object at the root of a bucket need change bucket's modificationTime
-      if (bucketInfo == null) {
-        throw new OMException("Bucket not found",
-            OMException.ResultCodes.BUCKET_NOT_FOUND);
-      }
-      bucketInfo.setModificationTime(modificationTime);
-      String bucketKey = omMetadataManager.getBucketKey(
-          bucketInfo.getVolumeName(), bucketInfo.getBucketName());
-      omMetadataManager.getBucketTable().addCacheEntry(
-          new CacheKey<>(bucketKey),
-          CacheValue.get(trxnLogIndex, bucketInfo));
+      return bucketInfo;
     }
+    // For FSO a bucket is root of the filesystem, so rename an
+    // object at the root of a bucket need change bucket's modificationTime
+    if (bucketInfo == null) {
+      throw new OMException("Bucket not found",
+          OMException.ResultCodes.BUCKET_NOT_FOUND);
+    }
+    OmBucketInfo newBucketInfo = bucketInfo.toBuilder()
+        .setModificationTime(modificationTime)
+        .build();
+    String bucketKey = omMetadataManager.getBucketKey(
+        newBucketInfo.getVolumeName(), newBucketInfo.getBucketName());
+    omMetadataManager.getBucketTable().addCacheEntry(
+        new CacheKey<>(bucketKey),
+        CacheValue.get(trxnLogIndex, newBucketInfo));
+
+    return newBucketInfo;
   }
 
   private Map<String, String> buildAuditMap(

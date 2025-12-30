@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.ozone.recon.api.types;
 
-import com.google.common.base.Preconditions;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
@@ -106,7 +106,6 @@ public final class PipelineMetadata {
     return containers;
   }
 
-
   /**
    * Returns new builder class that builds a PipelineMetadata.
    *
@@ -159,10 +158,10 @@ public final class PipelineMetadata {
      * @return instance of PipelineMetadata.
      */
     public PipelineMetadata build() {
-      Preconditions.checkNotNull(pipelineId);
-      Preconditions.checkNotNull(status);
-      Preconditions.checkNotNull(datanodes);
-      Preconditions.checkNotNull(replicationType);
+      Objects.requireNonNull(pipelineId, "pipelineId == null");
+      Objects.requireNonNull(status, "status == null");
+      Objects.requireNonNull(datanodes, "datanodes == null");
+      Objects.requireNonNull(replicationType, "replicationType == null");
 
       return new PipelineMetadata(this);
     }

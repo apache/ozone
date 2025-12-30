@@ -22,8 +22,6 @@ package org.apache.hadoop.hdds.security;
  * <a href="https://datatracker.ietf.org/doc/html/rfc7468">RFC-7468</a>.
  */
 public final class SecurityConstants {
-  private SecurityConstants() { }
-
   private static final String PEM_PRE_ENCAPSULATION_BOUNDARY_FORMAT = "-----BEGIN %s-----";
 
   public static final String PEM_POST_ENCAPSULATION_BOUNDARY_FORMAT = "-----END %s-----";
@@ -44,4 +42,5 @@ public final class SecurityConstants {
   public static final String PEM_POST_ENCAPSULATION_BOUNDARY_PRIVATE_KEY =
       String.format(PEM_POST_ENCAPSULATION_BOUNDARY_FORMAT, PEM_ENCAPSULATION_BOUNDARY_LABEL_PRIVATE_KEY);
 
+  private SecurityConstants() { }
 }

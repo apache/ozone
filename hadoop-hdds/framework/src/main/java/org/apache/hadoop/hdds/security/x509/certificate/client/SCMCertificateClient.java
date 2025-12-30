@@ -337,7 +337,6 @@ public class SCMCertificateClient extends DefaultCertificateClient {
     }
   }
 
-
   /**
    * For primary SCM get sub-ca signed certificate and root CA certificate by
    * root CA certificate server and store it using certificate client.

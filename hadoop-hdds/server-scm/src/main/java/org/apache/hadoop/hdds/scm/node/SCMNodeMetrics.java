@@ -132,6 +132,7 @@ public final class SCMNodeMetrics implements MetricsSource {
   public void getMetrics(MetricsCollector collector, boolean all) {
     Map<String, Map<String, Integer>> nodeCount = managerMXBean.getNodeCount();
     Map<String, Long> nodeInfo = managerMXBean.getNodeInfo();
+    Map<String, String> nodeStatistics = managerMXBean.getNodeStatistics();
     int totalNodeCount = 0;
     /**
      * Loop over the Node map and create a metric for the cross product of all
@@ -155,6 +156,15 @@ public final class SCMNodeMetrics implements MetricsSource {
     }
     metrics.addGauge(
         Interns.info("AllNodes", "Number of datanodes"), totalNodeCount);
+
+    String nonWritableNodes = nodeStatistics.get("NonWritableNodes");
+    if (nonWritableNodes != null) {
+      metrics.addGauge(
+          Interns.info("NonWritableNodes", "Number of datanodes that cannot accept new writes because " +
+              "they are either not in IN_SERVICE and HEALTHY state, cannot allocate new containers or " +
+              "cannot write to existing containers."),
+          Integer.parseInt(nonWritableNodes));
+    }
 
     for (Map.Entry<String, Long> e : nodeInfo.entrySet()) {
       metrics.addGauge(

@@ -36,10 +36,6 @@ public final class OmDBTenantState implements Comparable<OmDBTenantState> {
       OmDBTenantState.class,
       DelegatedCodec.CopyType.SHALLOW);
 
-  public static Codec<OmDBTenantState> getCodec() {
-    return CODEC;
-  }
-
   /**
    * Name of the tenant.
    */
@@ -74,6 +70,10 @@ public final class OmDBTenantState implements Comparable<OmDBTenantState> {
     this.adminRoleName = adminRoleName;
     this.bucketNamespacePolicyName = bucketNamespacePolicyName;
     this.bucketPolicyName = bucketPolicyName;
+  }
+
+  public static Codec<OmDBTenantState> getCodec() {
+    return CODEC;
   }
 
   @Override

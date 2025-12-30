@@ -135,7 +135,7 @@ load bats-assert/load.bash
 @test "script change including junit.sh" {
   run dev-support/ci/selective_ci_checks.sh 66093e52c6
 
-  assert_output -p 'basic-checks=["rat","bats","checkstyle","findbugs","native"]'
+  assert_output -p 'basic-checks=["rat","bats","checkstyle","findbugs"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=false
@@ -179,22 +179,22 @@ load bats-assert/load.bash
 @test "native only" {
   run dev-support/ci/selective_ci_checks.sh 5b1319a8c2
 
-  assert_output -p 'basic-checks=["rat","author","checkstyle","findbugs","pmd","native"]'
+  assert_output -p 'basic-checks=["rat","author","checkstyle","findbugs","pmd"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
-  assert_output -p needs-compose-tests=false
-  assert_output -p needs-integration-tests=false
-  assert_output -p needs-kubernetes-tests=false
+  assert_output -p needs-compose-tests=true
+  assert_output -p needs-integration-tests=true
+  assert_output -p needs-kubernetes-tests=true
 }
 
 @test "native test in other module" {
   run dev-support/ci/selective_ci_checks.sh 822c0dee1a
 
-  assert_output -p 'basic-checks=["rat","author","checkstyle","findbugs","pmd","native"]'
+  assert_output -p 'basic-checks=["rat","author","checkstyle","findbugs","pmd"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=false
-  assert_output -p needs-integration-tests=false
+  assert_output -p needs-integration-tests=true
   assert_output -p needs-kubernetes-tests=false
 }
 
@@ -245,7 +245,7 @@ load bats-assert/load.bash
 @test "java and compose change" {
   run dev-support/ci/selective_ci_checks.sh d0f0f806e
 
-  assert_output -p 'basic-checks=["rat","author","checkstyle","findbugs","pmd","native"]'
+  assert_output -p 'basic-checks=["rat","author","checkstyle","findbugs","pmd"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
@@ -267,7 +267,7 @@ load bats-assert/load.bash
 @test "pom change" {
   run dev-support/ci/selective_ci_checks.sh 9129424a9
 
-  assert_output -p 'basic-checks=["rat","checkstyle","findbugs","pmd","native"]'
+  assert_output -p 'basic-checks=["rat","checkstyle","findbugs","pmd"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
@@ -278,7 +278,7 @@ load bats-assert/load.bash
 @test "CI lib change" {
   run dev-support/ci/selective_ci_checks.sh ceb79acaa
 
-  assert_output -p 'basic-checks=["author","bats","checkstyle","docs","findbugs","native","pmd","rat"]'
+  assert_output -p 'basic-checks=["author","bats","checkstyle","docs","findbugs","pmd","rat"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
@@ -289,7 +289,7 @@ load bats-assert/load.bash
 @test "CI workflow change" {
   run dev-support/ci/selective_ci_checks.sh 90a8d7c01
 
-  assert_output -p 'basic-checks=["author","bats","checkstyle","docs","findbugs","native","pmd","rat"]'
+  assert_output -p 'basic-checks=["author","bats","checkstyle","docs","findbugs","pmd","rat"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
@@ -309,10 +309,21 @@ load bats-assert/load.bash
   assert_output -p needs-kubernetes-tests=false
 }
 
+@test "CI workflow change (check.yml)" {
+  run dev-support/ci/selective_ci_checks.sh 1468af02067ec75b255f605816c32f8bf4dfaabf
+
+  assert_output -p 'basic-checks=["author","bats","checkstyle","docs","findbugs","pmd","rat"]'
+  assert_output -p needs-build=true
+  assert_output -p needs-compile=true
+  assert_output -p needs-compose-tests=true
+  assert_output -p needs-integration-tests=true
+  assert_output -p needs-kubernetes-tests=true
+}
+
 @test "CI workflow change (ci.yaml)" {
   run dev-support/ci/selective_ci_checks.sh 90fd5f2adc
 
-  assert_output -p 'basic-checks=["author","bats","checkstyle","docs","findbugs","native","pmd","rat"]'
+  assert_output -p 'basic-checks=["author","bats","checkstyle","docs","findbugs","pmd","rat"]'
   assert_output -p needs-build=true
   assert_output -p needs-compile=true
   assert_output -p needs-compose-tests=true
@@ -411,7 +422,7 @@ load bats-assert/load.bash
 @test "properties file in resources" {
   run dev-support/ci/selective_ci_checks.sh 71b8bdd8becf72d6f7d4e7986895504b8259b3e5
 
-  assert_output -p 'basic-checks=["rat","checkstyle","native"]'
+  assert_output -p 'basic-checks=["rat","checkstyle"]'
   assert_output -p needs-build=false
   assert_output -p needs-compile=false
   assert_output -p needs-compose-tests=false

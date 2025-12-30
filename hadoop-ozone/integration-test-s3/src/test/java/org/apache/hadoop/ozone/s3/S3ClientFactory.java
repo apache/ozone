@@ -39,7 +39,11 @@ import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3AsyncClient;
+import software.amazon.awssdk.services.s3.S3AsyncClientBuilder;
+import software.amazon.awssdk.services.s3.S3BaseClientBuilder;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3ClientBuilder;
 
 /**
  * Factory class for creating S3 clients.
@@ -127,6 +131,23 @@ public class S3ClientFactory {
    * @throws Exception if there is an error creating the client
    */
   public S3Client createS3ClientV2(boolean enablePathStyle) throws Exception {
+    S3ClientBuilder builder = S3Client.builder();
+    configureCommon(builder, enablePathStyle);
+    return builder.build();
+  }
+
+  public S3AsyncClient createS3AsyncClientV2() throws Exception {
+    return createS3AsyncClientV2(true);
+  }
+
+  public S3AsyncClient createS3AsyncClientV2(boolean enablePathStyle) throws Exception {
+    S3AsyncClientBuilder builder = S3AsyncClient.builder();
+    configureCommon(builder, enablePathStyle);
+    return builder.build();
+  }
+
+  private <T extends S3BaseClientBuilder<T, ?>> void configureCommon(T builder, boolean enablePathStyle)
+      throws Exception {
     final String accessKey = "user";
     final String secretKey = "password";
     final Region region = Region.US_EAST_1;
@@ -151,11 +172,9 @@ public class S3ClientFactory {
 
     AwsBasicCredentials credentials = AwsBasicCredentials.create(accessKey, secretKey);
 
-    return S3Client.builder()
-        .region(region)
+    builder.region(region)
         .endpointOverride(new URI(endpoint))
         .credentialsProvider(StaticCredentialsProvider.create(credentials))
-        .forcePathStyle(enablePathStyle)
-        .build();
+        .forcePathStyle(enablePathStyle);
   }
 }

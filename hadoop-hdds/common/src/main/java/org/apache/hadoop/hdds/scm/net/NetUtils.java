@@ -21,7 +21,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,6 +36,7 @@ public final class NetUtils {
   private NetUtils() {
     // Prevent instantiation
   }
+
   /**
    * Normalize a path by stripping off any trailing.
    * {@link NetConstants#PATH_SEPARATOR}
@@ -73,7 +74,6 @@ public final class NetUtils {
     return newLocation.equals(NetConstants.PATH_SEPARATOR_STR) ? 1 :
         newLocation.split(NetConstants.PATH_SEPARATOR_STR).length;
   }
-
 
   /**
    *  Remove node from mutableExcludedNodes if it's covered by excludedScope.

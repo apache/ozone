@@ -141,7 +141,7 @@ enum Type {
   ListSnapshotDiffJobs = 122;
   CancelSnapshotDiff = 123;
   SetSafeMode = 124;
-  PrintCompactionLogDag = 125;
+  PrintCompactionLogDag = 125; // [deprecated = true] by HDDS-12053
   ListKeysLight = 126;
   AbortExpiredMultiPartUploads = 127;
   SetSnapshotProperty = 128;
@@ -292,7 +292,7 @@ message OMRequest {
   optional ListSnapshotDiffJobRequest       ListSnapshotDiffJobRequest     = 122;
   optional CancelSnapshotDiffRequest        CancelSnapshotDiffRequest      = 123;
   optional SetSafeModeRequest               SetSafeModeRequest             = 124;
-  optional PrintCompactionLogDagRequest     PrintCompactionLogDagRequest   = 125;
+  optional PrintCompactionLogDagRequest     PrintCompactionLogDagRequest   = 125 [deprecated = true];
 
   optional MultipartUploadsExpiredAbortRequest multipartUploadsExpiredAbortRequest = 126;
   optional SetSnapshotPropertyRequest       SetSnapshotPropertyRequest     = 127;
@@ -308,13 +308,13 @@ message OMRequest {
   optional GetObjectTaggingRequest          getObjectTaggingRequest        = 140;
   optional PutObjectTaggingRequest          putObjectTaggingRequest        = 141;
   optional DeleteObjectTaggingRequest       deleteObjectTaggingRequest     = 142;
+  repeated SetSnapshotPropertyRequest       SetSnapshotPropertyRequests    = 143;
 
-  optional SetLifecycleConfigurationRequest setLifecycleConfigurationRequest = 150;
-  optional GetLifecycleConfigurationRequest   getLifecycleConfigurationRequest   = 151;
-  optional DeleteLifecycleConfigurationRequest deleteLifecycleConfigurationRequest = 152;
-
-  optional GetLifecycleServiceStatusRequest getLifecycleServiceStatusRequest = 153;
-  optional SetLifecycleServiceStatusRequest setLifecycleServiceStatusRequest = 154;
+  optional SetLifecycleConfigurationRequest setLifecycleConfigurationRequest = 144;
+  optional GetLifecycleConfigurationRequest   getLifecycleConfigurationRequest   = 145;
+  optional DeleteLifecycleConfigurationRequest deleteLifecycleConfigurationRequest = 146;
+  optional GetLifecycleServiceStatusRequest getLifecycleServiceStatusRequest = 147;
+  optional SetLifecycleServiceStatusRequest setLifecycleServiceStatusRequest = 148;
 }
 
 message OMResponse {
@@ -432,7 +432,7 @@ message OMResponse {
   optional ListSnapshotDiffJobResponse       ListSnapshotDiffJobResponse   = 122;
   optional CancelSnapshotDiffResponse        cancelSnapshotDiffResponse    = 123;
   optional SetSafeModeResponse               SetSafeModeResponse           = 124;
-  optional PrintCompactionLogDagResponse     PrintCompactionLogDagResponse = 125;
+  optional PrintCompactionLogDagResponse     PrintCompactionLogDagResponse = 125 [deprecated = true];
   optional ListKeysLightResponse             listKeysLightResponse         = 126;
   optional MultipartUploadsExpiredAbortResponse multipartUploadsExpiredAbortResponse = 127;
   optional SetSnapshotPropertyResponse       SetSnapshotPropertyResponse   = 128;
@@ -582,8 +582,10 @@ enum Status {
     KEY_UNDER_LEASE_RECOVERY = 95;
     KEY_ALREADY_CLOSED = 96;
     KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD = 97;
-    LIFECYCLE_CONFIGURATION_NOT_FOUND = 98;
-    UPDATE_ID_NOT_MATCH = 99;
+    TOO_MANY_SNAPSHOTS = 98;
+
+    LIFECYCLE_CONFIGURATION_NOT_FOUND = 99;
+    UPDATE_ID_NOT_MATCH = 100;
 }
 
 /**
@@ -774,7 +776,7 @@ message BucketInfo {
     required string bucketName = 2;
     repeated OzoneAclInfo acls = 3;
     required bool isVersionEnabled = 4 [default = false];
-    required StorageTypeProto storageType = 5 [default = DISK];
+    required hadoop.hdds.StorageTypeProto storageType = 5 [default = DISK];
     optional uint64 creationTime = 6;
     repeated hadoop.hdds.KeyValue metadata = 7;
     optional BucketEncryptionInfoProto beinfo = 8;
@@ -790,13 +792,8 @@ message BucketInfo {
     optional BucketLayoutProto bucketLayout = 18;
     optional string owner = 19;
     optional hadoop.hdds.DefaultReplicationConfig defaultReplicationConfig = 20;
-}
-
-enum StorageTypeProto {
-    DISK = 1;
-    SSD = 2;
-    ARCHIVE = 3;
-    RAM_DISK = 4;
+    optional uint64 snapshotUsedBytes = 21;
+    optional uint64 snapshotUsedNamespace = 22;
 }
 
 enum BucketLayoutProto {
@@ -863,7 +860,7 @@ message BucketArgs {
     required string volumeName = 1;
     required string bucketName = 2;
     optional bool isVersionEnabled = 5;
-    optional StorageTypeProto storageType = 6;
+    optional hadoop.hdds.StorageTypeProto storageType = 6;
     repeated hadoop.hdds.KeyValue metadata = 7;
     optional uint64 quotaInBytes = 8;
     optional uint64 quotaInNamespace = 9;
@@ -903,8 +900,8 @@ message SnapshotInfo {
   optional hadoop.hdds.UUID pathPreviousSnapshotID = 8;
   optional hadoop.hdds.UUID globalPreviousSnapshotID = 9;
   optional string snapshotPath = 10;
-  optional string checkpointDir = 11;
-  optional int64 dbTxSequenceNumber = 12;
+  optional string checkpointDir = 11 [deprecated = true];
+  optional int64 dbTxSequenceNumber = 12 [deprecated = true];
   optional bool deepClean = 13;
   optional bool sstFiltered = 14;
   // snapshot reference size before any key replication or EC
@@ -918,6 +915,10 @@ message SnapshotInfo {
   // note: shared sizes can be calculated from: referenced - exclusive
   optional bool deepCleanedDeletedDir = 19;
   optional bytes lastTransactionInfo = 20;
+  optional uint64 exclusiveSizeDeltaFromDirDeepCleaning = 21;
+  // snapshot exclusive size after replication
+  optional uint64 exclusiveReplicatedSizeDeltaFromDirDeepCleaning = 22;
+  optional bytes createTransactionInfo = 23;
 }
 
 message SnapshotDiffJobProto {
@@ -1194,6 +1195,25 @@ message KeyInfo {
     optional uint64 expectedDataGeneration = 22;
 }
 
+// KeyInfoProtoLight is a lightweight subset of KeyInfo message containing
+// selected fields only, while maintaining the same field indices as KeyInfo
+// for compatibility and consistency.
+message KeyInfoProtoLight {
+  required string volumeName = 1;
+  required string bucketName = 2;
+  required string keyName = 3;
+  required uint64 dataSize = 4;
+  required hadoop.hdds.ReplicationType type = 5;
+  optional hadoop.hdds.ReplicationFactor factor = 6;
+  required uint64 creationTime = 8;
+  required uint64 modificationTime = 9;
+  optional uint64 objectID = 14;
+  optional uint64 updateID = 15;
+  optional uint64 parentID = 16;
+  optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 17;
+  optional bool isFile = 19;
+}
+
 message BasicKeyInfo {
     optional string keyName = 1;
     optional uint64 dataSize = 2;
@@ -1204,6 +1224,8 @@ message BasicKeyInfo {
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 7;
     optional string eTag = 8;
     optional string ownerName = 9;
+    optional bool isEncrypted = 10;
+    optional bool isFile = 11;
 }
 
 message DirectoryInfo {
@@ -1220,6 +1242,7 @@ message DirectoryInfo {
 
 message RepeatedKeyInfo {
     repeated KeyInfo keyInfo = 1;
+    optional uint64 bucketId = 2;
 }
 
 message OzoneFileStatusProto {
@@ -1411,8 +1434,8 @@ message DeleteKeyResponse {
 }
 
 message DeletedKeys {
-    required string volumeName = 1;
-    required string bucketName = 2;
+    required string volumeName = 1 [deprecated = true];
+    required string bucketName = 2 [deprecated = true];
     repeated string keys = 3;
 }
 
@@ -1423,6 +1446,14 @@ message PurgeKeysRequest {
     repeated SnapshotMoveKeyInfos keysToUpdate = 3;
     // previous snapshotID can also be null & this field would be absent in older requests.
     optional NullableUUID expectedPreviousSnapshotID = 4;
+    repeated string renamedKeys = 5;
+    repeated BucketPurgeKeysSize bucketPurgeKeysSize = 6;
+}
+
+message BucketPurgeKeysSize {
+  optional BucketNameInfo bucketNameInfo = 1;
+  optional uint64 purgedBytes = 2;
+  optional uint64 purgedNamespace = 3;
 }
 
 message PurgeKeysResponse {
@@ -1447,6 +1478,14 @@ message PurgeDirectoriesRequest {
   optional string snapshotTableKey = 2;
   // previous snapshotID can also be null & this field would be absent in older requests.
   optional NullableUUID expectedPreviousSnapshotID = 3;
+  repeated BucketNameInfo bucketNameInfos = 4;
+}
+
+message BucketNameInfo {
+  optional uint64 volumeId = 1;
+  optional uint64 bucketId = 2;
+  optional string volumeName = 3;
+  optional string bucketName = 4;
 }
 
 message NullableUUID {
@@ -2010,7 +2049,9 @@ message ListSnapshotDiffJobRequest {
   required string volumeName = 1;
   required string bucketName = 2;
   optional string jobStatus = 3;
-  optional bool listAll = 4;
+  optional bool listAll = 4; // Option to specify whether to list all jobs regardless of status
+  optional string prevSnapshotDiffJob = 5;
+  optional uint32 maxListResult = 6;
 }
 
 message DeleteSnapshotRequest {
@@ -2049,6 +2090,7 @@ message SnapshotMoveTableKeysRequest {
 message SnapshotMoveKeyInfos {
   optional string key = 1;
   repeated KeyInfo keyInfos = 2;
+  optional uint64 bucketId = 3;
 }
 
 message SnapshotPurgeRequest {
@@ -2062,6 +2104,7 @@ message SetSnapshotPropertyRequest {
   optional SnapshotSize snapshotSize = 3;
   optional bool deepCleanedDeletedDir = 4;
   optional bool deepCleanedDeletedKey = 5;
+  optional SnapshotSize snapshotSizeDeltaFromDirDeepCleaning = 6;
 }
 
 // SnapshotProperty in entirely deprecated, Keeping it here for proto.lock compatibility
@@ -2153,6 +2196,7 @@ message CancelSnapshotDiffResponse {
 
 message ListSnapshotDiffJobResponse {
   repeated SnapshotDiffJobProto snapshotDiffJob = 1;
+  optional string lastSnapshotDiffJob = 2;
 }
 
 message DeleteSnapshotResponse {

@@ -45,17 +45,14 @@ import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Test cases for mini ozone cluster.
  */
-@Timeout(300)
 public class TestMiniOzoneCluster {
 
   private MiniOzoneCluster cluster;
@@ -205,7 +202,7 @@ public class TestMiniOzoneCluster {
    * Test that a DN can register with SCM even if it was started before the SCM.
    * @throws Exception
    */
-  @Test @Timeout(100)
+  @Test
   public void testDNstartAfterSCM() throws Exception {
     // Start a cluster with 3 DN
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -250,7 +247,7 @@ public class TestMiniOzoneCluster {
    * Test that multiple datanode directories are created in MiniOzoneCluster.
    * @throws Exception
    */
-  @Test @Timeout(60)
+  @Test
   public void testMultipleDataDirs() throws Exception {
     // Start a cluster with 3 DN and configure reserved space in each DN
     String reservedSpace = "1B";
@@ -267,7 +264,7 @@ public class TestMiniOzoneCluster {
         + "-" + cluster.getClusterId();
     assertEquals(name, cluster.getName());
 
-    final String baseDir = GenericTestUtils.getTempPath(name);
+    final String baseDir = MiniOzoneCluster.Builder.getTempPath(name);
     assertEquals(baseDir, cluster.getBaseDir());
 
 
@@ -279,7 +276,7 @@ public class TestMiniOzoneCluster {
 
     volumeList.forEach(storageVolume -> assertEquals(
             (long) StorageSize.parse(reservedSpace).getValue(),
-            storageVolume.getVolumeUsage().get().getReservedInBytes()));
+            storageVolume.getVolumeUsage().getReservedInBytes()));
   }
 
 }

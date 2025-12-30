@@ -63,7 +63,8 @@ import picocli.CommandLine;
  */
 @CommandLine.Command(
     name = "recover",
-    description = "Recover Deleted SCM Certificate from RocksDB")
+    description = "Recover Deleted SCM Certificate from RocksDB."  +
+        " SCM should be stopped for this tool.")
 public class RecoverSCMCertificate extends RepairTool {
   @CommandLine.Option(names = {"--db"},
       required = true,
@@ -147,7 +148,6 @@ public class RecoverSCMCertificate extends RepairTool {
     }
     return cert.get();
   }
-
 
   private static X509Certificate getSubCertificate(
       Map<BigInteger, X509Certificate> allCerts, String hostName) throws Exception {

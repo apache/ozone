@@ -21,10 +21,14 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE;
 
 import com.google.common.primitives.Longs;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Map;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
+import org.apache.hadoop.hdds.utils.db.DBConfigFromFile;
 import org.apache.hadoop.hdds.utils.db.DBDefinition;
 import org.apache.hadoop.hdds.utils.db.FixedLengthStringCodec;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
@@ -33,6 +37,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
+import org.rocksdb.RocksDBException;
 
 /**
  * This class defines the RocksDB structure for datanode following schema
@@ -51,9 +56,9 @@ import org.apache.hadoop.ozone.container.common.utils.db.DatanodeDBProfile;
  * The keys would be encoded in a fix-length encoding style in order to
  * utilize the "Prefix Seek" feature from Rocksdb to optimize seek.
  */
-public class DatanodeSchemaThreeDBDefinition
-    extends AbstractDatanodeDBDefinition
+public class DatanodeSchemaThreeDBDefinition extends AbstractDatanodeDBDefinition
     implements DBDefinition.WithMapInterface {
+
   public static final DBColumnFamilyDefinition<String, BlockData>
       BLOCK_DATA =
       new DBColumnFamilyDefinition<>(
@@ -110,17 +115,14 @@ public class DatanodeSchemaThreeDBDefinition
     DatanodeDBProfile dbProfile = DatanodeDBProfile
         .getProfile(config.getEnum(HDDS_DB_PROFILE, HDDS_DEFAULT_DB_PROFILE));
 
-    ManagedColumnFamilyOptions cfOptions =
-        dbProfile.getColumnFamilyOptions(config);
-    // Use prefix seek to mitigating seek overhead.
-    // See: https://github.com/facebook/rocksdb/wiki/Prefix-Seek
-    cfOptions.useFixedLengthPrefixExtractor(getContainerKeyPrefixLength());
+    Path optionsPath = Paths.get(
+        config.get(HddsConfigKeys.DATANODE_DB_CONFIG_PATH, HddsConfigKeys.DATANODE_DB_CONFIG_PATH_DEFAULT));
 
-    BLOCK_DATA.setCfOptions(cfOptions);
-    METADATA.setCfOptions(cfOptions);
-    DELETE_TRANSACTION.setCfOptions(cfOptions);
-    FINALIZE_BLOCKS.setCfOptions(cfOptions);
-    LAST_CHUNK_INFO.setCfOptions(cfOptions);
+    setCfOptions(config, dbProfile, optionsPath, BLOCK_DATA);
+    setCfOptions(config, dbProfile, optionsPath, METADATA);
+    setCfOptions(config, dbProfile, optionsPath, DELETE_TRANSACTION);
+    setCfOptions(config, dbProfile, optionsPath, FINALIZE_BLOCKS);
+    setCfOptions(config, dbProfile, optionsPath, LAST_CHUNK_INFO);
   }
 
   @Override
@@ -176,6 +178,7 @@ public class DatanodeSchemaThreeDBDefinition
   public static String getKeyWithoutPrefix(String keyWithPrefix) {
     return keyWithPrefix.substring(keyWithPrefix.indexOf(separator) + 1);
   }
+
   /**
    *
    * @param key rocksDB original key
@@ -189,5 +192,22 @@ public class DatanodeSchemaThreeDBDefinition
 
   private void setSeparator(String keySeparator) {
     separator = keySeparator;
+  }
+
+  private void setCfOptions(ConfigurationSource config, DatanodeDBProfile dbProfile, Path pathToOptions,
+      DBColumnFamilyDefinition<?, ?> definition) {
+    // Use prefix seek to mitigating seek overhead.
+    // See: https://github.com/facebook/rocksdb/wiki/Prefix-Seek
+    ManagedColumnFamilyOptions cfOptions = null;
+    try {
+      cfOptions = DBConfigFromFile.readCFOptionsFromFile(pathToOptions, definition.getName());
+    } catch (RocksDBException e) {
+      LOG.error("Error while reading column family options from file: {}", pathToOptions);
+    }
+    if (cfOptions == null) {
+      cfOptions = dbProfile.getColumnFamilyOptions(config);
+    }
+    cfOptions.useFixedLengthPrefixExtractor(getContainerKeyPrefixLength());
+    definition.setCfOptions(cfOptions);
   }
 }

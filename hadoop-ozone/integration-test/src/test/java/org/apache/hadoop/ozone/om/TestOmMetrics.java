@@ -32,16 +32,17 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -57,6 +58,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -85,7 +87,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
@@ -93,7 +94,6 @@ import org.junit.jupiter.params.provider.EnumSource;
  * Test for OM metrics.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
 public class TestOmMetrics {
   private MiniOzoneCluster cluster;
   private MiniOzoneCluster.Builder clusterBuilder;
@@ -106,9 +106,6 @@ public class TestOmMetrics {
   private final OMException exception =
       new OMException("dummyException", OMException.ResultCodes.TIMEOUT);
   private OzoneClient client;
-  /**
-   * Create a MiniDFSCluster for testing.
-   */
 
   @BeforeAll
   public void setup() throws Exception {
@@ -132,9 +129,6 @@ public class TestOmMetrics {
         .getClientProxy().getOzoneManagerClient();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public void shutdown() {
     IOUtils.closeQuietly(client);
@@ -199,7 +193,7 @@ public class TestOmMetrics {
         "volumeManager", mockVm);
 
     // inject exception to test for Failure Metrics on the write path
-    OMMetadataManager metadataManager = mockWritePathExceptions(OmVolumeArgs.class);
+    OMMetadataManager metadataManager = mockWritePathExceptions(TestOmMetrics::mockVolumeTable);
     volumeArgs = createVolumeArgs();
     doVolumeOps(volumeArgs);
 
@@ -291,7 +285,7 @@ public class TestOmMetrics {
         ozoneManager, "bucketManager", mockBm);
 
     // inject exception to test for Failure Metrics on the write path
-    OMMetadataManager metadataManager = mockWritePathExceptions(OmBucketInfo.class);
+    OMMetadataManager metadataManager = mockWritePathExceptions(TestOmMetrics::mockBucketTable);
     doBucketOps(bucketInfo);
 
     ecBucketInfo = createBucketInfo(true);
@@ -425,7 +419,7 @@ public class TestOmMetrics {
         omMetadataReader, "keyManager", mockKm);
 
     // inject exception to test for Failure Metrics on the write path
-    OMMetadataManager metadataManager = mockWritePathExceptions(OmBucketInfo.class);
+    OMMetadataManager metadataManager = mockWritePathExceptions(TestOmMetrics::mockBucketTable);
     keyArgs = createKeyArgs(volumeName, bucketName,
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE));
     doKeyOps(keyArgs);
@@ -566,6 +560,7 @@ public class TestOmMetrics {
     assertEquals(initialNumKeyRenames + expectedRenames, getLongCounter("NumKeyRenames", omMetrics));
   }
 
+  @SuppressWarnings("checkstyle:methodlength")
   @Test
   public void testSnapshotOps() throws Exception {
     // This tests needs enough dataNodes to allocate the blocks for the keys.
@@ -573,12 +568,22 @@ public class TestOmMetrics {
     MetricsRecordBuilder omMetrics = getMetrics("OMMetrics");
     long initialNumSnapshotCreateFails = getLongCounter("NumSnapshotCreateFails", omMetrics);
     long initialNumSnapshotCreates = getLongCounter("NumSnapshotCreates", omMetrics);
+    long initialNumSnapshotInfoFails = getLongCounter("NumSnapshotInfoFails", omMetrics);
+    long initialNumSnapshotInfos = getLongCounter("NumSnapshotInfos", omMetrics);
     long initialNumSnapshotListFails = getLongCounter("NumSnapshotListFails", omMetrics);
     long initialNumSnapshotLists = getLongCounter("NumSnapshotLists", omMetrics);
     long initialNumSnapshotActive = getLongCounter("NumSnapshotActive", omMetrics);
     long initialNumSnapshotDeleted = getLongCounter("NumSnapshotDeleted", omMetrics);
+    long initialNumSnapshotDeletes = getLongCounter("NumSnapshotDeletes", omMetrics);
+    long initialNumSnapshotDeleteFails = getLongCounter("NumSnapshotDeleteFails", omMetrics);
     long initialNumSnapshotDiffJobs = getLongCounter("NumSnapshotDiffJobs", omMetrics);
     long initialNumSnapshotDiffJobFails = getLongCounter("NumSnapshotDiffJobFails", omMetrics);
+    long initialNumListSnapshotDiffJobs = getLongCounter("NumListSnapshotDiffJobs", omMetrics);
+    long initialNumListSnapshotDiffJobFails = getLongCounter("NumListSnapshotDiffJobFails", omMetrics);
+    long initialNumCancelSnapshotDiffs = getLongCounter("NumCancelSnapshotDiffs", omMetrics);
+    long initialNumCancelSnapshotDiffFails = getLongCounter("NumCancelSnapshotDiffFails", omMetrics);
+    long initialNumSnapshotRenames = getLongCounter("NumSnapshotRenames", omMetrics);
+    long initialNumSnapshotRenameFails = getLongCounter("NumSnapshotRenameFails", omMetrics);
 
     OmBucketInfo omBucketInfo = createBucketInfo(false);
 
@@ -586,6 +591,7 @@ public class TestOmMetrics {
     String bucketName = omBucketInfo.getBucketName();
     String snapshot1 = "snap1";
     String snapshot2 = "snap2";
+    String snapshot3 = "snap3";
 
     writeClient.createBucket(omBucketInfo);
 
@@ -629,8 +635,51 @@ public class TestOmMetrics {
       }
     }
     omMetrics = getMetrics("OMMetrics");
+
     assertEquals(initialNumSnapshotDiffJobs + 1, getLongCounter("NumSnapshotDiffJobs", omMetrics));
     assertEquals(initialNumSnapshotDiffJobFails, getLongCounter("NumSnapshotDiffJobFails", omMetrics));
+
+    // List snapshot diff jobs
+    writeClient.listSnapshotDiffJobs(volumeName, bucketName, "", true, null, 1000);
+
+    omMetrics = getMetrics("OMMetrics");
+    assertEquals(initialNumListSnapshotDiffJobs + 1, getLongCounter("NumListSnapshotDiffJobs", omMetrics));
+    assertEquals(initialNumListSnapshotDiffJobFails, getLongCounter("NumListSnapshotDiffJobFails", omMetrics));
+
+    // List snapshot diff jobs: invalid bucket case.
+    assertThrows(OMException.class, () ->
+        writeClient.listSnapshotDiffJobs(volumeName, "invalidBucket", "", true, null, 1000));
+    omMetrics = getMetrics("OMMetrics");
+    assertEquals(initialNumListSnapshotDiffJobs + 2, getLongCounter("NumListSnapshotDiffJobs", omMetrics));
+    assertEquals(initialNumListSnapshotDiffJobFails + 1, getLongCounter("NumListSnapshotDiffJobFails", omMetrics));
+
+    // Cancel snapshot diff
+    writeClient.cancelSnapshotDiff(volumeName, bucketName, snapshot1, snapshot2);
+
+    omMetrics = getMetrics("OMMetrics");
+    assertEquals(initialNumCancelSnapshotDiffs + 1, getLongCounter("NumCancelSnapshotDiffs", omMetrics));
+    assertEquals(initialNumCancelSnapshotDiffFails, getLongCounter("NumCancelSnapshotDiffFails", omMetrics));
+
+    // Cancel snapshot diff job: invalid bucket case.
+    assertThrows(OMException.class, () ->
+        writeClient.cancelSnapshotDiff(volumeName, "invalidBucket", snapshot1, snapshot2));
+    omMetrics = getMetrics("OMMetrics");
+    assertEquals(initialNumCancelSnapshotDiffs + 2, getLongCounter("NumCancelSnapshotDiffs", omMetrics));
+    assertEquals(initialNumCancelSnapshotDiffFails + 1, getLongCounter("NumCancelSnapshotDiffFails", omMetrics));
+
+    // Get snapshot info
+    writeClient.getSnapshotInfo(volumeName, bucketName, snapshot1);
+
+    omMetrics = getMetrics("OMMetrics");
+    assertEquals(initialNumSnapshotInfos + 1, getLongCounter("NumSnapshotInfos", omMetrics));
+    assertEquals(initialNumSnapshotInfoFails, getLongCounter("NumSnapshotInfoFails", omMetrics));
+
+    // Get snapshot info: invalid snapshot case.
+    assertThrows(OMException.class, () ->
+        writeClient.getSnapshotInfo(volumeName, bucketName, "invalidSnapshot"));
+    omMetrics = getMetrics("OMMetrics");
+    assertEquals(initialNumSnapshotInfos + 2, getLongCounter("NumSnapshotInfos", omMetrics));
+    assertEquals(initialNumSnapshotInfoFails + 1, getLongCounter("NumSnapshotInfoFails", omMetrics));
 
     // List snapshots
     writeClient.listSnapshot(
@@ -648,33 +697,68 @@ public class TestOmMetrics {
     omMetrics = getMetrics("OMMetrics");
     assertEquals(initialNumSnapshotLists + 2, getLongCounter("NumSnapshotLists", omMetrics));
     assertEquals(initialNumSnapshotListFails + 1, getLongCounter("NumSnapshotListFails", omMetrics));
+
+    // Rename snapshot
+    writeClient.renameSnapshot(volumeName, bucketName, snapshot2, snapshot3);
+
+    omMetrics = getMetrics("OMMetrics");
+    assertEquals(initialNumSnapshotActive + 2, getLongCounter("NumSnapshotActive", omMetrics));
+    assertEquals(initialNumSnapshotRenames + 1, getLongCounter("NumSnapshotRenames", omMetrics));
+    assertEquals(initialNumSnapshotRenameFails, getLongCounter("NumSnapshotRenameFails", omMetrics));
+
+    // Rename snapshot: invalid snapshot case.
+    assertThrows(OMException.class, () -> writeClient.renameSnapshot(volumeName,
+        bucketName, snapshot2, snapshot3));
+    omMetrics = getMetrics("OMMetrics");
+    assertEquals(initialNumSnapshotActive + 2, getLongCounter("NumSnapshotActive", omMetrics));
+    assertEquals(initialNumSnapshotRenames + 2, getLongCounter("NumSnapshotRenames", omMetrics));
+    assertEquals(initialNumSnapshotRenameFails + 1, getLongCounter("NumSnapshotRenameFails", omMetrics));
+
+    // Delete snapshot
+    writeClient.deleteSnapshot(volumeName, bucketName, snapshot3);
+
+    omMetrics = getMetrics("OMMetrics");
+    assertEquals(initialNumSnapshotActive + 1, getLongCounter("NumSnapshotActive", omMetrics));
+    assertEquals(initialNumSnapshotDeletes + 1, getLongCounter("NumSnapshotDeletes", omMetrics));
+    assertEquals(initialNumSnapshotDeleted + 1, getLongCounter("NumSnapshotDeleted", omMetrics));
+    assertEquals(initialNumSnapshotDeleteFails, getLongCounter("NumSnapshotDeleteFails", omMetrics));
+
+    // Delete snapshot: invalid snapshot case.
+    assertThrows(OMException.class, () -> writeClient.deleteSnapshot(volumeName,
+        bucketName, snapshot3));
+    omMetrics = getMetrics("OMMetrics");
+    assertEquals(initialNumSnapshotActive + 1, getLongCounter("NumSnapshotActive", omMetrics));
+    assertEquals(initialNumSnapshotDeletes + 2, getLongCounter("NumSnapshotDeletes", omMetrics));
+    assertEquals(initialNumSnapshotDeleted + 1, getLongCounter("NumSnapshotDeleted", omMetrics));
+    assertEquals(initialNumSnapshotDeleteFails + 1, getLongCounter("NumSnapshotDeleteFails", omMetrics));
   }
 
-  private <T> OMMetadataManager mockWritePathExceptions(Class<T>klass) throws Exception {
-    String tableName;
-    if (klass == OmBucketInfo.class) {
-      tableName = "bucketTable";
-    } else {
-      tableName = "volumeTable";
-    }
-    OMMetadataManager metadataManager = (OMMetadataManager)
-        HddsWhiteboxTestUtils.getInternalState(ozoneManager, "metadataManager");
-    OMMetadataManager mockMm = spy(metadataManager);
-    @SuppressWarnings("unchecked")
-    Table<String, T> table = (Table<String, T>)
-        HddsWhiteboxTestUtils.getInternalState(metadataManager, tableName);
-    Table<String, T> mockTable = spy(table);
-    doThrow(exception).when(mockTable).isExist(any());
-    if (klass == OmBucketInfo.class) {
-      doReturn(mockTable).when(mockMm).getBucketTable();
-    } else {
-      doReturn(mockTable).when(mockMm).getVolumeTable();
-    }
+  private OMMetadataManager mockWritePathExceptions(
+      Function<OMMetadataManager, Table<String, ?>> getTable
+  ) throws Exception {
+    OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
+    OMMetadataManager spy = spy(metadataManager);
+    Table<String, ?> table = getTable.apply(spy);
+    doThrow(new RocksDatabaseException()).when(table).isExist(any());
     HddsWhiteboxTestUtils.setInternalState(
-        ozoneManager, "metadataManager", mockMm);
+        ozoneManager, "metadataManager", spy);
 
     // Return the original metadataManager so it can be restored later
     return metadataManager;
+  }
+
+  private static Table<String, OmVolumeArgs> mockVolumeTable(OMMetadataManager spy) {
+    Table<String, OmVolumeArgs> table = spy(spy.getVolumeTable());
+    when(spy.getVolumeTable())
+        .thenReturn(table);
+    return table;
+  }
+
+  private static Table<String, OmBucketInfo> mockBucketTable(OMMetadataManager spy) {
+    Table<String, OmBucketInfo> table = spy(spy.getBucketTable());
+    when(spy.getBucketTable())
+        .thenReturn(table);
+    return table;
   }
 
   @Test
@@ -912,12 +996,14 @@ public class TestOmMetrics {
         .setAdminName("dummyAdmin")
         .build();
   }
+
   private OmBucketArgs getBucketArgs(OmBucketInfo info) {
     return new OmBucketArgs.Builder()
         .setVolumeName(info.getVolumeName())
         .setBucketName(info.getBucketName())
         .build();
   }
+
   private OmBucketInfo createBucketInfo(boolean isEcBucket) throws IOException {
     OmVolumeArgs volumeArgs = createVolumeArgs();
     writeClient.createVolume(volumeArgs);

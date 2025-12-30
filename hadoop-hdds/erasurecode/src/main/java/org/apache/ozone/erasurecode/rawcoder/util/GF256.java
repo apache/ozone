@@ -26,8 +26,6 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 @InterfaceAudience.Private
 public final class GF256 {
 
-  private GF256() { }
-
   private static final byte[] GF_BASE = new byte[]{
       (byte) 0x01, (byte) 0x02, (byte) 0x04, (byte) 0x08, (byte) 0x10,
       (byte) 0x20, (byte) 0x40, (byte) 0x80, (byte) 0x1d, (byte) 0x3a,
@@ -151,6 +149,9 @@ public final class GF256 {
         theGfMulTab[i][j] = gfMul((byte) i, (byte) j);
       }
     }
+  }
+
+  private GF256() {
   }
 
   /**

@@ -25,6 +25,7 @@ import java.io.OutputStream;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.locks.Condition;
@@ -75,17 +76,10 @@ import org.slf4j.LoggerFactory;
 public class KeyOutputStream extends OutputStream
     implements Syncable, KeyMetadataAware {
 
-  private final ReplicationConfig replication;
-
-  /**
-   * Defines stream action while calling handleFlushOrClose.
-   */
-  enum StreamAction {
-    FLUSH, HSYNC, CLOSE, FULL
-  }
-
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(KeyOutputStream.class);
+
+  private final ReplicationConfig replication;
 
   private boolean closed;
   private final Map<Class<? extends Throwable>, RetryPolicy> retryPolicyMap;
@@ -364,7 +358,7 @@ public class KeyOutputStream extends OutputStream
     }
 
     Throwable t = HddsClientUtils.checkForException(exception);
-    Preconditions.checkNotNull(t);
+    Objects.requireNonNull(t, "t == null");
     boolean retryFailure = checkForRetryFailure(t);
     boolean containerExclusionException = false;
     if (!retryFailure) {
@@ -391,7 +385,7 @@ public class KeyOutputStream extends OutputStream
         bufferedDataLen <= streamBufferArgs.getStreamBufferMaxSize());
     long containerId = streamEntry.getBlockID().getContainerID();
     Collection<DatanodeDetails> failedServers = streamEntry.getFailedServers();
-    Preconditions.checkNotNull(failedServers);
+    Objects.requireNonNull(failedServers, "failedServers == null");
     ExcludeList excludeList = blockOutputStreamEntryPool.getExcludeList();
     if (!failedServers.isEmpty()) {
       excludeList.addDatanodes(failedServers);
@@ -849,5 +843,12 @@ public class KeyOutputStream extends OutputStream
           ": " + FSExceptionMessages.STREAM_IS_CLOSED + " Key: "
               + blockOutputStreamEntryPool.getKeyName());
     }
+  }
+
+  /**
+   * Defines stream action while calling handleFlushOrClose.
+   */
+  enum StreamAction {
+    FLUSH, HSYNC, CLOSE, FULL
   }
 }

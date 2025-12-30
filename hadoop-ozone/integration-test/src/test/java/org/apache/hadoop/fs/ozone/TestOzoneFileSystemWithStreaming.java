@@ -53,14 +53,12 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Ozone file system tests with Streaming.
  */
-@Timeout(value = 300)
 public class TestOzoneFileSystemWithStreaming {
   private static final Logger LOG = LoggerFactory.getLogger(
       TestOzoneFileSystemWithStreaming.class);

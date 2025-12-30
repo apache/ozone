@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.response.volume;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.VOLUME_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;

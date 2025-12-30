@@ -25,7 +25,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import java.io.IOException;
 import java.io.OutputStream;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -62,7 +61,7 @@ import org.apache.hadoop.ozone.client.io.KeyOutputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.TestHelper;
-import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.protocol.exceptions.GroupMismatchException;
@@ -77,6 +76,10 @@ import org.junit.jupiter.params.provider.EnumSource;
  */
 @Flaky("HDDS-5818")
 public class TestWatchForCommit {
+  private static final int CHUNK_SIZE = 100;
+  private static final int FLUSH_SIZE = 2 * CHUNK_SIZE;
+  private static final int MAX_FLUSH_SIZE = 2 * FLUSH_SIZE;
+  private static final int BLOCK_SIZE = 2 * MAX_FLUSH_SIZE;
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;
@@ -85,27 +88,12 @@ public class TestWatchForCommit {
   private String volumeName;
   private String bucketName;
   private String keyString;
-  private int chunkSize;
-  private int flushSize;
-  private int maxFlushSize;
-  private int blockSize;
   private StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
-    chunkSize = 100;
-    flushSize = 2 * chunkSize;
-    maxFlushSize = 2 * flushSize;
-    blockSize = 2 * maxFlushSize;
 
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setStreamBufferFlushDelay(false);
@@ -138,10 +126,10 @@ public class TestWatchForCommit {
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 30, TimeUnit.SECONDS);
 
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
-        .setBlockSize(blockSize)
-        .setChunkSize(chunkSize)
-        .setStreamBufferFlushSize(flushSize)
-        .setStreamBufferMaxSize(maxFlushSize)
+        .setBlockSize(BLOCK_SIZE)
+        .setChunkSize(CHUNK_SIZE)
+        .setStreamBufferFlushSize(FLUSH_SIZE)
+        .setStreamBufferMaxSize(MAX_FLUSH_SIZE)
         .applyTo(conf);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -161,10 +149,6 @@ public class TestWatchForCommit {
         .getStorageContainerLocationClient();
   }
 
-
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);
@@ -181,7 +165,7 @@ public class TestWatchForCommit {
   public void testWatchForCommitWithKeyWrite() throws Exception {
     String keyName = getKeyName();
     OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS, 0);
-    int dataLength = maxFlushSize + 50;
+    int dataLength = MAX_FLUSH_SIZE + 50;
     // write data more than 1 chunk
     byte[] data1 =
         ContainerTestHelper.getFixedLengthString(keyString, dataLength)
@@ -199,13 +183,13 @@ public class TestWatchForCommit {
     assertEquals(4, blockOutputStream.getBufferPool().getSize());
     // writtenDataLength as well flushedDataLength will be updated here
     assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
-    assertEquals(maxFlushSize,
+    assertEquals(MAX_FLUSH_SIZE,
         blockOutputStream.getTotalDataFlushedLength());
     // since data equals to maxBufferSize is written, this will be a blocking
     // call and hence will wait for atleast flushSize worth of data to get
     // acked by all servers right here
     assertThat(blockOutputStream.getTotalAckDataLength())
-        .isGreaterThanOrEqualTo(flushSize);
+        .isGreaterThanOrEqualTo(FLUSH_SIZE);
     // watchForCommit will clean up atleast one entry from the map where each
     // entry corresponds to flushSize worth of data
     assertThat(blockOutputStream.getCommitIndex2flushedDataMap().size())
@@ -251,8 +235,7 @@ public class TestWatchForCommit {
   @ParameterizedTest
   @EnumSource(value = RaftProtos.ReplicationLevel.class, names = {"MAJORITY_COMMITTED", "ALL_COMMITTED"})
   public void testWatchForCommitForRetryfailure(RaftProtos.ReplicationLevel watchType) throws Exception {
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(XceiverClientRatis.LOG);
+    LogCapturer logCapturer = LogCapturer.captureLogs(XceiverClientRatis.class);
     RatisClientConfig ratisClientConfig = conf.getObject(RatisClientConfig.class);
     ratisClientConfig.setWatchType(watchType.toString());
     conf.setFromObject(ratisClientConfig);
@@ -277,13 +260,14 @@ public class TestWatchForCommit {
         cluster.shutdownHddsDatanode(pipeline.getNodes().get(1));
         // emulate closing pipeline when SCM detects DEAD datanodes
         cluster.getStorageContainerManager()
-            .getPipelineManager().closePipeline(pipeline, false);
+            .getPipelineManager().closePipeline(pipeline.getId());
         // again write data with more than max buffer limit. This wi
         // just watch for a log index which in not updated in the commitInfo Map
         // as well as there is no logIndex generate in Ratis.
         // The basic idea here is just to test if its throws an exception.
         ExecutionException e = assertThrows(ExecutionException.class,
-            () -> xceiverClient.watchForCommit(index + RandomUtils.nextInt(0, 100) + 10).get());
+            () -> xceiverClient.watchForCommit(index + RandomUtils.secure().randomInt(0, 100) + 10)
+                .get());
         // since the timeout value is quite long, the watch request will either
         // fail with NotReplicated exceptio, RetryFailureException or
         // RuntimeException
@@ -303,8 +287,7 @@ public class TestWatchForCommit {
   @ParameterizedTest
   @EnumSource(value = RaftProtos.ReplicationLevel.class, names = {"MAJORITY_COMMITTED", "ALL_COMMITTED"})
   public void test2WayCommitForTimeoutException(RaftProtos.ReplicationLevel watchType) throws Exception {
-    GenericTestUtils.LogCapturer logCapturer =
-        GenericTestUtils.LogCapturer.captureLogs(XceiverClientRatis.LOG);
+    LogCapturer logCapturer = LogCapturer.captureLogs(XceiverClientRatis.class);
     RatisClientConfig ratisClientConfig = conf.getObject(RatisClientConfig.class);
     ratisClientConfig.setWatchType(watchType.toString());
     conf.setFromObject(ratisClientConfig);
@@ -384,7 +367,8 @@ public class TestWatchForCommit {
         // as well as there is no logIndex generate in Ratis.
         // The basic idea here is just to test if its throws an exception.
         final Exception e = assertThrows(Exception.class,
-            () -> xceiverClient.watchForCommit(reply.getLogIndex() + RandomUtils.nextInt(0, 100) + 10).get());
+            () -> xceiverClient.watchForCommit(reply.getLogIndex() + RandomUtils.secure().randomInt(0, 100) + 10)
+                .get());
         assertInstanceOf(GroupMismatchException.class, HddsClientUtils.checkForException(e));
       } finally {
         clientManager.releaseClient(xceiverClient, false);

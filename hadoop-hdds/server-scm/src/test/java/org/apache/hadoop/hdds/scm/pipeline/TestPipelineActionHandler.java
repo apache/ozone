@@ -42,7 +42,6 @@ import org.junit.jupiter.api.Test;
  */
 public class TestPipelineActionHandler {
 
-
   @Test
   public void testPipelineActionHandlerForValidPipeline() throws IOException {
 

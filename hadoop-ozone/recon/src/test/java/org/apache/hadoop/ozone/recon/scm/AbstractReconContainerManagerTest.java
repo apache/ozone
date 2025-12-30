@@ -71,14 +71,9 @@ import org.junit.jupiter.api.io.TempDir;
 public class AbstractReconContainerManagerTest {
 
   private OzoneConfiguration conf;
-  private SCMStorageConfig scmStorageConfig;
   private ReconPipelineManager pipelineManager;
   private ReconContainerManager containerManager;
   private DBStore store;
-  private HDDSLayoutVersionManager layoutVersionManager;
-  private SCMHAManager scmhaManager;
-  private SCMContext scmContext;
-  private SequenceIdGenerator sequenceIdGen;
 
   @BeforeEach
   public void setUp(@TempDir File tempDir) throws Exception {
@@ -86,15 +81,15 @@ public class AbstractReconContainerManagerTest {
     conf.set(OZONE_METADATA_DIRS, tempDir.getAbsolutePath());
     conf.set(OZONE_SCM_NAMES, "localhost");
     store = DBStoreBuilder.createDBStore(conf, ReconSCMDBDefinition.get());
-    scmhaManager = SCMHAManagerStub.getInstance(
+    SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(
         true, new SCMHADBTransactionBufferStub(store));
-    sequenceIdGen = new SequenceIdGenerator(
+    SequenceIdGenerator sequenceIdGen = new SequenceIdGenerator(
         conf, scmhaManager, ReconSCMDBDefinition.SEQUENCE_ID.getTable(store));
-    scmContext = SCMContext.emptyContext();
-    scmStorageConfig = new ReconStorageConfig(conf, new ReconUtils());
+    SCMContext scmContext = SCMContext.emptyContext();
+    SCMStorageConfig scmStorageConfig = new ReconStorageConfig(conf, new ReconUtils());
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
-    layoutVersionManager = mock(HDDSLayoutVersionManager.class);
+    HDDSLayoutVersionManager layoutVersionManager = mock(HDDSLayoutVersionManager.class);
     when(layoutVersionManager.getSoftwareLayoutVersion())
         .thenReturn(maxLayoutVersion());
     when(layoutVersionManager.getMetadataLayoutVersion())
@@ -109,7 +104,7 @@ public class AbstractReconContainerManagerTest {
         scmhaManager,
         scmContext);
     ContainerReplicaPendingOps pendingOps = new ContainerReplicaPendingOps(
-        Clock.system(ZoneId.systemDefault()));
+        Clock.system(ZoneId.systemDefault()), null);
 
     containerManager = new ReconContainerManager(
         conf,
@@ -126,7 +121,6 @@ public class AbstractReconContainerManagerTest {
 
   @AfterEach
   public void tearDown() throws Exception {
-    containerManager.close();
     pipelineManager.close();
     store.close();
   }

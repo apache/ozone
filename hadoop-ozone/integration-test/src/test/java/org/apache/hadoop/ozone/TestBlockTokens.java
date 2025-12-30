@@ -35,6 +35,8 @@ import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigString
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.DELEGATION_REMOVER_SCAN_INTERVAL_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
@@ -53,7 +55,6 @@ import java.net.InetAddress;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -88,7 +89,6 @@ import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -97,7 +97,6 @@ import org.slf4j.LoggerFactory;
  * Integration test to verify block tokens in a secure cluster.
  */
 @InterfaceAudience.Private
-@Timeout(value = 180, unit = TimeUnit.SECONDS)
 public final class TestBlockTokens {
   private static final Logger LOG = LoggerFactory.getLogger(TestBlockTokens.class);
   private static final String TEST_VOLUME = "testvolume";
@@ -115,7 +114,6 @@ public final class TestBlockTokens {
   private static File spnegoKeytab;
   private static File testUserKeytab;
   private static String testUserPrincipal;
-  private static String host;
   private static MiniOzoneHAClusterImpl cluster;
   private static OzoneClient client;
   private static BlockInputStreamFactory blockInputStreamFactory =
@@ -140,7 +138,7 @@ public final class TestBlockTokens {
   private static void createTestData() throws IOException {
     client.getProxy().createVolume(TEST_VOLUME);
     client.getProxy().createBucket(TEST_VOLUME, TEST_BUCKET);
-    byte[] data = string2Bytes(RandomStringUtils.randomAlphanumeric(1024));
+    byte[] data = string2Bytes(RandomStringUtils.secure().nextAlphanumeric(1024));
     OzoneBucket bucket = client.getObjectStore().getVolume(TEST_VOLUME)
         .getBucket(TEST_BUCKET);
     try (OzoneOutputStream out = bucket.createKey(TEST_FILE, data.length)) {
@@ -151,10 +149,7 @@ public final class TestBlockTokens {
   @AfterAll
   public static void stop() {
     miniKdc.stop();
-    IOUtils.close(LOG, client);
-    if (cluster != null) {
-      cluster.stop();
-    }
+    IOUtils.close(LOG, client, cluster);
   }
 
   @Test
@@ -250,7 +245,7 @@ public final class TestBlockTokens {
     for (OmKeyLocationInfoGroup v : keyInfo.getKeyLocationVersions()) {
       for (OmKeyLocationInfo l : v.getLocationList()) {
         Token<OzoneBlockTokenIdentifier> token = l.getToken();
-        byte[] randomPassword = RandomUtils.nextBytes(100);
+        byte[] randomPassword = RandomUtils.secure().randomBytes(100);
         Token<OzoneBlockTokenIdentifier> override = new Token<>(
             token.getIdentifier(), randomPassword,
             token.getKind(), token.getService());
@@ -312,6 +307,8 @@ public final class TestBlockTokens {
         ROTATION_CHECK_DURATION_IN_MS + "ms");
     conf.set(HDDS_SECRET_KEY_ROTATE_DURATION, ROTATE_DURATION_IN_MS + "ms");
     conf.set(HDDS_SECRET_KEY_EXPIRY_DURATION, EXPIRY_DURATION_IN_MS + "ms");
+    conf.set(DELEGATION_TOKEN_MAX_LIFETIME_KEY, ROTATE_DURATION_IN_MS + "ms");
+    conf.set(DELEGATION_REMOVER_SCAN_INTERVAL_KEY, ROTATION_CHECK_DURATION_IN_MS + "ms");
 
     // enable tokens
     conf.setBoolean(HDDS_BLOCK_TOKEN_ENABLED, true);
@@ -340,8 +337,8 @@ public final class TestBlockTokens {
 
   private static void setSecureConfig() throws IOException {
     conf.setBoolean(OZONE_SECURITY_ENABLED_KEY, true);
-    host = InetAddress.getLocalHost().getCanonicalHostName()
-        .toLowerCase();
+    String host = InetAddress.getLocalHost().getCanonicalHostName()
+                      .toLowerCase();
 
     conf.set(HADOOP_SECURITY_AUTHENTICATION, KERBEROS.name());
 

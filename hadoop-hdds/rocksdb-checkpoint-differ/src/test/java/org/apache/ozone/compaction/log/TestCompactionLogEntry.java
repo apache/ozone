@@ -103,7 +103,6 @@ public class TestCompactionLogEntry {
     }
   }
 
-
   @ParameterizedTest(name = "{0}")
   @MethodSource("compactionLogEntryValidScenarios")
   public void testFromProtobuf(

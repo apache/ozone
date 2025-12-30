@@ -41,7 +41,7 @@ import org.slf4j.LoggerFactory;
 public class DatanodeSchemaV3FinalizeAction
     implements HDDSUpgradeAction<DatanodeStateMachine> {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(DatanodeSchemaV3FinalizeAction.class);
 
   @Override

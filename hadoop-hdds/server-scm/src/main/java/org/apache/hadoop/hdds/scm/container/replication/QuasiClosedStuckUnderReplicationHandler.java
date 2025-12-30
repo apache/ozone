@@ -39,7 +39,7 @@ import org.slf4j.LoggerFactory;
  * Class to correct under replicated QuasiClosed Stuck Ratis containers.
  */
 public class QuasiClosedStuckUnderReplicationHandler implements UnhealthyReplicationHandler {
-  public static final Logger LOG = LoggerFactory.getLogger(QuasiClosedStuckUnderReplicationHandler.class);
+  private static final Logger LOG = LoggerFactory.getLogger(QuasiClosedStuckUnderReplicationHandler.class);
 
   private final PlacementPolicy placementPolicy;
   private final ReplicationManager replicationManager;
@@ -108,9 +108,12 @@ public class QuasiClosedStuckUnderReplicationHandler implements UnhealthyReplica
           .collect(Collectors.toList());
       for (DatanodeDetails target : targets) {
         try {
-          replicationManager.sendThrottledReplicationCommand(containerInfo, sourceDatanodes, target, 0);
+          replicationManager.sendThrottledReplicationCommand(
+              containerInfo, sourceDatanodes, target, 0);
           // Add the pending op, so we exclude the node for subsequent origins
-          mutablePendingOps.add(ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.ADD, target, 0));
+          mutablePendingOps.add(new ContainerReplicaOp(
+              ContainerReplicaOp.PendingOpType.ADD, target, 0,
+              null, System.currentTimeMillis(), 0));
           totalCommandsSent++;
         } catch (CommandTargetOverloadedException e) {
           LOG.warn("Cannot replicate container {} because all sources are overloaded.", containerInfo);

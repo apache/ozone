@@ -47,6 +47,7 @@ public class TestHDDSKeyGenerator {
     conf.set(OZONE_METADATA_DIRS,  tempPath.getPath());
     config = new SecurityConfig(conf);
   }
+
   /**
    * In this test we verify that we are able to create a key pair, then get
    * bytes of that and use ASN1. parser to parse it back to a private key.

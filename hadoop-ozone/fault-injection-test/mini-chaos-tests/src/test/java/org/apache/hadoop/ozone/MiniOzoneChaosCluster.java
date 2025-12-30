@@ -72,7 +72,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
       List<HddsDatanodeService> hddsDatanodes, String clusterPath,
       Set<Class<? extends Failures>> clazzes) {
     super(conf, new SCMConfigurator(), omService, scmService, hddsDatanodes,
-        clusterPath, null);
+        clusterPath, Collections.emptyList());
     this.numDatanodes = getHddsDatanodes().size();
     this.numOzoneManagers = omService.getServices().size();
     this.numStorageContainerManagers = scmService.getServices().size();
@@ -317,12 +317,12 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     if (failedOmSet.size() >= numOzoneManagers / 2) {
       return false;
     }
-    return RandomUtils.nextBoolean();
+    return RandomUtils.secure().randomBoolean();
   }
 
   // Datanode specific
   private int getNumberOfDnToFail() {
-    return RandomUtils.nextBoolean() ? 1 : 2;
+    return RandomUtils.secure().randomBoolean() ? 1 : 2;
   }
 
   public Set<DatanodeDetails> dnToFail() {
@@ -395,7 +395,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     if (failedScmSet.size() >= numStorageContainerManagers / 2) {
       return false;
     }
-    return RandomUtils.nextBoolean();
+    return RandomUtils.secure().randomBoolean();
   }
 
 }

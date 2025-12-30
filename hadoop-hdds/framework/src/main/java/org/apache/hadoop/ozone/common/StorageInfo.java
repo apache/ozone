@@ -19,9 +19,9 @@ package org.apache.hadoop.ozone.common;
 
 import static org.apache.hadoop.ozone.common.Storage.STORAGE_FILE_VERSION;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.UUID;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -40,7 +40,7 @@ import org.slf4j.LoggerFactory;
 @InterfaceAudience.Private
 public class StorageInfo {
 
-  public static final Logger LOG = LoggerFactory.getLogger(StorageInfo.class);
+  private static final Logger LOG = LoggerFactory.getLogger(StorageInfo.class);
 
   private Properties properties = new Properties();
 
@@ -79,8 +79,8 @@ public class StorageInfo {
    */
   public StorageInfo(NodeType type, String cid, long cT, int layout)
       throws IOException {
-    Preconditions.checkNotNull(type);
-    Preconditions.checkNotNull(cid);
+    Objects.requireNonNull(type, "type == null");
+    Objects.requireNonNull(cid, "cid == null");
     properties.setProperty(NODE_TYPE, type.name());
     properties.setProperty(CLUSTER_ID, cid);
     properties.setProperty(CREATION_TIME, String.valueOf(cT));
@@ -166,7 +166,7 @@ public class StorageInfo {
   private void verifyNodeType(NodeType type)
       throws InconsistentStorageStateException {
     NodeType nodeType = getNodeType();
-    Preconditions.checkNotNull(nodeType);
+    Objects.requireNonNull(nodeType, "nodeType == null");
     if (type != nodeType) {
       throw new InconsistentStorageStateException("Expected NodeType: " + type +
           ", but found: " + nodeType);
@@ -176,7 +176,7 @@ public class StorageInfo {
   private void verifyClusterId()
       throws InconsistentStorageStateException {
     String clusterId = getClusterID();
-    Preconditions.checkNotNull(clusterId);
+    Objects.requireNonNull(clusterId, "clusterId == null");
     if (clusterId.isEmpty()) {
       throw new InconsistentStorageStateException("Cluster ID not found");
     }
@@ -184,9 +184,8 @@ public class StorageInfo {
 
   private void verifyCreationTime() {
     Long creationTime = getCreationTime();
-    Preconditions.checkNotNull(creationTime);
+    Objects.requireNonNull(creationTime, "creationTime == null");
   }
-
 
   public void writeTo(File to)
       throws IOException {

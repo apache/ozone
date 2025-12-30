@@ -17,12 +17,12 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -58,7 +58,7 @@ public class InterSCMGrpcClient implements SCMSnapshotDownloader {
   public InterSCMGrpcClient(final String host,
       int port, final ConfigurationSource conf,
       CertificateClient scmCertificateClient) throws IOException {
-    Preconditions.checkNotNull(conf);
+    Objects.requireNonNull(conf, "conf == null");
     timeout = conf.getTimeDuration(
             ScmConfigKeys.OZONE_SCM_HA_GRPC_DEADLINE_INTERVAL,
             ScmConfigKeys.OZONE_SCM_HA_GRPC_DEADLINE_INTERVAL_DEFAULT,
@@ -83,7 +83,6 @@ public class InterSCMGrpcClient implements SCMSnapshotDownloader {
     client = InterSCMProtocolServiceGrpc.newStub(channel).
         withDeadlineAfter(timeout, TimeUnit.SECONDS);
   }
-
 
   @Override
   public CompletableFuture<Path> download(final Path outputPath) {
@@ -131,7 +130,7 @@ public class InterSCMGrpcClient implements SCMSnapshotDownloader {
       this.response = response;
       this.outputPath = outputPath;
       try {
-        Preconditions.checkNotNull(outputPath, "Output path cannot be null");
+        Objects.requireNonNull(outputPath, "Output path cannot be null");
         stream = Files.newOutputStream(outputPath);
       } catch (IOException e) {
         throw new UncheckedIOException(

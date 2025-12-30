@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.response.s3.tenant;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.META_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.META_TABLE;
 
 import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nonnull;

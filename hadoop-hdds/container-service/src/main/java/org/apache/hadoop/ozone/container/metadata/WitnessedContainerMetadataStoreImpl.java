@@ -17,15 +17,25 @@
 
 package org.apache.hadoop.ozone.container.metadata;
 
+import static org.apache.hadoop.ozone.container.metadata.ContainerCreateInfo.INVALID_REPLICA_INDEX;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 
 /**
  * Class for interacting with database in the master volume of a datanode.
@@ -33,7 +43,9 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 public final class WitnessedContainerMetadataStoreImpl extends AbstractRDBStore<WitnessedContainerDBDefinition>
     implements WitnessedContainerMetadataStore {
 
-  private Table<Long, String> containerIdsTable;
+  private Table<ContainerID, ContainerCreateInfo> containerCreateInfoTable;
+  private PreviousVersionTables previousVersionTables;
+
   private static final ConcurrentMap<String, WitnessedContainerMetadataStore> INSTANCES =
       new ConcurrentHashMap<>();
 
@@ -56,20 +68,62 @@ public final class WitnessedContainerMetadataStoreImpl extends AbstractRDBStore<
     }
   }
 
-  private WitnessedContainerMetadataStoreImpl(ConfigurationSource config, boolean openReadOnly) throws IOException {
+  private WitnessedContainerMetadataStoreImpl(ConfigurationSource config, boolean openReadOnly)
+      throws RocksDatabaseException, CodecException {
     super(WitnessedContainerDBDefinition.get(), config, openReadOnly);
   }
 
   @Override
   protected DBStore initDBStore(DBStoreBuilder dbStoreBuilder, ManagedDBOptions options, ConfigurationSource config)
-      throws IOException {
-    DBStore dbStore = dbStoreBuilder.build();
-    this.containerIdsTable = this.getDbDef().getContainerIdsTable().getTable(dbStore);
+      throws RocksDatabaseException, CodecException {
+    previousVersionTables = new PreviousVersionTables();
+    previousVersionTables.addTables(dbStoreBuilder);
+    final DBStore dbStore = dbStoreBuilder.build();
+    previousVersionTables.init(dbStore);
+    this.containerCreateInfoTable = this.getDbDef().getContainerCreateInfoTableDef().getTable(dbStore);
     return dbStore;
   }
 
   @Override
-  public Table<Long, String> getContainerIdsTable() {
-    return containerIdsTable;
+  public Table<ContainerID, ContainerCreateInfo> getContainerCreateInfoTable() {
+    if (!VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE)) {
+      return previousVersionTables.getContainerIdsTable();
+    }
+    return containerCreateInfoTable;
+  }
+
+  public PreviousVersionTables getPreviousVersionTables() {
+    return previousVersionTables;
+  }
+
+  /**
+   * this will hold old version tables required during upgrade, and these are initialized based on version only.
+   */
+  public static class PreviousVersionTables {
+    private static final String CONTAINER_IDS_STR_VAL_TABLE = "containerIds";
+    private Table<ContainerID, ContainerCreateInfo> containerIdsTable;
+
+    public PreviousVersionTables() {
+    }
+
+    public void addTables(DBStoreBuilder dbStoreBuilder) {
+      if (!VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE)) {
+        dbStoreBuilder.addTable(CONTAINER_IDS_STR_VAL_TABLE);
+      }
+    }
+
+    public void init(DBStore dbStore) throws RocksDatabaseException, CodecException {
+      if (!VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.WITNESSED_CONTAINER_DB_PROTO_VALUE)) {
+        this.containerIdsTable = dbStore.getTable(CONTAINER_IDS_STR_VAL_TABLE, ContainerID.getCodec(),
+            new DelegatedCodec<>(StringCodec.get(),
+                (strVal) -> ContainerCreateInfo.valueOf(ContainerProtos.ContainerDataProto.State.valueOf(strVal),
+                    INVALID_REPLICA_INDEX),
+                (obj) -> obj.getState().name(), ContainerCreateInfo.class));
+      }
+    }
+
+    public Table<ContainerID, ContainerCreateInfo> getContainerIdsTable() {
+      return containerIdsTable;
+    }
   }
 }

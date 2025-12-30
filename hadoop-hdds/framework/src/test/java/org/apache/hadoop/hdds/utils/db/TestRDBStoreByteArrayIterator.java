@@ -17,6 +17,10 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
+import static org.apache.hadoop.hdds.utils.db.IteratorType.KEY_AND_VALUE;
+import static org.apache.hadoop.hdds.utils.db.IteratorType.KEY_ONLY;
+import static org.apache.hadoop.hdds.utils.db.IteratorType.NEITHER;
+import static org.apache.hadoop.hdds.utils.db.IteratorType.VALUE_ONLY;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -68,12 +72,11 @@ public class TestRDBStoreByteArrayIterator {
   }
 
   RDBStoreByteArrayIterator newIterator() {
-    return new RDBStoreByteArrayIterator(managedRocksIterator, null, null);
+    return new RDBStoreByteArrayIterator(managedRocksIterator, null, null, KEY_AND_VALUE);
   }
 
   RDBStoreByteArrayIterator newIterator(byte[] prefix) {
-    return new RDBStoreByteArrayIterator(
-        managedRocksIterator, rocksTableMock, prefix);
+    return new RDBStoreByteArrayIterator(managedRocksIterator, rocksTableMock, prefix, KEY_AND_VALUE);
   }
 
   @Test
@@ -95,8 +98,7 @@ public class TestRDBStoreByteArrayIterator {
     RDBStoreByteArrayIterator iter = newIterator();
     iter.forEachRemaining(consumerStub);
 
-    ArgumentCaptor<RawKeyValue.ByteArray> capture =
-        forClass(RawKeyValue.ByteArray.class);
+    final ArgumentCaptor<Table.KeyValue<byte[], byte[]>> capture = forClass(Table.KeyValue.class);
     verify(consumerStub, times(3)).accept(capture.capture());
     assertArrayEquals(
         new byte[]{0x00}, capture.getAllValues().get(0).getKey());
@@ -298,5 +300,20 @@ public class TestRDBStoreByteArrayIterator {
     assertInstanceOf(UnsupportedOperationException.class, e);
 
     iter.close();
+  }
+
+  @Test
+  public void testIteratorType() {
+    assertFalse(NEITHER.readKey());
+    assertFalse(NEITHER.readValue());
+
+    assertTrue(KEY_ONLY.readKey());
+    assertFalse(KEY_ONLY.readValue());
+
+    assertFalse(VALUE_ONLY.readKey());
+    assertTrue(VALUE_ONLY.readValue());
+
+    assertTrue(KEY_AND_VALUE.readKey());
+    assertTrue(KEY_AND_VALUE.readValue());
   }
 }

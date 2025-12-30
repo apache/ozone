@@ -15,13 +15,12 @@
 
 *** Settings ***
 Documentation       Test scm compatibility
-Library             BuiltIn
-Resource            ../lib/os.robot
+Resource            lib.resource
 Test Timeout        5 minutes
 
 *** Test Cases ***
 Picks up command line options
     Pass Execution If    '%{HDFS_STORAGECONTAINERMANAGER_OPTS}' == ''    Command-line option required for process check
-    ${processes} =    List All Processes
+    ${processes} =    Wait for server command-line options
     Should Contain    ${processes}   %{HDFS_STORAGECONTAINERMANAGER_OPTS}
-    Should Contain    ${processes}   %{HADOOP_OPTS}
+    Check client command-line options

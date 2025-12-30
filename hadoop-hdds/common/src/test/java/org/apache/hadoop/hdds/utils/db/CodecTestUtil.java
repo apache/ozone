@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.utils.db;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.ref.WeakReference;
@@ -98,5 +99,33 @@ public final class CodecTestUtil {
     final T fromWrappedArray = codec.fromCodecBuffer(wrapped);
     wrapped.release();
     assertEquals(original, fromWrappedArray);
+  }
+
+  public static <T> Codec<T> newCodecWithoutCodecBuffer(Codec<T> codec) {
+    assertTrue(codec.supportCodecBuffer());
+    final Codec<T> newCodec = new Codec<T>() {
+      @Override
+      public byte[] toPersistedFormat(T object) throws CodecException {
+        return codec.toPersistedFormat(object);
+      }
+
+      @Override
+      public T fromPersistedFormat(byte[] rawData) throws CodecException {
+        return codec.fromPersistedFormat(rawData);
+      }
+
+      @Override
+      public Class<T> getTypeClass() {
+        return codec.getTypeClass();
+      }
+
+      @Override
+      public T copyObject(T object) {
+        return codec.copyObject(object);
+      }
+    };
+
+    assertFalse(newCodec.supportCodecBuffer());
+    return newCodec;
   }
 }

@@ -83,7 +83,6 @@ public final class OzoneBucketStub extends OzoneBucket {
   private ReplicationConfig replicationConfig;
   private Map<String, OzoneLifecycleConfiguration> lifecyclesMap = new HashMap<>();
 
-
   public static Builder newBuilder() {
     return new Builder();
   }

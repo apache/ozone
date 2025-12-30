@@ -18,12 +18,13 @@
 package org.apache.hadoop.ozone.container.metadata;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.List;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.CodecException;
+import org.apache.hadoop.hdds.utils.db.IteratorType;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 
 /**
  * Wrapper class to represent a table in a datanode RocksDB instance.
@@ -43,117 +44,91 @@ public class DatanodeTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
-  public void put(KEY key, VALUE value) throws IOException {
+  public void put(KEY key, VALUE value) throws RocksDatabaseException, CodecException {
     table.put(key, value);
   }
 
   @Override
-  public void putWithBatch(BatchOperation batch, KEY key,
-                           VALUE value) throws IOException {
+  public void putWithBatch(BatchOperation batch, KEY key, VALUE value) throws RocksDatabaseException, CodecException {
     table.putWithBatch(batch, key, value);
   }
 
   @Override
-  public boolean isEmpty() throws IOException {
+  public boolean isEmpty() throws RocksDatabaseException {
     return table.isEmpty();
   }
 
   @Override
-  public void delete(KEY key) throws IOException {
+  public void delete(KEY key) throws RocksDatabaseException, CodecException {
     table.delete(key);
   }
 
   @Override
-  public void deleteRange(KEY beginKey, KEY endKey) throws IOException {
+  public void deleteRange(KEY beginKey, KEY endKey) throws RocksDatabaseException, CodecException {
     table.deleteRange(beginKey, endKey);
   }
 
   @Override
-  public void deleteWithBatch(BatchOperation batch, KEY key)
-          throws IOException {
+  public void deleteWithBatch(BatchOperation batch, KEY key) throws CodecException {
     table.deleteWithBatch(batch, key);
   }
 
   @Override
-  public final TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator() {
-    throw new UnsupportedOperationException("Iterating tables directly is not" +
-            " supported for datanode containers due to differing schema " +
-            "version.");
-  }
-
-  @Override
-  public final TableIterator<KEY, ? extends KeyValue<KEY, VALUE>> iterator(
-      KEY prefix) {
+  public final KeyValueIterator<KEY, VALUE> iterator(KEY prefix, IteratorType type) {
     throw new UnsupportedOperationException("Iterating tables directly is not" +
         " supported for datanode containers due to differing schema " +
         "version.");
   }
 
   @Override
-  public String getName() throws IOException {
+  public String getName() {
     return table.getName();
   }
 
   @Override
-  public long getEstimatedKeyCount() throws IOException {
+  public long getEstimatedKeyCount() throws RocksDatabaseException {
     return table.getEstimatedKeyCount();
   }
 
   @Override
-  public boolean isExist(KEY key) throws IOException {
+  public boolean isExist(KEY key) throws RocksDatabaseException, CodecException {
     return table.isExist(key);
   }
 
   @Override
-  public VALUE get(KEY key) throws IOException {
+  public VALUE get(KEY key) throws RocksDatabaseException, CodecException {
     return table.get(key);
   }
 
   @Override
-  public VALUE getIfExist(KEY key) throws IOException {
+  public VALUE getIfExist(KEY key) throws RocksDatabaseException, CodecException {
     return table.getIfExist(key);
   }
 
   @Override
-  public VALUE getReadCopy(KEY key) throws IOException {
+  public VALUE getReadCopy(KEY key) throws RocksDatabaseException, CodecException {
     return table.getReadCopy(key);
   }
 
   @Override
-  public List<? extends KeyValue<KEY, VALUE>> getRangeKVs(
-          KEY startKey, int count, KEY prefix,
-          MetadataKeyFilters.MetadataKeyFilter... filters)
-          throws IOException, IllegalArgumentException {
-    return table.getRangeKVs(startKey, count, prefix, filters);
+  public List<KeyValue<KEY, VALUE>> getRangeKVs(
+      KEY startKey, int count, KEY prefix, KeyPrefixFilter filter, boolean isSequential)
+      throws RocksDatabaseException, CodecException {
+    return table.getRangeKVs(startKey, count, prefix, filter, isSequential);
   }
 
   @Override
-  public List<? extends KeyValue<KEY, VALUE>> getSequentialRangeKVs(
-          KEY startKey, int count, KEY prefix,
-          MetadataKeyFilters.MetadataKeyFilter... filters)
-          throws IOException, IllegalArgumentException {
-    return table.getSequentialRangeKVs(startKey, count, prefix, filters);
-  }
-
-  @Override
-  public void deleteBatchWithPrefix(BatchOperation batch, KEY prefix)
-      throws IOException {
+  public void deleteBatchWithPrefix(BatchOperation batch, KEY prefix) throws RocksDatabaseException, CodecException {
     table.deleteBatchWithPrefix(batch, prefix);
   }
 
   @Override
-  public void dumpToFileWithPrefix(File externalFile, KEY prefix)
-      throws IOException {
+  public void dumpToFileWithPrefix(File externalFile, KEY prefix) throws RocksDatabaseException, CodecException {
     table.dumpToFileWithPrefix(externalFile, prefix);
   }
 
   @Override
-  public void loadFromFile(File externalFile) throws IOException {
+  public void loadFromFile(File externalFile) throws RocksDatabaseException {
     table.loadFromFile(externalFile);
-  }
-
-  @Override
-  public void close() throws Exception {
-    table.close();
   }
 }

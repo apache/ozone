@@ -35,6 +35,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -186,7 +187,7 @@ public final class TestHelper {
         objectStore.getVolume(volumeName).getBucket(bucketName)
             .readKey(keyName)) {
       byte[] readData = new byte[data.length];
-      is.read(readData);
+      IOUtils.readFully(is, readData);
       MessageDigest sha1 = MessageDigest.getInstance(OzoneConsts.FILE_HASH);
       sha1.update(data);
       MessageDigest sha2 = MessageDigest.getInstance(OzoneConsts.FILE_HASH);
@@ -211,7 +212,6 @@ public final class TestHelper {
     assertThat(containerIdList).isNotEmpty();
     waitForContainerClose(cluster, containerIdList.toArray(new Long[0]));
   }
-
 
   public static void waitForContainerClose(OzoneDataStreamOutput outputStream,
       MiniOzoneCluster cluster) throws Exception {
@@ -289,7 +289,7 @@ public final class TestHelper {
     for (Pipeline pipeline1 : pipelineList) {
       // issue pipeline destroy command
       cluster.getStorageContainerManager()
-          .getPipelineManager().closePipeline(pipeline1, false);
+          .getPipelineManager().closePipeline(pipeline1.getId());
     }
 
     // wait for the pipeline to get destroyed in the datanodes
@@ -377,6 +377,20 @@ public final class TestHelper {
       }
       index++;
     }
+  }
+
+  public static void waitForScmContainerState(MiniOzoneCluster cluster, long containerID,
+                                              HddsProtos.LifeCycleState lifeCycleState)
+      throws InterruptedException, TimeoutException {
+    GenericTestUtils.waitFor(() ->  {
+      try {
+        HddsProtos.LifeCycleState state = cluster.getStorageContainerManager().getContainerManager()
+            .getContainer(ContainerID.valueOf(containerID)).getState();
+        return state == lifeCycleState;
+      } catch (ContainerNotFoundException e) {
+        return false;
+      }
+    }, 500, 100 * 1000);
   }
 
   public static StateMachine getStateMachine(MiniOzoneCluster cluster)

@@ -28,7 +28,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.UNDELETED_KEYS_LIST;
 import static org.apache.hadoop.ozone.OzoneConsts.VOLUME;
 import static org.apache.hadoop.ozone.audit.OMAction.DELETE_KEYS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.PARTIAL_DELETE;
 
@@ -60,7 +60,6 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
-import org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -73,6 +72,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RequestSource;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.util.Time;
@@ -213,17 +213,19 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
         }
       }
 
-      long quotaReleased = 0;
       OmBucketInfo omBucketInfo =
           getBucketInfo(omMetadataManager, volumeName, bucketName);
 
       Map<String, OmKeyInfo> openKeyInfoMap = new HashMap<>();
       // Mark all keys which can be deleted, in cache as deleted.
-      quotaReleased =
+      Pair<Long, Integer> quotaReleasedEmptyKeys =
           markKeysAsDeletedInCache(ozoneManager, trxnLogIndex, omKeyInfoList,
-              dirList, omMetadataManager, quotaReleased, openKeyInfoMap);
-      omBucketInfo.incrUsedBytes(-quotaReleased);
-      omBucketInfo.incrUsedNamespace(-1L * omKeyInfoList.size());
+              dirList, omMetadataManager, openKeyInfoMap);
+      omBucketInfo.decrUsedBytes(quotaReleasedEmptyKeys.getKey(), true);
+      // For empty keyInfos the quota should be released and not added to namespace.
+      omBucketInfo.decrUsedNamespace(omKeyInfoList.size() + dirList.size() -
+              quotaReleasedEmptyKeys.getValue(), true);
+      omBucketInfo.decrUsedNamespace(quotaReleasedEmptyKeys.getValue(), false);
 
       final long volumeId = omMetadataManager.getVolumeId(volumeName);
       omClientResponse =
@@ -350,10 +352,12 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     return omClientResponse;
   }
 
-  protected long markKeysAsDeletedInCache(OzoneManager ozoneManager,
+  protected Pair<Long, Integer> markKeysAsDeletedInCache(OzoneManager ozoneManager,
       long trxnLogIndex, List<OmKeyInfo> omKeyInfoList, List<OmKeyInfo> dirList,
-      OMMetadataManager omMetadataManager, long quotaReleased, Map<String, OmKeyInfo> openKeyInfoMap)
+      OMMetadataManager omMetadataManager, Map<String, OmKeyInfo> openKeyInfoMap)
           throws IOException {
+    int emptyKeys = 0;
+    long quotaReleased = 0;
     for (OmKeyInfo omKeyInfo : omKeyInfoList) {
       String volumeName = omKeyInfo.getVolumeName();
       String bucketName = omKeyInfo.getBucketName();
@@ -362,8 +366,11 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
           new CacheKey<>(omMetadataManager.getOzoneKey(volumeName, bucketName, keyName)),
           CacheValue.get(trxnLogIndex));
 
-      omKeyInfo.setUpdateID(trxnLogIndex);
+      omKeyInfo = omKeyInfo.toBuilder()
+          .setUpdateID(trxnLogIndex)
+          .build();
       quotaReleased += sumBlockLengths(omKeyInfo);
+      emptyKeys += OmKeyInfo.isKeyEmpty(omKeyInfo) ? 1 : 0;
 
       // If omKeyInfo has hsync metadata, delete its corresponding open key as well
       String hsyncClientId = omKeyInfo.getMetadata().get(OzoneConsts.HSYNC_CLIENT_ID);
@@ -372,7 +379,8 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
         String dbOpenKey = omMetadataManager.getOpenKey(volumeName, bucketName, keyName, hsyncClientId);
         OmKeyInfo openKeyInfo = openKeyTable.get(dbOpenKey);
         if (openKeyInfo != null) {
-          openKeyInfo.getMetadata().put(DELETED_HSYNC_KEY, "true");
+          openKeyInfo = openKeyInfo.withMetadataMutations(
+              metadata -> metadata.put(DELETED_HSYNC_KEY, "true"));
           openKeyTable.addCacheEntry(dbOpenKey, openKeyInfo, trxnLogIndex);
           // Add to the map of open keys to be deleted.
           openKeyInfoMap.put(dbOpenKey, openKeyInfo);
@@ -381,7 +389,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
         }
       }
     }
-    return quotaReleased;
+    return Pair.of(quotaReleased, emptyKeys);
   }
 
   protected void addKeyToAppropriateList(List<OmKeyInfo> omKeyInfoList,
@@ -404,9 +412,9 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
     StringBuilder keys = new StringBuilder();
     for (int i = 0; i < deletedKeyInfos.size(); i++) {
       OmKeyInfo key = deletedKeyInfos.get(i);
-      keys.append("{").append(KEY).append("=").append(key.getKeyName()).append(", ");
-      keys.append(DATA_SIZE).append("=").append(key.getDataSize()).append(", ");
-      keys.append(REPLICATION_CONFIG).append("=").append(key.getReplicationConfig()).append("}");
+      keys.append('{').append(KEY).append('=').append(key.getKeyName()).append(", ");
+      keys.append(DATA_SIZE).append('=').append(key.getDataSize()).append(", ");
+      keys.append(REPLICATION_CONFIG).append('=').append(key.getReplicationConfig()).append('}');
       if (i < deletedKeyInfos.size() - 1) {
         keys.append(", ");
       }

@@ -33,6 +33,8 @@ import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigString
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getSecretKeyClientForDatanode;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.DELEGATION_REMOVER_SCAN_INTERVAL_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.DELEGATION_TOKEN_MAX_LIFETIME_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_KEYTAB_FILE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_FILE_KEY;
@@ -51,7 +53,6 @@ import java.net.InetAddress;
 import java.util.List;
 import java.util.Properties;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -59,7 +60,8 @@ import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
-import org.apache.hadoop.ipc.RemoteException;
+import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ipc_.RemoteException;
 import org.apache.hadoop.minikdc.MiniKdc;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
@@ -73,7 +75,6 @@ import org.apache.ratis.util.ExitUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,7 +83,6 @@ import org.slf4j.LoggerFactory;
  * Integration test to verify symmetric SecretKeys APIs in a secure cluster.
  */
 
-@Timeout(value = 500, unit = TimeUnit.SECONDS)
 @InterfaceAudience.Private
 public final class TestSecretKeysApi {
   private static final Logger LOG = LoggerFactory
@@ -114,9 +114,7 @@ public final class TestSecretKeysApi {
   @AfterEach
   public void stop() {
     miniKdc.stop();
-    if (cluster != null) {
-      cluster.stop();
-    }
+    IOUtils.closeQuietly(cluster);
   }
 
   private void createCredentialsInKDC() throws Exception {
@@ -188,6 +186,8 @@ public final class TestSecretKeysApi {
     conf.set(HDDS_SECRET_KEY_ROTATE_CHECK_DURATION, "100ms");
     conf.set(HDDS_SECRET_KEY_ROTATE_DURATION, "1s");
     conf.set(HDDS_SECRET_KEY_EXPIRY_DURATION, "3000ms");
+    conf.set(DELEGATION_TOKEN_MAX_LIFETIME_KEY, "1500ms");
+    conf.set(DELEGATION_REMOVER_SCAN_INTERVAL_KEY, "100ms");
 
     startCluster(3);
     SecretKeyProtocol secretKeyProtocol = getSecretKeyProtocol();
@@ -261,6 +261,7 @@ public final class TestSecretKeysApi {
     conf.set(HDDS_SECRET_KEY_ROTATE_CHECK_DURATION, "10m");
     conf.set(HDDS_SECRET_KEY_ROTATE_DURATION, "1d");
     conf.set(HDDS_SECRET_KEY_EXPIRY_DURATION, "7d");
+    conf.set(DELEGATION_TOKEN_MAX_LIFETIME_KEY, "5d");
 
     startCluster(3);
     SecretKeyProtocol securityProtocol = getSecretKeyProtocol();

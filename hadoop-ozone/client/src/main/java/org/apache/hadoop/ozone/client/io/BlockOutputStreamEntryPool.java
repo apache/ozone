@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
@@ -56,7 +57,7 @@ import org.slf4j.LoggerFactory;
  */
 public class BlockOutputStreamEntryPool implements KeyMetadataAware {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(BlockOutputStreamEntryPool.class);
 
   /**
@@ -170,7 +171,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
   }
 
   private synchronized void addKeyLocationInfo(OmKeyLocationInfo subKeyInfo, boolean forRetry) {
-    Preconditions.checkNotNull(subKeyInfo.getPipeline());
+    Objects.requireNonNull(subKeyInfo.getPipeline(), "subKeyInfo.getPipeline() == null");
     streamEntries.add(createStreamEntry(subKeyInfo, forRetry));
   }
 
@@ -285,6 +286,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
     return streamEntries.stream()
         .mapToLong(BlockOutputStreamEntry::getCurrentPosition).sum();
   }
+
   /**
    * Contact OM to get a new block. Set the new block with the index (e.g.
    * first block has index = 0, second has index = 1 etc.)
@@ -386,7 +388,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
       currentStreamIndex++;
     }
     if (streamEntries.size() <= currentStreamIndex) {
-      Preconditions.checkNotNull(omClient);
+      Objects.requireNonNull(omClient, "omClient == null");
       // allocate a new block, if a exception happens, log an error and
       // throw exception to the caller directly, and the write fails.
       allocateNewBlock(forRetry);

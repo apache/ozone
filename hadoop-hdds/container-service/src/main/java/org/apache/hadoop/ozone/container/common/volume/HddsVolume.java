@@ -25,16 +25,26 @@ import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
+import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
@@ -83,6 +93,9 @@ public class HddsVolume extends StorageVolume {
   private ContainerController controller;
 
   private final AtomicLong committedBytes = new AtomicLong(); // till Open containers become full
+  private Function<HddsVolume, Long> gatherContainerUsages = (K) -> 0L;
+
+  private final ConcurrentSkipListSet<Long> containerIds = new ConcurrentSkipListSet<>();
 
   // Mentions the type of volume
   private final VolumeType type = VolumeType.DATA_VOLUME;
@@ -94,8 +107,13 @@ public class HddsVolume extends StorageVolume {
   // and stored as a member to prevent spawning lots of File objects.
   private File dbParentDir;
   private File deletedContainerDir;
-  private AtomicBoolean dbLoaded = new AtomicBoolean(false);
+  private final AtomicBoolean dbLoaded = new AtomicBoolean(false);
   private final AtomicBoolean dbLoadFailure = new AtomicBoolean(false);
+
+  private final int volumeTestCount;
+  private final int volumeTestFailureTolerance;
+  private AtomicInteger volumeTestFailureCount;
+  private Queue<Boolean> volumeTestResultQueue;
 
   /**
    * Builder for HddsVolume.
@@ -129,10 +147,10 @@ public class HddsVolume extends StorageVolume {
       this.volumeInfoMetrics =
           new VolumeInfoMetrics(b.getVolumeRootStr(), this);
 
-      LOG.info("Creating HddsVolume: {} of storage type: {}, {}",
-          getStorageDir(),
-          b.getStorageType(),
-          getCurrentUsage());
+      this.volumeTestCount = getDatanodeConfig().getVolumeIOTestCount();
+      this.volumeTestFailureTolerance = getDatanodeConfig().getVolumeIOFailureTolerance();
+      this.volumeTestFailureCount = new AtomicInteger(0);
+      this.volumeTestResultQueue = new LinkedList<>();
 
       initialize();
     } else {
@@ -141,7 +159,11 @@ public class HddsVolume extends StorageVolume {
       this.setState(VolumeState.FAILED);
       volumeIOStats = null;
       volumeInfoMetrics = new VolumeInfoMetrics(b.getVolumeRootStr(), this);
+      this.volumeTestCount = 0;
+      this.volumeTestFailureTolerance = 0;
     }
+
+    LOG.info("HddsVolume: {}", getReport());
   }
 
   @Override
@@ -271,6 +293,9 @@ public class HddsVolume extends StorageVolume {
   @Override
   public synchronized VolumeCheckResult check(@Nullable Boolean unused)
       throws Exception {
+    volumeInfoMetrics.incNumScans();
+    checkVolumeUsages();
+
     VolumeCheckResult result = super.check(unused);
 
     if (isDbLoadFailure()) {
@@ -278,6 +303,7 @@ public class HddsVolume extends StorageVolume {
           "the volume might not have been loaded properly.", getStorageDir());
       return VolumeCheckResult.FAILED;
     }
+
     if (result != VolumeCheckResult.HEALTHY ||
         !getDatanodeConfig().getContainerSchemaV3Enabled() || !isDbLoaded()) {
       return result;
@@ -291,7 +317,78 @@ public class HddsVolume extends StorageVolume {
       return VolumeCheckResult.FAILED;
     }
 
+    return checkDbHealth(dbFile);
+  }
+
+  @VisibleForTesting
+  public VolumeCheckResult checkDbHealth(File dbFile) throws InterruptedException {
+    if (volumeTestCount == 0) {
+      return VolumeCheckResult.HEALTHY;
+    }
+
+    final boolean isVolumeTestResultHealthy = true;
+    try (ManagedOptions managedOptions = new ManagedOptions();
+         ManagedRocksDB ignored = ManagedRocksDB.openReadOnly(managedOptions, dbFile.toString())) {
+      volumeTestResultQueue.add(isVolumeTestResultHealthy);
+    } catch (Exception e) {
+      if (Thread.currentThread().isInterrupted()) {
+        throw new InterruptedException("Check of database for volume " + this + " interrupted.");
+      }
+      LOG.warn("Could not open Volume DB located at {}", dbFile, e);
+      volumeTestResultQueue.add(!isVolumeTestResultHealthy);
+      volumeTestFailureCount.incrementAndGet();
+    }
+
+    if (volumeTestResultQueue.size() > volumeTestCount
+        && (Boolean.TRUE.equals(volumeTestResultQueue.poll()) != isVolumeTestResultHealthy)) {
+      volumeTestFailureCount.decrementAndGet();
+    }
+
+    if (volumeTestFailureCount.get() > volumeTestFailureTolerance) {
+      LOG.error("Failed to open the database at \"{}\" for HDDS volume {}: " +
+              "the last {} runs encountered {} out of {} tolerated failures.",
+          dbFile, this, volumeTestResultQueue.size(), volumeTestFailureCount.get(), volumeTestFailureTolerance);
+      return VolumeCheckResult.FAILED;
+    }
+
+    LOG.debug("Successfully opened the database at \"{}\" for HDDS volume {}: " +
+            "the last {} runs encountered {} out of {} tolerated failures",
+        dbFile, this, volumeTestResultQueue.size(), volumeTestFailureTolerance, volumeTestFailureTolerance);
     return VolumeCheckResult.HEALTHY;
+  }
+
+  void checkVolumeUsages() {
+    boolean isEnoughSpaceAvailable = true;
+    SpaceUsageSource currentUsage = getCurrentUsage();
+    long getFreeSpaceToSpare = getFreeSpaceToSpare(currentUsage.getCapacity());
+    final long committed = committedBytes.get();
+    final long available = currentUsage.getAvailable();
+    if (available < getFreeSpaceToSpare) {
+      LOG.warn("Volume {} has insufficient space for write operation. Available: {}, Free space to spare: {}",
+          getStorageDir(), available, getFreeSpaceToSpare);
+      isEnoughSpaceAvailable = false;
+    } else if (committed > 0 && available < committed + getFreeSpaceToSpare) {
+      LOG.warn("Volume {} has insufficient space for on-going container write operation. " +
+              "Committed: {}, Available: {}, Free space to spare: {}",
+          getStorageDir(), committed, available, getFreeSpaceToSpare);
+      isEnoughSpaceAvailable = false;
+    }
+
+    volumeInfoMetrics.setAvailableSpaceInsufficient(!isEnoughSpaceAvailable);
+
+    final VolumeUsage usage = getVolumeUsage();
+    if (usage != null && usage.getReservedInBytes() > 0) {
+      final SpaceUsageSource realUsage = usage.realUsage();
+      long reservedUsed = VolumeUsage.getOtherUsed(realUsage);
+      final boolean crossesLimit = reservedUsed > usage.getReservedInBytes();
+      if (crossesLimit) {
+        LOG.warn("Volume {} reserved usages {} is higher than actual allocated reserved space {}. (Real usage: {})",
+            getStorageDir(), reservedUsed, usage.getReservedInBytes(), realUsage);
+      }
+      volumeInfoMetrics.setReservedCrossesLimit(crossesLimit);
+    } else {
+      volumeInfoMetrics.setReservedCrossesLimit(false);
+    }
   }
 
   /**
@@ -315,6 +412,38 @@ public class HddsVolume extends StorageVolume {
 
   public long getFreeSpaceToSpare(long volumeCapacity) {
     return getDatanodeConfig().getMinFreeSpace(volumeCapacity);
+  }
+
+  @Override
+  public void setGatherContainerUsages(Function<HddsVolume, Long> gatherContainerUsages) {
+    this.gatherContainerUsages = gatherContainerUsages;
+  }
+
+  @Override
+  protected long containerUsedSpace() {
+    return gatherContainerUsages.apply(this);
+  }
+
+  @Override
+  public File getContainerDirsPath() {
+    if (getStorageState() != VolumeState.NORMAL) {
+      return null;
+    }
+    File hddsVolumeRootDir = getHddsRootDir();
+    //filtering storage directory
+    File[] storageDirs = hddsVolumeRootDir.listFiles(File::isDirectory);
+    if (storageDirs == null) {
+      LOG.error("IO error for the volume {}, directory not found", hddsVolumeRootDir);
+      return null;
+    }
+    File clusterIDDir = new File(hddsVolumeRootDir, getClusterID());
+    if (storageDirs.length == 1 && !clusterIDDir.exists()) {
+      // If this volume was formatted pre SCM HA, this will be the SCM ID.
+      // A cluster ID symlink will exist in this case only if this cluster is finalized for SCM HA.
+      // If the volume was formatted post SCM HA, this will be the cluster ID.
+      clusterIDDir = storageDirs[0];
+    }
+    return new File(clusterIDDir, Storage.STORAGE_DIR_CURRENT);
   }
 
   public void setDbVolume(DbVolume dbVolume) {
@@ -411,10 +540,25 @@ public class HddsVolume extends StorageVolume {
     return 0;
   }
 
+  public void addContainer(long containerId) {
+    containerIds.add(containerId);
+  }
+
+  public void removeContainer(long containerId) {
+    containerIds.remove(containerId);
+  }
+
+  public Iterator<Long> getContainerIterator() {
+    return containerIds.iterator();
+  }
+
+  public long getContainerCount() {
+    return containerIds.size();
+  }
+
   /**
    * Pick a DbVolume for HddsVolume and init db instance.
    * Use the HddsVolume directly if no DbVolume found.
-   * @param dbVolumeSet
    */
   public void createDbStore(MutableVolumeSet dbVolumeSet) throws IOException {
     DbVolume chosenDbVolume = null;

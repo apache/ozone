@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.tasks;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.KEY_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -50,7 +50,6 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
 
   private final long nsSummaryFlushToDBMaxThreshold;
 
-
   public NSSummaryTaskWithOBS(
       ReconNamespaceSummaryManager reconNamespaceSummaryManager,
       ReconOMMetadataManager reconOMMetadataManager,
@@ -59,7 +58,6 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
         reconOMMetadataManager);
     this.nsSummaryFlushToDBMaxThreshold = nsSummaryFlushToDBMaxThreshold;
   }
-
 
   public boolean reprocessWithOBS(OMMetadataManager omMetadataManager) {
     Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
@@ -90,9 +88,9 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
             continue;
           }
 
-          setKeyParentID(keyInfo);
+          long parentObjectID = getKeyParentID(keyInfo);
 
-          handlePutKeyEvent(keyInfo, nsSummaryMap);
+          handlePutKeyEvent(keyInfo, nsSummaryMap, parentObjectID);
           if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
             if (!flushAndCommitNSToDB(nsSummaryMap)) {
               return false;
@@ -174,25 +172,25 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
           continue;
         }
 
-        setKeyParentID(updatedKeyInfo);
+        long parentObjectID = getKeyParentID(updatedKeyInfo);
 
         switch (action) {
         case PUT:
-          handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+          handlePutKeyEvent(updatedKeyInfo, nsSummaryMap, parentObjectID);
           break;
         case DELETE:
-          handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap);
+          handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap, parentObjectID);
           break;
         case UPDATE:
           if (oldKeyInfo != null) {
             // delete first, then put
-            setKeyParentID(oldKeyInfo);
-            handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
+            long oldKeyParentObjectID = getKeyParentID(oldKeyInfo);
+            handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap, oldKeyParentObjectID);
           } else {
             LOG.warn("Update event does not have the old keyInfo for {}.",
                 updatedKey);
           }
-          handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+          handlePutKeyEvent(updatedKeyInfo, nsSummaryMap, parentObjectID);
           break;
         default:
           LOG.debug("Skipping DB update event: {}", action);
@@ -220,7 +218,6 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
     return new ImmutablePair<>(seekPos, true);
   }
 
-
   /**
    * KeyTable entries don't have the parentId set.
    * In order to reuse the existing methods that rely on
@@ -231,7 +228,7 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
    * @param keyInfo
    * @throws IOException
    */
-  private void setKeyParentID(OmKeyInfo keyInfo)
+  private long getKeyParentID(OmKeyInfo keyInfo)
       throws IOException {
     String bucketKey = getReconOMMetadataManager()
         .getBucketKey(keyInfo.getVolumeName(), keyInfo.getBucketName());
@@ -239,7 +236,7 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
         getReconOMMetadataManager().getBucketTable().getSkipCache(bucketKey);
 
     if (parentBucketInfo != null) {
-      keyInfo.setParentObjectID(parentBucketInfo.getObjectID());
+      return parentBucketInfo.getObjectID();
     } else {
       LOG.warn("ParentBucketInfo is null for key: %s in volume: %s, bucket: %s",
           keyInfo.getKeyName(), keyInfo.getVolumeName(), keyInfo.getBucketName());

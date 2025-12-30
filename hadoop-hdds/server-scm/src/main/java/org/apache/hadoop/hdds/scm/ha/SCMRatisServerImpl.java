@@ -27,6 +27,7 @@ import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -274,7 +275,6 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     return isStopped;
   }
 
-
   @Override
   public List<String> getRatisRoles() {
     Collection<RaftPeer> peers = division.getGroup().getPeers();
@@ -299,6 +299,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
     }
     return ratisRoles;
   }
+
   /**
    * {@inheritDoc}
    */
@@ -392,7 +393,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
 
   private static RaftGroup buildRaftGroup(SCMNodeDetails details,
       String scmId, String clusterId) {
-    Preconditions.checkNotNull(scmId);
+    Objects.requireNonNull(scmId, "scmId == null");
     final RaftGroupId groupId = buildRaftGroupId(clusterId);
     RaftPeerId selfPeerId = getSelfPeerId(scmId);
 
@@ -414,7 +415,7 @@ public class SCMRatisServerImpl implements SCMRatisServer {
 
   @VisibleForTesting
   public static RaftGroupId buildRaftGroupId(String clusterId) {
-    Preconditions.checkNotNull(clusterId);
+    Objects.requireNonNull(clusterId, "clusterId == null");
     return RaftGroupId.valueOf(
         UUID.fromString(clusterId.replace(OzoneConsts.CLUSTER_ID_PREFIX, "")));
   }

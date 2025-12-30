@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.common;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.ByteBuffer;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -45,14 +44,14 @@ public class TestChecksum {
   }
 
   /**
-   * Tests {@link Checksum#verifyChecksum(byte[], ChecksumData)}.
+   * Tests {@link Checksum#verifyChecksum(ByteBuffer, ChecksumData, int)}.
    */
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
   public void testVerifyChecksum(boolean useChecksumCache) throws Exception {
     Checksum checksum = getChecksum(null, useChecksumCache);
     int dataLen = 55;
-    byte[] data = RandomStringUtils.randomAlphabetic(dataLen).getBytes(UTF_8);
+    byte[] data = RandomStringUtils.secure().nextAlphabetic(dataLen).getBytes(UTF_8);
     ByteBuffer byteBuffer = ByteBuffer.wrap(data);
 
     ChecksumData checksumData = checksum.computeChecksum(byteBuffer, useChecksumCache);
@@ -63,7 +62,7 @@ public class TestChecksum {
     assertEquals(6, checksumData.getChecksums().size());
 
     // Checksum verification should pass
-    assertTrue(Checksum.verifyChecksum(data, checksumData), "Checksum mismatch");
+    Checksum.verifyChecksum(ByteBuffer.wrap(data), checksumData, 0);
   }
 
   /**
@@ -73,7 +72,7 @@ public class TestChecksum {
   @ValueSource(booleans = {true, false})
   public void testIncorrectChecksum(boolean useChecksumCache) throws Exception {
     Checksum checksum = getChecksum(null, useChecksumCache);
-    byte[] data = RandomStringUtils.randomAlphabetic(55).getBytes(UTF_8);
+    byte[] data = RandomStringUtils.secure().nextAlphabetic(55).getBytes(UTF_8);
     ByteBuffer byteBuffer = ByteBuffer.wrap(data);
     ChecksumData originalChecksumData = checksum.computeChecksum(byteBuffer, useChecksumCache);
 

@@ -21,13 +21,12 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_CONTAINER_KEY_DB;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_SNAPSHOT_DB;
 
-import com.amazonaws.services.kms.model.InvalidArnException;
-import com.google.common.base.Preconditions;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
@@ -46,18 +45,18 @@ import org.apache.hadoop.ozone.recon.spi.impl.ReconDBDefinition;
  */
 public final class DBDefinitionFactory {
 
-  private DBDefinitionFactory() {
-  }
-
   private static final AtomicReference<String> DATANODE_DB_SCHEMA_VERSION = new AtomicReference<>();
   private static final Map<String, DBDefinition> DB_MAP;
 
   static {
     final Map<String, DBDefinition> map = new HashMap<>();
     Arrays.asList(SCMDBDefinition.get(), OMDBDefinition.get(), ReconSCMDBDefinition.get(),
-                  WitnessedContainerDBDefinition.get())
+            WitnessedContainerDBDefinition.get())
         .forEach(dbDefinition -> map.put(dbDefinition.getName(), dbDefinition));
     DB_MAP = Collections.unmodifiableMap(map);
+  }
+
+  private DBDefinitionFactory() {
   }
 
   public static DBDefinition getDefinition(String dbName) {
@@ -69,14 +68,12 @@ public final class DBDefinitionFactory {
     return definition != null ? definition : getReconDBDefinition(dbName);
   }
 
-  public static DBDefinition getDefinition(Path dbPath,
+  public static DBDefinition getDefinition(Path path,
       ConfigurationSource config) {
-    Preconditions.checkNotNull(dbPath,
-        "Path is required to identify the used db scheme");
+    final Path dbPath = Objects.requireNonNull(path, "path == null");
     final Path fileName = dbPath.getFileName();
     if (fileName == null) {
-      throw new InvalidArnException(
-          "Path is required to identify the used db scheme");
+      throw new IllegalArgumentException("DB path has no filename");
     }
     String dbName = fileName.toString();
     if (dbName.endsWith(OzoneConsts.CONTAINER_DB_SUFFIX)) {

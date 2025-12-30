@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.om.service;
 
+import static org.apache.hadoop.hdds.utils.db.IteratorType.KEY_AND_VALUE;
+import static org.apache.hadoop.hdds.utils.db.IteratorType.KEY_ONLY;
 import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
@@ -57,6 +59,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.ClientId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -74,6 +77,7 @@ public class QuotaRepairTask {
   private static final AtomicLong RUN_CNT = new AtomicLong(0);
   private final OzoneManager om;
   private ExecutorService executor;
+
   public QuotaRepairTask(OzoneManager ozoneManager) {
     this.om = ozoneManager;
   }
@@ -95,16 +99,16 @@ public class QuotaRepairTask {
   public static String getStatus() {
     return REPAIR_STATUS.toString();
   }
+
   private boolean repairTask(List<String> buckets) {
     LOG.info("Starting quota repair task {}", REPAIR_STATUS);
-    OMMetadataManager activeMetaManager = null;
-    try {
-      // thread pool with 3 Table type * (1 task each + 3 thread for each task)
-      executor = Executors.newFixedThreadPool(3 * (1 + TASK_THREAD_CNT));
+    // thread pool with 3 Table type * (1 task each + 3 thread for each task)
+    executor = Executors.newFixedThreadPool(3 * (1 + TASK_THREAD_CNT));
+    try (OMMetadataManager activeMetaManager =
+        createActiveDBCheckpoint(om.getMetadataManager(), om.getConfiguration())) {
       OzoneManagerProtocolProtos.QuotaRepairRequest.Builder builder
           = OzoneManagerProtocolProtos.QuotaRepairRequest.newBuilder();
       // repair active db
-      activeMetaManager = createActiveDBCheckpoint(om.getMetadataManager(), om.getConfiguration());
       repairActiveDb(activeMetaManager, builder, buckets);
 
       // TODO: repair snapshots for quota
@@ -132,9 +136,6 @@ public class QuotaRepairTask {
       LOG.info("Completed quota repair task {}", REPAIR_STATUS);
       executor.shutdown();
       try {
-        if (null != activeMetaManager) {
-          activeMetaManager.stop();
-        }
         cleanTempCheckPointPath(om.getMetadataManager());
       } catch (Exception exp) {
         LOG.error("failed to cleanup", exp);
@@ -235,11 +236,9 @@ public class QuotaRepairTask {
       }
       return;
     }
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>>
-             iterator = metadataManager.getBucketTable().iterator()) {
+    try (TableIterator<String, OmBucketInfo> iterator = metadataManager.getBucketTable().valueIterator()) {
       while (iterator.hasNext()) {
-        Table.KeyValue<String, OmBucketInfo> entry = iterator.next();
-        OmBucketInfo bucketInfo = entry.getValue();
+        final OmBucketInfo bucketInfo = iterator.next();
         populateBucket(nameBucketInfoMap, idBucketInfoMap, oriBucketInfoMap, metadataManager, bucketInfo);
       }
     }
@@ -252,8 +251,8 @@ public class QuotaRepairTask {
     String bucketNameKey = buildNamePath(bucketInfo.getVolumeName(),
         bucketInfo.getBucketName());
     oriBucketInfoMap.put(bucketNameKey, bucketInfo.copyObject());
-    bucketInfo.incrUsedNamespace(-bucketInfo.getUsedNamespace());
-    bucketInfo.incrUsedBytes(-bucketInfo.getUsedBytes());
+    bucketInfo.decrUsedBytes(bucketInfo.getUsedBytes(), false);
+    bucketInfo.decrUsedNamespace(bucketInfo.getUsedNamespace(), false);
     nameBucketInfoMap.put(bucketNameKey, bucketInfo);
     idBucketInfoMap.put(buildIdPath(metadataManager.getVolumeId(bucketInfo.getVolumeName()),
             bucketInfo.getObjectID()), bucketInfo);
@@ -346,9 +345,9 @@ public class QuotaRepairTask {
           prefixUsageMap, q, isRunning, haveValue)));
     }
     int count = 0;
-    long startTime = System.currentTimeMillis();
-    try (TableIterator<String, ? extends Table.KeyValue<String, VALUE>>
-             keyIter = table.iterator()) {
+    long startTime = Time.monotonicNow();
+    try (Table.KeyValueIterator<String, VALUE> keyIter
+        = table.iterator(null, haveValue ? KEY_AND_VALUE : KEY_ONLY)) {
       while (keyIter.hasNext()) {
         count++;
         kvList.add(keyIter.next());
@@ -363,7 +362,7 @@ public class QuotaRepairTask {
         f.get();
       }
       LOG.info("Recalculate {} completed, count {} time {}ms", strType,
-          count, (System.currentTimeMillis() - startTime));
+          count, (Time.monotonicNow() - startTime));
     } catch (IOException ex) {
       throw new UncheckedIOException(ex);
     } catch (InterruptedException ex) {
@@ -396,22 +395,18 @@ public class QuotaRepairTask {
       Table.KeyValue<String, VALUE> kv,
       Map<String, CountPair> prefixUsageMap,
       boolean haveValue) {
-    try {
-      String prefix = getVolumeBucketPrefix(kv.getKey());
-      CountPair usage = prefixUsageMap.get(prefix);
-      if (null == usage) {
-        return;
+    String prefix = getVolumeBucketPrefix(kv.getKey());
+    CountPair usage = prefixUsageMap.get(prefix);
+    if (null == usage) {
+      return;
+    }
+    usage.incrNamespace(1L);
+    // avoid decode of value
+    if (haveValue) {
+      VALUE value = kv.getValue();
+      if (value instanceof OmKeyInfo) {
+        usage.incrSpace(((OmKeyInfo) value).getReplicatedSize());
       }
-      usage.incrNamespace(1L);
-      // avoid decode of value
-      if (haveValue) {
-        VALUE value = kv.getValue();
-        if (value instanceof OmKeyInfo) {
-          usage.incrSpace(((OmKeyInfo) value).getReplicatedSize());
-        }
-      }
-    } catch (IOException ex) {
-      throw new UncheckedIOException(ex);
     }
   }
   

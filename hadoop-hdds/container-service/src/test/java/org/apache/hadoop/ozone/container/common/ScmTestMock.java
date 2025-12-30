@@ -17,13 +17,13 @@
 
 package org.apache.hadoop.ozone.container.common;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -57,6 +57,13 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
   private String clusterId;
   private String scmId;
 
+  // Map of datanode to containers
+  private Map<DatanodeDetails, Map<String, ContainerReplicaProto>> nodeContainers = new HashMap<>();
+  private Map<DatanodeDetails, NodeReportProto> nodeReports = new HashMap<>();
+  private AtomicInteger commandStatusReport = new AtomicInteger(0);
+  private List<CommandStatus> cmdStatusList = new ArrayList<>();
+  private List<SCMCommandProto> scmCommandRequests = new ArrayList<>();
+
   public ScmTestMock() {
     clusterId = UUID.randomUUID().toString();
     scmId = UUID.randomUUID().toString();
@@ -67,14 +74,6 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
     this.scmId = UUID.randomUUID().toString();
   }
 
-  // Map of datanode to containers
-  private Map<DatanodeDetails,
-      Map<String, ContainerReplicaProto>> nodeContainers =
-      new HashMap<>();
-  private Map<DatanodeDetails, NodeReportProto> nodeReports = new HashMap<>();
-  private AtomicInteger commandStatusReport = new AtomicInteger(0);
-  private List<CommandStatus> cmdStatusList = new ArrayList<>();
-  private List<SCMCommandProto> scmCommandRequests = new ArrayList<>();
   /**
    * Returns the number of heartbeats made to this class.
    *
@@ -275,7 +274,7 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
   public void updateContainerReport(
       StorageContainerDatanodeProtocolProtos.ContainerReportsProto reports,
       DatanodeDetailsProto datanodeDetails) throws IOException {
-    Preconditions.checkNotNull(reports);
+    Objects.requireNonNull(reports, "reports == null");
     containerReportsCount.incrementAndGet();
     DatanodeDetails datanode = DatanodeDetails.getFromProtoBuf(
         datanodeDetails);
@@ -292,7 +291,6 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
       }
     }
   }
-
 
   /**
    * Return the number of StorageReports of a datanode.
@@ -325,7 +323,6 @@ public class ScmTestMock implements StorageContainerDatanodeProtocol {
     rpcCount.set(0);
     containerReportsCount.set(0);
     nodeContainers.clear();
-
   }
 
   public int getCommandStatusReportCount() {

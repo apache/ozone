@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.protocol.commands;
 
-import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
 import java.util.Arrays;
 import java.util.List;
@@ -89,7 +88,7 @@ public class ReconstructECContainersCommand
 
   public static ReconstructECContainersCommand getFromProtobuf(
       ReconstructECContainersCommandProto protoMessage) {
-    Preconditions.checkNotNull(protoMessage);
+    Objects.requireNonNull(protoMessage, "protoMessage == null");
 
     List<DatanodeDetailsAndReplicaIndex> srcDatanodeDetails =
         protoMessage.getSourcesList().stream()
@@ -131,7 +130,7 @@ public class ReconstructECContainersCommand
     StringBuilder sb = new StringBuilder();
     sb.append(getType())
         .append(": cmdID: ").append(getId())
-        .append(", encodedToken: \"").append(getEncodedToken()).append("\"")
+        .append(", encodedToken: \"").append(getEncodedToken()).append('"')
         .append(", term: ").append(getTerm())
         .append(", deadlineMsSinceEpoch: ").append(getDeadline())
         .append(", containerID: ").append(containerID)
@@ -139,12 +138,13 @@ public class ReconstructECContainersCommand
         .append(", sources: [").append(getSources().stream()
             .map(a -> a.dnDetails
                 + " replicaIndex: " + a.getReplicaIndex())
-            .collect(Collectors.joining(", "))).append("]")
+            .collect(Collectors.joining(", "))).append(']')
         .append(", targets: ").append(getTargetDatanodes())
         .append(", missingIndexes: ").append(
             Arrays.toString(missingContainerIndexes.toByteArray()));
     return sb.toString();
   }
+
   /**
    * To store the datanode details with replica index.
    */

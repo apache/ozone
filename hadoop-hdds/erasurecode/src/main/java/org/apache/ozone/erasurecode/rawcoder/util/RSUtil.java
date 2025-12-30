@@ -26,14 +26,13 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
  */
 @InterfaceAudience.Private
 public final class RSUtil {
-
-  private RSUtil() {
-  }
-
   // We always use the byte system (with symbol size 8, field size 256,
   // primitive polynomial 285, and primitive root 2).
   public static final GaloisField GF = GaloisField.getInstance();
   public static final int PRIMITIVE_ROOT = 2;
+
+  private RSUtil() {
+  }
 
   public static int[] getPrimitivePower(int numDataUnits, int numParityUnits) {
     int[] primitivePower = new int[numDataUnits + numParityUnits];

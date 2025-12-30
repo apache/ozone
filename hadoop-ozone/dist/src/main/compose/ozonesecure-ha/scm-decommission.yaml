@@ -41,7 +41,7 @@ services:
       - "scm3.org=172.25.0.118"
     networks:
       ozone_net:
-        ipv4_address: 172.25.0.120
+        ipv4_address: 172.25.0.220
     profiles: ["scm4.org"]
   datanode4:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
@@ -56,7 +56,7 @@ services:
       - "scm1.org=172.25.0.116"
       - "scm2.org=172.25.0.117"
       - "scm3.org=172.25.0.118"
-      - "scm4.org=172.25.0.120"
+      - "scm4.org=172.25.0.220"
       - "recon=172.25.0.115"
     env_file:
       - docker-config
@@ -65,7 +65,7 @@ services:
       OZONE_OPTS:
     networks:
       ozone_net:
-        ipv4_address: 172.25.0.121
+        ipv4_address: 172.25.0.221
     profiles: [ "datanode4" ]
 networks:
   ozone_net:

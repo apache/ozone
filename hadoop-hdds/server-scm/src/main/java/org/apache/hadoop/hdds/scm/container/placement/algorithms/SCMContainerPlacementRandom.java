@@ -41,7 +41,7 @@ import org.slf4j.LoggerFactory;
 public final class SCMContainerPlacementRandom extends SCMCommonPlacementPolicy
     implements PlacementPolicy {
   @VisibleForTesting
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(SCMContainerPlacementRandom.class);
 
   private final SCMContainerPlacementMetrics metrics;

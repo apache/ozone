@@ -19,8 +19,8 @@ package org.apache.hadoop.hdds.scm;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.metrics2.annotation.Metric;
@@ -66,7 +66,6 @@ public final class ContainerClientMetrics {
   @Metric
   private MutableCounterLong flushesDuringWrite;
 
-
   private MutableQuantiles[] listBlockLatency;
   private MutableQuantiles[] getBlockLatency;
   private MutableQuantiles[] getCommittedBlockLengthLatency;
@@ -77,7 +76,7 @@ public final class ContainerClientMetrics {
   private MutableQuantiles[] datanodeHsyncLatencyNs;
   private final Map<PipelineID, MutableCounterLong> writeChunkCallsByPipeline;
   private final Map<PipelineID, MutableCounterLong> writeChunkBytesByPipeline;
-  private final Map<UUID, MutableCounterLong> writeChunksCallsByLeaders;
+  private final Map<DatanodeID, MutableCounterLong> writeChunksCallsByLeaders;
   private final MetricsRegistry registry;
 
   public static synchronized ContainerClientMetrics acquire() {
@@ -273,7 +272,7 @@ public final class ContainerClientMetrics {
     return writeChunkCallsByPipeline;
   }
 
-  Map<UUID, MutableCounterLong> getWriteChunksCallsByLeaders() {
+  Map<DatanodeID, MutableCounterLong> getWriteChunksCallsByLeaders() {
     return writeChunksCallsByLeaders;
   }
 

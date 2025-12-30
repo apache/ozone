@@ -17,21 +17,21 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import static org.apache.hadoop.hdds.utils.IOUtils.getINode;
+import static org.apache.hadoop.ozone.OzoneConsts.HARDLINK_SEPARATOR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.apache.hadoop.ozone.om.OmSnapshotManager;
 
 /**
  * Ozone Manager Snapshot Utilities.
@@ -40,6 +40,7 @@ public final class OmSnapshotUtils {
 
   public static final String DATA_PREFIX = "data";
   public static final String DATA_SUFFIX = "txt";
+  public static final String PATH_SEPARATOR = "/";
 
   private OmSnapshotUtils() { }
 
@@ -55,14 +56,23 @@ public final class OmSnapshotUtils {
   }
 
   /**
-   * Get the INode for file.
+   * Returns a string combining the inode (fileKey) and the last modification time (mtime) of the given file.
+   * <p>
+   * The returned string is formatted as "{inode}-{mtime}", where:
+   * <ul>
+   *   <li>{@code inode} is the unique file key obtained from the file system, typically representing
+   *   the inode on POSIX systems</li>
+   *   <li>{@code mtime} is the last modified time of the file in milliseconds since the epoch</li>
+   * </ul>
    *
-   * @param file File whose INode is to be retrieved.
-   * @return INode for file.
+   * @param file the {@link Path} to the file whose inode and modification time are to be retrieved
+   * @return a string in the format "{inode}-{mtime}"
+   * @throws IOException if an I/O error occurs
    */
-  @VisibleForTesting
-  public static Object getINode(Path file) throws IOException {
-    return Files.readAttributes(file, BasicFileAttributes.class).fileKey();
+  public static String getFileInodeAndLastModifiedTimeString(Path file) throws IOException {
+    Object inode = getINode(file);
+    FileTime mTime = Files.getLastModifiedTime(file);
+    return String.format("%s-%s", inode, mTime.toMillis());
   }
 
   /**
@@ -92,47 +102,11 @@ public final class OmSnapshotUtils {
           fixedFile = f.toString();
         }
       }
-      sb.append(truncateFileName(truncateLength, entry.getKey())).append("\t")
-          .append(fixedFile).append("\n");
+      sb.append(truncateFileName(truncateLength, entry.getKey())).append(HARDLINK_SEPARATOR)
+          .append(fixedFile).append('\n');
     }
     Files.write(data, sb.toString().getBytes(StandardCharsets.UTF_8));
     return data;
-  }
-
-  /**
-   * Create hard links listed in OM_HARDLINK_FILE.
-   *
-   * @param dbPath Path to db to have links created.
-   */
-  public static void createHardLinks(Path dbPath) throws IOException {
-    File hardLinkFile =
-        new File(dbPath.toString(), OmSnapshotManager.OM_HARDLINK_FILE);
-    if (hardLinkFile.exists()) {
-      // Read file.
-      try (Stream<String> s = Files.lines(hardLinkFile.toPath())) {
-        List<String> lines = s.collect(Collectors.toList());
-
-        // Create a link for each line.
-        for (String l : lines) {
-          String from = l.split("\t")[1];
-          String to = l.split("\t")[0];
-          Path fullFromPath = Paths.get(dbPath.toString(), from);
-          Path fullToPath = Paths.get(dbPath.toString(), to);
-          // Make parent dir if it doesn't exist.
-          Path parent = fullToPath.getParent();
-          if ((parent != null) && (!parent.toFile().exists())) {
-            if (!parent.toFile().mkdirs()) {
-              throw new IOException(
-                  "Failed to create directory: " + parent.toString());
-            }
-          }
-          Files.createLink(fullToPath, fullFromPath);
-        }
-        if (!hardLinkFile.delete()) {
-          throw new IOException("Failed to delete: " + hardLinkFile);
-        }
-      }
-    }
   }
 
   /**

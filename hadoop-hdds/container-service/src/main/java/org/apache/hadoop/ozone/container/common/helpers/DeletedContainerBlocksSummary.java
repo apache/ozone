@@ -99,7 +99,7 @@ public final class DeletedContainerBlocksSummary {
   @Override public String toString() {
     StringBuffer sb = new StringBuffer();
     for (DeletedBlocksTransaction blks : blocks) {
-      sb.append(" ")
+      sb.append(' ')
           .append("TXID=")
           .append(blks.getTxID())
           .append(", ")
@@ -108,8 +108,8 @@ public final class DeletedContainerBlocksSummary {
           .append(", ")
           .append(blks.getContainerID())
           .append(" : [")
-          .append(StringUtils.join(',', blks.getLocalIDList())).append("]")
-          .append("\n");
+          .append(StringUtils.join(',', blks.getLocalIDList())).append(']')
+          .append('\n');
     }
     return sb.toString();
   }

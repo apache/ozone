@@ -36,7 +36,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
@@ -112,7 +111,6 @@ public class TestSimpleContainerDownloader {
    * Test if different datanode is used for each download attempt.
    */
   @Test
-  @Timeout(10)
   public void testRandomSelection() throws Exception {
 
     //GIVEN

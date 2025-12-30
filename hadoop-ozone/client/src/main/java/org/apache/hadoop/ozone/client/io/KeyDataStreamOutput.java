@@ -24,6 +24,7 @@ import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -58,18 +59,10 @@ import org.slf4j.LoggerFactory;
 public class KeyDataStreamOutput extends AbstractDataStreamOutput
     implements KeyMetadataAware {
 
-  private OzoneClientConfig config;
-
-  /**
-   * Defines stream action while calling handleFlushOrClose.
-   */
-  enum StreamAction {
-    FLUSH, HSYNC, CLOSE, FULL
-  }
-
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(KeyDataStreamOutput.class);
 
+  private OzoneClientConfig config;
   private boolean closed;
 
   // how much of data is actually written yet to underlying stream
@@ -261,7 +254,7 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
   private void handleException(BlockDataStreamOutputEntry streamEntry,
       IOException exception) throws IOException {
     Throwable t = HddsClientUtils.checkForException(exception);
-    Preconditions.checkNotNull(t);
+    Objects.requireNonNull(t, "t == null");
     boolean retryFailure = checkForRetryFailure(t);
     boolean containerExclusionException = false;
     if (!retryFailure) {
@@ -274,7 +267,7 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
     streamEntry.setCurrentPosition(totalSuccessfulFlushedData);
     long containerId = streamEntry.getBlockID().getContainerID();
     Collection<DatanodeDetails> failedServers = streamEntry.getFailedServers();
-    Preconditions.checkNotNull(failedServers);
+    Objects.requireNonNull(failedServers, "failedServers == null");
     if (!containerExclusionException) {
       BlockDataStreamOutputEntry currentStreamEntry =
           blockDataStreamOutputEntryPool.getCurrentStreamEntry();
@@ -520,7 +513,6 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
       return this;
     }
 
-
     public Builder setReplicationConfig(ReplicationConfig replConfig) {
       this.replicationConfig = replConfig;
       return this;
@@ -560,5 +552,12 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
           ": " + FSExceptionMessages.STREAM_IS_CLOSED + " Key: "
               + blockDataStreamOutputEntryPool.getKeyName());
     }
+  }
+
+  /**
+   * Defines stream action while calling handleFlushOrClose.
+   */
+  enum StreamAction {
+    FLUSH, HSYNC, CLOSE, FULL
   }
 }

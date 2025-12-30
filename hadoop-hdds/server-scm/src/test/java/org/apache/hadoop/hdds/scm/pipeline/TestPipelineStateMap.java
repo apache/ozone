@@ -93,6 +93,4 @@ public class TestPipelineStateMap {
     assertEquals(1, map.getPipelineCount(new ECReplicationConfig(3, 2),
         Pipeline.PipelineState.CLOSED));
   }
-
-
 }

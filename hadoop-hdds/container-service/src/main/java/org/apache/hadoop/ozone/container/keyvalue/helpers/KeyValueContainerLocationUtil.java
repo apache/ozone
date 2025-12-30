@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.keyvalue.helpers;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
+import java.util.Objects;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -32,6 +33,7 @@ public final class KeyValueContainerLocationUtil {
   private KeyValueContainerLocationUtil() {
 
   }
+
   /**
    * Returns Container Metadata Location.
    * @param hddsVolumeDir base dir of the hdds volume where scm directories
@@ -94,8 +96,8 @@ public final class KeyValueContainerLocationUtil {
   public static String getBaseContainerLocation(String hddsVolumeDir,
                                                  String clusterId,
                                                  long containerId) {
-    Preconditions.checkNotNull(hddsVolumeDir, "Base Directory cannot be null");
-    Preconditions.checkNotNull(clusterId, "scmUuid cannot be null");
+    Objects.requireNonNull(hddsVolumeDir, "hddsVolumeDir == null");
+    Objects.requireNonNull(clusterId, "clusterId == null");
     Preconditions.checkState(containerId >= 0,
         "Container Id cannot be negative.");
 
@@ -123,13 +125,13 @@ public final class KeyValueContainerLocationUtil {
    */
   public static File getContainerDBFile(KeyValueContainerData containerData) {
     if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
-      Preconditions.checkNotNull(containerData.getVolume().getDbParentDir(), "Base Directory cannot be null");
-      return new File(containerData.getVolume().getDbParentDir(),
-          OzoneConsts.CONTAINER_DB_NAME);
+      final File dbParentDir = containerData.getVolume().getDbParentDir();
+      Objects.requireNonNull(dbParentDir, "dbParentDir == null");
+      return new File(dbParentDir, OzoneConsts.CONTAINER_DB_NAME);
     }
-    Preconditions.checkNotNull(containerData.getMetadataPath(), "Metadata Directory cannot be null");
-    return new File(containerData.getMetadataPath(), containerData.getContainerID() +
-        OzoneConsts.DN_CONTAINER_DB);
+    final String metadataPath = containerData.getMetadataPath();
+    Objects.requireNonNull(metadataPath, "metadataPath == null");
+    return new File(metadataPath, containerData.getContainerID() + OzoneConsts.DN_CONTAINER_DB);
   }
 
 }

@@ -63,7 +63,7 @@ public class LoadBucket {
   }
 
   private boolean isFsOp() {
-    return RandomUtils.nextBoolean();
+    return RandomUtils.secure().randomBoolean();
   }
 
   // Write ops.
@@ -150,7 +150,9 @@ public class LoadBucket {
     }
 
     abstract void doFsOp(Path p) throws IOException;
+
     abstract void doBucketOp(String key) throws IOException;
+
     abstract void doPostOp() throws IOException;
 
     @Override

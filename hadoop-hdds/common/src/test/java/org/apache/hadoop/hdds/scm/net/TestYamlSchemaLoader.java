@@ -26,13 +26,11 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 import java.io.FileNotFoundException;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 /** Test the node schema loader. */
-@Timeout(30)
 class TestYamlSchemaLoader {
   private final ClassLoader classLoader =
       Thread.currentThread().getContextClassLoader();

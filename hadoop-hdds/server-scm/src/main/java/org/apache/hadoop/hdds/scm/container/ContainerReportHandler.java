@@ -47,16 +47,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerReportHandler.class);
 
-  private final NodeManager nodeManager;
-  private final ContainerManager containerManager;
-  private final String unknownContainerHandleAction;
-
-  /**
-   * The action taken by ContainerReportHandler to handle
-   * unknown containers.
-   */
-  static final String UNKNOWN_CONTAINER_ACTION_WARN = "WARN";
-  static final String UNKNOWN_CONTAINER_ACTION_DELETE = "DELETE";
+  private final UnknownContainerAction unknownContainerHandleAction;
 
   /**
    * Constructs ContainerReportHandler instance with the
@@ -70,16 +61,19 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
                                 final ContainerManager containerManager,
                                 final SCMContext scmContext,
                                 OzoneConfiguration conf) {
-    super(containerManager, scmContext, LOG);
-    this.nodeManager = nodeManager;
-    this.containerManager = containerManager;
+    super(nodeManager, containerManager, scmContext);
 
     if (conf != null) {
       ScmConfig scmConfig = conf.getObject(ScmConfig.class);
-      unknownContainerHandleAction = scmConfig.getUnknownContainerAction();
+      unknownContainerHandleAction = UnknownContainerAction.parse(scmConfig.getUnknownContainerAction());
     } else {
-      unknownContainerHandleAction = UNKNOWN_CONTAINER_ACTION_WARN;
+      unknownContainerHandleAction = UnknownContainerAction.WARN;
     }
+  }
+
+  @Override
+  protected Logger getLogger() {
+    return LOG;
   }
 
   public ContainerReportHandler(final NodeManager nodeManager,
@@ -142,10 +136,9 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
 
     final DatanodeDetails dnFromReport =
         reportFromDatanode.getDatanodeDetails();
-    final DatanodeDetails datanodeDetails = nodeManager.getNode(dnFromReport.getID());
+    final DatanodeDetails datanodeDetails = getNodeManager().getNode(dnFromReport.getID());
     if (datanodeDetails == null) {
-      LOG.warn("Received container report from unknown datanode {}",
-          dnFromReport);
+      getLogger().warn("Datanode not found: {}", dnFromReport);
       return;
     }
     final ContainerReportsProto containerReport =
@@ -159,7 +152,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
         final List<ContainerReplicaProto> replicas =
             containerReport.getReportsList();
         final Set<ContainerID> expectedContainersInDatanode =
-            nodeManager.getContainers(datanodeDetails);
+            getNodeManager().getContainers(datanodeDetails);
 
         for (ContainerReplicaProto replica : replicas) {
           ContainerID cid = ContainerID.valueOf(replica.getContainerID());
@@ -169,7 +162,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
             // from protobuf. However we don't want to store that object if
             // there is already an instance for the same ContainerID we can
             // reuse.
-            container = containerManager.getContainer(cid);
+            container = getContainerManager().getContainer(cid);
             cid = container.containerID();
           } catch (ContainerNotFoundException e) {
             // Ignore this for now. It will be handled later with a null check
@@ -181,7 +174,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
           boolean alreadyInDn = expectedContainersInDatanode.remove(cid);
           if (!alreadyInDn) {
             // This is a new Container not in the nodeManager -> dn map yet
-            nodeManager.addContainer(datanodeDetails, cid);
+            getNodeManager().addContainer(datanodeDetails, cid);
           }
           if (container == null || ContainerReportValidator
                   .validate(container, datanodeDetails, replica)) {
@@ -193,7 +186,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
         // report, so it is now missing on the DN. We need to remove it from the
         // list
         processMissingReplicas(datanodeDetails, expectedContainersInDatanode);
-        containerManager.notifyContainerReportProcessing(true, true);
+        getContainerManager().notifyContainerReportProcessing(true, true);
         if (reportFromDatanode.isRegister()) {
           publisher.fireEvent(SCMEvents.CONTAINER_REGISTRATION_REPORT,
               new SCMDatanodeProtocolServer.NodeRegistrationContainerReport(datanodeDetails,
@@ -201,9 +194,8 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
         }
       }
     } catch (NodeNotFoundException ex) {
-      containerManager.notifyContainerReportProcessing(true, false);
-      LOG.error("Received container report from unknown datanode {}.",
-          datanodeDetails, ex);
+      getContainerManager().notifyContainerReportProcessing(true, false);
+      getLogger().warn("Datanode not found: {}", datanodeDetails, ex);
     }
 
   }
@@ -224,11 +216,9 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
       final EventPublisher publisher) {
     final Object detailsForLogging = getDetailsForLogging(container, replicaProto, datanodeDetails);
     if (container == null) {
-      if (unknownContainerHandleAction.equals(
-          UNKNOWN_CONTAINER_ACTION_WARN)) {
+      if (unknownContainerHandleAction == UnknownContainerAction.WARN) {
         getLogger().error("CONTAINER_NOT_FOUND for {}", detailsForLogging);
-      } else if (unknownContainerHandleAction.equals(
-          UNKNOWN_CONTAINER_ACTION_DELETE)) {
+      } else if (unknownContainerHandleAction == UnknownContainerAction.DELETE) {
         final ContainerID containerId = ContainerID
             .valueOf(replicaProto.getContainerID());
         deleteReplica(containerId, datanodeDetails, publisher, "CONTAINER_NOT_FOUND", true, detailsForLogging);
@@ -236,8 +226,7 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
       return;
     }
     try {
-      processContainerReplica(
-          datanodeDetails, container, replicaProto, publisher);
+      processContainerReplica(datanodeDetails, container, replicaProto, publisher, detailsForLogging);
     } catch (IOException | InvalidStateTransitionException e) {
       getLogger().error("Failed to process {}", detailsForLogging, e);
     }
@@ -253,27 +242,35 @@ public class ContainerReportHandler extends AbstractContainerReportHandler
                                       final Set<ContainerID> missingReplicas) {
     for (ContainerID id : missingReplicas) {
       try {
-        nodeManager.removeContainer(datanodeDetails, id);
+        getNodeManager().removeContainer(datanodeDetails, id);
       } catch (NodeNotFoundException e) {
-        LOG.warn("Failed to remove container {} from a node which does not " +
-            "exist {}", id, datanodeDetails, e);
+        getLogger().warn("Failed to remove missing container {}: datanode {} not found",
+            id, datanodeDetails, e);
       }
       try {
-        containerManager.getContainerReplicas(id).stream()
+        getContainerManager().getContainerReplicas(id).stream()
             .filter(replica -> replica.getDatanodeDetails()
                 .equals(datanodeDetails)).findFirst()
             .ifPresent(replica -> {
               try {
-                containerManager.removeContainerReplica(id, replica);
+                getContainerManager().removeContainerReplica(id, replica);
               } catch (ContainerNotFoundException |
                   ContainerReplicaNotFoundException ignored) {
                 // This should not happen, but even if it happens, not an issue
               }
             });
       } catch (ContainerNotFoundException e) {
-        LOG.warn("Cannot remove container replica, container {} not found.",
-            id, e);
+        getLogger().warn("Failed to remove container replica: container {} not found in datanode {}",
+            id, datanodeDetails, e);
       }
+    }
+  }
+
+  enum UnknownContainerAction {
+    WARN, DELETE;
+
+    static UnknownContainerAction parse(String s) {
+      return s.equals(DELETE.name()) ? DELETE : WARN;
     }
   }
 }

@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.ozone.freon;
 
+import static org.apache.hadoop.ozone.freon.OmBucketTestUtils.verifyOMLockMetrics;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.IOException;
@@ -30,9 +30,9 @@ import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneKey;
-import org.apache.hadoop.ozone.freon.TestOmBucketReadWriteFileOps.ParameterBuilder;
+import org.apache.hadoop.ozone.freon.OmBucketTestUtils.ParameterBuilder;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.lock.OMLockMetrics;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -69,7 +69,8 @@ public abstract class TestOmBucketReadWriteKeyOps implements NonHATests.TestCase
             .setNumOfWriteOperations(5)
             .setReadThreadPercentage(80)
             .setCountForRead(10)
-            .setCountForWrite(5),
+            .setCountForWrite(5)
+            .setDescription("default"),
         new ParameterBuilder()
             .setLength(32)
             .setTotalThreadCount(10)
@@ -77,13 +78,15 @@ public abstract class TestOmBucketReadWriteKeyOps implements NonHATests.TestCase
             .setNumOfWriteOperations(5)
             .setReadThreadPercentage(70)
             .setCountForRead(10)
-            .setCountForWrite(5),
+            .setCountForWrite(5)
+            .setDescription("with increased length of 32"),
         new ParameterBuilder()
             .setTotalThreadCount(15)
             .setNumOfReadOperations(5)
             .setNumOfWriteOperations(3)
             .setCountForRead(5)
-            .setCountForWrite(3),
+            .setCountForWrite(3)
+            .setDescription("with 0 byte objects"),
         new ParameterBuilder()
             .setTotalThreadCount(10)
             .setNumOfReadOperations(5)
@@ -91,22 +94,25 @@ public abstract class TestOmBucketReadWriteKeyOps implements NonHATests.TestCase
             .setCountForRead(5)
             .setCountForWrite(3)
             .setDataSize("64B")
-            .setBufferSize(16),
+            .setBufferSize(16)
+            .setDescription("with 64 byte object"),
         new ParameterBuilder()
             .setTotalThreadCount(10)
             .setNumOfReadOperations(5)
             .setNumOfWriteOperations(0)
-            .setCountForRead(5),
+            .setCountForRead(5)
+            .setDescription("pure reads"),
         new ParameterBuilder()
             .setTotalThreadCount(20)
             .setNumOfReadOperations(0)
             .setNumOfWriteOperations(5)
             .setCountForRead(0)
             .setCountForWrite(5)
+            .setDescription("pure writes")
     );
   }
 
-  @ParameterizedTest(name = "Filesystem Paths Enabled: {0}")
+  @ParameterizedTest(name = "{0}")
   @MethodSource("parameters")
   void testOmBucketReadWriteKeyOps(ParameterBuilder parameterBuilder) throws Exception {
     OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client,
@@ -115,7 +121,7 @@ public abstract class TestOmBucketReadWriteKeyOps implements NonHATests.TestCase
         parameterBuilder.getBucketArgs().setBucketLayout(BucketLayout.OBJECT_STORE).build()
     );
 
-    long startTime = System.currentTimeMillis();
+    long startTime = Time.monotonicNow();
     String om = cluster().getConf().get(OZONE_OM_ADDRESS_KEY);
     new Freon().getCmd().execute(
         "-D", OZONE_OM_ADDRESS_KEY + "=" + om,
@@ -132,7 +138,7 @@ public abstract class TestOmBucketReadWriteKeyOps implements NonHATests.TestCase
         "-R", String.valueOf(parameterBuilder.getNumOfReadOperations()),
         "-W", String.valueOf(parameterBuilder.getNumOfWriteOperations()),
         "-n", String.valueOf(1));
-    long totalTime = System.currentTimeMillis() - startTime;
+    long totalTime = Time.monotonicNow() - startTime;
     LOG.info("Total Execution Time: " + totalTime);
 
     LOG.info("Started verifying OM bucket read/write ops key generation...");
@@ -153,41 +159,4 @@ public abstract class TestOmBucketReadWriteKeyOps implements NonHATests.TestCase
     }
     assertEquals(expectedCount, actual, "Mismatch Count!");
   }
-
-  private void verifyOMLockMetrics(OMLockMetrics omLockMetrics) {
-    String readLockWaitingTimeMsStat =
-        omLockMetrics.getReadLockWaitingTimeMsStat();
-    LOG.info("Read Lock Waiting Time Stat: " + readLockWaitingTimeMsStat);
-    LOG.info("Longest Read Lock Waiting Time (ms): " +
-        omLockMetrics.getLongestReadLockWaitingTimeMs());
-    int readWaitingSamples =
-        Integer.parseInt(readLockWaitingTimeMsStat.split(" ")[2]);
-    assertThat(readWaitingSamples).isGreaterThan(0);
-
-    String readLockHeldTimeMsStat = omLockMetrics.getReadLockHeldTimeMsStat();
-    LOG.info("Read Lock Held Time Stat: " + readLockHeldTimeMsStat);
-    LOG.info("Longest Read Lock Held Time (ms): " +
-        omLockMetrics.getLongestReadLockHeldTimeMs());
-    int readHeldSamples =
-        Integer.parseInt(readLockHeldTimeMsStat.split(" ")[2]);
-    assertThat(readHeldSamples).isGreaterThan(0);
-
-    String writeLockWaitingTimeMsStat =
-        omLockMetrics.getWriteLockWaitingTimeMsStat();
-    LOG.info("Write Lock Waiting Time Stat: " + writeLockWaitingTimeMsStat);
-    LOG.info("Longest Write Lock Waiting Time (ms): " +
-        omLockMetrics.getLongestWriteLockWaitingTimeMs());
-    int writeWaitingSamples =
-        Integer.parseInt(writeLockWaitingTimeMsStat.split(" ")[2]);
-    assertThat(writeWaitingSamples).isGreaterThan(0);
-
-    String writeLockHeldTimeMsStat = omLockMetrics.getWriteLockHeldTimeMsStat();
-    LOG.info("Write Lock Held Time Stat: " + writeLockHeldTimeMsStat);
-    LOG.info("Longest Write Lock Held Time (ms): " +
-        omLockMetrics.getLongestWriteLockHeldTimeMs());
-    int writeHeldSamples =
-        Integer.parseInt(writeLockHeldTimeMsStat.split(" ")[2]);
-    assertThat(writeHeldSamples).isGreaterThan(0);
-  }
-
 }

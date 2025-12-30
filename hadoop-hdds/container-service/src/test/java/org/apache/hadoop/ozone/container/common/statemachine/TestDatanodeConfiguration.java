@@ -29,9 +29,10 @@ import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConf
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.FAILED_DB_VOLUMES_TOLERATED_KEY;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.FAILED_METADATA_VOLUMES_TOLERATED_KEY;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.FAILED_VOLUMES_TOLERATED_DEFAULT;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY;
-import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.getDefaultFreeSpace;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.concurrent.TimeUnit;
@@ -41,6 +42,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.util.TimeDuration;
@@ -154,7 +156,11 @@ public class TestDatanodeConfiguration {
   public void isCreatedWitDefaultValues() {
     // GIVEN
     OzoneConfiguration conf = new OzoneConfiguration();
+    // unset over-ridding configuration from ozone-site.xml defined for the test module
     conf.unset(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE); // set in ozone-site.xml
+
+    // Capture logs to verify no warnings are generated
+    LogCapturer logCapturer = LogCapturer.captureLogs(DatanodeConfiguration.class);
 
     // WHEN
     DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
@@ -177,7 +183,17 @@ public class TestDatanodeConfiguration {
     assertEquals(BLOCK_DELETE_COMMAND_WORKER_INTERVAL_DEFAULT,
         subject.getBlockDeleteCommandWorkerInterval());
     assertEquals(DatanodeConfiguration.getDefaultFreeSpace(), subject.getMinFreeSpace());
-    assertEquals(DatanodeConfiguration.MIN_FREE_SPACE_UNSET, subject.getMinFreeSpaceRatio());
+    assertEquals(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT, subject.getMinFreeSpaceRatio());
+    final long oneGB = 1024 * 1024 * 1024;
+    // capacity is less, consider default min_free_space
+    assertEquals(DatanodeConfiguration.getDefaultFreeSpace(), subject.getMinFreeSpace(oneGB));
+    // capacity is large, consider min_free_space_percent, max(min_free_space, min_free_space_percent * capacity)ß
+    assertEquals(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT * oneGB * oneGB,
+        subject.getMinFreeSpace(oneGB * oneGB));
+
+    // Verify that no warnings were logged when using default values
+    String logOutput = logCapturer.getOutput();
+    assertThat(logOutput).doesNotContain("is invalid, should be between 0 and 1");
   }
 
   @Test
@@ -187,22 +203,24 @@ public class TestDatanodeConfiguration {
 
     DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
 
-    assertEquals(DatanodeConfiguration.MIN_FREE_SPACE_UNSET, subject.getMinFreeSpaceRatio());
+    assertEquals(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT_DEFAULT, subject.getMinFreeSpaceRatio());
   }
 
   @Test
-  void usesDefaultFreeSpaceIfBothMinFreeSpacePropertiesSet() {
+  void useMaxIfBothMinFreeSpacePropertiesSet() {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setLong(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE, 10000);
+    int minFreeSpace = 10000;
+    conf.setLong(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE, minFreeSpace);
     conf.setFloat(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT, .5f);
 
     DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
 
-    assertEquals(DatanodeConfiguration.getDefaultFreeSpace(), subject.getMinFreeSpace());
-    assertEquals(DatanodeConfiguration.MIN_FREE_SPACE_UNSET, subject.getMinFreeSpaceRatio());
+    assertEquals(minFreeSpace, subject.getMinFreeSpace());
+    assertEquals(.5f, subject.getMinFreeSpaceRatio());
 
     for (long capacity : CAPACITIES) {
-      assertEquals(getDefaultFreeSpace(), subject.getMinFreeSpace(capacity));
+      // disk percent is higher than minFreeSpace configured 10000 bytes
+      assertEquals((long)(capacity * 0.5f), subject.getMinFreeSpace(capacity));
     }
   }
 
@@ -211,11 +229,12 @@ public class TestDatanodeConfiguration {
   void usesFixedMinFreeSpace(long bytes) {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setLong(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE, bytes);
+    // keeping %cent low so that min free space is picked up
+    conf.setFloat(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT, 0.00001f);
 
     DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);
 
     assertEquals(bytes, subject.getMinFreeSpace());
-    assertEquals(DatanodeConfiguration.MIN_FREE_SPACE_UNSET, subject.getMinFreeSpaceRatio());
 
     for (long capacity : CAPACITIES) {
       assertEquals(bytes, subject.getMinFreeSpace(capacity));
@@ -226,7 +245,8 @@ public class TestDatanodeConfiguration {
   @ValueSource(ints = {1, 10, 100})
   void calculatesMinFreeSpaceRatio(int percent) {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.unset(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE); // set in ozone-site.xml
+    // keeping min free space low so that %cent is picked up after calculation
+    conf.set(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE, "1000"); // set in ozone-site.xml
     conf.setFloat(DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT, percent / 100.0f);
 
     DatanodeConfiguration subject = conf.getObject(DatanodeConfiguration.class);

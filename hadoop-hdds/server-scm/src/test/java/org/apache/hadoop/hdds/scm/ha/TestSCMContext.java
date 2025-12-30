@@ -54,20 +54,19 @@ public class TestSCMContext {
   public void testSafeModeOperations() {
     // in safe mode
     SCMContext scmContext = new SCMContext.Builder()
-        .setIsInSafeMode(true)
-        .setIsPreCheckComplete(false)
+        .setSafeModeStatus(SafeModeStatus.INITIAL)
         .buildMaybeInvalid();
 
     assertTrue(scmContext.isInSafeMode());
     assertFalse(scmContext.isPreCheckComplete());
 
     // in safe mode, pass preCheck
-    scmContext.updateSafeModeStatus(new SafeModeStatus(true, true));
+    scmContext.updateSafeModeStatus(SafeModeStatus.PRE_CHECKS_PASSED);
     assertTrue(scmContext.isInSafeMode());
     assertTrue(scmContext.isPreCheckComplete());
 
     // out of safe mode
-    scmContext.updateSafeModeStatus(new SafeModeStatus(false, true));
+    scmContext.updateSafeModeStatus(SafeModeStatus.OUT_OF_SAFE_MODE);
     assertFalse(scmContext.isInSafeMode());
     assertTrue(scmContext.isPreCheckComplete());
   }

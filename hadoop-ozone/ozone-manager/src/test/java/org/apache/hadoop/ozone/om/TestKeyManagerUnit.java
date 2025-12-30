@@ -100,7 +100,6 @@ class TestKeyManagerUnit extends OzoneTestBase {
 
   private static final AtomicLong CONTAINER_ID = new AtomicLong();
 
-  private OzoneConfiguration configuration;
   private OMMetadataManager metadataManager;
   private StorageContainerLocationProtocol containerClient;
   private KeyManagerImpl keyManager;
@@ -114,7 +113,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
   @BeforeAll
   void setup(@TempDir Path testDir) throws Exception {
     ExitUtils.disableSystemExit();
-    configuration = new OzoneConfiguration();
+    OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.toString());
     containerClient = mock(StorageContainerLocationProtocol.class);
     blockClient = mock(ScmBlockLocationProtocol.class);
@@ -438,7 +437,6 @@ class TestKeyManagerUnit extends OzoneTestBase {
         .setBucketName(bucket)
         .setStorageType(StorageType.DISK)
         .setIsVersionEnabled(false)
-        .setAcls(new ArrayList<>())
         .build();
     OMRequestTestUtils.addBucketToOM(omMetadataManager, omBucketInfo);
   }
@@ -472,7 +470,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
     metadataManager.getMultipartInfoTable().addCacheEntry(
         new CacheKey<>(metadataManager.getMultipartKey(volume, bucket, key,
             uploadID)),
-        CacheValue.get(RandomUtils.nextInt(), multipartKeyInfo));
+        CacheValue.get(RandomUtils.secure().randomInt(), multipartKeyInfo));
     return new OmMultipartInfo(volume, bucket, key, uploadID);
   }
 
@@ -480,7 +478,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
       String volume, String bucket, String key, String uploadID) {
     metadataManager.getMultipartInfoTable().addCacheEntry(
         new CacheKey<>(metadataManager.getMultipartKey(volume, bucket, key,
-            uploadID)), CacheValue.get(RandomUtils.nextInt()));
+            uploadID)), CacheValue.get(RandomUtils.secure().randomInt()));
   }
 
   @Test
@@ -498,7 +496,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
         .setReplicationConfig(
             RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setState(Pipeline.PipelineState.OPEN)
-        .setLeaderId(dn1.getUuid())
+        .setLeaderId(dn1.getID())
         .setNodes(Arrays.asList(dn1, dn2, dn3))
         .build();
 
@@ -507,7 +505,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
         .setReplicationConfig(
             RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setState(Pipeline.PipelineState.OPEN)
-        .setLeaderId(dn1.getUuid())
+        .setLeaderId(dn1.getID())
         .setNodes(Arrays.asList(dn2, dn3, dn4))
         .build();
 
@@ -602,7 +600,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
         .setReplicationConfig(
             RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setState(Pipeline.PipelineState.OPEN)
-        .setLeaderId(dnOne.getUuid())
+        .setLeaderId(dnOne.getID())
         .setNodes(Arrays.asList(dnOne, dnTwo, dnThree))
         .build();
 
@@ -611,7 +609,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
         .setReplicationConfig(
             RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setState(Pipeline.PipelineState.OPEN)
-        .setLeaderId(dnFour.getUuid())
+        .setLeaderId(dnFour.getID())
         .setNodes(Arrays.asList(dnFour, dnFive, dnSix))
         .build();
 

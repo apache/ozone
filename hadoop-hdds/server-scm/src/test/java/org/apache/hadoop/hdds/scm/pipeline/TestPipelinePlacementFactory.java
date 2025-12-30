@@ -31,7 +31,6 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -67,13 +66,10 @@ import org.junit.jupiter.api.io.TempDir;
 public class TestPipelinePlacementFactory {
   private OzoneConfiguration conf;
   private NodeManager nodeManager;
-  private NodeManager nodeManagerBase;
   private PipelineStateManager stateManager;
   private NetworkTopologyImpl cluster;
   private final List<DatanodeDetails> datanodes = new ArrayList<>();
   private final List<DatanodeInfo> dnInfos = new ArrayList<>();
-  private DBStore dbStore;
-  private SCMHAManager scmhaManager;
 
   private static final long STORAGE_CAPACITY = 100L;
 
@@ -111,12 +107,12 @@ public class TestPipelinePlacementFactory {
 
       StorageContainerDatanodeProtocolProtos.StorageReportProto storage1 =
           HddsTestUtils.createStorageReport(
-          datanodeInfo.getUuid(), "/data1-" + datanodeInfo.getUuidString(),
+          datanodeInfo.getID(), "/data1-" + datanodeInfo.getID(),
           STORAGE_CAPACITY, 0, 100L, null);
       StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto
           metaStorage1 =
           HddsTestUtils.createMetadataStorageReport(
-              "/metadata1-" + datanodeInfo.getUuidString(),
+              "/metadata1-" + datanodeInfo.getID(),
               STORAGE_CAPACITY, 0, 100L, null);
       datanodeInfo.updateStorageReports(
           new ArrayList<>(Arrays.asList(storage1)));
@@ -124,7 +120,7 @@ public class TestPipelinePlacementFactory {
           new ArrayList<>(Arrays.asList(metaStorage1)));
       dnInfos.add(datanodeInfo);
     }
-    nodeManagerBase = new MockNodeManager(cluster, datanodes,
+    NodeManager nodeManagerBase = new MockNodeManager(cluster, datanodes,
         false, 10);
     nodeManager = spy(nodeManagerBase);
     for (DatanodeInfo dn: dnInfos) {
@@ -132,8 +128,8 @@ public class TestPipelinePlacementFactory {
           .thenReturn(dn);
     }
 
-    dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
-    scmhaManager = SCMHAManagerStub.getInstance(true);
+    DBStore dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
+    SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
 
     stateManager = PipelineStateManagerImpl.newBuilder()
         .setPipelineStore(SCMDBDefinition.PIPELINES.getTable(dbStore))
@@ -144,7 +140,7 @@ public class TestPipelinePlacementFactory {
   }
 
   @Test
-  public void testDefaultPolicy() throws IOException {
+  public void testDefaultPolicy() {
     PlacementPolicy policy = PipelinePlacementPolicyFactory
         .getPolicy(null, null, conf);
     assertSame(PipelinePlacementPolicy.class, policy.getClass());
@@ -315,14 +311,10 @@ public class TestPipelinePlacementFactory {
         policy.chooseDatanodes(usedNodes, excludeNodes, null, nodeNum, 15, 15);
     assertEquals(nodeNum, datanodeDetails.size());
     // policy should not return any of excluded node
-    assertNotSame(datanodeDetails.get(0).getUuid(),
-        excludeNodes.get(0).getUuid());
-    assertNotSame(datanodeDetails.get(0).getUuid(),
-        excludeNodes.get(1).getUuid());
-    assertNotSame(datanodeDetails.get(1).getUuid(),
-        excludeNodes.get(0).getUuid());
-    assertNotSame(datanodeDetails.get(1).getUuid(),
-        excludeNodes.get(1).getUuid());
+    assertNotSame(datanodeDetails.get(0).getID(), excludeNodes.get(0).getID());
+    assertNotSame(datanodeDetails.get(0).getID(), excludeNodes.get(1).getID());
+    assertNotSame(datanodeDetails.get(1).getID(), excludeNodes.get(0).getID());
+    assertNotSame(datanodeDetails.get(1).getID(), excludeNodes.get(1).getID());
     // One of the node should be in same rack as Node0
     assertTrue(cluster.isSameParent(usedNodes.get(0),
         datanodeDetails.get(0)) || cluster.isSameParent(usedNodes.get(0),
@@ -339,10 +331,8 @@ public class TestPipelinePlacementFactory {
         policy.chooseDatanodes(usedNodes, excludeNodes, null, nodeNum, 15, 15);
     assertEquals(nodeNum, datanodeDetails.size());
     // policy should not return any of excluded node
-    assertNotSame(datanodeDetails.get(0).getUuid(),
-        excludeNodes.get(0).getUuid());
-    assertNotSame(datanodeDetails.get(0).getUuid(),
-        excludeNodes.get(1).getUuid());
+    assertNotSame(datanodeDetails.get(0).getID(), excludeNodes.get(0).getID());
+    assertNotSame(datanodeDetails.get(0).getID(), excludeNodes.get(1).getID());
     // Since rack0 has not enough node (node0 is used and node1 is excluded),
     // Anchor will change to node4(rack2) and will return another node
     // from rack2

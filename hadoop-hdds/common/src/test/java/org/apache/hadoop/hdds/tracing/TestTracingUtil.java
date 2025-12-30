@@ -22,9 +22,6 @@ import static org.apache.hadoop.hdds.tracing.TracingUtil.exportCurrentSpan;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
-import io.jaegertracing.Configuration;
-import io.jaegertracing.internal.JaegerTracer;
-import io.opentracing.util.GlobalTracer;
 import org.apache.hadoop.hdds.conf.InMemoryConfiguration;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -47,10 +44,8 @@ public class TestTracingUtil {
 
   @Test
   public void testInitTracing() {
-    Configuration config = Configuration.fromEnv("testInitTracing");
-    JaegerTracer tracer = config.getTracerBuilder().build();
-    GlobalTracer.registerIfAbsent(tracer);
-    try (AutoCloseable ignored = TracingUtil.createActivatedSpan("initTracing")) {
+    TracingUtil.initTracing("testInitTracing", tracingEnabled());
+    try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan("initTracing")) {
       exportCurrentSpan();
     } catch (Exception e) {
       fail("Should not get exception");

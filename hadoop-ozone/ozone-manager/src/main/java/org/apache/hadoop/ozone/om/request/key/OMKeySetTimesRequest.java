@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
@@ -55,6 +55,11 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMKeySetTimesRequest.class);
 
+  private final String volumeName;
+  private final String bucketName;
+  private final String keyName;
+  private final long modificationTime;
+
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     OMRequest request = super.preExecute(ozoneManager);
@@ -73,6 +78,27 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
 
     OzoneManagerProtocolProtos.KeyArgs newKeyArgs = resolveBucketLink(ozoneManager, keyArgs);
 
+    // ACL check during preExecute
+    if (ozoneManager.getAclsEnabled()) {
+      try {
+        checkAcls(ozoneManager, OzoneObj.ResourceType.KEY,
+            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
+            newKeyArgs.getVolumeName(), newKeyArgs.getBucketName(), newKeyArgs.getKeyName());
+      } catch (IOException ex) {
+        // Ensure audit log captures preExecute failures
+        Map<String, String> auditMap = new LinkedHashMap<>();
+        auditMap.put(OzoneConsts.VOLUME, newKeyArgs.getVolumeName());
+        auditMap.put(OzoneConsts.BUCKET, newKeyArgs.getBucketName());
+        auditMap.put(OzoneConsts.KEY, newKeyArgs.getKeyName());
+        auditMap.put(OzoneConsts.MODIFICATION_TIME,
+            String.valueOf(getModificationTime()));
+        markForAudit(ozoneManager.getAuditLogger(),
+            buildAuditMessage(OMAction.SET_TIMES, auditMap, ex,
+                getOmRequest().getUserInfo()));
+        throw ex;
+      }
+    }
+
     return request.toBuilder()
         .setSetTimesRequest(
             setTimesRequest.toBuilder()
@@ -80,11 +106,6 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
                 .setMtime(getModificationTime()))
         .build();
   }
-
-  private final String volumeName;
-  private final String bucketName;
-  private final String keyName;
-  private final long modificationTime;
 
   public OMKeySetTimesRequest(OMRequest omRequest, BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
@@ -194,12 +215,6 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
       bucket = getBucketName();
       key = getKeyName();
 
-      // check Acl
-      if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.KEY,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
-            volume, bucket, key);
-      }
       mergeOmLockDetails(
           omMetadataManager.getLock().acquireWriteLock(BUCKET_LOCK, volume,
               bucket));
@@ -215,7 +230,7 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
 
       operationResult = true;
       apply(omKeyInfo);
-      omKeyInfo.setUpdateID(trxnLogIndex);
+      omKeyInfo = omKeyInfo.toBuilder().setUpdateID(trxnLogIndex).build();
 
       // update cache.
       omMetadataManager.getKeyTable(getBucketLayout())

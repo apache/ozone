@@ -18,8 +18,10 @@
 package org.apache.ozone.test;
 
 import com.google.common.base.Preconditions;
+import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeoutException;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,13 +37,13 @@ import org.slf4j.LoggerFactory;
  * with jitter: test author gets to choose).
  */
 public final class LambdaTestUtils {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(LambdaTestUtils.class);
+
+  private static final Logger LOG = LoggerFactory.getLogger(LambdaTestUtils.class);
+
+  public static final String NULL_RESULT = "(null)";
 
   private LambdaTestUtils() {
   }
-
-  public static final String NULL_RESULT = "(null)";
 
   /**
    * Interface to implement for converting a timeout into some form
@@ -103,9 +105,9 @@ public final class LambdaTestUtils {
       throws Exception {
     Preconditions.checkArgument(timeoutMillis >= 0,
         "timeoutMillis must be >= 0");
-    Preconditions.checkNotNull(timeoutHandler);
+    Objects.requireNonNull(timeoutHandler, "timeoutHandler == null");
 
-    final long endTime = System.currentTimeMillis() + timeoutMillis;
+    final long endTime = Time.monotonicNow() + timeoutMillis;
     Throwable ex = null;
     boolean running = true;
     int iterations = 0;
@@ -126,7 +128,7 @@ public final class LambdaTestUtils {
         LOG.debug("await() iteration {}", iterations, e);
         ex = e;
       }
-      running = System.currentTimeMillis() < endTime;
+      running = Time.monotonicNow() < endTime;
       if (running) {
         int sleeptime = retry.call();
         if (sleeptime >= 0) {

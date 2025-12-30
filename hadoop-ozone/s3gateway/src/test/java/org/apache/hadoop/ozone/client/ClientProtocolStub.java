@@ -41,6 +41,7 @@ import org.apache.hadoop.ozone.om.helpers.DeleteTenantState;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.LeaseKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
@@ -59,6 +60,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.security.token.Token;
@@ -252,6 +254,13 @@ public class ClientProtocolStub implements ClientProtocol {
   public OzoneInputStream getKey(String volumeName, String bucketName,
                                  String keyName) throws IOException {
     return getBucket(volumeName, bucketName).readKey(keyName);
+  }
+
+  @Override
+  public OmKeyInfo getKeyInfo(String volumeName, String bucketName, String keyName,
+      boolean forceUpdateContainerCache) throws IOException {
+    return objectStoreStub.getClientProxy().getKeyInfo(
+        volumeName, bucketName, keyName, forceUpdateContainerCache);
   }
 
   private OzoneBucket getBucket(String volumeName, String bucketName)
@@ -724,6 +733,7 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  @Deprecated
   public String printCompactionLogDag(String fileNamePrefix,
                                       String graphType) throws IOException {
     return null;
@@ -752,9 +762,13 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
-  public List<OzoneSnapshotDiff> listSnapshotDiffJobs(
-      String volumeName, String bucketName,
-      String jobStatus, boolean listAll) {
+  public ListSnapshotDiffJobResponse listSnapshotDiffJobs(
+      String volumeName,
+      String bucketName,
+      String jobStatus,
+      boolean listAllStatus,
+      String prevSnapshotDiffJob,
+      int maxListResult) {
     return null;
   }
 

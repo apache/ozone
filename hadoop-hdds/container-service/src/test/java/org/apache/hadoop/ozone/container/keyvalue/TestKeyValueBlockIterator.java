@@ -38,7 +38,7 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -65,7 +65,6 @@ public class TestKeyValueBlockIterator {
 
   private static final long CONTAINER_ID = 105L;
 
-  private KeyValueContainer container;
   private KeyValueContainerData containerData;
   private MutableVolumeSet volumeSet;
   private OzoneConfiguration conf;
@@ -73,14 +72,13 @@ public class TestKeyValueBlockIterator {
   private File testRoot;
   private DBHandle db;
   private ContainerLayoutVersion layout;
-  private String schemaVersion;
   private String datanodeID = UUID.randomUUID().toString();
   private String clusterID = UUID.randomUUID().toString();
 
   private void initTest(ContainerTestVersionInfo versionInfo,
       String keySeparator) throws Exception {
     this.layout = versionInfo.getLayout();
-    this.schemaVersion = versionInfo.getSchemaVersion();
+    String schemaVersion = versionInfo.getSchemaVersion();
     this.conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
     DatanodeConfiguration dc = conf.getObject(DatanodeConfiguration.class);
@@ -116,12 +114,11 @@ public class TestKeyValueBlockIterator {
         (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
         UUID.randomUUID().toString());
     // Init the container.
-    container = new KeyValueContainer(containerData, conf);
+    KeyValueContainer container = new KeyValueContainer(containerData, conf);
     container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(),
         clusterID);
     db = BlockUtils.getDB(containerData, conf);
   }
-
 
   @AfterEach
   public void tearDown() throws Exception {
@@ -306,16 +303,14 @@ public class TestKeyValueBlockIterator {
 
     // Test arbitrary filter.
     String schemaPrefix = containerData.containerPrefix();
-    MetadataKeyFilters.KeyPrefixFilter secondFilter =
-            new MetadataKeyFilters.KeyPrefixFilter()
-            .addFilter(schemaPrefix + secondPrefix);
+    final KeyPrefixFilter secondFilter = KeyPrefixFilter.newFilter(schemaPrefix + secondPrefix);
     testWithFilter(secondFilter, blockIDs.get(secondPrefix));
   }
 
   /**
    * Helper method to run some iterator tests with a provided filter.
    */
-  private void testWithFilter(MetadataKeyFilters.KeyPrefixFilter filter,
+  private void testWithFilter(KeyPrefixFilter filter,
                               List<Long> expectedIDs) throws Exception {
     try (BlockIterator<BlockData> iterator =
                 db.getStore().getBlockIterator(CONTAINER_ID, filter)) {

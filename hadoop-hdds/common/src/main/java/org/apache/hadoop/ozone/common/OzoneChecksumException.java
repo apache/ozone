@@ -20,35 +20,19 @@ package org.apache.hadoop.ozone.common;
 import java.io.IOException;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 
 /** Thrown for checksum errors. */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
 public class OzoneChecksumException extends IOException {
-
-  /**
-   * OzoneChecksumException to throw when checksum verification fails.
-   * @param index checksum list index at which checksum match failed
-   */
-  public OzoneChecksumException(int index) {
-    super(String.format("Checksum mismatch at index %d", index));
-  }
-
-  /**
-   * OzoneChecksumException to throw when unrecognized checksumType is given.
-   * @param unrecognizedChecksumType
-   */
-  public OzoneChecksumException(
-      ContainerProtos.ChecksumType unrecognizedChecksumType) {
-    super(String.format("Unrecognized ChecksumType: %s",
-        unrecognizedChecksumType));
-  }
-
   /**
    * OzoneChecksumException to throw with custom message.
    */
   public OzoneChecksumException(String message) {
     super(message);
+  }
+
+  public OzoneChecksumException(String message, Throwable cause) {
+    super(message, cause);
   }
 }

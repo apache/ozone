@@ -17,29 +17,19 @@
 
 package org.apache.hadoop.ozone.container.metadata;
 
-import java.io.Closeable;
 import java.io.IOException;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.db.BatchOperationHandler;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 
 /**
  * Interface for interacting with datanode databases.
  */
-public interface DBStoreManager extends Closeable {
-
-  /**
-   * Start datanode manager.
-   *
-   * @param configuration - Configuration
-   * @throws IOException - Unable to start datanode store.
-   */
-  void start(ConfigurationSource configuration) throws IOException;
-
+public interface DBStoreManager extends UncheckedAutoCloseable {
   /**
    * Stop datanode manager.
    */
-  void stop() throws Exception;
+  void stop();
 
   /**
    * Get datanode store.

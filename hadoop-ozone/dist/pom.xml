@@ -17,88 +17,120 @@
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone</artifactId>
-    <version>2.1.0-SNAPSHOT</version>
+    <version>2.2.0-SNAPSHOT</version>
   </parent>
   <artifactId>ozone-dist</artifactId>
-  <version>2.1.0-SNAPSHOT</version>
+  <version>2.2.0-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>Apache Ozone Distribution</name>
   <properties>
-    <!-- suffix appended to Ozone version to get Docker image version -->
-    <docker.ozone-runner.version>20241216-1-jdk21</docker.ozone-runner.version>
+    <!-- Hadoop Docker image for current version; multi-arch Hadoop 3.4.2-lean only available from ghcr.io currently -->
+    <docker.hadoop.image>ghcr.io/apache/hadoop</docker.hadoop.image>
+    <!-- suffix appended to Hadoop version to get Docker image version -->
+    <docker.hadoop.image.flavor>-lean</docker.hadoop.image.flavor>
+    <docker.ozone-runner.version>20250625-2-jdk21</docker.ozone-runner.version>
     <docker.ozone-testkr5b.image>ghcr.io/apache/ozone-testkrb5:20241129-1</docker.ozone-testkr5b.image>
     <docker.ozone.image>apache/ozone</docker.ozone.image>
+    <!-- suffix appended to Ozone version to get Docker image version; only used in xcompat test, to avoid old centos-based images -->
     <docker.ozone.image.flavor>-rocky</docker.ozone.image.flavor>
     <downloadSources>true</downloadSources>
     <file.encoding>UTF-8</file.encoding>
     <!-- no tests in this module so far -->
     <maven.test.skip>true</maven.test.skip>
+    <!-- rpm usage-->
+    <rpm.needArch>true</rpm.needArch>
   </properties>
 
   <dependencies>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-container-service</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-docs</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-rocks-native</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-server-scm</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-tools</artifactId>
+      <artifactId>ozone-cli-admin</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-cli-shell</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-common</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-csi</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-datanode</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-freon</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-httpfsgateway</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-insight</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-manager</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-multitenancy-ranger</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-recon</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-s3-secret-store</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-s3gateway</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-tools</artifactId>
+      <scope>runtime</scope>
     </dependency>
   </dependencies>
 
@@ -234,14 +266,12 @@
         <dependency>
           <groupId>org.apache.ozone</groupId>
           <artifactId>ozone-filesystem-hadoop2</artifactId>
+          <scope>runtime</scope>
         </dependency>
         <dependency>
           <groupId>org.apache.ozone</groupId>
           <artifactId>ozone-filesystem-hadoop3</artifactId>
-        </dependency>
-        <dependency>
-          <groupId>org.apache.ozone</groupId>
-          <artifactId>ozone-filesystem-hadoop3-client</artifactId>
+          <scope>runtime</scope>
         </dependency>
       </dependencies>
     </profile>
@@ -408,6 +438,243 @@
                     <argument>${project.build.directory}</argument>
                   </arguments>
                 </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>deb</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>exec-maven-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>detect-distro</id>
+                <goals>
+                  <goal>exec</goal>
+                </goals>
+                <phase>initialize</phase>
+                <configuration>
+                  <executable>bash</executable>
+                  <arguments>
+                    <argument>-c</argument>
+                    <argument><![CDATA[echo "linux.distro=$(if [ -f /etc/lsb-release ] && grep -q Ubuntu /etc/lsb-release; then echo ubuntu; elif [ -f /etc/debian_version ]; then echo debian; else echo linux; fi)" > ${project.build.directory}/system.properties]]></argument>
+                  </arguments>
+                </configuration>
+              </execution>
+              <execution>
+                <id>detect-system</id>
+                <goals>
+                  <goal>exec</goal>
+                </goals>
+                <phase>initialize</phase>
+                <configuration>
+                  <executable>bash</executable>
+                  <arguments>
+                    <argument>-c</argument>
+                    <argument><![CDATA[ARCH=$(uname -m)
+                      case $ARCH in
+                          x86_64) DEB_ARCH=amd64 ;;
+                          aarch64) DEB_ARCH=arm64 ;;
+                          armv7l) DEB_ARCH=armhf ;;
+                          i386|i686) DEB_ARCH=i386 ;;
+                          *) DEB_ARCH=all ;;
+                      esac
+                      
+                      echo "deb.arch=$DEB_ARCH" >> ${project.build.directory}/system.properties]]></argument>
+                  </arguments>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>properties-maven-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>read-distro</id>
+                <goals>
+                  <goal>read-project-properties</goal>
+                </goals>
+                <phase>initialize</phase>
+                <configuration>
+                  <files>
+                    <file>${project.build.directory}/system.properties</file>
+                  </files>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.vafer</groupId>
+            <artifactId>jdeb</artifactId>
+            <configuration>
+              <controlDir>${basedir}/src/main/package/deb/control</controlDir>
+              <deb>${project.build.directory}/ozone_${project.version}-${linux.distro}_${deb.arch}.deb</deb>
+              <skip>false</skip>
+              <skipPOMs>false</skipPOMs>
+              <dataSet>
+                <data>
+                  <src>${project.build.directory}/ozone-${project.version}/bin/ozone</src>
+                  <type>file</type>
+                  <mapper>
+                    <type>perm</type>
+                    <prefix>/opt/ozone/bin</prefix>
+                    <user>root</user>
+                    <group>root</group>
+                    <filemode>755</filemode>
+                  </mapper>
+                </data>
+
+                <data>
+                  <src>${project.build.directory}/ozone-${project.version}/sbin</src>
+                  <type>directory</type>
+                  <mapper>
+                    <type>perm</type>
+                    <prefix>/opt/ozone/sbin</prefix>
+                    <user>root</user>
+                    <group>root</group>
+                  </mapper>
+                </data>
+
+                <data>
+                  <src>${project.build.directory}/ozone-${project.version}/etc</src>
+                  <type>directory</type>
+                  <mapper>
+                    <type>perm</type>
+                    <prefix>/opt/ozone/etc</prefix>
+                    <user>root</user>
+                    <group>root</group>
+                  </mapper>
+                </data>
+
+                <data>
+                  <src>${project.build.directory}/ozone-${project.version}/libexec</src>
+                  <dst>/opt/ozone/libexec</dst>
+                  <type>directory</type>
+                  <mapper>
+                    <type>perm</type>
+                    <prefix>/opt/ozone/libexec</prefix>
+                    <user>root</user>
+                    <group>root</group>
+                  </mapper>
+                </data>
+
+                <data>
+                  <src>${project.build.directory}/ozone-${project.version}/share</src>
+                  <dst>/opt/ozone/share</dst>
+                  <type>directory</type>
+                  <mapper>
+                    <type>perm</type>
+                    <prefix>/opt/ozone/share</prefix>
+                    <user>root</user>
+                    <group>root</group>
+                  </mapper>
+                </data>
+              </dataSet>
+            </configuration>
+            <executions>
+              <execution>
+                <goals>
+                  <goal>jdeb</goal>
+                </goals>
+                <phase>package</phase>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <profile>
+      <id>rpm</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>rpm-maven-plugin</artifactId>
+            <version>2.3.0</version>
+            <configuration>
+              <name>ozone</name>
+              <version>${project.version}</version>
+              <release>${rpm.release}%{?dist}</release>
+              <license>Apache License, Version 2.0</license>
+              <summary>Ozone RPM package</summary>
+              <group>Applications/Engineering</group>
+              <targetOS>linux</targetOS>
+              <needarch>${rpm.needArch}</needarch>
+              <postinstallScriptlet>
+                <scriptFile>${basedir}/src/main/package/rpm/postinstall.sh</scriptFile>
+              </postinstallScriptlet>
+              <requires>
+                <require>java-headless &gt;= 1:1.8.0</require>
+                <require>ncurses</require>
+              </requires>
+
+              <defaultDirmode>500</defaultDirmode>
+              <defaultFilemode>644</defaultFilemode>
+              <defaultUsername>root</defaultUsername>
+              <defaultGroupname>root</defaultGroupname>
+
+              <mappings>
+                <mapping>
+                  <directory>/opt/ozone/bin</directory>
+                  <filemode>755</filemode>
+                  <username>root</username>
+                  <groupname>root</groupname>
+                  <sources>
+                    <source>
+                      <location>${project.build.directory}/ozone-${project.version}/bin/ozone</location>
+                    </source>
+                  </sources>
+                </mapping>
+
+                <mapping>
+                  <directory>/opt/ozone/sbin</directory>
+                  <sources>
+                    <source>
+                      <location>${project.build.directory}/ozone-${project.version}/sbin</location>
+                    </source>
+                  </sources>
+                </mapping>
+
+                <mapping>
+                  <directory>/opt/ozone/etc</directory>
+                  <sources>
+                    <source>
+                      <location>${project.build.directory}/ozone-${project.version}/etc</location>
+                    </source>
+                  </sources>
+                </mapping>
+
+                <mapping>
+                  <directory>/opt/ozone/libexec</directory>
+                  <sources>
+                    <source>
+                      <location>${project.build.directory}/ozone-${project.version}/libexec</location>
+                    </source>
+                  </sources>
+                </mapping>
+
+                <mapping>
+                  <directory>/opt/ozone/share</directory>
+                  <sources>
+                    <source>
+                      <location>${project.build.directory}/ozone-${project.version}/share</location>
+                    </source>
+                  </sources>
+                </mapping>
+              </mappings>
+            </configuration>
+            <executions>
+              <execution>
+                <goals>
+                  <goal>rpm</goal>
+                </goals>
+                <phase>package</phase>
               </execution>
             </executions>
           </plugin>

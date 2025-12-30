@@ -28,7 +28,7 @@ import org.slf4j.LoggerFactory;
  */
 public class SCMBlockLocationFailoverProxyProvider extends
     SCMFailoverProxyProviderBase<ScmBlockLocationProtocolPB> {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(SCMBlockLocationFailoverProxyProvider.class);
 
   public SCMBlockLocationFailoverProxyProvider(ConfigurationSource conf) {

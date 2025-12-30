@@ -23,7 +23,6 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.LinkedList;
@@ -75,6 +74,7 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
   private boolean closed = false;
   private boolean seeked = false;
   private OzoneClientConfig config;
+
   protected ECReplicationConfig getRepConfig() {
     return repConfig;
   }
@@ -173,8 +173,8 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
       Pipeline pipeline = Pipeline.newBuilder()
           .setReplicationConfig(StandaloneReplicationConfig.getInstance(
               HddsProtos.ReplicationFactor.ONE))
-          .setNodes(Arrays.asList(dataLocation))
-          .setId(PipelineID.valueOf(dataLocation.getUuid()))
+          .setNodes(Collections.singletonList(dataLocation))
+          .setId(dataLocation.getID())
           .setReplicaIndexes(ImmutableMap.of(dataLocation, locationIndex + 1))
           .setState(Pipeline.PipelineState.CLOSED)
           .build();

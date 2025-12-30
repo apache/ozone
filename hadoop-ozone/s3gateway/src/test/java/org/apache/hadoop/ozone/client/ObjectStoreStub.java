@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCK
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_EMPTY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
+import static org.mockito.Mockito.mock;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -39,17 +40,17 @@ import org.apache.hadoop.util.Time;
  */
 public class ObjectStoreStub extends ObjectStore {
 
+  private static OzoneConfiguration conf = new OzoneConfiguration();
+  private Map<String, OzoneVolumeStub> volumes = new HashMap<>();
+  private Map<String, Boolean> bucketEmptyStatus = new HashMap<>();
+
   public ObjectStoreStub() {
-    super();
+    super(conf, mock(ClientProtocol.class));
   }
 
   public ObjectStoreStub(ConfigurationSource conf, ClientProtocol proxy) {
     super(conf, proxy);
   }
-
-  private Map<String, OzoneVolumeStub> volumes = new HashMap<>();
-  private Map<String, Boolean> bucketEmptyStatus = new HashMap<>();
-  private static OzoneConfiguration conf = new OzoneConfiguration();
 
   @Override
   public void createVolume(String volumeName) throws IOException {

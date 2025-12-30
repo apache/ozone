@@ -72,6 +72,4 @@ public final class RocksDBUtils {
         StringCodec.get().toPersistedFormat(key));
     return bytes != null ? codec.fromPersistedFormat(bytes) : null;
   }
-
-
 }

@@ -303,3 +303,16 @@ Create&Download big file by multipart upload and get file not existed part numbe
                                 Execute AWSS3Cli           rm s3://${BUCKET}/big_file
                                 Execute                    rm -rf /tmp/big_file
                                 Execute                    rm -rf /tmp/big_file_1
+
+Check Bucket Ownership Verification
+    Execute             echo "Randomtext" > /tmp/testfile
+    ${correct_owner} =    Get bucket owner    ${BUCKET}
+    # test put
+    Execute AWSS3APICli with bucket owner check         put-object --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1 --body /tmp/testfile  ${correct_owner}
+
+    # test get
+    Execute AWSS3APICli with bucket owner check         get-object --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/f1 /tmp/testfile  ${correct_owner}
+
+    # create directory
+    Execute                                             touch /tmp/emptyfile
+    Execute AWSS3APICli with bucket owner check         put-object --bucket ${BUCKET} --key ${PREFIX}/bucketownercondition/key=value/dir/ --body /tmp/emptyfile  ${correct_owner}

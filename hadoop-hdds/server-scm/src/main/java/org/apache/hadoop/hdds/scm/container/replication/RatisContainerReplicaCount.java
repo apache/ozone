@@ -30,10 +30,10 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -511,7 +511,7 @@ public class RatisContainerReplicaCount implements ContainerReplicaCount {
     vulnerable and need to be saved.
      */
     // TODO should we also consider pending deletes?
-    Set<UUID> originsOfInServiceReplicas = new HashSet<>();
+    final Set<DatanodeID> originsOfInServiceReplicas = new HashSet<>();
     for (ContainerReplica replica : replicas) {
       if (replica.getDatanodeDetails().getPersistedOpState()
           .equals(IN_SERVICE) && replica.getSequenceId().equals(container.getSequenceId())) {

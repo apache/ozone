@@ -22,7 +22,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
-import java.io.IOException;
 import java.io.OutputStream;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
@@ -54,41 +53,28 @@ import org.apache.ratis.protocol.exceptions.GroupMismatchException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Tests failure detection and handling in BlockOutputStream Class by set
  * flush delay.
  */
-@Timeout(300)
 public class TestOzoneClientRetriesOnExceptionFlushDelay {
+  private static final int CHUNK_SIZE = 100;
+  private static final int FLUSH_SIZE = 2 * CHUNK_SIZE;
+  private static final int MAX_FLUSH_SIZE = 2 * FLUSH_SIZE;
+  private static final int BLOCK_SIZE = 2 * MAX_FLUSH_SIZE;
+
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();
   private OzoneClient client;
   private ObjectStore objectStore;
-  private int chunkSize;
-  private int flushSize;
-  private int maxFlushSize;
-  private int blockSize;
   private String volumeName;
   private String bucketName;
   private String keyString;
   private XceiverClientManager xceiverClientManager;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   @BeforeEach
   public void init() throws Exception {
-    chunkSize = 100;
-    flushSize = 2 * chunkSize;
-    maxFlushSize = 2 * flushSize;
-    blockSize = 2 * maxFlushSize;
-
     OzoneClientConfig config = conf.getObject(OzoneClientConfig.class);
     config.setChecksumType(ChecksumType.NONE);
     config.setMaxRetryCount(3);
@@ -101,10 +87,10 @@ public class TestOzoneClientRetriesOnExceptionFlushDelay {
     conf.setQuietMode(false);
 
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
-        .setBlockSize(blockSize)
-        .setChunkSize(chunkSize)
-        .setStreamBufferFlushSize(flushSize)
-        .setStreamBufferMaxSize(maxFlushSize)
+        .setBlockSize(BLOCK_SIZE)
+        .setChunkSize(CHUNK_SIZE)
+        .setStreamBufferFlushSize(FLUSH_SIZE)
+        .setStreamBufferMaxSize(MAX_FLUSH_SIZE)
         .applyTo(conf);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -126,9 +112,6 @@ public class TestOzoneClientRetriesOnExceptionFlushDelay {
     return UUID.randomUUID().toString();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);
@@ -141,7 +124,7 @@ public class TestOzoneClientRetriesOnExceptionFlushDelay {
   public void testGroupMismatchExceptionHandling() throws Exception {
     String keyName = getKeyName();
     // make sure flush will sync data.
-    int dataLength = maxFlushSize + chunkSize;
+    int dataLength = MAX_FLUSH_SIZE + CHUNK_SIZE;
     OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS,
         dataLength);
     // write data more than 1 chunk

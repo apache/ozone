@@ -86,7 +86,6 @@ public class DeletedBlocksTransactionInfoWrapper {
         .build();
   }
 
-
   public long getTxID() {
     return txID;
   }

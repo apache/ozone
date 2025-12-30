@@ -17,7 +17,7 @@
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>hdds</artifactId>
-    <version>2.1.0-SNAPSHOT</version>
+    <version>2.2.0-SNAPSHOT</version>
   </parent>
   <artifactId>hdds-rocks-native</artifactId>
   <name>Apache Ozone HDDS RocksDB Tools</name>
@@ -26,6 +26,10 @@
     <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>
@@ -40,12 +44,9 @@
       <artifactId>hdds-managed-rocksdb</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.eclipse.jetty</groupId>
-      <artifactId>jetty-io</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.rocksdb</groupId>
       <artifactId>rocksdbjni</artifactId>
+      <!-- <scope>test</scope> but transitive via hdds-managed-rocksdb -->
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
@@ -336,7 +337,6 @@
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-surefire-plugin</artifactId>
             <configuration>
-              <groups>native</groups>
               <argLine>${maven-surefire-plugin.argLine} @{argLine} -Djava.library.path=${project.build.directory}/native/rocksdb</argLine>
             </configuration>
           </plugin>

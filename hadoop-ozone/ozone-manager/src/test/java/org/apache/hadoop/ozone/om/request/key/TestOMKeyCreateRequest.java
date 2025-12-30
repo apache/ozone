@@ -32,6 +32,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -58,6 +59,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.KeyValue;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.PrefixManager;
 import org.apache.hadoop.ozone.om.PrefixManagerImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -346,8 +348,6 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     assertNull(omKeyInfo);
   }
 
-
-
   @ParameterizedTest
   @MethodSource("data")
   public void testValidateAndUpdateCacheWithVolumeNotFound(
@@ -387,7 +387,6 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     assertNull(omKeyInfo);
 
   }
-
 
   @ParameterizedTest
   @MethodSource("data")
@@ -430,7 +429,6 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     assertNull(omKeyInfo);
 
   }
-
 
   @ParameterizedTest
   @MethodSource("data")
@@ -503,8 +501,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     // We have to add the key to the key table, as validateAndUpdateCache only
     // updates the cache and not the DB.
     OmKeyInfo keyInfo = createOmKeyInfo(volumeName, bucketName, keyName,
-        replicationConfig).build();
-    keyInfo.setMetadata(initialMetadata);
+        replicationConfig).setMetadata(initialMetadata).build();
     omMetadataManager.getKeyTable(initialOmKeyCreateRequest.getBucketLayout())
         .put(getOzoneKey(), keyInfo);
 
@@ -567,6 +564,33 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     verifyMetadataInResponse(overwriteResponse, overwriteMetadata);
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testIgnoreClientACL(boolean ignoreClientACLs) throws Exception {
+    ozoneManager.getConfig().setIgnoreClientACLs(ignoreClientACLs);
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(new OzoneLockProvider(true, true));
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    // create file
+    String ozoneAll = "user:ozone:a";
+    List<OzoneAcl> aclList = new ArrayList<>();
+    aclList.add(OzoneAcl.parseAcl(ozoneAll));
+    OMRequest modifiedOmRequest =
+        doPreExecute(createKeyRequest(false, 0, keyName, emptyMap(), emptyMap(), aclList));
+    OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(modifiedOmRequest);
+    long id = modifiedOmRequest.getCreateKeyRequest().getClientID();
+    String openKey = getOpenKey(id);
+    OMClientResponse omKeyCreateResponse =
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
+    checkResponse(modifiedOmRequest, omKeyCreateResponse, id, false,
+        omKeyCreateRequest.getBucketLayout());
+
+    OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
+    if (ignoreClientACLs) {
+      assertFalse(omKeyInfo.getAcls().contains(OzoneAcl.parseAcl(ozoneAll)));
+    } else {
+      assertTrue(omKeyInfo.getAcls().contains(OzoneAcl.parseAcl(ozoneAll)));
+    }
+  }
 
   private void verifyMetadataInResponse(OMClientResponse response,
                                         Map<String, String> expectedMetadata) {
@@ -788,6 +812,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     OzoneConfiguration configuration = getOzoneConfiguration();
     configuration.setBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
     when(ozoneManager.getConfiguration()).thenReturn(configuration);
+    when(ozoneManager.getConfig()).thenReturn(configuration.getObject(OmConfig.class));
     when(ozoneManager.getEnableFileSystemPaths()).thenReturn(true);
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
         new OzoneLockProvider(setKeyPathLock, true));
@@ -1049,7 +1074,6 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     OMRequestTestUtils.addKeyToTable(false, volumeName, bucketName,
         keyName.substring(1), 0L, RatisReplicationConfig.getInstance(THREE), omMetadataManager);
   }
-
 
   private void checkNotAValidPath(String keyName) throws IOException {
     OMRequest omRequest = createKeyRequest(false, 0, keyName);

@@ -17,12 +17,9 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.setupReplicationConfigValidation;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.anyLong;
@@ -30,6 +27,7 @@ import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.framework;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import jakarta.annotation.Nonnull;
@@ -44,6 +42,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
@@ -54,6 +53,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -66,6 +66,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
+import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmMetadataReader;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
@@ -82,7 +83,6 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.snapshot.OMSnapshotCreateRequest;
 import org.apache.hadoop.ozone.om.request.snapshot.TestOMSnapshotCreateRequest;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotCreateResponse;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
@@ -90,9 +90,9 @@ import org.apache.hadoop.ozone.security.acl.OzoneNativeAuthorizer;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 import org.slf4j.event.Level;
@@ -146,13 +146,14 @@ public class TestOMKeyRequest {
         folder.toAbsolutePath().toString());
     ozoneConfiguration.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
     ozoneConfiguration.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration,
-        ozoneManager);
+    omMetadataManager = spy(new OmMetadataManagerImpl(ozoneConfiguration,
+        ozoneManager));
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getPerfMetrics()).thenReturn(perfMetrics);
     when(ozoneManager.getDeletionMetrics()).thenReturn(delMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
+    when(ozoneManager.getConfig()).thenReturn(ozoneConfiguration.getObject(OmConfig.class));
     OMLayoutVersionManager lvm = mock(OMLayoutVersionManager.class);
     when(lvm.isAllowed(anyString())).thenReturn(true);
     when(ozoneManager.getVersionManager()).thenReturn(lvm);
@@ -164,6 +165,11 @@ public class TestOMKeyRequest {
     when(ozoneManager.getBucketInfo(anyString(), anyString())).thenReturn(
         new OmBucketInfo.Builder().setVolumeName("").setBucketName("").build());
     doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
+
+    AuditMessage mockAuditMessage = mock(AuditMessage.class);
+    when(mockAuditMessage.getOp()).thenReturn("MOCK_OP");
+    when(ozoneManager.buildAuditMessageForSuccess(any(), any())).thenReturn(mockAuditMessage);
+    when(ozoneManager.buildAuditMessageForFailure(any(), any(), any())).thenReturn(mockAuditMessage);
 
     setupReplicationConfigValidation(ozoneManager, ozoneConfiguration);
 
@@ -190,8 +196,8 @@ public class TestOMKeyRequest {
     when(ozoneManager.getAccessAuthorizer())
         .thenReturn(new OzoneNativeAuthorizer());
 
-    ReferenceCounted<IOmMetadataReader> rcOmMetadataReader =
-        mock(ReferenceCounted.class);
+    UncheckedAutoCloseableSupplier<IOmMetadataReader> rcOmMetadataReader =
+        mock(UncheckedAutoCloseableSupplier.class);
     when(ozoneManager.getOmMetadataReader()).thenReturn(rcOmMetadataReader);
     // Init OmMetadataReader to let the test pass
     OmMetadataReader omMetadataReader = mock(OmMetadataReader.class);
@@ -226,8 +232,14 @@ public class TestOMKeyRequest {
           return allocatedBlocks;
         });
 
+    ContainerInfo containerInfo = new ContainerInfo.Builder()
+        .setContainerID(1L)
+        .setState(HddsProtos.LifeCycleState.OPEN)
+        .setReplicationConfig(RatisReplicationConfig.getInstance(ReplicationFactor.ONE))
+        .setPipelineID(pipeline.getId())
+        .build();
     ContainerWithPipeline containerWithPipeline =
-        new ContainerWithPipeline(Mockito.mock(ContainerInfo.class), pipeline);
+        new ContainerWithPipeline(containerInfo, pipeline);
     when(scmContainerLocationProtocol.getContainerWithPipeline(anyLong())).thenReturn(containerWithPipeline);
 
     volumeName = UUID.randomUUID().toString();
@@ -246,7 +258,13 @@ public class TestOMKeyRequest {
         .thenReturn(bucket);
     when(ozoneManager.resolveBucketLink(any(Pair.class),
         any(OMClientRequest.class)))
-        .thenReturn(bucket);
+        .thenAnswer(i -> {
+          Pair<String, String> bucketLink = i.getArgument(0);
+          OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
+              omMetadataManager.getBucketKey(bucketLink.getKey(), bucketLink.getValue()));
+          return new ResolvedBucket(bucketLink.getKey(), bucketLink.getValue(),
+              bucketLink.getKey(), bucketLink.getValue(), bucketInfo.getOwner(), bucketInfo.getBucketLayout());
+        });
     when(ozoneManager.resolveBucketLink(any(Pair.class)))
         .thenReturn(bucket);
     OmSnapshotManager omSnapshotManager = Mockito.spy(new OmSnapshotManager(ozoneManager));
@@ -254,16 +272,15 @@ public class TestOMKeyRequest {
         .thenReturn(omSnapshotManager);
 
     // Enable DEBUG level logging for relevant classes
-    GenericTestUtils.setLogLevel(OMKeyRequest.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(OMKeyCommitRequest.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(OMKeyCommitRequestWithFSO.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(OMKeyRequest.class, Level.DEBUG);
+    GenericTestUtils.setLogLevel(OMKeyCommitRequest.class, Level.DEBUG);
+    GenericTestUtils.setLogLevel(OMKeyCommitRequestWithFSO.class, Level.DEBUG);
   }
 
   @Nonnull
   protected OzoneConfiguration getOzoneConfiguration() {
     return new OzoneConfiguration();
   }
-
 
   /**
    * Verify path in open key table. Also, it returns OMKeyInfo for the given
@@ -298,15 +315,19 @@ public class TestOMKeyRequest {
     framework().clearInlineMocks();
   }
 
+  protected SnapshotInfo createSnapshot(String snapshot) throws Exception {
+    return createSnapshot(volumeName, bucketName, snapshot);
+  }
+
   /**
    * Create snapshot and checkpoint directory.
    */
-  protected SnapshotInfo createSnapshot(String snapshotName) throws Exception {
+  protected SnapshotInfo createSnapshot(String volume, String bucket, String snapshotName) throws Exception {
     when(ozoneManager.isAdmin(any())).thenReturn(true);
     BatchOperation batchOperation = omMetadataManager.getStore()
         .initBatchOperation();
     OzoneManagerProtocolProtos.OMRequest omRequest = OMRequestTestUtils
-        .createSnapshotRequest(volumeName, bucketName, snapshotName);
+        .createSnapshotRequest(volume, bucket, snapshotName);
     // Pre-Execute OMSnapshotCreateRequest.
     OMSnapshotCreateRequest omSnapshotCreateRequest =
         TestOMSnapshotCreateRequest.doPreExecute(omRequest, ozoneManager);
@@ -316,32 +337,16 @@ public class TestOMKeyRequest {
         omSnapshotCreateRequest.validateAndUpdateCache(ozoneManager, 1L);
     // Add to batch and commit to DB.
     omClientResponse.addToDBBatch(omMetadataManager, batchOperation);
+    omMetadataManager.getTransactionInfoTable().putWithBatch(batchOperation, TRANSACTION_INFO_KEY,
+        TransactionInfo.valueOf(1L, 1L));
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
     batchOperation.close();
 
-    String key = SnapshotInfo.getTableKey(volumeName,
-        bucketName, snapshotName);
+    String key = SnapshotInfo.getTableKey(volume,
+        bucket, snapshotName);
     SnapshotInfo snapshotInfo =
         omMetadataManager.getSnapshotInfoTable().get(key);
     assertNotNull(snapshotInfo);
     return snapshotInfo;
   }
-
-  @Test
-  public void testValidateKeyArgs() {
-    OMKeyRequest.ValidateKeyArgs validateKeyArgs1 = new OMKeyRequest.ValidateKeyArgs.Builder()
-        .setKeyName("tmpKey").setSnapshotReservedWord("tmpSnapshotReservedWord").build();
-    assertEquals("tmpSnapshotReservedWord", validateKeyArgs1.getSnapshotReservedWord());
-    assertEquals("tmpKey", validateKeyArgs1.getKeyName());
-    assertTrue(validateKeyArgs1.isValidateKeyName());
-    assertTrue(validateKeyArgs1.isValidateSnapshotReserved());
-
-    OMKeyRequest.ValidateKeyArgs validateKeyArgs2 = new OMKeyRequest.ValidateKeyArgs.Builder()
-        .setKeyName("tmpKey2").build();
-    assertNull(validateKeyArgs2.getSnapshotReservedWord());
-    assertEquals("tmpKey2", validateKeyArgs2.getKeyName());
-    assertTrue(validateKeyArgs2.isValidateKeyName());
-    assertFalse(validateKeyArgs2.isValidateSnapshotReserved());
-  }
-
 }

@@ -89,6 +89,12 @@
                     "value": "ACTIVE"
                   }
                 ]
+              },
+              {
+                "id": 6,
+                "name": "isListener",
+                "type": "bool",
+                "optional": true
               }
             ]
           },
@@ -125,6 +131,34 @@
                 "optional": true
               }
             ]
+          },
+          {
+            "name": "CompactRequest",
+            "fields": [
+              {
+                "id": 1,
+                "name": "columnFamily",
+                "type": "string",
+                "required": true
+              }
+            ]
+          },
+          {
+            "name": "CompactResponse",
+            "fields": [
+              {
+                "id": 1,
+                "name": "success",
+                "type": "bool",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "errorMsg",
+                "type": "string",
+                "optional": true
+              }
+            ]
           }
         ],
         "services": [
@@ -140,6 +174,11 @@
                 "name": "decommission",
                 "in_type": "DecommissionOMRequest",
                 "out_type": "DecommissionOMResponse"
+              },
+              {
+                "name": "compactDB",
+                "in_type": "CompactRequest",
+                "out_type": "CompactResponse"
               }
             ]
           }
@@ -962,6 +1001,10 @@
               {
                 "name": "KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD",
                 "integer": 97
+              },
+              {
+                "name": "TOO_MANY_SNAPSHOTS",
+                "integer": 98
               }
             ]
           },
@@ -979,27 +1022,6 @@
               {
                 "name": "VOLUMES_BY_CLUSTER",
                 "integer": 3
-              }
-            ]
-          },
-          {
-            "name": "StorageTypeProto",
-            "enum_fields": [
-              {
-                "name": "DISK",
-                "integer": 1
-              },
-              {
-                "name": "SSD",
-                "integer": 2
-              },
-              {
-                "name": "ARCHIVE",
-                "integer": 3
-              },
-              {
-                "name": "RAM_DISK",
-                "integer": 4
               }
             ]
           },
@@ -1236,6 +1258,31 @@
               {
                 "name": "CANCELLED",
                 "integer": 6
+              }
+            ]
+          },
+          {
+            "name": "SnapshotDiffResponse.SubStatus",
+            "enum_fields": [
+              {
+                "name": "SST_FILE_DELTA_DAG_WALK",
+                "integer": 1
+              },
+              {
+                "name": "SST_FILE_DELTA_FULL_DIFF",
+                "integer": 2
+              },
+              {
+                "name": "OBJECT_ID_MAP_GEN_OBS",
+                "integer": 3
+              },
+              {
+                "name": "OBJECT_ID_MAP_GEN_FSO",
+                "integer": 4
+              },
+              {
+                "name": "DIFF_REPORT_GEN",
+                "integer": 5
               }
             ]
           },
@@ -1833,7 +1880,13 @@
                 "id": 125,
                 "name": "PrintCompactionLogDagRequest",
                 "type": "PrintCompactionLogDagRequest",
-                "optional": true
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               },
               {
                 "id": 126,
@@ -1906,6 +1959,12 @@
                 "name": "deleteObjectTaggingRequest",
                 "type": "DeleteObjectTaggingRequest",
                 "optional": true
+              },
+              {
+                "id": 143,
+                "name": "SetSnapshotPropertyRequests",
+                "type": "SetSnapshotPropertyRequest",
+                "is_repeated": true
               }
             ]
           },
@@ -2450,7 +2509,13 @@
                 "id": 125,
                 "name": "PrintCompactionLogDagResponse",
                 "type": "PrintCompactionLogDagResponse",
-                "optional": true
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               },
               {
                 "id": 126,
@@ -3071,7 +3136,7 @@
               {
                 "id": 5,
                 "name": "storageType",
-                "type": "StorageTypeProto",
+                "type": "hadoop.hdds.StorageTypeProto",
                 "required": true,
                 "options": [
                   {
@@ -3180,6 +3245,18 @@
                 "id": 20,
                 "name": "defaultReplicationConfig",
                 "type": "hadoop.hdds.DefaultReplicationConfig",
+                "optional": true
+              },
+              {
+                "id": 21,
+                "name": "snapshotUsedBytes",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 22,
+                "name": "snapshotUsedNamespace",
+                "type": "uint64",
                 "optional": true
               }
             ]
@@ -3330,7 +3407,7 @@
               {
                 "id": 6,
                 "name": "storageType",
-                "type": "StorageTypeProto",
+                "type": "hadoop.hdds.StorageTypeProto",
                 "optional": true
               },
               {
@@ -3528,6 +3605,24 @@
                 "name": "lastTransactionInfo",
                 "type": "bytes",
                 "optional": true
+              },
+              {
+                "id": 21,
+                "name": "exclusiveSizeDeltaFromDirDeepCleaning",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 22,
+                "name": "exclusiveReplicatedSizeDeltaFromDirDeepCleaning",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 23,
+                "name": "createTransactionInfo",
+                "type": "bytes",
+                "optional": true
               }
             ]
           },
@@ -3598,6 +3693,18 @@
                 "id": 11,
                 "name": "disableNativeDiff",
                 "type": "bool",
+                "optional": true
+              },
+              {
+                "id": 12,
+                "name": "subStatus",
+                "type": "SnapshotDiffResponse.SubStatus",
+                "optional": true
+              },
+              {
+                "id": 13,
+                "name": "keysProcessedPct",
+                "type": "double",
                 "optional": true
               }
             ]
@@ -4388,6 +4495,89 @@
             ]
           },
           {
+            "name": "KeyInfoProtoLight",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeName",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "bucketName",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 3,
+                "name": "keyName",
+                "type": "string",
+                "required": true
+              },
+              {
+                "id": 4,
+                "name": "dataSize",
+                "type": "uint64",
+                "required": true
+              },
+              {
+                "id": 5,
+                "name": "type",
+                "type": "hadoop.hdds.ReplicationType",
+                "required": true
+              },
+              {
+                "id": 6,
+                "name": "factor",
+                "type": "hadoop.hdds.ReplicationFactor",
+                "optional": true
+              },
+              {
+                "id": 8,
+                "name": "creationTime",
+                "type": "uint64",
+                "required": true
+              },
+              {
+                "id": 9,
+                "name": "modificationTime",
+                "type": "uint64",
+                "required": true
+              },
+              {
+                "id": 14,
+                "name": "objectID",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 15,
+                "name": "updateID",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 16,
+                "name": "parentID",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 17,
+                "name": "ecReplicationConfig",
+                "type": "hadoop.hdds.ECReplicationConfig",
+                "optional": true
+              },
+              {
+                "id": 19,
+                "name": "isFile",
+                "type": "bool",
+                "optional": true
+              }
+            ]
+          },
+          {
             "name": "BasicKeyInfo",
             "fields": [
               {
@@ -4442,6 +4632,12 @@
                 "id": 9,
                 "name": "ownerName",
                 "type": "string",
+                "optional": true
+              },
+              {
+                "id": 10,
+                "name": "isEncrypted",
+                "type": "bool",
                 "optional": true
               }
             ]
@@ -4513,6 +4709,12 @@
                 "name": "keyInfo",
                 "type": "KeyInfo",
                 "is_repeated": true
+              },
+              {
+                "id": 2,
+                "name": "bucketId",
+                "type": "uint64",
+                "optional": true
               }
             ]
           },
@@ -5075,13 +5277,25 @@
                 "id": 1,
                 "name": "volumeName",
                 "type": "string",
-                "required": true
+                "required": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               },
               {
                 "id": 2,
                 "name": "bucketName",
                 "type": "string",
-                "required": true
+                "required": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               },
               {
                 "id": 3,
@@ -5116,6 +5330,41 @@
                 "id": 4,
                 "name": "expectedPreviousSnapshotID",
                 "type": "NullableUUID",
+                "optional": true
+              },
+              {
+                "id": 5,
+                "name": "renamedKeys",
+                "type": "string",
+                "is_repeated": true
+              },
+              {
+                "id": 6,
+                "name": "bucketPurgeKeysSize",
+                "type": "BucketPurgeKeysSize",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "BucketPurgeKeysSize",
+            "fields": [
+              {
+                "id": 1,
+                "name": "bucketNameInfo",
+                "type": "BucketNameInfo",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "purgedBytes",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "purgedNamespace",
+                "type": "uint64",
                 "optional": true
               }
             ]
@@ -5168,6 +5417,41 @@
                 "id": 3,
                 "name": "expectedPreviousSnapshotID",
                 "type": "NullableUUID",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "bucketNameInfos",
+                "type": "BucketNameInfo",
+                "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "BucketNameInfo",
+            "fields": [
+              {
+                "id": 1,
+                "name": "volumeId",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 2,
+                "name": "bucketId",
+                "type": "uint64",
+                "optional": true
+              },
+              {
+                "id": 3,
+                "name": "volumeName",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 4,
+                "name": "bucketName",
+                "type": "string",
                 "optional": true
               }
             ]
@@ -7069,6 +7353,18 @@
                 "name": "listAll",
                 "type": "bool",
                 "optional": true
+              },
+              {
+                "id": 5,
+                "name": "prevSnapshotDiffJob",
+                "type": "string",
+                "optional": true
+              },
+              {
+                "id": 6,
+                "name": "maxListResult",
+                "type": "uint32",
+                "optional": true
               }
             ]
           },
@@ -7219,6 +7515,12 @@
                 "name": "keyInfos",
                 "type": "KeyInfo",
                 "is_repeated": true
+              },
+              {
+                "id": 3,
+                "name": "bucketId",
+                "type": "uint64",
+                "optional": true
               }
             ]
           },
@@ -7282,6 +7584,12 @@
                 "id": 5,
                 "name": "deepCleanedDeletedKey",
                 "type": "bool",
+                "optional": true
+              },
+              {
+                "id": 6,
+                "name": "snapshotSizeDeltaFromDirDeepCleaning",
+                "type": "SnapshotSize",
                 "optional": true
               }
             ]
@@ -7498,6 +7806,12 @@
                 "name": "reason",
                 "type": "string",
                 "optional": true
+              },
+              {
+                "id": 5,
+                "name": "subStatus",
+                "type": "SubStatus",
+                "optional": true
               }
             ]
           },
@@ -7520,6 +7834,12 @@
                 "name": "snapshotDiffJob",
                 "type": "SnapshotDiffJobProto",
                 "is_repeated": true
+              },
+              {
+                "id": 2,
+                "name": "lastSnapshotDiffJob",
+                "type": "string",
+                "optional": true
               }
             ]
           },
@@ -8112,6 +8432,12 @@
                 "name": "ratisPort",
                 "type": "uint32",
                 "required": true
+              },
+              {
+                "id": 4,
+                "name": "isListener",
+                "type": "bool",
+                "optional": true
               }
             ]
           },

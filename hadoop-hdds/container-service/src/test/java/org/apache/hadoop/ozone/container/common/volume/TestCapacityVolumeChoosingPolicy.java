@@ -129,7 +129,7 @@ public class TestCapacityVolumeChoosingPolicy {
     String msg = e.getMessage();
     assertThat(msg)
         .contains("No volumes have enough space for a new container.  " +
-            "Most available space: 250 bytes");
+            "Most available space: 240 bytes");
   }
 
   @Test
@@ -149,4 +149,15 @@ public class TestCapacityVolumeChoosingPolicy {
         VolumeChoosingPolicyFactory.getPolicy(CONF).getClass());
   }
 
+  @Test
+  public void testVolumeCommittedSpace() throws Exception {
+    Map<HddsVolume, Long> initialCommittedSpace = new HashMap<>();
+    volumes.forEach(vol ->
+        initialCommittedSpace.put(vol, vol.getCommittedBytes()));
+
+    HddsVolume selectedVolume = policy.chooseVolume(volumes, 50);
+
+    assertEquals(initialCommittedSpace.get(selectedVolume) + 50,
+        selectedVolume.getCommittedBytes());
+  }
 }

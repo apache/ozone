@@ -30,7 +30,6 @@ public class DeleteBlocksCommand extends
 
   private List<DeletedBlocksTransaction> blocksTobeDeleted;
 
-
   public DeleteBlocksCommand(List<DeletedBlocksTransaction> blocks) {
     super();
     this.blocksTobeDeleted = blocks;
@@ -70,7 +69,7 @@ public class DeleteBlocksCommand extends
     StringBuilder sb = new StringBuilder();
     sb.append(getType())
         .append(": cmdID: ").append(getId())
-        .append(", encodedToken: \"").append(getEncodedToken()).append("\"")
+        .append(", encodedToken: \"").append(getEncodedToken()).append('"')
         .append(", term: ").append(getTerm())
         .append(", deadlineMsSinceEpoch: ").append(getDeadline())
         .append(", deletedBlocksTransaction: [");
@@ -84,7 +83,7 @@ public class DeleteBlocksCommand extends
     if (!blocksTobeDeleted.isEmpty()) {
       sb.delete(sb.length() - 2, sb.length());
     }
-    sb.append("]");
+    sb.append(']');
     return sb.toString();
   }
 }

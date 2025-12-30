@@ -18,7 +18,10 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
-import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.putTagging;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -33,9 +36,7 @@ import static org.mockito.Mockito.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -52,7 +53,10 @@ import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
+import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -86,9 +90,12 @@ public class TestPermissionCheck {
     when(client.getObjectStore()).thenReturn(objectStore);
     when(client.getConfiguration()).thenReturn(conf);
     headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
+        .thenReturn("mockSignature");
     clientProtocol = mock(ClientProtocol.class);
     S3GatewayMetrics.create(conf);
     when(client.getProxy()).thenReturn(clientProtocol);
+    when(objectStore.getClientProxy()).thenReturn(clientProtocol);
   }
 
   /**
@@ -126,20 +133,22 @@ public class TestPermissionCheck {
         .setClient(client)
         .build();
     OS3Exception e = assertThrows(OS3Exception.class, () ->
-        bucketEndpoint.put("bucketName", null, null, null, null));
+        bucketEndpoint.put("bucketName", null));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
   @Test
   public void testDeleteBucket() throws IOException {
     doThrow(exception).when(objectStore).deleteS3Bucket(anyString());
+    when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
     BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
     OS3Exception e = assertThrows(OS3Exception.class, () ->
-        bucketEndpoint.delete("bucketName", null));
+        bucketEndpoint.delete("bucketName"));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
+
   @Test
   public void testListMultiUpload() throws IOException {
     when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
@@ -161,9 +170,7 @@ public class TestPermissionCheck {
     BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
         .build();
-    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get(
-        "bucketName", null, null, null, 1000,
-        null, null, null, null, null, null, null, 0, null, null));
+    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get("bucketName"));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
@@ -205,10 +212,10 @@ public class TestPermissionCheck {
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
     BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
+        .setHeaders(headers)
         .build();
-    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get(
-            "bucketName", null, null, null, 1000, null, null, null, null, "acl",
-            null, null, 0, null, null), "Expected OS3Exception with FORBIDDEN http code.");
+    bucketEndpoint.queryParamsForTest().set(QueryParams.ACL, "acl");
+    OS3Exception e = assertThrows(OS3Exception.class, () -> bucketEndpoint.get("bucketName"));
     assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
   }
 
@@ -227,9 +234,11 @@ public class TestPermissionCheck {
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
     BucketEndpoint bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(client)
+        .setHeaders(headers)
         .build();
+    bucketEndpoint.queryParamsForTest().set(QueryParams.ACL, "acl");
     try {
-      bucketEndpoint.put("bucketName", "acl", null, headers, null);
+      bucketEndpoint.put("bucketName", null);
     } catch (Exception e) {
       assertTrue(e instanceof OS3Exception &&
           ((OS3Exception)e).getHttpCode() == HTTP_FORBIDDEN);
@@ -242,6 +251,7 @@ public class TestPermissionCheck {
   @Test
   public void testGetKey() throws IOException {
     when(client.getProxy()).thenReturn(clientProtocol);
+    when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(clientProtocol)
         .getS3KeyDetails(anyString(), anyString());
     ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
@@ -267,15 +277,13 @@ public class TestPermissionCheck {
         .setConfig(conf)
         .build();
 
-    OS3Exception e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(
-        "bucketName", "keyPath", 1024, 0, null, null, null,
-        new ByteArrayInputStream(new byte[]{})));
-    assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
+    assertErrorResponse(S3ErrorTable.ACCESS_DENIED, () -> put(objectEndpoint, "bucketName", "keyPath", ""));
   }
 
   @Test
   public void testDeleteKey() throws IOException {
     when(objectStore.getS3Volume()).thenReturn(volume);
+    when(volume.getBucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(clientProtocol).deleteKey(anyString(), anyString(),
         anyString(), anyBoolean());
     ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
@@ -318,7 +326,7 @@ public class TestPermissionCheck {
         .setClient(client)
         .build();
     String xml =
-        "<Tagging xmlns=\"http://s3.amazonaws.com/doc/2006-03-01/\">" +
+        "<Tagging xmlns=\"" + S3Consts.S3_XML_NAMESPACE + "\">" +
             "   <TagSet>" +
             "      <Tag>" +
             "         <Key>tag1</Key>" +
@@ -327,20 +335,11 @@ public class TestPermissionCheck {
             "   </TagSet>" +
             "</Tagging>";
 
-    InputStream tagInput = new ByteArrayInputStream(xml.getBytes(UTF_8));
-
-    OS3Exception e = assertThrows(OS3Exception.class, () ->
-        objectEndpoint.put("bucketName", "keyPath", 0, 1,
-            null, "", null, tagInput));
-    assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
-
-    e = assertThrows(OS3Exception.class, () ->
-        objectEndpoint.delete("bucketName", "keyPath", "", ""));
-    assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
-
-    e = assertThrows(OS3Exception.class, () ->
-        objectEndpoint.get("bucketName", "keyPath", 0, null,
-            0, null, ""));
-    assertEquals(HTTP_FORBIDDEN, e.getHttpCode());
+    assertErrorResponse(S3ErrorTable.ACCESS_DENIED,
+        () -> putTagging(objectEndpoint, "bucketName", "keyPath", xml));
+    assertErrorResponse(S3ErrorTable.ACCESS_DENIED,
+        () -> objectEndpoint.delete("bucketName", "keyPath", null, ""));
+    assertErrorResponse(S3ErrorTable.ACCESS_DENIED,
+        () -> objectEndpoint.get("bucketName", "keyPath", 0, null, 0, null, ""));
   }
 }

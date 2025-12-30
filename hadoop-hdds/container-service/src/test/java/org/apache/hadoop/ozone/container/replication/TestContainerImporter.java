@@ -23,10 +23,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -36,6 +41,7 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Semaphore;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
@@ -51,17 +57,23 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.TarContainerPacker;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.MockedStatic;
 
 /**
  * Test for {@link ContainerImporter}.
@@ -72,28 +84,42 @@ class TestContainerImporter {
   private File tempDir;
 
   private OzoneConfiguration conf;
+  private VolumeChoosingPolicy volumeChoosingPolicy;
+  private KeyValueContainerData containerData;
+  private KeyValueContainer container;
+  private ContainerController controllerMock;
+  private long containerId = 1;
+  private ContainerSet containerSet;
+  private MutableVolumeSet volumeSet;
+  private ContainerImporter containerImporter;
 
   @BeforeEach
-  void setup() {
+  void setup() throws IOException {
     conf = new OzoneConfiguration();
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, tempDir.getAbsolutePath());
+    volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
+    // create container
+    containerData = new KeyValueContainerData(containerId,
+        ContainerLayoutVersion.FILE_PER_BLOCK, 100, "test", "test");
+    container = new KeyValueContainer(containerData, conf);
+    controllerMock = mock(ContainerController.class);
+    when(controllerMock.importContainer(any(ContainerData.class), any(), any())).thenAnswer(
+        i -> {
+          containerData = i.getArgument(0);
+          container = new KeyValueContainer(containerData, conf);
+          return container;
+        });
+    containerSet = spy(newContainerSet(0));
+    volumeSet = new MutableVolumeSet("test", conf, null,
+        StorageVolume.VolumeType.DATA_VOLUME, null);
+    // create containerImporter object
+    containerImporter = new ContainerImporter(conf,
+        containerSet, controllerMock, volumeSet, volumeChoosingPolicy);
   }
 
   @Test
   void importSameContainerWhenAlreadyImport() throws Exception {
-    long containerId = 1;
-    // create container
-    KeyValueContainerData containerData = new KeyValueContainerData(containerId,
-        ContainerLayoutVersion.FILE_PER_BLOCK, 100, "test", "test");
-    KeyValueContainer container = new KeyValueContainer(containerData, conf);
-    ContainerController controllerMock = mock(ContainerController.class);
-    // create containerImporter object
-    ContainerSet containerSet = newContainerSet(0);
     containerSet.addContainer(container);
-    MutableVolumeSet volumeSet = new MutableVolumeSet("test", conf, null,
-        StorageVolume.VolumeType.DATA_VOLUME, null);
-    ContainerImporter containerImporter = new ContainerImporter(conf,
-        containerSet, controllerMock, volumeSet);
     File tarFile = new File("dummy.tar");
     // second import should fail immediately
     StorageContainerException ex = assertThrows(StorageContainerException.class,
@@ -105,25 +131,13 @@ class TestContainerImporter {
 
   @Test
   void importSameContainerWhenFirstInProgress() throws Exception {
-    long containerId = 1;
-    // create container
-    KeyValueContainerData containerData = new KeyValueContainerData(containerId,
-        ContainerLayoutVersion.FILE_PER_BLOCK, 100, "test", "test");
-    KeyValueContainer container = new KeyValueContainer(containerData, conf);
     // mock controller for return container data with delay
-    ContainerController controllerMock = mock(ContainerController.class);
     Semaphore semaphore = new Semaphore(0);
     when(controllerMock.importContainer(any(), any(), any()))
         .thenAnswer((invocation) -> {
           semaphore.acquire();
           return container;
         });
-    // create containerImporter object
-    ContainerSet containerSet = newContainerSet(0);
-    MutableVolumeSet volumeSet = new MutableVolumeSet("test", conf, null,
-        StorageVolume.VolumeType.DATA_VOLUME, null);
-    ContainerImporter containerImporter = new ContainerImporter(conf,
-        containerSet, controllerMock, volumeSet);
     // run import async first time having delay
     File tarFile = containerTarFile(containerId, containerData);
     CompletableFuture.runAsync(() -> {
@@ -149,46 +163,82 @@ class TestContainerImporter {
 
   @Test
   public void testInconsistentChecksumContainerShouldThrowError() throws Exception {
-    // create container
-    long containerId = 1;
-    KeyValueContainerData containerData = spy(new KeyValueContainerData(containerId,
+    // create container with mock to return different checksums
+    KeyValueContainerData data = spy(new KeyValueContainerData(containerId,
         ContainerLayoutVersion.FILE_PER_BLOCK, 100, "test", "test"));
     // mock to return different checksum
-    when(containerData.getChecksum()).thenReturn("checksum1", "checksum2");
-    doNothing().when(containerData).setChecksumTo0ByteArray();
-    // create containerImporter object
-    ContainerController controllerMock = mock(ContainerController.class);
-    ContainerSet containerSet = newContainerSet(0);
-    MutableVolumeSet volumeSet = new MutableVolumeSet("test", conf, null,
-        StorageVolume.VolumeType.DATA_VOLUME, null);
-    ContainerImporter containerImporter = spy(new ContainerImporter(conf,
-        containerSet, controllerMock, volumeSet));
+    when(data.getContainerFileChecksum()).thenReturn("checksum1", "checksum2");
+    // create containerImporter object with mock
+    ContainerImporter importer = spy(new ContainerImporter(conf,
+        containerSet, controllerMock, volumeSet, volumeChoosingPolicy));
 
     TarContainerPacker packer = mock(TarContainerPacker.class);
     when(packer.unpackContainerDescriptor(any())).thenReturn("test".getBytes(
         StandardCharsets.UTF_8));
-    when(containerImporter.getPacker(any())).thenReturn(packer);
+    when(importer.getPacker(any())).thenReturn(packer);
 
-    doReturn(containerData).when(containerImporter).getKeyValueContainerData(any(byte[].class));
-    when(containerImporter.getImportContainerProgress()).thenReturn(new HashSet<>());
+    doReturn(data).when(importer).getKeyValueContainerData(any(byte[].class));
+    when(importer.getImportContainerProgress()).thenReturn(new HashSet<>());
 
     File tarFile = File.createTempFile("temp_" + System
         .currentTimeMillis(), ".tar");
 
     StorageContainerException scException =
         assertThrows(StorageContainerException.class,
-            () -> containerImporter.importContainer(containerId,
+            () -> importer.importContainer(containerId,
                 tarFile.toPath(), null, NO_COMPRESSION));
     Assertions.assertTrue(scException.getMessage().
         contains("Container checksum error"));
   }
 
-  private File containerTarFile(
-      long containerId, ContainerData containerData) throws IOException {
+  @Test
+  public void testImportContainerTriggersOnDemandScanner() throws Exception {
+    // create containerImporter object
+    HddsVolume targetVolume = mock(HddsVolume.class);
+    doNothing().when(targetVolume).incrementUsedSpace(anyLong());
+
+    // import the container
+    File tarFile = containerTarFile(containerId, containerData);
+    containerImporter.importContainer(containerId, tarFile.toPath(),
+        targetVolume, NO_COMPRESSION);
+
+    verify(containerSet, atLeastOnce()).scanContainer(containerId, "Imported container");
+  }
+
+  @Test
+  public void testImportContainerFailureTriggersVolumeScan() throws Exception {
+    HddsVolume targetVolume = mock(HddsVolume.class);
+    try (MockedStatic<StorageVolumeUtil> mockedStatic = mockStatic(StorageVolumeUtil.class)) {
+      when(controllerMock.importContainer(any(ContainerData.class), any(), any())).thenThrow(new IOException());
+      // import the container
+      File tarFile = containerTarFile(containerId, containerData);
+      assertThrows(IOException.class, () -> containerImporter.importContainer(containerId, tarFile.toPath(),
+          targetVolume, NO_COMPRESSION));
+      mockedStatic.verify(() -> StorageVolumeUtil.onFailure(any()), times(1));
+    }
+  }
+
+  @Test
+  public void testImportContainerResetsLastScanTime() throws Exception {
+    containerData.setDataScanTimestamp(Time.monotonicNow());
+
+    // create containerImporter object
+    HddsVolume targetVolume = mock(HddsVolume.class);
+    doNothing().when(targetVolume).incrementUsedSpace(anyLong());
+
+    // import the container
+    File tarFile = containerTarFile(containerId, containerData);
+    containerImporter.importContainer(containerId, tarFile.toPath(),
+        targetVolume, NO_COMPRESSION);
+
+    assertEquals(Optional.empty(), containerData.lastDataScanTime());
+  }
+
+  private File containerTarFile(long id, ContainerData data) throws IOException {
     File yamlFile = new File(tempDir, "container.yaml");
-    ContainerDataYaml.createContainerFile(containerData, yamlFile);
+    ContainerDataYaml.createContainerFile(data, yamlFile);
     File tarFile = new File(tempDir,
-        ContainerUtils.getContainerTarName(containerId));
+        ContainerUtils.getContainerTarName(id));
     try (OutputStream output = Files.newOutputStream(tarFile.toPath())) {
       ArchiveOutputStream<TarArchiveEntry> archive = new TarArchiveOutputStream(output);
       TarArchiveEntry entry = archive.createArchiveEntry(yamlFile,

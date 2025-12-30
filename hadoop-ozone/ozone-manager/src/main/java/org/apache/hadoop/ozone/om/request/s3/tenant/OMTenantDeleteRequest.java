@@ -19,14 +19,14 @@ package org.apache.hadoop.ozone.om.request.s3.tenant;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_NOT_EMPTY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TENANT_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -59,7 +59,7 @@ import org.slf4j.LoggerFactory;
  * Handles OMTenantDelete request.
  */
 public class OMTenantDeleteRequest extends OMVolumeRequest {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(OMTenantDeleteRequest.class);
 
   public OMTenantDeleteRequest(OMRequest omRequest) {
@@ -80,7 +80,18 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
 
     // First get tenant name
     final String tenantId = omRequest.getDeleteTenantRequest().getTenantId();
-    Preconditions.checkNotNull(tenantId);
+    Objects.requireNonNull(tenantId, "tenantId == null");
+
+    // Check if there are any accessIds in the tenant.
+    // This must be done before we attempt to delete policies from Ranger.
+    if (!multiTenantManager.isTenantEmpty(tenantId)) {
+      LOG.warn("tenant: '{}' is not empty. Unable to delete the tenant",
+          tenantId);
+      throw new OMException("Tenant '" + tenantId + "' is not empty. " +
+          "All accessIds associated to this tenant must be revoked before " +
+          "the tenant can be deleted. See `ozone tenant user revoke`",
+          TENANT_NOT_EMPTY);
+    }
 
     // Get tenant object by tenant name
     final Tenant tenantObj = multiTenantManager.getTenantFromDBById(tenantId);
@@ -138,7 +149,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
       final OmDBTenantState dbTenantState =
           omMetadataManager.getTenantStateTable().get(tenantId);
       volumeName = dbTenantState.getBucketNamespaceName();
-      Preconditions.checkNotNull(volumeName);
+      Objects.requireNonNull(volumeName, "volumeName == null");
 
       LOG.debug("Tenant '{}' has volume '{}'", tenantId, volumeName);
       // decVolumeRefCount is true if volumeName is not empty string
@@ -148,16 +159,6 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
       mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volumeName));
       acquiredVolumeLock = getOmLockDetails().isLockAcquired();
-
-      // Check if there are any accessIds in the tenant
-      if (!ozoneManager.getMultiTenantManager().isTenantEmpty(tenantId)) {
-        LOG.warn("tenant: '{}' is not empty. Unable to delete the tenant",
-            tenantId);
-        throw new OMException("Tenant '" + tenantId + "' is not empty. " +
-            "All accessIds associated to this tenant must be revoked before " +
-            "the tenant can be deleted. See `ozone tenant user revoke`",
-            TENANT_NOT_EMPTY);
-      }
 
       // Invalidate cache entry
       omMetadataManager.getTenantStateTable().addCacheEntry(
@@ -173,9 +174,10 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
               volumeName, null, null);
         }
 
-        omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName);
-        // Decrement volume ref count
-        omVolumeArgs.decRefCount();
+        omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName)
+            .toBuilder()
+            .decRefCount()
+            .build();
 
         // Update omVolumeArgs
         final String dbVolumeKey = omMetadataManager.getVolumeKey(volumeName);

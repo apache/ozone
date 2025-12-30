@@ -78,6 +78,11 @@
         <property name="max" value="120"/>
         <property name="ignorePattern" value="^package.*|^import.*|a href|href|http://|https://|ftp://"/>
     </module>
+    <module name="RegexpMultiline">
+        <property name="format" value="Preconditions\s*\.\s*checkNotNull"/>
+        <property name="matchAcrossLines" value="true"/>
+        <property name="message" value="Use Objects.requireNonNull instead of Preconditions.checkNotNull"/>
+    </module>
     <module name="TreeWalker">
         <module name="SuppressWarningsHolder"/>
         <module name="SuppressionCommentFilter"/>
@@ -112,7 +117,8 @@
             <property name="regexp" value="true"/>
             <property name="illegalPkgs" value="^sun\..*, ^.*\.relocated\..*, ^.*\.shaded\..*"/>
             <property name="illegalClasses"
-                      value="^org.apache.hadoop.test.(GenericTestUtils|LambdaTestUtils|TimedOutTestsListener)"/>
+                      value="^org.apache.hadoop.test.(GenericTestUtils|LambdaTestUtils|TimedOutTestsListener)
+                      |^org.apache.hadoop.fs.CommonConfigurationKeys"/>
         </module>
         <module name="RedundantImport"/>
         <module name="UnusedImports"/>
@@ -134,6 +140,14 @@
         <!-- Checks for whitespace                               -->
         <!-- See http://checkstyle.sf.net/config_whitespace.html -->
         <module name="EmptyForIteratorPad"/>
+        <module name="EmptyLineSeparator">
+            <property name="tokens"
+                      value="PACKAGE_DEF, IMPORT, STATIC_IMPORT, CLASS_DEF, INTERFACE_DEF, ENUM_DEF,
+                        STATIC_INIT, INSTANCE_INIT, METHOD_DEF, CTOR_DEF, VARIABLE_DEF, RECORD_DEF,
+                        COMPACT_CTOR_DEF"/>
+            <property name="allowNoEmptyLineBetweenFields" value="true"/>
+            <property name="allowMultipleEmptyLines" value="false"/>
+        </module>
         <module name="MethodParamPad"/>
         <module name="NoWhitespaceAfter"/>
         <module name="NoWhitespaceBefore"/>

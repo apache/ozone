@@ -24,7 +24,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test for ResourceCache.
@@ -66,19 +65,16 @@ public class TestResourceCache {
   }
 
   @Test
-  @Timeout(5)
   public void testRemove() throws Exception {
     testRemove(cache -> cache.remove(2), 2);
   }
 
   @Test
-  @Timeout(5)
   public void testRemoveIf() throws Exception {
     testRemove(cache -> cache.removeIf(k -> k <= 2), 1, 2);
   }
 
   @Test
-  @Timeout(5)
   public void testClear() throws Exception {
     testRemove(Cache::clear, 1, 2, 3);
   }

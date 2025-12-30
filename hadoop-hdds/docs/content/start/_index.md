@@ -56,7 +56,7 @@ You can try out Ozone using docker hub without downloading the official release.
  Apache Ozone can also be run from the official release packages. Along with the official source releases, we also release a set of convenience binary packages. It is easy to run these binaries in different configurations.
 <br />
   {{<card title="Ozone on a physical cluster" link="start/OnPrem" link-text="On-Prem Ozone Cluster" image="start/hadoop.png">}}
-Ozone is designed to work concurrently with HDFS. The physical cluster instructions explain each component of Ozone and how to deploy with maximum control.
+Ozone is optimized for physical hosts. The physical cluster instructions explain each component of Ozone and how to deploy with maximum control.
   {{</card>}}
 
   {{<card title="Ozone on K8s" link="start/Kubernetes" link-text="Kubernetes" image="start/k8s.png">}}

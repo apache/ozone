@@ -98,6 +98,7 @@ public class OMException extends IOException {
   public String toString() {
     return result + " " + super.toString();
   }
+
   /**
    * Error codes to make it easy to decode these exceptions.
    */
@@ -272,6 +273,7 @@ public class OMException extends IOException {
     KEY_UNDER_LEASE_RECOVERY,
     KEY_ALREADY_CLOSED,
     KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD,
+    TOO_MANY_SNAPSHOTS,
     LIFECYCLE_CONFIGURATION_NOT_FOUND,
     UPDATE_ID_NOT_MATCH
   }

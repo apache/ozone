@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -51,6 +52,7 @@ public class SCMNodeStorageStatMap implements SCMNodeStorageStatMXBean {
   private final double criticalUtilizationThreshold;
 
   private final Map<UUID, Set<StorageLocationReport>> scmNodeStorageReportMap;
+
   /**
    * constructs the scmNodeStorageReportMap object.
    */
@@ -84,7 +86,7 @@ public class SCMNodeStorageStatMap implements SCMNodeStorageStatMXBean {
    * @return True if this is tracked, false if this map does not know about it.
    */
   public boolean isKnownDatanode(UUID datanodeID) {
-    Preconditions.checkNotNull(datanodeID);
+    Objects.requireNonNull(datanodeID, "datanodeID == null");
     return scmNodeStorageReportMap.containsKey(datanodeID);
   }
 
@@ -98,8 +100,6 @@ public class SCMNodeStorageStatMap implements SCMNodeStorageStatMXBean {
         .collect(Collectors.toList());
   }
 
-
-
   /**
    * Insert a new datanode into Node2Container Map.
    *
@@ -108,9 +108,9 @@ public class SCMNodeStorageStatMap implements SCMNodeStorageStatMXBean {
    */
   public void insertNewDatanode(UUID datanodeID,
       Set<StorageLocationReport> report) throws SCMException {
-    Preconditions.checkNotNull(report);
+    Objects.requireNonNull(report, "report == null");
     Preconditions.checkState(!report.isEmpty());
-    Preconditions.checkNotNull(datanodeID);
+    Objects.requireNonNull(datanodeID, "datanodeID == null");
     synchronized (scmNodeStorageReportMap) {
       if (isKnownDatanode(datanodeID)) {
         throw new SCMException("Node already exists in the map",
@@ -130,8 +130,8 @@ public class SCMNodeStorageStatMap implements SCMNodeStorageStatMXBean {
    */
   public void updateDatanodeMap(UUID datanodeID,
       Set<StorageLocationReport> report) throws SCMException {
-    Preconditions.checkNotNull(datanodeID);
-    Preconditions.checkNotNull(report);
+    Objects.requireNonNull(datanodeID, "datanodeID == null");
+    Objects.requireNonNull(report, "report == null");
     Preconditions.checkState(!report.isEmpty());
     synchronized (scmNodeStorageReportMap) {
       if (!scmNodeStorageReportMap.containsKey(datanodeID)) {
@@ -144,8 +144,8 @@ public class SCMNodeStorageStatMap implements SCMNodeStorageStatMXBean {
   public StorageReportResult processNodeReport(UUID datanodeID,
       StorageContainerDatanodeProtocolProtos.NodeReportProto nodeReport)
       throws IOException {
-    Preconditions.checkNotNull(datanodeID);
-    Preconditions.checkNotNull(nodeReport);
+    Objects.requireNonNull(datanodeID, "datanodeID == null");
+    Objects.requireNonNull(nodeReport, "nodeReport == null");
 
     long totalCapacity = 0;
     long totalRemaining = 0;
@@ -292,7 +292,7 @@ public class SCMNodeStorageStatMap implements SCMNodeStorageStatMXBean {
    * @throws SCMException in case the dataNode is not found in the map.
    */
   public void removeDatanode(UUID datanodeID) throws SCMException {
-    Preconditions.checkNotNull(datanodeID);
+    Objects.requireNonNull(datanodeID, "datanodeID == null");
     synchronized (scmNodeStorageReportMap) {
       if (!scmNodeStorageReportMap.containsKey(datanodeID)) {
         throw new SCMException("No such datanode", NO_SUCH_DATANODE);
@@ -311,7 +311,6 @@ public class SCMNodeStorageStatMap implements SCMNodeStorageStatMXBean {
   public Set<StorageLocationReport> getStorageVolumes(UUID datanodeID) {
     return scmNodeStorageReportMap.get(datanodeID);
   }
-
 
   /**
    * Truncate to 4 digits since uncontrolled precision is some times
@@ -332,6 +331,7 @@ public class SCMNodeStorageStatMap implements SCMNodeStorageStatMXBean {
         truncateDecimals(scmUsed / (double) capacity);
     return scmUsedRatio;
   }
+
   /**
    * Results possible from processing a Node report by
    * Node2ContainerMapper.

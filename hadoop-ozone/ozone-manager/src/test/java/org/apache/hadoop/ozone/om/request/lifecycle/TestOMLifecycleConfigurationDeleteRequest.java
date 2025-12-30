@@ -15,7 +15,6 @@
  * limitations under the License.
  */
 
-
 package org.apache.hadoop.ozone.om.request.lifecycle;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;

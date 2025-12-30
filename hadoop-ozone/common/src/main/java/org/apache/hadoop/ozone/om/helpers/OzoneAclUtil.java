@@ -26,15 +26,15 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
-import org.apache.hadoop.ozone.security.acl.OzoneAclConfig;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
@@ -49,9 +49,6 @@ public final class OzoneAclUtil {
   private OzoneAclUtil() {
   }
 
-  private static ACLType[] userRights;
-  private static ACLType[] groupRights;
-
   /**
    * Helper function to get default access acl list for current user.
    *
@@ -59,19 +56,14 @@ public final class OzoneAclUtil {
    * @param conf current configuration
    * @return list of OzoneAcls
    * */
-  public static List<OzoneAcl> getDefaultAclList(UserGroupInformation ugi, OzoneConfiguration conf) {
+  public static List<OzoneAcl> getDefaultAclList(UserGroupInformation ugi, OmConfig conf) {
     // Get default acl rights for user and group.
-    if (userRights == null || groupRights == null) {
-      OzoneAclConfig aclConfig = conf.getObject(OzoneAclConfig.class);
-      userRights = aclConfig.getUserDefaultRights();
-      groupRights = aclConfig.getGroupDefaultRights();
-    }
     List<OzoneAcl> listOfAcls = new ArrayList<>();
     // User ACL.
-    listOfAcls.add(OzoneAcl.of(USER, ugi.getShortUserName(), ACCESS, userRights));
+    listOfAcls.add(OzoneAcl.of(USER, ugi.getShortUserName(), ACCESS, conf.getUserDefaultRights()));
     try {
       String groupName = ugi.getPrimaryGroupName();
-      listOfAcls.add(OzoneAcl.of(GROUP, groupName, ACCESS, groupRights));
+      listOfAcls.add(OzoneAcl.of(GROUP, groupName, ACCESS, conf.getGroupDefaultRights()));
     } catch (IOException e) {
       // do nothing, since user has the permission, user can add ACL for selected groups later.
       LOG.warn("Failed to get primary group from user {}", ugi);
@@ -159,6 +151,11 @@ public final class OzoneAclUtil {
     return false;
   }
 
+  public static boolean inheritDefaultAcls(AclListBuilder acls,
+      List<OzoneAcl> parentAcls, OzoneAcl.AclScope scope) {
+    return inheritDefaultAcls(acls::add, parentAcls, scope);
+  }
+
   /**
    * Helper function to inherit default ACL with given {@code scope} for child object.
    * @param acls child object ACL list
@@ -167,6 +164,11 @@ public final class OzoneAclUtil {
    * @return true if any ACL was inherited from parent, false otherwise
    */
   public static boolean inheritDefaultAcls(List<OzoneAcl> acls,
+      List<OzoneAcl> parentAcls, OzoneAcl.AclScope scope) {
+    return inheritDefaultAcls(acl -> addAcl(acls, acl), parentAcls, scope);
+  }
+
+  private static boolean inheritDefaultAcls(Predicate<OzoneAcl> op,
       List<OzoneAcl> parentAcls, OzoneAcl.AclScope scope) {
     if (parentAcls != null && !parentAcls.isEmpty()) {
       Stream<OzoneAcl> aclStream = parentAcls.stream()
@@ -177,10 +179,11 @@ public final class OzoneAclUtil {
       }
 
       List<OzoneAcl> inheritedAcls = aclStream.collect(Collectors.toList());
-      if (!inheritedAcls.isEmpty()) {
-        inheritedAcls.forEach(acl -> addAcl(acls, acl));
-        return true;
+      boolean changed = false;
+      for (OzoneAcl acl : inheritedAcls) {
+        changed |= op.test(acl);
       }
+      return changed;
     }
 
     return false;
@@ -237,6 +240,15 @@ public final class OzoneAclUtil {
 
     existingAcls.add(acl);
     return true;
+  }
+
+  public static boolean addAllAcl(List<OzoneAcl> existingAcls, List<OzoneAcl> acls) {
+    // TOOD optimize
+    boolean changed = false;
+    for (OzoneAcl acl : acls) {
+      changed |= addAcl(existingAcls, acl);
+    }
+    return changed;
   }
 
   /**

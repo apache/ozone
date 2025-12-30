@@ -29,6 +29,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,25 +38,15 @@ import org.slf4j.LoggerFactory;
  * A thread safe class that implements InnerNode interface.
  */
 public class InnerNodeImpl extends NodeImpl implements InnerNode {
-  protected static class Factory implements InnerNode.Factory<InnerNodeImpl> {
-    protected Factory() { }
-
-    @Override
-    public InnerNodeImpl newInnerNode(String name, String location,
-        InnerNode parent, int level, int cost) {
-      return new InnerNodeImpl(name, location, parent, level, cost);
-    }
-  }
+  // LOGGER
+  private static final Logger LOG = LoggerFactory.getLogger(InnerNodeImpl.class);
 
   public static final Factory FACTORY = new Factory();
   // a map of node's network name to Node for quick search and keep
   // the insert order
-  private HashMap<String, Node> childrenMap =
-      new LinkedHashMap<String, Node>();
+  private HashMap<String, Node> childrenMap = new LinkedHashMap<String, Node>();
   // number of descendant leaves under this node
   private int numOfLeaves;
-  // LOGGER
-  public static final Logger LOG = LoggerFactory.getLogger(InnerNodeImpl.class);
 
   /**
    * Construct an InnerNode from its name, network location, parent, level and
@@ -288,7 +279,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
       // find the next ancestor node
       String ancestorName = getNextLevelAncestorName(node);
       InnerNodeImpl childNode = (InnerNodeImpl)childrenMap.get(ancestorName);
-      Preconditions.checkNotNull(childNode, "InnerNode is deleted before leaf");
+      Objects.requireNonNull(childNode, "InnerNode is deleted before leaf");
       // remove node from the parent node
       childNode.remove(node);
       // if the parent node has no children, remove the parent node too
@@ -686,5 +677,15 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
           excludedScopeNode.getNumOfLeaves());
     }
     return nodeCounts;
+  }
+
+  protected static class Factory implements InnerNode.Factory<InnerNodeImpl> {
+    protected Factory() { }
+
+    @Override
+    public InnerNodeImpl newInnerNode(String name, String location,
+        InnerNode parent, int level, int cost) {
+      return new InnerNodeImpl(name, location, parent, level, cost);
+    }
   }
 }

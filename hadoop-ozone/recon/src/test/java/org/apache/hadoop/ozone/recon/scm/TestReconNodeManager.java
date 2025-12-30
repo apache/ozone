@@ -36,7 +36,6 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
@@ -72,7 +71,6 @@ public class TestReconNodeManager {
 
   private OzoneConfiguration conf;
   private DBStore store;
-  private ReconStorageConfig reconStorageConfig;
   private HDDSLayoutVersionManager versionManager;
   private ReconContext reconContext;
 
@@ -82,7 +80,7 @@ public class TestReconNodeManager {
     conf.set(OZONE_METADATA_DIRS, temporaryFolder.toAbsolutePath().toString());
     conf.set(OZONE_SCM_NAMES, "localhost");
     ReconUtils reconUtils = new ReconUtils();
-    reconStorageConfig = new ReconStorageConfig(conf, reconUtils);
+    ReconStorageConfig reconStorageConfig = new ReconStorageConfig(conf, reconUtils);
     versionManager = new HDDSLayoutVersionManager(
         reconStorageConfig.getLayoutVersion());
     store = DBStoreBuilder.createDBStore(conf, ReconSCMDBDefinition.get());
@@ -101,8 +99,7 @@ public class TestReconNodeManager {
         new ReconStorageConfig(conf, reconUtils);
     EventQueue eventQueue = new EventQueue();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
-    Table<UUID, DatanodeDetails> nodeTable =
-        ReconSCMDBDefinition.NODES.getTable(store);
+    final Table<DatanodeID, DatanodeDetails> nodeTable = ReconSCMDBDefinition.NODES.getTable(store);
     ReconNodeManager reconNodeManager = new ReconNodeManager(conf,
         scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager, reconContext);
     assertThat(reconNodeManager.getAllNodes()).isEmpty();
@@ -130,8 +127,7 @@ public class TestReconNodeManager {
         new ReconStorageConfig(conf, new ReconUtils());
     EventQueue eventQueue = new EventQueue();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
-    Table<UUID, DatanodeDetails> nodeTable =
-        ReconSCMDBDefinition.NODES.getTable(store);
+    final Table<DatanodeID, DatanodeDetails> nodeTable = ReconSCMDBDefinition.NODES.getTable(store);
     ReconNodeManager reconNodeManager = new ReconNodeManager(conf,
         scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager, reconContext);
     ReconNewNodeHandler reconNewNodeHandler =
@@ -153,12 +149,12 @@ public class TestReconNodeManager {
     // interface, then they should be filtered out and not returned to the DN
     // when it heartbeats.
     // This command should never be returned by Recon
-    reconNodeManager.addDatanodeCommand(datanodeDetails.getUuid(),
+    reconNodeManager.addDatanodeCommand(datanodeDetails.getID(),
         new SetNodeOperationalStateCommand(1234,
         DECOMMISSIONING, 0));
 
     // This one should be returned
-    reconNodeManager.addDatanodeCommand(datanodeDetails.getUuid(),
+    reconNodeManager.addDatanodeCommand(datanodeDetails.getID(),
         new ReregisterCommand());
 
     // OperationalState sanity check
@@ -212,8 +208,7 @@ public class TestReconNodeManager {
         new ReconStorageConfig(conf, new ReconUtils());
     EventQueue eventQueue = new EventQueue();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
-    Table<UUID, DatanodeDetails> nodeTable =
-        ReconSCMDBDefinition.NODES.getTable(store);
+    final Table<DatanodeID, DatanodeDetails> nodeTable = ReconSCMDBDefinition.NODES.getTable(store);
     ReconNodeManager reconNodeManager = new ReconNodeManager(conf,
         scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager, reconContext);
 
@@ -246,8 +241,7 @@ public class TestReconNodeManager {
         new ReconStorageConfig(conf, new ReconUtils());
     EventQueue eventQueue = new EventQueue();
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
-    Table<UUID, DatanodeDetails> nodeTable =
-        ReconSCMDBDefinition.NODES.getTable(store);
+    final Table<DatanodeID, DatanodeDetails> nodeTable = ReconSCMDBDefinition.NODES.getTable(store);
     ReconNodeManager reconNodeManager = new ReconNodeManager(conf,
         scmStorageConfig, eventQueue, clusterMap, nodeTable, versionManager, reconContext);
     ReconNewNodeHandler reconNewNodeHandler =

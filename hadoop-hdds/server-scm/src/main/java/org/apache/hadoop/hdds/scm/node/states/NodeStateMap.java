@@ -21,7 +21,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Predicate;
@@ -34,51 +33,13 @@ import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 
 /**
- * Maintains the state of datanodes in SCM. This class should only be used by
- * NodeStateManager to maintain the state. If anyone wants to change the
- * state of a node they should call NodeStateManager, do not directly use
- * this class.
+ * Map: {@link DatanodeID} to {@link DatanodeEntry}.
  * <p>
- * Concurrency consideration:
- *   - thread-safe
+ * This class is thread-safe.
  */
 public class NodeStateMap {
-  private static class Entry {
-    private final DatanodeInfo info;
-    private final Set<ContainerID> containers = new TreeSet<>();
-
-    Entry(DatanodeInfo info) {
-      this.info = info;
-    }
-
-    DatanodeInfo getInfo() {
-      return info;
-    }
-
-    int getContainerCount() {
-      return containers.size();
-    }
-
-    Set<ContainerID> copyContainers() {
-      return new TreeSet<>(containers);
-    }
-
-    void add(ContainerID containerId) {
-      containers.add(containerId);
-    }
-
-    void remove(ContainerID containerID) {
-      containers.remove(containerID);
-    }
-
-    void setContainersForTesting(Set<ContainerID> newContainers) {
-      containers.clear();
-      containers.addAll(newContainers);
-    }
-  }
-
   /** Map: {@link DatanodeID} -> ({@link DatanodeInfo}, {@link ContainerID}s). */
-  private final Map<DatanodeID, Entry> nodeMap = new HashMap<>();
+  private final Map<DatanodeID, DatanodeEntry> nodeMap = new HashMap<>();
 
   private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
@@ -99,7 +60,7 @@ public class NodeStateMap {
       if (nodeMap.containsKey(id)) {
         throw new NodeAlreadyExistsException(id);
       }
-      nodeMap.put(id, new Entry(datanode));
+      nodeMap.put(id, new DatanodeEntry(datanode));
     } finally {
       lock.writeLock().unlock();
     }
@@ -131,7 +92,7 @@ public class NodeStateMap {
       if (oldInfo == null) {
         throw new NodeNotFoundException(id);
       }
-      nodeMap.put(id, new Entry(datanode));
+      nodeMap.put(id, new DatanodeEntry(datanode));
     } finally {
       lock.writeLock().unlock();
     }
@@ -212,7 +173,7 @@ public class NodeStateMap {
     lock.readLock().lock();
     try {
       return nodeMap.values().stream()
-          .map(Entry::getInfo)
+          .map(DatanodeEntry::getInfo)
           .collect(Collectors.toList());
     } finally {
       lock.readLock().unlock();
@@ -383,8 +344,8 @@ public class NodeStateMap {
    * @return the entry mapping to the given id.
    * @throws NodeNotFoundException If the node is missing.
    */
-  private Entry getExisting(DatanodeID id) throws NodeNotFoundException {
-    final Entry entry = nodeMap.get(id);
+  private DatanodeEntry getExisting(DatanodeID id) throws NodeNotFoundException {
+    final DatanodeEntry entry = nodeMap.get(id);
     if (entry == null) {
       throw new NodeNotFoundException(id);
     }
@@ -396,7 +357,7 @@ public class NodeStateMap {
     lock.readLock().lock();
     try {
       count = nodeMap.values().stream()
-          .map(Entry::getInfo)
+          .map(DatanodeEntry::getInfo)
           .filter(filter)
           .count();
     } finally {
@@ -412,7 +373,7 @@ public class NodeStateMap {
     lock.readLock().lock();
     try {
       return nodeMap.values().stream()
-          .map(Entry::getInfo)
+          .map(DatanodeEntry::getInfo)
           .filter(filter)
           .collect(Collectors.toList());
     } finally {

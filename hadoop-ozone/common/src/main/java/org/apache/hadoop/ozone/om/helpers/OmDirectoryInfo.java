@@ -17,12 +17,12 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import java.util.LinkedList;
+import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import net.jcip.annotations.Immutable;
 import org.apache.hadoop.hdds.utils.db.Codec;
-import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -32,61 +32,88 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Directo
 /**
  * This class represents the directory information by keeping each component
  * in the user given path and a pointer to its parent directory element in the
- * path. Also, it stores directory node related metdata details.
+ * path. Also, it stores directory node related metadata details.
  */
-public class OmDirectoryInfo extends WithParentObjectId
-    implements CopyObject<OmDirectoryInfo> {
+@Immutable
+public final class OmDirectoryInfo extends WithParentObjectId {
+
   private static final Codec<OmDirectoryInfo> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(DirectoryInfo.getDefaultInstance()),
       OmDirectoryInfo::getFromProtobuf,
       OmDirectoryInfo::getProtobuf,
-      OmDirectoryInfo.class);
+      OmDirectoryInfo.class,
+      DelegatedCodec.CopyType.SHALLOW);
+
+  private final String name; // directory name
+  private final String owner;
+
+  private final long creationTime;
+  private final long modificationTime;
+
+  private final ImmutableList<OzoneAcl> acls;
+
+  private OmDirectoryInfo(Builder builder) {
+    super(builder);
+    this.name = builder.name;
+    this.owner = builder.owner;
+    this.acls = builder.acls.build();
+    this.creationTime = builder.creationTime;
+    this.modificationTime = builder.modificationTime;
+  }
 
   public static Codec<OmDirectoryInfo> getCodec() {
     return CODEC;
   }
 
-  private final String name; // directory name
-  private String owner;
-
-  private final long creationTime;
-  private final long modificationTime;
-
-  private final List<OzoneAcl> acls;
-
-  public OmDirectoryInfo(Builder builder) {
-    super(builder);
-    this.name = builder.name;
-    this.owner = builder.owner;
-    this.acls = builder.acls;
-    this.creationTime = builder.creationTime;
-    this.modificationTime = builder.modificationTime;
+  /** @return new {@code Builder} with default values */
+  public static Builder newBuilder() {
+    return new Builder();
   }
 
-  /**
-   * Returns new builder class that builds a OmPrefixInfo.
-   *
-   * @return Builder
-   */
-  public static OmDirectoryInfo.Builder newBuilder() {
-    return new OmDirectoryInfo.Builder();
+  /** @return new {@code Builder} with values set from this {@code OmDirectoryInfo} */
+  public Builder toBuilder() {
+    return new Builder(this);
+  }
+
+  public static Builder builderFromOmKeyInfo(OmKeyInfo keyInfo) {
+    return new Builder(keyInfo);
+  }
+
+  public OmKeyInfo.Builder toKeyInfoBuilder() {
+    return OmKeyInfo.builderFromOmDirectoryInfo(this);
   }
 
   /**
    * Builder for Directory Info.
    */
-  public static class Builder extends WithParentObjectId.Builder {
+  public static final class Builder extends WithParentObjectId.Builder<OmDirectoryInfo> {
     private String name;
     private String owner;
 
     private long creationTime;
     private long modificationTime;
 
-    private final List<OzoneAcl> acls;
+    private final AclListBuilder acls;
 
-    public Builder() {
-      //Default values
-      this.acls = new LinkedList<>();
+    private Builder() {
+      this.acls = AclListBuilder.empty();
+    }
+
+    private Builder(OmDirectoryInfo obj) {
+      super(obj);
+      this.name = obj.name;
+      this.owner = obj.owner;
+      this.creationTime = obj.creationTime;
+      this.modificationTime = obj.modificationTime;
+      this.acls = AclListBuilder.of(obj.acls);
+    }
+
+    private Builder(OmKeyInfo keyInfo) {
+      super(keyInfo);
+      this.name = keyInfo.getFileName();
+      this.creationTime = keyInfo.getCreationTime();
+      this.modificationTime = keyInfo.getModificationTime();
+      this.acls = AclListBuilder.of(keyInfo.getAcls());
     }
 
     @Override
@@ -128,22 +155,7 @@ public class OmDirectoryInfo extends WithParentObjectId
     }
 
     public Builder setAcls(List<OzoneAcl> listOfAcls) {
-      if (listOfAcls != null) {
-        this.acls.addAll(listOfAcls);
-      }
-      return this;
-    }
-
-    public Builder addAcl(OzoneAcl ozoneAcl) {
-      if (ozoneAcl != null) {
-        this.acls.add(ozoneAcl);
-      }
-      return this;
-    }
-
-    @Override
-    public Builder addMetadata(String key, String value) {
-      super.addMetadata(key, value);
+      this.acls.addAll(listOfAcls);
       return this;
     }
 
@@ -153,7 +165,8 @@ public class OmDirectoryInfo extends WithParentObjectId
       return this;
     }
 
-    public OmDirectoryInfo build() {
+    @Override
+    protected OmDirectoryInfo buildObject() {
       return new OmDirectoryInfo(this);
     }
   }
@@ -183,7 +196,7 @@ public class OmDirectoryInfo extends WithParentObjectId
     return modificationTime;
   }
 
-  public List<OzoneAcl> getAcls() {
+  public ImmutableList<OzoneAcl> getAcls() {
     return acls;
   }
 
@@ -191,51 +204,47 @@ public class OmDirectoryInfo extends WithParentObjectId
    * Creates DirectoryInfo protobuf from OmDirectoryInfo.
    */
   public DirectoryInfo getProtobuf() {
-    final DirectoryInfo.Builder pib =
-            DirectoryInfo.newBuilder().setName(name)
-                    .setCreationTime(creationTime)
-                    .setModificationTime(modificationTime)
-                    .addAllMetadata(KeyValueUtil.toProtobuf(getMetadata()))
-                    .setObjectID(getObjectID())
-                    .setUpdateID(getUpdateID())
-                    .setParentID(getParentObjectID());
+    final DirectoryInfo.Builder builder = DirectoryInfo.newBuilder()
+        .setName(name)
+        .setCreationTime(creationTime)
+        .setModificationTime(modificationTime)
+        .addAllAcls(OzoneAclUtil.toProtobuf(acls))
+        .addAllMetadata(KeyValueUtil.toProtobuf(getMetadata()))
+        .setObjectID(getObjectID())
+        .setUpdateID(getUpdateID())
+        .setParentID(getParentObjectID());
     if (owner != null) {
-      pib.setOwnerName(owner);
+      builder.setOwnerName(owner);
     }
-    if (acls != null) {
-      pib.addAllAcls(OzoneAclUtil.toProtobuf(acls));
-    }
-    return pib.build();
+    return builder.build();
   }
 
   /**
-   * Parses DirectoryInfo protobuf and creates OmPrefixInfo.
-   * @param dirInfo
+   * Parses DirectoryInfo protobuf and creates OmDirectoryInfo Builder.
+   * @return Builder instance
+   */
+  public static Builder builderFromProtobuf(DirectoryInfo dirInfo) {
+    Builder builder = OmDirectoryInfo.newBuilder()
+        .setName(dirInfo.getName())
+        .setCreationTime(dirInfo.getCreationTime())
+        .setModificationTime(dirInfo.getModificationTime())
+        .setObjectID(dirInfo.getObjectID())
+        .setUpdateID(dirInfo.getUpdateID())
+        .setParentObjectID(dirInfo.getParentID())
+        .setAcls(OzoneAclUtil.fromProtobuf(dirInfo.getAclsList()))
+        .addAllMetadata(KeyValueUtil.getFromProtobuf(dirInfo.getMetadataList()));
+    if (dirInfo.hasOwnerName()) {
+      builder.setOwner(dirInfo.getOwnerName());
+    }
+    return builder;
+  }
+
+  /**
+   * Parses DirectoryInfo protobuf and creates OmDirectoryInfo.
    * @return instance of OmDirectoryInfo
    */
   public static OmDirectoryInfo getFromProtobuf(DirectoryInfo dirInfo) {
-    OmDirectoryInfo.Builder opib = OmDirectoryInfo.newBuilder()
-            .setName(dirInfo.getName())
-            .setCreationTime(dirInfo.getCreationTime())
-            .setModificationTime(dirInfo.getModificationTime())
-            .setAcls(OzoneAclUtil.fromProtobuf(dirInfo.getAclsList()));
-    if (dirInfo.getMetadataList() != null) {
-      opib.addAllMetadata(KeyValueUtil
-              .getFromProtobuf(dirInfo.getMetadataList()));
-    }
-    if (dirInfo.hasObjectID()) {
-      opib.setObjectID(dirInfo.getObjectID());
-    }
-    if (dirInfo.hasParentID()) {
-      opib.setParentObjectID(dirInfo.getParentID());
-    }
-    if (dirInfo.hasUpdateID()) {
-      opib.setUpdateID(dirInfo.getUpdateID());
-    }
-    if (dirInfo.hasOwnerName()) {
-      opib.setOwner(dirInfo.getOwnerName());
-    }
-    return opib.build();
+    return builderFromProtobuf(dirInfo).build();
   }
 
   @Override
@@ -247,41 +256,19 @@ public class OmDirectoryInfo extends WithParentObjectId
       return false;
     }
     OmDirectoryInfo omDirInfo = (OmDirectoryInfo) o;
-    return creationTime == omDirInfo.creationTime &&
-            modificationTime == omDirInfo.modificationTime &&
-            name.equals(omDirInfo.name) &&
-            Objects.equals(owner, omDirInfo.owner) &&
-            Objects.equals(getMetadata(), omDirInfo.getMetadata()) &&
-            Objects.equals(acls, omDirInfo.acls) &&
-            getObjectID() == omDirInfo.getObjectID() &&
-            getUpdateID() == omDirInfo.getUpdateID() &&
-            getParentObjectID() == omDirInfo.getParentObjectID();
+    return creationTime == omDirInfo.creationTime
+        && modificationTime == omDirInfo.modificationTime
+        && getObjectID() == omDirInfo.getObjectID()
+        && getUpdateID() == omDirInfo.getUpdateID()
+        && getParentObjectID() == omDirInfo.getParentObjectID()
+        && Objects.equals(name, omDirInfo.name)
+        && Objects.equals(owner, omDirInfo.owner)
+        && Objects.equals(getMetadata(), omDirInfo.getMetadata())
+        && Objects.equals(acls, omDirInfo.acls);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(getObjectID(), getParentObjectID(), name);
-  }
-
-  /**
-   * Return a new copy of the object.
-   */
-  @Override
-  public OmDirectoryInfo copyObject() {
-    OmDirectoryInfo.Builder builder = new Builder()
-            .setName(name)
-            .setOwner(owner)
-            .setCreationTime(creationTime)
-            .setModificationTime(modificationTime)
-            .setAcls(acls)
-            .setParentObjectID(getParentObjectID())
-            .setObjectID(getObjectID())
-            .setUpdateID(getUpdateID());
-
-    if (getMetadata() != null) {
-      builder.addAllMetadata(getMetadata());
-    }
-
-    return builder.build();
   }
 }

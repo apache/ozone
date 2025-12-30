@@ -17,6 +17,8 @@
 
 #suite:compat-new
 
+set -u -o pipefail
+
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
@@ -24,4 +26,5 @@ export COMPOSE_DIR
 source "${COMPOSE_DIR}/lib.sh"
 
 # current cluster with various clients
-COMPOSE_FILE=new-cluster.yaml:clients.yaml cluster_version=${current_version} test_cross_compatibility ${old_versions} ${current_version}
+export COMPOSE_FILE=new-cluster.yaml:clients.yaml
+cluster_version=${current_version} test_cross_compatibility ${old_versions} ${current_version}

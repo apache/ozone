@@ -20,10 +20,11 @@ package org.apache.hadoop.ozone.container.common.impl;
 import java.io.IOException;
 import net.jcip.annotations.Immutable;
 import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageTypeProto;
 import org.apache.hadoop.ozone.container.common.interfaces.StorageLocationReportMXBean;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage;
 
 /**
  * Storage location stats of datanodes that provide back store for containers.
@@ -41,6 +42,7 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
   private final long freeSpaceToSpare;
   private final StorageType storageType;
   private final String storageLocation;
+  private final long reserved;
 
   private StorageLocationReport(Builder builder) {
     this.id = builder.id;
@@ -52,6 +54,11 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
     this.freeSpaceToSpare = builder.freeSpaceToSpare;
     this.storageType = builder.storageType;
     this.storageLocation = builder.storageLocation;
+    this.reserved = builder.reserved;
+  }
+
+  public long getUsableSpace() {
+    return VolumeUsage.getUsableSpace(this);
   }
 
   @Override
@@ -132,6 +139,10 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
     return storageTypeProto;
   }
 
+  public long getReserved() { 
+    return reserved;
+  }
+
   private static StorageType getStorageType(StorageTypeProto proto) throws
       IOException {
     StorageType storageType;
@@ -174,6 +185,7 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
         .setStorageLocation(getStorageLocation())
         .setFailed(isFailed())
         .setFreeSpaceToSpare(getFreeSpaceToSpare())
+        .setReserved(getReserved())
         .build();
   }
 
@@ -224,37 +236,32 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
     if (report.hasFailed()) {
       builder.setFailed(report.getFailed());
     }
+
+    if (report.hasReserved()) {
+      builder.setReserved(report.getReserved());
+    }
     return builder.build();
   }
 
-  /**
-   * Returns the StorageLocationReport from the protoBuf message.
-   * @param report MetadataStorageReportProto
-   * @return StorageLocationReport
-   * @throws IOException in case of invalid storage type
-   */
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder(128)
+        .append('{')
+        .append(" id=").append(id)
+        .append(" dir=").append(storageLocation)
+        .append(" type=").append(storageType);
 
-  public static StorageLocationReport getMetadataFromProtobuf(
-      MetadataStorageReportProto report) throws IOException {
-    StorageLocationReport.Builder builder = StorageLocationReport.newBuilder();
-    builder.setStorageLocation(report.getStorageLocation());
-    if (report.hasCapacity()) {
-      builder.setCapacity(report.getCapacity());
-    }
-    if (report.hasScmUsed()) {
-      builder.setScmUsed(report.getScmUsed());
-    }
-    if (report.hasStorageType()) {
-      builder.setStorageType(getStorageType(report.getStorageType()));
-    }
-    if (report.hasRemaining()) {
-      builder.setRemaining(report.getRemaining());
+    if (failed) {
+      sb.append(" failed");
+    } else {
+      sb.append(" capacity=").append(capacity)
+          .append(" used=").append(scmUsed)
+          .append(" available=").append(remaining)
+          .append(" minFree=").append(freeSpaceToSpare)
+          .append(" committed=").append(committed);
     }
 
-    if (report.hasFailed()) {
-      builder.setFailed(report.getFailed());
-    }
-    return builder.build();
+    return sb.append(" }").toString();
   }
 
   /**
@@ -279,6 +286,7 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
     private long freeSpaceToSpare;
     private StorageType storageType;
     private String storageLocation;
+    private long reserved;
 
     /**
      * Sets the storageId.
@@ -386,6 +394,15 @@ public final class StorageLocationReport implements StorageLocationReportMXBean 
     public Builder setStorageLocation(String storageLocationValue) {
       this.storageLocation = storageLocationValue;
       return this;
+    }
+
+    public Builder setReserved(long reserved) { 
+      this.reserved = reserved; 
+      return this; 
+    }
+
+    public long getReserved() { 
+      return reserved;
     }
 
     /**

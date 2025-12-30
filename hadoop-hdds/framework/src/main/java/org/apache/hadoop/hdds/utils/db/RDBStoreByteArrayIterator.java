@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import java.io.IOException;
 import java.util.Arrays;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 
@@ -25,10 +24,13 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
  * RocksDB store iterator using the byte[] API.
  */
 class RDBStoreByteArrayIterator extends RDBStoreAbstractIterator<byte[]> {
+  private static byte[] copyPrefix(byte[] prefix) {
+    return prefix == null || prefix.length == 0 ? null : Arrays.copyOf(prefix, prefix.length);
+  }
+
   RDBStoreByteArrayIterator(ManagedRocksIterator iterator,
-      RDBTable table, byte[] prefix) {
-    super(iterator, table,
-        prefix == null ? null : Arrays.copyOf(prefix, prefix.length));
+      RDBTable table, byte[] prefix, IteratorType type) {
+    super(iterator, table, copyPrefix(prefix), type);
     seekToFirst();
   }
 
@@ -40,7 +42,9 @@ class RDBStoreByteArrayIterator extends RDBStoreAbstractIterator<byte[]> {
   @Override
   Table.KeyValue<byte[], byte[]> getKeyValue() {
     final ManagedRocksIterator i = getRocksDBIterator();
-    return RawKeyValue.create(i.get().key(), i.get().value());
+    final byte[] key = getType().readKey() ? i.get().key() : null;
+    final byte[] value = getType().readValue() ? i.get().value() : null;
+    return Table.newKeyValue(key, value);
   }
 
   @Override
@@ -49,7 +53,7 @@ class RDBStoreByteArrayIterator extends RDBStoreAbstractIterator<byte[]> {
   }
 
   @Override
-  void delete(byte[] key) throws IOException {
+  void delete(byte[] key) throws RocksDatabaseException {
     getRocksDBTable().delete(key);
   }
 

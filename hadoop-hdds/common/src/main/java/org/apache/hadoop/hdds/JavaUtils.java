@@ -47,7 +47,6 @@ public final class JavaUtils {
     return JAVA_SPEC_VER <= version;
   }
 
-
   /**
    * Private constructor.
    */

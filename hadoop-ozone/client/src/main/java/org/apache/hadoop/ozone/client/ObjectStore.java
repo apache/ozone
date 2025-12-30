@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -734,16 +735,73 @@ public class ObjectStore {
    * @param volumeName Name of the volume to which the snapshotted bucket belong
    * @param bucketName Name of the bucket to which the snapshots belong
    * @param jobStatus JobStatus to be used to filter the snapshot diff jobs
-   * @param listAll Option to specify whether to list all jobs or not
-   * @return a list of SnapshotDiffJob objects
+   * @param listAllStatus Option to specify whether to list all jobs regardless of status
+   * @param prevSnapshotDiffJob list snapshot diff jobs after this snapshot diff job.
+   * @return an iterator of SnapshotDiffJob objects
    * @throws IOException in case there is a failure while getting a response.
    */
-  public List<OzoneSnapshotDiff> listSnapshotDiffJobs(String volumeName,
-                                                    String bucketName,
-                                                    String jobStatus,
-                                                    boolean listAll)
-      throws IOException {
-    return proxy.listSnapshotDiffJobs(volumeName,
-        bucketName, jobStatus, listAll);
+  public Iterator<OzoneSnapshotDiff> listSnapshotDiffJobs(
+      String volumeName,
+      String bucketName,
+      String jobStatus,
+      boolean listAllStatus,
+      String prevSnapshotDiffJob
+  ) throws IOException {
+    return new SnapshotDiffJobIterator(volumeName, bucketName, jobStatus, listAllStatus, prevSnapshotDiffJob);
+  }
+
+  /**
+   * An Iterator to iterate over {@link SnapshotDiffJobIterator} list.
+   */
+  private final class SnapshotDiffJobIterator implements Iterator<OzoneSnapshotDiff> {
+    private final String volumeName;
+    private final String bucketName;
+    private final String jobStatus;
+    private final boolean listAllJobs;
+    private String lastSnapshotDiffJob;
+    private Iterator<OzoneSnapshotDiff> currentIterator;
+
+    private SnapshotDiffJobIterator(
+        String volumeName,
+        String bucketName,
+        String jobStatus,
+        boolean listAllStatus,
+        String prevSnapshotDiffJob) throws IOException {
+      this.volumeName = volumeName;
+      this.bucketName = bucketName;
+      this.jobStatus = jobStatus;
+      this.listAllJobs = listAllStatus;
+      // Initialized the currentIterator and lastSnapshotDiffJob.
+      getNextListOfSnapshotDiffJobs(prevSnapshotDiffJob);
+    }
+
+    @Override
+    public boolean hasNext() {
+      if (!currentIterator.hasNext() && StringUtils.isNotEmpty(lastSnapshotDiffJob)) {
+        try {
+          // fetch the next page if continuationToken is not null.
+          getNextListOfSnapshotDiffJobs(lastSnapshotDiffJob);
+        } catch (IOException e) {
+          LOG.error("Error retrieving next batch of list for snapshot diff jobs.", e);
+        }
+      }
+      return currentIterator.hasNext();
+    }
+
+    @Override
+    public OzoneSnapshotDiff next() {
+      if (hasNext()) {
+        return currentIterator.next();
+      }
+      throw new NoSuchElementException();
+    }
+
+    private void getNextListOfSnapshotDiffJobs(String prevSnapshotDiffJob) throws IOException {
+      ListSnapshotDiffJobResponse response = proxy.listSnapshotDiffJobs(volumeName, bucketName, jobStatus, listAllJobs,
+          prevSnapshotDiffJob, listCacheSize);
+      this.currentIterator =
+          response.getSnapshotDiffJobs().stream().map(OzoneSnapshotDiff::fromSnapshotDiffJob).iterator();
+      this.lastSnapshotDiffJob = response.getLastSnapshotDiffJob();
+    }
   }
 }

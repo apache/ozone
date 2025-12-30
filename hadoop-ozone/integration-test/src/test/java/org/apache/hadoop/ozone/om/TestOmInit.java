@@ -26,37 +26,23 @@ import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test Ozone Manager Init.
  */
-@Timeout(300)
 public class TestOmInit {
 
   private static MiniOzoneCluster cluster = null;
-  private static OMMetrics omMetrics;
   private static OzoneConfiguration conf;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
     cluster =  MiniOzoneCluster.newBuilder(conf)
         .build();
     cluster.waitForClusterToBeReady();
-    omMetrics = cluster.getOzoneManager().getMetrics();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public static void shutdown() {
     if (cluster != null) {

@@ -162,6 +162,4 @@ public class TestSCMNodeInfo {
     assertEquals("localhost:" + OZONE_SCM_DATANODE_PORT_DEFAULT,
         scmNodeInfos.get(0).getScmDatanodeAddress());
   }
-
-
 }

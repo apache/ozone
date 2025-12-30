@@ -1,0 +1,64 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+x-common-config:
+  &common-config
+  dns_search: .
+  image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
+  volumes:
+    - ../..:/opt/hadoop
+    - ../_keytabs:/etc/security/keytabs
+    - ./krb5.conf:/etc/krb5.conf
+  env_file:
+    - docker-config
+
+services:
+  s3g1:
+    hostname: s3g1
+    <<: *common-config
+    command: ["ozone","s3g"]
+    networks:
+      ozone_net:
+        ipv4_address: 172.25.0.121
+  s3g2:
+    hostname: s3g2
+    <<: *common-config
+    command: ["ozone","s3g"]
+    networks:
+      ozone_net:
+        ipv4_address: 172.25.0.122
+  s3g3:
+    hostname: s3g3
+    <<: *common-config
+    command: ["ozone","s3g"]
+    networks:
+      ozone_net:
+        ipv4_address: 172.25.0.123
+  s3g:
+    image: haproxy:lts-alpine
+    hostname: s3g
+    dns_search: .
+    volumes:
+      - ../..:/opt/hadoop
+      - ../_keytabs:/etc/security/keytabs
+      - ./krb5.conf:/etc/krb5.conf
+      - ./s3-haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
+    ports:
+      - 9878:9878
+    command: ["haproxy", "-f", "/usr/local/etc/haproxy/haproxy.cfg"]
+    networks:
+      ozone_net:
+        ipv4_address: 172.25.0.120

@@ -44,27 +44,24 @@ import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
  * This class tests the metrics of XceiverClient.
  */
-@Timeout(300)
 public class TestXceiverClientMetrics {
 
   // only for testing
   private volatile boolean breakFlag;
   private CountDownLatch latch;
 
-  private static OzoneConfiguration config;
   private static MiniOzoneCluster cluster;
   private static StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
 
   @BeforeAll
   public static void init() throws Exception {
-    config = new OzoneConfiguration();
+    OzoneConfiguration config = new OzoneConfiguration();
     cluster = MiniOzoneCluster.newBuilder(config).build();
     cluster.waitForClusterToBeReady();
     storageContainerLocationClient = cluster

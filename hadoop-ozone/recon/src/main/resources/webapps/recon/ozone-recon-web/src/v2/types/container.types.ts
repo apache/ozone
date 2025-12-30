@@ -25,6 +25,7 @@ export type ContainerReplica = {
   firstSeenTime: number;
   lastSeenTime: number;
   lastBcsId: number;
+  dataChecksum?: string;
 }
 
 export type Container = {
@@ -91,4 +92,5 @@ export type ContainerState = {
   underReplicatedContainerData: Container[];
   overReplicatedContainerData: Container[];
   misReplicatedContainerData: Container[];
+  mismatchedReplicaContainerData: Container[];
 }

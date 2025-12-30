@@ -43,7 +43,7 @@ class TestBufferPool {
 
   @BeforeAll
   static void init() {
-    GenericTestUtils.setLogLevel(BufferPool.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(BufferPool.class, Level.DEBUG);
   }
 
   @Test
@@ -67,7 +67,7 @@ class TestBufferPool {
     // As the pool is full, allocation will need to wait until a buffer is released.
     assertFull(pool);
 
-    LogCapturer logCapturer = LogCapturer.captureLogs(BufferPool.LOG);
+    LogCapturer logCapturer = LogCapturer.captureLogs(BufferPool.class);
     AtomicReference<ChunkBuffer> allocated = new AtomicReference<>();
     AtomicBoolean allocatorStarted = new AtomicBoolean();
     Thread allocator = new Thread(() -> {
@@ -101,7 +101,7 @@ class TestBufferPool {
     // As the pool is full, new allocation will be blocked interruptably if no allocated buffer is released.
     assertFull(pool);
 
-    LogCapturer logCapturer = LogCapturer.captureLogs(BufferPool.LOG);
+    LogCapturer logCapturer = LogCapturer.captureLogs(BufferPool.class);
     AtomicBoolean allocatorStarted = new AtomicBoolean();
     AtomicBoolean interrupted = new AtomicBoolean(false);
     Thread allocator = new Thread(() -> {

@@ -54,16 +54,12 @@ import org.junit.jupiter.api.Test;
 public class TestSCMSafeModeWithPipelineRules {
 
   private MiniOzoneCluster cluster;
-  private OzoneConfiguration conf;
   private PipelineManager pipelineManager;
 
   public void setup(int numDatanodes) throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
         100, TimeUnit.MILLISECONDS);
-    conf.setBoolean(
-        HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK,
-        true);
     conf.set(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "10s");
     conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL, "10s");
     conf.setInt(OZONE_DATANODE_PIPELINE_LIMIT, 1);
@@ -81,7 +77,6 @@ public class TestSCMSafeModeWithPipelineRules {
     StorageContainerManager scm = cluster.getStorageContainerManager();
     pipelineManager = scm.getPipelineManager();
   }
-
 
   @Test
   void testScmSafeMode() throws Exception {
@@ -116,19 +111,18 @@ public class TestSCMSafeModeWithPipelineRules {
     SCMSafeModeManager scmSafeModeManager =
         cluster.getStorageContainerManager().getScmSafeModeManager();
 
-
     // Ceil(0.1 * 2) is 1, as one pipeline is healthy pipeline rule is
     // satisfied
 
-    GenericTestUtils.waitFor(() ->
-        scmSafeModeManager.getHealthyPipelineSafeModeRule()
-            .validate(), 1000, 60000);
+    final HealthyPipelineSafeModeRule healthyPipelineRule = SafeModeRuleFactory.getInstance()
+        .getSafeModeRule(HealthyPipelineSafeModeRule.class);
+    GenericTestUtils.waitFor(healthyPipelineRule::validate, 1000, 60000);
 
     // As Ceil(0.9 * 2) is 2, and from second pipeline no datanodes's are
     // reported this rule is not met yet.
-    GenericTestUtils.waitFor(() ->
-        !scmSafeModeManager.getOneReplicaPipelineSafeModeRule()
-            .validate(), 1000, 60000);
+    final OneReplicaPipelineSafeModeRule oneReplicaPipelineRule = SafeModeRuleFactory.getInstance()
+        .getSafeModeRule(OneReplicaPipelineSafeModeRule.class);
+    GenericTestUtils.waitFor(() -> !oneReplicaPipelineRule.validate(), 1000, 60000);
 
     assertTrue(cluster.getStorageContainerManager().isInSafeMode());
 
@@ -136,9 +130,7 @@ public class TestSCMSafeModeWithPipelineRules {
     // Now restart one datanode from the 2nd pipeline
     cluster.restartHddsDatanode(restartedDatanode, false);
 
-    GenericTestUtils.waitFor(() ->
-        scmSafeModeManager.getOneReplicaPipelineSafeModeRule()
-            .validate(), 1000, 60000);
+    GenericTestUtils.waitFor(oneReplicaPipelineRule::validate, 1000, 60000);
 
     // All safeMode preChecks are now satisfied, SCM should be out of safe mode.
 
@@ -161,8 +153,7 @@ public class TestSCMSafeModeWithPipelineRules {
     ReplicationManager replicationManager =
         cluster.getStorageContainerManager().getReplicationManager();
 
-    GenericTestUtils.waitFor(() ->
-        replicationManager.isRunning(), 1000, 60000);
+    GenericTestUtils.waitFor(replicationManager::isRunning, 1000, 60000);
   }
 
   @AfterEach
@@ -171,7 +162,6 @@ public class TestSCMSafeModeWithPipelineRules {
       cluster.shutdown();
     }
   }
-
 
   private void waitForRatis3NodePipelines(int numPipelines)
       throws TimeoutException, InterruptedException {

@@ -26,16 +26,16 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.function.CheckedFunction;
 
@@ -139,13 +139,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
   HddsDatanodeService getHddsDatanode(DatanodeDetails dn) throws IOException;
 
   /**
-   * Returns a {@link ReconServer} instance.
-   *
-   * @return {@link ReconServer} instance if it is initialized, otherwise null.
-   */
-  ReconServer getReconServer();
-
-  /**
    * Returns an {@link OzoneClient} to access the {@link MiniOzoneCluster}.
    * The caller is responsible for closing the client after use.
    *
@@ -173,11 +166,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
   void restartOzoneManager() throws IOException;
 
   /**
-   * Restarts Recon instance.
-   */
-  void restartReconServer() throws Exception;
-
-  /**
    * Restart a particular HddsDatanode.
    *
    * @param i index of HddsDatanode in the MiniOzoneCluster
@@ -194,6 +182,7 @@ public interface MiniOzoneCluster extends AutoCloseable {
    */
   void restartHddsDatanode(DatanodeDetails dn, boolean waitForDatanode)
       throws InterruptedException, TimeoutException, IOException;
+
   /**
    * Shutdown a particular HddsDatanode.
    *
@@ -207,16 +196,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
    * @param dn HddsDatanode in the MiniOzoneCluster
    */
   void shutdownHddsDatanode(DatanodeDetails dn) throws IOException;
-
-  /**
-   * Start Recon.
-   */
-  void startRecon();
-
-  /**
-   * Stop Recon.
-   */
-  void stopRecon();
 
   /**
    * Shutdown the MiniOzoneCluster and delete the storage dirs.
@@ -250,7 +229,7 @@ public interface MiniOzoneCluster extends AutoCloseable {
   }
 
   default String getBaseDir() {
-    return GenericTestUtils.getTempPath(getName());
+    return Builder.getTempPath(getName());
   }
 
   /**
@@ -263,6 +242,10 @@ public interface MiniOzoneCluster extends AutoCloseable {
     protected static final int ACTIVE_SCMS_NOT_SET = -1;
     protected static final int DEFAULT_RATIS_RPC_TIMEOUT_SEC = 1;
 
+    private static final String SYSPROP_TEST_DATA_DIR = "test.build.data";
+    private static final String DEFAULT_TEST_DATA_PATH = "target/test/data/";
+    private static final boolean WINDOWS = System.getProperty("os.name").startsWith("Windows");
+
     protected OzoneConfiguration conf;
     protected String path;
 
@@ -271,8 +254,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
 
     protected String scmId = UUID.randomUUID().toString();
     protected String omId = UUID.randomUUID().toString();
-
-    protected boolean includeRecon = false;
 
     protected int numOfDatanodes = 3;
     protected boolean  startDataNodes = true;
@@ -293,7 +274,41 @@ public interface MiniOzoneCluster extends AutoCloseable {
      * between the clusters created. */
     protected void prepareForNextBuild() {
       conf = new OzoneConfiguration(conf);
+
+      // Remove the extra configs set in configureSCM() and configureOM() so that MiniOzoneClusterProvider won't fail
+      conf.unset(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR);
+      conf.unset(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_DIR);
+      conf.unset(ScmConfigKeys.OZONE_SCM_DB_DIRS);
+      conf.unset(OzoneConfigKeys.OZONE_HTTP_BASEDIR);
+
+      conf.unset(OMConfigKeys.OZONE_OM_RATIS_STORAGE_DIR);
+      conf.unset(OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_DIR);
+      conf.unset(OMConfigKeys.OZONE_OM_DB_DIRS);
+      conf.unset(OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DB_DIR);
+
       setClusterId();
+    }
+
+    /**
+     * Get a temp path. This may or may not be relative; it depends on what the
+     * {@link #SYSPROP_TEST_DATA_DIR} is set to. If unset, it returns a path
+     * under the relative path {@link #DEFAULT_TEST_DATA_PATH}
+     *
+     * @param subpath sub path, with no leading "/" character
+     * @return a string to use in paths
+     */
+    protected static String getTempPath(String subpath) {
+      String prop = WINDOWS ? DEFAULT_TEST_DATA_PATH
+          : System.getProperty(SYSPROP_TEST_DATA_DIR, DEFAULT_TEST_DATA_PATH);
+
+      if (prop.isEmpty()) {
+        // corner case: property is there but empty
+        prop = DEFAULT_TEST_DATA_PATH;
+      }
+      if (!prop.endsWith("/")) {
+        prop = prop + "/";
+      }
+      return prop + subpath;
     }
 
     public Builder setSCMConfigurator(SCMConfigurator configurator) {
@@ -303,7 +318,7 @@ public interface MiniOzoneCluster extends AutoCloseable {
 
     private void setClusterId() {
       clusterId = UUID.randomUUID().toString();
-      path = GenericTestUtils.getTempPath(
+      path = getTempPath(
           MiniOzoneClusterImpl.class.getSimpleName() + "-" + clusterId);
     }
 
@@ -351,11 +366,6 @@ public interface MiniOzoneCluster extends AutoCloseable {
       return this;
     }
 
-    public Builder includeRecon(boolean include) {
-      this.includeRecon = include;
-      return this;
-    }
-
     public Builder addService(Service service) {
       services.add(service);
       return this;
@@ -383,6 +393,7 @@ public interface MiniOzoneCluster extends AutoCloseable {
   /** Service to manage as part of the mini cluster. */
   interface Service {
     void start(OzoneConfiguration conf) throws Exception;
+
     void stop() throws Exception;
   }
 }

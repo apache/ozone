@@ -29,13 +29,11 @@ import org.apache.hadoop.ozone.container.common.statemachine.DatanodeQueueMetric
 import org.apache.ozone.test.NonHATests;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Test for queue metrics of datanodes.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Timeout(300)
 public abstract class TestDatanodeQueueMetrics implements NonHATests.TestCase {
 
   @Test

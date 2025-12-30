@@ -84,7 +84,6 @@ public final class OmLCRule {
         (andOperator != null && !andOperator.getTags().isEmpty());
   }
 
-
   public String getId() {
     return id;
   }
@@ -287,7 +286,7 @@ public final class OmLCRule {
     return builder.build();
   }
 
-  public static OmLCRule getFromProtobuf(LifecycleRule lifecycleRule, BucketLayout layout) throws OMException {
+  public static OmLCRule getFromProtobuf(LifecycleRule lifecycleRule, BucketLayout layout) {
     Builder builder = new Builder()
         .setEnabled(lifecycleRule.getEnabled());
 
@@ -379,7 +378,7 @@ public final class OmLCRule {
       return filter;
     }
 
-    public OmLCRule build() throws OMException {
+    public OmLCRule build() {
       return new OmLCRule(this);
     }
   }

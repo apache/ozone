@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.ha.ConfUtils;
@@ -46,7 +46,7 @@ import org.slf4j.LoggerFactory;
 public class HadoopRpcOMFailoverProxyProvider<T> extends
       OMFailoverProxyProviderBase<T> {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(HadoopRpcOMFailoverProxyProvider.class);
 
   private final Text delegationTokenService;
@@ -74,7 +74,7 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
     List<String> omNodeIDList = new ArrayList<>();
     Map<String, InetSocketAddress> omNodeAddressMap = new HashMap<>();
 
-    Collection<String> omNodeIds = OmUtils.getActiveOMNodeIds(config,
+    Collection<String> omNodeIds = OmUtils.getActiveNonListenerOMNodeIds(config,
         omSvcId);
 
     for (String nodeId : OmUtils.emptyAsSingletonNull(omNodeIds)) {

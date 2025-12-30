@@ -61,7 +61,6 @@ public class TestECMisReplicationHandler extends TestMisReplicationHandler {
   private static final int DATA = 3;
   private static final int PARITY = 2;
 
-
   @BeforeEach
   void setup(@TempDir File testDir) throws NodeNotFoundException,
       CommandTargetOverloadedException, NotLeaderException {
@@ -162,13 +161,13 @@ public class TestECMisReplicationHandler extends TestMisReplicationHandler {
     when(placementPolicy.validateContainerPlacement(anyList(),
             anyInt())).thenReturn(mockedContainerPlacementStatus);
     List<ContainerReplicaOp> pendingOp = singletonList(
-            ContainerReplicaOp.create(ContainerReplicaOp.PendingOpType.ADD,
-                    MockDatanodeDetails.randomDatanodeDetails(), 1));
+            new ContainerReplicaOp(ContainerReplicaOp.PendingOpType.ADD,
+                    MockDatanodeDetails.randomDatanodeDetails(), 1, null, Long.MAX_VALUE, 0));
     testMisReplication(availableReplicas, placementPolicy,
             pendingOp, 0, 1, 0);
-    pendingOp = singletonList(ContainerReplicaOp
-            .create(ContainerReplicaOp.PendingOpType.DELETE, availableReplicas
-                    .stream().findAny().get().getDatanodeDetails(), 1));
+    pendingOp = singletonList(new ContainerReplicaOp(
+            ContainerReplicaOp.PendingOpType.DELETE, availableReplicas
+                    .stream().findAny().get().getDatanodeDetails(), 1, null, Long.MAX_VALUE, 0));
     testMisReplication(availableReplicas, placementPolicy,
             pendingOp, 0, 1, 0);
   }

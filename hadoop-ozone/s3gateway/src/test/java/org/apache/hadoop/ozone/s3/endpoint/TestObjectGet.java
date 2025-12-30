@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_KEY;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_COUNT_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -33,11 +34,9 @@ import static org.mockito.Mockito.when;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.time.format.DateTimeFormatter;
-import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.MultivaluedHashMap;
+import javax.ws.rs.core.MultivaluedMap;
 import javax.ws.rs.core.Response;
-import javax.ws.rs.core.UriInfo;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -74,7 +73,6 @@ public class TestObjectGet {
   private HttpHeaders headers;
   private ObjectEndpoint rest;
   private OzoneClient client;
-  private ContainerRequestContext context;
 
   @BeforeEach
   public void init() throws OS3Exception, IOException {
@@ -83,6 +81,7 @@ public class TestObjectGet {
     client.getObjectStore().createS3Bucket(BUCKET_NAME);
 
     headers = mock(HttpHeaders.class);
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
 
     rest = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(client)
@@ -96,12 +95,6 @@ public class TestObjectGet {
     when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
     rest.put(BUCKET_NAME, KEY_WITH_TAG, CONTENT.length(),
         1, null, null, null, body);
-
-    context = mock(ContainerRequestContext.class);
-    when(context.getUriInfo()).thenReturn(mock(UriInfo.class));
-    when(context.getUriInfo().getQueryParameters())
-        .thenReturn(new MultivaluedHashMap<>());
-    rest.setContext(context);
   }
 
   @Test
@@ -171,8 +164,7 @@ public class TestObjectGet {
   public void overrideResponseHeader() throws IOException, OS3Exception {
     setDefaultHeader();
 
-    MultivaluedHashMap<String, String> queryParameter =
-        new MultivaluedHashMap<>();
+    MultivaluedMap<String, String> queryParameter = rest.getContext().getUriInfo().getQueryParameters();
     // overrider request header
     queryParameter.putSingle("response-content-type", CONTENT_TYPE2);
     queryParameter.putSingle("response-content-language", CONTENT_LANGUAGE2);
@@ -182,8 +174,6 @@ public class TestObjectGet {
         CONTENT_DISPOSITION2);
     queryParameter.putSingle("response-content-encoding", CONTENT_ENCODING2);
 
-    when(context.getUriInfo().getQueryParameters())
-        .thenReturn(queryParameter);
     Response response = rest.get(BUCKET_NAME, KEY_NAME, 0, null, 0, null, null);
 
     assertEquals(CONTENT_TYPE2,

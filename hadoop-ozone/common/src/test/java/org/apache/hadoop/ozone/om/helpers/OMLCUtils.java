@@ -40,13 +40,9 @@ public final class OMLCUtils {
   public static final OmLifecycleRuleAndOperator VALID_OM_LC_AND_OPERATOR;
 
   static {
-    try {
-      VALID_OM_LC_FILTER = getOmLCFilterBuilder("prefix", null, null).build();
-      VALID_OM_LC_AND_OPERATOR =
-          getOmLCAndOperatorBuilder("prefix", Collections.singletonMap("tag1", "value1")).build();
-    } catch (OMException e) {
-      throw new RuntimeException(e);
-    }
+    VALID_OM_LC_FILTER = getOmLCFilterBuilder("prefix", null, null).build();
+    VALID_OM_LC_AND_OPERATOR =
+        getOmLCAndOperatorBuilder("prefix", Collections.singletonMap("tag1", "value1")).build();
   }
 
   public static void assertOMException(Executable action, OMException.ResultCodes expectedResultCode,

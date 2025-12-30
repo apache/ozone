@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
@@ -35,10 +34,6 @@ public final class OmDBAccessIdInfo {
       OmDBAccessIdInfo::getProtobuf,
       OmDBAccessIdInfo.class,
       DelegatedCodec.CopyType.SHALLOW);
-
-  public static Codec<OmDBAccessIdInfo> getCodec() {
-    return CODEC;
-  }
 
   /**
    * Name of the tenant.
@@ -66,6 +61,10 @@ public final class OmDBAccessIdInfo {
     this.isDelegatedAdmin = isDelegatedAdmin;
   }
 
+  public static Codec<OmDBAccessIdInfo> getCodec() {
+    return CODEC;
+  }
+
   public String getTenantId() {
     return tenantId;
   }
@@ -85,9 +84,7 @@ public final class OmDBAccessIdInfo {
   /**
    * Convert protobuf to OmDBAccessIdInfo.
    */
-  public static OmDBAccessIdInfo getFromProtobuf(
-      ExtendedUserAccessIdInfo infoProto)
-      throws IOException {
+  public static OmDBAccessIdInfo getFromProtobuf(ExtendedUserAccessIdInfo infoProto) {
     return new Builder()
         .setTenantId(infoProto.getTenantId())
         .setUserPrincipal(infoProto.getUserPrincipal())

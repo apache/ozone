@@ -21,6 +21,10 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
@@ -30,9 +34,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentSkipListSet;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -74,17 +80,15 @@ public class TestOzoneContainer {
   private String clusterId = UUID.randomUUID().toString();
   private MutableVolumeSet volumeSet;
   private RoundRobinVolumeChoosingPolicy volumeChoosingPolicy;
-  private KeyValueContainerData keyValueContainerData;
   private KeyValueContainer keyValueContainer;
   private final DatanodeDetails datanodeDetails = createDatanodeDetails();
   private HashMap<String, Long> commitSpaceMap; //RootDir -> committed space
 
   private ContainerLayoutVersion layout;
-  private String schemaVersion;
 
   private void initTest(ContainerTestVersionInfo versionInfo) throws Exception {
     this.layout = versionInfo.getLayout();
-    this.schemaVersion = versionInfo.getSchemaVersion();
+    String schemaVersion = versionInfo.getSchemaVersion();
     this.conf = new OzoneConfiguration();
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
     setup();
@@ -99,6 +103,7 @@ public class TestOzoneContainer {
         clusterId, conf, null, StorageVolume.VolumeType.DATA_VOLUME, null);
     createDbInstancesForTestIfNeeded(volumeSet, clusterId, clusterId, conf);
     volumeChoosingPolicy = new RoundRobinVolumeChoosingPolicy();
+    volumeSet.startAllVolume();
   }
 
   @AfterEach
@@ -111,6 +116,25 @@ public class TestOzoneContainer {
     }
   }
 
+  /**
+   * Create a mock {@link HddsVolume} to track container IDs.
+   */
+  private HddsVolume mockHddsVolume(String storageId) {
+    HddsVolume volume = mock(HddsVolume.class);
+    when(volume.getStorageID()).thenReturn(storageId);
+
+    ConcurrentSkipListSet<Long> containerIds = new ConcurrentSkipListSet<>();
+
+    doAnswer(inv -> {
+      Long containerId = inv.getArgument(0);
+      containerIds.add(containerId);
+      return null;
+    }).when(volume).addContainer(any(Long.class));
+
+    when(volume.getContainerIterator()).thenAnswer(inv -> containerIds.iterator());
+    return volume;
+  }
+
   @ContainerTestVersionInfo.ContainerTest
   public void testBuildContainerMap(ContainerTestVersionInfo versionInfo)
       throws Exception {
@@ -118,9 +142,14 @@ public class TestOzoneContainer {
     // Format the volumes
     List<HddsVolume> volumes =
         StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList());
+    
+    // Create mock volumes with tracking, mapped by storage ID
+    Map<String, HddsVolume> mockVolumeMap = new HashMap<>();
     for (HddsVolume volume : volumes) {
       volume.format(clusterId);
       commitSpaceMap.put(getVolumeKey(volume), Long.valueOf(0));
+      // Create mock for each real volume
+      mockVolumeMap.put(volume.getStorageID(), mockHddsVolume(volume.getStorageID()));
     }
     List<KeyValueContainerData> containerDatas = new ArrayList<>();
     // Add containers to disk
@@ -132,7 +161,7 @@ public class TestOzoneContainer {
 
       HddsVolume myVolume;
 
-      keyValueContainerData = new KeyValueContainerData(i,
+      KeyValueContainerData keyValueContainerData = new KeyValueContainerData(i,
           layout,
           maxCap, UUID.randomUUID().toString(),
           datanodeDetails.getUuidString());
@@ -141,8 +170,14 @@ public class TestOzoneContainer {
           keyValueContainerData, conf);
       keyValueContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
       myVolume = keyValueContainer.getContainerData().getVolume();
+      
+      // Track container in mock volume
+      HddsVolume mockVolume = mockVolumeMap.get(myVolume.getStorageID());
+      if (mockVolume != null) {
+        mockVolume.addContainer(i);
+      }
 
-      freeBytes = addBlocks(keyValueContainer, 2, 3);
+      freeBytes = addBlocks(keyValueContainer, 2, 3, 65536);
 
       // update our expectation of volume committed space in the map
       volCommitBytes = commitSpaceMap.get(getVolumeKey(myVolume)).longValue();
@@ -158,6 +193,14 @@ public class TestOzoneContainer {
     ContainerSet containerset = ozoneContainer.getContainerSet();
     assertEquals(numTestContainers, containerset.containerCount());
     verifyCommittedSpace(ozoneContainer);
+    // container usage here, nrOfContainer * blocks * chunksPerBlock * datalen
+    // Use mock volumes to verify container usage
+    long totalUsage = 0;
+    for (HddsVolume volume : volumes) {
+      HddsVolume mockVolume = mockVolumeMap.get(volume.getStorageID());
+      totalUsage += ozoneContainer.gatherContainerUsages(mockVolume);
+    }
+    assertEquals(10 * 2 * 3 * 65536, totalUsage);
     Set<Long> missingContainers = new HashSet<>();
     for (int i = 0; i < numTestContainers; i++) {
       if (i % 2 == 0) {
@@ -189,7 +232,7 @@ public class TestOzoneContainer {
     for (int i = 0; i < 3; i++) {
       dbPaths[i] =
           Files.createDirectory(folder.resolve(Integer.toString(i))).toFile();
-      dbDirString.append(dbPaths[i]).append(",");
+      dbDirString.append(dbPaths[i]).append(',');
     }
     conf.set(OzoneConfigKeys.HDDS_DATANODE_CONTAINER_DB_DIR,
         dbDirString.toString());
@@ -235,7 +278,7 @@ public class TestOzoneContainer {
       // eat up 10 bytes more, now available space is less than 1 container
       volume.incCommittedBytes(10);
     }
-    keyValueContainerData = new KeyValueContainerData(99,
+    KeyValueContainerData keyValueContainerData = new KeyValueContainerData(99,
         layout, containerSize,
         UUID.randomUUID().toString(), datanodeDetails.getUuidString());
     keyValueContainer = new KeyValueContainer(keyValueContainerData, conf);
@@ -262,10 +305,9 @@ public class TestOzoneContainer {
   }
 
   private long addBlocks(KeyValueContainer container,
-      int blocks, int chunksPerBlock) throws Exception {
+      int blocks, int chunksPerBlock, int datalen) throws Exception {
     String strBlock = "block";
     String strChunk = "-chunkFile";
-    int datalen = 65536;
     long usedBytes = 0;
 
     long freeBytes = container.getContainerData().getMaxSize();

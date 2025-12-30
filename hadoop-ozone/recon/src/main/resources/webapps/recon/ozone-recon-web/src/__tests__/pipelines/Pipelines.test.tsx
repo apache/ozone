@@ -17,20 +17,15 @@
  */
 
 import React from 'react';
-import {
-  render,
-  screen,
-  waitFor,
-  fireEvent
-} from '@testing-library/react';
-import { rest } from 'msw';
-import { vi } from 'vitest';
+import {fireEvent, render, screen, waitFor} from '@testing-library/react';
+import {rest} from 'msw';
+import {vi} from 'vitest';
 
 import Pipelines from '@/v2/pages/pipelines/pipelines';
 import * as commonUtils from '@/utils/common';
-import { pipelineServer } from '@tests/mocks/pipelineMocks/pipelinesServer';
-import { pipelineLocators, searchInputLocator } from '@tests/locators/locators';
-import { waitForPipelineTable } from '@tests/utils/pipelines.utils';
+import {pipelineServer} from '@tests/mocks/pipelineMocks/pipelinesServer';
+import {pipelineLocators, searchInputLocator} from '@tests/locators/locators';
+import {waitForPipelineTable} from '@tests/utils/pipelines.utils';
 
 // Mock utility functions
 vi.spyOn(commonUtils, 'showDataFetchError');

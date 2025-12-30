@@ -15,10 +15,9 @@
  * limitations under the License.
  */
 
-
 package org.apache.hadoop.ozone.om.response.lifecycle;
 
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.LIFECYCLE_CONFIGURATION_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.LIFECYCLE_CONFIGURATION_TABLE;
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;

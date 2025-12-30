@@ -30,7 +30,7 @@ on:
         required: false
       submodule:
         description: Submodule
-        default: 'AUTO'
+        default: 'ozone-integration-test'
         required: true
       iterations:
         description: Number of Iterations per split
@@ -65,6 +65,8 @@ env:
   RATIS_REPO: ${{ github.event.inputs.ratis-repo }}
   RATIS_VERSION: ${{ github.event.inputs.ratis-ref }}
   JAVA_VERSION: ${{ github.event.inputs.java-version }}
+  SPLITS: ${{ github.event.inputs.splits }}
+  SUBMODULE: ${{ github.event.inputs.submodule }}
   # Surefire 3.0.0-M4 is used because newer versions do not reliably kill the fork on timeout
   # SUREFIRE-1722, SUREFIRE-1815
   SUREFIRE_VERSION: 3.0.0-M4
@@ -82,7 +84,7 @@ jobs:
         name: Generate test matrix
         run: |
           splits=()
-          for ((i = 1; i <= ${{ github.event.inputs.splits }}; i++)); do
+          for ((i = 1; i <= $SPLITS; i++)); do
             splits+=("$i")
           done
           printf -v x "%s," "${splits[@]}"
@@ -94,59 +96,18 @@ jobs:
     with:
       repo: ${{ github.event.inputs.ratis-repo || format('{0}/ratis', github.repository_owner) }}
       ref: ${{ github.event.inputs.ratis-ref }}
-  find-tests:
-    if: ${{ always() && github.event.inputs.submodule == 'AUTO' }}
-    needs:
-      - prepare-job
-    runs-on: ubuntu-24.04
-    outputs:
-      modules: ${{ steps.modules.outputs.modules }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.inputs.ref }}
-      - name: Cache for maven dependencies
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ~/.m2/repository/*/*/*
-            !~/.m2/repository/org/apache/ozone
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            maven-repo-
-      - name: Setup java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: ${{ github.event.inputs.java-version }}
-      - name: Find tests
-        run: |
-          # find tests to be run in splits by running them with very short timeout
-          hadoop-ozone/dev-support/checks/junit.sh -DexcludedGroups="native|slow|unhealthy" -DskipShade \
-              -Dtest="$TEST_CLASS,Abstract*Test*\$*" \
-              -Dsurefire.fork.timeout=1 -Dmaven-surefire-plugin.version=${{ env.SUREFIRE_VERSION }} \
-              || true # ignore errors
-        env:
-          ITERATIONS: 1
-      - name: Find modules
-        id: modules
-        run: |
-          grep -e 'surefire:${{ env.SUREFIRE_VERSION }}:test' -e 'Running org.apache' target/unit/output.log | grep -B1 'Running org.apache'
-          modules=$(grep -e 'surefire:${{ env.SUREFIRE_VERSION }}:test' -e 'Running org.apache' target/unit/output.log | grep -B1 'Running org.apache' \
-              | grep surefire | cut -f2 -d'@' | awk '{ print $1 }' | sed 's/^/:/' | xargs | sed -e 's/ /,/g')
-          echo "modules=$modules" >> $GITHUB_OUTPUT
-        if: ${{ !cancelled() }}
   build:
-    if: ${{ always() }}
+    if: ${{ !cancelled() }}
     needs:
       - prepare-job
       - ratis
-      - find-tests
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
       - name: Cache for maven dependencies
         uses: actions/cache/restore@v4
         with:
@@ -170,8 +131,8 @@ jobs:
           java-version: ${{ github.event.inputs.java-version }}
       - name: Build (most) of Ozone
         run: |
-          args="-DskipRecon -DskipShade -Dmaven.javadoc.skip=true"
-          if [[ "${{ github.event.inputs.ratis-ref }}" != "" ]]; then
+          args="-DskipRecon -DskipShade -Dmaven.javadoc.skip=true -Drocks_tools_native"
+          if [[ "$RATIS_VERSION" != "" ]]; then
             args="$args -Dratis.version=${{ needs.ratis.outputs.ratis-version }}"
             args="$args -Dratis.thirdparty.version=${{ needs.ratis.outputs.thirdparty-version }}"
             args="$args -Dio.grpc.version=${{ needs.ratis.outputs.grpc-version }}"
@@ -179,11 +140,7 @@ jobs:
             args="$args -Dgrpc.protobuf-compile.version=${{ needs.ratis.outputs.protobuf-version }}"
           fi
 
-          if [[ "${{ github.event.inputs.submodule }}" != "AUTO" ]]; then
-            args="$args -am -pl :${{ github.event.inputs.submodule }}"
-          elif [[ -n "${{ needs.find-tests.outputs.modules }}" ]]; then
-            args="$args -am -pl ${{ needs.find-tests.outputs.modules }}"
-          fi
+          args="$args -am -pl :$SUBMODULE"
 
           hadoop-ozone/dev-support/checks/build.sh $args
       - name: Store Maven repo for tests
@@ -194,12 +151,11 @@ jobs:
             ~/.m2/repository/org/apache/ozone
           retention-days: 1
   run-test:
-    if: ${{ always() }}
+    if: ${{ !cancelled() }}
     needs:
       - prepare-job
       - ratis
       - build
-      - find-tests
     name: Run-Split
     runs-on: ubuntu-24.04
     strategy:
@@ -245,8 +201,8 @@ jobs:
             export OZONE_REPO_CACHED=true
           fi
 
-          args="-DexcludedGroups=native|slow|unhealthy -DskipShade"
-          if [[ "${{ github.event.inputs.ratis-ref }}" != "" ]]; then
+          args="-DexcludedGroups=slow|unhealthy -DskipShade -Drocks_tools_native"
+          if [[ "$RATIS_VERSION" != "" ]]; then
             args="$args -Dratis.version=${{ needs.ratis.outputs.ratis-version }}"
             args="$args -Dratis.thirdparty.version=${{ needs.ratis.outputs.thirdparty-version }}"
             args="$args -Dio.grpc.version=${{ needs.ratis.outputs.grpc-version }}"
@@ -254,11 +210,7 @@ jobs:
             args="$args -Dgrpc.protobuf-compile.version=${{ needs.ratis.outputs.protobuf-version }}"
           fi
 
-          if [[ "${{ github.event.inputs.submodule }}" != "AUTO" ]]; then
-            args="$args -pl :${{ github.event.inputs.submodule }}"
-          elif [[ -n "${{ needs.find-tests.outputs.modules }}" ]]; then
-            args="$args -pl ${{ needs.find-tests.outputs.modules }}"
-          fi
+          args="$args -pl :$SUBMODULE"
 
           if [ "$TEST_METHOD" = "ALL" ]; then
             echo "Running all tests from $TEST_CLASS"
@@ -290,12 +242,12 @@ jobs:
         uses: actions/download-artifact@v4
       - name: Count failures
         run: |
-          failures=$(find . -name 'summary.txt' | grep -v 'iteration' | xargs grep -v 'exit code: 0' | wc -l)
+          failures=$(find . -name 'summary.txt' | grep --text -v 'iteration' | xargs grep --text -v 'exit code: 0' | wc -l)
           echo "Total failures: $failures"
           if [[ $failures -gt 0 ]]; then
             echo ""
             echo "Failed runs:"
-            grep 'exit code: 1' */summary.txt | grep -o 'split.*teration [0-9]*' | sed -e 's/.summary.txt:/ /' -e 's/-/ /' | sort -g -k2 -k4
+            grep --text 'exit code: 1' */summary.txt | grep --text -o 'split.*teration [0-9]*' | sed -e 's/.summary.txt:/ /' -e 's/-/ /' | sort -g -k2 -k4
             echo ""
             exit 1
           fi

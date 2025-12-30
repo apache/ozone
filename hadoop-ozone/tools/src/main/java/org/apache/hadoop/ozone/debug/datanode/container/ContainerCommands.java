@@ -17,17 +17,18 @@
 
 package org.apache.hadoop.ozone.debug.datanode.container;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
@@ -35,21 +36,25 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.InconsistentStorageStateException;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Handler;
+import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerReader;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
@@ -84,6 +89,8 @@ public class ContainerCommands extends AbstractSubcommand {
   public void loadContainersFromVolumes() throws IOException {
     OzoneConfiguration conf = getOzoneConf();
 
+    validateAllStorageDirectories(conf);
+
     ContainerSet containerSet = ContainerSet.newReadOnlyContainerSet(1000);
 
     ContainerMetrics metrics = ContainerMetrics.create(conf);
@@ -96,6 +103,7 @@ public class ContainerCommands extends AbstractSubcommand {
 
     volumeSet = new MutableVolumeSet(datanodeUuid, conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
+    VolumeChoosingPolicy volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
 
     if (VersionedDatanodeFeatures.SchemaV3.isFinalizedAndEnabled(conf)) {
       MutableVolumeSet dbVolumeSet =
@@ -118,9 +126,12 @@ public class ContainerCommands extends AbstractSubcommand {
               datanodeUuid,
               containerSet,
               volumeSet,
+              volumeChoosingPolicy,
               metrics,
               containerReplicaProto -> {
-              });
+              },
+              // Since this is an Ozone debug CLI, this instance is not part of a running datanode.
+              new ContainerChecksumTreeManager(conf));
       handler.setClusterID(clusterId);
       handlers.put(containerType, handler);
     }
@@ -153,7 +164,7 @@ public class ContainerCommands extends AbstractSubcommand {
   }
 
   private String getClusterId(String storageDir) throws IOException {
-    Preconditions.checkNotNull(storageDir);
+    Objects.requireNonNull(storageDir, "storageDir == null");
     try (Stream<Path> stream = Files.list(Paths.get(storageDir, "hdds"))) {
       final Path firstStorageDirPath = stream.filter(Files::isDirectory)
           .findFirst().get().getFileName();
@@ -192,5 +203,26 @@ public class ContainerCommands extends AbstractSubcommand {
 
   public static void outputContainer(ContainerData data) throws IOException {
     System.out.println(JsonUtils.toJsonStringWithDefaultPrettyPrinter(data));
+  }
+
+  private void validateAllStorageDirectories(ConfigurationSource config) throws IOException {
+    final Collection<String> storageDirs = HddsServerUtil.getDatanodeStorageDirs(config);
+    LOG.info("Configured storage directories for '{}': {}", ScmConfigKeys.HDDS_DATANODE_DIR_KEY, storageDirs);
+
+    List<String> missingDirs = new ArrayList<>();
+    for (String storageDir : storageDirs) {
+      String storageDirPath = StorageLocation.parse(storageDir).getUri().getPath();
+
+      if (!new File(storageDirPath).exists()) {
+        missingDirs.add(storageDirPath);
+      }
+    }
+    if (!missingDirs.isEmpty()) {
+      String errorMsg = String.join(", ", missingDirs) +
+          "' configured in '" + ScmConfigKeys.HDDS_DATANODE_DIR_KEY +
+          "' does not exist. Please provide the correct value for config.";
+      LOG.error(errorMsg);
+      throw new IOException(errorMsg);
+    }
   }
 }

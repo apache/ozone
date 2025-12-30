@@ -58,7 +58,6 @@ public class TestNodeReportHandler implements EventPublisher {
   private static final Logger LOG = LoggerFactory
       .getLogger(TestNodeReportHandler.class);
   private NodeReportHandler nodeReportHandler;
-  private HDDSLayoutVersionManager versionManager;
   private SCMNodeManager nodeManager;
   @TempDir
   private File storagePath;
@@ -72,7 +71,7 @@ public class TestNodeReportHandler implements EventPublisher {
     when(storageConfig.getClusterID()).thenReturn("cluster1");
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
 
-    this.versionManager = mock(HDDSLayoutVersionManager.class);
+    HDDSLayoutVersionManager versionManager = mock(HDDSLayoutVersionManager.class);
     when(versionManager.getMetadataLayoutVersion()).thenReturn(maxLayoutVersion());
     when(versionManager.getSoftwareLayoutVersion()).thenReturn(maxLayoutVersion());
     nodeManager =
@@ -85,7 +84,7 @@ public class TestNodeReportHandler implements EventPublisher {
   public void testNodeReport() throws IOException {
     DatanodeDetails dn = MockDatanodeDetails.randomDatanodeDetails();
     StorageReportProto storageOne = HddsTestUtils
-        .createStorageReport(dn.getUuid(), storagePath.getPath(), 100, 10, 90, null);
+        .createStorageReport(dn.getID(), storagePath.getPath(), 100, 10, 90, null);
     MetadataStorageReportProto metaStorageOne = HddsTestUtils
         .createMetadataStorageReport(metaStoragePath.getPath(), 100, 10, 90, null);
 
@@ -101,7 +100,7 @@ public class TestNodeReportHandler implements EventPublisher {
     assertEquals(10, (long) nodeMetric.get().getScmUsed().get());
 
     StorageReportProto storageTwo = HddsTestUtils
-        .createStorageReport(dn.getUuid(), storagePath.getPath(), 100, 10, 90, null);
+        .createStorageReport(dn.getID(), storagePath.getPath(), 100, 10, 90, null);
     nodeReportHandler.onMessage(
         getNodeReport(dn, Arrays.asList(storageOne, storageTwo),
             Arrays.asList(metaStorageOne)), this);

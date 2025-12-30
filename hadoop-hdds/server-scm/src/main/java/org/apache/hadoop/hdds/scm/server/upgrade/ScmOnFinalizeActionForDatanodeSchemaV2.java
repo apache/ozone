@@ -33,7 +33,7 @@ import org.slf4j.LoggerFactory;
     ON_FINALIZE)
 public class ScmOnFinalizeActionForDatanodeSchemaV2 implements
     HDDSUpgradeAction<SCMUpgradeFinalizationContext> {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(ScmOnFinalizeActionForDatanodeSchemaV2.class);
 
   @Override

@@ -17,11 +17,11 @@
 
 package org.apache.hadoop.ozone.container.common.report;
 
-import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.Message;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -104,7 +104,6 @@ public final class ReportManager {
     private ReportPublisherFactory publisherFactory;
     private String threadNamePrefix = "";
 
-
     private Builder(ConfigurationSource conf) {
       this.reportPublishers = new ArrayList<>();
       this.publisherFactory = new ReportPublisherFactory(conf);
@@ -157,7 +156,7 @@ public final class ReportManager {
      * @return {@link ReportManager}
      */
     public ReportManager build() {
-      Preconditions.checkNotNull(stateContext);
+      Objects.requireNonNull(stateContext, "stateContext == null");
       return new ReportManager(
           stateContext, reportPublishers, threadNamePrefix);
     }

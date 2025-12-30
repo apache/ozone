@@ -49,6 +49,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ExtendedDatanodeDetailsP
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReportsProto.Builder;
@@ -57,7 +58,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.PipelineReportsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -71,7 +71,7 @@ import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
 import org.apache.hadoop.ozone.recon.api.types.DatanodesResponse;
-import org.apache.hadoop.ozone.recon.common.CommonUtils;
+import org.apache.hadoop.ozone.recon.common.ReconTestUtils;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
@@ -92,7 +92,6 @@ public class TestOpenContainerCount {
   private Path temporaryFolder;
 
   private NodeEndpoint nodeEndpoint;
-  private ReconOMMetadataManager reconOMMetadataManager;
   private ReconStorageContainerManagerFacade reconScm;
   private boolean isSetupDone = false;
   private String pipelineId;
@@ -108,20 +107,16 @@ public class TestOpenContainerCount {
   private Pipeline pipeline2;
   private static final String HOST1 = "host1.datanode";
   private static final String IP1 = "1.1.1.1";
-  private ReconUtils reconUtilsMock;
   private StorageContainerServiceProvider mockScmServiceProvider;
 
   private List<Long> containerIDs;
 
   private List<ContainerWithPipeline> cpw;
-  private CommonUtils commonUtils;
-  private PipelineManager pipelineManager;
-  private ReconPipelineManager reconPipelineManager;
 
   private void initializeInjector() throws Exception {
-    reconOMMetadataManager = getTestReconOmMetadataManager(
-            initializeNewOmMetadataManager(Files.createDirectory(
-                temporaryFolder.resolve("JunitOmDBDir")).toFile()),
+    ReconOMMetadataManager reconOMMetadataManager = getTestReconOmMetadataManager(
+        initializeNewOmMetadataManager(Files.createDirectory(
+            temporaryFolder.resolve("JunitOmDBDir")).toFile()),
         Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
     datanodeDetails = randomDatanodeDetails();
     datanodeDetails.setHostName(HOST1);
@@ -160,7 +155,6 @@ public class TestOpenContainerCount {
               .thenReturn(containerWithPipeline);
       containerIDs.add(i);
       cpw.add(containerWithPipeline);
-      commonUtils = new CommonUtils();
     }
 
     // Open 5 containers on pipeline 2
@@ -185,7 +179,7 @@ public class TestOpenContainerCount {
             .getExistContainerWithPipelinesInBatch(containerIDs))
             .thenReturn(cpw);
 
-    reconUtilsMock = mock(ReconUtils.class);
+    ReconUtils reconUtilsMock = mock(ReconUtils.class);
 
     HttpURLConnection urlConnectionMock = mock(HttpURLConnection.class);
     when(urlConnectionMock.getResponseCode())
@@ -196,7 +190,7 @@ public class TestOpenContainerCount {
         anyString())).thenReturn(temporaryFolder.resolve("reconDbDir").toFile());
     when(reconUtilsMock.getReconNodeDetails(
         any(OzoneConfiguration.class))).thenReturn(
-        commonUtils.getReconNodeDetails());
+        ReconTestUtils.getReconNodeDetails());
 
     ReconTestInjector reconTestInjector =
             new ReconTestInjector.Builder(temporaryFolder.toFile())
@@ -220,8 +214,8 @@ public class TestOpenContainerCount {
     nodeEndpoint = reconTestInjector.getInstance(NodeEndpoint.class);
     reconScm = (ReconStorageContainerManagerFacade)
             reconTestInjector.getInstance(OzoneStorageContainerManager.class);
-    pipelineManager = reconScm.getPipelineManager();
-    reconPipelineManager = (ReconPipelineManager) pipelineManager;
+    PipelineManager pipelineManager = reconScm.getPipelineManager();
+    ReconPipelineManager reconPipelineManager = (ReconPipelineManager) pipelineManager;
     reconPipelineManager.addPipeline(pipeline);
     reconPipelineManager.addPipeline(pipeline2);
   }

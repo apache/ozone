@@ -17,9 +17,9 @@
 
 package org.apache.hadoop.ozone.container.common.states.endpoint;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.BindException;
+import java.util.Objects;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
@@ -39,8 +39,7 @@ import org.slf4j.LoggerFactory;
  */
 public class VersionEndpointTask implements
     Callable<EndpointStateMachine.EndPointStates> {
-  public static final Logger LOG = LoggerFactory.getLogger(VersionEndpointTask
-      .class);
+  private static final Logger LOG = LoggerFactory.getLogger(VersionEndpointTask.class);
   private final EndpointStateMachine rpcEndPoint;
   private final ConfigurationSource configuration;
   private final OzoneContainer ozoneContainer;
@@ -76,10 +75,8 @@ public class VersionEndpointTask implements
           String scmId = response.getValue(OzoneConsts.SCM_ID);
           String clusterId = response.getValue(OzoneConsts.CLUSTER_ID);
 
-          Preconditions.checkNotNull(scmId,
-              "Reply from SCM: scmId cannot be null");
-          Preconditions.checkNotNull(clusterId,
-              "Reply from SCM: clusterId cannot be null");
+          Objects.requireNonNull(scmId, "scmId == null");
+          Objects.requireNonNull(clusterId, "clusterId == null");
 
           // Check DbVolumes, format DbVolume at first register time.
           checkVolumeSet(ozoneContainer.getDbVolumeSet(), scmId, clusterId);

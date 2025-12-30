@@ -35,32 +35,11 @@ import org.apache.hadoop.ozone.container.common.statemachine.commandhandler.Comm
  */
 @InterfaceAudience.Private
 public final class CommandHandlerMetrics implements MetricsSource {
-  enum CommandMetricsMetricsInfo implements MetricsInfo {
-    Command("The type of the SCM command"),
-    TotalRunTimeMs("The total runtime of the command handler in milliseconds"),
-    AvgRunTimeMs("Average run time of the command handler in milliseconds"),
-    QueueWaitingTaskCount("The number of queued tasks waiting for execution"),
-    InvocationCount("The number of times the command handler has been invoked"),
-    ThreadPoolActivePoolSize("The number of active threads in the thread pool"),
-    ThreadPoolMaxPoolSize("The maximum number of threads in the thread pool"),
-    CommandReceivedCount(
-        "The number of received SCM commands for each command type");
+  public static final String SOURCE_NAME = CommandHandlerMetrics.class.getSimpleName();
 
-    private final String desc;
-    CommandMetricsMetricsInfo(String desc) {
-      this.desc = desc;
-    }
-
-    @Override
-    public String description() {
-      return desc;
-    }
-  }
-
-  public static final String SOURCE_NAME =
-      CommandHandlerMetrics.class.getSimpleName();
   private final Map<Type, CommandHandler> handlerMap;
   private final Map<Type, AtomicInteger> commandCount;
+
   private CommandHandlerMetrics(Map<Type, CommandHandler> handlerMap) {
     this.handlerMap = handlerMap;
     this.commandCount = new HashMap<>();
@@ -120,5 +99,27 @@ public final class CommandHandlerMetrics implements MetricsSource {
   public void unRegister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
+  }
+
+  enum CommandMetricsMetricsInfo implements MetricsInfo {
+    Command("The type of the SCM command"),
+    TotalRunTimeMs("The total runtime of the command handler in milliseconds"),
+    AvgRunTimeMs("Average run time of the command handler in milliseconds"),
+    QueueWaitingTaskCount("The number of queued tasks waiting for execution"),
+    InvocationCount("The number of times the command handler has been invoked"),
+    ThreadPoolActivePoolSize("The number of active threads in the thread pool"),
+    ThreadPoolMaxPoolSize("The maximum number of threads in the thread pool"),
+    CommandReceivedCount(
+        "The number of received SCM commands for each command type");
+
+    private final String desc;
+    CommandMetricsMetricsInfo(String desc) {
+      this.desc = desc;
+    }
+
+    @Override
+    public String description() {
+      return desc;
+    }
   }
 }

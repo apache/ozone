@@ -17,12 +17,15 @@
 
 package org.apache.hadoop.ozone.dn;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.io.File;
 import java.io.IOException;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.ozone.test.GenericTestUtils;
+
 /**
  * Utility offers low-level access methods to datanode.
  */
@@ -156,7 +159,7 @@ public final class DatanodeTestUtils {
   public static void injectContainerMetaDirFailure(File... dirs) {
     for (File dir : dirs) {
       if (dir.exists()) {
-        dir.setWritable(false, false);
+        assertTrue(dir.setWritable(false, false));
       }
     }
   }
@@ -169,7 +172,7 @@ public final class DatanodeTestUtils {
   public static void restoreContainerMetaDirFromFailure(File... dirs) {
     for (File dir : dirs) {
       if (dir.exists()) {
-        dir.setWritable(true, true);
+        assertTrue(dir.setWritable(true, true));
       }
     }
   }
@@ -182,7 +185,7 @@ public final class DatanodeTestUtils {
    */
   public static void simulateBadRootDir(File rootDir) {
     if (rootDir.exists()) {
-      rootDir.setWritable(false);
+      assertTrue(rootDir.setWritable(false));
     }
   }
 
@@ -203,7 +206,7 @@ public final class DatanodeTestUtils {
    */
   public static void restoreBadRootDir(File rootDir) {
     if (rootDir.exists()) {
-      rootDir.setWritable(true);
+      assertTrue(rootDir.setWritable(true));
     }
   }
 
@@ -214,20 +217,6 @@ public final class DatanodeTestUtils {
    */
   public static void restoreBadVolume(StorageVolume vol) {
     restoreBadRootDir(vol.getStorageDir());
-  }
-
-  /**
-   * Wait for detect volume failure.
-   *
-   * @param volSet
-   * @param numOfChecks target number of checks
-   * @throws Exception
-   */
-  public static void waitForCheckVolume(MutableVolumeSet volSet,
-                                        long numOfChecks) throws Exception {
-    GenericTestUtils.waitFor(
-        () -> numOfChecks == volSet.getVolumeChecker().getNumVolumeChecks(),
-        100, 10000);
   }
 
   /**

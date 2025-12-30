@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -48,7 +49,6 @@ import org.apache.hadoop.hdds.client.DecommissionUtils;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -108,9 +108,7 @@ public class NodeEndpoint {
   @GET
   public Response getDatanodes() {
     List<DatanodeMetadata> datanodes = new ArrayList<>();
-    List<DatanodeDetails> datanodeDetails = nodeManager.getAllNodes();
-
-    datanodeDetails.forEach(datanode -> {
+    nodeManager.getAllNodes().forEach(datanode -> {
       DatanodeStorageReport storageReport = getStorageReport(datanode);
       NodeState nodeState = null;
       try {
@@ -118,13 +116,10 @@ public class NodeEndpoint {
       } catch (NodeNotFoundException e) {
         LOG.warn("Cannot get nodeState for datanode {}", datanode, e);
       }
-      final NodeOperationalState nodeOpState = datanode.getPersistedOpState();
-      String hostname = datanode.getHostName();
       Set<PipelineID> pipelineIDs = nodeManager.getPipelines(datanode);
       List<DatanodePipeline> pipelines = new ArrayList<>();
       AtomicInteger leaderCount = new AtomicInteger();
       AtomicInteger openContainers = new AtomicInteger();
-      DatanodeMetadata.Builder builder = DatanodeMetadata.newBuilder();
 
       pipelineIDs.forEach(pipelineID -> {
         try {
@@ -134,7 +129,7 @@ public class NodeEndpoint {
               new DatanodePipeline(pipelineID.getId(),
                   pipeline.getReplicationConfig(), leaderNode);
           pipelines.add(datanodePipeline);
-          if (datanode.getUuid().equals(pipeline.getLeaderId())) {
+          if (datanode.getID().equals(pipeline.getLeaderId())) {
             leaderCount.getAndIncrement();
           }
           int openContainerPerPipeline =
@@ -143,41 +138,32 @@ public class NodeEndpoint {
           openContainers.getAndAdd(openContainerPerPipeline);
         } catch (PipelineNotFoundException ex) {
           LOG.warn("Cannot get pipeline {} for datanode {}, pipeline not found",
-              pipelineID.getId(), hostname, ex);
+              pipelineID.getId(), datanode, ex);
         } catch (IOException ioEx) {
           LOG.warn("Cannot get leader node of pipeline with id {}.",
               pipelineID.getId(), ioEx);
         }
       });
+
+      final DatanodeMetadata.Builder builder = DatanodeMetadata.newBuilder()
+          .setOpenContainers(openContainers.get());
+
       try {
         builder.setContainers(nodeManager.getContainerCount(datanode));
-        builder.setOpenContainers(openContainers.get());
       } catch (NodeNotFoundException ex) {
-        LOG.warn("Cannot get containers, datanode {} not found.",
-            datanode.getUuid(), ex);
+        LOG.warn("Failed to getContainerCount for {}", datanode, ex);
       }
 
-      DatanodeInfo dnInfo = (DatanodeInfo) datanode;
-      datanodes.add(builder.setHostname(nodeManager.getHostName(datanode))
+      datanodes.add(builder.setDatanode(datanode)
           .setDatanodeStorageReport(storageReport)
           .setLastHeartbeat(nodeManager.getLastHeartbeat(datanode))
           .setState(nodeState)
-          .setOperationalState(nodeOpState)
           .setPipelines(pipelines)
           .setLeaderCount(leaderCount.get())
-          .setUuid(datanode.getUuidString())
-          .setVersion(nodeManager.getVersion(datanode))
-          .setSetupTime(nodeManager.getSetupTime(datanode))
-          .setRevision(nodeManager.getRevision(datanode))
-          .setLayoutVersion(
-              dnInfo.getLastKnownLayoutVersion().getMetadataLayoutVersion())
-          .setNetworkLocation(datanode.getNetworkLocation())
           .build());
     });
 
-    DatanodesResponse datanodesResponse =
-        new DatanodesResponse(datanodes.size(), datanodes);
-    return Response.ok(datanodesResponse).build();
+    return Response.ok(new DatanodesResponse(datanodes)).build();
   }
 
   /**
@@ -188,11 +174,14 @@ public class NodeEndpoint {
   private DatanodeStorageReport getStorageReport(DatanodeDetails datanode) {
     SCMNodeStat nodeStat =
         nodeManager.getNodeStat(datanode).get();
-    long capacity = nodeStat.getCapacity().get();
-    long used = nodeStat.getScmUsed().get();
-    long remaining = nodeStat.getRemaining().get();
-    long committed = nodeStat.getCommitted().get();
-    return new DatanodeStorageReport(capacity, used, remaining, committed);
+    DatanodeStorageReport storageReport = DatanodeStorageReport.newBuilder()
+        .setCapacity(nodeStat.getCapacity().get())
+        .setUsed(nodeStat.getScmUsed().get())
+        .setRemaining(nodeStat.getRemaining().get())
+        .setCommitted(nodeStat.getCommitted().get())
+        .setMinimumFreeSpace(nodeStat.getFreeSpaceToSpare().get())
+        .build();
+    return storageReport;
   }
 
   /**
@@ -210,30 +199,26 @@ public class NodeEndpoint {
     List<DatanodeMetadata> removedDatanodes = new ArrayList<>();
     Map<String, String> failedNodeErrorResponseMap = new HashMap<>();
 
-    Preconditions.checkNotNull(uuids, "Datanode list argument should not be null");
+    Objects.requireNonNull(uuids, "Datanode list argument should not be null");
     Preconditions.checkArgument(!uuids.isEmpty(), "Datanode list argument should not be empty");
     try {
       for (String uuid : uuids) {
-        DatanodeDetails nodeByUuid = nodeManager.getNode(DatanodeID.fromUuidString(uuid));
-        try {
+        final DatanodeInfo nodeByUuid = nodeManager.getNode(DatanodeID.fromUuidString(uuid));
+        if (nodeByUuid != null) {
+          final DatanodeMetadata metadata = DatanodeMetadata.newBuilder()
+              .setDatanode(nodeByUuid)
+              .setState(nodeManager.getNodeStatus(nodeByUuid).getHealth())
+              .build();
+
           if (preChecksSuccess(nodeByUuid, failedNodeErrorResponseMap)) {
-            removedDatanodes.add(DatanodeMetadata.newBuilder()
-                .setHostname(nodeManager.getHostName(nodeByUuid))
-                .setUuid(uuid)
-                .setState(nodeManager.getNodeStatus(nodeByUuid).getHealth())
-                .build());
+            removedDatanodes.add(metadata);
             nodeManager.removeNode(nodeByUuid);
             LOG.info("Node {} removed successfully !!!", uuid);
           } else {
-            failedDatanodes.add(DatanodeMetadata.newBuilder()
-                .setHostname(nodeManager.getHostName(nodeByUuid))
-                .setUuid(uuid)
-                .setOperationalState(nodeByUuid.getPersistedOpState())
-                .setState(nodeManager.getNodeStatus(nodeByUuid).getHealth())
-                .build());
+            failedDatanodes.add(metadata);
           }
-        } catch (NodeNotFoundException nnfe) {
-          LOG.error("Selected node {} not found : {} ", uuid, nnfe);
+        } else {
+          LOG.error("Node not found: {}", uuid);
           notFoundDatanodes.add(DatanodeMetadata.newBuilder()
                   .setHostname("")
                   .setState(NodeState.DEAD)
@@ -241,7 +226,7 @@ public class NodeEndpoint {
         }
       }
     } catch (Exception exp) {
-      LOG.error("Unexpected Error while removing datanodes : {} ", exp);
+      LOG.error("Unexpected Error while removing datanodes {}", uuids, exp);
       throw new WebApplicationException(exp, Response.Status.INTERNAL_SERVER_ERROR);
     }
 
@@ -255,25 +240,19 @@ public class NodeEndpoint {
     }
 
     if (!notFoundDatanodes.isEmpty()) {
-      DatanodesResponse notFoundNodesResp =
-          new DatanodesResponse(notFoundDatanodes.size(), notFoundDatanodes);
+      final DatanodesResponse notFoundNodesResp = new DatanodesResponse(notFoundDatanodes);
       removeDataNodesResponseWrapper.getDatanodesResponseMap().put("notFoundDatanodes", notFoundNodesResp);
     }
 
     if (!removedDatanodes.isEmpty()) {
-      DatanodesResponse removedNodesResp =
-          new DatanodesResponse(removedDatanodes.size(), removedDatanodes);
+      final DatanodesResponse removedNodesResp = new DatanodesResponse(removedDatanodes);
       removeDataNodesResponseWrapper.getDatanodesResponseMap().put("removedDatanodes", removedNodesResp);
     }
     return Response.ok(removeDataNodesResponseWrapper).build();
   }
 
-  private boolean preChecksSuccess(DatanodeDetails nodeByUuid, Map<String, String> failedNodeErrorResponseMap)
-      throws NodeNotFoundException {
-    if (null == nodeByUuid) {
-      throw new NodeNotFoundException();
-    }
-    NodeStatus nodeStatus = null;
+  private boolean preChecksSuccess(DatanodeDetails nodeByUuid, Map<String, String> failedNodeErrorResponseMap) {
+    final NodeStatus nodeStatus;
     AtomicBoolean isContainerOrPipeLineOpen = new AtomicBoolean(false);
     try {
       nodeStatus = nodeManager.getNodeStatus(nodeByUuid);
@@ -305,9 +284,8 @@ public class NodeEndpoint {
             final Pipeline pipeline = pipelineManager.getPipeline(id);
             if (pipeline.isOpen()) {
               LOG.warn("Pipeline : {} is still open for datanode: {}, pre-check failed, datanode not eligible " +
-                  "for remove.", id.getId(), nodeByUuid.getUuid());
+                  "for remove.", id.getId(), nodeByUuid);
               isContainerOrPipeLineOpen.set(true);
-              return;
             }
           } catch (PipelineNotFoundException pipelineNotFoundException) {
             LOG.warn("Pipeline {} is not managed by PipelineManager.", id, pipelineNotFoundException);
@@ -322,10 +300,8 @@ public class NodeEndpoint {
           try {
             final ContainerInfo container = reconContainerManager.getContainer(id);
             if (container.getState() == HddsProtos.LifeCycleState.OPEN) {
-              LOG.warn("Container : {} is still open for datanode: {}, pre-check failed, datanode not eligible " +
-                  "for remove.", container.getContainerID(), nodeByUuid.getUuid());
+              LOG.warn("Failed to remove datanode {} due to OPEN container: {}", nodeByUuid, container);
               isContainerOrPipeLineOpen.set(true);
-              return;
             }
           } catch (ContainerNotFoundException cnfe) {
             LOG.warn("Container {} is not managed by ContainerManager.",
@@ -358,7 +334,7 @@ public class NodeEndpoint {
   public Response getDecommissionInfoForDatanode(@QueryParam("uuid") String uuid,
                                                  @QueryParam("ipAddress") String ipAddress) {
     if (StringUtils.isEmpty(uuid)) {
-      Preconditions.checkNotNull(ipAddress, "Either uuid or ipAddress of a datanode should be provided !!!");
+      Objects.requireNonNull(ipAddress, "Either uuid or ipAddress of a datanode should be provided !!!");
       Preconditions.checkArgument(!ipAddress.isEmpty(),
           "Either uuid or ipAddress of a datanode should be provided !!!");
     }

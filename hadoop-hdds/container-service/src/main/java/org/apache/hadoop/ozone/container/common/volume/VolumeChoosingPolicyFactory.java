@@ -22,6 +22,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSIN
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
+import org.apache.ratis.util.ReflectionUtils;
 
 /**
  * A factory to create volume choosing policy instance based on configuration
@@ -35,10 +36,10 @@ public final class VolumeChoosingPolicyFactory {
   private VolumeChoosingPolicyFactory() {
   }
 
-  public static VolumeChoosingPolicy getPolicy(ConfigurationSource conf)
-      throws InstantiationException, IllegalAccessException {
-    return conf.getClass(HDDS_DATANODE_VOLUME_CHOOSING_POLICY,
-            DEFAULT_VOLUME_CHOOSING_POLICY, VolumeChoosingPolicy.class)
-        .newInstance();
+  public static VolumeChoosingPolicy getPolicy(ConfigurationSource conf) {
+    Class<? extends VolumeChoosingPolicy> policyClass = conf.getClass(
+        HDDS_DATANODE_VOLUME_CHOOSING_POLICY,
+        DEFAULT_VOLUME_CHOOSING_POLICY, VolumeChoosingPolicy.class);
+    return ReflectionUtils.newInstance(policyClass);
   }
 }
