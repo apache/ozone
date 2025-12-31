@@ -64,7 +64,7 @@ public class TestS3RevokeSTSTokenRequest {
     KerberosName.setRuleMechanism(DEFAULT_MECHANISM);
     KerberosName.setRules(
         "RULE:[2:$1@$0](.*@EXAMPLE.COM)s/@.*//\n" + "RULE:[1:$1@$0](.*@EXAMPLE.COM)s/@.*//\n" + "DEFAULT");
-    
+
     secretKeyClient = new SecretKeyTestClient();
     stsTokenSecretManager = new STSTokenSecretManager(secretKeyClient);
     // Multi-tenant manager mock used for tests that exercise the S3 multi-tenancy permission branch.
@@ -98,7 +98,6 @@ public class TestS3RevokeSTSTokenRequest {
 
       final OzoneManagerProtocolProtos.RevokeSTSTokenRequest revokeRequest =
           OzoneManagerProtocolProtos.RevokeSTSTokenRequest.newBuilder()
-              .setAccessKeyId(tempAccessKeyId)
               .setSessionToken(sessionToken)
               .build();
 
@@ -135,7 +134,6 @@ public class TestS3RevokeSTSTokenRequest {
 
     final OzoneManagerProtocolProtos.RevokeSTSTokenRequest revokeRequest =
         OzoneManagerProtocolProtos.RevokeSTSTokenRequest.newBuilder()
-            .setAccessKeyId(tempAccessKeyId)
             .setSessionToken(sessionToken)
             .build();
 
@@ -179,7 +177,6 @@ public class TestS3RevokeSTSTokenRequest {
 
     final OzoneManagerProtocolProtos.RevokeSTSTokenRequest revokeRequest =
         OzoneManagerProtocolProtos.RevokeSTSTokenRequest.newBuilder()
-            .setAccessKeyId(tempAccessKeyId)
             .setSessionToken(sessionToken)
             .build();
 
@@ -224,7 +221,6 @@ public class TestS3RevokeSTSTokenRequest {
 
     final OzoneManagerProtocolProtos.RevokeSTSTokenRequest revokeRequest =
         OzoneManagerProtocolProtos.RevokeSTSTokenRequest.newBuilder()
-            .setAccessKeyId(tempAccessKeyId)
             .setSessionToken(sessionToken)
             .build();
 
@@ -271,7 +267,6 @@ public class TestS3RevokeSTSTokenRequest {
 
       final OzoneManagerProtocolProtos.RevokeSTSTokenRequest revokeRequest =
           OzoneManagerProtocolProtos.RevokeSTSTokenRequest.newBuilder()
-              .setAccessKeyId(tempAccessKeyId)
               .setSessionToken(sessionToken)
               .build();
 
@@ -286,46 +281,6 @@ public class TestS3RevokeSTSTokenRequest {
       ex = assertThrows(OMException.class, () -> omClientRequest.preExecute(ozoneManager));
     }
     assertEquals(OMException.ResultCodes.USER_MISMATCH, ex.getResult());
-  }
-
-  @Test
-  public void testPreExecuteFailsForMismatchedAccessKeyId() throws Exception {
-    // Verify that if the request access key id does not match the one inside the session token, the request is
-    // rejected. This prevents a user with a valid session token from revoking arbitrary STS credentials.
-    final String tempAccessKeyId = "ASIA123456789";
-    final String otherAccessKeyId = "ASI987654321";
-    final String originalAccessKeyId = "original-access-key-id";
-    final String sessionToken = createSessionToken(tempAccessKeyId, originalAccessKeyId);
-
-    // Caller is the owner of the session token, so permissions should pass
-    final UserGroupInformation originalUgi = UserGroupInformation.createRemoteUser(originalAccessKeyId);
-    Server.getCurCall().set(new StubCall(originalUgi));
-
-    final OMException ex;
-    try (OzoneManager ozoneManager = mock(OzoneManager.class)) {
-      when(ozoneManager.isS3MultiTenancyEnabled()).thenReturn(false);
-      when(ozoneManager.isS3Admin(any(UserGroupInformation.class)))
-          .thenReturn(false);
-      when(ozoneManager.getSecretKeyClient()).thenReturn(secretKeyClient);
-
-      // Request tries to revoke otherAccessKeyId using a token for tempAccessKeyId
-      final OzoneManagerProtocolProtos.RevokeSTSTokenRequest revokeRequest =
-          OzoneManagerProtocolProtos.RevokeSTSTokenRequest.newBuilder()
-              .setAccessKeyId(otherAccessKeyId)
-              .setSessionToken(sessionToken)
-              .build();
-
-      final OMRequest omRequest = OMRequest.newBuilder()
-          .setClientId(UUID.randomUUID().toString())
-          .setCmdType(Type.RevokeSTSToken)
-          .setRevokeSTSTokenRequest(revokeRequest)
-          .build();
-
-      final OMClientRequest omClientRequest = new S3RevokeSTSTokenRequest(omRequest);
-
-      ex = assertThrows(OMException.class, () -> omClientRequest.preExecute(ozoneManager));
-    }
-    assertEquals(OMException.ResultCodes.INVALID_REQUEST, ex.getResult());
   }
 
   /**

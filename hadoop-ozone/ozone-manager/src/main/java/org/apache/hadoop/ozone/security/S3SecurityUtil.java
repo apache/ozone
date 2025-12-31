@@ -73,7 +73,7 @@ public final class S3SecurityUtil {
               token, ozoneManager.getSecretKeyClient(), CLOCK);
 
           // Ensure the token is not revoked
-          if (isRevokedStsTempAccessKeyId(stsTokenIdentifier, ozoneManager)) {
+          if (isRevokedStsToken(token, ozoneManager)) {
             LOG.info("Session token has been revoked: {}, {}", stsTokenIdentifier.getTempAccessKeyId(), token);
             throw new OMException("STS token has been revoked", REVOKED_TOKEN);
           }
@@ -140,9 +140,9 @@ public final class S3SecurityUtil {
   }
 
   /**
-   * Returns true if the STS token's temporary access key ID is present in the revoked STS token table.
+   * Returns true if the STS session token is present in the revoked STS token table.
    */
-  private static boolean isRevokedStsTempAccessKeyId(STSTokenIdentifier stsTokenIdentifier, OzoneManager ozoneManager)
+  private static boolean isRevokedStsToken(String sessionToken, OzoneManager ozoneManager)
       throws OMException {
     try {
       final OMMetadataManager metadataManager = ozoneManager.getMetadataManager();
@@ -152,17 +152,14 @@ public final class S3SecurityUtil {
         throw new OMException(msg, INTERNAL_ERROR);
       }
 
-      final Table<String, String> revokedStsTokenTable = metadataManager.getS3RevokedStsTokenTable();
+      final Table<String, Long> revokedStsTokenTable = metadataManager.getS3RevokedStsTokenTable();
       if (revokedStsTokenTable == null) {
         final String msg = "Could not determine STS revocation: revokedStsTokenTable is null";
         LOG.warn(msg);
         throw new OMException(msg, INTERNAL_ERROR);
       }
 
-      // When the STSTokenIdentifier is validated, it ensures the temp access key id is not null/empty
-      final String tempAccessKeyId = stsTokenIdentifier.getTempAccessKeyId();
-
-      return revokedStsTokenTable.getIfExist(tempAccessKeyId) != null;
+      return revokedStsTokenTable.getIfExist(sessionToken) != null;
     } catch (Exception e) {
       final String msg = "Could not determine STS revocation because of Exception: " + e.getMessage();
       LOG.warn(msg, e);

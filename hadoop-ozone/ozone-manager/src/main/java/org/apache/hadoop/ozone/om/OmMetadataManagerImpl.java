@@ -181,7 +181,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private TypedTable<String, String> snapshotRenamedTable;
   private TypedTable<String, CompactionLogEntry> compactionLogTable;
 
-  private TypedTable<String, String> s3RevokedStsTokenTable;
+  private TypedTable<String, Long> s3RevokedStsTokenTable;
 
   private OzoneManager ozoneManager;
 
@@ -489,8 +489,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
     compactionLogTable = initializer.get(OMDBDefinition.COMPACTION_LOG_TABLE_DEF);
 
-    // temporaryAccessKeyId -> sessionToken
-    // FULL_CACHE keeps revocations in memory as there are not expected to be many revoked tokens
+    // sessionToken -> insertionTimeMillis
+    // FULL_CACHE keeps revocations in memory as there are not expected to be many
     s3RevokedStsTokenTable = initializer.get(
         OMDBDefinition.S3_REVOKED_STS_TOKEN_TABLE_DEF, CacheType.FULL_CACHE);
   }
@@ -1691,7 +1691,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
-  public Table<String, String> getS3RevokedStsTokenTable() {
+  public Table<String, Long> getS3RevokedStsTokenTable() {
     return s3RevokedStsTokenTable;
   }
 

@@ -489,7 +489,7 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
    *
    * @return Table.
    */
-  Table<String, String> getS3RevokedStsTokenTable();
+  Table<String, Long> getS3RevokedStsTokenTable();
 
 
   /**

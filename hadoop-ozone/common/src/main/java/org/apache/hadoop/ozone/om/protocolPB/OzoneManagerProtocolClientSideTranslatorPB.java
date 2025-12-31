@@ -2676,10 +2676,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   @Override
-  public void revokeSTSToken(String accessKeyId, String sessionToken) throws IOException {
+  public void revokeSTSToken(String sessionToken) throws IOException {
     final OzoneManagerProtocolProtos.RevokeSTSTokenRequest request =
         OzoneManagerProtocolProtos.RevokeSTSTokenRequest.newBuilder()
-            .setAccessKeyId(accessKeyId)
             .setSessionToken(sessionToken)
             .build();
 

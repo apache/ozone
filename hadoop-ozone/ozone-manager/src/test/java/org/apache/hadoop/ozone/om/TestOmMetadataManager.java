@@ -79,7 +79,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
@@ -105,6 +105,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.util.Time;
+import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -1299,34 +1300,36 @@ public class TestOmMetadataManager {
     // Ensure the table is initialized
     assertNotNull(omMetadataManager.getS3RevokedStsTokenTable(), "s3RevokedStsTokenTable should be initialized");
 
-    final String tempAccessKeyId1 = "ASIA7VUS1EOBCW8RRJVR";
+    final TestClock clock = TestClock.newInstance();
     final String sessionToken1 = "test-session-token-1";
-    final String tempAccessKeyId2 = "ASIA904E65QIGL9ON305";
+    final long insertionTime1 = clock.millis();
     final String sessionToken2 = "test-session-token-2";
-
-    final Table<String, String> table = omMetadataManager.getS3RevokedStsTokenTable();
+    final long insertionTime2 = insertionTime1 + 1234L;
 
     // This table is configured as FULL_CACHE in OmMetadataManagerImpl.
     // A put() writes to RocksDB but does not update the table cache, so get() and getIfExist() will return null unless
     // the cache is updated with addCacheEntry().  getSkipCache() will read the DB instead of the cache.
-    table.put(tempAccessKeyId1, sessionToken1);
-    table.put(tempAccessKeyId2, sessionToken2);
+    final TypedTable<String, Long> revokedTable =
+        (TypedTable<String, Long>) omMetadataManager.getS3RevokedStsTokenTable();
+
+    revokedTable.put(sessionToken1, insertionTime1);
+    revokedTable.put(sessionToken2, insertionTime2);
 
     // Verify the values are persisted in RocksDB.
-    assertEquals(sessionToken1, table.getSkipCache(tempAccessKeyId1));
-    assertEquals(sessionToken2, table.getSkipCache(tempAccessKeyId2));
+    assertEquals(insertionTime1, revokedTable.getSkipCache(sessionToken1));
+    assertEquals(insertionTime2, revokedTable.getSkipCache(sessionToken2));
 
     // Update cache to make get/getIfExist reflect the write for FULL_CACHE tables.
-    table.addCacheEntry(tempAccessKeyId1, sessionToken1, 1L);
-    table.addCacheEntry(tempAccessKeyId2, sessionToken2, 1L);
+    revokedTable.addCacheEntry(sessionToken1, insertionTime1, 1L);
+    revokedTable.addCacheEntry(sessionToken2, insertionTime2, 1L);
 
     // Verify get and getIfExist return the stored value
-    assertEquals(sessionToken1, table.get(tempAccessKeyId1));
-    assertEquals(sessionToken1, table.getIfExist(tempAccessKeyId1));
-    assertEquals(sessionToken2, table.get(tempAccessKeyId2));
-    assertEquals(sessionToken2, table.getIfExist(tempAccessKeyId2));
+    assertEquals(insertionTime1, revokedTable.get(sessionToken1));
+    assertEquals(insertionTime1, revokedTable.getIfExist(sessionToken1));
+    assertEquals(insertionTime2, revokedTable.get(sessionToken2));
+    assertEquals(insertionTime2, revokedTable.getIfExist(sessionToken2));
 
-    // Unknown key should return null for getIfExist
-    assertNull(table.getIfExist("ASIA_UNKNOWN_ACCESS_KEY"));
+    // Invalid sessionToken should return null for getIfExist
+    assertNull(revokedTable.getIfExist("INVALID_SESSION_TOKEN"));
   }
 }
