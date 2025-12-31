@@ -44,7 +44,7 @@ public final class DiskBalancerConfiguration {
           "back to use metadata directory instead.")
   private String infoDir;
 
-  @Config(key = "hdds.datanode.disk.balancer.volume.density.threshold", type = ConfigType.DOUBLE,
+  @Config(key = "hdds.datanode.disk.balancer.volume.density.threshold.percent", type = ConfigType.DOUBLE,
       defaultValue = "10", tags = {ConfigTag.DISKBALANCER},
       description = "Threshold is a percentage in the range of 0 to 100. A " +
           "datanode is considered balanced if for each volume, the " +
@@ -197,12 +197,12 @@ public final class DiskBalancerConfiguration {
   /**
    * Sets the threshold value for Disk Balancer.
    *
-   * @param threshold a percentage value in the range 0 to 100
+   * @param threshold a percentage value in the range (0 to 100) both exclusive
    */
   public void setThreshold(double threshold) {
-    if (threshold < 0d || threshold >= 100d) {
+    if (threshold <= 0d || threshold >= 100d) {
       throw new IllegalArgumentException(
-          "Threshold must be a percentage(double) in the range 0 to 100.");
+          "Threshold must be a percentage(double) in the range 0 to 100 both exclusive.");
     }
     this.threshold = threshold;
   }
