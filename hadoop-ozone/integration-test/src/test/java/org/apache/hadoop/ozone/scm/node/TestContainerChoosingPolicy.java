@@ -66,6 +66,7 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -272,12 +273,16 @@ public class TestContainerChoosingPolicy {
 
       containerData.setState(isOpen ? ContainerDataProto.State.OPEN : ContainerDataProto.State.CLOSED);
       containerData.setVolume(volume);
+      // Set some bytes used for containers so they can be chosen for disk balancing
+      // Use a small non-zero value to ensure containers are not skipped
+      long bytesUsed = isOpen ? 0 : (i % 1000 + 1) * 1024L; // 1KB to 1MB for closed containers
+      containerData.getStatistics().setBlockBytesForTesting(bytesUsed);
       KeyValueContainer container = new KeyValueContainer(containerData, CONF);
 
       try {
         containerSet.addContainer(container); // Add container to ContainerSet
       } catch (Exception e) {
-        throw new RuntimeException("Failed to add container to ContainerSet", e);
+        Assertions.fail(e.getMessage());
       }
 
       // Collect IDs of closed containers

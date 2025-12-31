@@ -658,7 +658,7 @@ public class RpcClient implements ClientProtocol {
         .setOwner(owner);
 
     if (bucketArgs.getAcls() != null) {
-      builder.setAcls(bucketArgs.getAcls());
+      builder.acls().addAll(bucketArgs.getAcls());
     }
 
     // Link bucket default acl

@@ -39,7 +39,7 @@ import picocli.CommandLine.Command;
  *
  * To start:
  *      ozone admin datanode diskbalancer start {@literal <host[:port]>} [{@literal <host[:port]>} ...]
- *      [ -t/--threshold {@literal <threshold>}]
+ *      [ -t/--threshold-percentage {@literal <threshold>}]
  *      [ -b/--bandwidth-in-mb {@literal <bandwidthInMB>}]
  *      [ -p/--parallel-thread {@literal <parallelThread>}]
  *      [ -s/--stop-after-disk-even {@literal <stopAfterDiskEven>}]
@@ -97,7 +97,7 @@ import picocli.CommandLine.Command;
  *
  * To update:
  *      ozone admin datanode diskbalancer update {@literal <host[:port]>} [{@literal <host[:port]>} ...]
- *      [ -t/--threshold {@literal <threshold>}]
+ *      [ -t/--threshold-percentage {@literal <threshold>}]
  *      [ -b/--bandwidth-in-mb {@literal <bandwidthInMB>}]
  *      [ -p/--parallel-thread {@literal <parallelThread>}]
  *      [ -s/--stop-after-disk-even {@literal <stopAfterDiskEven>}]

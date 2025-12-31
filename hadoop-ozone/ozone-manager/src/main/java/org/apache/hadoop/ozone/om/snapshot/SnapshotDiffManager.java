@@ -116,6 +116,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotDiffJob;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
+import org.apache.hadoop.ozone.om.snapshot.db.SnapshotDiffDBDefinition;
 import org.apache.hadoop.ozone.om.snapshot.diff.delta.CompositeDeltaDiffComputer;
 import org.apache.hadoop.ozone.om.snapshot.diff.delta.DeltaFileComputer;
 import org.apache.hadoop.ozone.om.snapshot.util.TableMergeIterator;
@@ -141,11 +142,7 @@ import org.slf4j.LoggerFactory;
  * Class to generate snapshot diff.
  */
 public class SnapshotDiffManager implements AutoCloseable {
-  private static final Logger LOG =
-          LoggerFactory.getLogger(SnapshotDiffManager.class);
-  private static final String FROM_SNAP_TABLE_SUFFIX = "-from-snap";
-  private static final String TO_SNAP_TABLE_SUFFIX = "-to-snap";
-  private static final String UNIQUE_IDS_TABLE_SUFFIX = "-unique-ids";
+  private static final Logger LOG = LoggerFactory.getLogger(SnapshotDiffManager.class);
   private static final String DELETE_DIFF_TABLE_SUFFIX = "-delete-diff";
   private static final String RENAME_DIFF_TABLE_SUFFIX = "-rename-diff";
   private static final String CREATE_DIFF_TABLE_SUFFIX = "-create-diff";
@@ -816,11 +813,11 @@ public class SnapshotDiffManager implements AutoCloseable {
       // JobId is prepended to column families name to make them unique
       // for request.
       fromSnapshotColumnFamily =
-          createColumnFamily(jobId + FROM_SNAP_TABLE_SUFFIX);
+          createColumnFamily(jobId + SnapshotDiffDBDefinition.SNAP_DIFF_FROM_SNAP_OBJECT_TABLE_NAME);
       toSnapshotColumnFamily =
-          createColumnFamily(jobId + TO_SNAP_TABLE_SUFFIX);
+          createColumnFamily(jobId + SnapshotDiffDBDefinition.SNAP_DIFF_TO_SNAP_OBJECT_TABLE_NAME);
       objectIDsColumnFamily =
-          createColumnFamily(jobId + UNIQUE_IDS_TABLE_SUFFIX);
+          createColumnFamily(jobId + SnapshotDiffDBDefinition.SNAP_DIFF_UNIQUE_IDS_TABLE_NAME);
 
       // ObjectId to keyName map to keep key info for fromSnapshot.
       // objectIdToKeyNameMap is used to identify what keys were touched
@@ -1084,16 +1081,12 @@ public class SnapshotDiffManager implements AutoCloseable {
           throw new RuntimeException(e);
         }
       }
-    } catch (RocksDBException rocksDBException) {
-      // TODO: [SNAPSHOT] Gracefully handle exception
-      //  e.g. when input files do not exist
-      throw new RuntimeException(rocksDBException);
     }
   }
 
   private void validateEstimatedKeyChangesAreInLimits(
       SstFileSetReader sstFileReader
-  ) throws RocksDBException, IOException {
+  ) throws IOException {
     if (sstFileReader.getEstimatedTotalKeys() >
         maxAllowedKeyChangesForASnapDiff) {
       // TODO: [SNAPSHOT] HDDS-8202: Change it to custom snapshot exception.

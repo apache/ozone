@@ -18,12 +18,10 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import com.google.common.collect.ImmutableList;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.protocol.StorageType;
@@ -56,9 +54,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
    */
   private final String bucketName;
   /**
-   * ACL Information (mutable).
+   * ACL Information.
    */
-  private final CopyOnWriteArrayList<OzoneAcl> acls;
+  private final ImmutableList<OzoneAcl> acls;
   /**
    * Bucket Version flag.
    */
@@ -113,7 +111,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     super(b);
     this.volumeName = b.volumeName;
     this.bucketName = b.bucketName;
-    this.acls = new CopyOnWriteArrayList<>(b.acls);
+    this.acls = b.acls.build();
     this.isVersionEnabled = b.isVersionEnabled;
     this.storageType = b.storageType;
     this.creationTime = b.creationTime;
@@ -157,36 +155,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
    * @return {@literal List<OzoneAcl>}
    */
   public List<OzoneAcl> getAcls() {
-    return ImmutableList.copyOf(acls);
-  }
-
-  /**
-   * Add an ozoneAcl to list of existing Acl set.
-   * @param ozoneAcl
-   * @return true - if successfully added, false if not added or acl is
-   * already existing in the acl list.
-   */
-  public boolean addAcl(OzoneAcl ozoneAcl) {
-    return OzoneAclUtil.addAcl(acls, ozoneAcl);
-  }
-
-  /**
-   * Remove acl from existing acl list.
-   * @param ozoneAcl
-   * @return true - if successfully removed, false if not able to remove due
-   * to that acl is not in the existing acl list.
-   */
-  public boolean removeAcl(OzoneAcl ozoneAcl) {
-    return OzoneAclUtil.removeAcl(acls, ozoneAcl);
-  }
-
-  /**
-   * Reset the existing acl list.
-   * @param ozoneAcls
-   * @return true - if successfully able to reset.
-   */
-  public boolean setAcls(List<OzoneAcl> ozoneAcls) {
-    return OzoneAclUtil.setAcl(acls, ozoneAcls);
+    return acls;
   }
 
   /**
@@ -411,7 +380,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         .setBucketEncryptionKey(bekInfo)
         .setSourceVolume(sourceVolume)
         .setSourceBucket(sourceBucket)
-        .setAcls(acls)
         .setUsedBytes(usedBytes)
         .setUsedNamespace(usedNamespace)
         .setQuotaInBytes(quotaInBytes)
@@ -429,7 +397,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
   public static class Builder extends WithObjectID.Builder<OmBucketInfo> {
     private String volumeName;
     private String bucketName;
-    private final List<OzoneAcl> acls = new ArrayList<>();
+    private final AclListBuilder acls;
     private boolean isVersionEnabled;
     private StorageType storageType = StorageType.DISK;
     private long creationTime;
@@ -448,10 +416,12 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     private long snapshotUsedNamespace;
 
     public Builder() {
+      acls = AclListBuilder.empty();
     }
 
     private Builder(OmBucketInfo obj) {
       super(obj);
+      acls = AclListBuilder.of(obj.acls);
     }
 
     public Builder setVolumeName(String volume) {
@@ -466,12 +436,12 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
 
     public Builder setAcls(List<OzoneAcl> listOfAcls) {
       if (listOfAcls != null) {
-        this.acls.addAll(listOfAcls);
+        this.acls.set(listOfAcls);
       }
       return this;
     }
 
-    public List<OzoneAcl> getAcls() {
+    public AclListBuilder acls() {
       return acls;
     }
 
@@ -511,12 +481,6 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     @Override
     public Builder setUpdateID(long id) {
       super.setUpdateID(id);
-      return this;
-    }
-
-    @Override
-    public Builder addMetadata(String key, String value) {
-      super.addMetadata(key, value);
       return this;
     }
 

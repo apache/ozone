@@ -44,6 +44,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.Stack;
 import java.util.UUID;
@@ -590,7 +591,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     private final HierarchicalResourceLock lock;
     private final HierarchicalResourceLock previousLock;
     private final OmSnapshotLocalData snapshotLocalData;
-    private OmSnapshotLocalData previousSnapshotLocalData;
+    private Optional<OmSnapshotLocalData> previousSnapshotLocalData;
     private volatile boolean isPreviousSnapshotLoaded = false;
     private final UUID resolvedPreviousSnapshotId;
 
@@ -616,7 +617,7 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       this.lock = result.getLock();
       this.previousLock = result.getPreviousLock();
       this.resolvedPreviousSnapshotId = result.getPreviousSnapshotId();
-      this.previousSnapshotLocalData = null;
+      this.previousSnapshotLocalData = Optional.empty();
       this.isPreviousSnapshotLoaded = false;
     }
 
@@ -624,11 +625,12 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
       return snapshotLocalData;
     }
 
-    public synchronized OmSnapshotLocalData getPreviousSnapshotLocalData() throws IOException {
+    public synchronized Optional<OmSnapshotLocalData> getPreviousSnapshotLocalData() throws IOException {
       if (!isPreviousSnapshotLoaded) {
         if (resolvedPreviousSnapshotId != null) {
           File previousSnapshotLocalDataFile = new File(getSnapshotLocalPropertyYamlPath(resolvedPreviousSnapshotId));
-          this.previousSnapshotLocalData = snapshotLocalDataSerializer.load(previousSnapshotLocalDataFile);
+          this.previousSnapshotLocalData =
+              Optional.ofNullable(snapshotLocalDataSerializer.load(previousSnapshotLocalDataFile));
         }
         this.isPreviousSnapshotLoaded = true;
       }
@@ -863,9 +865,9 @@ public class OmSnapshotLocalDataManager implements AutoCloseable {
     public void addSnapshotVersion(RDBStore snapshotStore) throws IOException {
       List<LiveFileMetaData> sstFiles = getLiveSSTFilesForCFs(snapshotStore.getDb().getManagedRocksDb(),
           COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT);
-      OmSnapshotLocalData previousSnapshotLocalData = getPreviousSnapshotLocalData();
-      this.getSnapshotLocalData().addVersionSSTFileInfos(sstFiles, previousSnapshotLocalData == null ? 0 :
-          previousSnapshotLocalData.getVersion());
+      Optional<OmSnapshotLocalData> previousSnapshotLocalData = getPreviousSnapshotLocalData();
+      this.getSnapshotLocalData().addVersionSSTFileInfos(sstFiles,
+          previousSnapshotLocalData.map(OmSnapshotLocalData::getVersion).orElse(0));
       // Adding a new snapshot version means it has been defragged thus the flag needs to be reset.
       this.getSnapshotLocalData().setNeedsDefrag(false);
       // Set Dirty if a version is added.

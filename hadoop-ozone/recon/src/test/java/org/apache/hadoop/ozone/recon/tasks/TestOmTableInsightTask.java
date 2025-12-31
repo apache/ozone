@@ -38,6 +38,8 @@ import static org.apache.hadoop.ozone.recon.tasks.OMDBUpdateEvent.OMDBUpdateActi
 import static org.apache.ozone.recon.schema.generated.tables.GlobalStatsTable.GLOBAL_STATS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -53,6 +55,7 @@ import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TypedTable;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
@@ -346,6 +349,25 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
   @Test
   public void testReprocessForCount() throws Exception {
     OMMetadataManager omMetadataManager = mock(OmMetadataManagerImpl.class);
+    
+    // Mock DBStore for getStore() calls
+    DBStore mockStore = mock(DBStore.class);
+    when(omMetadataManager.getStore()).thenReturn(mockStore);
+    
+    // Mock getDeletedTable() for DeletedKeysInsightHandler
+    TypedTable<String, RepeatedOmKeyInfo> deletedTable = mock(TypedTable.class);
+    TypedTable.TypedTableIterator deletedIter = mock(TypedTable.TypedTableIterator.class);
+    when(deletedTable.iterator()).thenReturn(deletedIter);
+    when(omMetadataManager.getDeletedTable()).thenReturn(deletedTable);
+    when(deletedIter.hasNext()).thenReturn(true, true, true, true, true, false);
+    
+    RepeatedOmKeyInfo deletedKeyInfo = mock(RepeatedOmKeyInfo.class);
+    when(deletedKeyInfo.getTotalSize()).thenReturn(ImmutablePair.of(100L, 100L));
+    when(deletedKeyInfo.getOmKeyInfoList()).thenReturn(Arrays.asList(mock(OmKeyInfo.class)));
+    
+    Table.KeyValue deletedKv = mock(Table.KeyValue.class);
+    when(deletedKv.getValue()).thenReturn(deletedKeyInfo);
+    when(deletedIter.next()).thenReturn(deletedKv);
 
     // Mock 5 rows in each table and test the count
     for (String tableName : omTableInsightTask.getTaskTables()) {
@@ -353,8 +375,13 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
       TypedTable.TypedTableIterator mockIter =
           mock(TypedTable.TypedTableIterator.class);
       when(table.iterator()).thenReturn(mockIter);
+      when(table.keyIterator()).thenReturn(mockIter);
+      when(table.getEstimatedKeyCount()).thenReturn(5L);
       when(omMetadataManager.getTable(tableName)).thenReturn(table);
       when(mockIter.hasNext()).thenReturn(true, true, true, true, true, false);
+      
+      // Mock DBStore.getTable() to return the same table
+      when(mockStore.getTable(eq(tableName), any(), any(), any())).thenAnswer(invocation -> table);
 
       final Table.KeyValue mockKeyValue = mock(Table.KeyValue.class);
 

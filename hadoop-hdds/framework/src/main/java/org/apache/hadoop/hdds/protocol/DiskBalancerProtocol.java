@@ -22,9 +22,11 @@ import java.io.Closeable;
 import java.io.IOException;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.hadoop.hdds.protocol.proto.DiskBalancerProtocolProtos.DatanodeDiskBalancerInfoType;
+import org.apache.hadoop.hdds.protocol.proto.DiskBalancerProtocolProtos.GetDiskBalancerInfoRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDiskBalancerInfoProto;
 import org.apache.hadoop.io.retry.Idempotent;
+import org.apache.hadoop.ozone.ClientVersion;
 
 /**
  * Client-to-datanode RPC protocol for administering DiskBalancer.
@@ -35,23 +37,22 @@ public interface DiskBalancerProtocol extends Closeable {
 
   long VERSIONID = 1L;
 
+  GetDiskBalancerInfoRequestProto DEFAULT_GET_DISK_BALANCER_INFO_REQUEST
+      = GetDiskBalancerInfoRequestProto.newBuilder().setClientVersion(ClientVersion.CURRENT_VERSION).build();
+
+  @Idempotent
+  default DatanodeDiskBalancerInfoProto getDiskBalancerInfo() throws IOException {
+    return getDiskBalancerInfo(DEFAULT_GET_DISK_BALANCER_INFO_REQUEST);
+  }
+
   /**
    * Get DiskBalancer information for a datanode.
    * 
-   * <p>The type of information returned depends on the infoType parameter:
-   * <ul>
-   *   <li>{@link DatanodeDiskBalancerInfoType#REPORT} - Returns volume density (lightweight)</li>
-   *   <li>{@link DatanodeDiskBalancerInfoType#STATUS} - Returns detailed status with counters</li>
-   * </ul>
-   *
-   * @param infoType type of information to retrieve (REPORT or STATUS)
-   * @param clientVersion protocol client version
    * @return DiskBalancer information for the datanode
    * @throws IOException on RPC or serialization errors
    */
   @Idempotent
-  HddsProtos.DatanodeDiskBalancerInfoProto getDiskBalancerInfo(
-      DatanodeDiskBalancerInfoType infoType, int clientVersion) throws IOException;
+  DatanodeDiskBalancerInfoProto getDiskBalancerInfo(GetDiskBalancerInfoRequestProto request) throws IOException;
 
   /**
    * Start DiskBalancer on the datanode using the provided configuration. When

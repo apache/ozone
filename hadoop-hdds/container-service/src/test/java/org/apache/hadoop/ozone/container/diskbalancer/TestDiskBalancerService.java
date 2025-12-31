@@ -18,10 +18,12 @@
 package org.apache.hadoop.ozone.container.diskbalancer;
 
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
+import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.getVolumeUsages;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
@@ -29,7 +31,6 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.google.common.collect.ImmutableList;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -53,6 +54,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.VolumeFixedUsage;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultVolumeChoosingPolicy;
@@ -254,10 +256,9 @@ public class TestDiskBalancerService {
     long expectedBytesToMove = (long) Math.ceil(
         (totalCapacity * expectedBytesToMovePercent) / 100.0 * totalOverUtilisedVolumes);
 
-    ImmutableList<HddsVolume> immutableVolumes = DiskBalancerVolumeCalculation.getImmutableVolumeSet(volumeSet);
-
+    final List<VolumeFixedUsage> volumeUsages = getVolumeUsages(volumeSet, null);
     // data precision loss due to double data involved in calculation
-    assertTrue(Math.abs(expectedBytesToMove - svc.calculateBytesToMove(immutableVolumes)) <= 1);
+    assertTrue(Math.abs(expectedBytesToMove - svc.calculateBytesToMove(volumeUsages)) <= 1);
   }
 
   @Test
@@ -295,7 +296,8 @@ public class TestDiskBalancerService {
     when(containerData.getBytesUsed()).thenReturn(100L);
 
     when(volumePolicy.chooseVolume(any(), anyDouble(), any(), anyLong())).thenReturn(Pair.of(source, dest));
-    when(containerPolicy.chooseContainer(any(), any(), any(), any(), any(), any(), any())).thenReturn(containerData);
+    when(containerPolicy.chooseContainer(any(), any(), any(), any(), anyDouble(), any(), any()))
+        .thenReturn(containerData);
 
     // Test when no tasks are in progress, it should schedule up to the limit
     BackgroundTaskQueue queue = svc.getTasks();
@@ -327,18 +329,53 @@ public class TestDiskBalancerService {
     ContainerTestVersionInfo.setTestSchemaVersion(schemaVersion, conf);
   }
 
+  public static Stream<Arguments> thresholdValidationTestCases() {
+    return Stream.of(
+        // Invalid values that should throw IllegalArgumentException
+        Arguments.arguments(0.0, true, null),
+        Arguments.arguments(100.0, true, null),
+        Arguments.arguments(-1.0, true, null),
+        Arguments.arguments(-0.001, true, null),
+        Arguments.arguments(100.001, true, null),
+        // Valid boundary values that should be accepted
+        Arguments.arguments(0.001, false, 0.001),
+        Arguments.arguments(99.999, false, 99.999),
+        // Valid middle values that should be accepted
+        Arguments.arguments(50.5, false, 50.5),
+        Arguments.arguments(99.0, false, 99.0)
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("thresholdValidationTestCases")
+  public void testDiskBalancerConfigurationThresholdValidation(double threshold,
+      boolean shouldThrowException, Double expectedThreshold) {
+    DiskBalancerConfiguration config = new DiskBalancerConfiguration();
+
+    if (shouldThrowException) {
+      IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+          () -> config.setThreshold(threshold));
+      assertEquals("Threshold must be a percentage(double) in the range 0 to 100 both exclusive.",
+          exception.getMessage());
+    } else {
+      // Valid threshold should be accepted
+      config.setThreshold(threshold);
+      assertEquals(expectedThreshold, config.getThreshold(), 0.0001);
+    }
+  }
+
   @Test
   public void testDiskBalancerTmpDirCreatedAtCorrectLocation() throws Exception {
     // Start volumes to initialize tmp directories
     volumeSet.startAllVolume();
-    
+
     ContainerSet containerSet = ContainerSet.newReadOnlyContainerSet(1000);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
         new KeyValueHandler(conf, datanodeUuid, containerSet, volumeSet,
             metrics, c -> {
         }, new ContainerChecksumTreeManager(conf));
-    
+
     // Use actual DiskBalancerService (not TestImpl) to test the real start() method
     OzoneContainer ozoneContainer = mockDependencies(containerSet, keyValueHandler, null);
     DiskBalancerService svc = new DiskBalancerService(ozoneContainer, 1000, 1000,
@@ -355,24 +392,24 @@ public class TestDiskBalancerService {
         HddsVolume hddsVolume = (HddsVolume) volume;
         File hddsRootDir = hddsVolume.getHddsRootDir();
         File volumeTmpDir = hddsVolume.getTmpDir();
-        
+
         // Expected correct location: hdds/<cluster-id>/tmp/diskBalancer
         File expectedDiskBalancerTmpDir = new File(volumeTmpDir, DiskBalancerService.DISK_BALANCER_DIR);
-        
+
         // Verify the correct location exists
         assertTrue(expectedDiskBalancerTmpDir.exists());
         assertTrue(expectedDiskBalancerTmpDir.isDirectory());
-        
+
         // Verify it's NOT created at the wrong location: volume-root/tmp/diskBalancer
         File volumeRootDir = new File(hddsVolume.getVolumeRootDir());
-        File wrongLocation = new File(volumeRootDir, "tmp" + File.separator + 
+        File wrongLocation = new File(volumeRootDir, "tmp" + File.separator +
             DiskBalancerService.DISK_BALANCER_DIR);
-        
+
         // The wrong location should NOT exist (unless it's the same as correct location)
         if (!wrongLocation.getAbsolutePath().equals(expectedDiskBalancerTmpDir.getAbsolutePath())) {
           assertFalse(wrongLocation.exists());
         }
-        
+
         // Verify the path structure: should be under hdds/<cluster-id>/tmp/diskBalancer
         String expectedPath = hddsRootDir.getAbsolutePath() + File.separator + scmId +
             File.separator + "tmp" + File.separator + DiskBalancerService.DISK_BALANCER_DIR;
@@ -389,7 +426,7 @@ public class TestDiskBalancerService {
     // This simulates volumes that are formatted but tmpDir is not initialized
     MutableVolumeSet testVolumeSet = new MutableVolumeSet(datanodeUuid, scmId, conf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
-    
+
     // Format volumes and ensure clusterID directory exists, but DON'T create tmp dirs
     // This simulates the scenario where tmpDir is null
     for (StorageVolume volume : testVolumeSet.getVolumesList()) {
@@ -408,19 +445,19 @@ public class TestDiskBalancerService {
         assertNull(hddsVolume.getTmpDir());
       }
     }
-    
+
     ContainerSet containerSet = ContainerSet.newReadOnlyContainerSet(1000);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
         new KeyValueHandler(conf, datanodeUuid, containerSet, testVolumeSet,
             metrics, c -> {
         }, new ContainerChecksumTreeManager(conf));
-    
+
     // Use actual DiskBalancerService (not TestImpl) to test the real start() method
     OzoneContainer ozoneContainer = mockDependencies(containerSet, keyValueHandler, null);
     // Override getVolumeSet to return our test volume set
     when(ozoneContainer.getVolumeSet()).thenReturn(testVolumeSet);
-    
+
     DiskBalancerService svc = new DiskBalancerService(ozoneContainer, 1000, 1000,
         TimeUnit.MILLISECONDS, 1, conf);
 
@@ -435,22 +472,22 @@ public class TestDiskBalancerService {
         HddsVolume hddsVolume = (HddsVolume) volume;
         File hddsRootDir = hddsVolume.getHddsRootDir();
         File volumeTmpDir = hddsVolume.getTmpDir();
-        
+
         // Verify tmpDir is now initialized (created by checkTmpDirExists())
         assertNotNull(volumeTmpDir);
         assertTrue(volumeTmpDir.exists());
         assertTrue(volumeTmpDir.isDirectory());
-        
+
         // Verify tmpDir is at the correct location: hdds/<cluster-id>/tmp
         String expectedTmpPath = hddsRootDir.getAbsolutePath() + File.separator + scmId +
             File.separator + "tmp";
         assertEquals(expectedTmpPath, volumeTmpDir.getAbsolutePath());
-        
+
         // Verify diskBalancer directory is created at the correct location
         File expectedDiskBalancerTmpDir = new File(volumeTmpDir, DiskBalancerService.DISK_BALANCER_DIR);
         assertTrue(expectedDiskBalancerTmpDir.exists());
         assertTrue(expectedDiskBalancerTmpDir.isDirectory());
-        
+
         // Verify the complete path structure: hdds/<cluster-id>/tmp/diskBalancer
         String expectedDiskBalancerPath = hddsRootDir.getAbsolutePath() + File.separator + scmId +
             File.separator + "tmp" + File.separator + DiskBalancerService.DISK_BALANCER_DIR;

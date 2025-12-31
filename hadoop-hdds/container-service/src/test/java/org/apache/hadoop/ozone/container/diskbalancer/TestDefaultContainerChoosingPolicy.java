@@ -35,12 +35,14 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsagePersistence;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
@@ -154,14 +156,7 @@ public class TestDefaultContainerChoosingPolicy {
    */
   private void createContainer(long id, long size, HddsVolume vol)
       throws IOException {
-    KeyValueContainerData containerData = new KeyValueContainerData(id,
-        ContainerLayoutVersion.FILE_PER_BLOCK, size,
-        UUID.randomUUID().toString(), UUID.randomUUID().toString());
-    containerData.setState(ContainerDataProto.State.CLOSED);
-    containerData.setVolume(vol);
-    containerData.getStatistics().setBlockBytesForTesting(size);
-    KeyValueContainer container = new KeyValueContainer(containerData, CONF);
-    containerSet.addContainer(container);
+    createContainer(id, size, vol, containerSet);
   }
 
   @Test
@@ -199,5 +194,57 @@ public class TestDefaultContainerChoosingPolicy {
 
     // No containers should not be chosen
     assertNull(chosenContainer);
+  }
+
+  @Test
+  public void testSizeZeroContainersSkipped() throws IOException {
+    // Create a new container set with containers that have size 0
+    ContainerSet testContainerSet = newContainerSet();
+    
+    // Create containers with size 0 (should be skipped)
+    createContainer(10L, 0L, sourceVolume, testContainerSet);
+    createContainer(11L, 0L, sourceVolume, testContainerSet);
+    
+    // Create a container with non-zero size (should be chosen)
+    createContainer(12L, 200L * MB, sourceVolume, testContainerSet);
+    
+    // Mock OzoneContainer to return our test container set
+    OzoneContainer testOzoneContainer = mock(OzoneContainer.class);
+    ContainerController testController = new ContainerController(testContainerSet, null);
+    when(testOzoneContainer.getController()).thenReturn(testController);
+    
+    // The policy should skip containers 10 and 11 (size 0) and choose container 12
+    ContainerData chosenContainer = policy.chooseContainer(testOzoneContainer,
+        sourceVolume, destVolume1, inProgressContainerIDs, THRESHOLD, volumeSet, deltaMap);
+    
+    // Container 12 (non-zero size) should be chosen, skipping containers 10 and 11 (size 0)
+    assertNotNull(chosenContainer);
+    assertEquals(12L, chosenContainer.getContainerID());
+    assertEquals(200L * MB, chosenContainer.getBytesUsed());
+  }
+
+  /**
+   * Create KeyValueContainers and add it to the specified containerSet.
+   * @param id container ID
+   * @param usedBytes bytes used by the container (can be 0)
+   * @param vol volume where container is located
+   * @param targetContainerSet container set to add the container to
+   */
+  private void createContainer(long id, long usedBytes, HddsVolume vol,
+      ContainerSet targetContainerSet) throws IOException {
+    // Use maxSize as the container capacity (must be > 0)
+    // If usedBytes is 0, we still need a valid maxSize for container creation
+    long maxSize = usedBytes > 0 ? usedBytes : (long) CONF.getStorageSize(
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
+        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
+    KeyValueContainerData containerData = new KeyValueContainerData(id,
+        ContainerLayoutVersion.FILE_PER_BLOCK, maxSize,
+        UUID.randomUUID().toString(), UUID.randomUUID().toString());
+    containerData.setState(ContainerDataProto.State.CLOSED);
+    containerData.setVolume(vol);
+    // Set the actual used bytes (can be 0)
+    containerData.getStatistics().setBlockBytesForTesting(usedBytes);
+    KeyValueContainer container = new KeyValueContainer(containerData, CONF);
+    targetContainerSet.addContainer(container);
   }
 }

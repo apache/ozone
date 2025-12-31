@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
+import org.apache.hadoop.hdds.utils.db.IteratorType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -63,15 +64,15 @@ public class ManagedRawSSTFileReader<T> implements Closeable {
 
   public ManagedRawSSTFileIterator<T> newIterator(
       Function<ManagedRawSSTFileIterator.KeyValue, T> transformerFunction,
-      ManagedSlice fromSlice, ManagedSlice toSlice) {
+      ManagedSlice fromSlice, ManagedSlice toSlice, IteratorType type) {
     long fromNativeHandle = fromSlice == null ? 0 : fromSlice.getNativeHandle();
     long toNativeHandle = toSlice == null ? 0 : toSlice.getNativeHandle();
     LOG.info("Iterating SST file: {} with native lib. " +
-            "LowerBound: {}, UpperBound: {}", fileName, fromSlice, toSlice);
+            "LowerBound: {}, UpperBound: {}, type : {}", fileName, fromSlice, toSlice, type);
     return new ManagedRawSSTFileIterator<>(
         newIterator(this.nativeHandle, fromSlice != null,
             fromNativeHandle, toSlice != null, toNativeHandle),
-        transformerFunction);
+        transformerFunction, type);
   }
 
   private native long newRawSSTFileReader(long optionsHandle, String filePath, int readSize);

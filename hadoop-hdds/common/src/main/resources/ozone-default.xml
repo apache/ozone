@@ -4343,6 +4343,43 @@
       recon rocks DB containerKeyTable
     </description>
   </property>
+
+  <property>
+    <name>ozone.recon.filesizecount.flush.db.max.threshold</name>
+    <value>200000</value>
+    <tag>OZONE, RECON, PERFORMANCE</tag>
+    <description>
+      Maximum threshold number of entries to hold in memory for File Size Count task in hashmap before flushing to
+      recon derby DB
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.recon.task.reprocess.max.iterators</name>
+    <value>5</value>
+    <tag>OZONE, RECON, PERFORMANCE</tag>
+    <description>
+      Maximum number of iterator threads to use for parallel table iteration during reprocess
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.recon.task.reprocess.max.workers</name>
+    <value>20</value>
+    <tag>OZONE, RECON, PERFORMANCE</tag>
+    <description>
+      Maximum number of worker threads to use for parallel table processing during reprocess
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.recon.task.reprocess.max.keys.in.memory</name>
+    <value>2000</value>
+    <tag>OZONE, RECON, PERFORMANCE</tag>
+    <description>
+      Maximum number of keys to batch in memory before handing to worker threads during parallel reprocess
+    </description>
+  </property>
     
   <property>
     <name>ozone.recon.heatmap.provider</name>

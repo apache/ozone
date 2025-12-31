@@ -25,10 +25,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
-import org.apache.hadoop.hdds.protocol.proto.DiskBalancerProtocolProtos.DatanodeDiskBalancerInfoType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDiskBalancerInfoProto;
-import org.apache.hadoop.ozone.ClientVersion;
 import picocli.CommandLine.Command;
 
 /**
@@ -50,10 +48,7 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
     DiskBalancerProtocol diskBalancerProxy = DiskBalancerSubCommandUtil
         .getSingleNodeDiskBalancerProxy(hostName);
     try {
-      DatanodeDiskBalancerInfoProto status =
-          diskBalancerProxy.getDiskBalancerInfo(
-              DatanodeDiskBalancerInfoType.STATUS,
-              ClientVersion.CURRENT_VERSION);
+      final DatanodeDiskBalancerInfoProto status = diskBalancerProxy.getDiskBalancerInfo();
       
       // Only create JSON result object if JSON mode is enabled
       if (getOptions().isJson()) {
@@ -129,8 +124,13 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
       contentList.add(estimatedTimeLeft >= 0 ? String.valueOf(estimatedTimeLeft) : "N/A");
     }
 
-    formatBuilder.append("%nNote: Estimated time left is calculated" +
-        " based on the estimated bytes to move and the configured disk bandwidth.");
+    formatBuilder.append("%nNote:%n");
+    formatBuilder.append("  - EstBytesToMove is calculated based on the target disk even state" +
+        " with the configured threshold.%n");
+    formatBuilder.append("  - EstTimeLeft is calculated based on EstimatedBytesToMove and configured" +
+        " disk bandwidth.%n");
+    formatBuilder.append("  - Both EstimatedBytes and EstTimeLeft could be non-zero while no containers" +
+        " can be moved, especially when the configured threshold or disk capacity is too small.");
 
     return String.format(formatBuilder.toString(),
         contentList.toArray(new String[0]));

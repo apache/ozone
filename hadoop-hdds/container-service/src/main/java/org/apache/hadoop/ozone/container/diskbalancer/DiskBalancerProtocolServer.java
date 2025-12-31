@@ -22,7 +22,7 @@ import java.io.IOException;
 import java.util.Objects;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
-import org.apache.hadoop.hdds.protocol.proto.DiskBalancerProtocolProtos.DatanodeDiskBalancerInfoType;
+import org.apache.hadoop.hdds.protocol.proto.DiskBalancerProtocolProtos.GetDiskBalancerInfoRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDiskBalancerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerConfigurationProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
@@ -64,43 +64,32 @@ public class DiskBalancerProtocolServer implements DiskBalancerProtocol {
   }
 
   @Override
-  public DatanodeDiskBalancerInfoProto getDiskBalancerInfo(
-      DatanodeDiskBalancerInfoType infoType, int clientVersion) throws IOException {
+  public DatanodeDiskBalancerInfoProto getDiskBalancerInfo(GetDiskBalancerInfoRequestProto request) throws IOException {
     // No admin check - both report and status are read-only
-    DiskBalancerInfo info = getDiskBalancerInfo();
+    final DiskBalancerInfo info = getDiskBalancerInfoImpl();
     DatanodeDetails datanodeDetails = datanodeStateMachine.getDatanodeDetails();
 
-    DatanodeDiskBalancerInfoProto.Builder builder =
-        DatanodeDiskBalancerInfoProto.newBuilder()
-            .setNode(datanodeDetails.toProto(clientVersion))
-            .setCurrentVolumeDensitySum(info.getVolumeDataDensity());
-
-    // For STATUS, include additional details
-    if (infoType == DatanodeDiskBalancerInfoType.STATUS) {
-      // Build configuration proto
-      DiskBalancerConfigurationProto.Builder confBuilder =
-          DiskBalancerConfigurationProto.newBuilder()
-              .setThreshold(info.getThreshold())
-              .setDiskBandwidthInMB(info.getBandwidthInMB())
-              .setParallelThread(info.getParallelThread())
-              .setStopAfterDiskEven(info.isStopAfterDiskEven());
-
-      builder.setDiskBalancerConf(confBuilder.build())
-          .setSuccessMoveCount(info.getSuccessCount())
-          .setFailureMoveCount(info.getFailureCount())
-          .setBytesToMove(info.getBytesToMove())
-          .setBytesMoved(info.getBalancedBytes())
-          .setRunningStatus(info.getOperationalState());
-    }
-
-    return builder.build();
+    return DatanodeDiskBalancerInfoProto.newBuilder()
+        .setNode(datanodeDetails.toProto(request.getClientVersion()))
+        .setCurrentVolumeDensitySum(info.getVolumeDataDensity())
+        .setDiskBalancerConf(DiskBalancerConfigurationProto.newBuilder()
+                .setThreshold(info.getThreshold())
+                .setDiskBandwidthInMB(info.getBandwidthInMB())
+                .setParallelThread(info.getParallelThread())
+                .setStopAfterDiskEven(info.isStopAfterDiskEven()))
+        .setSuccessMoveCount(info.getSuccessCount())
+        .setFailureMoveCount(info.getFailureCount())
+        .setBytesToMove(info.getBytesToMove())
+        .setBytesMoved(info.getBalancedBytes())
+        .setRunningStatus(info.getOperationalState())
+        .build();
   }
 
   @Override
   public void startDiskBalancer(DiskBalancerConfigurationProto configProto)
       throws IOException {
     adminChecker.check("startDiskBalancer");
-    DiskBalancerInfo info = getDiskBalancerInfo();
+    final DiskBalancerInfo info = getDiskBalancerInfoImpl();
 
     // Check node operational state before starting DiskBalancer
     // Only IN_SERVICE nodes should actively balance disks
@@ -132,7 +121,7 @@ public class DiskBalancerProtocolServer implements DiskBalancerProtocol {
   @Override
   public void stopDiskBalancer() throws IOException {
     adminChecker.check("stopDiskBalancer");
-    DiskBalancerInfo info = getDiskBalancerInfo();
+    final DiskBalancerInfo info = getDiskBalancerInfoImpl();
     LOG.info("DiskBalancer opType : STOP");
     info.setOperationalState(DiskBalancerRunningStatus.STOPPED);
     refreshService(info);
@@ -142,7 +131,7 @@ public class DiskBalancerProtocolServer implements DiskBalancerProtocol {
   public void updateDiskBalancerConfiguration(@Nonnull DiskBalancerConfigurationProto configProto)
       throws IOException {
     adminChecker.check("updateDiskBalancerConfiguration");
-    DiskBalancerInfo info = getDiskBalancerInfo();
+    final DiskBalancerInfo info = getDiskBalancerInfoImpl();
 
     // only update fields present in configProto
     DiskBalancerConfiguration currentConfig = info.toConfiguration();
@@ -152,7 +141,7 @@ public class DiskBalancerProtocolServer implements DiskBalancerProtocol {
     refreshService(info);
   }
 
-  private DiskBalancerInfo getDiskBalancerInfo() throws IOException {
+  private DiskBalancerInfo getDiskBalancerInfoImpl() throws IOException {
     OzoneContainer container = datanodeStateMachine.getContainer();
     if (container.getDiskBalancerService() == null) {
       throw new IOException("DiskBalancer service is disabled on this datanode");

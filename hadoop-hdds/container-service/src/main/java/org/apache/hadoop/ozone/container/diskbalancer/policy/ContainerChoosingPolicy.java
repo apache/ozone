@@ -36,7 +36,7 @@ public interface ContainerChoosingPolicy {
    * @param destVolume the destination volume to which container is being moved.
    * @param inProgressContainerIDs containerIDs present in this set should be
    - avoided as these containers are already under move by diskBalancer.
-   * @param threshold the threshold value
+   * @param thresholdPercentage the threshold percentage in range (0, 100)
    * @param volumeSet the volumeSet instance
    * @param deltaMap the deltaMap instance of source volume
    * @return a Container
@@ -44,6 +44,6 @@ public interface ContainerChoosingPolicy {
   ContainerData chooseContainer(OzoneContainer ozoneContainer,
       HddsVolume srcVolume, HddsVolume destVolume,
       Set<ContainerID> inProgressContainerIDs,
-      Double threshold, MutableVolumeSet volumeSet,
+      double thresholdPercentage, MutableVolumeSet volumeSet,
       Map<HddsVolume, Long> deltaMap);
 }

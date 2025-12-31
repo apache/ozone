@@ -283,7 +283,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private RootCARotationManager rootCARotationManager;
   private ContainerTokenSecretManager containerTokenMgr;
 
-  private final OzoneConfiguration configuration;
+  private OzoneConfiguration configuration;
   private SCMContainerMetrics scmContainerMetrics;
   private SCMContainerPlacementMetrics placementMetrics;
   private PlacementPolicy containerPlacementPolicy;
@@ -601,6 +601,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   public OzoneConfiguration getConfiguration() {
     return configuration;
+  }
+
+  @VisibleForTesting
+  public void setConfiguration(OzoneConfiguration conf) {
+    this.configuration = conf;
   }
 
   /**
@@ -2243,6 +2248,20 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     return getScmHAManager().removeSCM(request);
 
+  }
+
+  /**
+   * Check if the input scmId exists in the peers list.
+   * @return true if the nodeId is self, or it exists in peer node list,
+   *         false otherwise.
+   */
+  @VisibleForTesting
+  public boolean doesPeerExist(String scmId) {
+    if (getScmId().equals(scmId)) {
+      return true;
+    }
+    return getScmHAManager().getRatisServer().getDivision()
+        .getGroup().getPeer(RaftPeerId.valueOf(scmId)) != null;
   }
 
   public void scmHAMetricsUpdate(String leaderId) {

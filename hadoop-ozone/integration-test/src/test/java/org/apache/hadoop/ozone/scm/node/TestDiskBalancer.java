@@ -37,7 +37,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
 import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
-import org.apache.hadoop.hdds.protocol.proto.DiskBalancerProtocolProtos.DatanodeDiskBalancerInfoType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDiskBalancerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerConfigurationProto;
@@ -51,7 +50,6 @@ import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
@@ -114,8 +112,7 @@ public class TestDiskBalancer {
 
     for (DatanodeDetails dn : datanodes) {
       try (DiskBalancerProtocol proxy = getDiskBalancerProxy(dn)) {
-        DatanodeDiskBalancerInfoProto report = proxy.getDiskBalancerInfo(
-            DatanodeDiskBalancerInfoType.REPORT, ClientVersion.CURRENT_VERSION);
+        DatanodeDiskBalancerInfoProto report = proxy.getDiskBalancerInfo();
         assertNotNull(report);
         assertTrue(report.hasCurrentVolumeDensitySum());
         reportProtoList.add(report);
@@ -151,8 +148,7 @@ public class TestDiskBalancer {
       proxy.startDiskBalancer(configProto);
 
       // Query status to verify it's RUNNING
-      DatanodeDiskBalancerInfoProto status = proxy.getDiskBalancerInfo(
-          DatanodeDiskBalancerInfoType.STATUS, ClientVersion.CURRENT_VERSION);
+      DatanodeDiskBalancerInfoProto status = proxy.getDiskBalancerInfo();
       assertEquals(DiskBalancerRunningStatus.RUNNING, status.getRunningStatus());
 
       // Wait for some time and query status to verify the RUNNING status changes to STOPPED
@@ -160,8 +156,7 @@ public class TestDiskBalancer {
       GenericTestUtils.waitFor(
           () -> {
             try {
-              DatanodeDiskBalancerInfoProto currentStatus = proxy.getDiskBalancerInfo(
-                  DatanodeDiskBalancerInfoType.STATUS, ClientVersion.CURRENT_VERSION);
+              DatanodeDiskBalancerInfoProto currentStatus = proxy.getDiskBalancerInfo();
               return currentStatus.getRunningStatus() == DiskBalancerRunningStatus.STOPPED;
             } catch (IOException e) {
               return false;
@@ -195,8 +190,7 @@ public class TestDiskBalancer {
     List<DatanodeDiskBalancerInfoProto> statusProtoList = new ArrayList<>();
     for (DatanodeDetails dn : allDatanodes) {
       try (DiskBalancerProtocol proxy = getDiskBalancerProxy(dn)) {
-        DatanodeDiskBalancerInfoProto status = proxy.getDiskBalancerInfo(
-            DatanodeDiskBalancerInfoType.STATUS, ClientVersion.CURRENT_VERSION);
+        DatanodeDiskBalancerInfoProto status = proxy.getDiskBalancerInfo();
         assertEquals(DiskBalancerRunningStatus.RUNNING, status.getRunningStatus());
         statusProtoList.add(status);
       }
@@ -213,8 +207,7 @@ public class TestDiskBalancer {
       GenericTestUtils.waitFor(
           () -> {
             try {
-              DatanodeDiskBalancerInfoProto status = proxy.getDiskBalancerInfo(
-                  DatanodeDiskBalancerInfoType.STATUS, ClientVersion.CURRENT_VERSION);
+              DatanodeDiskBalancerInfoProto status = proxy.getDiskBalancerInfo();
               return status.getRunningStatus() == DiskBalancerRunningStatus.PAUSED;
             } catch (IOException e) {
               return false;
@@ -222,8 +215,7 @@ public class TestDiskBalancer {
           },
           500, 30000); // Check every 500ms, timeout after 30s
 
-      DatanodeDiskBalancerInfoProto pausedStatus = proxy.getDiskBalancerInfo(
-          DatanodeDiskBalancerInfoType.STATUS, ClientVersion.CURRENT_VERSION);
+      DatanodeDiskBalancerInfoProto pausedStatus = proxy.getDiskBalancerInfo();
       assertEquals(DiskBalancerRunningStatus.PAUSED, pausedStatus.getRunningStatus(),
           "DiskBalancer status should be PAUSED after decommissioning");
     }
@@ -233,8 +225,7 @@ public class TestDiskBalancer {
     statusProtoList.clear();
     for (DatanodeDetails dn : inServiceDatanodes) {
       try (DiskBalancerProtocol proxy = getDiskBalancerProxy(dn)) {
-        DatanodeDiskBalancerInfoProto status = proxy.getDiskBalancerInfo(
-            DatanodeDiskBalancerInfoType.STATUS, ClientVersion.CURRENT_VERSION);
+        DatanodeDiskBalancerInfoProto status = proxy.getDiskBalancerInfo();
         assertEquals(DiskBalancerRunningStatus.RUNNING, status.getRunningStatus());
         statusProtoList.add(status);
       }
@@ -252,8 +243,7 @@ public class TestDiskBalancer {
       GenericTestUtils.waitFor(
           () -> {
             try {
-              DatanodeDiskBalancerInfoProto status = proxy.getDiskBalancerInfo(
-                  DatanodeDiskBalancerInfoType.STATUS, ClientVersion.CURRENT_VERSION);
+              DatanodeDiskBalancerInfoProto status = proxy.getDiskBalancerInfo();
               return status.getRunningStatus() == DiskBalancerRunningStatus.RUNNING;
             } catch (IOException e) {
               return false;

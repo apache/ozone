@@ -189,9 +189,11 @@ public class TestOmKeyInfo {
       }
     }
 
-    key.setAcls(Arrays.asList(OzoneAcl.of(
-        IAccessAuthorizer.ACLIdentityType.USER, "user1",
-        ACCESS, IAccessAuthorizer.ACLType.WRITE)));
+    key = key.toBuilder()
+        .setAcls(Arrays.asList(OzoneAcl.of(
+            IAccessAuthorizer.ACLIdentityType.USER, "user1",
+            ACCESS, IAccessAuthorizer.ACLType.WRITE)))
+        .build();
 
     // Change acls and check.
     assertNotEquals(key, cloneKey);

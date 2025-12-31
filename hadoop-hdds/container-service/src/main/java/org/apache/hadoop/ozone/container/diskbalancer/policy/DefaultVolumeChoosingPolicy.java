@@ -17,17 +17,19 @@
 
 package org.apache.hadoop.ozone.container.diskbalancer.policy;
 
-import com.google.common.collect.ImmutableList;
+import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.getIdealUsage;
+import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.newVolumeFixedUsage;
+
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.hadoop.hdds.fs.SpaceUsageSource;
-import org.apache.hadoop.ozone.container.common.volume.AvailableSpaceFilter;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.VolumeFixedUsage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,67 +52,43 @@ public class DefaultVolumeChoosingPolicy implements DiskBalancerVolumeChoosingPo
 
   @Override
   public Pair<HddsVolume, HddsVolume> chooseVolume(MutableVolumeSet volumeSet,
-      double threshold, Map<HddsVolume, Long> deltaMap, long containerSize) {
+      double thresholdPercentage, Map<HddsVolume, Long> deltaMap, long containerSize) {
     lock.lock();
     try {
       // Create truly immutable snapshot of volumes to ensure consistency
-      ImmutableList<HddsVolume> allVolumes = DiskBalancerVolumeCalculation.getImmutableVolumeSet(volumeSet);
-
+      final List<StorageVolume> allVolumes = volumeSet.getVolumesList();
       if (allVolumes.size() < 2) {
         return null; // Can't balance with less than 2 volumes.
       }
-      
-      // Calculate ideal usage using the same immutable volume
-      double idealUsage = DiskBalancerVolumeCalculation.getIdealUsage(allVolumes, deltaMap);
 
-      // Threshold is given as a percentage
-      double normalizedThreshold = threshold / 100;
-      List<HddsVolume> volumes = allVolumes
-          .stream()
-          .filter(volume -> {
-            SpaceUsageSource usage = volume.getCurrentUsage();
+      // Calculate usages and sort in ascending order of utilization
+      final List<VolumeFixedUsage> volumeUsages = allVolumes.stream()
+          .map(v -> newVolumeFixedUsage(v, deltaMap))
+          .sorted(Comparator.comparingDouble(VolumeFixedUsage::getUtilization))
+          .collect(Collectors.toList());
 
-            return Math.abs(
-                  ((double)((usage.getCapacity() - usage.getAvailable())
-                      + deltaMap.getOrDefault(volume, 0L) + volume.getCommittedBytes()))
-                      / usage.getCapacity() - idealUsage) >= normalizedThreshold;
-
-          }).sorted((v1, v2) -> {
-            SpaceUsageSource usage1 = v1.getCurrentUsage();
-            SpaceUsageSource usage2 = v2.getCurrentUsage();
-
-            return Double.compare(
-                  (double) ((usage2.getCapacity() - usage2.getAvailable())
-                      + deltaMap.getOrDefault(v2, 0L) + v2.getCommittedBytes()) /
-                      usage2.getCapacity(),
-                  (double) ((usage1.getCapacity() - usage1.getAvailable())
-                      + deltaMap.getOrDefault(v1, 0L) + v1.getCommittedBytes()) /
-                      usage1.getCapacity());
-          }).collect(Collectors.toList());
-
-      // Can not generate DiskBalancerTask if we have less than 2 results
-      if (volumes.size() <= 1) {
-        LOG.debug("Can not find appropriate Source volume and Dest Volume.");
-        return null;
+      // Calculate the actual threshold and check src
+      final double actualThreshold = getIdealUsage(volumeUsages) + thresholdPercentage / 100;
+      final VolumeFixedUsage src = volumeUsages.get(volumeUsages.size() - 1);
+      if (src.getUtilization() < actualThreshold) {
+        return null; // all volumes are under the threshold
       }
-      AvailableSpaceFilter filter = new AvailableSpaceFilter(containerSize);
-      HddsVolume srcVolume = volumes.get(0);
-      HddsVolume destVolume = volumes.get(volumes.size() - 1);
-      while (!filter.test(destVolume)) {
-        // If the destination volume does not have enough space, try the next
-        // one in the list.
-        LOG.debug("Destination volume {} does not have enough space, trying next volume.",
-            destVolume.getStorageID());
-        volumes.remove(destVolume);
-        if (volumes.size() <= 1) {
-          LOG.debug("Can not find appropriate Source volume and Dest Volume.");
-          return null;
+
+      // Find dst
+      for (int i = 0; i < volumeUsages.size() - 1; i++) {
+        final VolumeFixedUsage dstUsage = volumeUsages.get(i);
+        final HddsVolume dst = dstUsage.getVolume();
+
+        if (containerSize < dstUsage.computeUsableSpace()) {
+          // Found dst, reserve space and return
+          dst.incCommittedBytes(containerSize);
+          return Pair.of(src.getVolume(), dst);
         }
-        destVolume = volumes.get(volumes.size() - 1);
+        LOG.debug("Destination volume {} does not have enough space, trying next volume.",
+            dst.getStorageID());
       }
-      // reserve space for the dest volume
-      destVolume.incCommittedBytes(containerSize);
-      return Pair.of(srcVolume, destVolume);
+      LOG.debug("Failed to find appropriate destination volume.");
+      return null;
     } finally {
       lock.unlock();
     }
