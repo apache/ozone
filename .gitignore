@@ -41,3 +41,7 @@ dev-support/ci/bats-support
 
 .mvn/.gradle-enterprise/
 .mvn/.develocity/
+
+# Installer logs
+tools/installer/logs/**
+**/__pycache__

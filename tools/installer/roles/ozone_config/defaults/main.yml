@@ -1,0 +1,6 @@
+---
+install_base: "/opt/ozone"
+data_base: "/data/ozone"
+CONFIG_DIR: ""   # if provided, can be used to feed additional properties via vars
+
+

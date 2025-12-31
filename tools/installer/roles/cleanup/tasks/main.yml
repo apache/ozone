@@ -1,0 +1,51 @@
+---
+- name: "Check install_base presence"
+  stat:
+    path: "{{ install_base }}"
+  register: _st_install_base
+  become: true
+
+- name: "Set presence flag"
+  set_fact:
+    install_present: "{{ _st_install_base.stat.exists | default(false) }}"
+
+- name: "Skip cleanup when install_base is absent on this host"
+  debug:
+    msg: "install_base '{{ install_base }}' not present; skipping cleanup on this host"
+  when: not install_present
+  changed_when: false
+
+- name: "Perform cleanup when install_base exists"
+  when: install_present
+  block:
+    - name: "Set ozone bin path"
+      set_fact:
+        ozone_bin: "{{ install_base }}/current/bin/ozone"
+
+    - name: "Kill OMs/SCMs/Datanodes/Recon (if running)"
+      shell: |
+        pkill -KILL -f "{{ item }}"
+      become: true
+      failed_when: false
+      changed_when: false
+      loop:
+        - "org.apache.hadoop.ozone.om.OzoneManagerStarter"
+        - "org.apache.hadoop.hdds.scm.server.StorageContainerManagerStarter"
+        - "org.apache.hadoop.ozone.HddsDatanodeService"
+        - "org.apache.hadoop.ozone.recon.ReconServer"
+      loop_control:
+        label: "{{ item }}"
+
+    - name: "Remove install base"
+      file:
+        path: "{{ install_base }}"
+        state: absent
+      become: true
+
+    - name: "Remove data base"
+      file:
+        path: "{{ data_base }}"
+        state: absent
+      become: true
+
+

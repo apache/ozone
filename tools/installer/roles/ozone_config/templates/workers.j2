@@ -1,0 +1,3 @@
+{% for h in (groups.get('datanodes', []) | list) %}
+{{ h }}
+{% endfor %}

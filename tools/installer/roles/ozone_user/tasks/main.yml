@@ -1,0 +1,33 @@
+---
+- name: "Ensure service group exists"
+  group:
+    name: "{{ service_group }}"
+    state: present
+  become: true
+
+- name: "Ensure service user exists"
+  user:
+    name: "{{ service_user }}"
+    group: "{{ service_group }}"
+    shell: "{{ service_shell }}"
+    create_home: true
+    state: present
+  become: true
+
+- name: "Unlock service user account"
+  command: "passwd -u {{ service_user }}"
+  register: unlock_out
+  changed_when: unlock_out.rc == 0
+  failed_when: false
+  become: true
+
+- name: "Ensure home directory permissions"
+  file:
+    path: "{{ (service_user == 'root') | ternary('/root', '/home/' + service_user) }}"
+    state: directory
+    owner: "{{ (service_user == 'root') | ternary('root', service_user) }}"
+    group: "{{ (service_user == 'root') | ternary('root', service_user) }}"
+    mode: "0755"
+  become: true
+
+
