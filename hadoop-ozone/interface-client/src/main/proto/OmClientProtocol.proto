@@ -2397,11 +2397,11 @@ message RevokeSTSTokenResponse {
 }
 
 /**
- This will contain a list of revoked STS temporary access key IDs whose entries should be removed from
+ This will contain a list of revoked STS session tokens whose entries should be removed from
  the s3RevokedStsTokenTable.
 */
 message CleanupRevokedSTSTokensRequest {
-  repeated string accessKeyId = 1;
+  repeated string sessionToken = 1;
 }
 
 message CleanupRevokedSTSTokensResponse {

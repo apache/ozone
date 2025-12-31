@@ -43,8 +43,8 @@ public class S3CleanupRevokedSTSTokensRequest extends OMClientRequest {
     final CleanupRevokedSTSTokensRequest request = getOmRequest().getCleanupRevokedSTSTokensRequest();
     final OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(getOmRequest());
 
-    final List<String> accessKeyIds = request.getAccessKeyIdList();
-    return new S3CleanupRevokedSTSTokensResponse(accessKeyIds, omResponse.build());
+    final List<String> sessionTokens = request.getSessionTokenList();
+    return new S3CleanupRevokedSTSTokensResponse(sessionTokens, omResponse.build());
   }
 }
 

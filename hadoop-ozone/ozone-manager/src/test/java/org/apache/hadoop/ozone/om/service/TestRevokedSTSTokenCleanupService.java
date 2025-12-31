@@ -66,13 +66,13 @@ public class TestRevokedSTSTokenCleanupService {
 
   @Test
   public void submitsCleanupRequestForOnlyExpiredTokens() throws Exception {
-    // If there are two revoked entries, one expired and one not expired, only the expired access key id should be
+    // If there are two revoked entries, one expired and one not expired, only the expired session token should be
     // submitted for cleanup.
     final long nowMillis = testClock.millis();
     final long expiredCreationTimeMillis = nowMillis - TimeUnit.HOURS.toMillis(13); // older than 12h threshold
     final long validCreationTimeMillis = nowMillis - TimeUnit.HOURS.toMillis(1);
-    revokedStsTokenTable.put("ASIA1234567890", expiredCreationTimeMillis);
-    revokedStsTokenTable.put("ASIA4567890123", validCreationTimeMillis);
+    revokedStsTokenTable.put("session-token-a", expiredCreationTimeMillis);
+    revokedStsTokenTable.put("session-token-b", validCreationTimeMillis);
 
     final AtomicReference<OMRequest> capturedRequest = new AtomicReference<>();
 
@@ -91,7 +91,7 @@ public class TestRevokedSTSTokenCleanupService {
 
       final CleanupRevokedSTSTokensRequest cleanupRevokedSTSTokensRequest =
           omRequest.getCleanupRevokedSTSTokensRequest();
-      assertThat(cleanupRevokedSTSTokensRequest.getAccessKeyIdList()).containsExactly("ASIA1234567890");
+      assertThat(cleanupRevokedSTSTokensRequest.getSessionTokenList()).containsExactly("session-token-a");
     }
   }
 
@@ -100,8 +100,8 @@ public class TestRevokedSTSTokenCleanupService {
     // If only non-expired entries exist in the revoked sts token table, no cleanup request should be submitted and
     // no metrics should be updated.
     final long nowMillis = testClock.millis();
-    revokedStsTokenTable.put("ASIA1234567890", nowMillis - TimeUnit.HOURS.toMillis(1));
-    revokedStsTokenTable.put("ASIA0123456789", nowMillis - TimeUnit.HOURS.toMillis(2));
+    revokedStsTokenTable.put("session-token-c", nowMillis - TimeUnit.HOURS.toMillis(1));
+    revokedStsTokenTable.put("session-token-d", nowMillis - TimeUnit.HOURS.toMillis(2));
 
     final AtomicReference<OMRequest> capturedRequest = new AtomicReference<>();
 
@@ -140,8 +140,8 @@ public class TestRevokedSTSTokenCleanupService {
     // If there are expired tokens in the table but the OM request submission to clean up the entries fails with a
     // service exception, the metrics should not be updated
     final long nowMillis = testClock.millis();
-    revokedStsTokenTable.put("ASIA1234567890", nowMillis - TimeUnit.HOURS.toMillis(13));
-    revokedStsTokenTable.put("ASIA0987654321", nowMillis - TimeUnit.HOURS.toMillis(14));
+    revokedStsTokenTable.put("session-token-e", nowMillis - TimeUnit.HOURS.toMillis(13));
+    revokedStsTokenTable.put("session-token-f", nowMillis - TimeUnit.HOURS.toMillis(14));
 
     final AtomicInteger submitAttempts = new AtomicInteger(0);
 
@@ -163,7 +163,7 @@ public class TestRevokedSTSTokenCleanupService {
     // If there is an expired token in the table but the OM request submission to clean up the entries gets a
     // non-successful response, the metrics should not be updated
     final long nowMillis = testClock.millis();
-    revokedStsTokenTable.put("ASIA1234567890", nowMillis - TimeUnit.HOURS.toMillis(20));
+    revokedStsTokenTable.put("session-token-f", nowMillis - TimeUnit.HOURS.toMillis(20));
 
     try (MockedStatic<OzoneManagerRatisUtils> ozoneManagerRatisUtilsMock = mockStatic(OzoneManagerRatisUtils.class)) {
       // Return a non-successful response
@@ -181,9 +181,9 @@ public class TestRevokedSTSTokenCleanupService {
   public void handlesAllExpiredTokens() throws Exception {
     // If all the tokens in the table are expired on a particular run, ensure the metrics are updated appropriately
     final long nowMillis = testClock.millis();
-    revokedStsTokenTable.put("ASIA1234567890", nowMillis - TimeUnit.HOURS.toMillis(13));
-    revokedStsTokenTable.put("ASIA0123456789", nowMillis - TimeUnit.HOURS.toMillis(14));
-    revokedStsTokenTable.put("ASIA9876543210", nowMillis - TimeUnit.HOURS.toMillis(15));
+    revokedStsTokenTable.put("session-token-g", nowMillis - TimeUnit.HOURS.toMillis(13));
+    revokedStsTokenTable.put("session-token-h", nowMillis - TimeUnit.HOURS.toMillis(14));
+    revokedStsTokenTable.put("session-token-i", nowMillis - TimeUnit.HOURS.toMillis(15));
 
     final AtomicReference<OMRequest> capturedRequest = new AtomicReference<>();
 
@@ -202,8 +202,8 @@ public class TestRevokedSTSTokenCleanupService {
 
       final CleanupRevokedSTSTokensRequest cleanupRevokedSTSTokensRequest =
           omRequest.getCleanupRevokedSTSTokensRequest();
-      assertThat(cleanupRevokedSTSTokensRequest.getAccessKeyIdList())
-          .containsExactlyInAnyOrder("ASIA1234567890", "ASIA0123456789", "ASIA9876543210");
+      assertThat(cleanupRevokedSTSTokensRequest.getSessionTokenList())
+          .containsExactlyInAnyOrder("session-token-g", "session-token-h", "session-token-i");
     }
   }
 

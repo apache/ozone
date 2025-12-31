@@ -47,7 +47,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Background service that periodically scans the revoked STS token table and submits OM requests to
- * remove entries whose session token has expired.
+ * remove entries have been present past the cleanup threshold.
  */
 public class RevokedSTSTokenCleanupService extends BackgroundService {
   private static final Logger LOG = LoggerFactory.getLogger(RevokedSTSTokenCleanupService.class);
@@ -127,7 +127,7 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
       final Table<String, Long> revokedStsTokenTable = metadataManager.getS3RevokedStsTokenTable();
 
       // Collect entries that have existed for over 12 hours during the scan
-      final List<String> accessKeyIdsToCleanup = new ArrayList<>();
+      final List<String> sessionTokensToCleanup = new ArrayList<>();
 
       // Iterate over all entries in the revoked STS token table and remove
       // those whose initialCreationTimeMillis is more than 12 hours
@@ -135,11 +135,11 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
         iterator.seekToFirst();
         while (iterator.hasNext()) {
           final Table.KeyValue<String, Long> entry = iterator.next();
-          final String accessKeyId = entry.getKey();
+          final String sessionToken = entry.getKey();
           final Long initialCreationTimeMillis = entry.getValue();
 
           if (shouldCleanup(initialCreationTimeMillis)) {
-            accessKeyIdsToCleanup.add(accessKeyId);
+            sessionTokensToCleanup.add(sessionToken);
           }
         }
       } catch (IOException e) {
@@ -149,11 +149,11 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
       }
 
       final long deletedInRun;
-      if (!accessKeyIdsToCleanup.isEmpty()) {
-        LOG.info("Found {} revoked STS token entries to clean up.", accessKeyIdsToCleanup.size());
-        final boolean success = submitCleanupRequest(accessKeyIdsToCleanup);
+      if (!sessionTokensToCleanup.isEmpty()) {
+        LOG.info("Found {} revoked STS token entries to clean up.", sessionTokensToCleanup.size());
+        final boolean success = submitCleanupRequest(sessionTokensToCleanup);
         if (success) {
-          deletedInRun = accessKeyIdsToCleanup.size();
+          deletedInRun = sessionTokensToCleanup.size();
         } else {
           deletedInRun = 0;
           LOG.warn(
@@ -178,7 +178,7 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
     }
 
     /**
-     * Returns true if the given STS session token has expired.
+     * Returns true if the given STS session token has been in the table past the cleanup threshold.
      */
     private boolean shouldCleanup(long initialCreationTimeMillis) {
       final long now = CLOCK.millis();
@@ -197,9 +197,9 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
     /**
      * Builds and submits an OMRequest to delete the provided revoked STS token(s).
      */
-    private boolean submitCleanupRequest(List<String> expiredAccessKeyIds) {
+    private boolean submitCleanupRequest(List<String> sessionTokens) {
       final CleanupRevokedSTSTokensRequest request = CleanupRevokedSTSTokensRequest.newBuilder()
-          .addAllAccessKeyId(expiredAccessKeyIds)
+          .addAllSessionToken(sessionTokens)
           .build();
 
       final OMRequest omRequest = OMRequest.newBuilder()
