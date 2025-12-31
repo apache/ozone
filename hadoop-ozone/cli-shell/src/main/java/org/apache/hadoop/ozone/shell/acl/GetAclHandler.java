@@ -30,10 +30,12 @@ import picocli.CommandLine.Option;
  */
 public abstract class GetAclHandler extends AclHandler {
 
-  @Option(names = {"--json"},
-      description = "Format output as JSON",
-      defaultValue = "true",
-      fallbackValue = "true")
+  @Option(names = "--json", negatable = true,
+      defaultValue = "true", fallbackValue = "true",
+      description = {
+          "Format output as JSON. Default is true.",
+          "Use --json=false or --no-json to turn off output JSON format."
+      })
   private boolean json;
 
   @Override
