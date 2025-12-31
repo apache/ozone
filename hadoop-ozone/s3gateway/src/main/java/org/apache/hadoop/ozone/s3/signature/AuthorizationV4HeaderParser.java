@@ -90,6 +90,7 @@ public class AuthorizationV4HeaderParser implements SignatureParser {
         .setCredentialScope(credentialObj.createScope())
         .setAlgorithm(algorithm)
         .setSignPayload(true)
+        .setService(credentialObj.getAwsService())
         .build();
   }
 

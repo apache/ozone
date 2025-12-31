@@ -15,31 +15,21 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.s3.signature;
+package org.apache.hadoop.ozone.s3sts;
 
-import java.io.IOException;
-import java.security.NoSuchAlgorithmException;
-import java.time.format.DateTimeFormatter;
-import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+import javax.ws.rs.NameBinding;
 
 /**
- * Parser to request auth parser for http request.
+ * Annotation to disable S3 STS Endpoint.
  */
-public interface SignatureProcessor {
-
-  String CONTENT_TYPE = "content-type";
-
-  String CONTENT_MD5 = "content-md5";
-
-  String AWS4_SIGNING_ALGORITHM = "AWS4-HMAC-SHA256";
-
-  String HOST_HEADER = "Host";
-
-  DateTimeFormatter DATE_FORMATTER =
-      DateTimeFormatter.ofPattern("yyyyMMdd");
-
-  /**
-   * API to return string to sign.
-   */
-  SignatureInfo parseSignature() throws OS3Exception, IOException, NoSuchAlgorithmException;
+@NameBinding
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD})
+public @interface S3STSEnabled {
 }
+
+
