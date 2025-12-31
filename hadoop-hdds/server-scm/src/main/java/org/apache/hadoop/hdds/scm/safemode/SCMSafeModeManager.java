@@ -20,12 +20,18 @@ package org.apache.hadoop.hdds.scm.safemode;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_ENABLED_DEFAULT;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -79,6 +85,10 @@ public class SCMSafeModeManager implements SafeModeManager {
   private final SCMContext scmContext;
   private final SafeModeMetrics safeModeMetrics;
 
+  private long safeModeLogIntervalMs;
+  private ScheduledExecutorService safeModeLogExecutor;
+  private ScheduledFuture<?> safeModeLogTask;
+
   public SCMSafeModeManager(final ConfigurationSource conf,
                             final NodeManager nodeManager,
                             final PipelineManager pipelineManager,
@@ -89,6 +99,10 @@ public class SCMSafeModeManager implements SafeModeManager {
     this.serviceManager = serviceManager;
     this.scmContext = scmContext;
     this.safeModeMetrics = SafeModeMetrics.create();
+    this.safeModeLogIntervalMs = conf.getTimeDuration(
+        HddsConfigKeys.HDDS_SCM_SAFEMODE_LOG_INTERVAL,
+        HddsConfigKeys.HDDS_SCM_SAFEMODE_LOG_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
 
     SafeModeRuleFactory.initialize(conf, scmContext, eventQueue,
         pipelineManager, containerManager, nodeManager);
@@ -107,9 +121,11 @@ public class SCMSafeModeManager implements SafeModeManager {
 
   public void start() {
     emitSafeModeStatus();
+    startSafeModePeriodicLogger();
   }
 
   public void stop() {
+    stopSafeModePeriodicLogger();
     safeModeMetrics.unRegister();
   }
 
@@ -123,6 +139,7 @@ public class SCMSafeModeManager implements SafeModeManager {
 
     // notify SCMServiceManager
     if (!safeModeStatus.isInSafeMode()) {
+      stopSafeModePeriodicLogger();
       // If safemode is off, then notify the delayed listeners with a delay.
       serviceManager.notifyStatusChanged();
     } else if (safeModeStatus.isPreCheckComplete()) {
@@ -148,12 +165,14 @@ public class SCMSafeModeManager implements SafeModeManager {
     // and notify listeners.
     if (validatedPreCheckRules.size() == preCheckRules.size()
         && status.compareAndSet(SafeModeStatus.INITIAL, SafeModeStatus.PRE_CHECKS_PASSED)) {
+      logSafeModeStatus();
       LOG.info("All SCM safe mode pre check rules have passed");
       emitSafeModeStatus();
     }
 
     if (validatedRules.size() == exitRules.size()
         && status.compareAndSet(SafeModeStatus.PRE_CHECKS_PASSED, SafeModeStatus.OUT_OF_SAFE_MODE)) {
+      logSafeModeStatus();
       // All rules are satisfied, we can exit safe mode.
       LOG.info("ScmSafeModeManager, all rules are successfully validated");
       LOG.info("SCM exiting safe mode.");
@@ -225,6 +244,97 @@ public class SCMSafeModeManager implements SafeModeManager {
         .getCurrentContainerThreshold();
   }
 
+  private synchronized void startSafeModePeriodicLogger() {
+    if (!getInSafeMode()) {
+      return;
+    }
+    if (safeModeLogExecutor == null) {
+      safeModeLogExecutor = Executors.newScheduledThreadPool(1,
+          new ThreadFactoryBuilder()
+              .setNameFormat(scmContext.threadNamePrefix() + "SCM-SafeMode-Log-%d")
+              .setDaemon(true)
+              .build());
+    }
+
+    if (safeModeLogTask != null && !safeModeLogTask.isDone()) {
+      safeModeLogTask.cancel(false);
+    }
+    safeModeLogTask = safeModeLogExecutor.scheduleAtFixedRate(() -> {
+      try {
+        logSafeModeStatus();
+      } catch (Throwable t) {
+        LOG.warn("Safe mode periodic logger encountered an error", t);
+      }
+    }, 0L, safeModeLogIntervalMs, TimeUnit.MILLISECONDS);
+    LOG.info("Started periodic Safe Mode logging with interval {} ms", safeModeLogIntervalMs);
+  }
+
+  private synchronized void logSafeModeStatus() {
+    SafeModeStatus safeModeStatus = status.get();
+    int validatedCount = validatedRules.size();
+    int preCheckValidatedCount = validatedPreCheckRules.size();
+    StringBuilder statusLog = new StringBuilder();
+    statusLog.append(String.format(
+        "%nSCM SafeMode Status | state=%s preCheckComplete=%s validatedPreCheckRules=%d/%d validatedRules=%d/%d",
+        safeModeStatus.isInSafeMode() ? 
+            (safeModeStatus.isPreCheckComplete() ? "PRE_CHECKS_PASSED" : "INITIAL") : "OUT_OF_SAFE_MODE",
+        safeModeStatus.isPreCheckComplete(), preCheckValidatedCount, preCheckRules.size(), validatedCount,
+        exitRules.size()));
+    
+    for (SafeModeExitRule<?> rule : exitRules.values()) {
+      String name = rule.getRuleName();
+      boolean isValidated = validatedRules.contains(name);
+      String statusText = rule.getStatusText();
+      
+      if (statusText.endsWith(";")) {
+        statusText = statusText.substring(0, statusText.length() - 1);
+      }
+
+      statusLog.append(String.format("%nSCM SafeMode Status | %s (%s) %s",
+          name,
+          isValidated ? "validated" : "waiting",
+          statusText));
+    }
+
+    LOG.info(statusLog.toString());
+    if (!getInSafeMode()) {
+      stopSafeModePeriodicLogger();
+    }
+  }
+
+  private synchronized void stopSafeModePeriodicLogger() {
+    if (safeModeLogExecutor != null) {
+      safeModeLogExecutor.shutdownNow();
+      safeModeLogExecutor = null;
+      LOG.info("Stopped periodic Safe Mode logging");
+    }
+  }
+
+  /**
+   * Updates the Safe Mode logging interval dynamically.
+   * This method cancels the existing periodic logging task (if any) and
+   * schedules a new one with the updated interval, without recreating the
+   * executor thread pool.
+   *
+   * @param newInterval The new interval duration
+   * @param unit The time unit of the new interval
+   */
+  public synchronized void reconfigureLogInterval(long newInterval, TimeUnit unit) {
+    long newIntervalMs = unit.toMillis(newInterval);
+    if (this.safeModeLogIntervalMs == newIntervalMs) {
+      return;
+    }
+
+    LOG.info("Reconfiguring Safe Mode Log Interval from {} ms to {} ms",
+        this.safeModeLogIntervalMs, newIntervalMs);
+
+    this.safeModeLogIntervalMs = newIntervalMs;
+    
+    if (getInSafeMode()) {
+      startSafeModePeriodicLogger();
+    }
+  }
+  
   /**
    * Possible states of SCM SafeMode.
    */
