@@ -82,6 +82,7 @@ import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.assertj.core.api.Fail;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -600,6 +601,74 @@ public class TestDiskBalancerTask {
     task.call();
     // Verify that the old container is deleted
     assertFalse(oldContainerDir.exists());
+  }
+
+  @ParameterizedTest
+  @EnumSource(names = {"OPEN", "CLOSING", "UNHEALTHY", "INVALID", "DELETED", "RECOVERING"})
+  public void testMoveSkippedWhenContainerStateChanged(State invalidState)
+      throws IOException, InterruptedException, TimeoutException {
+    LogCapturer serviceLog = LogCapturer.captureLogs(DiskBalancerService.class);
+
+    // Create a CLOSED container which will be selected by DefaultContainerChoosingPolicy
+    Container container = createContainer(CONTAINER_ID, sourceVolume, State.CLOSED);
+    long initialSourceUsed = sourceVolume.getCurrentUsage().getUsedSpace();
+    long initialDestUsed = destVolume.getCurrentUsage().getUsedSpace();
+    long initialDestCommitted = destVolume.getCommittedBytes();
+    long initialSourceDelta = diskBalancerService.getDeltaSizes().get(sourceVolume) == null ?
+        0L : diskBalancerService.getDeltaSizes().get(sourceVolume);
+    String oldContainerPath = container.getContainerData().getContainerPath();
+
+    // Verify temp container directory doesn't exist before task execution
+    Path tempContainerDir = destVolume.getTmpDir().toPath()
+        .resolve(DISK_BALANCER_DIR).resolve(String.valueOf(CONTAINER_ID));
+    assertFalse(Files.exists(tempContainerDir));
+
+    // Get the task (container is selected as CLOSED)
+    DiskBalancerService.DiskBalancerTask task = getTask();
+    assertNotNull(task);
+
+    // Change container state to invalid state (OPEN or DELETED) before move process starts
+    KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
+    containerData.setState(invalidState);
+
+    // Execute the task - it should skip the move due to invalid state
+    task.call();
+
+    // Verify that move process was skipped
+    GenericTestUtils.waitFor(() ->
+            serviceLog.getOutput().contains("skipping move process") &&
+            serviceLog.getOutput().contains(String.valueOf(CONTAINER_ID)) &&
+            serviceLog.getOutput().contains(invalidState.toString()),
+        100, 5000);
+
+    // Verify container is still in the original location
+    Container originalContainer = containerSet.getContainer(CONTAINER_ID);
+    assertNotNull(originalContainer);
+    assertEquals(container, originalContainer);
+    assertEquals(invalidState, originalContainer.getContainerState());
+    assertEquals(sourceVolume, originalContainer.getContainerData().getVolume());
+    assertTrue(new File(oldContainerPath).exists(), "Container should still exist in original location");
+
+    // Verify no temp directory was created
+    assertFalse(Files.exists(tempContainerDir), "Temp container directory should not be created");
+
+    // Verify volume usage is unchanged
+    assertEquals(initialSourceUsed, sourceVolume.getCurrentUsage().getUsedSpace());
+    assertEquals(initialDestUsed, destVolume.getCurrentUsage().getUsedSpace());
+
+    // Verify metrics show failure (since move was skipped)
+    assertEquals(1, diskBalancerService.getMetrics().getFailureCount());
+    assertEquals(0, diskBalancerService.getMetrics().getSuccessCount());
+    assertEquals(0, diskBalancerService.getMetrics().getSuccessBytes());
+
+    // Verify committed bytes are released
+    assertEquals(initialDestCommitted, destVolume.getCommittedBytes());
+
+    // Verify container is removed from in-progress set
+    assertFalse(diskBalancerService.getInProgressContainers().contains(ContainerID.valueOf(CONTAINER_ID)));
+
+    // Verify delta sizes are restored
+    assertEquals(initialSourceDelta, diskBalancerService.getDeltaSizes().get(sourceVolume));
   }
 
   private KeyValueContainer createContainer(long containerId, HddsVolume vol, State state)

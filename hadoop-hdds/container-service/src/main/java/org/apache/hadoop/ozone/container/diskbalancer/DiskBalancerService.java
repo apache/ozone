@@ -45,7 +45,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -457,6 +457,18 @@ public class DiskBalancerService extends BackgroundService {
         postCall(false, startTime);
         return BackgroundTaskResult.EmptyTaskResult.newResult();
       }
+
+      // Double check container state before acquiring lock to start move process.
+      // Container state may have changed after selection.
+      // Only CLOSED and QUASI_CLOSED containers can be moved.
+      State containerState = container.getContainerData().getState();
+      if (containerState != State.CLOSED && containerState != State.QUASI_CLOSED) {
+        LOG.warn("Container {} is in {} state, skipping move process. Only CLOSED containers can be moved.",
+            containerId, containerState);
+        postCall(false, startTime);
+        return BackgroundTaskResult.EmptyTaskResult.newResult();
+      }
+
       // hold read lock on the container first, to avoid other threads to update the container state,
       // such as block deletion.
       container.readLock();
@@ -477,8 +489,8 @@ public class DiskBalancerService extends BackgroundService {
         // Before move the container directory to final place, the destination dir is empty and doesn't have
         // a metadata directory. Writing the .container file will fail as the metadata dir doesn't exist.
         // So we instead save the container file to the diskBalancerTmpDir.
-        ContainerProtos.ContainerDataProto.State originalState = tempContainerData.getState();
-        tempContainerData.setState(ContainerProtos.ContainerDataProto.State.RECOVERING);
+        State originalState = tempContainerData.getState();
+        tempContainerData.setState(State.RECOVERING);
         // update tempContainerData volume to point to destVolume
         tempContainerData.setVolume(destVolume);
         // overwrite the .container file with the new state.
