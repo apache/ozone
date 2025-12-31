@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.slf4j.Logger;
@@ -69,8 +70,6 @@ public final class ContainerUtils {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerUtils.class);
-
-  private static final String VERSION_FILE   = "VERSION";
 
   private ContainerUtils() {
     //never constructed.
@@ -206,7 +205,7 @@ public final class ContainerUtils {
     Collection<String> dataNodeDirs =
         HddsServerUtil.getDatanodeStorageDirs(conf);
     for (String dataNodeDir : dataNodeDirs) {
-      File versionFile = new File(dataNodeDir, HddsVolume.HDDS_VOLUME_DIR + "/" + VERSION_FILE);
+      File versionFile = new File(dataNodeDir, HddsVolume.HDDS_VOLUME_DIR + "/" + StorageVolumeUtil.VERSION_FILE);
       if (versionFile.exists()) {
         Properties props = DatanodeVersionFile.readFrom(versionFile);
         dnUuid = props.getProperty(OzoneConsts.DATANODE_UUID);
