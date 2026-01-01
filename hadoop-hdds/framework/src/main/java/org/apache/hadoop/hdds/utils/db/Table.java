@@ -138,7 +138,7 @@ public interface Table<KEY, VALUE> {
    * Deletes a range of keys from the metadata store.
    *
    * @param beginKey start metadata key
-   * @param endKey end metadata key
+   * @param endKey   end metadata key
    */
   void deleteRange(KEY beginKey, KEY endKey) throws RocksDatabaseException, CodecException;
 
@@ -168,6 +168,20 @@ public interface Table<KEY, VALUE> {
    */
   KeyValueIterator<KEY, VALUE> iterator(KEY prefix, IteratorType type)
       throws RocksDatabaseException, CodecException;
+
+  /**
+   * Iterate the table with a seek key.
+   *
+   * @param prefix The prefix of the elements to be iterated.
+   * @param seek   The key to seek to.
+   * @return an iterator.
+   */
+  default KeyValueIterator<KEY, VALUE> iterator(KEY prefix, KEY seek)
+      throws RocksDatabaseException, CodecException {
+    KeyValueIterator<KEY, VALUE> iterator = iterator(prefix, IteratorType.KEY_AND_VALUE);
+    iterator.seek(seek);
+    return iterator;
+  }
 
   /**
    * @param prefix The prefix of the elements to be iterated.
