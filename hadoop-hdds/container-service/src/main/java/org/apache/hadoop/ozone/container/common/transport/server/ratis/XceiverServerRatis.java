@@ -130,7 +130,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private int adminPort;
   private int clientPort;
 
-  // TODO: https://issues.apache.org/jira/browse/HDDS-13558
   private final RaftServer server;
   private final String name;
   private final List<ThreadPoolExecutor> chunkExecutors;
@@ -243,7 +242,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         chunkExecutors, this, conf, datanodeDetails.threadNamePrefix());
   }
 
-  private int setUpRatisStream(RaftProperties properties) {
+  private void setUpRatisStream(RaftProperties properties) {
     // set the datastream config
     final int requestedPort;
     if (conf.getBoolean(
@@ -265,8 +264,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     int dataStreamClientPoolSize = ratisServerConfig.getClientPoolSize();
     RaftServerConfigKeys.DataStream.setClientPoolSize(properties,
         dataStreamClientPoolSize);
-
-    return requestedPort;
   }
 
   @SuppressWarnings("checkstyle:methodlength")
@@ -288,8 +285,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
     // setup ratis stream if datastream is enabled
     if (streamEnable) {
-      final int requestedPort = setUpRatisStream(properties);
-      LOG.debug("{} datastream requested port: {}", name, requestedPort);
+      setUpRatisStream(properties);
     }
 
     // Set Ratis State Machine Data configurations
