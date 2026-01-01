@@ -127,11 +127,14 @@ public class NSSummaryTaskDbEventHandler {
   protected void handlePutKeyEventReprocess(OmKeyInfo keyInfo, Map<Long,
       NSSummary> nsSummaryMap) throws IOException {
     long parentObjectId = keyInfo.getParentObjectID();
+    LOG.info("Processing key: {} (parent: {}), size: {}", keyInfo.getKeyName(), parentObjectId, keyInfo.getDataSize());
+
     // Get from local thread map only, no DB reads during reprocess
     NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
     if (nsSummary == null) {
       // Create new instance if not found
       nsSummary = new NSSummary();
+      LOG.info("Created new NSSummary for parent: {}", parentObjectId);
     }
     int[] fileBucket = nsSummary.getFileSizeBucket();
 
@@ -151,6 +154,9 @@ public class NSSummaryTaskDbEventHandler {
     ++fileBucket[binIndex];
     nsSummary.setFileSizeBucket(fileBucket);
     nsSummaryMap.put(parentObjectId, nsSummary);
+
+    LOG.info("Updated NSSummary for parent {}: files={}, size={}, bucket[{}]={}",
+        parentObjectId, nsSummary.getNumOfFiles(), nsSummary.getSizeOfFiles(), binIndex, fileBucket[binIndex]);
   }
 
   protected void handlePutDirEvent(OmDirectoryInfo directoryInfo,
