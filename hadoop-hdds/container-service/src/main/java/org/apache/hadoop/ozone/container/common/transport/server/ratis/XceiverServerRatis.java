@@ -131,8 +131,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private int clientPort;
 
   // TODO: https://issues.apache.org/jira/browse/HDDS-13558
-  @SuppressWarnings("PMD.SingularField")
-  private int dataStreamPort;
   private final RaftServer server;
   private final String name;
   private final List<ThreadPoolExecutor> chunkExecutors;
@@ -245,20 +243,21 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         chunkExecutors, this, conf, datanodeDetails.threadNamePrefix());
   }
 
-  private void setUpRatisStream(RaftProperties properties) {
+  private int setUpRatisStream(RaftProperties properties) {
     // set the datastream config
+    final int requestedPort;
     if (conf.getBoolean(
         OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT,
         OzoneConfigKeys.
             HDDS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT_DEFAULT)) {
-      dataStreamPort = 0;
+      requestedPort = 0;
     } else {
-      dataStreamPort = conf.getInt(
+      requestedPort = conf.getInt(
           OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_PORT,
           OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_PORT_DEFAULT);
     }
     RatisHelper.enableNettyStreaming(properties);
-    NettyConfigKeys.DataStream.setPort(properties, dataStreamPort);
+    NettyConfigKeys.DataStream.setPort(properties, requestedPort);
     int dataStreamAsyncRequestThreadPoolSize =
         ratisServerConfig.getStreamRequestThreads();
     RaftServerConfigKeys.DataStream.setAsyncRequestThreadPoolSize(properties,
@@ -266,6 +265,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     int dataStreamClientPoolSize = ratisServerConfig.getClientPoolSize();
     RaftServerConfigKeys.DataStream.setClientPoolSize(properties,
         dataStreamClientPoolSize);
+
+    return requestedPort;
   }
 
   @SuppressWarnings("checkstyle:methodlength")
@@ -287,7 +288,8 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
     // setup ratis stream if datastream is enabled
     if (streamEnable) {
-      setUpRatisStream(properties);
+      final int requestedPort = setUpRatisStream(properties);
+      LOG.debug("{} datastream requested port: {}", name, requestedPort);
     }
 
     // Set Ratis State Machine Data configurations
@@ -570,9 +572,9 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       serverPort = getRealPort(serverRpc.getInetSocketAddress(),
           Port.Name.RATIS_SERVER);
       if (streamEnable) {
-        DataStreamServerRpc dataStreamServerRpc =
+        final DataStreamServerRpc dataStreamServerRpc =
             server.getDataStreamServerRpc();
-        dataStreamPort = getRealPort(dataStreamServerRpc.getInetSocketAddress(),
+        getRealPort(dataStreamServerRpc.getInetSocketAddress(),
             Port.Name.RATIS_DATASTREAM);
       }
       isStarted = true;
