@@ -117,35 +117,25 @@ public class NSSummaryAsyncFlusher implements Closeable {
    * Flush worker map with propagation to ancestors.
    */
   private void flushWithPropagation(Map<Long, NSSummary> workerMap) throws IOException {
-    LOG.info("{}: Flush starting with {} entries", taskName, workerMap.size());
+
     Map<Long, NSSummary> mergedMap = new HashMap<>();
 
     // For each object in worker map (could be either a directory or bucket)
     for (Map.Entry<Long, NSSummary> entry : workerMap.entrySet()) {
       long currentObjectId = entry.getKey();
       NSSummary delta = entry.getValue();
-      LOG.info("Processing flush entry: {} -> files={}, size={}", currentObjectId, delta.getNumOfFiles(), delta.getSizeOfFiles());
 
       // Get actual UpToDate nssummary (check merged map first, then DB)
       NSSummary existingNSSummary = mergedMap.get(currentObjectId);
       if (existingNSSummary == null) {
         existingNSSummary = reconNamespaceSummaryManager.getNSSummary(currentObjectId);
-        if (existingNSSummary != null) {
-          LOG.info("Found existing NSSummary in DB for {}: files={}, size={}", currentObjectId, existingNSSummary.getNumOfFiles(), existingNSSummary.getSizeOfFiles());
-        }
-      } else {
-        LOG.info("Found existing NSSummary in mergedMap for {}: files={}, size={}", currentObjectId, existingNSSummary.getNumOfFiles(), existingNSSummary.getSizeOfFiles());
       }
 
       if (existingNSSummary == null) {
-        // Object doesn't exist in DB yet - use delta as base
+        // Object doesn't exist in DB yet - use delta as base (has metadata like dirName, parentId)
         existingNSSummary = delta;
-        LOG.info("No existing NSSummary for {}, using delta as base", currentObjectId);
       } else {
         // Object exists in DB - merge delta into it
-        long oldFiles = existingNSSummary.getNumOfFiles();
-        long oldSize = existingNSSummary.getSizeOfFiles();
-
         existingNSSummary.setNumOfFiles(existingNSSummary.getNumOfFiles() + delta.getNumOfFiles());
         existingNSSummary.setSizeOfFiles(existingNSSummary.getSizeOfFiles() + delta.getSizeOfFiles());
         existingNSSummary.setReplicatedSizeOfFiles(existingNSSummary.getReplicatedSizeOfFiles() + delta.getReplicatedSizeOfFiles());
@@ -159,26 +149,22 @@ public class NSSummaryAsyncFlusher implements Closeable {
 
         // Merge child dirs
         existingNSSummary.getChildDir().addAll(delta.getChildDir());
+        existingNSSummary.setFileSizeBucket(actualBucket);
 
         // Repair dirName if existing entry is missing it and delta has the value
         if (StringUtils.isEmpty(existingNSSummary.getDirName()) && StringUtils.isNotEmpty(delta.getDirName())) {
           existingNSSummary.setDirName(delta.getDirName());
-          LOG.info("Repaired dirName for {}", currentObjectId);
         }
         // Repair parentId if existing entry is missing it and delta has the value
         if (existingNSSummary.getParentId() == 0 && delta.getParentId() != 0) {
           existingNSSummary.setParentId(delta.getParentId());
-          LOG.info("Repaired parentId for {}", currentObjectId);
         }
-
-        LOG.info("Merged NSSummary for {}: files {}->{}, size {}->{}", currentObjectId, oldFiles, existingNSSummary.getNumOfFiles(), oldSize, existingNSSummary.getSizeOfFiles());
       }
 
       // Store updated object in merged map
       mergedMap.put(currentObjectId, existingNSSummary);
 
       if (delta.getSizeOfFiles() > 0 || delta.getNumOfFiles() > 0) {
-        LOG.info("Propagating delta from {} to parent {}", currentObjectId, existingNSSummary.getParentId());
         // Propagate delta to ancestors (parent, grandparent, etc.)
         propagateDeltaToAncestors(existingNSSummary.getParentId(), delta, mergedMap);
       }
@@ -186,7 +172,7 @@ public class NSSummaryAsyncFlusher implements Closeable {
 
     // Write merged map to DB
     writeToDb(mergedMap);
-    LOG.info("{}: Flush completed, wrote {} entries", taskName, mergedMap.size());
+    LOG.debug("{}: Flush completed, wrote {} entries", taskName, mergedMap.size());
   }
 
 
