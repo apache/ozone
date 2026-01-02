@@ -173,6 +173,47 @@ public class ContainerHealthSchemaManager {
   }
 
   /**
+   * Delete a specific unhealthy container state record.
+   *
+   * @param containerId Container ID
+   * @param state Container state to delete
+   */
+  public void deleteUnhealthyContainer(long containerId, Object state) {
+    DSLContext dslContext = containerSchemaDefinition.getDSLContext();
+    try {
+      if (state instanceof UnHealthyContainerStates) {
+        dslContext.deleteFrom(UNHEALTHY_CONTAINERS)
+            .where(UNHEALTHY_CONTAINERS.CONTAINER_ID.eq(containerId))
+            .and(UNHEALTHY_CONTAINERS.CONTAINER_STATE.eq(((UnHealthyContainerStates) state).toString()))
+            .execute();
+      } else {
+        dslContext.deleteFrom(UNHEALTHY_CONTAINERS)
+            .where(UNHEALTHY_CONTAINERS.CONTAINER_ID.eq(containerId))
+            .and(UNHEALTHY_CONTAINERS.CONTAINER_STATE.eq(state.toString()))
+            .execute();
+      }
+    } catch (Exception e) {
+      LOG.error("Failed to delete unhealthy container {} state {}", containerId, state, e);
+    }
+  }
+
+  /**
+   * Delete all unhealthy states for a container.
+   *
+   * @param containerId Container ID
+   */
+  public void deleteAllStatesForContainer(long containerId) {
+    DSLContext dslContext = containerSchemaDefinition.getDSLContext();
+    try {
+      dslContext.deleteFrom(UNHEALTHY_CONTAINERS)
+          .where(UNHEALTHY_CONTAINERS.CONTAINER_ID.eq(containerId))
+          .execute();
+    } catch (Exception e) {
+      LOG.error("Failed to delete all states for container {}", containerId, e);
+    }
+  }
+
+  /**
    * Clear all unhealthy container records. This is primarily used for testing
    * to ensure clean state between tests.
    */
