@@ -391,8 +391,8 @@ public abstract class OMFailoverProxyProviderBase<T> implements
     return waitBetweenRetries;
   }
 
-  public List<ProxyInfo> getOMProxies() {
-    return new ArrayList<ProxyInfo>(omProxies.values());
+  public List<ProxyInfo<T>> getOMProxies() {
+    return new ArrayList<>(omProxies.values());
   }
 
   public Map<String, ProxyInfo<T>> getOMProxyMap() {
@@ -440,8 +440,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
     return conf;
   }
 
-  protected synchronized void setOmProxies(Map<String,
-      ProxyInfo<T>> omProxies) {
+  protected synchronized void setOmProxies(Map<String, ProxyInfo<T>> omProxies) {
     this.omProxies = omProxies;
   }
 

@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.ha;
 
 import java.net.InetSocketAddress;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.retry.FailoverProxyProvider.ProxyInfo;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.SecurityUtil;
 import org.slf4j.Logger;
@@ -27,16 +28,17 @@ import org.slf4j.LoggerFactory;
 /**
  * Class to store OM proxy information.
  */
-public class OMProxyInfo {
-  private String nodeId;
-  private String rpcAddrStr;
-  private InetSocketAddress rpcAddr;
-  private Text dtService;
+public class OMProxyInfo<T> extends ProxyInfo<T> {
+  private final String nodeId;
+  private final String rpcAddrStr;
+  private final InetSocketAddress rpcAddr;
+  private final Text dtService;
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OMProxyInfo.class);
 
-  OMProxyInfo(String serviceID, String nodeID, String rpcAddress) {
+  public OMProxyInfo(String serviceID, String nodeID, String rpcAddress) {
+    super(null, "nodeId=" + nodeID + ",nodeAddress=" + rpcAddress);
     this.nodeId = nodeID;
     this.rpcAddrStr = rpcAddress;
     this.rpcAddr = NetUtils.createSocketAddr(rpcAddrStr);
@@ -47,24 +49,24 @@ public class OMProxyInfo {
           rpcAddress, serviceID, nodeId);
       this.dtService = null;
     } else {
-
       // This issue will be a problem with docker/kubernetes world where one of
       // the container is killed, and that OM address will be unresolved.
       // For now skip the unresolved OM address setting it to the token
       // service field.
-
       this.dtService = SecurityUtil.buildTokenService(rpcAddr);
     }
   }
 
-  @Override
-  public String toString() {
-    StringBuilder sb = new StringBuilder()
-        .append("nodeId=")
-        .append(nodeId)
-        .append(",nodeAddress=")
-        .append(rpcAddrStr);
-    return sb.toString();
+  public String getNodeId() {
+    return nodeId;
+  }
+
+  public String getRpcAddrStr() {
+    return rpcAddrStr;
+  }
+
+  public InetSocketAddress getRpcAddr() {
+    return rpcAddr;
   }
 
   public InetSocketAddress getAddress() {
