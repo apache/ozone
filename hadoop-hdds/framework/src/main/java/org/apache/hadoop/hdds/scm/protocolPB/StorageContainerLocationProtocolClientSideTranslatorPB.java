@@ -1049,12 +1049,24 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
     ContainerBalancerStatusInfoRequestProto request =
             ContainerBalancerStatusInfoRequestProto.getDefaultInstance();
-    ContainerBalancerStatusInfoResponseProto response =
-            submitRequest(Type.GetContainerBalancerStatusInfo,
-                    builder -> builder.setContainerBalancerStatusInfoRequest(request))
-                    .getContainerBalancerStatusInfoResponse();
-    return response;
-
+    try {
+      ContainerBalancerStatusInfoResponseProto response =
+              submitRequest(Type.GetContainerBalancerStatusInfo,
+                      builder -> builder.setContainerBalancerStatusInfoRequest(request))
+                      .getContainerBalancerStatusInfoResponse();
+      return response;
+    } catch (IOException e) {
+      // HDDS-11120 - Added a rich rebalancing status info
+      // Backward compatibility fix - newer clients (2.0 >=) gracefully fallback to the old
+      // API when connecting to older servers (< 2.0) that don't support the new enum value.
+      if (e.getMessage() != null && e.getMessage().contains("missing required fields")) {
+        boolean isRunning = getContainerBalancerStatus();
+        return ContainerBalancerStatusInfoResponseProto.newBuilder()
+            .setIsRunning(isRunning)
+            .build();
+      }
+      throw e;
+    }
   }
 
   /**

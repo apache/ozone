@@ -168,3 +168,12 @@ Key Info File Flag Should Be Set Correctly
 
     ${dir_info} =     Execute    ozone sh key info ${dirpath}
     Should Contain    ${dir_info}    \"file\" : false
+
+Container Balancer Status Command Runs
+    # Container balancer command was introduced in version 1.2.0
+    # Skip test if either client or cluster doesn't support it
+    Pass Execution If    '${CLIENT_VERSION}' < '${CONTAINERBALANCER_VERSION}'    Client does not support container balancer
+    Pass Execution If    '${CLUSTER_VERSION}' < '${CONTAINERBALANCER_VERSION}'   Cluster does not support container balancer
+
+    ${result} =     Execute     ozone admin containerbalancer status
+    Should Contain    ${result}    ContainerBalancer

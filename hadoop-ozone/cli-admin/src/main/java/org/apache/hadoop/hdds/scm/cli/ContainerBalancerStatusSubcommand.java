@@ -59,7 +59,7 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
     ContainerBalancerStatusInfoResponseProto response = scmClient.getContainerBalancerStatusInfo();
     boolean isRunning = response.getIsRunning();
     ContainerBalancerStatusInfoProto balancerStatusInfo = response.getContainerBalancerStatusInfo();
-    if (isRunning) {
+    if (isRunning && balancerStatusInfo != null) {
       Instant startedAtInstant = Instant.ofEpochSecond(balancerStatusInfo.getStartedAt());
       LocalDateTime dateTime =
           LocalDateTime.ofInstant(startedAtInstant, ZoneId.systemDefault());
@@ -101,6 +101,8 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
         }
       }
 
+    } else if (isRunning) {
+      System.out.println("ContainerBalancer is Running.");
     } else {
       System.out.println("ContainerBalancer is Not Running.");
     }
