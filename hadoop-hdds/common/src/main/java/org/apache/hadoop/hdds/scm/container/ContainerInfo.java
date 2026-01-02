@@ -85,6 +85,9 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
   // The sequenceId of a close container cannot change, and all the
   // container replica should have the same sequenceId.
   private long sequenceId;
+  // Health state of the container (determined by ReplicationManager)
+  // Stored as short value (2 bytes) instead of enum reference (8 bytes) for memory efficiency
+  private short healthStateValue;
 
   private ContainerInfo(Builder b) {
     containerID = ContainerID.valueOf(b.containerID);
@@ -99,6 +102,7 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
     sequenceId = b.sequenceId;
     replicationConfig = b.replicationConfig;
     clock = b.clock;
+    healthStateValue = b.healthState != null ? b.healthState.getValue() : ContainerHealthState.HEALTHY.getValue();
   }
 
   public static Codec<ContainerInfo> getCodec() {
@@ -242,6 +246,25 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
     lastUsed = clock.instant();
   }
 
+  /**
+   * Get the health state of the container.
+   *
+   * @return ContainerHealthState
+   */
+  public ContainerHealthState getHealthState() {
+    return ContainerHealthState.fromValue(healthStateValue);
+  }
+
+  /**
+   * Set the health state of the container using the short value.
+   * Stores as 2-byte short for memory efficiency.
+   *
+   * @param stateValue The health state value (from ContainerHealthState.getValue())
+   */
+  public void setHealthState(short stateValue) {
+    this.healthStateValue = stateValue;
+  }
+
   @JsonIgnore
   public HddsProtos.ContainerInfoProto getProtobuf() {
     HddsProtos.ContainerInfoProto.Builder builder =
@@ -269,6 +292,7 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
     if (getPipelineID() != null) {
       builder.setPipelineID(getPipelineID().getProtobuf());
     }
+
     return builder.build();
   }
 
@@ -370,6 +394,7 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
     private long sequenceId;
     private PipelineID pipelineID;
     private ReplicationConfig replicationConfig;
+    private ContainerHealthState healthState;
 
     public Builder setPipelineID(PipelineID pipelineId) {
       this.pipelineID = pipelineId;
@@ -419,6 +444,11 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
 
     public Builder setSequenceId(long sequenceID) {
       this.sequenceId = sequenceID;
+      return this;
+    }
+
+    public Builder setHealthState(ContainerHealthState healthState) {
+      this.healthState = healthState;
       return this;
     }
 
