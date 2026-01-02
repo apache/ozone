@@ -90,7 +90,8 @@ public class TestS3GatewayMetrics {
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
-        .thenReturn("mockSignature");
+        .thenReturn("UNSIGNED-PAYLOAD");
+
 
     bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(clientStub)
