@@ -21,7 +21,6 @@ import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.create
 import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.getVolumeUsages;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -54,6 +53,7 @@ import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.VolumeFixedUsage;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
@@ -114,6 +114,45 @@ public class TestDiskBalancerService {
     BlockUtils.shutdownCache(conf);
     FileUtils.deleteDirectory(testRoot);
     volumeSet.shutdown();
+  }
+
+  /**
+   * Creates stale diskBalancer directories to simulate leftover directories
+   * from previous failed container moves.
+   *
+   * @param volumeSet the volume set containing volumes to create stale dirs for
+   * @param clusterId the cluster ID to use when constructing paths for uninitialized volumes
+   * @throws IOException if directory creation fails
+   */
+  private void createStaleDiskBalancerDirs(VolumeSet volSet, String clusterId)
+      throws IOException {
+    List<StorageVolume> volumes = volSet.getVolumesList();
+    for (StorageVolume volume : volumes) {
+      if (volume instanceof HddsVolume) {
+        HddsVolume hddsVolume = (HddsVolume) volume;
+        File staleDiskBalancerDir;
+        
+        File volumeTmpDir = hddsVolume.getTmpDir();
+        if (volumeTmpDir != null) {
+          // If tmpDir is initialized, use it directly
+          staleDiskBalancerDir = new File(volumeTmpDir, DiskBalancerService.DISK_BALANCER_DIR);
+        } else {
+          // If tmpDir is not initialized, construct the path manually
+          File clusterIdDir = new File(hddsVolume.getHddsRootDir(), clusterId);
+          File tmpDirPath = new File(clusterIdDir, "tmp");
+          staleDiskBalancerDir = new File(tmpDirPath, DiskBalancerService.DISK_BALANCER_DIR);
+        }
+        
+        // Create stale directory with some content
+        assertTrue(staleDiskBalancerDir.mkdirs(),
+            "Failed to create stale diskBalancer directory: " + staleDiskBalancerDir.getAbsolutePath());
+        File staleContainerDir = new File(staleDiskBalancerDir, "12345");
+        assertTrue(staleContainerDir.mkdirs());
+        // Verify stale directory exists before cleanup
+        assertTrue(staleDiskBalancerDir.exists(),
+            "Stale diskBalancer directory should exist before cleanup");
+      }
+    }
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -364,8 +403,9 @@ public class TestDiskBalancerService {
     }
   }
 
-  @Test
-  public void testDiskBalancerTmpDirCreatedAtCorrectLocation() throws Exception {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testDiskBalancerCleansUpStaleTmpDir(ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
     // Start volumes to initialize tmp directories
     volumeSet.startAllVolume();
 
@@ -376,52 +416,36 @@ public class TestDiskBalancerService {
             metrics, c -> {
         }, new ContainerChecksumTreeManager(conf));
 
+    // Create stale diskBalancer directories to simulate leftover from previous run
+    createStaleDiskBalancerDirs(volumeSet, scmId);
+
     // Use actual DiskBalancerService (not TestImpl) to test the real start() method
     OzoneContainer ozoneContainer = mockDependencies(containerSet, keyValueHandler, null);
     DiskBalancerService svc = new DiskBalancerService(ozoneContainer, 1000, 1000,
         TimeUnit.MILLISECONDS, 1, conf);
 
-    // Start the service, which should create tmp directories via constructTmpDir()
+    // Start the service, which should clean up stale tmp directories via cleanupTmpDir()
     svc.start();
 
-    // Verify diskBalancer tmp directory is created at the correct location
-    // for each volume: hdds/<cluster-id>/tmp/diskBalancer
-    List<StorageVolume> volumes = volumeSet.getVolumesList();
-    for (StorageVolume volume : volumes) {
+    // Verify stale diskBalancer tmp directories are cleaned up
+    for (StorageVolume volume : volumeSet.getVolumesList()) {
       if (volume instanceof HddsVolume) {
         HddsVolume hddsVolume = (HddsVolume) volume;
-        File hddsRootDir = hddsVolume.getHddsRootDir();
         File volumeTmpDir = hddsVolume.getTmpDir();
+        File diskBalancerTmpDir = new File(volumeTmpDir, DiskBalancerService.DISK_BALANCER_DIR);
 
-        // Expected correct location: hdds/<cluster-id>/tmp/diskBalancer
-        File expectedDiskBalancerTmpDir = new File(volumeTmpDir, DiskBalancerService.DISK_BALANCER_DIR);
-
-        // Verify the correct location exists
-        assertTrue(expectedDiskBalancerTmpDir.exists());
-        assertTrue(expectedDiskBalancerTmpDir.isDirectory());
-
-        // Verify it's NOT created at the wrong location: volume-root/tmp/diskBalancer
-        File volumeRootDir = new File(hddsVolume.getVolumeRootDir());
-        File wrongLocation = new File(volumeRootDir, "tmp" + File.separator +
-            DiskBalancerService.DISK_BALANCER_DIR);
-
-        // The wrong location should NOT exist (unless it's the same as correct location)
-        if (!wrongLocation.getAbsolutePath().equals(expectedDiskBalancerTmpDir.getAbsolutePath())) {
-          assertFalse(wrongLocation.exists());
-        }
-
-        // Verify the path structure: should be under hdds/<cluster-id>/tmp/diskBalancer
-        String expectedPath = hddsRootDir.getAbsolutePath() + File.separator + scmId +
-            File.separator + "tmp" + File.separator + DiskBalancerService.DISK_BALANCER_DIR;
-        assertEquals(expectedPath, expectedDiskBalancerTmpDir.getAbsolutePath());
+        // Verify stale directory is cleaned up (should not exist)
+        assertFalse(diskBalancerTmpDir.exists(),
+            "Stale diskBalancer tmp directory should be cleaned up on startup");
       }
     }
 
     svc.shutdown();
   }
 
-  @Test
-  public void testDiskBalancerCreatesTmpDirWhenNotInitialized() throws Exception {
+  @ContainerTestVersionInfo.ContainerTest
+  public void testDiskBalancerCleanupWhenTmpDirNotInitialized(ContainerTestVersionInfo versionInfo) throws Exception {
+    setLayoutAndSchemaForTest(versionInfo);
     // Create a fresh volume set WITHOUT calling createDbInstancesForTestIfNeeded
     // This simulates volumes that are formatted but tmpDir is not initialized
     MutableVolumeSet testVolumeSet = new MutableVolumeSet(datanodeUuid, scmId, conf, null,
@@ -446,6 +470,10 @@ public class TestDiskBalancerService {
       }
     }
 
+    // Create stale diskBalancer directories manually to simulate leftover from failed move
+    // This tests the scenario where stale dirs exist even though tmpDir is not initialized
+    createStaleDiskBalancerDirs(testVolumeSet, scmId);
+
     ContainerSet containerSet = ContainerSet.newReadOnlyContainerSet(1000);
     ContainerMetrics metrics = ContainerMetrics.create(conf);
     KeyValueHandler keyValueHandler =
@@ -461,37 +489,25 @@ public class TestDiskBalancerService {
     DiskBalancerService svc = new DiskBalancerService(ozoneContainer, 1000, 1000,
         TimeUnit.MILLISECONDS, 1, conf);
 
-    // Start the service - this should create tmp directories via checkTmpDirExists()
-    // even though volumes were not started (tmpDir was null)
+    // Start the service - cleanup should handle volumes with uninitialized tmpDir
+    // and clean up stale directories even when tmpDir is null
     svc.start();
 
-    // Verify tmpDir is now initialized and diskBalancer directory is created correctly
+    // Verify stale directories are cleaned up even though tmpDir is not initialized
     List<StorageVolume> volumes = testVolumeSet.getVolumesList();
     for (StorageVolume volume : volumes) {
       if (volume instanceof HddsVolume) {
         HddsVolume hddsVolume = (HddsVolume) volume;
+        // tmpDir should still be null - cleanup doesn't initialize it
+        assertNull(hddsVolume.getTmpDir(),
+            "tmpDir should not be initialized by cleanup, it will be created lazily");
+
+        // Verify stale diskBalancer directory is cleaned up
         File hddsRootDir = hddsVolume.getHddsRootDir();
-        File volumeTmpDir = hddsVolume.getTmpDir();
-
-        // Verify tmpDir is now initialized (created by checkTmpDirExists())
-        assertNotNull(volumeTmpDir);
-        assertTrue(volumeTmpDir.exists());
-        assertTrue(volumeTmpDir.isDirectory());
-
-        // Verify tmpDir is at the correct location: hdds/<cluster-id>/tmp
-        String expectedTmpPath = hddsRootDir.getAbsolutePath() + File.separator + scmId +
-            File.separator + "tmp";
-        assertEquals(expectedTmpPath, volumeTmpDir.getAbsolutePath());
-
-        // Verify diskBalancer directory is created at the correct location
-        File expectedDiskBalancerTmpDir = new File(volumeTmpDir, DiskBalancerService.DISK_BALANCER_DIR);
-        assertTrue(expectedDiskBalancerTmpDir.exists());
-        assertTrue(expectedDiskBalancerTmpDir.isDirectory());
-
-        // Verify the complete path structure: hdds/<cluster-id>/tmp/diskBalancer
-        String expectedDiskBalancerPath = hddsRootDir.getAbsolutePath() + File.separator + scmId +
-            File.separator + "tmp" + File.separator + DiskBalancerService.DISK_BALANCER_DIR;
-        assertEquals(expectedDiskBalancerPath, expectedDiskBalancerTmpDir.getAbsolutePath());
+        File expectedDiskBalancerTmpDir = new File(new File(hddsRootDir, scmId),
+            "tmp" + File.separator + DiskBalancerService.DISK_BALANCER_DIR);
+        assertFalse(expectedDiskBalancerTmpDir.exists(),
+            "Stale diskBalancer directory should be cleaned up even when tmpDir is not initialized");
       }
     }
 

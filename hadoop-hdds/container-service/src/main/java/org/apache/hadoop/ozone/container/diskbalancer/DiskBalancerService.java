@@ -175,56 +175,44 @@ public class DiskBalancerService extends BackgroundService {
   }
 
   /**
-   * Checks if the tmp directory exists for the given volume.
-   * Creates it if it doesn't exist yet and properly initializes the volume's tmpDir field.
+   * Cleans up stale diskBalancer temporary directories on startup.
    *
-   * @param volume the HddsVolume to ensure tmp directory for
-   * @return the tmp directory File
-   * @throws IOException if tmp directory cannot be created
+   * @throws IOException if cleanup fails
    */
-  private File checkTmpDirExists(HddsVolume volume) throws IOException {
-    File tmpDir = volume.getTmpDir();
-    if (tmpDir == null) {
-      // If tmpDir is not yet initialized, create it using createTmpDirs()
-      // This properly initializes the volume's tmpDir field
-      String clusterId = volume.getClusterID();
-      if (clusterId == null) {
-        throw new IOException("ClusterID is not set for volume " +
-            volume.getStorageDir());
-      }
-      // Use workingDirName if available, otherwise use clusterId
-      String workDirName = volume.getWorkingDirName();
-      if (workDirName == null) {
-        File clusterIdDir = new File(volume.getStorageDir(), clusterId);
-        if (!clusterIdDir.exists()) {
-          Files.createDirectories(clusterIdDir.toPath());
-        }
-        workDirName = clusterId;
-      }
-      // This will create tmpDir and set it on the volume object
-      // createTmpDirs() uses Files.createDirectories() which creates parent dirs if needed
-      volume.createTmpDirs(workDirName);
-      tmpDir = volume.getTmpDir();
-    }
-    return tmpDir;
-  }
-
-  private void constructTmpDir() throws IOException {
+  private void cleanupTmpDir() throws IOException {
     for (HddsVolume volume:
         StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())) {
-      // check if tmp directory exists if not, initialize it
-      checkTmpDirExists(volume);
-      Path diskBalancerTmpDir = getDiskBalancerTmpDir(volume);
+      Path diskBalancerTmpDir = null;
       try {
-        // Clean up any existing diskBalancer directory and recreate it
+        File tmpDir = volume.getTmpDir();
+        if (tmpDir != null) {
+          // If tmpDir is initialized, use it directly
+          diskBalancerTmpDir = tmpDir.toPath().resolve(DISK_BALANCER_DIR);
+        } else {
+          // If tmpDir is not initialized, construct the path manually
+          // This handles the case where stale directories exist from previous
+          // failed moves even though volumes haven't been initialized yet
+          String clusterId = volume.getClusterID();
+          if (clusterId == null) {
+            // Skip volumes without clusterID - they're not properly formatted
+            continue;
+          }
+          String workDirName = volume.getWorkingDirName();
+          if (workDirName == null) {
+            workDirName = clusterId;
+          }
+          diskBalancerTmpDir = Paths.get(volume.getStorageDir().toString(),
+              workDirName, "tmp", DISK_BALANCER_DIR);
+        }
+
+        // Clean up any existing diskBalancer directory from previous runs
         if (diskBalancerTmpDir.toFile().exists()) {
           FileUtils.deleteDirectory(diskBalancerTmpDir.toFile());
+          LOG.info("Cleaned up stale diskBalancer tmp directory: {}", diskBalancerTmpDir);
         }
-        FileUtils.forceMkdir(diskBalancerTmpDir.toFile());
       } catch (IOException ex) {
-        LOG.warn("Can not reconstruct tmp directory under volume {}", volume,
-            ex);
-        throw ex;
+        LOG.warn("Failed to clean up diskBalancer tmp directory under volume {}: {}",
+            volume, diskBalancerTmpDir, ex);
       }
     }
   }
@@ -379,12 +367,11 @@ public class DiskBalancerService extends BackgroundService {
 
   @Override
   public synchronized void start() {
-    // Ensure tmp directories are properly constructed before starting the service
+    // Clean up any stale diskBalancer tmp directories from previous runs
     try {
-      constructTmpDir();
+      cleanupTmpDir();
     } catch (IOException e) {
-      LOG.error("Failed to construct diskBalancer tmp directories before starting service", e);
-      throw new RuntimeException("Failed to initialize diskBalancer tmp directories", e);
+      LOG.warn("Failed to clean up diskBalancer tmp directories before starting service", e);
     }
     super.start();
   }
