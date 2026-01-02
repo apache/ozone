@@ -117,14 +117,15 @@ public class NSSummaryTask implements ReconOmTask {
         ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_WORKERS,
         ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_WORKERS_DEFAULT);
 
-    this.nsSummaryTaskWithFSO = new NSSummaryTaskWithFSO(
-        reconNamespaceSummaryManager, reconOMMetadataManager,
-        nsSummaryFlushToDBMaxThreshold, maxIterators, maxWorkers, maxKeysInMemory);
+    this.nsSummaryTaskWithFSO =
+        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager, reconOMMetadataManager, nsSummaryFlushToDBMaxThreshold,
+            maxIterators, maxWorkers, maxKeysInMemory);
     this.nsSummaryTaskWithLegacy =
         new NSSummaryTaskWithLegacy(reconNamespaceSummaryManager, reconOMMetadataManager, ozoneConfiguration,
             nsSummaryFlushToDBMaxThreshold);
-    this.nsSummaryTaskWithOBS = new NSSummaryTaskWithOBS(
-        reconNamespaceSummaryManager, reconOMMetadataManager, nsSummaryFlushToDBMaxThreshold, 5, 20, 2000);
+    this.nsSummaryTaskWithOBS =
+        new NSSummaryTaskWithOBS(reconNamespaceSummaryManager, reconOMMetadataManager, nsSummaryFlushToDBMaxThreshold,
+            maxIterators, maxWorkers, maxKeysInMemory);
   }
 
   @Override

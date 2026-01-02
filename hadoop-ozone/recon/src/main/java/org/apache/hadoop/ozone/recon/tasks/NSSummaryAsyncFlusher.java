@@ -198,8 +198,10 @@ public class NSSummaryAsyncFlusher implements Closeable {
     }
     
     // Apply DELTA to ACTUAL ancestor
-    actualAncestor.setNumOfFiles(actualAncestor.getNumOfFiles() + delta.getNumOfFiles());
-    actualAncestor.setSizeOfFiles(actualAncestor.getSizeOfFiles() + delta.getSizeOfFiles());
+    actualAncestor.setNumOfFiles(
+        actualAncestor.getNumOfFiles() + delta.getNumOfFiles());
+    actualAncestor.setSizeOfFiles(
+        actualAncestor.getSizeOfFiles() + delta.getSizeOfFiles());
     actualAncestor.setReplicatedSizeOfFiles(
         actualAncestor.getReplicatedSizeOfFiles() + delta.getReplicatedSizeOfFiles());
     
