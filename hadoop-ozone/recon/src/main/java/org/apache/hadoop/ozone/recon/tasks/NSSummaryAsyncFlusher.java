@@ -36,7 +36,7 @@ import org.slf4j.LoggerFactory;
  * Async flusher for NSSummary maps with background thread.
  * Workers submit their maps to a queue, background thread processes them.
  */
-public class NSSummaryAsyncFlusher implements Closeable {
+public final class NSSummaryAsyncFlusher implements Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(NSSummaryAsyncFlusher.class);
 
   private final BlockingQueue<Map<Long, NSSummary>> flushQueue;
