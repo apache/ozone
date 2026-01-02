@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
@@ -64,7 +65,7 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
   }
 
   @Override
-  protected void displayResults(List<String> successNodes, List<String> failedNodes) {
+  protected void displayResults(Set<String> successNodes, Set<String> failedNodes) {
     // In JSON mode, results are already written
     if (getOptions().isJson()) {
       return;

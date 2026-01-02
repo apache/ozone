@@ -259,5 +259,24 @@ class TestDiskBalancerProtocolServer {
     assertEquals("Access denied for operation: updateDiskBalancerConfiguration", 
         exception.getMessage());
   }
+
+  @Test
+  void testStartDiskBalancerWhenAlreadyRunning() throws IOException {
+    // Start DiskBalancer first
+    server.startDiskBalancer(null);
+    assertEquals(DiskBalancerRunningStatus.RUNNING, diskBalancerInfo.getOperationalState());
+    
+    // Verify service was refreshed once (from the first start)
+    verify(diskBalancerService, times(1)).refresh(diskBalancerInfo);
+    
+    // Try to start again - should log warning and return early without exception
+    server.startDiskBalancer(null);
+    
+    // Verify state is still RUNNING (unchanged)
+    assertEquals(DiskBalancerRunningStatus.RUNNING, diskBalancerInfo.getOperationalState());
+    
+    // Verify service was not refreshed again (still only once)
+    verify(diskBalancerService, times(1)).refresh(diskBalancerInfo);
+  }
 }
 

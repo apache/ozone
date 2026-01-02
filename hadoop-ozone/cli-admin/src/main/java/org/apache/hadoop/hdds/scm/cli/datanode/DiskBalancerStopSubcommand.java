@@ -18,8 +18,9 @@
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import java.io.IOException;
-import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
 import picocli.CommandLine.Command;
@@ -40,8 +41,12 @@ public class DiskBalancerStopSubcommand extends AbstractDiskBalancerSubCommand {
         .getSingleNodeDiskBalancerProxy(hostName);
     try {
       diskBalancerProxy.stopDiskBalancer();
-      Map<String, Object> result = new java.util.LinkedHashMap<>();
-      result.put("datanode", hostName);
+      
+      // Get hostname for consistent JSON output
+      String dnHostname = DiskBalancerSubCommandUtil.getDatanodeHostname(hostName);
+      
+      Map<String, Object> result = new LinkedHashMap<>();
+      result.put("datanode", dnHostname);
       result.put("action", "stop");
       result.put("status", "success");
       return result;
@@ -51,7 +56,7 @@ public class DiskBalancerStopSubcommand extends AbstractDiskBalancerSubCommand {
   }
 
   @Override
-  protected void displayResults(List<String> successNodes, List<String> failedNodes) {
+  protected void displayResults(Set<String> successNodes, Set<String> failedNodes) {
     // In JSON mode, results are already written, only show summary if needed
     if (getOptions().isJson()) {
       return;
