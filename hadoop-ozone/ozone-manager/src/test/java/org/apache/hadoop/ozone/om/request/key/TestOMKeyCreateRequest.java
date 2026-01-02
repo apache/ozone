@@ -27,6 +27,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_INDICATOR;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.addVolumeAndBucketToDB;
 import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.createOmKeyInfo;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.KEY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.NOT_A_FILE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
@@ -132,6 +133,89 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         () -> preExecuteTest(false, 0, invalidReplication));
 
     assertEquals(OMException.ResultCodes.INVALID_REQUEST, e.getResult());
+  }
+
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testCreateKeyExpectedGenCreateIfNotExistsKeyMissing(
+      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(
+        new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
+
+    OMRequest modifiedOmRequest = doPreExecute(createKeyRequest(
+        false, 0, 100L, replicationConfig,
+        OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS));
+    OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(modifiedOmRequest);
+
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+
+    long id = modifiedOmRequest.getCreateKeyRequest().getClientID();
+    OMClientResponse response =
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
+
+    checkResponse(modifiedOmRequest, response, id, false, getBucketLayout());
+  }
+
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testCreateKeyExpectedGenCreateIfNotExistsKeyAlreadyExists(
+      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(
+        new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
+
+    OMRequest modifiedOmRequest = doPreExecute(createKeyRequest(
+        false, 0, 100L, replicationConfig,
+        OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS));
+    OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(modifiedOmRequest);
+
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+
+    OmKeyInfo existingKeyInfo = createOmKeyInfo(
+        volumeName, bucketName, keyName, replicationConfig).setUpdateID(1L).build();
+    omMetadataManager.getKeyTable(getBucketLayout()).put(getOzoneKey(), existingKeyInfo);
+
+    long id = modifiedOmRequest.getCreateKeyRequest().getClientID();
+    String openKey = getOpenKey(id);
+
+    OMClientResponse response =
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
+    assertEquals(KEY_ALREADY_EXISTS, response.getOMResponse().getStatus());
+
+    // As we got error, no entry should be created in openKeyTable.
+    OmKeyInfo openKeyInfo =
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
+    assertNull(openKeyInfo);
+  }
+
+  @ParameterizedTest
+  @MethodSource("data")
+  public void testCreateKeyExpectedGenMismatchReturnsKeyGenerationMismatch(
+      boolean setKeyPathLock, boolean setFileSystemPaths) throws Exception {
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(
+        new OzoneLockProvider(setKeyPathLock, setFileSystemPaths));
+
+    long expectedGen = 1L;
+    OMRequest modifiedOmRequest = doPreExecute(createKeyRequest(
+        false, 0, 100L, replicationConfig, expectedGen));
+    OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(modifiedOmRequest);
+
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+
+    OmKeyInfo existingKeyInfo = createOmKeyInfo(
+        volumeName, bucketName, keyName, replicationConfig).setUpdateID(2L).build();
+    omMetadataManager.getKeyTable(getBucketLayout()).put(getOzoneKey(), existingKeyInfo);
+
+    long id = modifiedOmRequest.getCreateKeyRequest().getClientID();
+    String openKey = getOpenKey(id);
+
+    OMClientResponse response =
+        omKeyCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
+    assertEquals(KEY_NOT_FOUND, response.getOMResponse().getStatus());
+
+    // As we got error, no entry should be created in openKeyTable.
+    OmKeyInfo openKeyInfo =
+        omMetadataManager.getOpenKeyTable(getBucketLayout()).get(openKey);
+    assertNull(openKeyInfo);
   }
 
   @ParameterizedTest
