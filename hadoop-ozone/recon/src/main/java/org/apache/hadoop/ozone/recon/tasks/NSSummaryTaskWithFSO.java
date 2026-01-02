@@ -239,7 +239,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
     final int queueCapacity = maxWorkers + 10;
 
     try (NSSummaryAsyncFlusher dirFlusher =
-             new NSSummaryAsyncFlusher(getReconNamespaceSummaryManager(),
+             NSSummaryAsyncFlusher.create(getReconNamespaceSummaryManager(),
                  "NSSummaryTaskWithFSO-dir", queueCapacity)) {
       if (!processDirTableInParallel(omMetadataManager, dirFlusher)) {
         return false;
@@ -250,7 +250,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
     }
 
     try (NSSummaryAsyncFlusher fileFlusher =
-             new NSSummaryAsyncFlusher(getReconNamespaceSummaryManager(),
+             NSSummaryAsyncFlusher.create(getReconNamespaceSummaryManager(),
                  "NSSummaryTaskWithFSO-file", queueCapacity)) {
       if (!processFileTableInParallel(omMetadataManager, fileFlusher)) {
         return false;

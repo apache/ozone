@@ -78,7 +78,7 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
     int queueCapacity = maxWorkers + 10;
 
     try (NSSummaryAsyncFlusher asyncFlusher =
-             new NSSummaryAsyncFlusher(getReconNamespaceSummaryManager(),
+             NSSummaryAsyncFlusher.create(getReconNamespaceSummaryManager(),
                  "NSSummaryTaskWithOBS", queueCapacity)) {
 
       if (!processKeyTableInParallel(omMetadataManager, asyncFlusher)) {

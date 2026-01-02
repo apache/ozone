@@ -52,17 +52,29 @@ public class NSSummaryAsyncFlusher implements Closeable {
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private final String taskName;
   
-  public NSSummaryAsyncFlusher(ReconNamespaceSummaryManager reconNamespaceSummaryManager,
-                                String taskName,
-                                int queueCapacity) {
+  private NSSummaryAsyncFlusher(ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+                                 String taskName,
+                                 int queueCapacity) {
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.taskName = taskName;
     this.flushQueue = new LinkedBlockingQueue<>(queueCapacity);
     
     this.backgroundFlusher = new Thread(this::flushLoop, taskName + "-AsyncFlusher");
     this.backgroundFlusher.setDaemon(true);
-    this.backgroundFlusher.start();
+  }
+  
+  /**
+   * Factory method to create and start an async flusher.
+   */
+  public static NSSummaryAsyncFlusher create(
+      ReconNamespaceSummaryManager reconNamespaceSummaryManager,
+      String taskName,
+      int queueCapacity) {
+    NSSummaryAsyncFlusher flusher = new NSSummaryAsyncFlusher(
+        reconNamespaceSummaryManager, taskName, queueCapacity);
+    flusher.backgroundFlusher.start();
     LOG.info("{}: Started async flusher with queue capacity {}", taskName, queueCapacity);
+    return flusher;
   }
   
   /**
