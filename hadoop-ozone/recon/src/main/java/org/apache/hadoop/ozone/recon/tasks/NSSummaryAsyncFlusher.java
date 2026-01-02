@@ -136,9 +136,12 @@ public class NSSummaryAsyncFlusher implements Closeable {
         existingNSSummary = delta;
       } else {
         // Object exists in DB - merge delta into it
-        existingNSSummary.setNumOfFiles(existingNSSummary.getNumOfFiles() + delta.getNumOfFiles());
-        existingNSSummary.setSizeOfFiles(existingNSSummary.getSizeOfFiles() + delta.getSizeOfFiles());
-        existingNSSummary.setReplicatedSizeOfFiles(existingNSSummary.getReplicatedSizeOfFiles() + delta.getReplicatedSizeOfFiles());
+        existingNSSummary.setNumOfFiles(
+            existingNSSummary.getNumOfFiles() + delta.getNumOfFiles());
+        existingNSSummary.setSizeOfFiles(
+            existingNSSummary.getSizeOfFiles() + delta.getSizeOfFiles());
+        existingNSSummary.setReplicatedSizeOfFiles(
+            existingNSSummary.getReplicatedSizeOfFiles() + delta.getReplicatedSizeOfFiles());
 
         // Merge file size buckets
         int[] actualBucket = existingNSSummary.getFileSizeBucket();
@@ -174,7 +177,6 @@ public class NSSummaryAsyncFlusher implements Closeable {
     writeToDb(mergedMap);
     LOG.debug("{}: Flush completed, wrote {} entries", taskName, mergedMap.size());
   }
-
 
   /**
    * Recursively propagate delta values up the ancestor Id.

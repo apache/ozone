@@ -508,8 +508,7 @@ public class TestContainerEndpoint {
     // Set up test data for FSO keys
     setUpFSOData();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
-        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
-            reconOMMetadataManager, 10,5,20,2000);
+        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager, reconOMMetadataManager, 10, 5, 20, 2000);
     nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
     // Reprocess the container key mapper to ensure the latest mapping is used
     reprocessContainerKeyMapper();
@@ -596,8 +595,7 @@ public class TestContainerEndpoint {
     // Reprocess the container key mapper to ensure the latest mapping is used
     reprocessContainerKeyMapper();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
-        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
-            reconOMMetadataManager, 10,5,20,2000);
+        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager, reconOMMetadataManager, 10, 5, 20, 2000);
     nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
     response = containerEndpoint.getKeysForContainer(20L, -1, "/0/1/2/file7");
 
@@ -1854,7 +1852,7 @@ public class TestContainerEndpoint {
     setUpDuplicateFSOFileKeys();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
         new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
-            reconOMMetadataManager, 10,5,20,2000);
+            reconOMMetadataManager, 10, 5, 20, 2000);
     nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
     // Reprocess the container key mappings so that the new keys are loaded.
     reprocessContainerKeyMapper();

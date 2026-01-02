@@ -369,7 +369,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy extends NSSummaryTests {
     populateOMDB();
     NSSummaryTaskWithOBS nsSummaryTaskWithOBS =
         new NSSummaryTaskWithOBS(reconNamespaceSummaryManager,
-            reconOMMetadataManager, 10,5,20,2000);
+            reconOMMetadataManager, 10, 5, 20, 2000);
     nsSummaryTaskWithOBS.reprocessWithOBS(reconOMMetadataManager);
     NSSummaryTaskWithLegacy nsSummaryTaskWithLegacy =
         new NSSummaryTaskWithLegacy(reconNamespaceSummaryManager,

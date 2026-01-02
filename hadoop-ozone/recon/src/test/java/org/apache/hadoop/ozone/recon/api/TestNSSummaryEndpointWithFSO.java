@@ -431,8 +431,7 @@ public class TestNSSummaryEndpointWithFSO extends NSSummaryTests {
     populateVolumeThree();
     setUpMultiBlockReplicatedKeys();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
-        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
-            reconOMMetadataManager, 10,5,20,2000);
+        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager, reconOMMetadataManager, 10, 5, 20, 2000);
     nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
   }
 
