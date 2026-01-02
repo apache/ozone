@@ -81,7 +81,7 @@ public class TestObjectGet {
     client.getObjectStore().createS3Bucket(BUCKET_NAME);
 
     headers = mock(HttpHeaders.class);
-    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("UNSIGNED-PAYLOAD");
 
     rest = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(client)
