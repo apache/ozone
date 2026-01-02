@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.KEY_GENERATION_MISMATCH;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.KEY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -261,7 +261,7 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     closedKeyTable.put(getOzonePathKey(), invalidKeyInfo);
     // This should fail as the updateID ia zero and the open key has rewrite generation of 1.
     omClientResponse = omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 100L);
-    assertEquals(KEY_GENERATION_MISMATCH, omClientResponse.getOMResponse().getStatus());
+    assertEquals(KEY_NOT_FOUND, omClientResponse.getOMResponse().getStatus());
 
     omKeyInfoBuilder.setUpdateID(1L);
     OmKeyInfo closedKeyInfo = omKeyInfoBuilder.build();
