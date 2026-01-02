@@ -53,19 +53,10 @@ import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
 
 /**
- * Test class for verifying batch operations with delete ranges using the
- * RDBBatchOperation and MockedConstruction of ManagedWriteBatch.
- *
- * This test class includes:
- * - Mocking and tracking of operations including put, delete, and delete range
- *   within a batch operation.
- * - Validation of committed operations using assertions on collected data.
- * - Ensures that the batch operation interacts correctly with the
- *   RocksDatabase and ColumnFamilyHandle components.
- *
- * The test method includes:
- * 1. Setup of mocked ColumnFamilyHandle and RocksDatabase.ColumnFamily.
- * 2. Mocking of methods to track operations performed on*/
+ * The TestRDBBatchOperation class provides test cases to validate the functionality of RDB batch operations
+ * in a RocksDB-based backend. It verifies the correct behavior of write operations using batch processing
+ * and ensures the integrity of operations like put and delete when performed in batch mode.
+ */
 public class TestRDBBatchOperation {
 
   static {
