@@ -243,6 +243,12 @@ public class ContainerManagerImpl implements ContainerManager {
   private ContainerInfo allocateContainer(final Pipeline pipeline,
                                           final String owner)
       throws IOException {
+    if (!pipelineManager.hasEnoughSpace(pipeline, maxContainerSize)) {
+      LOG.debug("Cannot allocate a new container because pipeline {} does not have the required space {}.",
+          pipeline, maxContainerSize);
+      return null;
+    }
+
     final long uniqueId = sequenceIdGen.getNextId(CONTAINER_ID);
     Preconditions.checkState(uniqueId > 0,
         "Cannot allocate container, negative container id" +
@@ -352,24 +358,17 @@ public class ContainerManagerImpl implements ContainerManager {
       synchronized (pipeline.getId()) {
         containerIDs = getContainersForOwner(pipeline, owner);
         if (containerIDs.size() < getOpenContainerCountPerPipeline(pipeline)) {
-          if (pipelineManager.hasEnoughSpace(pipeline, maxContainerSize)) {
-            allocateContainer(pipeline, owner);
+          ContainerInfo allocated = allocateContainer(pipeline, owner);
+          if (allocated != null) {
+            // New container was created, refresh IDs so it becomes eligible.
             containerIDs = getContainersForOwner(pipeline, owner);
-          } else {
-            LOG.debug("Cannot allocate a new container because pipeline {} does not have the required space {}.",
-                pipeline, maxContainerSize);
           }
         }
         containerIDs.removeAll(excludedContainerIDs);
         containerInfo = containerStateManager.getMatchingContainer(
             size, owner, pipeline.getId(), containerIDs);
         if (containerInfo == null) {
-          if (pipelineManager.hasEnoughSpace(pipeline, maxContainerSize)) {
-            containerInfo = allocateContainer(pipeline, owner);
-          } else {
-            LOG.debug("Cannot allocate a new container because pipeline {} does not have the required space {}.",
-                pipeline, maxContainerSize);
-          }
+          containerInfo = allocateContainer(pipeline, owner);
         }
         return containerInfo;
       }
