@@ -22,6 +22,7 @@ import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 
 /**
@@ -51,6 +52,12 @@ public class SafeModeMetrics {
       numPipelinesWithAtleastOneReplicaReportedThreshold;
   private @Metric MutableCounterLong
       currentPipelinesWithAtleastOneReplicaReportedCount;
+
+  @Metric("Metric will be set to 1 if SCM is in SafeMode, otherwise 0") 
+  private MutableGaugeInt scmInSafeMode;
+  
+  @Metric private MutableGaugeLong numRequiredDatanodesThreshold;
+  @Metric private MutableCounterLong currentRegisteredDatanodesCount;
 
   public static SafeModeMetrics create() {
     final MetricsSystem ms = DefaultMetricsSystem.instance();
@@ -86,12 +93,24 @@ public class SafeModeMetrics {
     }
   }
 
+  public void setScmInSafeMode(boolean inSafeMode) {
+    this.scmInSafeMode.set(inSafeMode ? 1 : 0);
+  }
+
+  public void setNumRequiredDatanodesThreshold(long val) {
+    this.numRequiredDatanodesThreshold.set(val);
+  }
+
   public void incCurrentContainersWithOneReplicaReportedCount() {
     this.currentContainersWithOneReplicaReportedCount.incr();
   }
 
   public void incCurrentContainersWithECDataReplicaReportedCount() {
     this.currentContainersWithECDataReplicaReportedCount.incr();
+  }
+
+  public void incCurrentRegisteredDatanodesCount() {
+    this.currentRegisteredDatanodesCount.incr();
   }
 
   MutableGaugeLong getNumHealthyPipelinesThreshold() {
@@ -121,6 +140,14 @@ public class SafeModeMetrics {
 
   MutableCounterLong getCurrentContainersWithOneReplicaReportedCount() {
     return currentContainersWithOneReplicaReportedCount;
+  }
+  
+  MutableCounterLong getCurrentRegisteredDatanodesCount() {
+    return currentRegisteredDatanodesCount;
+  }
+
+  MutableGaugeInt getScmInSafeMode() {
+    return scmInSafeMode;
   }
 
   public void unRegister() {

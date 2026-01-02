@@ -109,6 +109,9 @@ public class TestSCMSafeModeManager {
 
   @AfterEach
   public void destroyDbStore() throws Exception {
+    if (scmSafeModeManager != null) {
+      scmSafeModeManager.getSafeModeMetrics().unRegister();
+    }
     if (scmMetadataStore.getStore() != null) {
       scmMetadataStore.getStore().close();
     }
@@ -136,6 +139,7 @@ public class TestSCMSafeModeManager {
     scmSafeModeManager.start();
 
     assertTrue(scmSafeModeManager.getInSafeMode());
+    assertEquals(1, scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value());
     validateRuleStatus("DatanodeSafeModeRule", "registered datanodes 0");
     SCMDatanodeProtocolServer.NodeRegistrationContainerReport nodeRegistrationContainerReport =
         HddsTestUtils.createNodeRegistrationContainerReport(containers);
@@ -151,6 +155,7 @@ public class TestSCMSafeModeManager {
 
     GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
         100, 1000 * 5);
+    assertEquals(0, scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value());
 
     assertEquals(cutOff, scmSafeModeManager.getSafeModeMetrics()
         .getCurrentContainersWithOneReplicaReportedCount().value());
@@ -182,6 +187,7 @@ public class TestSCMSafeModeManager {
         .getNumContainerWithOneReplicaReportedThreshold().value());
 
     assertTrue(scmSafeModeManager.getInSafeMode());
+    assertEquals(1, scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value());
     validateRuleStatus("ContainerSafeModeRule",
         "0.00% of [Ratis] Containers(0 / 100) with at least one reported");
     testContainerThreshold(containers.subList(0, 25), 0.25);
@@ -202,6 +208,7 @@ public class TestSCMSafeModeManager {
 
     GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
         100, 1000 * 5);
+    assertEquals(0, scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value());
   }
 
   private OzoneConfiguration createConf(double healthyPercent,
@@ -306,6 +313,7 @@ public class TestSCMSafeModeManager {
     scmSafeModeManager.start();
 
     assertTrue(scmSafeModeManager.getInSafeMode());
+    assertEquals(1, scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value());
     if (healthyPipelinePercent > 0) {
       validateRuleStatus("HealthyPipelineSafeModeRule",
           "healthy Ratis/THREE pipelines");
@@ -367,6 +375,7 @@ public class TestSCMSafeModeManager {
 
     GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
         100, 1000 * 5);
+    assertEquals(0, scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value());
   }
 
   /**
@@ -477,8 +486,10 @@ public class TestSCMSafeModeManager {
 
     scmSafeModeManager = new SCMSafeModeManager(config, null, null,
         containerManager, serviceManager, queue, scmContext);
+    scmSafeModeManager.start();
 
     assertTrue(scmSafeModeManager.getInSafeMode());
+    assertEquals(1, scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value());
 
     // When 10 CLOSED containers are reported by DNs, the computed container
     // threshold should be 10/20 as there are only 20 CLOSED NON-EMPTY
@@ -494,6 +505,7 @@ public class TestSCMSafeModeManager {
 
     GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
         100, 1000 * 5);
+    assertEquals(0, scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value());
   }
 
   // We simulate common EC types: EC-2-2-1024K, EC-3-2-1024K, EC-6-3-1024K.
@@ -584,6 +596,7 @@ public class TestSCMSafeModeManager {
 
     // Assert SCM is in Safe mode.
     assertTrue(scmSafeModeManager.getInSafeMode());
+    assertEquals(1, scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value());
 
     // Register all DataNodes except last one and assert SCM is in safe mode.
     for (int i = 0; i < numOfDns - 1; i++) {
@@ -606,6 +619,8 @@ public class TestSCMSafeModeManager {
         HddsTestUtils.createNodeRegistrationContainerReport(containers));
     GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
         10, 1000 * 10);
+    queue.processAll(5000);
+    assertEquals(0, scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value());
   }
 
   private void testContainerThreshold(List<ContainerInfo> dnContainers,
@@ -700,11 +715,13 @@ public class TestSCMSafeModeManager {
       
 
     assertTrue(scmSafeModeManager.getInSafeMode());
+    assertEquals(1, scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value());
 
     firePipelineEvent(pipelineManager, pipeline);
 
     GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
         100, 1000 * 10);
+    assertEquals(0, scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value());
     pipelineManager.close();
   }
 
@@ -744,6 +761,7 @@ public class TestSCMSafeModeManager {
 
     // Assert SCM is in Safe mode.
     assertTrue(scmSafeModeManager.getInSafeMode());
+    assertEquals(1, scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value());
 
     // stop background pipeline creator as we manually create
     // pipeline below
@@ -781,5 +799,6 @@ public class TestSCMSafeModeManager {
     queue.processAll(5000);
     assertTrue(scmSafeModeManager.getPreCheckComplete());
     assertFalse(scmSafeModeManager.getInSafeMode());
+    assertEquals(0, scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value());
   }
 }
