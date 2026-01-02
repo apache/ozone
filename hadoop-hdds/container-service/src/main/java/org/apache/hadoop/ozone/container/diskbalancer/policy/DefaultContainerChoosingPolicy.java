@@ -97,4 +97,9 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
   public static void setTest(boolean isTest) {
     test = isTest;
   }
+
+  @VisibleForTesting
+  public static boolean isTest() {
+    return test;
+  }
 }
