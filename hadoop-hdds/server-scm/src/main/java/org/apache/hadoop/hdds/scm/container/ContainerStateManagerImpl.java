@@ -381,11 +381,10 @@ public final class ContainerStateManagerImpl
             transactionBuffer.addToBuffer(containerStore, id,
                 containers.getContainerInfo(id));
           }).onException(() -> {
-            // Get current info instead of stale oldInfo
-            ContainerInfo currentInfo = containers.getContainerInfo(id);
-            currentInfo.setState(oldState);  // Revert only the state
-            transactionBuffer.addToBuffer(containerStore, id, currentInfo);
             containers.updateState(id, newState, oldState);
+            ContainerInfo currentInfo = containers.getContainerInfo(id);
+            transactionBuffer.addToBuffer(containerStore, id, currentInfo);
+
           }).execute();
           containerStateChangeActions.getOrDefault(event, info -> { })
               .accept(containerInfo);
