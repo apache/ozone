@@ -41,9 +41,9 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
-import org.apache.hadoop.hdds.utils.db.managed.TrackingUtilManagedWriteBatch;
-import org.apache.hadoop.hdds.utils.db.managed.TrackingUtilManagedWriteBatch.OpType;
-import org.apache.hadoop.hdds.utils.db.managed.TrackingUtilManagedWriteBatch.Operation;
+import org.apache.hadoop.hdds.utils.db.managed.TrackingUtilManagedWriteBatchForTesting;
+import org.apache.hadoop.hdds.utils.db.managed.TrackingUtilManagedWriteBatchForTesting.OpType;
+import org.apache.hadoop.hdds.utils.db.managed.TrackingUtilManagedWriteBatchForTesting.Operation;
 import org.apache.hadoop.ozone.util.ClosableIterator;
 import org.apache.ratis.util.function.CheckedConsumer;
 import org.junit.jupiter.api.Test;
@@ -81,8 +81,8 @@ public class TestRDBBatchOperation {
 
   @Test
   public void testBatchOperation() throws RocksDatabaseException, CodecException, RocksDBException {
-    try (TrackingUtilManagedWriteBatch writeBatch = new TrackingUtilManagedWriteBatch();
-        RDBBatchOperation batchOperation = RDBBatchOperation.newAtomicOperation(writeBatch)) {
+    try (TrackingUtilManagedWriteBatchForTesting writeBatch = new TrackingUtilManagedWriteBatchForTesting();
+         RDBBatchOperation batchOperation = RDBBatchOperation.newAtomicOperation(writeBatch)) {
       ColumnFamilyHandle columnFamilyHandle = Mockito.mock(ColumnFamilyHandle.class);
       RocksDatabase.ColumnFamily columnFamily = Mockito.mock(RocksDatabase.ColumnFamily.class);
       doAnswer((i) -> {

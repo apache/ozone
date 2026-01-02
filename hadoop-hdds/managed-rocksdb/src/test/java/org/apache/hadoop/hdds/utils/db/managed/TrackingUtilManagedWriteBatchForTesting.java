@@ -37,7 +37,7 @@ import org.rocksdb.RocksDBException;
  * Direct operations are created using ByteBuffers while indirect operations are created using
  * byte arrays.
  */
-public class TrackingUtilManagedWriteBatch extends ManagedWriteBatch {
+public class TrackingUtilManagedWriteBatchForTesting extends ManagedWriteBatch {
 
   private final Map<String, List<Operation>> operations = new HashMap<>();
 
@@ -107,7 +107,7 @@ public class TrackingUtilManagedWriteBatch extends ManagedWriteBatch {
     return operations;
   }
 
-  public TrackingUtilManagedWriteBatch() {
+  public TrackingUtilManagedWriteBatchForTesting() {
     super();
   }
 
