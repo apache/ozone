@@ -70,6 +70,7 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.VolumeFixedUsage;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.DiskBalancerVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
@@ -459,10 +460,12 @@ public class DiskBalancerService extends BackgroundService {
       }
 
       // Double check container state before acquiring lock to start move process.
-      // Container state may have changed after selection.
-      // Only CLOSED and QUASI_CLOSED containers can be moved.
+      // Container state may have changed after selection. Only CLOSED containers can be moved.
+      // QUASI_CLOSED is allowed when test mode is enabled, this is done to test in production
+      // these containers are rejected.
       State containerState = container.getContainerData().getState();
-      if (containerState != State.CLOSED && containerState != State.QUASI_CLOSED) {
+      boolean isTestMode = DefaultContainerChoosingPolicy.isTest();
+      if (containerState != State.CLOSED && !(isTestMode && containerState == State.QUASI_CLOSED)) {
         LOG.warn("Container {} is in {} state, skipping move process. Only CLOSED containers can be moved.",
             containerId, containerState);
         postCall(false, startTime);

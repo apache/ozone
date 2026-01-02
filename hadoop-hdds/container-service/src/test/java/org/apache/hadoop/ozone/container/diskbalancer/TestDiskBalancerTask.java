@@ -603,8 +603,13 @@ public class TestDiskBalancerTask {
     assertFalse(oldContainerDir.exists());
   }
 
+  /**
+   * Testing that invalid states (including QUASI_CLOSED in production mode) are correctly rejected.
+   * Here, with QUASI_CLOSED state, we ensure that the test runs in production mode
+   * where QUASI_CLOSED is not allowed for move.
+   */
   @ParameterizedTest
-  @EnumSource(names = {"OPEN", "CLOSING", "UNHEALTHY", "INVALID", "DELETED", "RECOVERING"})
+  @EnumSource(names = {"OPEN", "CLOSING", "QUASI_CLOSED", "UNHEALTHY", "INVALID", "DELETED", "RECOVERING"})
   public void testMoveSkippedWhenContainerStateChanged(State invalidState)
       throws IOException, InterruptedException, TimeoutException {
     LogCapturer serviceLog = LogCapturer.captureLogs(DiskBalancerService.class);
