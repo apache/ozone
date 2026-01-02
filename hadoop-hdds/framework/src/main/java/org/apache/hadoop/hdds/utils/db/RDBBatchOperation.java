@@ -136,14 +136,13 @@ public final class RDBBatchOperation implements BatchOperation {
     }
   }
 
-  private abstract static class Op implements Closeable {
+  private abstract static class SingleKeyOp extends Op {
     private final CodecBuffer keyBuffer;
     private final Bytes keyBytes;
-    private final AtomicBoolean closed = new AtomicBoolean(false);
 
-    private Op(CodecBuffer keyBuffer) {
-      this.keyBuffer = keyBuffer;
-      this.keyBytes = keyBuffer == null ? null : Bytes.newBytes(keyBuffer);
+    private SingleKeyOp(CodecBuffer keyBuffer) {
+      this.keyBuffer = Objects.requireNonNull(keyBuffer);
+      this.keyBytes = Bytes.newBytes(keyBuffer);
     }
 
     CodecBuffer getKeyBuffer() {
@@ -154,11 +153,8 @@ public final class RDBBatchOperation implements BatchOperation {
       return keyBytes;
     }
 
-    abstract void apply(ColumnFamily family, ManagedWriteBatch batch) throws RocksDatabaseException;
-
     int keyLen() {
-      CodecBuffer key = getKeyBuffer();
-      return key == null ? 0 : key.readableBytes();
+      return getKeyBuffer().readableBytes();
     }
 
     int valLen() {
@@ -169,12 +165,25 @@ public final class RDBBatchOperation implements BatchOperation {
       return keyLen() + valLen();
     }
 
+    @Override
     boolean closeImpl() {
-      if (closed.compareAndSet(false, true)) {
+      if (super.closeImpl()) {
         IOUtils.close(LOG, keyBuffer, keyBytes);
         return true;
       }
       return false;
+    }
+  }
+
+  private abstract static class Op implements Closeable {
+    private final AtomicBoolean closed = new AtomicBoolean(false);
+
+    abstract void apply(ColumnFamily family, ManagedWriteBatch batch) throws RocksDatabaseException;
+
+    abstract int totalLength();
+
+    boolean closeImpl() {
+      return closed.compareAndSet(false, true);
     }
 
     @Override
@@ -186,10 +195,10 @@ public final class RDBBatchOperation implements BatchOperation {
   /**
    * Delete operation to be applied to a {@link ColumnFamily} batch.
    */
-  private static final class DeleteOp extends Op {
+  private static final class DeleteOp extends SingleKeyOp {
 
     private DeleteOp(CodecBuffer key) {
-      super(Objects.requireNonNull(key, "keyBytes == null"));
+      super(key);
     }
 
     @Override
@@ -201,7 +210,7 @@ public final class RDBBatchOperation implements BatchOperation {
   /**
    * Put operation to be applied to a {@link ColumnFamily} batch using the CodecBuffer api.
    */
-  private final class PutOp extends Op {
+  private final class PutOp extends SingleKeyOp {
     private final CodecBuffer value;
 
     private PutOp(CodecBuffer key, CodecBuffer value) {
@@ -248,7 +257,7 @@ public final class RDBBatchOperation implements BatchOperation {
        * It supports operations such as additions and deletions while maintaining the ability to overwrite
        * existing entries when necessary.
        */
-      private final Map<Bytes, Op> ops = new HashMap<>();
+      private final Map<Bytes, SingleKeyOp> ops = new HashMap<>();
       private boolean isCommit;
 
       private long batchSize;
@@ -289,7 +298,7 @@ public final class RDBBatchOperation implements BatchOperation {
       }
 
       private void deleteIfExist(Bytes key) {
-        final Op previous = ops.remove(key);
+        final SingleKeyOp previous = ops.remove(key);
         if (previous != null) {
           previous.close();
           discardedSize += previous.totalLength();
@@ -299,7 +308,7 @@ public final class RDBBatchOperation implements BatchOperation {
         }
       }
 
-      void overwriteIfExists(Op op) {
+      void overwriteIfExists(SingleKeyOp op) {
         Preconditions.checkState(!isCommit, "%s is already committed.", this);
         Bytes key = op.getKeyBytes();
         deleteIfExist(key);

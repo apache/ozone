@@ -49,9 +49,9 @@ public class TrackingUtilManagedWriteBatch extends ManagedWriteBatch {
     DELETE_DIRECT,
     MERGE_DIRECT,
     DELETE_RANGE_INDIRECT,
-    PUT_INDIRECT,
-    DELETE_INDIRECT,
-    MERGE_INDIRECT,
+    PUT_NON_DIRECT,
+    DELETE_NON_DIRECT,
+    MERGE_NON_DIRECT,
   }
 
   /**
@@ -120,7 +120,7 @@ public class TrackingUtilManagedWriteBatch extends ManagedWriteBatch {
   @Override
   public void delete(ColumnFamilyHandle columnFamilyHandle, byte[] key) throws RocksDBException {
     operations.computeIfAbsent(bytes2String(columnFamilyHandle.getName()), k -> new ArrayList<>())
-        .add(new Operation(key, OpType.DELETE_INDIRECT));
+        .add(new Operation(key, OpType.DELETE_NON_DIRECT));
   }
 
   @Override
@@ -131,7 +131,7 @@ public class TrackingUtilManagedWriteBatch extends ManagedWriteBatch {
 
   @Override
   public void delete(byte[] key) throws RocksDBException {
-    operations.computeIfAbsent("", k -> new ArrayList<>()).add(new Operation(key, OpType.DELETE_INDIRECT));
+    operations.computeIfAbsent("", k -> new ArrayList<>()).add(new Operation(key, OpType.DELETE_NON_DIRECT));
   }
 
   @Override
@@ -156,19 +156,19 @@ public class TrackingUtilManagedWriteBatch extends ManagedWriteBatch {
   @Override
   public void merge(ColumnFamilyHandle columnFamilyHandle, byte[] key, byte[] value) throws RocksDBException {
     operations.computeIfAbsent(bytes2String(columnFamilyHandle.getName()), k -> new ArrayList<>())
-        .add(new Operation(key, value, OpType.MERGE_INDIRECT));
+        .add(new Operation(key, value, OpType.MERGE_NON_DIRECT));
   }
 
   @Override
   public void merge(byte[] key, byte[] value) {
     operations.computeIfAbsent("", k -> new ArrayList<>())
-        .add(new Operation(key, value, OpType.MERGE_INDIRECT));
+        .add(new Operation(key, value, OpType.MERGE_NON_DIRECT));
   }
 
   @Override
   public void put(ColumnFamilyHandle columnFamilyHandle, byte[] key, byte[] value) throws RocksDBException {
     operations.computeIfAbsent(bytes2String(columnFamilyHandle.getName()), k -> new ArrayList<>())
-        .add(new Operation(key, value, OpType.PUT_INDIRECT));
+        .add(new Operation(key, value, OpType.PUT_NON_DIRECT));
   }
 
   @Override
@@ -179,7 +179,7 @@ public class TrackingUtilManagedWriteBatch extends ManagedWriteBatch {
 
   @Override
   public void put(byte[] key, byte[] value) throws RocksDBException {
-    operations.computeIfAbsent("", k -> new ArrayList<>()).add(new Operation(key, value, OpType.PUT_INDIRECT));
+    operations.computeIfAbsent("", k -> new ArrayList<>()).add(new Operation(key, value, OpType.PUT_NON_DIRECT));
   }
 
   @Override

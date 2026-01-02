@@ -25,16 +25,29 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableSet;
+import com.google.common.primitives.UnsignedBytes;
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
+import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
 import org.apache.hadoop.hdds.utils.db.managed.TrackingUtilManagedWriteBatch;
 import org.apache.hadoop.hdds.utils.db.managed.TrackingUtilManagedWriteBatch.OpType;
 import org.apache.hadoop.hdds.utils.db.managed.TrackingUtilManagedWriteBatch.Operation;
+import org.apache.hadoop.ozone.util.ClosableIterator;
+import org.apache.ratis.util.function.CheckedConsumer;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mockito;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
@@ -58,6 +71,9 @@ public class TestRDBBatchOperation {
   static {
     ManagedRocksObjectUtils.loadRocksDBLibrary();
   }
+
+  @TempDir
+  private Path tempDir;
 
   private static Operation getOperation(String key, String value, OpType opType) {
     return new Operation(string2Bytes(key), value == null ? null : string2Bytes(value), opType);
@@ -120,4 +136,85 @@ public class TestRDBBatchOperation {
       assertEquals(expectedOps, new HashSet<>(writeBatch.getOperations().get("test")));
     }
   }
+
+  private DBStore getDBStore(OzoneConfiguration conf, String name, String tableName) throws RocksDatabaseException {
+    return DBStoreBuilder.newBuilder(conf)
+        .setName(name).setPath(tempDir).addTable(tableName).build();
+  }
+
+  private void performPut(Table<String, String> withBatchTable, BatchOperation batchOperation,
+      Table<String, String> withoutBatchTable, String key) throws RocksDatabaseException, CodecException {
+    String value = getRandomString();
+    withBatchTable.putWithBatch(batchOperation, key, value);
+    withoutBatchTable.put(key, value);
+  }
+
+  private void performDelete(Table<String, String> withBatchTable, BatchOperation batchOperation,
+      Table<String, String> withoutBatchTable, String key) throws RocksDatabaseException, CodecException {
+    withBatchTable.deleteWithBatch(batchOperation, key);
+    withoutBatchTable.delete(key);
+  }
+
+  private String getRandomString() {
+    int length = ThreadLocalRandom.current().nextInt(1, 1024);
+    return RandomStringUtils.secure().next(length);
+  }
+
+  private void performOpWithRandomKey(CheckedConsumer<String, IOException> op, Set<String> keySet,
+      List<String> keyList) throws IOException {
+    String key = getRandomString();
+    op.accept(key);
+    if (!keySet.contains(key)) {
+      keyList.add(key);
+      keySet.add(key);
+    }
+  }
+
+  private void performOpWithRandomPreExistingKey(CheckedConsumer<String, IOException> op, List<String> keyList)
+      throws IOException {
+    int randomIndex = ThreadLocalRandom.current().nextInt(0, keyList.size());
+    op.accept(keyList.get(randomIndex));
+  }
+
+  @Test
+  public void testRDBBatchOperationWithRDB() throws IOException {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    String tableName = "test";
+    try (DBStore dbStore1 = getDBStore(conf, "WithBatch.db", tableName);
+         DBStore dbStore2 = getDBStore(conf, "WithoutBatch.db", tableName)) {
+      try (BatchOperation batchOperation = dbStore1.initBatchOperation()) {
+        Table<String, String> withBatchTable = dbStore1.getTable(tableName, StringCodec.get(), StringCodec.get());
+        Table<String, String> withoutBatchTable = dbStore2.getTable(tableName, StringCodec.get(), StringCodec.get());
+        List<String> keyList = new ArrayList<>();
+        Set<String> keySet = new HashSet<>();
+        List<CheckedConsumer<String, IOException>> ops = Arrays.asList(
+            (key) -> performPut(withBatchTable, batchOperation, withoutBatchTable, key),
+            (key) -> performDelete(withBatchTable, batchOperation, withoutBatchTable, key));
+        for (int i = 0; i < 30000; i++) {
+          CheckedConsumer<String, IOException> op = ops.get(ThreadLocalRandom.current().nextInt(ops.size()));
+          boolean performWithPreExistingKey = ThreadLocalRandom.current().nextBoolean();
+          if (performWithPreExistingKey && !keyList.isEmpty()) {
+            performOpWithRandomPreExistingKey(op, keyList);
+          } else {
+            performOpWithRandomKey(op, keySet, keyList);
+          }
+        }
+        dbStore1.commitBatchOperation(batchOperation);
+      }
+      Table<byte[], ?> withBatchTable = dbStore1.getTable(tableName, ByteArrayCodec.get(), StringCodec.get());
+      Table<byte[], ?> withoutBatchTable = dbStore2.getTable(tableName, ByteArrayCodec.get(), StringCodec.get());
+      try (ClosableIterator<KeyValue<byte[], List<Object>>> itr = dbStore1.getMergeIterator(
+          UnsignedBytes.lexicographicalComparator(), null, (Table<byte[], Object>) withBatchTable,
+          (Table<byte[], Object>) withoutBatchTable)) {
+        while (itr.hasNext()) {
+          KeyValue<byte[], List<Object>> kv = itr.next();
+          String actualKey = StringCodec.get().fromPersistedFormat(kv.getKey());
+          assertEquals(2, kv.getValue().size(), "Expected 2 values for key " + actualKey);
+          assertEquals(kv.getValue().get(0), kv.getValue().get(1), "Expected same value for key " + actualKey);
+        }
+      }
+    }
+
+  }
+
 }
