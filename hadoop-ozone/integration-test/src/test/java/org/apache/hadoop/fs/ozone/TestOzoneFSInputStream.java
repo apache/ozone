@@ -32,10 +32,15 @@ import java.io.InputStream;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileRange;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
@@ -323,5 +328,105 @@ public abstract class TestOzoneFSInputStream implements NonHATests.TestCase {
     // The behavior should be consistent with HDFS
     assertEquals(srcfile.length(), blockStart);
     in.close();
+  }
+
+  @Test
+  public void testVectoredRead() throws Exception {
+    try (FSDataInputStream inputStream = fs.open(filePath)) {
+      // Create multiple file ranges to read
+      List<FileRange> ranges = new ArrayList<>();
+
+      // Read from different parts of the file
+      ranges.add(FileRange.createFileRange(0L, 100));          // First 100 bytes
+      ranges.add(FileRange.createFileRange(500L, 200));        // 200 bytes from offset 500
+      ranges.add(FileRange.createFileRange(1024L, 512));       // 512 bytes from offset 1024
+      ranges.add(FileRange.createFileRange(10L * 1024, 1024)); // 1KB from offset 10KB
+
+      // Perform vectored read
+      inputStream.readVectored(ranges, ByteBuffer::allocate);
+
+      // Wait for all reads to complete and validate
+      for (FileRange range : ranges) {
+        CompletableFuture<ByteBuffer> result = range.getData();
+        ByteBuffer buffer = result.get(30, TimeUnit.SECONDS);
+
+        assertEquals(range.getLength(), buffer.remaining(),
+            "Buffer size mismatch for range at offset " + range.getOffset());
+
+        // Validate data by comparing with sequential read
+        byte[] vectoredData = new byte[buffer.remaining()];
+        buffer.get(vectoredData);
+
+        byte[] expectedData = new byte[range.getLength()];
+        System.arraycopy(data, (int)range.getOffset(), expectedData, 0, range.getLength());
+
+        assertArrayEquals(expectedData, vectoredData,
+            "Data mismatch for range at offset " + range.getOffset());
+      }
+    }
+  }
+
+  @Test
+  public void testVectoredReadWithOverlappingRanges() throws Exception {
+    try (FSDataInputStream inputStream = fs.open(filePath)) {
+      // Create overlapping ranges
+      List<FileRange> ranges = new ArrayList<>();
+      ranges.add(FileRange.createFileRange(100L, 500));
+      ranges.add(FileRange.createFileRange(300L, 400));  // Overlaps with first range
+      ranges.add(FileRange.createFileRange(600L, 200));
+
+      // Overlapping ranges should throw IllegalArgumentException
+      assertThrows(IllegalArgumentException.class, () -> {
+        inputStream.readVectored(ranges, ByteBuffer::allocate);
+      });
+    }
+  }
+
+  @Test
+  public void testVectoredReadAcrossMultipleBlocks() throws Exception {
+    // This test reads ranges that span across different blocks in the file
+    try (FSDataInputStream inputStream = fs.open(filePath)) {
+      List<FileRange> ranges = new ArrayList<>();
+
+      // Assuming blocks are 1MB each, read ranges that cross block boundaries
+      ranges.add(FileRange.createFileRange(1024L * 1024 - 100, 200)); // Crosses first block boundary
+      ranges.add(FileRange.createFileRange(2L * 1024 * 1024 - 50, 100)); // Crosses second block boundary
+
+      inputStream.readVectored(ranges, ByteBuffer::allocate);
+
+      for (FileRange range : ranges) {
+        CompletableFuture<ByteBuffer> result = range.getData();
+        ByteBuffer buffer = result.get(30, TimeUnit.SECONDS);
+
+        byte[] vectoredData = new byte[buffer.remaining()];
+        buffer.get(vectoredData);
+
+        byte[] expectedData = new byte[range.getLength()];
+        System.arraycopy(data, (int)range.getOffset(), expectedData, 0, range.getLength());
+
+        assertArrayEquals(expectedData, vectoredData,
+            "Data mismatch for range crossing block boundary at offset " + range.getOffset());
+      }
+    }
+  }
+
+  @Test
+  public void testVectoredReadWithSmallRanges() throws Exception {
+    try (FSDataInputStream inputStream = fs.open(filePath)) {
+      // Test with many small ranges
+      List<FileRange> ranges = new ArrayList<>();
+      for (int i = 0; i < 50; i++) {
+        ranges.add(FileRange.createFileRange((long) i * 100, 50));
+      }
+
+      inputStream.readVectored(ranges, ByteBuffer::allocate);
+
+      // Validate all small reads
+      for (FileRange range : ranges) {
+        CompletableFuture<ByteBuffer> result = range.getData();
+        ByteBuffer buffer = result.get(30, TimeUnit.SECONDS);
+        assertEquals(range.getLength(), buffer.remaining());
+      }
+    }
   }
 }
