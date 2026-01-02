@@ -39,18 +39,18 @@ import org.slf4j.LoggerFactory;
 public class NSSummaryAsyncFlusher implements Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(NSSummaryAsyncFlusher.class);
 
-  private enum FlushState {
-    RUNNING,
-    STOPPING,
-    STOPPED
-  }
-  
   private final BlockingQueue<Map<Long, NSSummary>> flushQueue;
   private final Thread backgroundFlusher;
   private final AtomicReference<FlushState> state =
       new AtomicReference<>(FlushState.RUNNING);
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private final String taskName;
+
+  private enum FlushState {
+    RUNNING,
+    STOPPING,
+    STOPPED
+  }
   
   private NSSummaryAsyncFlusher(ReconNamespaceSummaryManager reconNamespaceSummaryManager,
                                  String taskName,
