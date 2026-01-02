@@ -275,7 +275,5 @@ public class OMException extends IOException {
     KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD,
 
     TOO_MANY_SNAPSHOTS,
-
-    KEY_GENERATION_MISMATCH,
   }
 }

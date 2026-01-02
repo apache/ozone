@@ -474,7 +474,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
           throw new OMException("Key not found during expected rewrite", OMException.ResultCodes.KEY_NOT_FOUND);
         }
         if (dbKeyInfo.getUpdateID() != expectedGen) {
-          throw new OMException("Generation mismatch during expected rewrite", OMException.ResultCodes.KEY_NOT_FOUND);
+          throw new OMException("Generation mismatch during expected rewrite",
+              OMException.ResultCodes.KEY_NOT_FOUND);
         }
       }
     }

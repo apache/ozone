@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_ALREADY_CLOSED;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_GENERATION_MISMATCH;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_UNDER_LEASE_RECOVERY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
@@ -632,7 +631,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         if (!toCommit.getExpectedDataGeneration().equals(existing.getUpdateID())) {
           throw new OMException("Cannot commit as current generation (" + existing.getUpdateID() +
               ") does not match the expected generation to rewrite (" + toCommit.getExpectedDataGeneration() + ")",
-              KEY_GENERATION_MISMATCH);
+              KEY_NOT_FOUND);
         }
       }
     }
