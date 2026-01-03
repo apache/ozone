@@ -34,7 +34,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.lang3.tuple.Triple;
-import org.apache.hadoop.hdds.utils.db.ByteArrayCodec;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.apache.hadoop.hdds.utils.db.CodecBufferCodec;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
@@ -65,7 +66,6 @@ public class OmTableInsightTask implements ReconOmTask {
   private Map<String, Long> objectCountMap;
   private Map<String, Long> unReplicatedSizeMap;
   private Map<String, Long> replicatedSizeMap;
-  private final int maxKeysInMemory;
   private final int maxIterators;
 
   @Inject
@@ -80,9 +80,6 @@ public class OmTableInsightTask implements ReconOmTask {
     tableHandlers.put(OPEN_FILE_TABLE, new OpenKeysInsightHandler());
     tableHandlers.put(DELETED_TABLE, new DeletedKeysInsightHandler());
     tableHandlers.put(MULTIPART_INFO_TABLE, new MultipartInfoInsightHandler());
-    this.maxKeysInMemory = reconOMMetadataManager.getOzoneConfiguration().getInt(
-        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_KEYS_IN_MEMORY,
-        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_KEYS_IN_MEMORY_DEFAULT);
     this.maxIterators = reconOMMetadataManager.getOzoneConfiguration().getInt(
         ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_ITERATORS,
         ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_ITERATORS_DEFAULT);
@@ -177,9 +174,9 @@ public class OmTableInsightTask implements ReconOmTask {
   private void processTableSequentially(String tableName, OMMetadataManager omMetadataManager) throws IOException {
     LOG.info("{}: Processing table {} sequentially (non-String keys)", getTaskName(), tableName);
 
-    Table<byte[], byte[]> table = omMetadataManager.getStore()
-        .getTable(tableName, ByteArrayCodec.get(), ByteArrayCodec.get(), TableCache.CacheType.NO_CACHE);
-    try (TableIterator<byte[], byte[]> keyIterator = table.keyIterator()) {
+    Table<CodecBuffer, CodecBuffer> table = omMetadataManager.getStore()
+        .getTable(tableName, CodecBufferCodec.get(true), CodecBufferCodec.get(true), TableCache.CacheType.NO_CACHE);
+    try (TableIterator<CodecBuffer, CodecBuffer> keyIterator = table.keyIterator()) {
       long count = Iterators.size(keyIterator);
       objectCountMap.put(getTableCountKeyFromTable(tableName), count);
     }
@@ -192,8 +189,8 @@ public class OmTableInsightTask implements ReconOmTask {
   private void processTableInParallel(String tableName, OMMetadataManager omMetadataManager) throws Exception {
     int workerCount = 2;  // Only 2 workers needed for simple counting
     
-    Table<String, byte[]> table = omMetadataManager.getStore()
-        .getTable(tableName, StringCodec.get(), ByteArrayCodec.get(), TableCache.CacheType.NO_CACHE);
+    Table<String, CodecBuffer> table = omMetadataManager.getStore()
+        .getTable(tableName, StringCodec.get(), CodecBufferCodec.get(true), TableCache.CacheType.NO_CACHE);
     
     long estimatedCount = 100000;  // Default
     try {
@@ -205,9 +202,8 @@ public class OmTableInsightTask implements ReconOmTask {
     
     AtomicLong count = new AtomicLong(0);
 
-    try (ParallelTableIteratorOperation<String, byte[]> parallelIter = new ParallelTableIteratorOperation<>(
-        omMetadataManager, table, StringCodec.get(),
-        maxIterators, workerCount, maxKeysInMemory, loggingThreshold)) {
+    try (ParallelTableIteratorOperation<String, CodecBuffer> parallelIter = new ParallelTableIteratorOperation<>(
+        omMetadataManager, table, StringCodec.get(), maxIterators, loggingThreshold)) {
       
       parallelIter.performTaskOnTableVals(getTaskName(), null, null, kv -> {
         if (kv != null) {
