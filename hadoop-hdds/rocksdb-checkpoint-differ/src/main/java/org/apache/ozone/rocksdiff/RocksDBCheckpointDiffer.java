@@ -23,8 +23,6 @@ import static org.apache.hadoop.hdds.utils.db.IteratorType.KEY_ONLY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT;
@@ -72,11 +70,9 @@ import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CompactionLogEntryProto;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.Scheduler;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
-import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileIterator;
-import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileReader;
+import org.apache.hadoop.hdds.utils.db.ManagedRawSstFileIterator;
 import org.apache.hadoop.hdds.utils.db.RDBSstFileWriter;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
@@ -93,6 +89,7 @@ import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.AbstractEventListener;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.CompactionJobInfo;
+import org.rocksdb.EntryType;
 import org.rocksdb.LiveFileMetaData;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
@@ -175,7 +172,6 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   private volatile boolean closed;
   private final long maxAllowedTimeInDag;
   private final BootstrapStateHandler.Lock lock;
-  private static final int SST_READ_AHEAD_SIZE = 2 * 1024 * 1024;
   private int pruneSSTFileBatchSize;
   private SSTFilePruningMetrics sstFilePruningMetrics;
   private ColumnFamilyHandle snapshotInfoTableCFHandle;
@@ -247,16 +243,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
         OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE,
         OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE_DEFAULT);
     this.sstFilePruningMetrics = SSTFilePruningMetrics.create(activeDBLocationName);
-    try {
-      if (configuration.getBoolean(OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB, OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT)
-          && ManagedRawSSTFileReader.loadLibrary()) {
-        this.pruneQueue = new ConcurrentLinkedQueue<>();
-      }
-    } catch (NativeLibraryNotLoadedException e) {
-      LOG.warn("Native Library for raw sst file reading loading failed." +
-          " Cannot prune OMKeyInfo from SST files. {}", e.getMessage());
-    }
-
+    this.pruneQueue = new ConcurrentLinkedQueue<>();
     if (pruneCompactionDagDaemonRunIntervalInMs > 0) {
       this.scheduler = new Scheduler(DAG_PRUNING_SERVICE_NAME,
           true, 1);
@@ -1363,14 +1350,15 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
   }
 
   private void removeValueFromSSTFile(ManagedOptions options, String sstFilePath, File prunedFile) throws IOException {
-    try (ManagedRawSSTFileReader sstFileReader = new ManagedRawSSTFileReader(options, sstFilePath, SST_READ_AHEAD_SIZE);
-         ManagedRawSSTFileIterator<Pair<CodecBuffer, Integer>> itr = sstFileReader.newIterator(
-             keyValue -> Pair.of(keyValue.getKey(), keyValue.getType()), null, null, KEY_ONLY);
+    try (ManagedRawSstFileIterator<Pair<CodecBuffer, EntryType>> itr =
+             new ManagedRawSstFileIterator<>(sstFilePath, options,
+                 Optional.empty(), Optional.empty(), KEY_ONLY,
+                 kv -> Pair.of(kv.getKey(), kv.getType()));
          RDBSstFileWriter sstFileWriter = new RDBSstFileWriter(prunedFile);
          CodecBuffer emptyCodecBuffer = CodecBuffer.getEmptyBuffer()) {
       while (itr.hasNext()) {
-        Pair<CodecBuffer, Integer> keyValue = itr.next();
-        if (keyValue.getValue() == 0) {
+        Pair<CodecBuffer, EntryType> keyValue = itr.next();
+        if (Objects.requireNonNull(keyValue.getValue()) == EntryType.kEntryDelete) {
           sstFileWriter.delete(keyValue.getKey());
         } else {
           sstFileWriter.put(keyValue.getKey(), emptyCodecBuffer);

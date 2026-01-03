@@ -42,7 +42,6 @@
     <module>interface-client</module>
     <module>interface-server</module>
     <module>managed-rocksdb</module>
-    <module>rocks-native</module>
     <module>rocksdb-checkpoint-differ</module>
     <module>server-scm</module>
     <module>test-utils</module>

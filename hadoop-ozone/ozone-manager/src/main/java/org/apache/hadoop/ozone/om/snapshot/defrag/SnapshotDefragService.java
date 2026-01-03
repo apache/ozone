@@ -57,7 +57,6 @@ import org.apache.hadoop.hdds.utils.db.CodecBufferCodec;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
-import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.RDBSstFileWriter;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
@@ -164,7 +163,7 @@ public class SnapshotDefragService extends BackgroundService
     this.deltaDiffComputer = new CompositeDeltaDiffComputer(omSnapshotManager,
         ozoneManager.getMetadataManager(), differTmpDir, (status) -> {
       LOG.debug("Snapshot defragmentation diff status: {}", status);
-    }, false, !isRocksToolsNativeLibAvailable());
+    }, false, false);
     this.lockIds = new ArrayList<>(1);
   }
 
@@ -186,18 +185,6 @@ public class SnapshotDefragService extends BackgroundService
 
   boolean isRunning() {
     return running.get();
-  }
-
-  /**
-   * Checks if rocks-tools native library is available.
-   */
-  private boolean isRocksToolsNativeLibAvailable() {
-    try {
-      return ManagedRawSSTFileReader.tryLoadLibrary();
-    } catch (Exception e) {
-      LOG.warn("Failed to check native code availability", e);
-      return false;
-    }
   }
 
   /**
@@ -651,13 +638,6 @@ public class SnapshotDefragService extends BackgroundService
     final long count = runCount.incrementAndGet();
     if (LOG.isDebugEnabled()) {
       LOG.debug("Initiating Snapshot Defragmentation Task: run # {}", count);
-    }
-
-    // Check if rocks-tools native lib is available
-    if (!isRocksToolsNativeLibAvailable()) {
-      LOG.warn("Rocks-tools native library is not available. " +
-          "Stopping SnapshotDefragService.");
-      return false;
     }
 
     Optional<OmSnapshotManager> snapshotManager = Optional.ofNullable(ozoneManager)

@@ -23,6 +23,7 @@ import static org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogItera
 import static org.rocksdb.RocksDB.listColumnFamilies;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import java.io.Closeable;
 import java.io.File;
 import java.nio.ByteBuffer;
@@ -56,7 +57,6 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedTransactionLogIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
-import org.apache.ozone.rocksdiff.RocksDiffUtils;
 import org.apache.ratis.util.MemoizedSupplier;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.ColumnFamilyDescriptor;
@@ -873,36 +873,36 @@ public final class RocksDatabase implements Closeable {
    */
   public void deleteFilesNotMatchingPrefix(TablePrefixInfo prefixInfo) throws RocksDatabaseException {
     try (UncheckedAutoCloseable ignored = acquire()) {
+      Map<String, String[]> sstFileRangeMap = new HashMap<>();
       for (LiveFileMetaData liveFileMetaData : getSstFileList()) {
         String sstFileColumnFamily = StringUtils.bytes2String(liveFileMetaData.columnFamilyName());
-        int lastLevel = getLastLevel();
-
-        // RocksDB #deleteFile API allows only to delete the last level of
-        // SST Files. Any level < last level won't get deleted and
-        // only last file of level 0 can be deleted
-        // and will throw warning in the rocksdb manifest.
-        // Instead, perform the level check here
-        // itself to avoid failed delete attempts for lower level files.
-        if (liveFileMetaData.level() != lastLevel || lastLevel == 0) {
-          continue;
-        }
-
-        String prefixForColumnFamily = prefixInfo.getTablePrefix(sstFileColumnFamily);
         String firstDbKey = StringUtils.bytes2String(liveFileMetaData.smallestKey());
         String lastDbKey = StringUtils.bytes2String(liveFileMetaData.largestKey());
-        boolean isKeyWithPrefixPresent = RocksDiffUtils.isKeyWithPrefixPresent(
-            prefixForColumnFamily, firstDbKey, lastDbKey);
-        if (!isKeyWithPrefixPresent) {
-          LOG.info("Deleting sst file: {} with start key: {} and end key: {} "
-                  + "corresponding to column family {} from db: {}. "
-                  + "Prefix for the column family: {}.",
-              liveFileMetaData.fileName(),
-              firstDbKey, lastDbKey,
-              StringUtils.bytes2String(liveFileMetaData.columnFamilyName()),
-              db.get().getName(),
-              prefixForColumnFamily);
-          db.deleteFile(liveFileMetaData);
+        sstFileRangeMap.compute(sstFileColumnFamily, (key, value) -> {
+          if (value == null) {
+            return new String[]{firstDbKey, lastDbKey};
+          }
+          value[0] = firstDbKey.compareTo(value[0]) < 0 ? firstDbKey : value[0];
+          value[1] = lastDbKey.compareTo(value[1]) > 0 ? lastDbKey : value[1];
+          return value;
+        });
+      }
+      for (String tableName : prefixInfo.getTableNames()) {
+        String prefixForColumnFamily = prefixInfo.getTablePrefix(tableName);
+        ColumnFamilyHandle ch = getColumnFamilyHandle(tableName);
+        if (ch == null || prefixForColumnFamily == null || prefixForColumnFamily.isEmpty()) {
+          continue;
         }
+        String smallestDBKey = sstFileRangeMap.get(tableName)[0];
+        String largestDBKey = sstFileRangeMap.get(tableName)[1];
+        String nextLargestDBKey = StringUtils.getLexicographicallyHigherString(prefixForColumnFamily);
+        LOG.info("Deleting sst files in range [{}, {}) and [{}, {}) corresponding to column family {} from db: {}. " +
+                "Prefix for the column family: {}.",
+            smallestDBKey, prefixForColumnFamily, nextLargestDBKey, largestDBKey,
+            tableName, db.get().getName(), prefixForColumnFamily);
+        db.deleteFile(ch, ImmutableList.of(StringUtils.string2Bytes(smallestDBKey),
+            StringUtils.string2Bytes(prefixForColumnFamily), StringUtils.string2Bytes(nextLargestDBKey),
+            StringUtils.string2Bytes(largestDBKey)));
       }
     }
   }

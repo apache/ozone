@@ -655,8 +655,10 @@ public final class OzoneConfigKeys {
   public static final int
       OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE_DEFAULT = 2000;
 
+  @Deprecated
   public static final String OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB =
       "ozone.om.snapshot.load.native.lib";
+  @Deprecated
   public static final boolean OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT = true;
 
   public static final String OZONE_OM_DELTA_UPDATE_DATA_SIZE_MAX_LIMIT =

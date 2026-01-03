@@ -504,7 +504,7 @@ WTFPL
 
 
 --------------------------------------------------------------------------------
-hdds-server-scm, ozone-manager, ozone-s3gateway, hdds-rocks-native and hdds-server-framework
+hdds-server-scm, ozone-manager, ozone-s3gateway and hdds-server-framework
 contains the source of the following javascript/css components (See licenses/ for text of these licenses):
 
 Apache Software Foundation License 2.0

@@ -127,8 +127,6 @@ mvn clean package -DskipTests=true -Pdist
 * Use `-DskipShade` to skip shaded Ozone FS jar file creation. Saves time, but you can't test integration with other software that uses Ozone as a Hadoop-compatible file system.
 * Use `-DskipRecon` to skip building Recon Web UI. It saves about 2 minutes.
 * Use `-Dmaven.javadoc.skip=true` to skip building javadocs.
-* Use `-Drocks_tools_native` to build the RocksDB native code for the Ozone Snapshot feature. This is optional and not required for building Ozone. It is only needed if you want to build the RocksDB native code for Ozone.
-
 
 ## How to run Ozone from build
 
