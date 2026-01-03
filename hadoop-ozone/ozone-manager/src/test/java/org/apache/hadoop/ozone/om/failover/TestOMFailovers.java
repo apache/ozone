@@ -53,7 +53,7 @@ public class TestOMFailovers {
   private Exception testException;
 
   @Test
-  public void testAccessContorlExceptionFailovers() throws Exception {
+  public void testAccessControlExceptionFailovers() throws Exception {
 
     testException = new AccessControlException();
 
@@ -105,8 +105,7 @@ public class TestOMFailovers {
     }
   }
 
-  private final class MockFailoverProxyProvider
-      extends HadoopRpcOMFailoverProxyProvider {
+  private final class MockFailoverProxyProvider extends HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> {
 
     private MockFailoverProxyProvider(ConfigurationSource configuration)
         throws IOException {
@@ -114,31 +113,30 @@ public class TestOMFailovers {
     }
 
     @Override
-    protected ProxyInfo createOMProxy(String nodeId) {
-      ProxyInfo proxyInfo = new ProxyInfo<>(new MockOzoneManagerProtocol(nodeId,
-          testException), nodeId);
-      getOMProxyMap().put(nodeId, proxyInfo);
-      return proxyInfo;
+    protected ProxyInfo<OzoneManagerProtocolPB> createOMProxyIfNeeded(ProxyInfo<OzoneManagerProtocolPB> pi) {
+      if (pi.proxy == null) {
+        OMProxyInfo<OzoneManagerProtocolPB> omProxyInfo = (OMProxyInfo<OzoneManagerProtocolPB>) pi;
+        pi.proxy = new MockOzoneManagerProtocol(omProxyInfo.getNodeId(), testException);
+      }
+      return pi;
     }
 
     @Override
     protected void loadOMClientConfigs(ConfigurationSource config,
         String omSvcId) {
-      HashMap<String, ProxyInfo<OzoneManagerProtocolPB>> omProxies =
-          new HashMap<>();
-      HashMap<String, OMProxyInfo> omProxyInfos = new HashMap<>();
+      HashMap<String, ProxyInfo<OzoneManagerProtocolPB>> omProxyInfos = new HashMap<>();
       HashMap<String, InetSocketAddress> omNodeAddressMap = new HashMap<>();
       ArrayList<String> omNodeIDList = new ArrayList<>();
 
       for (int i = 1; i <= 3; i++) {
         String nodeId = "om" + i;
-        omProxies.put(nodeId, null);
-        omProxyInfos.put(nodeId, null);
+        OMProxyInfo<OzoneManagerProtocolPB> omProxyInfo = new OMProxyInfo<>(omSvcId, nodeId,
+            "127.0.0.1:9862");
+        omProxyInfos.put(nodeId, omProxyInfo);
         omNodeIDList.add(nodeId);
         omNodeAddressMap.put(nodeId, null);
       }
-      setProxiesForTesting(omProxies, omProxyInfos, omNodeIDList,
-          omNodeAddressMap);
+      setProxiesForTesting(omProxyInfos, omNodeIDList, omNodeAddressMap);
     }
 
     @Override

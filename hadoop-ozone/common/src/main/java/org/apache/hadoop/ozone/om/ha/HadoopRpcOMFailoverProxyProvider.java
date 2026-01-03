@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.ha;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
@@ -50,7 +51,6 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
       LoggerFactory.getLogger(HadoopRpcOMFailoverProxyProvider.class);
 
   private final Text delegationTokenService;
-  private Map<String, OMProxyInfo> omProxyInfos;
 
   // HadoopRpcOMFailoverProxyProvider, on encountering certain exception,
   // tries each OM once in a round robin fashion. After that it waits
@@ -70,7 +70,7 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
   protected void loadOMClientConfigs(ConfigurationSource config, String omSvcId)
       throws IOException {
     Map<String, ProxyInfo<T>> omProxies = new HashMap<>();
-    this.omProxyInfos = new HashMap<>();
+
     List<String> omNodeIDList = new ArrayList<>();
     Map<String, InetSocketAddress> omNodeAddressMap = new HashMap<>();
 
@@ -86,8 +86,8 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
         continue;
       }
 
-      OMProxyInfo omProxyInfo = new OMProxyInfo(omSvcId, nodeId,
-          rpcAddrStr);
+      // ProxyInfo.proxy will be set during first time call to server.
+      OMProxyInfo<T> omProxyInfo = new OMProxyInfo<>(omSvcId, nodeId, rpcAddrStr);
 
       if (omProxyInfo.getAddress() != null) {
         // For a non-HA OM setup, nodeId might be null. If so, we assign it
@@ -95,9 +95,7 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
         if (nodeId == null) {
           nodeId = OzoneConsts.OM_DEFAULT_NODE_ID;
         }
-        // ProxyInfo will be set during first time call to server.
-        omProxies.put(nodeId, null);
-        omProxyInfos.put(nodeId, omProxyInfo);
+        omProxies.put(nodeId, omProxyInfo);
         omNodeIDList.add(nodeId);
         omNodeAddressMap.put(nodeId, omProxyInfo.getAddress());
       } else {
@@ -123,31 +121,25 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
    */
   @Override
   public synchronized ProxyInfo<T> getProxy() {
-    ProxyInfo currentProxyInfo = getOMProxyMap().get(getCurrentProxyOMNodeId());
-    if (currentProxyInfo == null) {
-      currentProxyInfo = createOMProxy(getCurrentProxyOMNodeId());
-    }
-    return currentProxyInfo;
+    ProxyInfo<T> current = getOMProxyMap().get(getCurrentProxyOMNodeId());
+    return createOMProxyIfNeeded(current);
   }
 
   /**
    * Creates proxy object.
    */
-  protected ProxyInfo createOMProxy(String nodeId) {
-    OMProxyInfo omProxyInfo = omProxyInfos.get(nodeId);
-    InetSocketAddress address = omProxyInfo.getAddress();
-    ProxyInfo proxyInfo;
-    try {
-      T proxy = createOMProxy(address);
-      // Create proxyInfo here, to make it work with all Hadoop versions.
-      proxyInfo = new ProxyInfo<>(proxy, omProxyInfo.toString());
-      getOMProxyMap().put(nodeId, proxyInfo);
-    } catch (IOException ioe) {
-      LOG.error("{} Failed to create RPC proxy to OM at {}",
-          this.getClass().getSimpleName(), address, ioe);
-      throw new RuntimeException(ioe);
+  protected ProxyInfo<T> createOMProxyIfNeeded(ProxyInfo<T> pi) {
+    if (pi.proxy == null) {
+      OMProxyInfo<T> omProxyInfo = (OMProxyInfo<T>) pi;
+      try {
+        pi.proxy = createOMProxy(omProxyInfo.getAddress());
+      } catch (IOException ioe) {
+        LOG.error("{} Failed to create RPC proxy to OM at {}",
+            this.getClass().getSimpleName(), omProxyInfo.getAddress(), ioe);
+        throw new RuntimeException(ioe);
+      }
     }
-    return proxyInfo;
+    return pi;
   }
 
   public Text getCurrentProxyDelegationToken() {
@@ -158,9 +150,9 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
     // For HA, this will return "," separated address of all OM's.
     List<String> addresses = new ArrayList<>();
 
-    for (Map.Entry<String, OMProxyInfo> omProxyInfoSet :
-        omProxyInfos.entrySet()) {
-      Text dtService = omProxyInfoSet.getValue().getDelegationTokenService();
+    for (Map.Entry<String, ProxyInfo<T>> omProxyInfoSet :
+        getOMProxyMap().entrySet()) {
+      Text dtService = ((OMProxyInfo<T>) omProxyInfoSet.getValue()).getDelegationTokenService();
 
       // During client object creation when one of the OM configured address
       // in unreachable, dtService can be null.
@@ -186,30 +178,22 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
   @Override
   public synchronized void close() throws IOException {
     for (ProxyInfo<T> proxyInfo : getOMProxies()) {
-      if (proxyInfo != null) {
-        RPC.stopProxy(proxyInfo.proxy);
+      if (proxyInfo.proxy != null) {
+        if (proxyInfo.proxy instanceof Closeable) {
+          ((Closeable)proxyInfo.proxy).close();
+        } else {
+          RPC.stopProxy(proxyInfo.proxy);
+        }
       }
     }
   }
 
   @VisibleForTesting
-  public List<OMProxyInfo> getOMProxyInfos() {
-    return new ArrayList<OMProxyInfo>(omProxyInfos.values());
-  }
-
-  @VisibleForTesting
-  public Map<String, OMProxyInfo> getOMProxyInfoMap() {
-    return omProxyInfos;
-  }
-
-  @VisibleForTesting
   protected void setProxiesForTesting(
       Map<String, ProxyInfo<T>> setOMProxies,
-      Map<String, OMProxyInfo> setOMProxyInfos,
       List<String> setOMNodeIDList,
       Map<String, InetSocketAddress> setOMNodeAddress) {
     setOmProxies(setOMProxies);
-    this.omProxyInfos = setOMProxyInfos;
     setOmNodeIDList(setOMNodeIDList);
     setOmNodeAddressMap(setOMNodeAddress);
   }

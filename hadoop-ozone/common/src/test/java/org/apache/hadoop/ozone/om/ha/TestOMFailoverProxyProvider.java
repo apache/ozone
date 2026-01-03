@@ -167,9 +167,9 @@ public class TestOMFailoverProxyProvider {
                  UserGroupInformation.getCurrentUser(), OM_SERVICE_ID,
                  OzoneManagerProtocolPB.class)) {
       // Verify listener node is not included in proxy map
-      assertTrue(providerWithListeners.getOMProxyInfoMap().containsKey(NODE_ID_BASE_STR + 1));
-      assertTrue(providerWithListeners.getOMProxyInfoMap().containsKey(NODE_ID_BASE_STR + 3));
-      assertFalse(providerWithListeners.getOMProxyInfoMap().containsKey(listenerNode));
+      assertTrue(providerWithListeners.getOMProxyMap().containsKey(NODE_ID_BASE_STR + 1));
+      assertTrue(providerWithListeners.getOMProxyMap().containsKey(NODE_ID_BASE_STR + 3));
+      assertFalse(providerWithListeners.getOMProxyMap().containsKey(listenerNode));
     }
   }
 
