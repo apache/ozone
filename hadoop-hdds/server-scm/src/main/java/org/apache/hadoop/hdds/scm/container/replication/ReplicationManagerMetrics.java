@@ -35,7 +35,6 @@ import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.Interns;
-import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -158,8 +157,6 @@ public final class ReplicationManagerMetrics implements MetricsSource {
       " reaching the cluster inflight replication limit.")
   private MutableCounterLong pendingReplicationLimitReachedTotal;
 
-  private MetricsRegistry registry;
-
   private final ReplicationManager replicationManager;
 
   //EC Metrics
@@ -225,7 +222,6 @@ public final class ReplicationManagerMetrics implements MetricsSource {
   private MutableCounterLong replicateContainerCmdsDeferredTotal;
 
   public ReplicationManagerMetrics(ReplicationManager manager) {
-    this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
     this.replicationManager = manager;
   }
 

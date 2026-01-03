@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.om;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.ozone.OzoneConsts;
 
@@ -32,7 +31,6 @@ public class OmSnapshotInternalMetrics {
 
   public static final String METRICS_SOURCE_NAME =
       OmSnapshotInternalMetrics.class.getSimpleName();
-  private MetricsRegistry registry;
 
   /*
    * Total internal snapshot deletion operation metrics since last restart.
@@ -52,7 +50,6 @@ public class OmSnapshotInternalMetrics {
   private MutableCounterLong numSnapshotMoveTableKeysFails;
 
   public OmSnapshotInternalMetrics() {
-    this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
   }
 
   public static OmSnapshotInternalMetrics create() {
