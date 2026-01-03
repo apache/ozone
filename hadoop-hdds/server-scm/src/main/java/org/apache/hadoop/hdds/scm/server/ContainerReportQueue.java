@@ -253,7 +253,7 @@ public class ContainerReportQueue
     return false;
   }
 
-  @Nonnull
+  @Nullable
   @Override
   public ContainerReport take() throws InterruptedException {
     String uuid = orderingQueue.take();
