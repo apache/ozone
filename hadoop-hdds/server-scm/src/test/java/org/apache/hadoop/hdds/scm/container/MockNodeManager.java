@@ -106,6 +106,7 @@ public class MockNodeManager implements NodeManager {
   private final Map<DatanodeDetails, SCMNodeStat> nodeMetricMap;
   private final SCMNodeStat aggregateStat;
   private final Map<DatanodeID, List<SCMCommand<?>>> commandMap;
+  private final ConcurrentMap<DatanodeID, DatanodeInfo> nodeMap;
   private Node2PipelineMap node2PipelineMap;
   private final NodeStateMap node2ContainerMap;
   private NetworkTopology clusterMap;
@@ -120,6 +121,7 @@ public class MockNodeManager implements NodeManager {
     this.nodeMetricMap = new HashMap<>();
     this.node2PipelineMap = new Node2PipelineMap();
     this.node2ContainerMap = new NodeStateMap();
+    this.nodeMap = new ConcurrentHashMap<>();
     this.dnsToUuidMap = new ConcurrentHashMap<>();
     this.aggregateStat = new SCMNodeStat();
     this.clusterMap = new NetworkTopologyImpl(new OzoneConfiguration());
@@ -205,6 +207,15 @@ public class MockNodeManager implements NodeManager {
     numHealthyDisksPerDatanode = 1;
     numPipelinePerDatanode = NUM_RAFT_LOG_DISKS_PER_DATANODE *
         NUM_PIPELINE_PER_METADATA_DISK;
+  }
+
+  private DatanodeInfo getRequiredInfo(DatanodeDetails dd)
+      throws NodeNotFoundException {
+    DatanodeInfo info = nodeMap.get(dd.getID());
+    if (info == null) {
+      throw new NodeNotFoundException(dd.getID());
+    }
+    return info;
   }
 
   /**
@@ -417,6 +428,11 @@ public class MockNodeManager implements NodeManager {
   @Override
   public NodeStatus getNodeStatus(DatanodeDetails dd)
       throws NodeNotFoundException {
+    DatanodeInfo info = nodeMap.get(dd.getID());
+    if (info != null) {
+      return info.getNodeStatus();
+    }
+
     if (healthyNodes.contains(dd)) {
       return NodeStatus.inServiceHealthy();
     } else if (staleNodes.contains(dd)) {
@@ -436,6 +452,7 @@ public class MockNodeManager implements NodeManager {
   @Override
   public void setNodeOperationalState(DatanodeDetails datanodeDetails,
       HddsProtos.NodeOperationalState newState) throws NodeNotFoundException {
+    setNodeOperationalState(datanodeDetails, newState, 0);
   }
 
   /**
@@ -447,6 +464,19 @@ public class MockNodeManager implements NodeManager {
   public void setNodeOperationalState(DatanodeDetails datanodeDetails,
       HddsProtos.NodeOperationalState newState, long opStateExpiryEpocSec)
       throws NodeNotFoundException {
+    DatanodeInfo info = getRequiredInfo(datanodeDetails);
+    NodeStatus old = info.getNodeStatus();
+
+    NodeStatus updated = NodeStatus.valueOf(
+        newState,
+        old.getHealth(),
+        opStateExpiryEpocSec);
+
+    datanodeDetails.setPersistedOpState(updated.getOperationalState());
+    datanodeDetails.setPersistedOpStateExpiryEpochSec(
+        updated.getOpStateExpiryEpochSeconds());
+
+    info.setNodeStatus(updated);
   }
 
   /**
@@ -652,6 +682,12 @@ public class MockNodeManager implements NodeManager {
     } else {
       deadNodes.add(dn);
     }
+    DatanodeInfo info = nodeMap.get(dn.getID());
+    if (info != null) {
+      NodeStatus old = info.getNodeStatus();
+      info.setNodeStatus(NodeStatus.valueOf(
+          old.getOperationalState(), state, old.getOpStateExpiryEpochSeconds()));
+    }
   }
 
   /**
@@ -695,7 +731,12 @@ public class MockNodeManager implements NodeManager {
                                     NodeReportProto nodeReport,
                                     PipelineReportsProto pipelineReportsProto,
                                     LayoutVersionProto layoutInfo) {
+    NodeStatus s = NodeStatus.inServiceHealthy();
+    datanodeDetails.setPersistedOpState(s.getOperationalState());
+    datanodeDetails.setPersistedOpStateExpiryEpochSec(
+        s.getOpStateExpiryEpochSeconds());
     final DatanodeInfo info = new DatanodeInfo(datanodeDetails, NodeStatus.inServiceHealthy(), layoutInfo);
+    nodeMap.put(datanodeDetails.getID(), info);
     try {
       node2ContainerMap.addNode(info);
       addEntryTodnsToUuidMap(datanodeDetails.getIpAddress(),
@@ -741,9 +782,9 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
-  public Boolean isNodeRegistered(
-      DatanodeDetails datanodeDetails) {
-    return healthyNodes.contains(datanodeDetails);
+  public Boolean isNodeRegistered(DatanodeDetails datanodeDetails) {
+    return nodeMap.containsKey(datanodeDetails.getID()) ||
+        healthyNodes.contains(datanodeDetails);
   }
 
   @Override
