@@ -17,8 +17,9 @@
 
 package org.apache.hadoop.hdds.utils;
 
+import java.util.Collections;
+import java.util.EnumMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.metrics2.MetricsCollector;
@@ -34,33 +35,36 @@ import org.apache.ratis.util.UncheckedAutoCloseable;
 /**
  * Metrics to count all the subtypes of a specific message.
  */
-public class ProtocolMessageMetrics<KEY> implements MetricsSource {
+public class ProtocolMessageMetrics<KEY extends Enum<KEY>> implements MetricsSource {
 
   private final String name;
 
   private final String description;
 
-  private final Map<KEY, AtomicLong> counters =
-      new ConcurrentHashMap<>();
+  private final Map<KEY, AtomicLong> counters;
 
-  private final Map<KEY, AtomicLong> elapsedTimes =
-      new ConcurrentHashMap<>();
+  private final Map<KEY, AtomicLong> elapsedTimes;
 
   private final AtomicInteger concurrency = new AtomicInteger(0);
 
-  public static <KEY> ProtocolMessageMetrics<KEY> create(String name,
+  public static <KEY extends Enum<KEY>> ProtocolMessageMetrics<KEY> create(String name,
       String description, KEY[] types) {
-    return new ProtocolMessageMetrics<KEY>(name, description, types);
+    return new ProtocolMessageMetrics<>(name, description, types);
   }
 
   public ProtocolMessageMetrics(String name, String description,
       KEY[] values) {
     this.name = name;
     this.description = description;
+    final Class<KEY> enumClass = values[0].getDeclaringClass();
+    final EnumMap<KEY, AtomicLong> countersMap = new EnumMap<>(enumClass);
+    final EnumMap<KEY, AtomicLong> elapsedMap = new EnumMap<>(enumClass);
     for (KEY value : values) {
-      counters.put(value, new AtomicLong(0));
-      elapsedTimes.put(value, new AtomicLong(0));
+      countersMap.put(value, new AtomicLong(0));
+      elapsedMap.put(value, new AtomicLong(0));
     }
+    this.counters = Collections.unmodifiableMap(countersMap);
+    this.elapsedTimes = Collections.unmodifiableMap(elapsedMap);
   }
 
   public void increment(KEY key, long duration) {

@@ -78,7 +78,6 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError;
 import org.apache.hadoop.ozone.container.ozoneimpl.DataScanResult;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
-import org.apache.ratis.thirdparty.com.google.protobuf.ProtocolMessageEnum;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.slf4j.Logger;
@@ -110,9 +109,9 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   private final ContainerSet containerSet;
   private final StateContext context;
   private final float containerCloseThreshold;
-  private final ProtocolMessageMetrics<ProtocolMessageEnum> protocolMetrics;
+  private final ProtocolMessageMetrics<Type> protocolMetrics;
   private OzoneProtocolMessageDispatcher<ContainerCommandRequestProto,
-      ContainerCommandResponseProto, ProtocolMessageEnum> dispatcher;
+      ContainerCommandResponseProto, Type> dispatcher;
   private String clusterId;
   private ContainerMetrics metrics;
   private final TokenVerifier tokenVerifier;

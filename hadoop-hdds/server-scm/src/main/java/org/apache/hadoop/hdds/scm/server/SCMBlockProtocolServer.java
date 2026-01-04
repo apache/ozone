@@ -33,7 +33,6 @@ import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
-import com.google.protobuf.ProtocolMessageEnum;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
@@ -99,7 +98,7 @@ public class SCMBlockProtocolServer implements
   private final StorageContainerManager scm;
   private final RPC.Server blockRpcServer;
   private final InetSocketAddress blockRpcAddress;
-  private final ProtocolMessageMetrics<ProtocolMessageEnum>
+  private final ProtocolMessageMetrics<ScmBlockLocationProtocolProtos.Type>
       protocolMessageMetrics;
   private final SCMPerformanceMetrics perfMetrics;
 

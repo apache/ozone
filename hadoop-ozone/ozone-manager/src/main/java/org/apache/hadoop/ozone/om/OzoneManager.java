@@ -113,7 +113,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.BlockingService;
-import com.google.protobuf.ProtocolMessageEnum;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
@@ -414,7 +413,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final OMMetrics metrics;
   private final OmSnapshotInternalMetrics omSnapshotIntMetrics;
   private OMHAMetrics omhaMetrics;
-  private final ProtocolMessageMetrics<ProtocolMessageEnum>
+  private final ProtocolMessageMetrics<OzoneManagerProtocolProtos.Type>
       omClientProtocolMetrics;
   private final DeletingServiceMetrics omDeletionMetrics;
   private OzoneManagerHttpServer httpServer;

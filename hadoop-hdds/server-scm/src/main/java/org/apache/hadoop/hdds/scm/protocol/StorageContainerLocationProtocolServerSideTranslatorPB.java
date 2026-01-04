@@ -30,7 +30,6 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProt
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.ListPipelines;
 import static org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol.ADMIN_COMMAND_TYPE;
 
-import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
@@ -185,7 +184,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   private static final String ROLE_TYPE = "SCM";
 
   private OzoneProtocolMessageDispatcher<ScmContainerLocationRequest,
-      ScmContainerLocationResponse, ProtocolMessageEnum>
+      ScmContainerLocationResponse, StorageContainerLocationProtocolProtos.Type>
       dispatcher;
 
   /**
@@ -198,7 +197,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   public StorageContainerLocationProtocolServerSideTranslatorPB(
       StorageContainerLocationProtocol impl,
       StorageContainerManager scm,
-      ProtocolMessageMetrics<ProtocolMessageEnum> protocolMetrics)
+      ProtocolMessageMetrics<StorageContainerLocationProtocolProtos.Type> protocolMetrics)
       throws IOException {
     this.impl = impl;
     this.scm = scm;
