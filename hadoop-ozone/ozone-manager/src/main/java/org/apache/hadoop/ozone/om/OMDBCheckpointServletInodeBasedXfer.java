@@ -369,10 +369,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
     }
     for (Path snapshotLocalPropertyYaml : snapshotLocalPropertyFiles) {
       File yamlFile = snapshotLocalPropertyYaml.toFile();
-      if (omdbArchiver.getHardLinkFileMap() != null) {
-        omdbArchiver.getHardLinkFileMap().put(yamlFile.getAbsolutePath(), yamlFile.getName());
-      }
-      omdbArchiver.recordFileEntry(yamlFile, yamlFile.getName());
+      omdbArchiver.recordFileEntry(yamlFile, yamlFile.getName(), getDbStore());
     }
   }
 
@@ -493,20 +490,12 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
           continue;
         }
         String fileId = OmSnapshotUtils.getFileInodeAndLastModifiedTimeString(dbFile);
-        if (omdbArchiver.getHardLinkFileMap() != null) {
-          String path = dbFile.toFile().getAbsolutePath();
-          // if the file is in the om checkpoint dir, then we need to change the path to point to the OM DB.
-          if (path.contains(OM_CHECKPOINT_DIR)) {
-            path = getDbStore().getDbLocation().toPath().resolve(dbFile.getFileName()).toAbsolutePath().toString();
-          }
-          omdbArchiver.getHardLinkFileMap().put(path, fileId);
-        }
         if (!sstFilesToExclude.contains(fileId)) {
           long fileSize = Files.size(dbFile);
           if (maxTotalSstSize.get() - fileSize <= 0) {
             return false;
           }
-          bytesRecorded += omdbArchiver.recordFileEntry(dbFile.toFile(), fileId);
+          bytesRecorded += omdbArchiver.recordFileEntry(dbFile.toFile(), fileId, getDbStore());
           filesWritten++;
           maxTotalSstSize.addAndGet(-fileSize);
           sstFilesToExclude.add(fileId);

@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om;
 import static org.apache.hadoop.hdds.utils.Archiver.includeFile;
 import static org.apache.hadoop.hdds.utils.Archiver.tar;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.includeRatisSnapshotCompleteFlag;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.om.OMDBCheckpointServletInodeBasedXfer.writeHardlinkFile;
 
 import java.io.File;
@@ -32,6 +33,7 @@ import java.util.Map;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,24 +83,37 @@ public class OMDBArchiver {
   /**
    * @param file the file to create a hardlink and record into the map
    * @param entryName name of the entry corresponding to file
+   * @param dbStore DBStore instance of the OM
    * @return the file size
    * @throws IOException in case of hardlink failure
    *
    * Records the given file entry into the map after taking a hardlink.
    */
-  public long recordFileEntry(File file, String entryName) throws IOException {
+  public long recordFileEntry(File file, String entryName, DBStore dbStore) throws IOException {
     File link = tmpDir.resolve(entryName).toFile();
     long bytes = 0;
     try {
       Files.createLink(link.toPath(), file.toPath());
       filesToWriteIntoTarball.put(entryName, link);
       bytes = file.length();
+      writeToHardlinkMap(file, entryName, dbStore);
     } catch (IOException ioe) {
       LOG.error("Couldn't create hardlink for file {} while including it in tarball.",
           file.getAbsolutePath(), ioe);
       throw ioe;
     }
     return bytes;
+  }
+
+  private void writeToHardlinkMap(File file, String entryName, DBStore dbStore) {
+    if (hardLinkFileMap != null) {
+      String path = file.getAbsolutePath();
+      // if the file is in the om checkpoint dir, then we need to change the path to point to the OM DB.
+      if (path.contains(OM_CHECKPOINT_DIR)) {
+        path = dbStore.getDbLocation().toPath().resolve(file.getName()).toAbsolutePath().toString();
+      }
+      hardLinkFileMap.put(path, entryName);
+    }
   }
 
   /**
