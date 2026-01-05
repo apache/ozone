@@ -309,6 +309,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
                 maxTotalSstSize, omdbArchiver);
           }
         }
+        omdbArchiver.setCompleted(true);
       }
 
     } catch (IOException ioe) {
