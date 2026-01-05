@@ -1,10 +1,10 @@
 ---
-title: "Reconfigurability"
+title: "Dynamic Property Reload"
 weight: 11
 menu:
    main:
       parent: Features
-summary: Dynamic reloading configuration.
+summary: Dynamically reload configuration properties without restarting Ozone services.
 ---
 <!---
   Licensed to the Apache Software Foundation (ASF) under one or more
@@ -23,93 +23,173 @@ summary: Dynamic reloading configuration.
   limitations under the License.
 -->
 
-Ozone supports dynamic loading of certain properties without restarting the service. 
-If a property is reconfigurable, you can modify it in the configuration file (`ozone-site.xml`) and then invoke the command to flush it to memory.
+Ozone supports dynamic reloading of certain configuration properties without restarting services. This enables operators to tune cluster behavior, adjust limits, and update settings in production without service disruption.
 
-command:
+## Overview
+
+When a property is marked as reconfigurable, you can:
+1. Modify the property value in the configuration file (`ozone-site.xml`)
+2. Invoke the reconfig command to apply the changes to the running service
+
+The reconfiguration is performed asynchronously, and you can check the status to verify completion.
+
+## Command Reference
+
 ```shell
-ozone admin reconfig --service=[OM|SCM|DATANODE] --address=<ip:port> start|status|properties
+ozone admin reconfig --service=[OM|SCM|DATANODE] --address=<ip:port> <operation>
 ```
 
-The meaning of command options:
-- **--service**: The node type of the server specified with --address
-- **--address**: RPC address for one server
-- Three operations are provided:
-    - **start**:      Execute the reconfig operation asynchronously
-    - **status**:     Check reconfig status
-    - **properties**: List reconfigurable properties
+### Options
 
-## Retrieve the reconfigurable properties list
-To retrieve all the reconfigurable properties list for a specific component in Ozone,
-you can use the command: `ozone admin reconfig --service=[OM|SCM|DATANODE] --address=<ip:port> properties`.
-This command will list all the properties that can be dynamically reconfigured at runtime for specific component.<br>
+| Option | Description |
+|--------|-------------|
+| `--service` | The service type: `OM`, `SCM`, or `DATANODE` |
+| `--address` | RPC address of the target server (e.g., `hadoop1:9862`) |
+| `--in-service-datanodes` | (DataNode only) Apply to all IN_SERVICE datanodes |
 
-> For example, get the Ozone OM reconfigurable properties list.
->
->$ `ozone admin reconfig --service=OM --address=hadoop1:9862 properties`<br>
-OM: Node [hadoop1:9862] Reconfigurable properties:<br>
+### Operations
+
+| Operation | Description |
+|-----------|-------------|
+| `start` | Execute reconfiguration asynchronously |
+| `status` | Check the status of a reconfiguration task |
+| `properties` | List all reconfigurable properties for the service |
+
+## Reconfigurable Properties Reference
+
+### Ozone Manager (OM)
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `ozone.administrators` | - | Comma-separated list of Ozone administrators |
+| `ozone.om.server.list.max.size` | `1000` | Maximum server-side response size for list operations |
+| `ozone.om.volume.listall.allowed` | `true` | Allow all users to list all volumes |
+| `ozone.om.follower.read.local.lease.enabled` | `false` | Enable local lease for follower read optimization |
+| `ozone.om.follower.read.local.lease.lag.limit` | `10000` | Maximum log lag for follower reads |
+| `ozone.om.follower.read.local.lease.time.ms` | `5000` | Lease time in milliseconds for follower reads |
+
+### Storage Container Manager (SCM)
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `ozone.administrators` | - | Comma-separated list of Ozone administrators |
+| `hdds.scm.block.deletion.per-interval.max` | `500000` | Maximum blocks SCM processes per deletion interval |
+| `hdds.scm.replication.thread.interval` | `300s` | Interval for the replication monitor thread |
+| `hdds.scm.replication.under.replicated.interval` | `30s` | Frequency to check the under-replicated queue |
+| `hdds.scm.replication.over.replicated.interval` | `30s` | Frequency to check the over-replicated queue |
+| `hdds.scm.replication.event.timeout` | `12m` | Timeout for replication/deletion commands |
+| `hdds.scm.replication.event.timeout.datanode.offset` | `6m` | Offset subtracted from event timeout for datanode deadline |
+| `hdds.scm.replication.maintenance.replica.minimum` | `2` | Minimum replicas required for node maintenance |
+| `hdds.scm.replication.maintenance.remaining.redundancy` | `1` | Remaining redundancy required for maintenance (EC) |
+| `hdds.scm.replication.datanode.replication.limit` | `20` | Max replication commands queued per datanode |
+| `hdds.scm.replication.datanode.reconstruction.weight` | `3` | Weight multiplier for reconstruction commands |
+| `hdds.scm.replication.datanode.delete.container.limit` | `40` | Max delete container commands queued per datanode |
+| `hdds.scm.replication.inflight.limit.factor` | `0.75` | Factor to scale cluster-wide replication limit |
+| `hdds.scm.replication.container.sample.limit` | `100` | Number of containers sampled per state for debugging |
+| `ozone.scm.ec.pipeline.minimum` | `5` | Minimum EC pipelines to keep open |
+| `ozone.scm.ec.pipeline.per.volume.factor` | `1` | Factor for calculating EC pipelines based on volumes |
+
+### DataNode
+
+| Property | Default | Description |
+|----------|---------|-------------|
+| `hdds.datanode.block.deleting.limit.per.interval` | `20000` | Maximum blocks deleted per interval on a datanode |
+
+## Usage Examples
+
+### List Reconfigurable Properties
+
+To view all properties that can be dynamically reconfigured:
+
+```shell
+$ ozone admin reconfig --service=OM --address=hadoop1:9862 properties
+OM: Node [hadoop1:9862] Reconfigurable properties:
 ozone.administrators
+ozone.om.server.list.max.size
+ozone.om.volume.listall.allowed
+ozone.om.follower.read.local.lease.enabled
+ozone.om.follower.read.local.lease.lag.limit
+ozone.om.follower.read.local.lease.time.ms
+```
 
-## OM Reconfigurability
->For example, modify `ozone.administrators` in ozone-site.xml and execute:
->
-> $ `ozone admin reconfig --service=OM --address=hadoop1:9862 start`<br>
-OM: Started OM reconfiguration task on node [hadoop1:9862].
->
->$ `ozone admin reconfig --service=OM --address=hadoop1:9862 status`<br>
-OM: Reconfiguring status for node [hadoop1:9862]: started at Wed Dec 28 19:04:44 CST 2022 and finished at Wed Dec 28 19:04:44 CST 2022.<br>
-SUCCESS: Changed property ozone.administrators<br>
-From: "hadoop"<br>
+### OM Reconfiguration Example
+
+Modify `ozone.administrators` in `ozone-site.xml`, then execute:
+
+```shell
+$ ozone admin reconfig --service=OM --address=hadoop1:9862 start
+OM: Started reconfiguration task on node [hadoop1:9862].
+
+$ ozone admin reconfig --service=OM --address=hadoop1:9862 status
+OM: Reconfiguring status for node [hadoop1:9862]: started at Wed Dec 28 19:04:44 CST 2022 and finished at Wed Dec 28 19:04:44 CST 2022.
+SUCCESS: Changed property ozone.administrators
+From: "hadoop"
 To: "hadoop,bigdata"
->
-> $ `ozone admin reconfig --service=OM -address=hadoop1:9862 properties`<br>
-OM: Node [hadoop1:9862] Reconfigurable properties:<br>
-ozone.administrators
+```
 
-## SCM Reconfigurability
->For example, modify `ozone.administrators` in ozone-site.xml and execute:
->
-> $ `ozone admin reconfig --service=SCM --address=hadoop1:9860 start`<br>
-SCM: Started OM reconfiguration task on node [hadoop1:9860].
->
->$ `ozone admin reconfig --service=SCM --address=hadoop1:9860 status`<br>
-SCM: Reconfiguring status for node [hadoop1:9860]: started at Wed Dec 28 19:04:44 CST 2022 and finished at Wed Dec 28 19:04:44 CST 2022.<br>
-SUCCESS: Changed property ozone.administrators<br>
-From: "hadoop"<br>
+### SCM Reconfiguration Example
+
+Modify `ozone.administrators` in `ozone-site.xml`, then execute:
+
+```shell
+$ ozone admin reconfig --service=SCM --address=hadoop1:9860 start
+SCM: Started reconfiguration task on node [hadoop1:9860].
+
+$ ozone admin reconfig --service=SCM --address=hadoop1:9860 status
+SCM: Reconfiguring status for node [hadoop1:9860]: started at Wed Dec 28 19:04:44 CST 2022 and finished at Wed Dec 28 19:04:44 CST 2022.
+SUCCESS: Changed property ozone.administrators
+From: "hadoop"
 To: "hadoop,bigdata"
->
-> $ `ozone admin reconfig --service=SCM -address=hadoop1:9860 properties`<br>
-SCM: Node [hadoop1:9860] Reconfigurable properties:<br>
-ozone.administrators
+```
 
-## Datanode Reconfigurability
->For example, modify `ozone.example.config` in ozone-site.xml and execute:
->
-> $ `ozone admin reconfig --service=DATANODE --address=hadoop1:19864 start`<br>
+### DataNode Reconfiguration Example
+
+Modify `hdds.datanode.block.deleting.limit.per.interval` in `ozone-site.xml`, then execute:
+
+```shell
+$ ozone admin reconfig --service=DATANODE --address=hadoop1:19864 start
 Datanode: Started reconfiguration task on node [hadoop1:19864].
->
->$ `ozone admin reconfig --service=DATANODE --address=hadoop1:19864 status`<br>
-Datanode: Reconfiguring status for node [hadoop1:19864]: started at Wed Dec 28 19:04:44 CST 2022 and finished at Wed Dec 28 19:04:44 CST 2022.<br>
-SUCCESS: Changed property ozone.example.config<br>
-From: "old"<br>
-To: "new"
->
-> $ `ozone admin reconfig --service=DATANODE -address=hadoop1:19864 properties`<br>
-Datanode: Node [hadoop1:19864] Reconfigurable properties:<br>
-ozone.example.config
 
-### Batch operation
-If you want to perform a batch operations on the Datanode, you can set the `--in-service-datanodes` flag.
-This will send reconfiguration requests to all available DataNodes in the `IN_SERVICE`operational state.<br>
-Currently, only Datanode supports batch operations<br>
+$ ozone admin reconfig --service=DATANODE --address=hadoop1:19864 status
+Datanode: Reconfiguring status for node [hadoop1:19864]: started at Wed Dec 28 19:04:44 CST 2022 and finished at Wed Dec 28 19:04:44 CST 2022.
+SUCCESS: Changed property hdds.datanode.block.deleting.limit.per.interval
+From: "20000"
+To: "30000"
+```
 
+### Batch Operations (DataNode Only)
 
->For example, to list the reconfigurable properties of all Datanodes:<br>
-> $ `ozone admin reconfig --service=DATANODE --in-service-datanodes properties`<br>
-Datanode: Node [hadoop1:19864] Reconfigurable properties:<br>
-ozone.example.config<br>
-Datanode: Node [hadoop2:19864] Reconfigurable properties:<br>
-ozone.example.config<br>
-Datanode: Node [hadoop3:19864] Reconfigurable properties:<br>
-ozone.example.config<br>
-Reconfig successfully 3 nodes, failure 0 nodes.<br>
+To perform reconfiguration on all IN_SERVICE datanodes simultaneously:
+
+```shell
+$ ozone admin reconfig --service=DATANODE --in-service-datanodes start
+Datanode: Started reconfiguration task on node [hadoop1:19864].
+Datanode: Started reconfiguration task on node [hadoop2:19864].
+Datanode: Started reconfiguration task on node [hadoop3:19864].
+Reconfig successfully 3 nodes, failure 0 nodes.
+```
+
+To list properties across all datanodes:
+
+```shell
+$ ozone admin reconfig --service=DATANODE --in-service-datanodes properties
+Datanode: Node [hadoop1:19864] Reconfigurable properties:
+hdds.datanode.block.deleting.limit.per.interval
+Datanode: Node [hadoop2:19864] Reconfigurable properties:
+hdds.datanode.block.deleting.limit.per.interval
+Datanode: Node [hadoop3:19864] Reconfigurable properties:
+hdds.datanode.block.deleting.limit.per.interval
+Reconfig successfully 3 nodes, failure 0 nodes.
+```
+
+## Best Practices
+
+1. **Test in non-production first**: Always validate configuration changes in a test environment before applying to production.
+
+2. **Change one property at a time**: When making multiple changes, apply them incrementally to isolate the impact of each change.
+
+3. **Monitor after changes**: Watch cluster metrics and logs after reconfiguration to ensure the changes have the desired effect.
+
+4. **Document changes**: Keep a record of configuration changes for troubleshooting and audit purposes.
+
+5. **Use batch operations carefully**: When using `--in-service-datanodes`, ensure all nodes should receive the same configuration.
