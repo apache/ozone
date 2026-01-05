@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.diskbalancer;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.container.common.volume.StorageVolume.TMP_DIR_NAME;
 import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.calculateVolumeDataDensity;
 import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.getIdealUsage;
 import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.getVolumeUsages;
@@ -202,7 +203,7 @@ public class DiskBalancerService extends BackgroundService {
             workDirName = clusterId;
           }
           diskBalancerTmpDir = Paths.get(volume.getStorageDir().toString(),
-              workDirName, "tmp", DISK_BALANCER_DIR);
+              workDirName, TMP_DIR_NAME, DISK_BALANCER_DIR);
         }
 
         // Clean up any existing diskBalancer directory from previous runs

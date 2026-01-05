@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.diskbalancer;
 
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
+import static org.apache.hadoop.ozone.container.common.volume.StorageVolume.TMP_DIR_NAME;
 import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.getVolumeUsages;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -139,7 +140,7 @@ public class TestDiskBalancerService {
         } else {
           // If tmpDir is not initialized, construct the path manually
           File clusterIdDir = new File(hddsVolume.getHddsRootDir(), clusterId);
-          File tmpDirPath = new File(clusterIdDir, "tmp");
+          File tmpDirPath = new File(clusterIdDir, TMP_DIR_NAME);
           staleDiskBalancerDir = new File(tmpDirPath, DiskBalancerService.DISK_BALANCER_DIR);
         }
         
@@ -505,7 +506,7 @@ public class TestDiskBalancerService {
         // Verify stale diskBalancer directory is cleaned up
         File hddsRootDir = hddsVolume.getHddsRootDir();
         File expectedDiskBalancerTmpDir = new File(new File(hddsRootDir, scmId),
-            "tmp" + File.separator + DiskBalancerService.DISK_BALANCER_DIR);
+            TMP_DIR_NAME + File.separator + DiskBalancerService.DISK_BALANCER_DIR);
         assertFalse(expectedDiskBalancerTmpDir.exists(),
             "Stale diskBalancer directory should be cleaned up even when tmpDir is not initialized");
       }
