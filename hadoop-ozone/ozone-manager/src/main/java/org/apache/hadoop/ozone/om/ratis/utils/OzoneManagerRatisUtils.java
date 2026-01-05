@@ -346,10 +346,13 @@ public final class OzoneManagerRatisUtils {
       bucketName = keyArgs.getBucketName();
       break;
     case SetLifecycleConfiguration:
+      ozoneManager.checkLifecycleEnabled();
       return new OMLifecycleConfigurationSetRequest(omRequest);
     case DeleteLifecycleConfiguration:
+      ozoneManager.checkLifecycleEnabled();
       return new OMLifecycleConfigurationDeleteRequest(omRequest);
     case SetLifecycleServiceStatus:
+      ozoneManager.checkLifecycleEnabled();
       return new OMLifecycleSetServiceStatusRequest(omRequest);
     default:
       throw new OMException("Unrecognized write command type request "

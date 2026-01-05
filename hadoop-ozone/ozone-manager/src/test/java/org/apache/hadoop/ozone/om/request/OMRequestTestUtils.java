@@ -79,6 +79,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3Vo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleAction;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleConfiguration;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleRule;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListTenantRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartCommitUploadPartRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartInfoInitiateRequest;
@@ -1489,6 +1492,78 @@ public final class OMRequestTestUtils {
         .setCmdType(Type.DeleteSnapshot)
         .setClientId(UUID.randomUUID().toString())
         .setUserInfo(userInfo)
+        .build();
+  }
+
+  public static OMRequest setLifecycleConfigurationRequest(
+      String volumeName, String bucketName) {
+    LifecycleConfiguration.Builder lifecycleConfigurationBuilder = LifecycleConfiguration.newBuilder()
+        .addRules(LifecycleRule.newBuilder()
+            .setId(UUID.randomUUID().toString())
+            .setEnabled(true)
+            .addAction(LifecycleAction.getDefaultInstance())
+            .build())
+        .setVolume(volumeName)
+        .setBucket(bucketName)
+        .setCreationTime(Time.now())
+        .setBucketLayout(getDefaultBucketLayout().toProto());
+    OzoneManagerProtocolProtos.SetLifecycleConfigurationRequest setLifecycleConfigurationRequest =
+        OzoneManagerProtocolProtos.SetLifecycleConfigurationRequest.newBuilder()
+            .setLifecycleConfiguration(lifecycleConfigurationBuilder)
+            .build();
+    return OMRequest.newBuilder()
+        .setSetLifecycleConfigurationRequest(setLifecycleConfigurationRequest)
+        .setCmdType(Type.SetLifecycleConfiguration)
+        .setClientId(UUID.randomUUID().toString())
+        .build();
+  }
+
+  public static OMRequest deleteLifecycleConfigurationRequest(String volumeName, String bucketName) {
+    OzoneManagerProtocolProtos.DeleteLifecycleConfigurationRequest deleteLifecycleConfigurationRequest =
+        OzoneManagerProtocolProtos.DeleteLifecycleConfigurationRequest.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .build();
+    return OMRequest.newBuilder()
+        .setDeleteLifecycleConfigurationRequest(deleteLifecycleConfigurationRequest)
+        .setCmdType(Type.DeleteLifecycleConfiguration)
+        .setClientId(UUID.randomUUID().toString())
+        .build();
+  }
+
+  public static OMRequest setLifecycleServiceStatus() {
+    OzoneManagerProtocolProtos.SetLifecycleServiceStatusRequest setLifecycleServiceStatusRequest =
+        OzoneManagerProtocolProtos.SetLifecycleServiceStatusRequest.newBuilder()
+            .setSuspend(true)
+            .build();
+    return OMRequest.newBuilder()
+        .setSetLifecycleServiceStatusRequest(setLifecycleServiceStatusRequest)
+        .setCmdType(Type.SetLifecycleServiceStatus)
+        .setClientId(UUID.randomUUID().toString())
+        .build();
+  }
+
+  public static OMRequest getLifecycleConfigurationRequest(String volumeName, String bucketName) {
+    OzoneManagerProtocolProtos.GetLifecycleConfigurationRequest getLifecycleConfigurationRequest =
+        OzoneManagerProtocolProtos.GetLifecycleConfigurationRequest.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName)
+            .build();
+    return OMRequest.newBuilder()
+        .setGetLifecycleConfigurationRequest(getLifecycleConfigurationRequest)
+        .setCmdType(Type.GetLifecycleConfiguration)
+        .setClientId(UUID.randomUUID().toString())
+        .build();
+  }
+
+  public static OMRequest getLifecycleServiceStatus() {
+    OzoneManagerProtocolProtos.GetLifecycleServiceStatusRequest getLifecycleServiceStatusRequest =
+        OzoneManagerProtocolProtos.GetLifecycleServiceStatusRequest.newBuilder()
+            .build();
+    return OMRequest.newBuilder()
+        .setGetLifecycleServiceStatusRequest(getLifecycleServiceStatusRequest)
+        .setCmdType(Type.GetLifecycleServiceStatus)
+        .setClientId(UUID.randomUUID().toString())
         .build();
   }
 
