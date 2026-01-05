@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -194,6 +195,46 @@ public class TestContainerStateManager {
     } catch (IOException e) {
       assertInstanceOf(InvalidContainerStateException.class, e.getCause().getCause());
     }
+  }
+
+  @Test
+  public void testSequenceIdOnStateUpdate() throws Exception {
+    ContainerID containerID = ContainerID.valueOf(3L);
+    long sequenceId = 100L;
+
+    ContainerInfo containerInfo = new ContainerInfo.Builder()
+        .setContainerID(containerID.getId())
+        .setState(HddsProtos.LifeCycleState.OPEN)
+        .setSequenceId(sequenceId)
+        .setOwner("scm")
+        .setPipelineID(PipelineID.randomId())
+        .setReplicationConfig(
+            RatisReplicationConfig
+                .getInstance(ReplicationFactor.THREE))
+        .build();
+
+    containerStateManager.addContainer(containerInfo.getProtobuf());
+
+    // Try to update with a higher sequenceId
+    containerStateManager.updateContainerStateWithSequenceId(
+        containerID.getProtobuf(),
+        HddsProtos.LifeCycleEvent.FINALIZE,
+        sequenceId + 1);
+
+    ContainerInfo afterFirst = containerStateManager.getContainer(containerID);
+    long currentSequenceId = afterFirst.getSequenceId();
+    // Sequence id should be updated with latest sequence id
+    assertEquals(sequenceId + 1, currentSequenceId);
+
+    // Try updating with older sequenceId
+    containerStateManager.updateContainerStateWithSequenceId(
+        containerID.getProtobuf(),
+        HddsProtos.LifeCycleEvent.CLOSE,
+        sequenceId - 10); // Older sequenceId
+
+    // Assert - SequenceId should not change
+    ContainerInfo finalInfo = containerStateManager.getContainer(containerID);
+    assertEquals(finalInfo.getSequenceId(), currentSequenceId);
   }
 
   private void addReplica(ContainerInfo cont, DatanodeDetails node) {
