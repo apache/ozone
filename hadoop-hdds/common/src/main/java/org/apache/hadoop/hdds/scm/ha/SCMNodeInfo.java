@@ -32,6 +32,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_K
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NODES_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SECURITY_SERVICE_PORT_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_DUMMY_NODEID;
@@ -74,21 +75,10 @@ public class SCMNodeInfo {
     // First figure out scm client address from HA style config.
     // If service Id is not defined, fall back to non-HA config.
 
-    // Check for common configuration typo
-    if (conf.get("ozone.scm.service.ids") == null) {
-      String typo = conf.get("ozone.scm.service.id");
-      String errorMsg = "Configuration property 'ozone.scm.service.ids' is missing.\n";
-      if (typo != null) {
-        errorMsg += "Found 'ozone.scm.service.id=" + typo + "' in configuration.\n" +
-                    "Did you mean 'ozone.scm.service.ids'?\n";
-      }
-      errorMsg += "For SCM HA configuration, use 'ozone.scm.service.ids' to specify service IDs.";
-      throw new ConfigurationException(errorMsg);
-    }
-
     List<SCMNodeInfo> scmNodeInfoList = new ArrayList<>();
     String scmServiceId = HddsUtils.getScmServiceId(conf);
     if (scmServiceId != null) {
+      LOG.info("{} for StorageContainerManager is {}", OZONE_SCM_SERVICE_IDS_KEY, scmServiceId);
       ArrayList< String > scmNodeIds = new ArrayList<>(
           HddsUtils.getSCMNodeIds(conf, scmServiceId));
       if (scmNodeIds.isEmpty()) {
@@ -135,6 +125,7 @@ public class SCMNodeInfo {
       return scmNodeInfoList;
     } else {
       scmServiceId = SCM_DUMMY_SERVICE_ID;
+      LOG.info("ServiceID for StorageContainerManager is dummy service ID {}", scmServiceId);
 
       // Following current approach of fall back to
       // OZONE_SCM_CLIENT_ADDRESS_KEY to figure out hostname.

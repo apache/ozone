@@ -107,8 +107,10 @@ public final class HAUtils {
           "Common issues: missing service IDs, incorrect hostnames, or missing port numbers.\n" +
           "Details: " + e.getMessage(), e);
     } catch (IOException e) {
+      LOG.error("Failed to get SCM info", e);
       throw e;
     } catch (Exception e) {
+      LOG.error("Failed to get SCM info", e);
       throw new IOException("Failed to get SCM info: " + e.getMessage(), e);
     }
   }
