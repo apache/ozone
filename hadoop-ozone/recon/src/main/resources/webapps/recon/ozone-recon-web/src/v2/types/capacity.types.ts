@@ -28,44 +28,56 @@ type GlobalNamespace = {
 };
 
 type UsedSpaceBreakdown = {
-  openKeysBytes: number;
-  committedBytes: number;
-  containerPreAllocated: number;
-  deletionPendingBytes: {
-    total: number;
-    byStage: {
-      DN: {
-        pendingBytes: number;
-      };
-      SCM: {
-        pendingBytes: number;
-      };
-      OM: {
-        pendingKeyBytes: number;
-        pendingBytes: number;
-        pendingDirectoryBytes: number;
-      };
-    };
-  };
+  openKeyBytes: number;
+  committedKeyBytes: number;
+  preAllocatedContainerBytes: number;
 };
 
-type DataNodeUsage = {
-  uuid: string;
+type DNPendingDeleteStat = {
+  hostName: string;
+  datanodeUuid: string;
+  pendingBlockSize: number;
+}
+
+export type DataNodeUsage = {
+  datanodeUuid: string;
+  hostName: string;
   capacity: number;
   used: number;
   remaining: number;
   committed: number;
-  pendingDeletion: number;
+  minimumFreeSpace: number;
+  reserved: number;
 };
 
-type UtilizationResponse = {
+export type UtilizationResponse = {
   globalStorage: GlobalStorage;
   globalNamespace: GlobalNamespace;
   usedSpaceBreakdown: UsedSpaceBreakdown;
   dataNodeUsage: DataNodeUsage[];
 };
 
-type Segment = {
+export type DNPendingDeletion = {
+  status: "NOT_STARTED" | "IN_PROGRESS" | "FINISHED" | "FAILED";
+  totalPendingDeletionSize: number | null;
+  pendingDeletionPerDataNode: DNPendingDeleteStat[] | null;
+  totalNodesQueried: number | null;
+  totalNodeQueriesFailed: number | null;
+}
+
+export type OMPendingDeletion = {
+  totalSize: number;
+  pendingDirectorySize: number;
+  pendingKeySize: number;
+}
+
+export type SCMPendingDeletion = {
+  totalBlocksize: number;
+  totalReplicatedBlockSize: number;
+  totalBlocksCount: number;
+}
+
+export type Segment = {
   value: number;
   color: string;
   label: string | React.ReactNode;

@@ -19,7 +19,8 @@
 import { EChart } from '@/components/eChart/eChart';
 import { GraphLegendIcon } from '@/utils/themeIcons';
 import { cardHeadStyle, statisticValueStyle } from '@/v2/pages/capacity/constants/styles.constants';
-import { Card, Divider, Row, Select, Statistic } from 'antd';
+import { Segment } from '@/v2/types/capacity.types';
+import { Card, Divider, Row, Select, Spin, Statistic } from 'antd';
 import filesize from 'filesize';
 import React from 'react';
 
@@ -27,15 +28,17 @@ type DataDetailItem = {
   title: string | React.ReactNode;
   size: number;
   breakdown: Segment[];
+  loading?: boolean;
 }
 
 type CapacityDetailProps = {
-  title: string;
+  title: string | React.ReactNode;
   showDropdown: boolean;
   dataDetails: DataDetailItem[];
   dropdownItems?: string[];
-  handleSelect?: React.Dispatch<React.SetStateAction<string | null>>
+  handleSelect?: React.Dispatch<React.SetStateAction<string>>
   loading: boolean;
+  extra?: React.ReactNode;
 };
 
 const getEchartOptions = (title: string | React.ReactNode, data: DataDetailItem) => {
@@ -84,7 +87,7 @@ const getEchartOptions = (title: string | React.ReactNode, data: DataDetailItem)
 
 
 const CapacityDetail: React.FC<CapacityDetailProps> = (
-  { title, showDropdown, dropdownItems, dataDetails, handleSelect, loading }
+  { title, showDropdown, dropdownItems, dataDetails, handleSelect, loading, extra }
 ) => {
 
   const options = dropdownItems?.map((item) => ({
@@ -93,7 +96,7 @@ const CapacityDetail: React.FC<CapacityDetailProps> = (
   })) ?? [];
 
   return (
-    <Card title={title} size='small' headStyle={cardHeadStyle} loading={loading}>
+    <Card title={title} size='small' headStyle={cardHeadStyle} loading={loading} extra={extra}>
       { showDropdown && options.length > 0 &&
         <div className='node-select-container'>
           <strong>Node Selector:</strong>
@@ -116,22 +119,21 @@ const CapacityDetail: React.FC<CapacityDetailProps> = (
                 suffix={size[1]}
                 valueStyle={statisticValueStyle}
                 className='data-detail-statistic'
+                loading={data.loading}
               />
-              <Row className='data-detail-breakdown-container'>
+              {!data.loading && <Row className='data-detail-breakdown-container'>
                 {data.breakdown.map((item, idx) => (
-                  <Statistic
-                    key={`data-detail-breakdown-${item.label}-${idx}`}
-                    title={item.label}
-                    prefix={<GraphLegendIcon color={item.color} height={12}/>}
-                    value={filesize(item.value, { round: 1 })}
-                    className='data-detail-breakdown-statistic'
-                  />
+                  <div key={`data-defailt-breakdown-${item.label}-${idx}`} className='data-detail-breakdown-item'>
+                    <GraphLegendIcon color={item.color} height={12} />
+                    <span className="data-detail-breakdown-label">{item.label}</span>
+                    <span className="data-detail-breakdown-value">{filesize(item.value, {round: 1})}</span>
+                  </div>
                 ))}
                 <EChart
                   option={getEchartOptions(data.title, data)}
                   style={{ height: '40px', width: '100%', margin: '10px 0px' }} />
                 {idx < dataDetails.length - 1 && <Divider />}
-              </Row>
+              </Row>}
             </div>
           )
         })}

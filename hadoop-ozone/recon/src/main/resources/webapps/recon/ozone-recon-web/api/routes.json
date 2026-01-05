@@ -55,5 +55,8 @@
   "/datanodes/decommission/info/datanode?uuid=*": "/DatanodesDecommissionInfo",
   "/datanodes/remove": "/datanodesRemove",
 
-  "/storageDistribution": "/utilization"
+  "/storageDistribution": "/utilization",
+  "/pendingDeletion?component=dn": "/pendingDeletionDN",
+  "/pendingDeletion?component=om": "/pendingDeletionOM",
+  "/pendingDeletion?component=scm": "/pendingDeletionSCM"
 }

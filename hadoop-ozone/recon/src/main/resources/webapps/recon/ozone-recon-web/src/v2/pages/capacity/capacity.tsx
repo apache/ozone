@@ -16,15 +16,12 @@
  * limitations under the License.
  */
 
-import { Popover, Tag, Typography } from 'antd';
+import { Popover, Tag, Tooltip, Typography } from 'antd';
 import React from 'react';
 import AutoReloadPanel from '@/components/autoReloadPanel/autoReloadPanel';
 
 import './capacity.less';
-import { AxiosGetHelper, cancelRequests } from '@/utils/axiosRequestHelper';
-import { showDataFetchError } from '@/utils/common';
-import { AxiosError } from 'axios';
-import { AutoReloadHelper } from '@/utils/autoReloadHelper';
+import { showDataFetchError } from '@/utils/common'
 import moment from 'moment';
 import CapacityBreakdown from '@/v2/pages/capacity/components/CapacityBreakdown';
 import CapacityDetail from '@/v2/pages/capacity/components/CapacityDetail';
@@ -36,113 +33,123 @@ import {
 } from '@/v2/pages/capacity/constants/descriptions.constants';
 import WrappedInfoIcon from '@/v2/pages/capacity/components/WrappedInfoIcon';
 import filesize from 'filesize';
-import { InfoCircleOutlined } from '@ant-design/icons';
+import { InfoCircleOutlined, WarningFilled, CheckCircleFilled } from '@ant-design/icons';
+import { useApiData } from '@/v2/hooks/useAPIData.hook';
+import * as CONSTANTS from '@/v2/constants/capacity.constants';
+import { UtilizationResponse, SCMPendingDeletion, OMPendingDeletion, DNPendingDeletion, DataNodeUsage } from '@/v2/types/capacity.types';
+import { useAutoReload } from '@/v2/hooks/useAutoReload.hook';
 
 type CapacityState = {
-  loading: boolean;
+  isDNPending: boolean;
   lastUpdated: number;
 };
 
 const Capacity: React.FC<object> = () => {
 
   const [state, setState] = React.useState<CapacityState>({
-    loading: false,
+    isDNPending: true,
     lastUpdated: 0
   });
-  const [globalStorage, setGlobalStorage] = React.useState<GlobalStorage>({
-    totalUsedSpace: 0,
-    totalFreeSpace: 0,
-    totalCapacity: 0,
-  });
 
-  // Not being used for now
-  // const [globalNamespace, setGlobalNamespace] = React.useState<GlobalNamespace>({
-  //   totalUsedSpace: 0,
-  //   totalKeys: 0
-  // });
+  const storageDistribution = useApiData<UtilizationResponse>(
+    '/api/v1/storageDistribution',
+    CONSTANTS.DEFAULT_CAPACITY_UTILIZATION,
+    {
+      retryAttempts: 2,
+      onError: (error) => showDataFetchError(error)
+    }
+  );
+  
+  const scmPendingDeletes = useApiData<SCMPendingDeletion>(
+    '/api/v1/pendingDeletion?component=scm',
+    CONSTANTS.DEFAULT_SCM_PENDING_DELETION,
+    {
+      retryAttempts: 2,
+      onError: (error) => showDataFetchError(error)
+    }
+  );
 
-  const [usageBreakdown, setUsageBreakdown] = React.useState<UsedSpaceBreakdown>({
-    openKeysBytes: 0,
-    committedBytes: 0,
-    containerPreAllocated: 0,
-    deletionPendingBytes: {
-      total: 0,
-      byStage: {
-        DN: {
-            pendingBytes: 0
-        },
-        SCM: {
-            pendingBytes: 0
-        },
-        OM: {
-            pendingKeyBytes: 0,
-            pendingBytes: 0,
-            pendingDirectoryBytes: 0
-        }
+  const omPendingDeletes = useApiData<OMPendingDeletion>(
+    '/api/v1/pendingDeletion?component=om',
+    CONSTANTS.DEFAULT_OM_PENDING_DELETION,
+    {
+      retryAttempts: 2,
+      onError: (error) => showDataFetchError(error)
+    }
+  );
+
+  const dnPendingDeletes = useApiData<DNPendingDeletion>(
+    '/api/v1/pendingDeletion?component=dn',
+    CONSTANTS.DEFAULT_DN_PENDING_DELETION,
+    {
+      retryAttempts: 2,
+      initialFetch: false,
+      onError: (error) => showDataFetchError(error)
+    }
+  );
+
+  const [selectedDatanode, setSelectedDatanode] = React.useState<string>(storageDistribution.data.dataNodeUsage[0]?.hostName ?? "");
+
+  // Seed selected datanode once data loads so dependent calculations work
+  React.useEffect(() => {
+    const firstHost = storageDistribution.data.dataNodeUsage[0]?.hostName;
+    if (!selectedDatanode && firstHost) {
+      setSelectedDatanode(firstHost);
+    }
+  }, [selectedDatanode, storageDistribution.data.dataNodeUsage]);
+
+  const loadDNData = () => {
+    dnPendingDeletes.refetch();
+    setState({
+      isDNPending: dnPendingDeletes.data.status === "FINISHED",
+      lastUpdated: Number(moment())
+    })
+  }
+
+  const autoReload = useAutoReload(loadDNData);
+
+  const selectedDNDetails: DataNodeUsage & { pendingBlockSize: number } = React.useMemo(() => {
+    const selected = storageDistribution.data.dataNodeUsage.find(datanode => datanode.hostName === selectedDatanode)
+      ?? storageDistribution.data.dataNodeUsage[0];
+    return {
+      ...(selected ?? {
+        datanodeUuid: "unknown-uuid",
+        hostName: "unknown-host",
+        capacity: 0,
+        used: 0,
+        remaining: 0,
+        committed: 0,
+        minimumFreeSpace: 0,
+        reserved: 0
+      }),
+      ...dnPendingDeletes.data.pendingDeletionPerDataNode?.find(dn => dn.hostName === (selected?.hostName ?? selectedDatanode)) ?? {
+        hostName: "unknown-host",
+        datanodeUuid: "unknown-uuid",
+        pendingBlockSize: 0
       }
     }
-  });
-  const [datanodeUsage, setDatanodeUsage] = React.useState<DataNodeUsage[]>([]);
-  const [selectedDatanode, setSelectedDatanode] = React.useState<string | null>(null);
+  }, [selectedDatanode, storageDistribution.data.dataNodeUsage, dnPendingDeletes.data.pendingDeletionPerDataNode]);
 
-  const cancelSignal = React.useRef<AbortController>();
-
-  const loadData = () => {
-    setState(prev => ({
-      ...prev,
-      loading: true
-    }));
-
-    cancelRequests([cancelSignal.current!]);
-    const { request, controller } = AxiosGetHelper(
-      '/api/v1/storageDistribution',
-      cancelSignal.current
-    );
-    cancelSignal.current = controller;
-    
-    request.then(response => {
-      const utilizationResponse: UtilizationResponse = response.data;
-      setGlobalStorage(utilizationResponse.globalStorage);
-      // setGlobalNamespace(utilizationResponse.globalNamespace);
-      setUsageBreakdown(utilizationResponse.usedSpaceBreakdown);
-      setDatanodeUsage(utilizationResponse.dataNodeUsage);
-      setSelectedDatanode(utilizationResponse.dataNodeUsage[0].hostName);
-      setState({
-        loading: false,
-        lastUpdated: Number(moment())
-      });
-    }).catch(error => {
-      setState(prev => ({
-        ...prev,
-        loading: true
-      }));
-      showDataFetchError((error as AxiosError).toString());
-    });
-  };
-
-  const  autoReloadHelper: AutoReloadHelper = new AutoReloadHelper(loadData);
-
-  React.useEffect(() => {
-    autoReloadHelper.startPolling();
-    loadData();
-
-    return (() => {
-      autoReloadHelper.stopPolling();
-      cancelRequests([cancelSignal.current!]);
-    });
-  }, []);
-
-  const selectedDNDetails: DataNodeUsage = React.useMemo(() => {
-    return datanodeUsage.find(datanode => datanode.hostName === selectedDatanode) ?? {
-      datanodeUuid: "unknown-uuid",
-      hostName: "unknown-host",
-      capacity: 0,
-      used: 0,
-      remaining: 0,
-      committed: 0,
-      pendingDeletion: 0
-    } as DataNodeUsage;
-  }, [selectedDatanode]);
+  const dnReportStatus = (
+    (dnPendingDeletes.data.totalNodeQueriesFailed ?? 0) > 0
+    ? <Tooltip title={<>
+      { (dnPendingDeletes.data.totalNodesQueried ?? 0)
+        - (dnPendingDeletes.data.totalNodeQueriesFailed ?? 0)
+      } / { (dnPendingDeletes.data.totalNodesQueried ?? 0) } DNs
+      </>
+    }>
+      <WarningFilled style={{ color: '#f6a62eff', marginRight: 8, fontSize: 14 }} />
+      Datanodes
+    </Tooltip>
+    : <Tooltip title={
+      <>
+        {dnPendingDeletes.data.totalNodesQueried ?? 0} / {dnPendingDeletes.data.totalNodesQueried ?? 0} DNs
+      </>
+    }>
+      <CheckCircleFilled style={{ color: '#1ea57a', marginRight: 8, fontSize: 14 }} />
+        Datanodes  
+    </Tooltip>
+  )
 
   const unusedSpaceBreakdown = (
     <span>
@@ -153,7 +160,7 @@ const Capacity: React.FC<object> = () => {
         content={
           <div className='unused-space-breakdown'>
             Minimum Free Space
-            <Tag color='red'>To Be Added</Tag>
+            <Tag color='red'>{filesize(selectedDNDetails.minimumFreeSpace, {round: 1})}</Tag>
             Remaining
             <Tag color='green'>{filesize(selectedDNDetails.remaining, { round: 1})}</Tag>
           </div>
@@ -169,16 +176,16 @@ const Capacity: React.FC<object> = () => {
       <div className='page-header-v2'>
         Cluster Capacity
         <AutoReloadPanel
-          isLoading={state.loading}
+          isLoading={state.isDNPending}
           lastRefreshed={state.lastUpdated}
-          togglePolling={autoReloadHelper.handleAutoReloadToggle}
-          onReload={loadData} />
+          togglePolling={autoReload.handleAutoReloadToggle}
+          onReload={loadDNData} />
       </div>
       <div className='data-container'>
         <Typography.Title level={4} className='section-title'>Cluster</Typography.Title>
         <CapacityBreakdown
           title='Ozone Capacity'
-          loading={state.loading}
+          loading={storageDistribution.loading}
           items={[{
             title: (
               <span>
@@ -186,10 +193,10 @@ const Capacity: React.FC<object> = () => {
                 <WrappedInfoIcon title={totalCapacityDesc} />
               </span>
             ),
-            value: globalStorage.totalCapacity,
+            value: storageDistribution.data.globalStorage.totalCapacity,
           }, {
             title: 'OZONE USED SPACE',
-            value: globalStorage.totalUsedSpace,
+            value: storageDistribution.data.globalStorage.totalUsedSpace,
             color: '#f4a233'
           }, {
             title: (
@@ -198,15 +205,19 @@ const Capacity: React.FC<object> = () => {
                 <WrappedInfoIcon title={otherUsedSpaceDesc} />
               </span>
             ),
-            value: globalStorage.totalCapacity - globalStorage.totalFreeSpace - globalStorage.totalUsedSpace,
+            value: (
+              storageDistribution.data.globalStorage.totalCapacity
+              - storageDistribution.data.globalStorage.totalFreeSpace
+              - storageDistribution.data.globalStorage.totalUsedSpace
+            ),
             color: '#11073a'
           }, {
             title: 'CONTAINER PRE-ALLOCATED',
-            value: usageBreakdown.containerPreAllocated,
+            value: storageDistribution.data.usedSpaceBreakdown.preAllocatedContainerBytes,
             color: '#f47b2d'
           }, {
             title: 'REMAINING SPACE',
-            value: globalStorage.totalFreeSpace,
+            value: storageDistribution.data.globalStorage.totalFreeSpace,
             color: '#4553ee'
           }]}
         />
@@ -218,47 +229,60 @@ const Capacity: React.FC<object> = () => {
               <WrappedInfoIcon title={ozoneUsedSpaceDesc} />
             </span>
           )}
-          loading={state.loading}
+          loading={storageDistribution.loading}
           items={[{
             title: 'TOTAL',
-            value: globalStorage.totalUsedSpace
+            value: storageDistribution.data.globalStorage.totalUsedSpace
           }, {
             title: 'OPEN KEYS',
-            value: usageBreakdown.openKeysBytes,
+            value: storageDistribution.data.usedSpaceBreakdown.openKeyBytes,
             color: '#f47c2d'
           }, {
             title: 'COMMITTED KEYS',
-            value: usageBreakdown.committedBytes,
+            value: storageDistribution.data.usedSpaceBreakdown.committedKeyBytes,
             color: '#f4a233'
           }, {
-            title: 'PENDING DELETION',
-            value: usageBreakdown.deletionPendingBytes.total,
-            color: '#10073b'
+            title: (
+              dnPendingDeletes.data.status === "FINISHED"
+              ? 'PENDING DELETION'
+              : (
+                <span>
+                  PENDING DELETION
+                  <WrappedInfoIcon title="DN pending deletion data is not yet available. It will be fetched once the pending deletion scan is finished on all datanodes." />
+                </span>
+              )
+            ),
+            value: (
+              omPendingDeletes.data.totalSize
+              + scmPendingDeletes.data.totalBlocksize
+              + (dnPendingDeletes.data.totalPendingDeletionSize ?? 0)
+            ),
+            color: "#10073b"
           }]}
         />
         <div className='data-breakdown-section'>
           <CapacityDetail
             title='Pending Deletion'
-            loading={state.loading}
+            loading={omPendingDeletes.loading || scmPendingDeletes.loading}
             showDropdown={false}
             dataDetails={[{
               title: 'OZONE MANAGER',
-              size: usageBreakdown.deletionPendingBytes.byStage.OM.totalBytes ?? 0,
+              size: omPendingDeletes.data.totalSize ?? 0,
               breakdown: [{
                 label: 'KEYS',
-                value: usageBreakdown.deletionPendingBytes.byStage.OM.pendingKeyBytes,
+                value: omPendingDeletes.data.pendingKeySize,
                 color: '#f4a233'
               }, {
                 label: 'DIRECTORIES',
-                value: usageBreakdown.deletionPendingBytes.byStage.OM.pendingDirectoryBytes,
+                value: omPendingDeletes.data.pendingDirectorySize,
                 color: '#10073b'
               }]
             }, {
               title: 'STORAGE CONTAINER MANAGER',
-              size: usageBreakdown.deletionPendingBytes.byStage.SCM.pendingBytes,
+              size: scmPendingDeletes.data.totalBlocksize,
               breakdown: [{
                 label: 'BLOCKS',
-                value: usageBreakdown.deletionPendingBytes.byStage.SCM.pendingBytes,
+                value: scmPendingDeletes.data.totalBlocksize,
                 color: '#f4a233'
               }]
             }, {
@@ -268,25 +292,26 @@ const Capacity: React.FC<object> = () => {
                   <WrappedInfoIcon title={datanodesPendingDeletionDesc} />
                 </span>
               ),
-              size: usageBreakdown.deletionPendingBytes.byStage.DN.pendingBytes,
+              loading: dnPendingDeletes.loading || dnPendingDeletes.data.status !== "FINISHED",
+              size: dnPendingDeletes.data.totalPendingDeletionSize ?? 0,
               breakdown: [{
                 label: 'BLOCKS',
-                value: usageBreakdown.deletionPendingBytes.byStage.DN.pendingBytes,
+                value: dnPendingDeletes.data.totalPendingDeletionSize ?? 0,
                 color: '#f4a233'
               }]
             }]} />
           <CapacityDetail
-            title='Datanode'
-            loading={state.loading}
+            title={dnReportStatus}
+            loading={dnPendingDeletes.loading || dnPendingDeletes.data.status !== "FINISHED"}
             showDropdown={true}
             handleSelect={setSelectedDatanode}
-            dropdownItems={datanodeUsage.map(datanode => datanode.hostName)}
+            dropdownItems={storageDistribution.data.dataNodeUsage.map(datanode => datanode.hostName)}
             dataDetails={[{
               title: 'USED SPACE',
-              size: (selectedDNDetails.used ?? 0) + (selectedDNDetails.pendingDeletion ?? 0),
+              size: (selectedDNDetails.used ?? 0) + (selectedDNDetails.pendingBlockSize ?? 0),
               breakdown: [{
                 label: 'PENDING DELETION',
-                value: selectedDNDetails.pendingDeletion ?? 0,
+                value: selectedDNDetails.pendingBlockSize ?? 0,
                 color: '#f4a233'
               }, {
                 label: 'OZONE USED',

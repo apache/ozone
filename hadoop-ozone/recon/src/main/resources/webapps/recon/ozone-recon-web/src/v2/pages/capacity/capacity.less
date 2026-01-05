@@ -40,7 +40,7 @@
     flex-direction: column;
     gap: 16px;
     margin: 16px 0px auto 0px;
-    height: 15em;
+    height: 11em;
   }
 
   .cluster-card-data-container {
@@ -63,16 +63,24 @@
       flex-direction: column;
       justify-content: flex-start;
       align-items: stretch;
-      padding: 16px;
       border-radius: 3px;
 
       .data-detail-breakdown-container {
         justify-content: flex-end;
         flex-wrap: wrap;
-        .data-detail-breakdown-statistic {
-          flex: 0 0 50%;
-          max-width: 25%;
-          text-align: right;
+        .data-detail-breakdown-item {
+          margin-left: 20px;
+          .data-detail-breakdown-label {
+            font-size: 12px;
+            color: #5a656d;
+            margin-right: 4px;
+          }
+
+          .data-detail-breakdown-value {
+            font-size: 14px;
+            font-weight: 500;
+          }
+          
         }
       }
     }
