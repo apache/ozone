@@ -32,6 +32,7 @@ import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.metrics.Metric;
 import org.apache.hadoop.ozone.recon.spi.MetricsServiceProvider;
+import org.apache.hadoop.security.SecurityUtil;
 
 /**
  * Implementation of the Jmx Metrics Service provider.
@@ -106,19 +107,21 @@ public class JmxServiceProviderImpl implements MetricsServiceProvider {
    */
   private List<Map<String, Object>> getMetrics(String api, String queryString)
       throws Exception {
-    HttpURLConnection urlConnection =
-        getMetricsResponse(api, queryString);
-    if (Response.Status.fromStatusCode(urlConnection.getResponseCode())
-        .getFamily() == Response.Status.Family.SUCCESSFUL) {
-      try (InputStream inputStream = urlConnection.getInputStream()) {
-        Map<String, Object> jsonMap = JsonUtils.getDefaultMapper().readValue(inputStream, Map.class);
-        Object beansObj = jsonMap.get("beans");
-        if (beansObj instanceof List) {
-          return (List<Map<String, Object>>) beansObj;
+    return SecurityUtil.doAsLoginUser(() -> {
+      HttpURLConnection urlConnection =
+          getMetricsResponse(api, queryString);
+      if (Response.Status.fromStatusCode(urlConnection.getResponseCode())
+          .getFamily() == Response.Status.Family.SUCCESSFUL) {
+        try (InputStream inputStream = urlConnection.getInputStream()) {
+          Map<String, Object> jsonMap = JsonUtils.getDefaultMapper().readValue(inputStream, Map.class);
+          Object beansObj = jsonMap.get("beans");
+          if (beansObj instanceof List) {
+            return (List<Map<String, Object>>) beansObj;
+          }
         }
       }
-    }
-    return Collections.emptyList();
+      return Collections.emptyList();
+    });
   }
 
   private boolean isKerberosEnabled() {
