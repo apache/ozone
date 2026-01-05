@@ -160,9 +160,9 @@ public class TestPartUpload {
       when(rest.getMessageDigestInstance()).thenReturn(messageDigest);
       when(rest.getSha256DigestInstance()).thenReturn(sha256Digest);
       if (enableDataStream) {
-        streaming.when(() -> ObjectEndpointStreaming.createMultipartKey(
-            any(), any(), anyLong(), anyInt(), any(), anyInt(), any(), any()))
-                .thenThrow(IOException.class);
+        streaming.when(() -> ObjectEndpointStreaming.createMultipartKey(any(), any(), anyLong(), anyInt(), any(),
+                anyInt(), any(), any()))
+            .thenThrow(IOException.class);
       } else {
         ioutils.when(() -> IOUtils.copyLarge(any(InputStream.class), any(OutputStream.class), anyLong(),
                 anyLong(), any(byte[].class)))

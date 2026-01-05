@@ -17,20 +17,19 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.Collections.singletonList;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.completeMultipartUpload;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.uploadPart;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -76,7 +75,7 @@ public class TestMultipartUploadComplete {
 
   private String initiateMultipartUpload(String key) throws IOException,
       OS3Exception {
-    return initiateMultipartUpload(key, Collections.emptyMap());
+    return EndpointTestUtils.initiateMultipartUpload(rest, OzoneConsts.S3_BUCKET, key);
   }
 
   private String initiateMultipartUpload(String key, Map<String, String> metadata) throws IOException,
@@ -93,70 +92,16 @@ public class TestMultipartUploadComplete {
     return EndpointTestUtils.initiateMultipartUpload(rest, OzoneConsts.S3_BUCKET, key);
   }
 
-  private Part uploadPart(String key, String uploadID, int partNumber, String
-      content) throws IOException, OS3Exception {
-    ByteArrayInputStream body =
-        new ByteArrayInputStream(content.getBytes(UTF_8));
-    Response response = rest.put(OzoneConsts.S3_BUCKET, key, content.length(),
-        partNumber, uploadID, null, null, body);
-    assertEquals(200, response.getStatus());
-    assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
-    Part part = new Part();
-    part.setETag(response.getHeaderString(OzoneConsts.ETAG));
-    part.setPartNumber(partNumber);
-
-    return part;
-  }
-
-  private void completeMultipartUpload(String key,
-      CompleteMultipartUploadRequest completeMultipartUploadRequest,
-      String uploadID) throws IOException, OS3Exception {
-    Response response = rest.completeMultipartUpload(OzoneConsts.S3_BUCKET, key,
-        uploadID, completeMultipartUploadRequest);
-
-    assertEquals(200, response.getStatus());
-
-    CompleteMultipartUploadResponse completeMultipartUploadResponse =
-        (CompleteMultipartUploadResponse) response.getEntity();
-
-    assertEquals(OzoneConsts.S3_BUCKET,
-        completeMultipartUploadResponse.getBucket());
-    assertEquals(key, completeMultipartUploadResponse.getKey());
-    assertEquals(OzoneConsts.S3_BUCKET,
-        completeMultipartUploadResponse.getLocation());
-    assertNotNull(completeMultipartUploadResponse.getETag());
-  }
-
   @Test
   public void testMultipart() throws Exception {
-
-    // Initiate multipart upload
     String uploadID = initiateMultipartUpload(OzoneConsts.KEY);
 
-    List<Part> partsList = new ArrayList<>();
-
-
     // Upload parts
-    String content = "Multipart Upload 1";
-    int partNumber = 1;
+    List<Part> partsList = new ArrayList<>();
+    partsList.add(uploadPart(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 1, uploadID, "Multipart Upload 1"));
+    partsList.add(uploadPart(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 2, uploadID, "Multipart Upload 2"));
 
-    Part part1 = uploadPart(OzoneConsts.KEY, uploadID, partNumber, content);
-    partsList.add(part1);
-
-    content = "Multipart Upload 2";
-    partNumber = 2;
-    Part part2 = uploadPart(OzoneConsts.KEY, uploadID, partNumber, content);
-    partsList.add(part2);
-
-    // complete multipart upload
-    CompleteMultipartUploadRequest completeMultipartUploadRequest = new
-        CompleteMultipartUploadRequest();
-    completeMultipartUploadRequest.setPartList(partsList);
-
-
-    completeMultipartUpload(OzoneConsts.KEY, completeMultipartUploadRequest,
-        uploadID);
-
+    completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY, uploadID, partsList);
   }
 
   @Test
@@ -168,21 +113,8 @@ public class TestMultipartUploadComplete {
     customMetadata.put("custom-key2", "custom-value2");
 
     String uploadID = initiateMultipartUpload(key, customMetadata);
-
-    List<Part> partsList = new ArrayList<>();
-
-    // Upload parts
-    String content = "Multipart Upload 1";
-    int partNumber = 1;
-
-    Part part1 = uploadPart(key, uploadID, partNumber, content);
-    partsList.add(part1);
-
-    CompleteMultipartUploadRequest completeMultipartUploadRequest = new
-        CompleteMultipartUploadRequest();
-    completeMultipartUploadRequest.setPartList(partsList);
-
-    completeMultipartUpload(key, completeMultipartUploadRequest, uploadID);
+    Part part1 = uploadPart(rest, OzoneConsts.S3_BUCKET, key, 1, uploadID, "Multipart Upload 1");
+    completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, uploadID, singletonList(part1));
 
     Response headResponse = rest.head(OzoneConsts.S3_BUCKET, key);
 
@@ -200,27 +132,17 @@ public class TestMultipartUploadComplete {
     List<Part> partsList = new ArrayList<>();
 
     // Upload parts
-    String content = "Multipart Upload 1";
-    int partNumber = 1;
 
-    Part part1 = uploadPart(key, uploadID, partNumber, content);
+    Part part1 = uploadPart(rest, OzoneConsts.S3_BUCKET, key, 1, uploadID, "Multipart Upload 1");
     // Change part number
     part1.setPartNumber(3);
     partsList.add(part1);
 
-    content = "Multipart Upload 2";
-    partNumber = 2;
-
-    Part part2 = uploadPart(key, uploadID, partNumber, content);
-    partsList.add(part2);
+    partsList.add(uploadPart(rest, OzoneConsts.S3_BUCKET, key, 2, uploadID, "Multipart Upload 2"));
 
     // complete multipart upload
-    CompleteMultipartUploadRequest completeMultipartUploadRequest = new
-        CompleteMultipartUploadRequest();
-    completeMultipartUploadRequest.setPartList(partsList);
-    OS3Exception ex =
-        assertThrows(OS3Exception.class,
-            () -> completeMultipartUpload(key, completeMultipartUploadRequest, uploadID));
+    OS3Exception ex = assertThrows(OS3Exception.class,
+        () -> completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, uploadID, partsList));
     assertEquals(S3ErrorTable.INVALID_PART_ORDER.getCode(), ex.getCode());
   }
 
@@ -234,27 +156,16 @@ public class TestMultipartUploadComplete {
     List<Part> partsList = new ArrayList<>();
 
     // Upload parts
-    String content = "Multipart Upload 1";
-    int partNumber = 1;
-
-    Part part1 = uploadPart(key, uploadID, partNumber, content);
+    Part part1 = uploadPart(rest, OzoneConsts.S3_BUCKET, key, 1, uploadID, "Multipart Upload 1");
     // Change part name.
     part1.setETag("random");
     partsList.add(part1);
 
-    content = "Multipart Upload 2";
-    partNumber = 2;
-
-    Part part2 = uploadPart(key, uploadID, partNumber, content);
-    partsList.add(part2);
+    partsList.add(uploadPart(rest, OzoneConsts.S3_BUCKET, key, 2, uploadID, "Multipart Upload 2"));
 
     // complete multipart upload
-    CompleteMultipartUploadRequest completeMultipartUploadRequest = new
-        CompleteMultipartUploadRequest();
-    completeMultipartUploadRequest.setPartList(partsList);
-    OS3Exception ex =
-        assertThrows(OS3Exception.class,
-            () -> completeMultipartUpload(key, completeMultipartUploadRequest, uploadID));
+    OS3Exception ex = assertThrows(OS3Exception.class,
+        () -> completeMultipartUpload(rest, OzoneConsts.S3_BUCKET, key, uploadID, partsList));
     assertEquals(ex.getCode(), S3ErrorTable.INVALID_PART.getCode());
   }
 }

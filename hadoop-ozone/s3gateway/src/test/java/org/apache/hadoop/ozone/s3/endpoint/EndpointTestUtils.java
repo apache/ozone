@@ -24,7 +24,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.List;
 import javax.ws.rs.core.Response;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.http.HttpStatus;
 import org.apache.ratis.util.function.CheckedSupplier;
@@ -105,6 +107,8 @@ public final class EndpointTestUtils {
     return subject.delete(bucket, key, null, "");
   }
 
+  /** Initiate multipart upload.
+   * @return upload ID */
   public static String initiateMultipartUpload(ObjectEndpoint subject, String bucket, String key)
       throws IOException, OS3Exception {
     try (Response response = subject.initializeMultipartUpload(bucket, key)) {
@@ -113,6 +117,54 @@ public final class EndpointTestUtils {
       String uploadID = entity.getUploadID();
       assertNotNull(uploadID, "uploadID == null");
       return uploadID;
+    }
+  }
+
+  /** Upload part of multipart key.
+   * @return Part to be used for completion request */
+  public static CompleteMultipartUploadRequest.Part uploadPart(
+      ObjectEndpoint subject,
+      String bucket,
+      String key,
+      int partNumber,
+      String uploadID,
+      String content
+  ) throws IOException, OS3Exception {
+    CompleteMultipartUploadRequest.Part part = new CompleteMultipartUploadRequest.Part();
+
+    try (Response response = put(subject, bucket, key, partNumber, uploadID, content)) {
+      assertEquals(HttpStatus.SC_OK, response.getStatus());
+      String eTag = response.getHeaderString(OzoneConsts.ETAG);
+      assertNotNull(eTag);
+      part.setETag(eTag);
+    }
+
+    part.setPartNumber(partNumber);
+
+    return part;
+  }
+
+  /** Complete multipart upload. */
+  public static void completeMultipartUpload(
+      ObjectEndpoint subject,
+      String bucket,
+      String key,
+      String uploadID,
+      List<CompleteMultipartUploadRequest.Part> parts
+  ) throws IOException, OS3Exception {
+    CompleteMultipartUploadRequest completeMultipartUploadRequest = new CompleteMultipartUploadRequest();
+    completeMultipartUploadRequest.setPartList(parts);
+
+    try (Response response = subject.completeMultipartUpload(bucket, key, uploadID, completeMultipartUploadRequest)) {
+      assertEquals(HttpStatus.SC_OK, response.getStatus());
+
+      CompleteMultipartUploadResponse completeMultipartUploadResponse =
+          (CompleteMultipartUploadResponse) response.getEntity();
+
+      assertEquals(bucket, completeMultipartUploadResponse.getBucket());
+      assertEquals(key, completeMultipartUploadResponse.getKey());
+      assertEquals(bucket, completeMultipartUploadResponse.getLocation());
+      assertNotNull(completeMultipartUploadResponse.getETag());
     }
   }
 
