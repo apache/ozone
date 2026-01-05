@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.ByteArrayInputStream;
@@ -102,6 +103,17 @@ public final class EndpointTestUtils {
       String key
   ) throws IOException, OS3Exception {
     return subject.delete(bucket, key, null, "");
+  }
+
+  public static String initiateMultipartUpload(ObjectEndpoint subject, String bucket, String key)
+      throws IOException, OS3Exception {
+    try (Response response = subject.initializeMultipartUpload(bucket, key)) {
+      assertEquals(HttpStatus.SC_OK, response.getStatus());
+      MultipartUploadInitiateResponse entity = (MultipartUploadInitiateResponse) response.getEntity();
+      String uploadID = entity.getUploadID();
+      assertNotNull(uploadID, "uploadID == null");
+      return uploadID;
+    }
   }
 
   /** Verify response is success for {@code request}. */

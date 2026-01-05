@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.initiateMultipartUpload;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -81,19 +82,12 @@ public class TestPartUploadWithStream {
 
   @Test
   public void testPartUpload() throws Exception {
-
-    Response response = rest.initializeMultipartUpload(S3BUCKET, S3KEY);
-    MultipartUploadInitiateResponse multipartUploadInitiateResponse =
-        (MultipartUploadInitiateResponse) response.getEntity();
-    assertNotNull(multipartUploadInitiateResponse.getUploadID());
-    String uploadID = multipartUploadInitiateResponse.getUploadID();
-
-    assertEquals(200, response.getStatus());
+    String uploadID = initiateMultipartUpload(rest, S3BUCKET, S3KEY);
 
     String content = "Multipart Upload";
     ByteArrayInputStream body =
         new ByteArrayInputStream(content.getBytes(UTF_8));
-    response = rest.put(S3BUCKET, S3KEY,
+    Response response = rest.put(S3BUCKET, S3KEY,
         content.length(), 1, uploadID, null, null, body);
 
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
@@ -102,19 +96,12 @@ public class TestPartUploadWithStream {
 
   @Test
   public void testPartUploadWithOverride() throws Exception {
-
-    Response response = rest.initializeMultipartUpload(S3BUCKET, S3KEY);
-    MultipartUploadInitiateResponse multipartUploadInitiateResponse =
-        (MultipartUploadInitiateResponse) response.getEntity();
-    assertNotNull(multipartUploadInitiateResponse.getUploadID());
-    String uploadID = multipartUploadInitiateResponse.getUploadID();
-
-    assertEquals(200, response.getStatus());
+    String uploadID = initiateMultipartUpload(rest, S3BUCKET, S3KEY);
 
     String content = "Multipart Upload";
     ByteArrayInputStream body =
         new ByteArrayInputStream(content.getBytes(UTF_8));
-    response = rest.put(S3BUCKET, S3KEY,
+    Response response = rest.put(S3BUCKET, S3KEY,
         content.length(), 1, uploadID, null, null, body);
 
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));

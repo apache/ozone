@@ -90,16 +90,7 @@ public class TestMultipartUploadComplete {
 
     when(headers.getRequestHeaders()).thenReturn(metadataHeaders);
 
-    Response response = rest.initializeMultipartUpload(OzoneConsts.S3_BUCKET,
-        key);
-    MultipartUploadInitiateResponse multipartUploadInitiateResponse =
-        (MultipartUploadInitiateResponse) response.getEntity();
-    assertNotNull(multipartUploadInitiateResponse.getUploadID());
-    String uploadID = multipartUploadInitiateResponse.getUploadID();
-
-    assertEquals(200, response.getStatus());
-
-    return uploadID;
+    return EndpointTestUtils.initiateMultipartUpload(rest, OzoneConsts.S3_BUCKET, key);
   }
 
   private Part uploadPart(String key, String uploadID, int partNumber, String

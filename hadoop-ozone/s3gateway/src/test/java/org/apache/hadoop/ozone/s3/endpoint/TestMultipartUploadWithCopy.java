@@ -309,20 +309,9 @@ public class TestMultipartUploadWithCopy {
     }
   }
 
-  private String initiateMultipartUpload(String key) throws IOException,
-      OS3Exception {
+  private String initiateMultipartUpload(String key) throws IOException, OS3Exception {
     setHeaders();
-    Response response = endpoint.initializeMultipartUpload(OzoneConsts.S3_BUCKET,
-        key);
-    MultipartUploadInitiateResponse multipartUploadInitiateResponse =
-        (MultipartUploadInitiateResponse) response.getEntity();
-    assertNotNull(multipartUploadInitiateResponse.getUploadID());
-    String uploadID = multipartUploadInitiateResponse.getUploadID();
-
-    assertEquals(200, response.getStatus());
-
-    return uploadID;
-
+    return EndpointTestUtils.initiateMultipartUpload(endpoint, OzoneConsts.S3_BUCKET, key);
   }
 
   private Part uploadPart(String key, String uploadID, int partNumber, String

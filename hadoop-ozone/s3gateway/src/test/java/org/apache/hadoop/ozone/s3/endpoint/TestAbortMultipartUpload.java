@@ -17,9 +17,9 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.initiateMultipartUpload;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -55,17 +55,10 @@ public class TestAbortMultipartUpload {
         .build();
 
 
-    Response response = rest.initializeMultipartUpload(bucket, key);
-
-    assertEquals(200, response.getStatus());
-    MultipartUploadInitiateResponse multipartUploadInitiateResponse =
-        (MultipartUploadInitiateResponse) response.getEntity();
-    assertNotNull(multipartUploadInitiateResponse.getUploadID());
-    String uploadID = multipartUploadInitiateResponse.getUploadID();
-
+    String uploadID = initiateMultipartUpload(rest, bucket, key);
 
     // Abort multipart upload
-    response = rest.delete(bucket, key, uploadID, null);
+    Response response = rest.delete(bucket, key, uploadID, null);
 
     assertEquals(204, response.getStatus());
 
