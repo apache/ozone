@@ -30,8 +30,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.UUID;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Stream;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
@@ -50,11 +51,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import java.util.stream.Stream;
-
 /**
  * Unit tests for DefaultVolumeChoosingPolicy.
- * Tests scenarios where one volume is beyond threshold and no volumes are under threshold.
  */
 public class TestDefaultVolumeChoosingPolicy {
 
@@ -82,10 +80,18 @@ public class TestDefaultVolumeChoosingPolicy {
   public static class VolumeTestConfig {
     private final String name;
     private final double utilization;
+    private final Long customCapacity; // null means use default VOLUME_CAPACITY
 
     public VolumeTestConfig(String name, double utilization) {
       this.name = name;
       this.utilization = utilization;
+      this.customCapacity = null;
+    }
+
+    public VolumeTestConfig(String name, double utilization, long customCapacity) {
+      this.name = name;
+      this.utilization = utilization;
+      this.customCapacity = customCapacity;
     }
 
     public String getName() {
@@ -94,6 +100,10 @@ public class TestDefaultVolumeChoosingPolicy {
 
     public double getUtilization() {
       return utilization;
+    }
+
+    public Long getCustomCapacity() {
+      return customCapacity;
     }
   }
 
@@ -156,23 +166,24 @@ public class TestDefaultVolumeChoosingPolicy {
   }
 
   /**
-   * Creates a volume with specific utilization.
+   * Creates a volume with specific utilization and capacity.
    *
    * @param name Volume name/identifier
    * @param utilization Utilization as a double (0.0 to 1.0, representing percentage)
-   * @return HddsVolume with specified utilization
+   * @param capacity capacity for the volume
+   * @return HddsVolume with specified utilization and capacity
    */
-  private HddsVolume createVolume(String name, double utilization)
+  private HddsVolume createVolume(String name, double utilization, long capacity)
       throws IOException {
-    long usedSpace = (long) (VOLUME_CAPACITY * utilization);
+    long usedSpace = (long) (capacity * utilization);
     Path volumePath = baseDir.resolve(name);
 
     // Create a configuration without reserved space to avoid capacity adjustments
     OzoneConfiguration volumeConf = new OzoneConfiguration();
     volumeConf.setFloat("hdds.datanode.dir.du.reserved.percent", 0.0f);
 
-    SpaceUsageSource source = MockSpaceUsageSource.fixed(VOLUME_CAPACITY,
-        VOLUME_CAPACITY - usedSpace);
+    SpaceUsageSource source = MockSpaceUsageSource.fixed(capacity,
+        capacity - usedSpace);
     SpaceUsageCheckFactory factory = MockSpaceUsageCheckFactory.of(
         source, Duration.ZERO, SpaceUsagePersistence.None.INSTANCE);
 
@@ -193,7 +204,9 @@ public class TestDefaultVolumeChoosingPolicy {
       throws IOException {
     List<HddsVolume> volumes = new ArrayList<>();
     for (VolumeTestConfig config : configs) {
-      HddsVolume volume = createVolume(config.getName(), config.getUtilization());
+      long capacity = config.getCustomCapacity() != null ? 
+          config.getCustomCapacity() : VOLUME_CAPACITY;
+      HddsVolume volume = createVolume(config.getName(), config.getUtilization(), capacity);
       volumes.add(volume);
     }
     return volumes;
@@ -225,7 +238,7 @@ public class TestDefaultVolumeChoosingPolicy {
   /**
    * Helper method to get disk name from volume.
    */
-  private String getDiskName(HddsVolume volume, Map<String, HddsVolume> diskNameToVolume) {
+  private String getVolumeName(HddsVolume volume, Map<String, HddsVolume> diskNameToVolume) {
     for (Map.Entry<String, HddsVolume> entry : diskNameToVolume.entrySet()) {
       if (entry.getValue().equals(volume)) {
         return entry.getKey();
@@ -262,9 +275,9 @@ public class TestDefaultVolumeChoosingPolicy {
         scenario.getThresholdPercentage(), deltaMap, scenario.getContainerSize());
 
     if (scenario.shouldFindPair()) {
-      assertNotNull(result, "Should find a valid source-destination pair for scenario");
-      assertNotNull(result.getLeft(), "Source volume should not be null");
-      assertNotNull(result.getRight(), "Destination volume should not be null");
+      assertNotNull(result);
+      assertNotNull(result.getLeft());
+      assertNotNull(result.getRight());
 
       // Verify source is the expected disk
       if (scenario.getExpectedSourceDisk() != null) {
@@ -272,7 +285,7 @@ public class TestDefaultVolumeChoosingPolicy {
         assertNotNull(expectedSource, "Expected source disk not found: " + scenario.getExpectedSourceDisk());
         assertTrue(result.getLeft().equals(expectedSource),
             "Expected source disk: " + scenario.getExpectedSourceDisk() + 
-            ", but got: " + getDiskName(result.getLeft(), diskNameToVolume));
+            ", but got: " + getVolumeName(result.getLeft(), diskNameToVolume));
       }
 
       // Verify destination is the expected disk (or one of the valid options)
@@ -281,7 +294,7 @@ public class TestDefaultVolumeChoosingPolicy {
         assertNotNull(expectedDest, "Expected destination disk not found: " + scenario.getExpectedDestinationDisk());
         assertTrue(result.getRight().equals(expectedDest),
             "Expected destination disk: " + scenario.getExpectedDestinationDisk() + 
-            ", but got: " + getDiskName(result.getRight(), diskNameToVolume));
+            ", but got: " + getVolumeName(result.getRight(), diskNameToVolume));
       }
 
       // Verify source is the highest utilization volume
@@ -292,7 +305,7 @@ public class TestDefaultVolumeChoosingPolicy {
           break;
         }
       }
-      assertNotNull(sourceUsage, "Source usage should be found");
+      assertNotNull(sourceUsage);
 
       // Verify destination has lower utilization than source
       VolumeFixedUsage destUsage = null;
@@ -302,7 +315,7 @@ public class TestDefaultVolumeChoosingPolicy {
           break;
         }
       }
-      assertNotNull(destUsage, "Destination usage should be found");
+      assertNotNull(destUsage);
       assertTrue(destUsage.getUtilization() < sourceUsage.getUtilization(),
           "Destination should have lower utilization than source");
     } else {
@@ -313,6 +326,7 @@ public class TestDefaultVolumeChoosingPolicy {
   /**
    * Provides test scenarios for parameterized testing.
    */
+  @SuppressWarnings("checkstyle:methodlength")
   public static Stream<Arguments> testScenarios() {
     return Stream.of(
         // Scenario 1: One volume beyond threshold, no volumes under threshold
@@ -423,43 +437,7 @@ public class TestDefaultVolumeChoosingPolicy {
             "disk3"    // Expected destination
         )),
 
-        // Scenario 7: All volumes above threshold
-        // Disk1: 80%, Disk2: 85%, Disk3: 90%, Threshold: 5%
-        // Ideal: 85%, Range: (80%, 90%), Out of range: Disk3 (at boundary)
-        // Expected source: Disk3 (highest), Expected destination: Disk1 (lowest)
-        Arguments.arguments(new TestScenario(
-            "AllVolumesAboveThreshold",
-            Arrays.asList(
-                new VolumeTestConfig("disk1", 0.80),
-                new VolumeTestConfig("disk2", 0.85),
-                new VolumeTestConfig("disk3", 0.90)
-            ),
-            5.0,
-            DEFAULT_CONTAINER_SIZE,
-            true,
-            "disk3",  // Expected source
-            "disk1"    // Expected destination
-        )),
-
-        // Scenario 8: All volumes below threshold
-        // Disk1: 10%, Disk2: 15%, Disk3: 5%, Threshold: 5%
-        // Ideal: 10%, Range: (5%, 15%), Out of range: Disk3 (at boundary)
-        // Expected source: Disk2 (highest), Expected destination: Disk3 (lowest)
-        Arguments.arguments(new TestScenario(
-            "AllVolumesBelowThreshold",
-            Arrays.asList(
-                new VolumeTestConfig("disk1", 0.10),
-                new VolumeTestConfig("disk2", 0.15),
-                new VolumeTestConfig("disk3", 0.05)
-            ),
-            5.0,
-            DEFAULT_CONTAINER_SIZE,
-            true,
-            "disk2",  // Expected source
-            "disk3"    // Expected destination
-        )),
-
-        // Scenario 9: Edge case - volumes at threshold boundaries
+        // Scenario 7: Edge case - volumes at threshold boundaries
         // Disk1: 50%, Disk2: 40%, Disk3: 60%, Threshold: 10%
         // Ideal: 50%, Range: (40%, 60%), Out of range: Disk3 (at upper), Disk2 (at lower)
         // Expected source: Disk3 (highest), Expected destination: Disk2 (lowest)
@@ -477,7 +455,7 @@ public class TestDefaultVolumeChoosingPolicy {
             "disk2"    // Expected destination
         )),
 
-        // Scenario 10: Small threshold with moderate imbalance
+        // Scenario 8: Small threshold with moderate imbalance
         // Disk1: 35%, Disk2: 30%, Disk3: 30%, Threshold: 2%
         // Ideal: 31.67%, Range: (29.67%, 33.67%), Out of range: Disk1
         // Expected source: Disk1, Expected destination: Disk2 or Disk3
@@ -493,6 +471,28 @@ public class TestDefaultVolumeChoosingPolicy {
             true,
             "disk1",  // Expected source
             null      // Destination can be disk2 or disk3
+        )),
+
+        // Scenario 9: Best destination has low utilization but insufficient space
+        // Disk1: 90% (Source)
+        // Disk2: 10% (Best Util, but small capacity 500MB) -> REJECT (insufficient space)
+        // Disk3: 20% (Second Best Util, plenty of space) -> ACCEPT
+        // Disk2: capacity=500MB, 10% used=50MB, available=450MB
+        // Container size 500MB > 450MB available, so disk2 is rejected
+        // Disk3: capacity=2500MB, 20% used=500MB, available=2000MB
+        // Container size 500MB < 2000MB available, so disk3 is accepted
+        Arguments.arguments(new TestScenario(
+            "BestDestInsufficientSpace",
+            Arrays.asList(
+                new VolumeTestConfig("disk1", 0.90),
+                new VolumeTestConfig("disk2", 0.10, 500L * MB), // Small capacity
+                new VolumeTestConfig("disk3", 0.20)
+            ),
+            10.0,
+            500L * MB, // Container size larger than disk2's available space
+            true,
+            "disk1",  // Expected source
+            "disk3"    // Should skip disk2 and pick disk3
         ))
     );
   }

@@ -67,24 +67,41 @@ public class DefaultVolumeChoosingPolicy implements DiskBalancerVolumeChoosingPo
           .sorted(Comparator.comparingDouble(VolumeFixedUsage::getUtilization))
           .collect(Collectors.toList());
 
-      // Calculate the actual threshold and check src
-      final double actualThreshold = getIdealUsage(volumeUsages) + thresholdPercentage / 100;
-      final VolumeFixedUsage src = volumeUsages.get(volumeUsages.size() - 1);
-      if (src.getUtilization() < actualThreshold) {
-        return null; // all volumes are under the threshold
+      // Calculate ideal usage and threshold range
+      final double idealUsage = getIdealUsage(volumeUsages);
+      final double actualThreshold = thresholdPercentage / 100.0;
+      final double lowerThreshold = idealUsage - actualThreshold;
+      final double upperThreshold = idealUsage + actualThreshold;
+
+      // Get highest and lowest utilization volumes
+      final VolumeFixedUsage highestUsage = volumeUsages.get(volumeUsages.size() - 1);
+      final VolumeFixedUsage lowestUsage = volumeUsages.get(0);
+
+      // Only return null if highest is below upper threshold AND lowest is above lower threshold
+      // This means all volumes are strictly within the range (not at boundaries)
+      if (highestUsage.getUtilization() < upperThreshold && 
+          lowestUsage.getUtilization() > lowerThreshold) {
+        // All volumes are strictly within threshold range, no balancing needed
+        return null;
       }
 
-      // Find dst
+      // Determine source volume: highest utilization volume (if above threshold) 
+      final VolumeFixedUsage src = highestUsage;
+
+      // Find destination volume: lowest utilization volume that has enough space
+      // Prefer volumes below threshold, but accept any volume with lower utilization than source
       for (int i = 0; i < volumeUsages.size() - 1; i++) {
         final VolumeFixedUsage dstUsage = volumeUsages.get(i);
         final HddsVolume dst = dstUsage.getVolume();
 
-        if (containerSize < dstUsage.computeUsableSpace()) {
+        // Check if destination has enough space and has lower utilization than source
+        if (dstUsage.getUtilization() < src.getUtilization() &&
+            containerSize < dstUsage.computeUsableSpace()) {
           // Found dst, reserve space and return
           dst.incCommittedBytes(containerSize);
           return Pair.of(src.getVolume(), dst);
         }
-        LOG.debug("Destination volume {} does not have enough space, trying next volume.",
+        LOG.debug("Destination volume {} does not have enough space or utilization, trying next volume.",
             dst.getStorageID());
       }
       LOG.debug("Failed to find appropriate destination volume.");
