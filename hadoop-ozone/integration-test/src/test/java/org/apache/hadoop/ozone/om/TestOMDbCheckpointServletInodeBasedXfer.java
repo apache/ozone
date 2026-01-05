@@ -37,7 +37,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
@@ -237,7 +236,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     doCallRealMethod().when(omDbCheckpointServletMock)
         .writeDbDataToStream(any(), any(), any(), any(), any());
     doCallRealMethod().when(omDbCheckpointServletMock)
-        .writeDBToArchive(any(), any(), any(), any(), any(), any(), anyBoolean());
+        .collectFilesFromDir(any(), any(), any(), anyBoolean(), any());
 
     when(omDbCheckpointServletMock.getBootstrapStateLock())
         .thenReturn(lock);
@@ -245,11 +244,11 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     assertNull(doCallRealMethod().when(omDbCheckpointServletMock).getBootstrapTempData());
     doCallRealMethod().when(omDbCheckpointServletMock).
         processMetadataSnapshotRequest(any(), any(), anyBoolean(), anyBoolean());
-    doCallRealMethod().when(omDbCheckpointServletMock).writeDbDataToStream(any(), any(), any(), any());
+    doCallRealMethod().when(omDbCheckpointServletMock).writeDbDataToStream(any(), any(), any(), any(), any());
     doCallRealMethod().when(omDbCheckpointServletMock).getCompactionLogDir();
     doCallRealMethod().when(omDbCheckpointServletMock).getSstBackupDir();
     doCallRealMethod().when(omDbCheckpointServletMock)
-        .transferSnapshotData(anySet(), any(), anyCollection(), anyCollection(), any(), any(), anyMap());
+        .collectSnapshotData(anySet(),  anyCollection(), anyCollection(), any(), any());
     doCallRealMethod().when(omDbCheckpointServletMock).createAndPrepareCheckpoint(anyBoolean());
     doCallRealMethod().when(omDbCheckpointServletMock).getSnapshotDirsFromDB(any(), any(), any());
   }
@@ -425,8 +424,10 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     Set<String> sstFilesToExclude = new HashSet<>();
     AtomicLong maxTotalSstSize = new AtomicLong(1000000); // Sufficient size
     Map<String, String> hardLinkFileMap = new java.util.HashMap<>();
+    OMDBArchiver omdbArchiver = new OMDBArchiver();
     Path tmpDir = folder.resolve("tmp");
     Files.createDirectories(tmpDir);
+    omdbArchiver.setTmpDir(tmpDir);
     TarArchiveOutputStream mockArchiveOutputStream = mock(TarArchiveOutputStream.class);
     List<String> fileNames = new ArrayList<>();
     try (MockedStatic<Archiver> archiverMock = mockStatic(Archiver.class)) {
@@ -441,9 +442,8 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         aos.closeArchiveEntry();
         return 100L;
       });
-      boolean success = omDbCheckpointServletMock.writeDBToArchive(
-          sstFilesToExclude, dbDir, maxTotalSstSize, mockArchiveOutputStream,
-              tmpDir, hardLinkFileMap, expectOnlySstFiles);
+      boolean success = omDbCheckpointServletMock.collectFilesFromDir(
+          sstFilesToExclude, dbDir, maxTotalSstSize, expectOnlySstFiles, omdbArchiver);
       assertTrue(success);
       verify(mockArchiveOutputStream, times(fileNames.size())).putArchiveEntry(any());
       verify(mockArchiveOutputStream, times(fileNames.size())).closeArchiveEntry();
