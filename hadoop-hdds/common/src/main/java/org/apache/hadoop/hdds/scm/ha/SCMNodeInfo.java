@@ -129,15 +129,18 @@ public class SCMNodeInfo {
 
       String scmBlockClientAddress = getHostNameFromConfigKeys(conf,
           OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
-          OZONE_SCM_CLIENT_ADDRESS_KEY).orElse(null);
+          OZONE_SCM_CLIENT_ADDRESS_KEY,
+          OZONE_SCM_NAMES).orElse(null);
 
       String scmClientAddress = getHostNameFromConfigKeys(conf,
-          OZONE_SCM_CLIENT_ADDRESS_KEY).orElse(null);
+          OZONE_SCM_CLIENT_ADDRESS_KEY,
+          OZONE_SCM_NAMES).orElse(null);
 
       String scmSecurityClientAddress =
           getHostNameFromConfigKeys(conf,
               OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY,
-              OZONE_SCM_CLIENT_ADDRESS_KEY).orElse(null);
+              OZONE_SCM_CLIENT_ADDRESS_KEY,
+              OZONE_SCM_NAMES).orElse(null);
 
       String scmDatanodeAddress =
           getHostNameFromConfigKeys(conf,
