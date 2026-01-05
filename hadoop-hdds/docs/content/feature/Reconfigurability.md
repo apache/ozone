@@ -62,17 +62,23 @@ ozone admin reconfig --service=[OM|SCM|DATANODE] --address=<ip:port> <operation>
 | Property | Default | Description |
 |----------|---------|-------------|
 | `ozone.administrators` | - | Comma-separated list of Ozone administrators |
+| `ozone.readonly.administrators` | - | Comma-separated list of read-only administrators |
 | `ozone.om.server.list.max.size` | `1000` | Maximum server-side response size for list operations |
 | `ozone.om.volume.listall.allowed` | `true` | Allow all users to list all volumes |
 | `ozone.om.follower.read.local.lease.enabled` | `false` | Enable local lease for follower read optimization |
 | `ozone.om.follower.read.local.lease.lag.limit` | `10000` | Maximum log lag for follower reads |
 | `ozone.om.follower.read.local.lease.time.ms` | `5000` | Lease time in milliseconds for follower reads |
+| `ozone.key.deleting.limit.per.task` | `50000` | Maximum keys to delete per task |
+| `ozone.directory.deleting.service.interval` | `60s` | Directory deletion service run interval |
+| `ozone.thread.number.dir.deletion` | `10` | Number of threads for directory deletion |
+| `ozone.snapshot.filtering.service.interval` | `60s` | Snapshot SST filtering service run interval |
 
 ### Storage Container Manager (SCM)
 
 | Property | Default | Description |
 |----------|---------|-------------|
 | `ozone.administrators` | - | Comma-separated list of Ozone administrators |
+| `ozone.readonly.administrators` | - | Comma-separated list of read-only administrators |
 | `hdds.scm.block.deletion.per-interval.max` | `500000` | Maximum blocks SCM processes per deletion interval |
 | `hdds.scm.replication.thread.interval` | `300s` | Interval for the replication monitor thread |
 | `hdds.scm.replication.under.replicated.interval` | `30s` | Frequency to check the under-replicated queue |
@@ -94,6 +100,11 @@ ozone admin reconfig --service=[OM|SCM|DATANODE] --address=<ip:port> <operation>
 | Property | Default | Description |
 |----------|---------|-------------|
 | `hdds.datanode.block.deleting.limit.per.interval` | `20000` | Maximum blocks deleted per interval on a datanode |
+| `hdds.datanode.block.delete.threads.max` | `5` | Maximum threads for block deletion |
+| `ozone.block.deleting.service.workers` | `10` | Number of block deletion service workers |
+| `ozone.block.deleting.service.interval` | `60s` | Block deletion service run interval |
+| `ozone.block.deleting.service.timeout` | `300s` | Block deletion service timeout |
+| `hdds.datanode.replication.streams.limit` | `10` | Maximum replication streams per datanode |
 
 ## Usage Examples
 
