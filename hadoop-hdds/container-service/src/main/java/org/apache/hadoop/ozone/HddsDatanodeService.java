@@ -455,7 +455,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
     File idFile = new File(idFilePath);
     DatanodeDetails details;
     if (idFile.exists()) {
-      details = ContainerUtils.readDatanodeDetailsFrom(idFile);
+      details = ContainerUtils.readDatanodeDetailsFrom(idFile, conf);
     } else {
       // There is no datanode.id file, this might be the first time datanode
       // is started.
