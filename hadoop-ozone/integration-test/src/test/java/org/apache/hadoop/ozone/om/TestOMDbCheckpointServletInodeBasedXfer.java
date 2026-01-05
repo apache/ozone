@@ -423,7 +423,6 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     Files.write(nonSstFile, "log content".getBytes(StandardCharsets.UTF_8));
     Set<String> sstFilesToExclude = new HashSet<>();
     AtomicLong maxTotalSstSize = new AtomicLong(1000000); // Sufficient size
-    Map<String, String> hardLinkFileMap = new java.util.HashMap<>();
     OMDBArchiver omdbArchiver = new OMDBArchiver();
     Path tmpDir = folder.resolve("tmp");
     Files.createDirectories(tmpDir);

@@ -399,7 +399,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
    * @throws IOException If an I/O error occurs while creating or writing the
    *                     hardlink file.
    */
- static void writeHardlinkFile(OzoneConfiguration conf, Map<String, String> hardlinkFileMap,
+  static void writeHardlinkFile(OzoneConfiguration conf, Map<String, String> hardlinkFileMap,
       ArchiveOutputStream<TarArchiveEntry> archiveOutputStream) throws IOException {
     Path data = Files.createTempFile(DATA_PREFIX, DATA_SUFFIX);
     Path metaDirPath = OMStorage.getOmDbDir(conf).toPath();

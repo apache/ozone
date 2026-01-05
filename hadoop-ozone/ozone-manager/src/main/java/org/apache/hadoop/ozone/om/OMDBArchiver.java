@@ -22,12 +22,6 @@ import static org.apache.hadoop.hdds.utils.Archiver.tar;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.includeRatisSnapshotCompleteFlag;
 import static org.apache.hadoop.ozone.om.OMDBCheckpointServletInodeBasedXfer.writeHardlinkFile;
 
-import org.apache.commons.compress.archivers.ArchiveOutputStream;
-import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.util.Time;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -35,6 +29,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.commons.compress.archivers.ArchiveOutputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.util.Time;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Class for handling operations relevant to archiving the OM DB tarball.
@@ -45,9 +45,9 @@ import java.util.Map;
  */
 public class OMDBArchiver {
 
-  Path tmpDir;
-  Map<String, File> filesToWriteIntoTarball;
-  Map<String, String> hardLinkFileMap;
+  private Path tmpDir;
+  private Map<String, File> filesToWriteIntoTarball;
+  private Map<String, String> hardLinkFileMap;
   private static final Logger LOG = LoggerFactory.getLogger(OMDBArchiver.class);
 
   public OMDBArchiver() {
