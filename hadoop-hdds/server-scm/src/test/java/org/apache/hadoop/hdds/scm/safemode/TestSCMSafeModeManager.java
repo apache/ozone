@@ -155,7 +155,9 @@ public class TestSCMSafeModeManager {
 
     GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
         100, 1000 * 5);
-    assertEquals(0, scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value());
+    GenericTestUtils.waitFor(() ->
+            scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value() == 0,
+        100, 1000 * 5);
 
     assertEquals(cutOff, scmSafeModeManager.getSafeModeMetrics()
         .getCurrentContainersWithOneReplicaReportedCount().value());
@@ -208,7 +210,9 @@ public class TestSCMSafeModeManager {
 
     GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
         100, 1000 * 5);
-    assertEquals(0, scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value());
+    GenericTestUtils.waitFor(() ->
+            scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value() == 0,
+        100, 1000 * 5);
   }
 
   private OzoneConfiguration createConf(double healthyPercent,
@@ -375,7 +379,9 @@ public class TestSCMSafeModeManager {
 
     GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
         100, 1000 * 5);
-    assertEquals(0, scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value());
+    GenericTestUtils.waitFor(() ->
+            scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value() == 0,
+        100, 1000 * 5);
   }
 
   /**
@@ -505,7 +511,9 @@ public class TestSCMSafeModeManager {
 
     GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
         100, 1000 * 5);
-    assertEquals(0, scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value());
+    GenericTestUtils.waitFor(() ->
+            scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value() == 0,
+        100, 1000 * 5);
   }
 
   // We simulate common EC types: EC-2-2-1024K, EC-3-2-1024K, EC-6-3-1024K.
@@ -619,8 +627,9 @@ public class TestSCMSafeModeManager {
         HddsTestUtils.createNodeRegistrationContainerReport(containers));
     GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
         10, 1000 * 10);
-    queue.processAll(5000);
-    assertEquals(0, scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value());
+    GenericTestUtils.waitFor(() ->
+            scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value() == 0,
+        100, 1000 * 5);
   }
 
   private void testContainerThreshold(List<ContainerInfo> dnContainers,
@@ -721,7 +730,9 @@ public class TestSCMSafeModeManager {
 
     GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
         100, 1000 * 10);
-    assertEquals(0, scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value());
+    GenericTestUtils.waitFor(() ->
+            scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value() == 0,
+        100, 1000 * 5);
     pipelineManager.close();
   }
 
@@ -799,6 +810,8 @@ public class TestSCMSafeModeManager {
     queue.processAll(5000);
     assertTrue(scmSafeModeManager.getPreCheckComplete());
     assertFalse(scmSafeModeManager.getInSafeMode());
-    assertEquals(0, scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value());
+    GenericTestUtils.waitFor(() ->
+            scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value() == 0,
+        100, 1000 * 5);
   }
 }
