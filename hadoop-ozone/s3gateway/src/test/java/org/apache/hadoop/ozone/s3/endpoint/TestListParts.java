@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.initiateMultipartUpload;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.uploadPart;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
@@ -27,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -71,45 +73,36 @@ public class TestListParts {
 
   @Test
   public void testListParts() throws Exception {
-    Response response = rest.get(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 0,
-        uploadID, 3, "0", null);
-
-    ListPartsResponse listPartsResponse =
-        (ListPartsResponse) response.getEntity();
+    ListPartsResponse listPartsResponse = listParts(3, 0);
 
     assertFalse(listPartsResponse.getTruncated());
     assertEquals(3, listPartsResponse.getPartList().size());
-
   }
 
   @Test
   public void testListPartsContinuation() throws Exception {
-    Response response = rest.get(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 0,
-        uploadID, 2, "0", null);
-    ListPartsResponse listPartsResponse =
-        (ListPartsResponse) response.getEntity();
+    ListPartsResponse listPartsResponse = listParts(2, 0);
 
     assertTrue(listPartsResponse.getTruncated());
     assertEquals(2, listPartsResponse.getPartList().size());
 
     // Continue
-    response = rest.get(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 0, uploadID, 2,
-        Integer.toString(listPartsResponse.getNextPartNumberMarker()), null);
-    listPartsResponse = (ListPartsResponse) response.getEntity();
+    listPartsResponse = listParts(2, listPartsResponse.getNextPartNumberMarker());
 
     assertFalse(listPartsResponse.getTruncated());
     assertEquals(1, listPartsResponse.getPartList().size());
-
   }
 
   @Test
-  public void testListPartsWithUnknownUploadID() throws Exception {
-    try {
-      rest.get(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 0,
-          uploadID, 2, "0", null);
-    } catch (OS3Exception ex) {
-      assertEquals(S3ErrorTable.NO_SUCH_UPLOAD.getErrorMessage(),
-          ex.getErrorMessage());
+  public void testListPartsWithUnknownUploadID() {
+    assertErrorResponse(S3ErrorTable.NO_SUCH_UPLOAD,
+        () -> EndpointTestUtils.listParts(rest, OzoneConsts.S3_BUCKET, "no-such-key", "no-such-upload", 2, 0));
+  }
+
+  private ListPartsResponse listParts(int maxParts, int nextPart) throws IOException, OS3Exception {
+    try (Response response = EndpointTestUtils.listParts(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
+        uploadID, maxParts, nextPart)) {
+      return (ListPartsResponse) response.getEntity();
     }
   }
 }
