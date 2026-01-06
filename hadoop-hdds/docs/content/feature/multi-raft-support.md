@@ -124,8 +124,8 @@ SCM will attempt to create and maintain approximately **24** open, FACTOR_THREE 
 For most production deployments, using the dynamic per-disk limit (`ozone.scm.datanode.pipeline.limit=0`) is
 recommended, as it allows the cluster to scale pipeline capacity naturally with its resources. You can use the
 global limit (`ozone.scm.ratis.pipeline.limit`) as a safety cap if needed. A good starting value for
-`ozone.scm.pipeline.per.metadata.disk` is **2**. Monitor the `NumOpenPipelines` metric in SCM to see if the
-actual number of pipelines aligns with your configured targets.
+`ozone.scm.pipeline.per.metadata.disk` is **2**. Monitor the section **Pipeline Statistics** in SCM web UI, or run
+the command `ozone admin pipeline list` to see if the actual number of pipelines aligns with your configured targets.
 
 ## How to Use
 1. Configure Datanode metadata directories:
