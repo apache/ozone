@@ -51,7 +51,7 @@ import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.endpoint.BucketEndpoint;
 import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest;
 import org.apache.hadoop.ozone.s3.endpoint.EndpointBuilder;
-import org.apache.hadoop.ozone.s3.endpoint.MultipartUploadInitiateResponse;
+import org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils;
 import org.apache.hadoop.ozone.s3.endpoint.ObjectEndpoint;
 import org.apache.hadoop.ozone.s3.endpoint.RootEndpoint;
 import org.apache.hadoop.ozone.s3.endpoint.TestBucketAcl;
@@ -357,7 +357,7 @@ public class TestS3GatewayMetrics {
   public void testInitMultiPartUploadSuccess() throws Exception {
 
     long oriMetric = metrics.getInitMultiPartUploadSuccess();
-    keyEndpoint.initializeMultipartUpload(bucketName, keyName);
+    EndpointTestUtils.initiateMultipartUpload(keyEndpoint, bucketName, keyName);
     long curMetric = metrics.getInitMultiPartUploadSuccess();
     assertEquals(1L, curMetric - oriMetric);
   }
@@ -560,20 +560,8 @@ public class TestS3GatewayMetrics {
     assertEquals(1L, curMetric - oriMetric);
   }
 
-  private String initiateMultipartUpload(String bktName, String key)
-      throws IOException,
-      OS3Exception {
-    // Initiate the Upload
-    Response response =
-        keyEndpoint.initializeMultipartUpload(bktName, key);
-    MultipartUploadInitiateResponse multipartUploadInitiateResponse =
-        (MultipartUploadInitiateResponse) response.getEntity();
-    if (response.getStatus() == 200) {
-      // Fetch the Upload-Id
-      String uploadID = multipartUploadInitiateResponse.getUploadID();
-      return uploadID;
-    }
-    return "Invalid-Id";
+  private String initiateMultipartUpload(String bktName, String key) throws IOException, OS3Exception {
+    return EndpointTestUtils.initiateMultipartUpload(keyEndpoint, bktName, key);
   }
 
   private static String getPutTaggingBody() {
