@@ -101,6 +101,9 @@ OZONE-SITE.XML_ozone.security.http.kerberos.enabled=true
 OZONE-SITE.XML_ozone.s3g.secret.http.enabled=true
 OZONE-SITE.XML_ozone.http.filter.initializers=org.apache.hadoop.security.AuthenticationFilterInitializer
 
+# Enable S3 Gateway STS (AWS STS compatible) endpoint on s3g (http://s3g:9880/sts)
+OZONE-SITE.XML_ozone.s3g.sts.http.enabled=true
+
 OZONE-SITE.XML_ozone.om.http.auth.type=kerberos
 OZONE-SITE.XML_hdds.scm.http.auth.type=kerberos
 OZONE-SITE.XML_hdds.datanode.http.auth.type=kerberos
