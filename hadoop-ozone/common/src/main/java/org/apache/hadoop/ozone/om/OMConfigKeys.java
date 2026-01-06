@@ -188,6 +188,11 @@ public final class OMConfigKeys {
       "ozone.lifecycle.service.delete.cached.directory.max-count";
   public static final long OZONE_KEY_LIFECYCLE_SERVICE_DELETE_CACHED_DIRECTORY_MAX_COUNT_DEFAULT = 1000000;
 
+  public static final String OZONE_KEY_LIFECYCLE_SERVICE_MOVE_TO_TRASH_ENABLED =
+      "ozone.lifecycle.service.move.to.trash.enabled";
+  public static final boolean
+      OZONE_KEY_LIFECYCLE_SERVICE_MOVE_TO_TRASH_ENABLED_DEFAULT = true;
+
   /**
    * OM Ratis related configurations.
    */

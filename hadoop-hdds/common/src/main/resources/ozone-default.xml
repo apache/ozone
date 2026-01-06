@@ -4915,6 +4915,15 @@
     <tag>OZONE</tag>
     <description>It specifies whether to enable lifecycle management service.</description>
   </property>
+
+  <property>
+    <name>ozone.lifecycle.service.move-to-trash.enabled</name>
+    <value>true</value>
+    <tag>OZONE</tag>
+    <description>When enabled KeyLifecycleService will move expired keys/dirs to trash if trash is available.
+      When disabled, it will delete them directly.
+    </description>
+  </property>
   <property>
     <name>ozone.lifecycle.service.delete.batch-size</name>
     <value>1000</value>

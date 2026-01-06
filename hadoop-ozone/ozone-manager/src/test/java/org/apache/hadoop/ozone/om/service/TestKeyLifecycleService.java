@@ -214,6 +214,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
     @AfterEach
     void resume() {
       keyLifecycleService.setOzoneTrash(null);
+      keyLifecycleService.setMoveToTrashEnabled(true);
     }
 
     @AfterAll
@@ -1576,6 +1577,42 @@ class TestKeyLifecycleService extends OzoneTestBase {
       assertTrue(status.getIsEnabled());
       assertEquals(0, status.getRunningBucketsCount());
       
+      deleteLifecyclePolicy(volumeName, bucketName);
+    }
+
+    @Test
+    void testDisableMoveToTrashDeletesDirectly() throws Exception {
+      final String volumeName = getTestName();
+      final String bucketName = uniqueObjectName("bucket");
+      final String prefix = "key";
+      long initialDeletedKeyCount = getDeletedKeyCount();
+      long initialKeyCount = getKeyCount(FILE_SYSTEM_OPTIMIZED);
+      long initialRenamedKeyCount = metrics.getNumKeyRenamed().value();
+
+      // Create keys
+      createKeys(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, KEY_COUNT, 1, prefix, null);
+      Thread.sleep(SERVICE_INTERVAL);
+      GenericTestUtils.waitFor(() -> getKeyCount(FILE_SYSTEM_OPTIMIZED) - initialKeyCount == KEY_COUNT,
+          WAIT_CHECK_INTERVAL, 1000);
+
+      // Make trash available, but disable move-to-trash in KeyLifecycleService.
+      keyLifecycleService.setMoveToTrashEnabled(false);
+      final float trashInterval = 0.5f; // 30 seconds
+      conf.setFloat(FS_TRASH_INTERVAL_KEY, trashInterval);
+      FileSystem fs = SecurityUtil.doAsLoginUser(
+          (PrivilegedExceptionAction<FileSystem>)
+              () -> new TrashOzoneFileSystem(om));
+      keyLifecycleService.setOzoneTrash(new OzoneTrash(fs, conf, om));
+
+      // Expire keys
+      ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(EXPIRE_SECONDS);
+      createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, "", null, date.toString(), true);
+
+      // With move-to-trash disabled, keys should be deleted directly (not renamed).
+      GenericTestUtils.waitFor(() ->
+          (getDeletedKeyCount() - initialDeletedKeyCount) == KEY_COUNT, WAIT_CHECK_INTERVAL, 10000);
+      assertEquals(initialRenamedKeyCount, metrics.getNumKeyRenamed().value());
+      assertEquals(0, getKeyCount(FILE_SYSTEM_OPTIMIZED) - initialKeyCount);
       deleteLifecyclePolicy(volumeName, bucketName);
     }
   }
