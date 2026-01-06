@@ -568,7 +568,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       serverPort = getRealPort(serverRpc.getInetSocketAddress(),
           Port.Name.RATIS_SERVER);
       if (streamEnable) {
-        final DataStreamServerRpc dataStreamServerRpc =
+        DataStreamServerRpc dataStreamServerRpc =
             server.getDataStreamServerRpc();
         getRealPort(dataStreamServerRpc.getInetSocketAddress(),
             Port.Name.RATIS_DATASTREAM);
