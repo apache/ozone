@@ -41,11 +41,22 @@ public class ProtocolMessageMetrics<KEY extends Enum<KEY>> implements MetricsSou
 
   private final String description;
 
-  private final Map<KEY, AtomicLong> counters;
-
-  private final Map<KEY, AtomicLong> elapsedTimes;
+  private final Map<KEY, Stats> stats;
 
   private final AtomicInteger concurrency = new AtomicInteger(0);
+
+  private static final MetricsInfo TYPE_TAG_INFO =
+      Interns.info("type", "Message type");
+
+  private static final MetricsInfo COUNTER_INFO =
+      Interns.info("counter", "Number of distinct calls");
+
+  private static final MetricsInfo TIME_INFO =
+      Interns.info("time", "Sum of the duration of the calls");
+
+  private static final MetricsInfo CONCURRENCY_INFO =
+      Interns.info("concurrency",
+          "Number of requests processed concurrently");
 
   public static <KEY extends Enum<KEY>> ProtocolMessageMetrics<KEY> create(String name,
       String description, KEY[] types) {
@@ -57,19 +68,15 @@ public class ProtocolMessageMetrics<KEY extends Enum<KEY>> implements MetricsSou
     this.name = name;
     this.description = description;
     final Class<KEY> enumClass = values[0].getDeclaringClass();
-    final EnumMap<KEY, AtomicLong> countersMap = new EnumMap<>(enumClass);
-    final EnumMap<KEY, AtomicLong> elapsedMap = new EnumMap<>(enumClass);
+    final EnumMap<KEY, Stats> map = new EnumMap<>(enumClass);
     for (KEY value : values) {
-      countersMap.put(value, new AtomicLong(0));
-      elapsedMap.put(value, new AtomicLong(0));
+      map.put(value, new Stats());
     }
-    this.counters = Collections.unmodifiableMap(countersMap);
-    this.elapsedTimes = Collections.unmodifiableMap(elapsedMap);
+    this.stats = Collections.unmodifiableMap(map);
   }
 
   public void increment(KEY key, long duration) {
-    counters.get(key).incrementAndGet();
-    elapsedTimes.get(key).addAndGet(duration);
+    stats.get(key).add(duration);
   }
 
   public UncheckedAutoCloseable measure(KEY key) {
@@ -77,8 +84,7 @@ public class ProtocolMessageMetrics<KEY extends Enum<KEY>> implements MetricsSou
     concurrency.incrementAndGet();
     return () -> {
       concurrency.decrementAndGet();
-      counters.get(key).incrementAndGet();
-      elapsedTimes.get(key).addAndGet(Time.monotonicNow() - startTime);
+      stats.get(key).add(Time.monotonicNow() - startTime);
     };
   }
 
@@ -93,44 +99,41 @@ public class ProtocolMessageMetrics<KEY extends Enum<KEY>> implements MetricsSou
 
   @Override
   public void getMetrics(MetricsCollector collector, boolean all) {
-    counters.forEach((key, value) -> {
+    stats.forEach((key, stat) -> {
       MetricsRecordBuilder builder =
           collector.addRecord(name);
       builder.add(
-          new MetricsTag(Interns.info("type", "Message type"), key.toString()));
-      builder.addCounter(new MetricName("counter", "Number of distinct calls"),
-          value.longValue());
+          new MetricsTag(TYPE_TAG_INFO, key.toString()));
+      builder.addCounter(COUNTER_INFO,
+          stat.counter());
       builder.addCounter(
-          new MetricName("time", "Sum of the duration of the calls"),
-          elapsedTimes.get(key).longValue());
+          TIME_INFO,
+          stat.time());
       builder.endRecord();
 
     });
     MetricsRecordBuilder builder = collector.addRecord(name);
-    builder.addCounter(new MetricName("concurrency",
-            "Number of requests processed concurrently"), concurrency.get());
+    builder.addCounter(CONCURRENCY_INFO, concurrency.get());
   }
 
   /**
-   * Simple metrics info implementation.
+   * Holds counters for a single message type.
    */
-  public static class MetricName implements MetricsInfo {
-    private final String name;
-    private final String description;
+  private static final class Stats {
+    private final AtomicLong counter = new AtomicLong(0);
+    private final AtomicLong time = new AtomicLong(0);
 
-    public MetricName(String name, String description) {
-      this.name = name;
-      this.description = description;
+    void add(long duration) {
+      counter.incrementAndGet();
+      time.addAndGet(duration);
     }
 
-    @Override
-    public String name() {
-      return name;
+    long counter() {
+      return counter.get();
     }
 
-    @Override
-    public String description() {
-      return description;
+    long time() {
+      return time.get();
     }
   }
 }
