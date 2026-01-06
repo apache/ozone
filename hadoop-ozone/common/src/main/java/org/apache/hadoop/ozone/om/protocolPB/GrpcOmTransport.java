@@ -75,20 +75,19 @@ public class GrpcOmTransport implements OmTransport {
   // gRPC specific
   private static List<X509Certificate> caCerts = null;
 
-  private Map<String,
+  private final Map<String,
       OzoneManagerServiceGrpc.OzoneManagerServiceBlockingStub> clients;
-  private Map<String, ManagedChannel> channels;
-  private ConfigurationSource conf;
+  private final Map<String, ManagedChannel> channels;
+  private final ConfigurationSource conf;
 
-  private AtomicReference<String> host;
-  private AtomicInteger syncFailoverCount;
+  private final AtomicReference<String> host;
+  private final AtomicInteger syncFailoverCount;
   private final int maxSize;
-  private SecurityConfig secConfig;
+  private final SecurityConfig secConfig;
 
   private RetryPolicy retryPolicy;
   private int failoverCount = 0;
-  private GrpcOMFailoverProxyProvider<OzoneManagerProtocolPB>
-      omFailoverProxyProvider;
+  private final GrpcOMFailoverProxyProvider<OzoneManagerProtocolPB> omFailoverProxyProvider;
 
   public static void setCaCerts(List<X509Certificate> x509Certificates) {
     caCerts = x509Certificates;
@@ -101,7 +100,7 @@ public class GrpcOmTransport implements OmTransport {
     this.channels = new HashMap<>();
     this.clients = new HashMap<>();
     this.conf = conf;
-    this.host = new AtomicReference();
+    this.host = new AtomicReference<>();
     this.failoverCount = 0;
     this.syncFailoverCount = new AtomicInteger();
 
@@ -110,7 +109,7 @@ public class GrpcOmTransport implements OmTransport {
     maxSize = conf.getInt(OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH,
         OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH_DEFAULT);
 
-    omFailoverProxyProvider = new GrpcOMFailoverProxyProvider(
+    omFailoverProxyProvider = new GrpcOMFailoverProxyProvider<>(
         conf,
         ugi,
         omServiceId,
@@ -258,7 +257,6 @@ public class GrpcOmTransport implements OmTransport {
       action = retryPolicy.shouldRetry((Exception)ex, 0, failoverCount++, true);
       LOG.debug("grpc failover retry action {}", action.action);
       if (action.action == RetryPolicy.RetryAction.RetryDecision.FAIL) {
-        retry = false;
         LOG.error("Retry request failed. Action : {}, {}",
             action.action, ex.toString());
       } else {

@@ -37,8 +37,8 @@ public class OMProxyInfo<T> extends ProxyInfo<T> {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMProxyInfo.class);
 
-  public OMProxyInfo(String serviceID, String nodeID, String rpcAddress) {
-    super(null, "nodeId=" + nodeID + ",nodeAddress=" + rpcAddress);
+  public OMProxyInfo(T proxy, String serviceID, String nodeID, String rpcAddress, String proxyInfo) {
+    super(proxy, proxyInfo);
     this.nodeId = nodeID;
     this.rpcAddrStr = rpcAddress;
     this.rpcAddr = NetUtils.createSocketAddr(rpcAddrStr);
@@ -55,6 +55,10 @@ public class OMProxyInfo<T> extends ProxyInfo<T> {
       // service field.
       this.dtService = SecurityUtil.buildTokenService(rpcAddr);
     }
+  }
+
+  public OMProxyInfo(String serviceID, String nodeID, String rpcAddress) {
+    this(null, serviceID, nodeID, rpcAddress, "nodeId=" + nodeID + ",nodeAddress=" + rpcAddress);
   }
 
   public String getNodeId() {

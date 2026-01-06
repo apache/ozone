@@ -70,9 +70,8 @@ public abstract class OMFailoverProxyProviderBase<T> implements
   private final Class<T> protocolClass;
 
   // Map of OMNodeID to its proxy
-  private Map<String, ProxyInfo<T>> omProxies;
+  private Map<String, OMProxyInfo<T>> omProxies;
   private List<String> omNodeIDList;
-  private Map<String, InetSocketAddress> omNodeAddressMap;
 
   private String currentProxyOMNodeId;
   private int currentProxyIndex;
@@ -84,11 +83,11 @@ public abstract class OMFailoverProxyProviderBase<T> implements
   // before attempting to contact all the OMs again. For other exceptions
   // such as LeaderNotReadyException, the same OM is contacted again with a
   // linearly increasing wait time.
-  private Set<String> attemptedOMs = new HashSet<>();
+  private final Set<String> attemptedOMs = new HashSet<>();
   private String lastAttemptedOM;
   private int numAttemptsOnSameOM = 0;
   private final long waitBetweenRetries;
-  private Set<String> accessControlExceptionOMs = new HashSet<>();
+  private final Set<String> accessControlExceptionOMs = new HashSet<>();
   private boolean performFailoverDone;
 
   private final UserGroupInformation ugi;
@@ -109,7 +108,6 @@ public abstract class OMFailoverProxyProviderBase<T> implements
     loadOMClientConfigs(conf, omServiceId);
     Objects.requireNonNull(omProxies, "omProxies == null");
     Objects.requireNonNull(omNodeIDList, "omNodeIDList == null");
-    Objects.requireNonNull(omNodeAddressMap, "omNodeAddressMap == null");
 
     nextProxyIndex = 0;
     nextProxyOMNodeId = omNodeIDList.get(nextProxyIndex);
@@ -220,8 +218,8 @@ public abstract class OMFailoverProxyProviderBase<T> implements
                 notLeaderException.getSuggestedLeaderNodeId();
             if (suggestedLeaderAddress != null &&
                 suggestedNodeId != null &&
-                omNodeAddressMap.containsKey(suggestedNodeId) &&
-                omNodeAddressMap.get(suggestedNodeId).toString()
+                omProxies.containsKey(suggestedNodeId) &&
+                omProxies.get(suggestedNodeId).getRpcAddr().toString()
                     .equals(suggestedLeaderAddress)) {
               setNextOmProxy(suggestedNodeId);
               return getRetryAction(RetryDecision.FAILOVER_AND_RETRY,
@@ -391,11 +389,11 @@ public abstract class OMFailoverProxyProviderBase<T> implements
     return waitBetweenRetries;
   }
 
-  public List<ProxyInfo<T>> getOMProxies() {
+  public List<OMProxyInfo<T>> getOMProxies() {
     return new ArrayList<>(omProxies.values());
   }
 
-  public Map<String, ProxyInfo<T>> getOMProxyMap() {
+  public Map<String, OMProxyInfo<T>> getOMProxyMap() {
     return omProxies;
   }
 
@@ -440,7 +438,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
     return conf;
   }
 
-  protected synchronized void setOmProxies(Map<String, ProxyInfo<T>> omProxies) {
+  protected synchronized void setOmProxies(Map<String, OMProxyInfo<T>> omProxies) {
     this.omProxies = omProxies;
   }
 
@@ -451,11 +449,6 @@ public abstract class OMFailoverProxyProviderBase<T> implements
 
   protected synchronized List<String> getOmNodeIDList() {
     return omNodeIDList;
-  }
-
-  protected synchronized void setOmNodeAddressMap(
-      Map<String, InetSocketAddress> map) {
-    this.omNodeAddressMap = map;
   }
 
 }

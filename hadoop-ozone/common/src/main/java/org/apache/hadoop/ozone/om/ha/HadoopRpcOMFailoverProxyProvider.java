@@ -22,7 +22,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -69,10 +68,9 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
   @Override
   protected void loadOMClientConfigs(ConfigurationSource config, String omSvcId)
       throws IOException {
-    Map<String, ProxyInfo<T>> omProxies = new HashMap<>();
+    Map<String, OMProxyInfo<T>> omProxies = new HashMap<>();
 
     List<String> omNodeIDList = new ArrayList<>();
-    Map<String, InetSocketAddress> omNodeAddressMap = new HashMap<>();
 
     Collection<String> omNodeIds = OmUtils.getActiveNonListenerOMNodeIds(config,
         omSvcId);
@@ -97,7 +95,6 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
         }
         omProxies.put(nodeId, omProxyInfo);
         omNodeIDList.add(nodeId);
-        omNodeAddressMap.put(nodeId, omProxyInfo.getAddress());
       } else {
         LOG.error("Failed to create OM proxy for {} at address {}",
             nodeId, rpcAddrStr);
@@ -111,7 +108,6 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
     }
     setOmProxies(omProxies);
     setOmNodeIDList(omNodeIDList);
-    setOmNodeAddressMap(omNodeAddressMap);
   }
 
   /**
@@ -150,9 +146,9 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
     // For HA, this will return "," separated address of all OM's.
     List<String> addresses = new ArrayList<>();
 
-    for (Map.Entry<String, ProxyInfo<T>> omProxyInfoSet :
+    for (Map.Entry<String, OMProxyInfo<T>> omProxyInfoSet :
         getOMProxyMap().entrySet()) {
-      Text dtService = ((OMProxyInfo<T>) omProxyInfoSet.getValue()).getDelegationTokenService();
+      Text dtService = omProxyInfoSet.getValue().getDelegationTokenService();
 
       // During client object creation when one of the OM configured address
       // in unreachable, dtService can be null.
@@ -190,12 +186,10 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
 
   @VisibleForTesting
   protected void setProxiesForTesting(
-      Map<String, ProxyInfo<T>> setOMProxies,
-      List<String> setOMNodeIDList,
-      Map<String, InetSocketAddress> setOMNodeAddress) {
+      Map<String, OMProxyInfo<T>> setOMProxies,
+      List<String> setOMNodeIDList) {
     setOmProxies(setOMProxies);
     setOmNodeIDList(setOMNodeIDList);
-    setOmNodeAddressMap(setOMNodeAddress);
   }
 
 }

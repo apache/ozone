@@ -124,7 +124,7 @@ public class TestOMFailovers {
     @Override
     protected void loadOMClientConfigs(ConfigurationSource config,
         String omSvcId) {
-      HashMap<String, ProxyInfo<OzoneManagerProtocolPB>> omProxyInfos = new HashMap<>();
+      HashMap<String, OMProxyInfo<OzoneManagerProtocolPB>> omProxyInfos = new HashMap<>();
       HashMap<String, InetSocketAddress> omNodeAddressMap = new HashMap<>();
       ArrayList<String> omNodeIDList = new ArrayList<>();
 
@@ -134,9 +134,8 @@ public class TestOMFailovers {
             "127.0.0.1:9862");
         omProxyInfos.put(nodeId, omProxyInfo);
         omNodeIDList.add(nodeId);
-        omNodeAddressMap.put(nodeId, null);
       }
-      setProxiesForTesting(omProxyInfos, omNodeIDList, omNodeAddressMap);
+      setProxiesForTesting(omProxyInfos, omNodeIDList);
     }
 
     @Override
