@@ -17,17 +17,16 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.initiateMultipartUpload;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.uploadPart;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import java.io.ByteArrayInputStream;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -63,32 +62,11 @@ public class TestListParts {
         .setClient(client)
         .build();
 
-    Response response = rest.initializeMultipartUpload(OzoneConsts.S3_BUCKET,
-        OzoneConsts.KEY);
-    MultipartUploadInitiateResponse multipartUploadInitiateResponse =
-        (MultipartUploadInitiateResponse) response.getEntity();
-    assertNotNull(multipartUploadInitiateResponse.getUploadID());
-    uploadID = multipartUploadInitiateResponse.getUploadID();
+    uploadID = initiateMultipartUpload(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY);
 
-    assertEquals(200, response.getStatus());
-
-    String content = "Multipart Upload";
-    ByteArrayInputStream body =
-        new ByteArrayInputStream(content.getBytes(UTF_8));
-    response = rest.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
-        content.length(), 1, uploadID, null, null, body);
-
-    assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
-
-    response = rest.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
-        content.length(), 2, uploadID, null, null, body);
-
-    assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
-
-    response = rest.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
-        content.length(), 3, uploadID, null, null, body);
-
-    assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
+    for (int i = 1; i <= 3; i++) {
+      uploadPart(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY, i, uploadID, "Multipart Upload");
+    }
   }
 
   @Test

@@ -20,17 +20,22 @@ package org.apache.hadoop.hdds.utils.db.managed;
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
 import java.nio.ByteBuffer;
+import java.util.Objects;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.DirectSlice;
 
 /**
- * Managed Direct Slice.
+ * Managed {@link DirectSlice} for leak detection.
+ *
+ *  The {@link DirectSlice} class is designed to handle specific memory slicing operations while ensuring that the
+ *  provided ByteBuffer’s constraints are respected.
  */
 public class ManagedDirectSlice extends DirectSlice {
+
   private final UncheckedAutoCloseable leakTracker = track(this);
 
-  public ManagedDirectSlice(ByteBuffer data) {
-    super(data);
+  public ManagedDirectSlice(ByteBuffer buffer) {
+    super(Objects.requireNonNull(buffer, "buffer == null").slice(), buffer.remaining());
   }
 
   @Override

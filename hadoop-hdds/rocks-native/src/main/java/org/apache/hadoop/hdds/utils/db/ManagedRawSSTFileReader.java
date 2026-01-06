@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.utils.db.managed;
+package org.apache.hadoop.hdds.utils.db;
 
 import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME;
 
@@ -24,14 +24,16 @@ import java.util.Arrays;
 import java.util.function.Function;
 import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
-import org.apache.hadoop.hdds.utils.db.IteratorType;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedSlice;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * JNI for RocksDB RawSSTFileReader.
  */
-public class ManagedRawSSTFileReader<T> implements Closeable {
+public class ManagedRawSSTFileReader implements Closeable {
 
   private static final Logger LOG = LoggerFactory.getLogger(ManagedRawSSTFileReader.class);
 
@@ -62,14 +64,15 @@ public class ManagedRawSSTFileReader<T> implements Closeable {
     this.nativeHandle = this.newRawSSTFileReader(options.getNativeHandle(), fileName, readAheadSize);
   }
 
-  public ManagedRawSSTFileIterator<T> newIterator(
+  public <T> ManagedRawSSTFileIterator<T> newIterator(
       Function<ManagedRawSSTFileIterator.KeyValue, T> transformerFunction,
       ManagedSlice fromSlice, ManagedSlice toSlice, IteratorType type) {
     long fromNativeHandle = fromSlice == null ? 0 : fromSlice.getNativeHandle();
     long toNativeHandle = toSlice == null ? 0 : toSlice.getNativeHandle();
     LOG.info("Iterating SST file: {} with native lib. " +
-            "LowerBound: {}, UpperBound: {}, type : {}", fileName, fromSlice, toSlice, type);
-    return new ManagedRawSSTFileIterator<>(
+            "LowerBound: {}, UpperBound: {}, type : {} with reader handle: {}", fileName, fromSlice, toSlice, type,
+        this.nativeHandle);
+    return new ManagedRawSSTFileIterator<>(fileName + " " + this.nativeHandle,
         newIterator(this.nativeHandle, fromSlice != null,
             fromNativeHandle, toSlice != null, toNativeHandle),
         transformerFunction, type);

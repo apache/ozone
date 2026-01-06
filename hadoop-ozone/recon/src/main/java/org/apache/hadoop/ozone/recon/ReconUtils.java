@@ -847,4 +847,34 @@ public class ReconUtils {
     }
     return pathBuilder.toString();
   }
+
+  public static Map<String, Object> getMetricsData(List<Map<String, Object>> metrics, String beanName) {
+    if (metrics == null || StringUtils.isEmpty(beanName)) {
+      return null;
+    }
+    for (Map<String, Object> item :metrics) {
+      if (beanName.equals(item.get("name"))) {
+        return item;
+      }
+    }
+    return null;
+  }
+
+  public static long extractLongMetricValue(Map<String, Object> metrics, String keyName) {
+    if (metrics == null || StringUtils.isEmpty(keyName)) {
+      return  -1;
+    }
+    Object value = metrics.get(keyName);
+    if (value instanceof Number) {
+      return ((Number) value).longValue();
+    }
+    if (value instanceof String) {
+      try {
+        return Long.parseLong((String) value);
+      } catch (NumberFormatException e) {
+        log.error("Failed to parse long value for key: {} with value: {}", keyName, value, e);
+      }
+    }
+    return -1;
+  }
 }
