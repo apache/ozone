@@ -66,7 +66,10 @@ public class TestContainerToKeyMapping {
   private static final long BUCKET_ID = 200L;
   private static final long DIR_ID = 300L;
   private static final long FILE_ID = 400L;
-  private static final long CONTAINER_ID = 1L;
+  private static final long CONTAINER_ID_1 = 1L;
+  private static final long CONTAINER_ID_2 = 2L;
+  private static final long UNREFERENCED_FILE_ID = 500L;
+  private static final long MISSING_DIR_ID = 999L;  // Non-existent parent
 
   @BeforeEach
   public void setup() throws Exception {
@@ -97,12 +100,12 @@ public class TestContainerToKeyMapping {
 
   @Test
   public void testContainerToKeyMapping() {
-    int exitCode = execute("--containers", String.valueOf(CONTAINER_ID));
+    int exitCode = execute("--containers", String.valueOf(CONTAINER_ID_1));
     assertEquals(0, exitCode);
     
     String output = outWriter.toString();
 
-    assertThat(output).contains("\"" + CONTAINER_ID + "\"");
+    assertThat(output).contains("\"" + CONTAINER_ID_1 + "\"");
     assertThat(output).contains("vol1/bucket1/dir1/file1");
     assertThat(output).contains("\"numOfKeys\" : 1");
   }
@@ -117,6 +120,18 @@ public class TestContainerToKeyMapping {
     String output = outWriter.toString();
     assertThat(output).contains("\"" + nonExistentContainerId + "\"");
     assertThat(output).contains("\"numOfKeys\" : 0");
+  }
+
+  @Test
+  public void testUnreferencedKeys() {
+    int exitCode = execute("--containers", String.valueOf(CONTAINER_ID_2));
+    assertEquals(0, exitCode);
+    
+    String output = outWriter.toString();
+
+    assertThat(output).contains("\"" + CONTAINER_ID_2 + "\"");
+    assertThat(output).contains("\"numOfKeys\" : 0");
+    assertThat(output).contains("\"unreferencedKeys\" : 1");
   }
 
   private void createTestData() throws Exception {
@@ -151,8 +166,26 @@ public class TestContainerToKeyMapping {
     omMetadataManager.getDirectoryTable().put(dirKey, dirInfo);
 
     // Create file with a block in container 1
+    OmKeyInfo keyInfo = createKeyInfo(
+        "file1", FILE_ID, DIR_ID, CONTAINER_ID_1);
+    String fileKey = omMetadataManager.getOzonePathKey(
+        VOLUME_ID, BUCKET_ID, DIR_ID, "file1");
+    omMetadataManager.getFileTable().put(fileKey, keyInfo);
+    
+    // Create unreferenced file (parent directory doesn't exist)
+    OmKeyInfo unreferencedKey = createKeyInfo(
+        "unreferencedFile", UNREFERENCED_FILE_ID, MISSING_DIR_ID, CONTAINER_ID_2);
+    String unreferencedFileKey = omMetadataManager.getOzonePathKey(
+        VOLUME_ID, BUCKET_ID, MISSING_DIR_ID, "unreferencedFile");
+    omMetadataManager.getFileTable().put(unreferencedFileKey, unreferencedKey);
+  }
+
+  /**
+   * Helper method to create OmKeyInfo with a block in specified container.
+   */
+  private OmKeyInfo createKeyInfo(String keyName, long objectId, long parentId, long containerId) {
     OmKeyLocationInfo locationInfo = new OmKeyLocationInfo.Builder()
-        .setBlockID(new BlockID(CONTAINER_ID, 1L))
+        .setBlockID(new BlockID(containerId, 1L))
         .setLength(1024)
         .setOffset(0)
         .build();
@@ -160,20 +193,17 @@ public class TestContainerToKeyMapping {
     OmKeyLocationInfoGroup locationGroup = new OmKeyLocationInfoGroup(0,
         Collections.singletonList(locationInfo));
 
-    OmKeyInfo keyInfo = new OmKeyInfo.Builder()
+    return new OmKeyInfo.Builder()
         .setVolumeName(VOLUME_NAME)
         .setBucketName(BUCKET_NAME)
-        .setKeyName("file1")
+        .setKeyName(keyName)
         .setReplicationConfig(StandaloneReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE))
         .setDataSize(1024)
-        .setObjectID(FILE_ID)
-        .setParentObjectID(DIR_ID)
+        .setObjectID(objectId)
+        .setParentObjectID(parentId)
         .setUpdateID(1)
         .addOmKeyLocationInfoGroup(locationGroup)
         .build();
-
-    String fileKey = omMetadataManager.getOzonePathKey(VOLUME_ID, BUCKET_ID, DIR_ID, "file1");
-    omMetadataManager.getFileTable().put(fileKey, keyInfo);
   }
 
   private int execute(String... args) {

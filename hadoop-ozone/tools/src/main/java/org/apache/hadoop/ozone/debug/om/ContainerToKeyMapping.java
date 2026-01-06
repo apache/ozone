@@ -46,17 +46,13 @@ import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
-import org.apache.hadoop.ozone.debug.RocksDBUtils;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.rocksdb.ColumnFamilyDescriptor;
-import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.RocksDBException;
 import picocli.CommandLine;
 
 /**
@@ -84,15 +80,16 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
       description = "Comma separated Container IDs")
   private String containers;
 
-  private ManagedRocksDB rocksDB;
-  private ColumnFamilyHandle volumeCFHandle;
-  private ColumnFamilyHandle bucketCFHandle;
-  private ColumnFamilyHandle directoryCFHandle;
-  private ColumnFamilyHandle fileCFHandle;
+  private DBStore omDbStore;
+  private Table<String, OmVolumeArgs> volumeTable;
+  private Table<String, OmBucketInfo> bucketTable;
+  private Table<String, OmDirectoryInfo> directoryTable;
+  private Table<String, OmKeyInfo> fileTable;
   private DBStore dirTreeDbStore;
   private Table<Long, String> dirTreeTable;
   // Cache volume IDs to avoid repeated lookups
   private final Map<String, Long> volumeCache = new HashMap<>();
+  private ConfigurationSource conf;
 
   // TODO: Add support to OBS keys (HDDS-14118)
   @Override
@@ -103,32 +100,38 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
     // Parse container IDs
     Set<Long> containerIDs = Arrays.stream(containers.split(","))
         .map(String::trim)
+        .filter(s -> !s.isEmpty())
         .map(Long::parseLong)
         .collect(Collectors.toSet());
 
-    List<ColumnFamilyDescriptor> cfDescList = RocksDBUtils.getColumnFamilyDescriptors(dbPath);
-    List<ColumnFamilyHandle> cfHandleList = new ArrayList<>();
+    if (containerIDs.isEmpty()) {
+      err().println("No valid container IDs provided");
+      return null;
+    }
+
+    conf = new OzoneConfiguration();
+    File dbFile = new File(dbPath);
 
     try (PrintWriter writer = out()) {
-      rocksDB = ManagedRocksDB.openReadOnly(dbPath, cfDescList, cfHandleList);
-      volumeCFHandle = RocksDBUtils.getColumnFamilyHandle(
-          OMDBDefinition.VOLUME_TABLE_DEF.getName(), cfHandleList);
-      bucketCFHandle = RocksDBUtils.getColumnFamilyHandle(
-          OMDBDefinition.BUCKET_TABLE_DEF.getName(), cfHandleList);
-      directoryCFHandle = RocksDBUtils.getColumnFamilyHandle(
-          OMDBDefinition.DIRECTORY_TABLE_DEF.getName(), cfHandleList);
-      fileCFHandle = RocksDBUtils.getColumnFamilyHandle(
-          OMDBDefinition.FILE_TABLE_DEF.getName(), cfHandleList);
+      omDbStore = DBStoreBuilder.newBuilder(conf, OMDBDefinition.get(), dbFile.getName(),
+          dbFile.getParentFile().toPath())
+          .setOpenReadOnly(true)
+          .build();
+
+      volumeTable = OMDBDefinition.VOLUME_TABLE_DEF.getTable(omDbStore, CacheType.NO_CACHE);
+      bucketTable = OMDBDefinition.BUCKET_TABLE_DEF.getTable(omDbStore, CacheType.NO_CACHE);
+      directoryTable = OMDBDefinition.DIRECTORY_TABLE_DEF.getTable(omDbStore, CacheType.NO_CACHE);
+      fileTable = OMDBDefinition.FILE_TABLE_DEF.getTable(omDbStore, CacheType.NO_CACHE);
 
       openDirTreeDB(dbPath);
       retrieve(writer, containerIDs);
-    } catch (RocksDBException e) {
+    } catch (Exception e) {
       err().println("Failed to open RocksDB: " + e);
       throw e;
     } finally {
       closeDirTreeDB(dbPath);
-      if (rocksDB != null) {
-        rocksDB.close();
+      if (omDbStore != null) {
+        omDbStore.close();
       }
     }
     return null;
@@ -141,7 +144,6 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
       FileUtils.deleteDirectory(dirTreeDbPath);
     }
 
-    ConfigurationSource conf = new OzoneConfiguration();
     dirTreeDbStore = DBStoreBuilder.newBuilder(conf)
         .setName(DIRTREE_DB_NAME)
         .setPath(dirTreeDbPath.getParentFile().toPath())
@@ -173,18 +175,20 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
 
     // Map to collect keys per container
     Map<Long, List<String>> containerToKeysMap = new HashMap<>();
+    // Track unreferenced keys count per container
+    Map<Long, Long> unreferencedCountMap = new HashMap<>();
     for (Long containerId : containerIds) {
       containerToKeysMap.put(containerId, new ArrayList<>());
+      unreferencedCountMap.put(containerId, 0L);
     }
 
     // Iterate file table and filter for container
-    try (ManagedRocksIterator fileIterator = new ManagedRocksIterator(
-        rocksDB.get().newIterator(fileCFHandle))) {
-      fileIterator.get().seekToFirst();
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> fileIterator = 
+        fileTable.iterator()) {
       
-      while (fileIterator.get().isValid()) {
-        byte[] value = fileIterator.get().value();
-        OmKeyInfo keyInfo = OMDBDefinition.FILE_TABLE_DEF.getValueCodec().fromPersistedFormat(value);
+      while (fileIterator.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> entry = fileIterator.next();
+        OmKeyInfo keyInfo = entry.getValue();
 
         // Find which containers this key uses
         Set<Long> keyContainers = new HashSet<>();
@@ -199,64 +203,56 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
 
         if (!keyContainers.isEmpty()) {
           // Reconstruct full path
-          String fullPath = reconstructFullPath(keyInfo, bucketVolMap);
+          String fullPath = reconstructFullPath(keyInfo, bucketVolMap, unreferencedCountMap, keyContainers);
           if (fullPath != null) {
             for (Long containerId : keyContainers) {
               containerToKeysMap.get(containerId).add(fullPath);
             }
           }
         }
-        
-        fileIterator.get().next();
       }
     } catch (Exception e) {
       err().println("Exception occurred reading file Table, " + e);
       return;
     }
-    jsonOutput(writer, containerToKeysMap);
+    jsonOutput(writer, containerToKeysMap, unreferencedCountMap);
   }
 
   private void prepareDirIdTree(Map<Long, Pair<Long, String>> bucketVolMap) throws Exception {
     // Add bucket volume tree
-    try (ManagedRocksIterator bucketIterator = new ManagedRocksIterator(
-        rocksDB.get().newIterator(bucketCFHandle))) {
-      bucketIterator.get().seekToFirst();
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>> bucketIterator = 
+        bucketTable.iterator()) {
       
-      while (bucketIterator.get().isValid()) {
-        byte[] value = bucketIterator.get().value();
-        OmBucketInfo bucketInfo = OMDBDefinition.BUCKET_TABLE_DEF.getValueCodec().fromPersistedFormat(value);
+      while (bucketIterator.hasNext()) {
+        Table.KeyValue<String, OmBucketInfo> entry = bucketIterator.next();
+        OmBucketInfo bucketInfo = entry.getValue();
         String volumeName = bucketInfo.getVolumeName();
 
         // Get volume ID from volume table
         Long volumeId = getVolumeId(volumeName);
         if (volumeId == null) {
-          bucketIterator.get().next();
           continue;
         }
 
         bucketVolMap.put(bucketInfo.getObjectID(), Pair.of(volumeId, bucketInfo.getBucketName()));
         bucketVolMap.putIfAbsent(volumeId, Pair.of(null, volumeName));
-        
-        bucketIterator.get().next();
       }
     }
 
     // Add dir tree
-    try (ManagedRocksIterator directoryIterator = new ManagedRocksIterator(
-        rocksDB.get().newIterator(directoryCFHandle))) {
-      directoryIterator.get().seekToFirst();
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmDirectoryInfo>> directoryIterator = 
+        directoryTable.iterator()) {
       
-      while (directoryIterator.get().isValid()) {
-        byte[] value = directoryIterator.get().value();
-        OmDirectoryInfo dirInfo = OMDBDefinition.DIRECTORY_TABLE_DEF.getValueCodec().fromPersistedFormat(value);
+      while (directoryIterator.hasNext()) {
+        Table.KeyValue<String, OmDirectoryInfo> entry = directoryIterator.next();
+        OmDirectoryInfo dirInfo = entry.getValue();
         addToDirTree(dirInfo.getObjectID(), dirInfo.getParentObjectID(), dirInfo.getName());
-        
-        directoryIterator.get().next();
       }
     }
   }
 
-  private String reconstructFullPath(OmKeyInfo keyInfo, Map<Long, Pair<Long, String>> bucketVolMap) throws Exception {
+  private String reconstructFullPath(OmKeyInfo keyInfo, Map<Long, Pair<Long, String>> bucketVolMap,
+      Map<Long, Long> unreferencedCountMap, Set<Long> keyContainers) throws Exception {
     StringBuilder sb = new StringBuilder(keyInfo.getKeyName());
     Long prvParent = keyInfo.getParentObjectID();
     
@@ -275,6 +271,10 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
       // Check dir tree
       Pair<Long, String> nameParentPair = getFromDirTree(prvParent);
       if (nameParentPair == null) {
+        // Parent not found - increment unreferenced count for all containers this key uses
+        for (Long containerId : keyContainers) {
+          unreferencedCountMap.put(containerId, unreferencedCountMap.get(containerId) + 1);
+        }
         break;
       }
       sb.insert(0, nameParentPair.getValue() + OM_KEY_PREFIX);
@@ -307,11 +307,9 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
     }
     
     String volumeKey = OM_KEY_PREFIX + volumeName;
-    byte[] keyBytes = OMDBDefinition.VOLUME_TABLE_DEF.getKeyCodec().toPersistedFormat(volumeKey);
-    byte[] valueBytes = rocksDB.get().get(volumeCFHandle, keyBytes);
+    OmVolumeArgs volumeArgs = volumeTable.get(volumeKey);
     
-    if (valueBytes != null) {
-      OmVolumeArgs volumeArgs = OMDBDefinition.VOLUME_TABLE_DEF.getValueCodec().fromPersistedFormat(valueBytes);
+    if (volumeArgs != null) {
       Long volumeId = volumeArgs.getObjectID();
       volumeCache.put(volumeName, volumeId);
       return volumeId;
@@ -327,13 +325,15 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
     }
   }
 
-  private void jsonOutput(PrintWriter writer, Map<Long, List<String>> containerToKeysMap) {
+  private void jsonOutput(PrintWriter writer, Map<Long, List<String>> containerToKeysMap,
+      Map<Long, Long> unreferencedCountMap) {
     try {
       ObjectMapper mapper = new ObjectMapper();
       ObjectNode root = mapper.createObjectNode();
       ObjectNode containersNode = mapper.createObjectNode();
 
       for (Map.Entry<Long, List<String>> entry : containerToKeysMap.entrySet()) {
+        Long containerId = entry.getKey();
         ObjectNode containerNode = mapper.createObjectNode();
         ArrayNode keysArray = mapper.createArrayNode();
         
@@ -343,7 +343,14 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
         
         containerNode.set("keys", keysArray);
         containerNode.put("numOfKeys", entry.getValue().size());
-        containersNode.set(entry.getKey().toString(), containerNode);
+        
+        // Add unreferenced count if > 0
+        long unreferencedCount = unreferencedCountMap.get(containerId);
+        if (unreferencedCount > 0) {
+          containerNode.put("unreferencedKeys", unreferencedCount);
+        }
+        
+        containersNode.set(containerId.toString(), containerNode);
       }
 
       root.set("containers", containersNode);
