@@ -95,7 +95,6 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -111,7 +110,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFi
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -1853,8 +1851,7 @@ public class KeyValueHandler extends Handler {
         .build();
     // Under construction is set here, during BlockInputStream#initialize() it is used to update the block length.
     blkInfo.setUnderConstruction(true);
-    try (BlockInputStream blockInputStream = (BlockInputStream) blockInputStreamFactory.create(
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+    try (BlockInputStream blockInputStream = blockInputStreamFactory.createBlockInputStream(
         blkInfo, pipeline, blockToken, dnClient.getXceiverClientManager(),
         null, conf.getObject(OzoneClientConfig.class))) {
       // Initialize the BlockInputStream. Gets the blockData from the peer, sets the block length and
