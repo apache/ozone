@@ -36,7 +36,7 @@ import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CleanupRevokedSTSTokensRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteRevokedSTSTokensRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
@@ -198,13 +198,13 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
      * Builds and submits an OMRequest to delete the provided revoked STS token(s).
      */
     private boolean submitCleanupRequest(List<String> sessionTokens) {
-      final CleanupRevokedSTSTokensRequest request = CleanupRevokedSTSTokensRequest.newBuilder()
+      final DeleteRevokedSTSTokensRequest request = DeleteRevokedSTSTokensRequest.newBuilder()
           .addAllSessionToken(sessionTokens)
           .build();
 
       final OMRequest omRequest = OMRequest.newBuilder()
-          .setCmdType(Type.CleanupRevokedSTSTokens)
-          .setCleanupRevokedSTSTokensRequest(request)
+          .setCmdType(Type.DeleteRevokedSTSTokens)
+          .setDeleteRevokedSTSTokensRequest(request)
           .setClientId(clientId.toString())
           .setVersion(ClientVersion.CURRENT_VERSION)
           .build();

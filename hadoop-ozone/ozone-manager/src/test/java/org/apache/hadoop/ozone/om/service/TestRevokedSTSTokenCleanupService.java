@@ -33,7 +33,7 @@ import org.apache.hadoop.hdds.utils.db.StringInMemoryTestTable;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CleanupRevokedSTSTokensRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteRevokedSTSTokensRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
@@ -87,11 +87,11 @@ public class TestRevokedSTSTokenCleanupService {
 
       final OMRequest omRequest = capturedRequest.get();
       assertThat(omRequest).isNotNull();
-      assertThat(omRequest.getCmdType()).isEqualTo(Type.CleanupRevokedSTSTokens);
+      assertThat(omRequest.getCmdType()).isEqualTo(Type.DeleteRevokedSTSTokens);
 
-      final CleanupRevokedSTSTokensRequest cleanupRevokedSTSTokensRequest =
-          omRequest.getCleanupRevokedSTSTokensRequest();
-      assertThat(cleanupRevokedSTSTokensRequest.getSessionTokenList()).containsExactly("session-token-a");
+      final DeleteRevokedSTSTokensRequest deleteRevokedSTSTokensRequest =
+          omRequest.getDeleteRevokedSTSTokensRequest();
+      assertThat(deleteRevokedSTSTokensRequest.getSessionTokenList()).containsExactly("session-token-a");
     }
   }
 
@@ -198,11 +198,11 @@ public class TestRevokedSTSTokenCleanupService {
 
       final OMRequest omRequest = capturedRequest.get();
       assertThat(omRequest).isNotNull();
-      assertThat(omRequest.getCmdType()).isEqualTo(Type.CleanupRevokedSTSTokens);
+      assertThat(omRequest.getCmdType()).isEqualTo(Type.DeleteRevokedSTSTokens);
 
-      final CleanupRevokedSTSTokensRequest cleanupRevokedSTSTokensRequest =
-          omRequest.getCleanupRevokedSTSTokensRequest();
-      assertThat(cleanupRevokedSTSTokensRequest.getSessionTokenList())
+      final DeleteRevokedSTSTokensRequest deleteRevokedSTSTokensRequest =
+          omRequest.getDeleteRevokedSTSTokensRequest();
+      assertThat(deleteRevokedSTSTokensRequest.getSessionTokenList())
           .containsExactlyInAnyOrder("session-token-g", "session-token-h", "session-token-i");
     }
   }
@@ -239,7 +239,7 @@ public class TestRevokedSTSTokenCleanupService {
     omRatisUtilsMock.when(
         () -> OzoneManagerRatisUtils.submitRequest(any(), any(), any(), anyLong()))
         .thenReturn(OMResponse.newBuilder()
-            .setCmdType(Type.CleanupRevokedSTSTokens)
+            .setCmdType(Type.DeleteRevokedSTSTokens)
             .setStatus(Status.INTERNAL_ERROR)
             .setSuccess(false)
             .build());

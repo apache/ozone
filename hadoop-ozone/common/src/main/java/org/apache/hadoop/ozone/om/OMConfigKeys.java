@@ -683,12 +683,12 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL_DEFAULT = "5m";
 
   public static final String OZONE_OM_REVOKED_STS_TOKEN_CLEANUP_SERVICE_INTERVAL
-      = "ozone.om.revoked.sts.token.cleanup.service.interval";
+      = "ozone.om.sts.token.cleanup.service.interval";
   public static final String OZONE_OM_REVOKED_STS_TOKEN_CLEANUP_SERVICE_INTERVAL_DEFAULT
       = "3h";
 
   public static final String OZONE_OM_REVOKED_STS_TOKEN_CLEANUP_SERVICE_TIMEOUT
-      = "ozone.om.revoked.sts.token.cleanup.service.timeout";
+      = "ozone.om.sts.token.cleanup.service.timeout";
   public static final String OZONE_OM_REVOKED_STS_TOKEN_CLEANUP_SERVICE_TIMEOUT_DEFAULT
       = "15m";
 

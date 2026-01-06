@@ -31,14 +31,14 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
- * Response for CleanupRevokedSTSTokens request.
+ * Response for DeleteRevokedSTSTokens request.
  */
 @CleanupTableInfo(cleanupTables = {S3_REVOKED_STS_TOKEN_TABLE})
-public class S3CleanupRevokedSTSTokensResponse extends OMClientResponse {
+public class S3DeleteRevokedSTSTokensResponse extends OMClientResponse {
 
   private final List<String> sessionTokens;
 
-  public S3CleanupRevokedSTSTokensResponse(List<String> sessionTokens, @Nonnull OMResponse omResponse) {
+  public S3DeleteRevokedSTSTokensResponse(List<String> sessionTokens, @Nonnull OMResponse omResponse) {
     super(omResponse);
     this.sessionTokens = sessionTokens;
   }

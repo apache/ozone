@@ -23,28 +23,28 @@ import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.response.s3.security.S3CleanupRevokedSTSTokensResponse;
+import org.apache.hadoop.ozone.om.response.s3.security.S3DeleteRevokedSTSTokensResponse;
 import org.apache.hadoop.ozone.om.service.RevokedSTSTokenCleanupService;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CleanupRevokedSTSTokensRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteRevokedSTSTokensRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 
 /**
- * Handles CleanupRevokedSTSTokens requests submitted by {@link RevokedSTSTokenCleanupService}.
+ * Handles DeleteRevokedSTSTokens requests submitted by {@link RevokedSTSTokenCleanupService}.
  */
-public class S3CleanupRevokedSTSTokensRequest extends OMClientRequest {
+public class S3DeleteRevokedSTSTokensRequest extends OMClientRequest {
 
-  public S3CleanupRevokedSTSTokensRequest(OMRequest omRequest) {
+  public S3DeleteRevokedSTSTokensRequest(OMRequest omRequest) {
     super(omRequest);
   }
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final CleanupRevokedSTSTokensRequest request = getOmRequest().getCleanupRevokedSTSTokensRequest();
+    final DeleteRevokedSTSTokensRequest request = getOmRequest().getDeleteRevokedSTSTokensRequest();
     final OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(getOmRequest());
 
     final List<String> sessionTokens = request.getSessionTokenList();
-    return new S3CleanupRevokedSTSTokensResponse(sessionTokens, omResponse.build());
+    return new S3DeleteRevokedSTSTokensResponse(sessionTokens, omResponse.build());
   }
 }
 
