@@ -18,8 +18,10 @@
 package org.apache.hadoop.ozone.s3.endpoint;
 
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -52,9 +54,9 @@ import org.slf4j.LoggerFactory;
  * This handler extends EndpointBase to inherit all required functionality
  * (configuration, headers, request context, audit logging, metrics, etc.).
  */
-public class AclHandler extends EndpointBase implements BucketOperationHandler {
+public class BucketAclHandler extends EndpointBase implements BucketOperationHandler {
 
-  private static final Logger LOG = LoggerFactory.getLogger(AclHandler.class);
+  private static final Logger LOG = LoggerFactory.getLogger(BucketAclHandler.class);
 
   /**
    * Determine if this handler should handle the current request.
@@ -188,18 +190,16 @@ public class AclHandler extends EndpointBase implements BucketOperationHandler {
    *
    * Example: x-amz-grant-write: id="111122223333", id="555566667777"
    */
-  private List<OzoneAcl> getAndConvertAclOnBucket(String value,
-                                                  String permission)
-      throws OS3Exception {
+  private List<OzoneAcl> getAndConvertAclOnBucket(
+      String value, String permission) throws OS3Exception {
     return parseAndConvertAcl(value, permission, true);
   }
 
   /**
    * Convert ACL string to Ozone ACL on volume.
    */
-  private List<OzoneAcl> getAndConvertAclOnVolume(String value,
-                                                  String permission)
-      throws OS3Exception {
+  private List<OzoneAcl> getAndConvertAclOnVolume(
+      String value, String permission) throws OS3Exception {
     return parseAndConvertAcl(value, permission, false);
   }
 
@@ -215,9 +215,8 @@ public class AclHandler extends EndpointBase implements BucketOperationHandler {
    * @return list of OzoneAcl objects
    * @throws OS3Exception if parsing fails or grantee type is not supported
    */
-  private List<OzoneAcl> parseAndConvertAcl(String value, String permission,
-                                            boolean isBucket)
-      throws OS3Exception {
+  private List<OzoneAcl> parseAndConvertAcl(
+      String value, String permission, boolean isBucket) throws OS3Exception {
     List<OzoneAcl> ozoneAclList = new ArrayList<>();
     if (StringUtils.isEmpty(value)) {
       return ozoneAclList;
@@ -243,28 +242,13 @@ public class AclHandler extends EndpointBase implements BucketOperationHandler {
         // Build ACL on Bucket
         EnumSet<IAccessAuthorizer.ACLType> aclsOnBucket =
             S3Acl.getOzoneAclOnBucketFromS3Permission(permission);
-        ozoneAclList.add(OzoneAcl.of(
-            IAccessAuthorizer.ACLIdentityType.USER,
-            userId,
-            OzoneAcl.AclScope.DEFAULT,
-            aclsOnBucket
-        ));
-        ozoneAclList.add(OzoneAcl.of(
-            IAccessAuthorizer.ACLIdentityType.USER,
-            userId,
-            ACCESS,
-            aclsOnBucket
-        ));
+        ozoneAclList.add(OzoneAcl.of(USER, userId, DEFAULT, aclsOnBucket));
+        ozoneAclList.add(OzoneAcl.of(USER, userId, ACCESS, aclsOnBucket));
       } else {
         // Build ACL on Volume
         EnumSet<IAccessAuthorizer.ACLType> aclsOnVolume =
             S3Acl.getOzoneAclOnVolumeFromS3Permission(permission);
-        ozoneAclList.add(OzoneAcl.of(
-            IAccessAuthorizer.ACLIdentityType.USER,
-            userId,
-            ACCESS,
-            aclsOnVolume
-        ));
+        ozoneAclList.add(OzoneAcl.of(USER, userId, ACCESS, aclsOnVolume));
       }
     }
 
@@ -274,6 +258,6 @@ public class AclHandler extends EndpointBase implements BucketOperationHandler {
   @Override
   @PostConstruct
   public void init() {
-    // No initialization needed for AclHandler
+    // No initialization needed for BucketAclHandler
   }
 }

@@ -43,6 +43,8 @@ public interface BucketOperationHandler {
    * @throws IOException if an I/O error occurs
    * @throws OS3Exception if an S3-specific error occurs
    */
-  Response handlePutRequest(String bucketName, InputStream body)
-      throws IOException, OS3Exception;
+  default Response handlePutRequest(String bucketName, InputStream body)
+      throws IOException, OS3Exception {
+    return null;
+  }
 }

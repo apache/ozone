@@ -90,7 +90,7 @@ public class BucketEndpoint extends EndpointBase {
   private boolean listKeysShallowEnabled;
   private int maxKeysLimit = 1000;
 
-  private List<BucketOperationHandler> putHandlers;
+  private List<BucketOperationHandler> handlers;
 
   /**
    * Rest endpoint to list objects in a specific bucket.
@@ -307,7 +307,7 @@ public class BucketEndpoint extends EndpointBase {
   ) throws IOException, OS3Exception {
 
     // Chain of responsibility: let each handler try to handle the request
-    for (BucketOperationHandler handler : putHandlers) {
+    for (BucketOperationHandler handler : handlers) {
       Response response = handler.handlePutRequest(bucketName, body);
       if (response != null) {
         return response;  // Handler handled the request
@@ -607,11 +607,11 @@ public class BucketEndpoint extends EndpointBase {
         OZONE_S3G_LIST_MAX_KEYS_LIMIT_DEFAULT);
 
     // Initialize PUT handlers
-    AclHandler aclHandler = new AclHandler();
+    BucketAclHandler aclHandler = new BucketAclHandler();
     copyDependenciesTo(aclHandler);
     aclHandler.initialization();
 
-    putHandlers = new ArrayList<>();
-    putHandlers.add(aclHandler);
+    handlers = new ArrayList<>();
+    handlers.add(aclHandler);
   }
 }
