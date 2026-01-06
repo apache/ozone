@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.diskbalancer;
 
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.container.common.volume.StorageVolume.TMP_DIR_NAME;
 import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.calculateVolumeDataDensity;
 import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.getIdealUsage;
 import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.getVolumeUsages;
@@ -66,7 +67,6 @@ import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.VolumeFixedUsage;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
@@ -165,8 +165,6 @@ public class DiskBalancerService extends BackgroundService {
     metrics = DiskBalancerServiceMetrics.create();
 
     loadDiskBalancerInfo();
-
-    constructTmpDir();
   }
 
   /**
@@ -178,17 +176,45 @@ public class DiskBalancerService extends BackgroundService {
     applyDiskBalancerInfo(diskBalancerInfo);
   }
 
-  private void constructTmpDir() throws IOException {
+  /**
+   * Cleans up stale diskBalancer temporary directories on startup.
+   *
+   * @throws IOException if cleanup fails
+   */
+  private void cleanupTmpDir() throws IOException {
     for (HddsVolume volume:
         StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())) {
-      Path tmpDir = getDiskBalancerTmpDir(volume);
+      Path diskBalancerTmpDir = null;
       try {
-        FileUtils.deleteDirectory(tmpDir.toFile());
-        FileUtils.forceMkdir(tmpDir.toFile());
+        File tmpDir = volume.getTmpDir();
+        if (tmpDir != null) {
+          // If tmpDir is initialized, use it directly
+          diskBalancerTmpDir = tmpDir.toPath().resolve(DISK_BALANCER_DIR);
+        } else {
+          // If tmpDir is not initialized, construct the path manually
+          // This handles the case where stale directories exist from previous
+          // failed moves even though volumes haven't been initialized yet
+          String clusterId = volume.getClusterID();
+          if (clusterId == null) {
+            // Skip volumes without clusterID - they're not properly formatted
+            continue;
+          }
+          String workDirName = volume.getWorkingDirName();
+          if (workDirName == null) {
+            workDirName = clusterId;
+          }
+          diskBalancerTmpDir = Paths.get(volume.getStorageDir().toString(),
+              workDirName, TMP_DIR_NAME, DISK_BALANCER_DIR);
+        }
+
+        // Clean up any existing diskBalancer directory from previous runs
+        if (diskBalancerTmpDir.toFile().exists()) {
+          FileUtils.deleteDirectory(diskBalancerTmpDir.toFile());
+          LOG.info("Cleaned up stale diskBalancer tmp directory: {}", diskBalancerTmpDir);
+        }
       } catch (IOException ex) {
-        LOG.warn("Can not reconstruct tmp directory under volume {}", volume,
-            ex);
-        throw ex;
+        LOG.warn("Failed to clean up diskBalancer tmp directory under volume {}: {}",
+            volume, diskBalancerTmpDir, ex);
       }
     }
   }
@@ -342,6 +368,17 @@ public class DiskBalancerService extends BackgroundService {
   }
 
   @Override
+  public synchronized void start() {
+    // Clean up any stale diskBalancer tmp directories from previous runs
+    try {
+      cleanupTmpDir();
+    } catch (IOException e) {
+      LOG.warn("Failed to clean up diskBalancer tmp directories before starting service", e);
+    }
+    super.start();
+  }
+
+  @Override
   public BackgroundTaskQueue getTasks() {
     BackgroundTaskQueue queue = new BackgroundTaskQueue();
 
@@ -477,8 +514,8 @@ public class DiskBalancerService extends BackgroundService {
       container.readLock();
       try {
         // Step 1: Copy container to new Volume's tmp Dir
-        diskBalancerTmpDir = destVolume.getTmpDir().toPath()
-            .resolve(DISK_BALANCER_DIR).resolve(String.valueOf(containerId));
+        diskBalancerTmpDir = getDiskBalancerTmpDir(destVolume)
+            .resolve(String.valueOf(containerId));
         ozoneContainer.getController().copyContainer(containerData, diskBalancerTmpDir);
 
         // Step 2: verify checksum and Transition Temp container to Temp C1-RECOVERING
@@ -697,9 +734,8 @@ public class DiskBalancerService extends BackgroundService {
     return totalBytesToMove;
   }
 
-  private Path getDiskBalancerTmpDir(HddsVolume hddsVolume) {
-    return Paths.get(hddsVolume.getVolumeRootDir())
-        .resolve(StorageVolume.TMP_DIR_NAME).resolve(DISK_BALANCER_DIR);
+  private Path getDiskBalancerTmpDir(HddsVolume hddsVolume) throws IOException {
+    return hddsVolume.getTmpDir().toPath().resolve(DISK_BALANCER_DIR);
   }
 
   public DiskBalancerServiceMetrics getMetrics() {
