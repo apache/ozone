@@ -17,8 +17,10 @@
 
 package org.apache.hadoop.ozone.om.request.s3.security;
 
+import java.io.IOException;
 import java.util.List;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -28,6 +30,8 @@ import org.apache.hadoop.ozone.om.service.RevokedSTSTokenCleanupService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteRevokedSTSTokensRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authentication.client.AuthenticationException;
 
 /**
  * Handles DeleteRevokedSTSTokens requests submitted by {@link RevokedSTSTokenCleanupService}.
@@ -36,6 +40,23 @@ public class S3DeleteRevokedSTSTokensRequest extends OMClientRequest {
 
   public S3DeleteRevokedSTSTokensRequest(OMRequest omRequest) {
     super(omRequest);
+  }
+
+  @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    final UserGroupInformation ugi;
+    try {
+      ugi = createUGI();
+    } catch (AuthenticationException e) {
+      throw new OMException(e, OMException.ResultCodes.PERMISSION_DENIED);
+    }
+    if (!ozoneManager.isAdmin(ugi) && !ozoneManager.isS3Admin(ugi)) {
+      throw new OMException("Only admins can delete revoked STS tokens", OMException.ResultCodes.PERMISSION_DENIED);
+    }
+
+    return getOmRequest().toBuilder()
+        .setUserInfo(getUserInfo())
+        .build();
   }
 
   @Override
