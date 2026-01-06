@@ -34,7 +34,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleRule;
 import org.junit.jupiter.api.Test;
@@ -184,6 +186,90 @@ class TestOmLCRule {
         .setRules(rules);
 
     assertOMException(() -> config.buildAndValid(), INVALID_REQUEST, "Duplicate rule IDs found");
+  }
+
+  @Test
+  public void testTrashPrefixValidation() throws OMException {
+    long currentTime = System.currentTimeMillis();
+    OmLCExpiration exp = new OmLCExpiration.Builder()
+        .setDays(30)
+        .build();
+
+    // Case 1: Prefix is .Trash
+    OmLCRule.Builder r1 = new OmLCRule.Builder()
+        .setId("trash-rule-1")
+        .setEnabled(true)
+        .setPrefix(FileSystem.TRASH_PREFIX)
+        .setAction(exp);
+    assertOMException(() -> r1.build().valid(BucketLayout.DEFAULT, currentTime), INVALID_REQUEST,
+        "Lifecycle rule prefix cannot be trash root");
+
+    // Case 4: Prefix is .Trash/subdir
+    OmLCRule.Builder r2 = new OmLCRule.Builder()
+        .setId("trash-rule-2")
+        .setEnabled(true)
+        .setPrefix(FileSystem.TRASH_PREFIX + "/user")
+        .setAction(exp);
+    assertOMException(() -> r2.build().valid(BucketLayout.DEFAULT, currentTime), INVALID_REQUEST,
+        "Lifecycle rule prefix cannot be trash root");
+  }
+
+  @Test
+  public void testTagValidation() throws OMException {
+    long currentTime = System.currentTimeMillis();
+    OmLCExpiration exp = new OmLCExpiration.Builder()
+        .setDays(30)
+        .build();
+
+    // Case 1: Tag key too long
+    String longKey = RandomStringUtils.randomAlphanumeric(129);
+    OmLCFilter filterKeyTooLong = getOmLCFilterBuilder(null, Pair.of(longKey, "value"), null).build();
+    OmLCRule.Builder r1 = new OmLCRule.Builder()
+        .setId("long-tag-key")
+        .setEnabled(true)
+        .setFilter(filterKeyTooLong)
+        .setAction(exp);
+    assertOMException(() -> r1.build().valid(BucketLayout.DEFAULT, currentTime), INVALID_REQUEST,
+        "A Tag's Key must be a length between 1 and 128");
+
+    // Case 2: Tag value too long
+    String longValue = RandomStringUtils.randomAlphanumeric(257);
+    OmLCFilter filterValueTooLong = getOmLCFilterBuilder(null, Pair.of("key", longValue), null).build();
+    OmLCRule.Builder r2 = new OmLCRule.Builder()
+        .setId("long-tag-value")
+        .setEnabled(true)
+        .setFilter(filterValueTooLong)
+        .setAction(exp);
+    assertOMException(() -> r2.build().valid(BucketLayout.DEFAULT, currentTime), INVALID_REQUEST,
+        "A Tag's Value must be a length between 0 and 256");
+  }
+
+  @Test
+  public void testPrefixLengthValidation() throws OMException {
+    long currentTime = System.currentTimeMillis();
+    OmLCExpiration exp = new OmLCExpiration.Builder()
+        .setDays(30)
+        .build();
+
+    // Case 1: Prefix too long
+    String longPrefix = RandomStringUtils.randomAlphanumeric(1025);
+    OmLCRule.Builder r1 = new OmLCRule.Builder()
+        .setId("long-prefix")
+        .setEnabled(true)
+        .setPrefix(longPrefix)
+        .setAction(exp);
+    assertOMException(() -> r1.build().valid(BucketLayout.DEFAULT, currentTime), INVALID_REQUEST,
+        "The maximum size of a prefix is 1024");
+
+    // Case 2: Filter Prefix too long
+    OmLCFilter filterPrefixTooLong = getOmLCFilterBuilder(longPrefix, null, null).build();
+    OmLCRule.Builder r2 = new OmLCRule.Builder()
+        .setId("filter-long-prefix")
+        .setEnabled(true)
+        .setFilter(filterPrefixTooLong)
+        .setAction(exp);
+    assertOMException(() -> r2.build().valid(BucketLayout.DEFAULT, currentTime), INVALID_REQUEST,
+        "The maximum size of a prefix is 1024");
   }
 
   @Test

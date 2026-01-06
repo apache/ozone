@@ -17,8 +17,10 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.isValidKeyPath;
-import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.normalizePrefix;
+import static org.apache.hadoop.ozone.om.helpers.OmLifecycleUtils.validateAndNormalizePrefix;
+import static org.apache.hadoop.ozone.om.helpers.OmLifecycleUtils.validatePrefixLength;
+import static org.apache.hadoop.ozone.om.helpers.OmLifecycleUtils.validateTagUniqAndLength;
+import static org.apache.hadoop.ozone.om.helpers.OmLifecycleUtils.validateTrashPrefix;
 
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
@@ -73,10 +75,6 @@ public final class OmLifecycleRuleAndOperator {
   /**
    * Validates the OmLifecycleRuleAndOperator.
    * Ensures the following:
-   * - Either tags or prefix must be specified.
-   * - If there are tags and no prefix, the tags should be more than one.
-   * - Prefix can be "".
-   * - Prefix alone is not allowed.
    *
    * @throws OMException if the validation fails.
    */
@@ -102,17 +100,17 @@ public final class OmLifecycleRuleAndOperator {
           OMException.ResultCodes.INVALID_REQUEST);
     }
 
+    if (hasTags) {
+      validateTagUniqAndLength(tags);
+    }
+
+    if (hasPrefix) {
+      validatePrefixLength(prefix);
+      validateTrashPrefix(prefix);
+    }
+
     if (hasPrefix && layout == BucketLayout.FILE_SYSTEM_OPTIMIZED) {
-      String normalizedPrefix = normalizePrefix(prefix);
-      if (!normalizedPrefix.equals(prefix)) {
-        throw new OMException("Prefix format is not supported. Please use " + normalizedPrefix +
-            " instead of " + prefix + ".", OMException.ResultCodes.INVALID_REQUEST);
-      }
-      try {
-        isValidKeyPath(normalizedPrefix);
-      } catch (OMException e) {
-        throw new OMException("Prefix is not a valid key path: " + prefix, OMException.ResultCodes.INVALID_REQUEST);
-      }
+      validateAndNormalizePrefix(prefix);
     }
   }
 

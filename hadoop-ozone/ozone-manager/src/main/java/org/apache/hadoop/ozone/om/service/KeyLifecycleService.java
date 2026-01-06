@@ -372,18 +372,11 @@ public class KeyLifecycleService extends BackgroundService {
     private void evaluateFSOBucket(OmVolumeArgs volume, OmBucketInfo bucket, String bucketKey,
         Table<String, OmKeyInfo> keyTable, List<OmLCRule> ruleList,
         LimitedExpiredObjectList expiredKeyList, LimitedExpiredObjectList expiredDirList) {
-      List<OmLCRule> prefixStartsWithTrashRuleList =
-          ruleList.stream().filter(r -> r.isPrefixEnable() && r.getEffectivePrefix().startsWith(
-              TRASH_PREFIX + OzoneConsts.OM_KEY_PREFIX)).collect(Collectors.toList());
       List<OmLCRule> prefixRuleList =
           ruleList.stream().filter(r -> r.isPrefixEnable()).collect(Collectors.toList());
       // r.isPrefixEnable() == false means empty filter
       List<OmLCRule> noPrefixRuleList =
           ruleList.stream().filter(r -> !r.isPrefixEnable()).collect(Collectors.toList());
-
-      prefixRuleList.removeAll(prefixStartsWithTrashRuleList);
-      prefixStartsWithTrashRuleList.stream().forEach(
-          r -> LOG.info("Skip rule {} as its prefix starts with {}", r, TRASH_PREFIX + OzoneConsts.OM_KEY_PREFIX));
 
       for (OmLCRule rule : prefixRuleList) {
         // find KeyInfo of each directory for prefix
@@ -709,15 +702,6 @@ public class KeyLifecycleService extends BackgroundService {
         Table<String, OmKeyInfo> keyTable, List<OmLCRule> ruleList, LimitedExpiredObjectList expiredKeyList) {
       String volumeName = bucketInfo.getVolumeName();
       String bucketName = bucketInfo.getBucketName();
-
-      if (bucketInfo.getBucketLayout() == BucketLayout.LEGACY) {
-        List<OmLCRule> prefixStartsWithTrashRuleList =
-            ruleList.stream().filter(r -> r.isPrefixEnable() && r.getEffectivePrefix().startsWith(
-                TRASH_PREFIX + OzoneConsts.OM_KEY_PREFIX)).collect(Collectors.toList());
-        ruleList.removeAll(prefixStartsWithTrashRuleList);
-        prefixStartsWithTrashRuleList.stream().forEach(
-            r -> LOG.info("Skip rule {} as its prefix starts with {}", r, TRASH_PREFIX + OzoneConsts.OM_KEY_PREFIX));
-      }
 
       // use bucket name as key iterator prefix
       try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyTblItr =
