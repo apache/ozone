@@ -495,7 +495,7 @@ public class SCMDatanodeProtocolServer implements
         getProtocolMessageMetrics() {
     return ProtocolMessageMetrics
         .create("SCMDatanodeProtocol", "SCM Datanode protocol",
-            StorageContainerDatanodeProtocolProtos.Type.values());
+            StorageContainerDatanodeProtocolProtos.Type.class);
   }
 
   /**

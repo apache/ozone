@@ -141,7 +141,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         new ProtocolMessageMetrics<>(
             "HddsDispatcher",
             "HDDS dispatcher metrics",
-            Type.values());
+            Type.class);
 
     this.dispatcher =
         new OzoneProtocolMessageDispatcher<>("DatanodeClient",

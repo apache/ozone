@@ -45,31 +45,23 @@ public class ProtocolMessageMetrics<KEY extends Enum<KEY>> implements MetricsSou
 
   private final AtomicInteger concurrency = new AtomicInteger(0);
 
-  private static final MetricsInfo TYPE_TAG_INFO =
-      Interns.info("type", "Message type");
-
-  private static final MetricsInfo COUNTER_INFO =
-      Interns.info("counter", "Number of distinct calls");
-
-  private static final MetricsInfo TIME_INFO =
-      Interns.info("time", "Sum of the duration of the calls");
-
-  private static final MetricsInfo CONCURRENCY_INFO =
-      Interns.info("concurrency",
-          "Number of requests processed concurrently");
+  private static final MetricsInfo TYPE_TAG_INFO = Interns.info("type", "Message type");
+  private static final MetricsInfo COUNTER_INFO = Interns.info("counter", "Number of distinct calls");
+  private static final MetricsInfo TIME_INFO = Interns.info("time", "Sum of the duration of the calls");
+  private static final MetricsInfo CONCURRENCY_INFO = Interns.info("concurrency",
+      "Number of requests processed concurrently");
 
   public static <KEY extends Enum<KEY>> ProtocolMessageMetrics<KEY> create(String name,
-      String description, KEY[] types) {
-    return new ProtocolMessageMetrics<>(name, description, types);
+      String description, Class<KEY> enumClass) {
+    return new ProtocolMessageMetrics<>(name, description, enumClass);
   }
 
   public ProtocolMessageMetrics(String name, String description,
-      KEY[] values) {
+      Class<KEY> enumClass) {
     this.name = name;
     this.description = description;
-    final Class<KEY> enumClass = values[0].getDeclaringClass();
     final EnumMap<KEY, Stats> map = new EnumMap<>(enumClass);
-    for (KEY value : values) {
+    for (KEY value : enumClass.getEnumConstants()) {
       map.put(value, new Stats());
     }
     this.stats = Collections.unmodifiableMap(map);
@@ -100,20 +92,15 @@ public class ProtocolMessageMetrics<KEY extends Enum<KEY>> implements MetricsSou
   @Override
   public void getMetrics(MetricsCollector collector, boolean all) {
     stats.forEach((key, stat) -> {
-      MetricsRecordBuilder builder =
-          collector.addRecord(name);
-      builder.add(
-          new MetricsTag(TYPE_TAG_INFO, key.toString()));
-      builder.addCounter(COUNTER_INFO,
-          stat.counter());
-      builder.addCounter(
-          TIME_INFO,
-          stat.time());
-      builder.endRecord();
-
+      collector.addRecord(name)
+          .add(new MetricsTag(TYPE_TAG_INFO, key.toString()))
+          .addCounter(COUNTER_INFO, stat.counter())
+          .addCounter(TIME_INFO, stat.time())
+          .endRecord();
     });
-    MetricsRecordBuilder builder = collector.addRecord(name);
-    builder.addCounter(CONCURRENCY_INFO, concurrency.get());
+    collector.addRecord(name)
+        .addCounter(CONCURRENCY_INFO, concurrency.get())
+        .endRecord();
   }
 
   /**

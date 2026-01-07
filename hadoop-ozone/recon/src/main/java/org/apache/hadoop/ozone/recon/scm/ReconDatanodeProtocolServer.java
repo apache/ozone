@@ -51,7 +51,7 @@ public class ReconDatanodeProtocolServer extends SCMDatanodeProtocolServer
       getProtocolMessageMetrics() {
     return ProtocolMessageMetrics
         .create("ReconDatanodeProtocol", "Recon Datanode protocol",
-            StorageContainerDatanodeProtocolProtos.Type.values());
+            StorageContainerDatanodeProtocolProtos.Type.class);
   }
 
   @Override
