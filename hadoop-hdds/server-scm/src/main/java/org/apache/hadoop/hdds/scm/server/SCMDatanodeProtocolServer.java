@@ -438,7 +438,6 @@ public class SCMDatanodeProtocolServer implements
           .setReconcileContainerCommandProto(
               ((ReconcileContainerCommand)cmd).getProto())
           .build();
-
     default:
       throw new IllegalArgumentException("Scm command " +
           cmd.getType().toString() + " is not implemented");

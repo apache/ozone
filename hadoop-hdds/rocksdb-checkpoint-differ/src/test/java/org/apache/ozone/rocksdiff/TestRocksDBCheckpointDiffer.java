@@ -44,6 +44,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -56,6 +57,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -90,22 +92,22 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileIterator;
+import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileReader;
+import org.apache.hadoop.hdds.utils.db.RDBSstFileWriter;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCheckpoint;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedFlushOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileIterator;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReaderIterator;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.compaction.log.CompactionFileInfo;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
@@ -1608,20 +1610,21 @@ public class TestRocksDBCheckpointDiffer {
     assertEquals(0L, sstFilePruningMetrics.getCompactionsProcessed());
     assertEquals(0L, sstFilePruningMetrics.getFilesRemovedTotal());
 
-    List<Pair<byte[], Integer>> keys = new ArrayList<Pair<byte[], Integer>>();
-    keys.add(Pair.of("key1".getBytes(UTF_8), Integer.valueOf(1)));
-    keys.add(Pair.of("key2".getBytes(UTF_8), Integer.valueOf(0)));
-    keys.add(Pair.of("key3".getBytes(UTF_8), Integer.valueOf(1)));
+    List<Pair<String, Integer>> keys = new ArrayList<Pair<String, Integer>>();
+    keys.add(Pair.of("key1", Integer.valueOf(1)));
+    keys.add(Pair.of("key2", Integer.valueOf(0)));
+    keys.add(Pair.of("key3", Integer.valueOf(1)));
 
     String inputFile78 = "000078";
     String inputFile73 = "000073";
     String outputFile81 = "000081";
     // Create src & destination files in backup & activedirectory.
     // Pruning job should succeed when pruned temp file is already present.
-    createSSTFileWithKeys(sstBackUpDir + "/" + inputFile78 + SST_FILE_EXTENSION, keys);
-    createSSTFileWithKeys(sstBackUpDir + "/" + inputFile73 + SST_FILE_EXTENSION, keys);
-    createSSTFileWithKeys(sstBackUpDir + PRUNED_SST_FILE_TEMP, keys);
-    createSSTFileWithKeys(activeDbDir + "/" + outputFile81 + SST_FILE_EXTENSION, keys);
+    Path sstBackupDirPath = sstBackUpDir.toPath();
+    createSSTFileWithKeys(sstBackupDirPath.resolve(inputFile78 + SST_FILE_EXTENSION).toFile(), keys);
+    createSSTFileWithKeys(sstBackupDirPath.resolve(inputFile73 + SST_FILE_EXTENSION).toFile(), keys);
+    createSSTFileWithKeys(sstBackupDirPath.resolve(PRUNED_SST_FILE_TEMP).toFile(), keys);
+    createSSTFileWithKeys(activeDbDir.toPath().resolve(outputFile81 + SST_FILE_EXTENSION).toFile(), keys);
 
     // Load compaction log
     CompactionLogEntry compactionLogEntry = new CompactionLogEntry(178, System.currentTimeMillis(),
@@ -1639,15 +1642,21 @@ public class TestRocksDBCheckpointDiffer {
     // Pruning should not fail a source SST file has been removed by another pruner.
     Files.delete(sstBackUpDir.toPath().resolve(inputFile73 + SST_FILE_EXTENSION));
     // Run the SST file pruner.
-    ManagedRawSSTFileIterator mockedRawSSTFileItr = mock(ManagedRawSSTFileIterator.class);
-    Iterator keyItr = keys.iterator();
-    when(mockedRawSSTFileItr.hasNext()).thenReturn(true, true, true, false);
-    when(mockedRawSSTFileItr.next()).thenReturn(keyItr.next(), keyItr.next(), keyItr.next());
-    try (MockedConstruction<ManagedRawSSTFileReader> mockedRawSSTReader = Mockito.mockConstruction(
-        ManagedRawSSTFileReader.class, (mock, context) -> {
-          when(mock.newIterator(any(), any(), any(), any())).thenReturn(mockedRawSSTFileItr);
-          doNothing().when(mock).close();
-        })) {
+
+    try (CodecBuffer keyCodecBuffer = CodecBuffer.allocateDirect(1024);
+        MockedConstruction<ManagedRawSSTFileReader> mockedRawSSTReader = Mockito.mockConstruction(
+            ManagedRawSSTFileReader.class, (mock, context) -> {
+              ManagedRawSSTFileIterator mockedRawSSTFileItr = mock(ManagedRawSSTFileIterator.class);
+              Iterator<Pair<CodecBuffer, Integer>> keyItr = keys.stream().map(i -> {
+                keyCodecBuffer.clear();
+                keyCodecBuffer.put(ByteBuffer.wrap(i.getKey().getBytes(UTF_8)));
+                return Pair.of(keyCodecBuffer, i.getValue());
+              }).iterator();
+              doAnswer(i -> keyItr.hasNext()).when(mockedRawSSTFileItr).hasNext();
+              doAnswer(i -> keyItr.next()).when(mockedRawSSTFileItr).next();
+              when(mock.newIterator(any(), any(), any(), any())).thenReturn(mockedRawSSTFileItr);
+              doNothing().when(mock).close();
+            })) {
       rocksDBCheckpointDiffer.pruneSstFileValues();
     }
     // pruned.sst.tmp should be deleted when pruning job exits successfully.
@@ -1692,22 +1701,18 @@ public class TestRocksDBCheckpointDiffer {
     assertEquals(1L, sstFilePruningMetrics.getFilesRemovedTotal());
   }
 
-  private void createSSTFileWithKeys(String filePath, List<Pair<byte[], Integer>> keys)
-      throws Exception {
-    try (ManagedSstFileWriter sstFileWriter = new ManagedSstFileWriter(new ManagedEnvOptions(), new ManagedOptions())) {
-      sstFileWriter.open(filePath);
-      Iterator<Pair<byte[], Integer>> itr = keys.iterator();
+  private void createSSTFileWithKeys(File file, List<Pair<String, Integer>> keys) throws RocksDatabaseException {
+    byte[] value = "dummyValue".getBytes(UTF_8);
+    try (RDBSstFileWriter sstFileWriter = new RDBSstFileWriter(file)) {
+      Iterator<Pair<String, Integer>> itr = keys.iterator();
       while (itr.hasNext()) {
-        Pair<byte[], Integer> entry = itr.next();
+        Pair<String, Integer> entry = itr.next();
         if (entry.getValue() == 0) {
-          sstFileWriter.delete(entry.getKey());
+          sstFileWriter.delete(entry.getKey().getBytes(UTF_8));
         } else {
-          sstFileWriter.put(entry.getKey(), "dummyValue".getBytes(UTF_8));
+          sstFileWriter.put(entry.getKey().getBytes(UTF_8), value);
         }
       }
-      sstFileWriter.finish();
-    } catch (RocksDBException ex) {
-      throw new RocksDatabaseException("Failed to get write " + filePath, ex);
     }
   }
 

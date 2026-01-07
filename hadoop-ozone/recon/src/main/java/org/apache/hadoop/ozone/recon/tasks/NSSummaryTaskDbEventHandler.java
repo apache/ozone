@@ -61,7 +61,7 @@ public class NSSummaryTaskDbEventHandler {
 
   private void updateNSSummariesToDB(Map<Long, NSSummary> nsSummaryMap, Collection<Long> objectIdsToBeDeleted)
       throws IOException {
-    try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
+    try (RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation()) {
       for (Map.Entry<Long, NSSummary> entry : nsSummaryMap.entrySet()) {
         try {
           reconNamespaceSummaryManager.batchStoreNSSummaries(rdbBatchOperation, entry.getKey(), entry.getValue());
@@ -160,19 +160,19 @@ public class NSSummaryTaskDbEventHandler {
 
     // Add child directory to parent
     parentNSSummary.addChildDir(objectId);
-    
+
     // If the directory already existed with content, update immediate parent's stats
     if (directoryAlreadyExists && (existingSizeOfFiles > 0 || existingNumOfFiles > 0)) {
       parentNSSummary.setNumOfFiles(parentNSSummary.getNumOfFiles() + existingNumOfFiles);
       parentNSSummary.setSizeOfFiles(parentNSSummary.getSizeOfFiles() + existingSizeOfFiles);
-      
+
       long parentReplSize = parentNSSummary.getReplicatedSizeOfFiles();
       if (parentReplSize < 0) {
         parentReplSize = 0;
       }
       parentNSSummary.setReplicatedSizeOfFiles(parentReplSize + existingReplicatedSizeOfFiles);
       nsSummaryMap.put(parentObjectId, parentNSSummary);
-      
+
       // Propagate to grandparents and beyond
       propagateSizeUpwards(parentObjectId, existingSizeOfFiles,
           existingReplicatedSizeOfFiles, existingNumOfFiles, nsSummaryMap);
@@ -245,7 +245,7 @@ public class NSSummaryTaskDbEventHandler {
 
     // Remove the deleted directory ID from parent's childDir set
     parentNsSummary.removeChildDir(deletedDirObjectId);
-    
+
     // If deleted directory exists with content, update immediate parent's stats
     if (deletedDirSummary != null) {
       long deletedSize = deletedDirSummary.getSizeOfFiles();
@@ -254,7 +254,7 @@ public class NSSummaryTaskDbEventHandler {
       if (deletedReplSize < 0) {
         deletedReplSize = 0;
       }
-      
+
       // Decrement immediate parent's totals
       parentNsSummary.setNumOfFiles(parentNsSummary.getNumOfFiles() - deletedNumFiles);
       parentNsSummary.setSizeOfFiles(parentNsSummary.getSizeOfFiles() - deletedSize);
@@ -263,7 +263,7 @@ public class NSSummaryTaskDbEventHandler {
         parentNsSummary.setReplicatedSizeOfFiles(parentReplSize - deletedReplSize);
       }
       nsSummaryMap.put(parentObjectId, parentNsSummary);
-      
+
       // Propagate to grandparents and beyond
       propagateSizeUpwards(parentObjectId, -deletedSize, -deletedReplSize, -deletedNumFiles, nsSummaryMap);
       

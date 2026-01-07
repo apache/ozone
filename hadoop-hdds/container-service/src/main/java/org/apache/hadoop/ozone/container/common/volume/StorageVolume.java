@@ -86,8 +86,8 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
   private long cTime;             // creation time of the file system state
   private int layoutVersion;      // layout version of the storage data
 
-  private final ConfigurationSource conf;
-  private final DatanodeConfiguration dnConf;
+  private ConfigurationSource conf;
+  private DatanodeConfiguration dnConf;
 
   private final StorageType storageType;
   private final String volumeRoot;
@@ -576,6 +576,12 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
 
   public ConfigurationSource getConf() {
     return conf;
+  }
+
+  @VisibleForTesting
+  public void setConf(ConfigurationSource newConf) {
+    this.conf = newConf;
+    this.dnConf = newConf.getObject(DatanodeConfiguration.class);
   }
 
   public DatanodeConfiguration getDatanodeConfig() {

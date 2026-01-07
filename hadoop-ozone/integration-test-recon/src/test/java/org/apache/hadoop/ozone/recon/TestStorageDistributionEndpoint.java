@@ -49,6 +49,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
@@ -74,6 +75,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.recon.api.DataNodeMetricsService;
 import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsServiceResponse;
+import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
 import org.apache.hadoop.ozone.recon.api.types.ScmPendingDeletion;
 import org.apache.hadoop.ozone.recon.api.types.StorageCapacityDistributionResponse;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
@@ -215,7 +217,21 @@ public class TestStorageDistributionEndpoint {
       assertEquals(0, storageResponse.getUsedSpaceBreakDown().getOpenKeyBytes());
       assertEquals(60, storageResponse.getUsedSpaceBreakDown().getCommittedKeyBytes());
       assertEquals(3, storageResponse.getDataNodeUsage().size());
-
+      List<DatanodeStorageReport> reports = storageResponse.getDataNodeUsage();
+      List<HddsProtos.DatanodeUsageInfoProto> scmReports =
+          scm.getClientProtocolServer().getDatanodeUsageInfo(true, 3, 1);
+      for (DatanodeStorageReport report : reports) {
+        for (HddsProtos.DatanodeUsageInfoProto scmReport : scmReports) {
+          if (scmReport.getNode().getUuid().equals(report.getDatanodeUuid())) {
+            assertEquals(report.getMinimumFreeSpace(), scmReport.getFreeSpaceToSpare());
+            assertEquals(report.getReserved(), scmReport.getReserved());
+            assertEquals(report.getCapacity(), scmReport.getCapacity());
+            assertEquals(report.getRemaining(), scmReport.getRemaining());
+            assertEquals(report.getUsed(), scmReport.getUsed());
+            assertEquals(report.getCommitted(), scmReport.getCommitted());
+          }
+        }
+      }
       return true;
     } catch (Exception e) {
       LOG.debug("Waiting for storage distribution assertions to pass", e);

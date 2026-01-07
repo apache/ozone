@@ -36,6 +36,7 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -68,6 +69,7 @@ public class TestBucketAcl {
         .setClient(client)
         .setHeaders(headers)
         .build();
+    bucketEndpoint.queryParamsForTest().set(QueryParams.ACL, ACL_MARKER);
   }
 
   @AfterEach
@@ -80,9 +82,7 @@ public class TestBucketAcl {
   @Test
   public void testGetAcl() throws Exception {
     when(parameterMap.containsKey(ACL_MARKER)).thenReturn(true);
-    Response response =
-        bucketEndpoint.get(BUCKET_NAME, null, null, null, 0, null,
-            null, null, null, ACL_MARKER, null, null, 0);
+    Response response = bucketEndpoint.get(BUCKET_NAME);
     assertEquals(HTTP_OK, response.getStatus());
     System.out.println(response.getEntity());
   }
@@ -93,7 +93,7 @@ public class TestBucketAcl {
         .thenReturn(S3Acl.ACLIdentityType.GROUP.getHeaderType() + "=root");
     when(parameterMap.containsKey(ACL_MARKER)).thenReturn(true);
     OS3Exception e = assertThrows(OS3Exception.class, () ->
-        bucketEndpoint.put(BUCKET_NAME, ACL_MARKER, null));
+        bucketEndpoint.put(BUCKET_NAME, null));
     assertEquals(e.getHttpCode(), HTTP_NOT_IMPLEMENTED);
   }
 
@@ -103,7 +103,7 @@ public class TestBucketAcl {
     when(headers.getHeaderString(S3Acl.GRANT_READ))
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
     Response response =
-        bucketEndpoint.put(BUCKET_NAME, ACL_MARKER, null);
+        bucketEndpoint.put(BUCKET_NAME, null);
     assertEquals(HTTP_OK, response.getStatus());
     S3BucketAcl getResponse = bucketEndpoint.getAcl(BUCKET_NAME);
     assertEquals(1, getResponse.getAclList().getGrantList().size());
@@ -117,7 +117,7 @@ public class TestBucketAcl {
     when(headers.getHeaderString(S3Acl.GRANT_WRITE))
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
     Response response =
-        bucketEndpoint.put(BUCKET_NAME, ACL_MARKER, null);
+        bucketEndpoint.put(BUCKET_NAME, null);
     assertEquals(HTTP_OK, response.getStatus());
     S3BucketAcl getResponse = bucketEndpoint.getAcl(BUCKET_NAME);
     assertEquals(1, getResponse.getAclList().getGrantList().size());
@@ -128,10 +128,10 @@ public class TestBucketAcl {
   @Test
   public void testReadACP() throws Exception {
     when(parameterMap.containsKey(ACL_MARKER)).thenReturn(true);
-    when(headers.getHeaderString(S3Acl.GRANT_READ_CAP))
+    when(headers.getHeaderString(S3Acl.GRANT_READ_ACP))
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
     Response response =
-        bucketEndpoint.put(BUCKET_NAME, ACL_MARKER, null);
+        bucketEndpoint.put(BUCKET_NAME, null);
     assertEquals(HTTP_OK, response.getStatus());
     S3BucketAcl getResponse =
         bucketEndpoint.getAcl(BUCKET_NAME);
@@ -143,10 +143,10 @@ public class TestBucketAcl {
   @Test
   public void testWriteACP() throws Exception {
     when(parameterMap.containsKey(ACL_MARKER)).thenReturn(true);
-    when(headers.getHeaderString(S3Acl.GRANT_WRITE_CAP))
+    when(headers.getHeaderString(S3Acl.GRANT_WRITE_ACP))
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
     Response response =
-        bucketEndpoint.put(BUCKET_NAME, ACL_MARKER, null);
+        bucketEndpoint.put(BUCKET_NAME, null);
     assertEquals(HTTP_OK, response.getStatus());
     S3BucketAcl getResponse = bucketEndpoint.getAcl(BUCKET_NAME);
     assertEquals(1, getResponse.getAclList().getGrantList().size());
@@ -160,7 +160,7 @@ public class TestBucketAcl {
     when(headers.getHeaderString(S3Acl.GRANT_FULL_CONTROL))
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
     Response response =
-        bucketEndpoint.put(BUCKET_NAME, ACL_MARKER, null);
+        bucketEndpoint.put(BUCKET_NAME, null);
     assertEquals(HTTP_OK, response.getStatus());
     S3BucketAcl getResponse = bucketEndpoint.getAcl(BUCKET_NAME);
     assertEquals(1, getResponse.getAclList().getGrantList().size());
@@ -175,14 +175,14 @@ public class TestBucketAcl {
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
     when(headers.getHeaderString(S3Acl.GRANT_WRITE))
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
-    when(headers.getHeaderString(S3Acl.GRANT_READ_CAP))
+    when(headers.getHeaderString(S3Acl.GRANT_READ_ACP))
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
-    when(headers.getHeaderString(S3Acl.GRANT_WRITE_CAP))
+    when(headers.getHeaderString(S3Acl.GRANT_WRITE_ACP))
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
     when(headers.getHeaderString(S3Acl.GRANT_FULL_CONTROL))
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
     Response response =
-        bucketEndpoint.put(BUCKET_NAME, ACL_MARKER, null);
+        bucketEndpoint.put(BUCKET_NAME, null);
     assertEquals(HTTP_OK, response.getStatus());
     S3BucketAcl getResponse = bucketEndpoint.getAcl(BUCKET_NAME);
     assertEquals(5, getResponse.getAclList().getGrantList().size());
@@ -195,7 +195,7 @@ public class TestBucketAcl {
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
     // Put READ
     Response response =
-        bucketEndpoint.put(BUCKET_NAME, ACL_MARKER, null);
+        bucketEndpoint.put(BUCKET_NAME, null);
     assertEquals(HTTP_OK, response.getStatus());
     S3BucketAcl getResponse = bucketEndpoint.getAcl(BUCKET_NAME);
     assertEquals(1, getResponse.getAclList().getGrantList().size());
@@ -212,7 +212,7 @@ public class TestBucketAcl {
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
     //Put WRITE
     response =
-        bucketEndpoint.put(BUCKET_NAME, ACL_MARKER, null);
+        bucketEndpoint.put(BUCKET_NAME, null);
     assertEquals(HTTP_OK, response.getStatus());
     getResponse = bucketEndpoint.getAcl(BUCKET_NAME);
     assertEquals(1, getResponse.getAclList().getGrantList().size());
@@ -230,7 +230,7 @@ public class TestBucketAcl {
         .getResourceAsStream("groupAccessControlList.xml");
     when(parameterMap.containsKey(ACL_MARKER)).thenReturn(true);
     assertThrows(OS3Exception.class, () -> bucketEndpoint.put(
-        BUCKET_NAME, ACL_MARKER, inputBody));
+        BUCKET_NAME, inputBody));
   }
 
   @Test
@@ -239,7 +239,7 @@ public class TestBucketAcl {
         .getResourceAsStream("userAccessControlList.xml");
     when(parameterMap.containsKey(ACL_MARKER)).thenReturn(true);
     Response response =
-        bucketEndpoint.put(BUCKET_NAME, ACL_MARKER, inputBody);
+        bucketEndpoint.put(BUCKET_NAME, inputBody);
     assertEquals(HTTP_OK, response.getStatus());
     S3BucketAcl getResponse = bucketEndpoint.getAcl(BUCKET_NAME);
     assertEquals(2, getResponse.getAclList().getGrantList().size());

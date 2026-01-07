@@ -47,7 +47,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 import javax.xml.bind.DatatypeConverter;
@@ -68,6 +67,7 @@ import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.s3.S3ClientFactory;
 import org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils;
 import org.apache.hadoop.ozone.s3.endpoint.S3Owner;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.NonHATests;
 import org.apache.ozone.test.OzoneTestBase;
@@ -647,6 +647,41 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     }
 
     @Test
+    public void testPresignedUrlPutSingleChunkWithWrongSha256() throws Exception {
+      final String keyName = getKeyName();
+
+      PutObjectRequest objectRequest = PutObjectRequest.builder().bucket(BUCKET_NAME).key(keyName).build();
+
+      PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
+          .signatureDuration(duration)
+          .putObjectRequest(objectRequest)
+          .build();
+
+      PresignedPutObjectRequest presignedRequest = presigner.presignPutObject(presignRequest);
+
+      Map<String, List<String>> headers = presignedRequest.signedHeaders();
+      List<String> sha256 = new ArrayList<>();
+      sha256.add("wrong-sha256-value");
+      headers.put(S3Consts.X_AMZ_CONTENT_SHA256, sha256);
+
+      // use http url connection
+      HttpURLConnection connection = null;
+      try {
+        connection = S3SDKTestUtils.openHttpURLConnection(presignedRequest.url(), "PUT",
+            headers, CONTENT.getBytes(StandardCharsets.UTF_8));
+        int responseCode = connection.getResponseCode();
+        assertEquals(400, responseCode, "PutObject presigned URL should return 400 because of wrong SHA256");
+      } finally {
+        if (connection != null) {
+          connection.disconnect();
+        }
+      }
+
+      // Verify the object was not uploaded
+      assertThrows(NoSuchKeyException.class, () -> s3Client.headObject(b -> b.bucket(BUCKET_NAME).key(keyName)));
+    }
+
+    @Test
     public void testPresignedUrlMultipartUpload(@TempDir Path tempDir) throws Exception {
       final String keyName = getKeyName();
       final Map<String, String> userMetadata = new HashMap<>();
@@ -1066,16 +1101,16 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     return getBucketName("");
   }
 
-  private String getBucketName(String suffix) {
-    return ("v2-" + getTestName() + "bucket" + suffix).toLowerCase(Locale.ROOT);
+  private String getBucketName(String ignored) {
+    return uniqueObjectName();
   }
 
   private String getKeyName() {
     return getKeyName("");
   }
 
-  private String getKeyName(String suffix) {
-    return (getTestName() +  "key" + suffix).toLowerCase(Locale.ROOT);
+  private String getKeyName(String ignored) {
+    return uniqueObjectName();
   }
 
   private String multipartUpload(String bucketName, String key, File file, int partSize,

@@ -1376,7 +1376,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   public DecommissionScmResponseProto decommissionScm(
       DecommissionScmRequestProto request) throws IOException {
     return impl.decommissionScm(
-        request.getScmId());
+            request.getScmId());
   }
 
   public GetMetricsResponseProto getMetrics(GetMetricsRequestProto request) throws IOException {
@@ -1387,4 +1387,5 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     impl.reconcileContainer(request.getContainerID());
     return ReconcileContainerResponseProto.getDefaultInstance();
   }
+
 }
