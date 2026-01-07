@@ -25,7 +25,6 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableSet;
-import com.google.common.primitives.UnsignedBytes;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Path;
@@ -44,7 +43,6 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteBatch;
 import org.apache.hadoop.hdds.utils.db.managed.TrackingUtilManagedWriteBatchForTesting;
 import org.apache.hadoop.hdds.utils.db.managed.TrackingUtilManagedWriteBatchForTesting.OpType;
 import org.apache.hadoop.hdds.utils.db.managed.TrackingUtilManagedWriteBatchForTesting.Operation;
-import org.apache.hadoop.ozone.util.ClosableIterator;
 import org.apache.ratis.util.function.CheckedConsumer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -148,7 +146,7 @@ public class TestRDBBatchOperation {
 
   private String getRandomString() {
     int length = ThreadLocalRandom.current().nextInt(1, 1024);
-    return RandomStringUtils.secure().next(length);
+    return RandomStringUtils.insecure().next(length);
   }
 
   private void performOpWithRandomKey(CheckedConsumer<String, IOException> op, Set<String> keySet,
@@ -171,11 +169,13 @@ public class TestRDBBatchOperation {
   public void testRDBBatchOperationWithRDB() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     String tableName = "test";
-    try (DBStore dbStore1 = getDBStore(conf, "WithBatch.db", tableName);
-         DBStore dbStore2 = getDBStore(conf, "WithoutBatch.db", tableName)) {
-      try (BatchOperation batchOperation = dbStore1.initBatchOperation()) {
-        Table<String, String> withBatchTable = dbStore1.getTable(tableName, StringCodec.get(), StringCodec.get());
-        Table<String, String> withoutBatchTable = dbStore2.getTable(tableName, StringCodec.get(), StringCodec.get());
+    try (DBStore dbStoreWithBatch = getDBStore(conf, "WithBatch.db", tableName);
+         DBStore dbStoreWithoutBatch = getDBStore(conf, "WithoutBatch.db", tableName)) {
+      try (BatchOperation batchOperation = dbStoreWithBatch.initBatchOperation()) {
+        Table<String, String> withBatchTable = dbStoreWithBatch.getTable(tableName,
+            StringCodec.get(), StringCodec.get());
+        Table<String, String> withoutBatchTable = dbStoreWithoutBatch.getTable(tableName,
+            StringCodec.get(), StringCodec.get());
         List<String> keyList = new ArrayList<>();
         Set<String> keySet = new HashSet<>();
         List<CheckedConsumer<String, IOException>> ops = Arrays.asList(
@@ -190,22 +190,24 @@ public class TestRDBBatchOperation {
             performOpWithRandomKey(op, keySet, keyList);
           }
         }
-        dbStore1.commitBatchOperation(batchOperation);
+        dbStoreWithBatch.commitBatchOperation(batchOperation);
       }
-      Table<byte[], ?> withBatchTable = dbStore1.getTable(tableName, ByteArrayCodec.get(), StringCodec.get());
-      Table<byte[], ?> withoutBatchTable = dbStore2.getTable(tableName, ByteArrayCodec.get(), StringCodec.get());
-      try (ClosableIterator<KeyValue<byte[], List<Object>>> itr = dbStore1.getMergeIterator(
-          UnsignedBytes.lexicographicalComparator(), null, (Table<byte[], Object>) withBatchTable,
-          (Table<byte[], Object>) withoutBatchTable)) {
-        while (itr.hasNext()) {
-          KeyValue<byte[], List<Object>> kv = itr.next();
-          String actualKey = StringCodec.get().fromPersistedFormat(kv.getKey());
-          assertEquals(2, kv.getValue().size(), "Expected 2 values for key " + actualKey);
-          assertEquals(kv.getValue().get(0), kv.getValue().get(1), "Expected same value for key " + actualKey);
+      Table<CodecBuffer, CodecBuffer> withBatchTable = dbStoreWithBatch.getTable(tableName,
+          CodecBufferCodec.get(true), CodecBufferCodec.get(true));
+      Table<CodecBuffer, CodecBuffer> withoutBatchTable = dbStoreWithoutBatch.getTable(tableName,
+          CodecBufferCodec.get(true), CodecBufferCodec.get(true));
+      try (Table.KeyValueIterator<CodecBuffer, CodecBuffer> itr1 = withBatchTable.iterator();
+           Table.KeyValueIterator<CodecBuffer, CodecBuffer> itr2 = withoutBatchTable.iterator();) {
+        while (itr1.hasNext() || itr2.hasNext()) {
+          assertEquals(itr1.hasNext(), itr2.hasNext(), "Expected same number of entries");
+          KeyValue<CodecBuffer, CodecBuffer> kv1 = itr1.next();
+          KeyValue<CodecBuffer, CodecBuffer> kv2 = itr2.next();
+          assertEquals(kv1.getKey().asReadOnlyByteBuffer(), kv2.getKey().asReadOnlyByteBuffer(),
+              "Expected same keys");
+          assertEquals(kv1.getValue().asReadOnlyByteBuffer(), kv2.getValue().asReadOnlyByteBuffer(),
+              "Expected same keys");
         }
       }
     }
-
   }
-
 }

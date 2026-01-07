@@ -326,19 +326,6 @@ public final class RDBBatchOperation implements BatchOperation {
         overwriteIfExists(new PutOp(key, value));
       }
 
-      void put(byte[] key, byte[] value) {
-        putCount++;
-        CodecBuffer keyBuffer = DIRECT_CODEC_BUFFER_CODEC.fromPersistedFormat(key);
-        CodecBuffer valueBuffer = DIRECT_CODEC_BUFFER_CODEC.fromPersistedFormat(value);
-        overwriteIfExists(new PutOp(keyBuffer, valueBuffer));
-      }
-
-      void delete(byte[] key) {
-        delCount++;
-        CodecBuffer keyBuffer = DIRECT_CODEC_BUFFER_CODEC.fromPersistedFormat(key);
-        overwriteIfExists(new DeleteOp(keyBuffer));
-      }
-
       void delete(CodecBuffer key) {
         delCount++;
         overwriteIfExists(new DeleteOp(key));
@@ -367,16 +354,6 @@ public final class RDBBatchOperation implements BatchOperation {
     void put(ColumnFamily f, CodecBuffer key, CodecBuffer value) {
       name2cache.computeIfAbsent(f.getName(), k -> new FamilyCache(f))
           .put(key, value);
-    }
-
-    void put(ColumnFamily f, byte[] key, byte[] value) {
-      name2cache.computeIfAbsent(f.getName(), k -> new FamilyCache(f))
-          .put(key, value);
-    }
-
-    void delete(ColumnFamily family, byte[] key) {
-      name2cache.computeIfAbsent(family.getName(), k -> new FamilyCache(family))
-          .delete(key);
     }
 
     void delete(ColumnFamily family, CodecBuffer key) {
@@ -456,7 +433,7 @@ public final class RDBBatchOperation implements BatchOperation {
   }
 
   public void delete(ColumnFamily family, byte[] key) {
-    opCache.delete(family, key);
+    opCache.delete(family, DIRECT_CODEC_BUFFER_CODEC.fromPersistedFormat(key));
   }
 
   public void delete(ColumnFamily family, CodecBuffer key) {
@@ -468,6 +445,7 @@ public final class RDBBatchOperation implements BatchOperation {
   }
 
   public void put(ColumnFamily family, byte[] key, byte[] value) {
-    opCache.put(family, key, value);
+    opCache.put(family, DIRECT_CODEC_BUFFER_CODEC.fromPersistedFormat(key),
+        DIRECT_CODEC_BUFFER_CODEC.fromPersistedFormat(value));
   }
 }
