@@ -245,6 +245,11 @@ public class SCMSafeModeManager implements SafeModeManager {
         .getCurrentContainerThreshold();
   }
 
+  /**
+   * Starts periodic logging of safe mode status.
+   * Logs are generated at the interval specified by
+   * {@link HddsConfigKeys#HDDS_SCM_SAFEMODE_LOG_INTERVAL}.
+   */
   private synchronized void startSafeModePeriodicLogger() {
     if (!getInSafeMode()) {
       return;
@@ -270,6 +275,11 @@ public class SCMSafeModeManager implements SafeModeManager {
     LOG.info("Started periodic Safe Mode logging with interval {} ms", safeModeLogIntervalMs);
   }
 
+  /**
+   * Logs the safe mode status.
+   * Includes state, preCheckComplete, validatedPreCheckRules count,
+   * validatedRules count, and individual rule statuses.
+   */
   private synchronized void logSafeModeStatus() {
     SafeModeStatus safeModeStatus = status.get();
     int validatedCount = validatedRules.size();
@@ -279,9 +289,9 @@ public class SCMSafeModeManager implements SafeModeManager {
     statusLog.append("\nSCM SafeMode Status | state=").append(safeModeStatus.name())
         .append(" preCheckComplete=").append(safeModeStatus.isPreCheckComplete())
         .append(" validatedPreCheckRules=").append(preCheckValidatedCount)
-        .append("/").append(preCheckRules.size())
+        .append('/').append(preCheckRules.size())
         .append(" validatedRules=").append(validatedCount)
-        .append("/").append(exitRules.size());
+        .append('/').append(exitRules.size());
     
     for (SafeModeExitRule<?> rule : exitRules.values()) {
       String name = rule.getRuleName();
@@ -299,6 +309,10 @@ public class SCMSafeModeManager implements SafeModeManager {
     }
   }
 
+  /**
+   * Stops the periodic safe mode logger.
+   * Called when safe mode exits.
+   */
   private synchronized void stopSafeModePeriodicLogger() {
     if (safeModeLogExecutor != null) {
       safeModeLogExecutor.shutdownNow();
