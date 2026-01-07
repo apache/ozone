@@ -19,8 +19,6 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD;
-import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
-import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
@@ -29,10 +27,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayInputStream;
 import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Map;
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -89,7 +89,12 @@ public class TestUploadWithStream {
 
   @Test
   public void testUpload() throws Exception {
-    assertSucceeds(() -> put(rest, S3BUCKET, S3KEY, S3_COPY_EXISTING_KEY_CONTENT));
+    byte[] keyContent = S3_COPY_EXISTING_KEY_CONTENT.getBytes(UTF_8);
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(keyContent);
+    Response response = rest.put(S3BUCKET, S3KEY, 0, 0, null, null, null, body);
+
+    assertEquals(200, response.getStatus());
   }
 
   @Test
@@ -121,7 +126,9 @@ public class TestUploadWithStream {
         .forEach((k, v) -> when(headers.getHeaderString(k)).thenReturn(v));
     rest.setHeaders(headers);
 
-    assertSucceeds(() -> put(rest, S3BUCKET, S3KEY, null));
+    Response response = rest.put(S3BUCKET, S3KEY, 0, 0, null, null, null, null);
+
+    assertEquals(200, response.getStatus());
 
     final long newDataSize = bucket.getKey(S3KEY).getDataSize();
     assertEquals(dataSize, newDataSize);

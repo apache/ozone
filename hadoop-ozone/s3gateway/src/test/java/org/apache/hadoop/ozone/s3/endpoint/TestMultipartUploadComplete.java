@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -44,7 +45,6 @@ import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.endpoint.CompleteMultipartUploadRequest.Part;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
-import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -104,7 +104,10 @@ public class TestMultipartUploadComplete {
 
   private Part uploadPart(String key, String uploadID, int partNumber, String
       content) throws IOException, OS3Exception {
-    Response response = put(rest, OzoneConsts.S3_BUCKET, key, partNumber, uploadID, content);
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(content.getBytes(UTF_8));
+    Response response = rest.put(OzoneConsts.S3_BUCKET, key, content.length(),
+        partNumber, uploadID, null, null, body);
     assertEquals(200, response.getStatus());
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
     Part part = new Part();
@@ -117,9 +120,8 @@ public class TestMultipartUploadComplete {
   private void completeMultipartUpload(String key,
       CompleteMultipartUploadRequest completeMultipartUploadRequest,
       String uploadID) throws IOException, OS3Exception {
-    rest.queryParamsForTest().set(S3Consts.QueryParams.UPLOAD_ID, uploadID);
     Response response = rest.completeMultipartUpload(OzoneConsts.S3_BUCKET, key,
-        completeMultipartUploadRequest);
+        uploadID, completeMultipartUploadRequest);
 
     assertEquals(200, response.getStatus());
 

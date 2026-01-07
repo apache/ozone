@@ -17,17 +17,19 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
-import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
-import static org.apache.hadoop.ozone.s3.endpoint.TestPartUpload.initiateUpload;
+import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayInputStream;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -35,7 +37,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
-import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -79,35 +81,65 @@ public class TestPartUploadWithStream {
 
   @Test
   public void testPartUpload() throws Exception {
-    String uploadID = initiateUpload(rest, S3BUCKET, S3KEY);
+
+    Response response = rest.initializeMultipartUpload(S3BUCKET, S3KEY);
+    MultipartUploadInitiateResponse multipartUploadInitiateResponse =
+        (MultipartUploadInitiateResponse) response.getEntity();
+    assertNotNull(multipartUploadInitiateResponse.getUploadID());
+    String uploadID = multipartUploadInitiateResponse.getUploadID();
+
+    assertEquals(200, response.getStatus());
 
     String content = "Multipart Upload";
-    Response response = put(rest, S3BUCKET, S3KEY, 1, uploadID, content);
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(content.getBytes(UTF_8));
+    response = rest.put(S3BUCKET, S3KEY,
+        content.length(), 1, uploadID, null, null, body);
 
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
+
   }
 
   @Test
   public void testPartUploadWithOverride() throws Exception {
-    String uploadID = initiateUpload(rest, S3BUCKET, S3KEY);
+
+    Response response = rest.initializeMultipartUpload(S3BUCKET, S3KEY);
+    MultipartUploadInitiateResponse multipartUploadInitiateResponse =
+        (MultipartUploadInitiateResponse) response.getEntity();
+    assertNotNull(multipartUploadInitiateResponse.getUploadID());
+    String uploadID = multipartUploadInitiateResponse.getUploadID();
+
+    assertEquals(200, response.getStatus());
 
     String content = "Multipart Upload";
-    Response response = put(rest, S3BUCKET, S3KEY, 1, uploadID, content);
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(content.getBytes(UTF_8));
+    response = rest.put(S3BUCKET, S3KEY,
+        content.length(), 1, uploadID, null, null, body);
+
+    assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
 
     String eTag = response.getHeaderString(OzoneConsts.ETAG);
-    assertNotNull(eTag);
 
     // Upload part again with same part Number, the ETag should be changed.
     content = "Multipart Upload Changed";
-    response = put(rest, S3BUCKET, S3KEY, 1, uploadID, content);
+    response = rest.put(S3BUCKET, S3KEY,
+        content.length(), 1, uploadID, null, null, body);
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
     assertNotEquals(eTag, response.getHeaderString(OzoneConsts.ETAG));
 
   }
 
   @Test
-  public void testPartUploadWithIncorrectUploadID() {
-    String content = "Multipart Upload With Incorrect uploadID";
-    assertErrorResponse(S3ErrorTable.NO_SUCH_UPLOAD, () -> put(rest, S3BUCKET, S3KEY, 1, "random", content));
+  public void testPartUploadWithIncorrectUploadID() throws Exception {
+    OS3Exception ex = assertThrows(OS3Exception.class, () -> {
+      String content = "Multipart Upload With Incorrect uploadID";
+      ByteArrayInputStream body =
+          new ByteArrayInputStream(content.getBytes(UTF_8));
+      rest.put(S3BUCKET, S3KEY, content.length(), 1,
+          "random", null, null, body);
+    });
+    assertEquals("NoSuchUpload", ex.getCode());
+    assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
   }
 }

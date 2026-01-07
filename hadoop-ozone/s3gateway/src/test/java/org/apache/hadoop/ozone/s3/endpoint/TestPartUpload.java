@@ -17,9 +17,8 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
-import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
-import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
+import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
@@ -27,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
@@ -36,6 +36,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -49,8 +50,6 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneMultipartUploadPartListParts;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
-import org.apache.http.HttpStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
@@ -84,27 +83,52 @@ public class TestPartUpload {
 
   @Test
   public void testPartUpload() throws Exception {
-    String uploadID = initiateUpload(OzoneConsts.KEY);
-    String content = "Multipart Upload";
 
-    Response response = put(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 1, uploadID, content);
+    Response response = rest.initializeMultipartUpload(OzoneConsts.S3_BUCKET,
+        OzoneConsts.KEY);
+    MultipartUploadInitiateResponse multipartUploadInitiateResponse =
+        (MultipartUploadInitiateResponse) response.getEntity();
+    assertNotNull(multipartUploadInitiateResponse.getUploadID());
+    String uploadID = multipartUploadInitiateResponse.getUploadID();
+
+    assertEquals(200, response.getStatus());
+
+    String content = "Multipart Upload";
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(content.getBytes(UTF_8));
+    response = rest.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
+        content.length(), 1, uploadID, null, null, body);
 
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
+
   }
 
   @Test
   public void testPartUploadWithOverride() throws Exception {
-    String uploadID = initiateUpload(OzoneConsts.KEY);
+
+    Response response = rest.initializeMultipartUpload(OzoneConsts.S3_BUCKET,
+        OzoneConsts.KEY);
+    MultipartUploadInitiateResponse multipartUploadInitiateResponse =
+        (MultipartUploadInitiateResponse) response.getEntity();
+    assertNotNull(multipartUploadInitiateResponse.getUploadID());
+    String uploadID = multipartUploadInitiateResponse.getUploadID();
+
+    assertEquals(200, response.getStatus());
 
     String content = "Multipart Upload";
-    Response response = put(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 1, uploadID, content);
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(content.getBytes(UTF_8));
+    response = rest.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
+        content.length(), 1, uploadID, null, null, body);
+
+    assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
 
     String eTag = response.getHeaderString(OzoneConsts.ETAG);
-    assertNotNull(eTag);
 
     // Upload part again with same part Number, the ETag should be changed.
     content = "Multipart Upload Changed";
-    response = put(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 1, uploadID, content);
+    response = rest.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
+        content.length(), 1, uploadID, null, null, body);
     assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
     assertNotEquals(eTag, response.getHeaderString(OzoneConsts.ETAG));
 
@@ -112,14 +136,20 @@ public class TestPartUpload {
 
   @Test
   public void testPartUploadWithIncorrectUploadID() throws Exception {
-    String content = "Multipart Upload With Incorrect uploadID";
-    assertErrorResponse(S3ErrorTable.NO_SUCH_UPLOAD,
-        () -> put(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 1, "random", content));
+    OS3Exception ex = assertThrows(OS3Exception.class, () -> {
+      String content = "Multipart Upload With Incorrect uploadID";
+      ByteArrayInputStream body =
+          new ByteArrayInputStream(content.getBytes(UTF_8));
+      rest.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY, content.length(), 1,
+          "random", null, null, body);
+    });
+    assertEquals("NoSuchUpload", ex.getCode());
+    assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
   }
 
   @Test
   public void testPartUploadStreamContentLength()
-      throws Exception {
+      throws IOException, OS3Exception {
     HttpHeaders headers = mock(HttpHeaders.class);
     when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
         .thenReturn("mockSignature");
@@ -138,24 +168,39 @@ public class TestPartUpload {
     when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER))
         .thenReturn("15");
 
-    String uploadID = initiateUpload(keyName);
+    Response response = objectEndpoint.initializeMultipartUpload(
+        OzoneConsts.S3_BUCKET, keyName);
+    MultipartUploadInitiateResponse multipartUploadInitiateResponse =
+        (MultipartUploadInitiateResponse) response.getEntity();
+    assertNotNull(multipartUploadInitiateResponse.getUploadID());
+    String uploadID = multipartUploadInitiateResponse.getUploadID();
+    long contentLength = chunkedContent.length();
 
-    assertSucceeds(() -> put(objectEndpoint, OzoneConsts.S3_BUCKET, keyName, 1, uploadID, chunkedContent));
+    objectEndpoint.put(OzoneConsts.S3_BUCKET, keyName, contentLength, 1,
+        uploadID, null, null, new ByteArrayInputStream(chunkedContent.getBytes(UTF_8)));
     assertContentLength(uploadID, keyName, 15);
   }
 
   @Test
-  public void testPartUploadContentLength() throws Exception {
+  public void testPartUploadContentLength() throws IOException, OS3Exception {
     // The contentLength specified when creating the Key should be the same as
     // the Content-Length, the key Commit will compare the Content-Length with
     // the actual length of the data written.
 
     String keyName = UUID.randomUUID().toString();
-    String uploadID = initiateUpload(keyName);
+    Response response = rest.initializeMultipartUpload(OzoneConsts.S3_BUCKET,
+        keyName);
+    MultipartUploadInitiateResponse multipartUploadInitiateResponse =
+        (MultipartUploadInitiateResponse) response.getEntity();
+    assertNotNull(multipartUploadInitiateResponse.getUploadID());
+    String uploadID = multipartUploadInitiateResponse.getUploadID();
     String content = "Multipart Upload";
+    long contentLength = content.length();
 
-    assertSucceeds(() -> put(rest, OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 1, uploadID, content));
-
+    ByteArrayInputStream body =
+        new ByteArrayInputStream(content.getBytes(UTF_8));
+    rest.put(OzoneConsts.S3_BUCKET, keyName,
+        contentLength, 1, uploadID, null, null, body);
     assertContentLength(uploadID, keyName, content.length());
   }
 
@@ -171,12 +216,21 @@ public class TestPartUpload {
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn(
         "STANDARD");
 
-    ObjectEndpoint objectEndpoint = spy(EndpointBuilder.newObjectEndpointBuilder()
+    ObjectEndpoint objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()
         .setHeaders(headers)
         .setClient(clientStub)
-        .build());
+        .build();
 
-    String uploadID = initiateUpload(OzoneConsts.KEY);
+    objectEndpoint = spy(objectEndpoint);
+
+    Response response = objectEndpoint.initializeMultipartUpload(OzoneConsts.S3_BUCKET,
+        OzoneConsts.KEY);
+    MultipartUploadInitiateResponse multipartUploadInitiateResponse =
+        (MultipartUploadInitiateResponse) response.getEntity();
+    assertNotNull(multipartUploadInitiateResponse.getUploadID());
+    String uploadID = multipartUploadInitiateResponse.getUploadID();
+
+    assertEquals(200, response.getStatus());
 
     MessageDigest messageDigest = mock(MessageDigest.class);
     try (MockedStatic<IOUtils> mocked = mockStatic(IOUtils.class)) {
@@ -187,8 +241,17 @@ public class TestPartUpload {
           .thenThrow(IOException.class);
 
       String content = "Multipart Upload";
-      assertThrows(IOException.class, () -> put(objectEndpoint, OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 1, uploadID, content));
-      verify(messageDigest, times(1)).reset();
+      ByteArrayInputStream body =
+          new ByteArrayInputStream(content.getBytes(UTF_8));
+      try {
+        objectEndpoint.put(OzoneConsts.S3_BUCKET, OzoneConsts.KEY,
+            content.length(), 1, uploadID, null, null, body);
+        fail("Should throw IOException");
+      } catch (IOException ignored) {
+        // Verify that the message digest is reset so that the instance can be reused for the
+        // next request in the same thread
+        verify(messageDigest, times(1)).reset();
+      }
     }
   }
 
@@ -200,19 +263,5 @@ public class TestPartUpload {
     assertEquals(1, parts.getPartInfoList().size());
     assertEquals(contentLength,
         parts.getPartInfoList().get(0).getSize());
-  }
-
-  private String initiateUpload(String key) throws IOException, OS3Exception {
-    return initiateUpload(rest, OzoneConsts.S3_BUCKET, key);
-  }
-
-  static String initiateUpload(ObjectEndpoint subject, String bucket, String key) throws IOException, OS3Exception {
-    try (Response response = subject.initializeMultipartUpload(bucket, key)) {
-      MultipartUploadInitiateResponse multipartUploadInitiateResponse =
-          (MultipartUploadInitiateResponse) response.getEntity();
-      assertNotNull(multipartUploadInitiateResponse.getUploadID());
-      assertEquals(HttpStatus.SC_OK, response.getStatus());
-      return multipartUploadInitiateResponse.getUploadID();
-    }
   }
 }

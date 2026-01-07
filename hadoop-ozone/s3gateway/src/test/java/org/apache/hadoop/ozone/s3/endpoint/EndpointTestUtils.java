@@ -25,7 +25,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.http.HttpStatus;
 import org.apache.ratis.util.function.CheckedSupplier;
 
@@ -60,17 +59,12 @@ public final class EndpointTestUtils {
       String uploadID,
       String content
   ) throws IOException, OS3Exception {
-    if (uploadID != null) {
-      subject.queryParamsForTest().set(S3Consts.QueryParams.UPLOAD_ID, uploadID);
-    }
-    subject.queryParamsForTest().setInt(S3Consts.QueryParams.PART_NUMBER, partNumber);
-
     if (content == null) {
-      return subject.put(bucket, key, 0, null);
+      return subject.put(bucket, key, 0, partNumber, uploadID, null, null, null);
     } else {
       final long length = content.length();
       try (ByteArrayInputStream body = new ByteArrayInputStream(content.getBytes(UTF_8))) {
-        return subject.put(bucket, key, length, body);
+        return subject.put(bucket, key, length, partNumber, uploadID, null, null, body);
       }
     }
   }

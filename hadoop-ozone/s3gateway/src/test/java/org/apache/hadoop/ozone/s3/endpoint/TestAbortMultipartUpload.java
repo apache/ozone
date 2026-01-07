@@ -30,7 +30,6 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
-import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -64,16 +63,15 @@ public class TestAbortMultipartUpload {
     assertNotNull(multipartUploadInitiateResponse.getUploadID());
     String uploadID = multipartUploadInitiateResponse.getUploadID();
 
+
     // Abort multipart upload
-    rest.queryParamsForTest().set(S3Consts.QueryParams.UPLOAD_ID, uploadID);
-    response = rest.delete(bucket, key);
+    response = rest.delete(bucket, key, uploadID, null);
 
     assertEquals(204, response.getStatus());
 
     // test with unknown upload Id.
     try {
-      rest.queryParamsForTest().set(S3Consts.QueryParams.UPLOAD_ID, "random");
-      rest.delete(bucket, key);
+      rest.delete(bucket, key, "random", null);
     } catch (OS3Exception ex) {
       assertEquals(S3ErrorTable.NO_SUCH_UPLOAD.getCode(), ex.getCode());
       assertEquals(S3ErrorTable.NO_SUCH_UPLOAD.getErrorMessage(),
