@@ -28,7 +28,9 @@ import java.util.List;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.http.HttpStatus;
+import org.apache.ratis.util.function.CheckedRunnable;
 import org.apache.ratis.util.function.CheckedSupplier;
 
 /** Utilities for unit-testing S3 endpoints. */
@@ -40,7 +42,7 @@ public final class EndpointTestUtils {
       String bucket,
       String key
   ) throws IOException, OS3Exception {
-    return subject.get(bucket, key, 0, null, 0, null, null);
+    return subject.get(bucket, key);
   }
 
   /** Get key tags. */
@@ -49,7 +51,8 @@ public final class EndpointTestUtils {
       String bucket,
       String key
   ) throws IOException, OS3Exception {
-    return subject.get(bucket, key, 0, null, 0, null, "");
+    subject.queryParamsForTest().set(S3Consts.QueryParams.TAGGING, "");
+    return subject.get(bucket, key);
   }
 
   /** List parts of MPU. */
@@ -61,7 +64,10 @@ public final class EndpointTestUtils {
       int maxParts,
       int nextPart
   ) throws IOException, OS3Exception {
-    return subject.get(bucket, key, 0, uploadID, maxParts, String.valueOf(nextPart), null);
+    subject.queryParamsForTest().set(S3Consts.QueryParams.UPLOAD_ID, uploadID);
+    subject.queryParamsForTest().setInt(S3Consts.QueryParams.MAX_PARTS, maxParts);
+    subject.queryParamsForTest().setInt(S3Consts.QueryParams.PART_NUMBER_MARKER, nextPart);
+    return subject.get(bucket, key);
   }
 
   /** Put without content. */
@@ -90,12 +96,13 @@ public final class EndpointTestUtils {
       String key,
       String content
   ) throws IOException, OS3Exception {
+    subject.queryParamsForTest().set(S3Consts.QueryParams.TAGGING, "");
     if (content == null) {
-      return subject.put(bucket, key, 0, 0, null, "", null, null);
+      return subject.put(bucket, key, 0, null);
     } else {
       final long length = content.length();
       try (ByteArrayInputStream body = new ByteArrayInputStream(content.getBytes(UTF_8))) {
-        return subject.put(bucket, key, length, 0, null, "", null, body);
+        return subject.put(bucket, key, length, body);
       }
     }
   }
@@ -109,12 +116,17 @@ public final class EndpointTestUtils {
       String uploadID,
       String content
   ) throws IOException, OS3Exception {
+    if (uploadID != null) {
+      subject.queryParamsForTest().set(S3Consts.QueryParams.UPLOAD_ID, uploadID);
+    }
+    subject.queryParamsForTest().setInt(S3Consts.QueryParams.PART_NUMBER, partNumber);
+
     if (content == null) {
-      return subject.put(bucket, key, 0, partNumber, uploadID, null, null, null);
+      return subject.put(bucket, key, 0, null);
     } else {
       final long length = content.length();
       try (ByteArrayInputStream body = new ByteArrayInputStream(content.getBytes(UTF_8))) {
-        return subject.put(bucket, key, length, partNumber, uploadID, null, null, body);
+        return subject.put(bucket, key, length, body);
       }
     }
   }
@@ -125,7 +137,7 @@ public final class EndpointTestUtils {
       String bucket,
       String key
   ) throws IOException, OS3Exception {
-    return subject.delete(bucket, key, null, null);
+    return subject.delete(bucket, key);
   }
 
   /** Delete key tags. */
@@ -134,7 +146,8 @@ public final class EndpointTestUtils {
       String bucket,
       String key
   ) throws IOException, OS3Exception {
-    return subject.delete(bucket, key, null, "");
+    subject.queryParamsForTest().set(S3Consts.QueryParams.TAGGING, "");
+    return subject.delete(bucket, key);
   }
 
   /** Initiate multipart upload.
@@ -185,7 +198,9 @@ public final class EndpointTestUtils {
     CompleteMultipartUploadRequest completeMultipartUploadRequest = new CompleteMultipartUploadRequest();
     completeMultipartUploadRequest.setPartList(parts);
 
-    try (Response response = subject.completeMultipartUpload(bucket, key, uploadID, completeMultipartUploadRequest)) {
+    subject.queryParamsForTest().set(S3Consts.QueryParams.UPLOAD_ID, uploadID);
+
+    try (Response response = subject.completeMultipartUpload(bucket, key, completeMultipartUploadRequest)) {
       assertEquals(HttpStatus.SC_OK, response.getStatus());
 
       CompleteMultipartUploadResponse completeMultipartUploadResponse =
@@ -205,7 +220,8 @@ public final class EndpointTestUtils {
       String key,
       String uploadID
   ) throws IOException, OS3Exception {
-    return subject.delete(bucket, key, uploadID, null);
+    subject.queryParamsForTest().set(S3Consts.QueryParams.UPLOAD_ID, uploadID);
+    return subject.delete(bucket, key);
   }
 
   /** Verify response is success for {@code request}. */
@@ -220,7 +236,15 @@ public final class EndpointTestUtils {
     }
   }
 
-  /** Verify error response for {@code request} matching {@code expected} {@link OS3Exception}. */
+  /** Verify error response for {@code request} matches {@code expected} {@link OS3Exception}. */
+  public static OS3Exception assertErrorResponse(OS3Exception expected, CheckedRunnable<?> request) {
+    OS3Exception actual = assertThrows(OS3Exception.class, request::run);
+    assertEquals(expected.getCode(), actual.getCode());
+    assertEquals(expected.getHttpCode(), actual.getHttpCode());
+    return actual;
+  }
+
+  /** Verify error response for {@code request} matches {@code expected} {@link OS3Exception}. */
   public static OS3Exception assertErrorResponse(OS3Exception expected, CheckedSupplier<Response, ?> request) {
     OS3Exception actual = assertThrows(OS3Exception.class, () -> request.get().close());
     assertEquals(expected.getCode(), actual.getCode());
