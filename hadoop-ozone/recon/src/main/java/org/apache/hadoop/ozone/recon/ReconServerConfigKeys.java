@@ -123,14 +123,14 @@ public final class  ReconServerConfigKeys {
 
   public static final String
       OZONE_RECON_METRICS_HTTP_CONNECTION_TIMEOUT_DEFAULT =
-      "10s";
+      "30s";
 
   public static final String
       OZONE_RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT =
       "ozone.recon.metrics.http.connection.request.timeout";
 
   public static final String
-      OZONE_RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT_DEFAULT = "10s";
+      OZONE_RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT_DEFAULT = "60s";
 
   public static final String OZONE_RECON_SCM_CONTAINER_THRESHOLD =
       "ozone.recon.scm.container.threshold";
@@ -212,6 +212,14 @@ public final class  ReconServerConfigKeys {
 
   public static final int
       OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_DEFAULT = 3;
+
+  public static final String OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY =
+      "ozone.recon.dn.metrics.collection.minimum.api.delay";
+  public static final String OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY_DEFAULT = "30s";
+
+  public static final String OZONE_RECON_DN_METRICS_COLLECTION_TIMEOUT =
+      "ozone.recon.dn.metrics.collection.timeout";
+  public static final String OZONE_RECON_DN_METRICS_COLLECTION_TIMEOUT_DEFAULT = "10m";
 
   /**
    * Private constructor for utility class.

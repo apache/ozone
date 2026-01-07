@@ -60,6 +60,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
@@ -83,6 +84,7 @@ import org.apache.hadoop.hdds.utils.db.InMemoryTestTable;
 import org.apache.hadoop.hdds.utils.db.RDBSstFileWriter;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
+import org.apache.hadoop.hdds.utils.db.SstFileSetReader;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.StringInMemoryTestTable;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -107,7 +109,6 @@ import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.util.ClosableIterator;
 import org.apache.ozone.rocksdb.util.SstFileInfo;
-import org.apache.ozone.rocksdb.util.SstFileSetReader;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -240,11 +241,11 @@ public class TestSnapshotDefragService {
     WritableOmSnapshotLocalDataProvider provider = mock(WritableOmSnapshotLocalDataProvider.class);
     OmSnapshotLocalData localData = mock(OmSnapshotLocalData.class);
     OmSnapshotLocalData previousLocalData = mock(OmSnapshotLocalData.class);
-
+    Optional<OmSnapshotLocalData> optionalPreviousLocalData = Optional.of(previousLocalData);
     when(snapshotLocalDataManager.getWritableOmSnapshotLocalData(snapshotInfo)).thenReturn(provider);
     when(provider.needsDefrag()).thenReturn(false);
     when(provider.getSnapshotLocalData()).thenReturn(localData);
-    when(provider.getPreviousSnapshotLocalData()).thenReturn(previousLocalData);
+    when(provider.getPreviousSnapshotLocalData()).thenReturn(optionalPreviousLocalData);
     when(localData.getVersion()).thenReturn(1);
     when(previousLocalData.getVersion()).thenReturn(0);
 

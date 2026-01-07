@@ -43,6 +43,19 @@ public final class AclListBuilder {
     return new AclListBuilder(list);
   }
 
+  /**
+   * Overload accepting List instead of ImmutableList for binary compatibility
+   * across different Guava versions (especially for Hadoop 2.x compatibility).
+   * This method can be removed when Hadoop 2.x support is dropped and all
+   * callers are guaranteed to use the same Guava version.
+   */
+  public static AclListBuilder of(List<OzoneAcl> list) {
+    if (list instanceof ImmutableList) {
+      return new AclListBuilder((ImmutableList<OzoneAcl>) list);
+    }
+    return copyOf(list);
+  }
+
   public static AclListBuilder copyOf(List<OzoneAcl> list) {
     return new AclListBuilder(list == null ? ImmutableList.of() : ImmutableList.copyOf(list));
   }
@@ -59,36 +72,49 @@ public final class AclListBuilder {
     return changed ? ImmutableList.copyOf(updatedList) : originalList;
   }
 
-  public void add(@Nonnull OzoneAcl acl) {
+  public boolean add(@Nonnull OzoneAcl acl) {
     Objects.requireNonNull(acl, "acl == null");
     ensureInitialized();
-    changed |= OzoneAclUtil.addAcl(updatedList, acl);
+    boolean added = OzoneAclUtil.addAcl(updatedList, acl);
+    changed |= added;
+    return added;
   }
 
-  public void addAll(@Nullable List<OzoneAcl> newAcls) {
+  public boolean addAll(@Nullable List<OzoneAcl> newAcls) {
     if (newAcls == null || newAcls.isEmpty()) {
-      return;
+      return false;
     }
     ensureInitialized();
-    changed |= OzoneAclUtil.addAllAcl(updatedList, newAcls);
+    boolean added = OzoneAclUtil.addAllAcl(updatedList, newAcls);
+    changed |= added;
+    return added;
   }
 
   /** Set the list being built to {@code acls}.  For further mutations to work, it must be modifiable. */
-  public void set(@Nonnull List<OzoneAcl> acls) {
+  public boolean set(@Nonnull List<OzoneAcl> acls) {
     Objects.requireNonNull(acls, "acls == null");
-    changed |= !acls.equals(updatedList != null ? updatedList : originalList);
+    boolean set = !acls.equals(updatedList != null ? updatedList : originalList);
+    changed |= set;
     updatedList = acls;
+    return set;
   }
 
-  public void remove(@Nonnull OzoneAcl acl) {
+  public boolean remove(@Nonnull OzoneAcl acl) {
     Objects.requireNonNull(acl, "acl == null");
     ensureInitialized();
-    changed |= OzoneAclUtil.removeAcl(updatedList, acl);
+    boolean removed = OzoneAclUtil.removeAcl(updatedList, acl);
+    changed |= removed;
+    return removed;
   }
 
   private void ensureInitialized() {
     if (updatedList == null) {
       updatedList = new ArrayList<>(originalList);
     }
+  }
+
+  @Override
+  public String toString() {
+    return build().toString();
   }
 }

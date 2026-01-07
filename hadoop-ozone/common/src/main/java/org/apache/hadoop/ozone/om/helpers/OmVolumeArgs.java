@@ -308,12 +308,6 @@ public final class OmVolumeArgs extends WithObjectID
     }
 
     @Override
-    public Builder addMetadata(String key, String value) {
-      super.addMetadata(key, value);
-      return this;
-    }
-
-    @Override
     public Builder addAllMetadata(Map<String, String> additionalMetaData) {
       super.addAllMetadata(additionalMetaData);
       return this;

@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.List;
 import java.util.Map;
-import java.util.function.BiConsumer;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -33,8 +32,8 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
-import org.apache.hadoop.ozone.om.helpers.AclListBuilder;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.request.util.AclOp;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -85,8 +84,7 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
       OmVolumeArgs.Builder builder = omVolumeArgs.toBuilder();
 
       // result is false upon add existing acl or remove non-existing acl
-      omVolumeAclOp.accept(ozoneAcls, builder.acls());
-      boolean applyAcl = builder.acls().isChanged();
+      boolean applyAcl = omVolumeAclOp.test(ozoneAcls, builder.acls());
 
       // Update only when
       if (applyAcl) {
@@ -186,11 +184,4 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
   abstract void onComplete(Result result, Exception ex, long trxnLogIndex,
       AuditLogger auditLogger, Map<String, String> auditMap);
 
-  /**
-   * Volume ACL operation.
-   */
-  public interface AclOp extends
-      BiConsumer<List<OzoneAcl>, AclListBuilder> {
-    // just a shortcut to avoid having to repeat long list of generic parameters
-  }
 }

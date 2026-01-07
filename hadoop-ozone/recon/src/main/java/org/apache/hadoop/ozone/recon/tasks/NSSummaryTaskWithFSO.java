@@ -210,21 +210,21 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
 
     switch (action) {
     case PUT:
-      handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+      handlePutKeyEvent(updatedKeyInfo, nsSummaryMap, updatedKeyInfo.getParentObjectID());
       break;
 
     case DELETE:
-      handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap);
+      handleDeleteKeyEvent(updatedKeyInfo, nsSummaryMap, updatedKeyInfo.getParentObjectID());
       break;
 
     case UPDATE:
       if (oldKeyInfo != null) {
         // delete first, then put
-        handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap);
+        handleDeleteKeyEvent(oldKeyInfo, nsSummaryMap, oldKeyInfo.getParentObjectID());
       } else {
         LOG.warn("Update event does not have the old keyInfo for {}.", omdbUpdateEvent.getKey());
       }
-      handlePutKeyEvent(updatedKeyInfo, nsSummaryMap);
+      handlePutKeyEvent(updatedKeyInfo, nsSummaryMap, updatedKeyInfo.getParentObjectID());
       break;
 
     default:
@@ -273,7 +273,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
 
     // Per-worker maps for lockless updates
     Map<Long, Map<Long, NSSummary>> allWorkerMaps = new ConcurrentHashMap<>();
-    
+
     // Divide threshold by worker count
     final long perWorkerThreshold = Math.max(1, nsSummaryFlushToDBMaxThreshold / maxWorkers);
 
@@ -285,7 +285,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       try {
         // Check if async flusher has failed - stop immediately if so
         asyncFlusher.checkForFailures();
-        
+
         // Update immediate parent only, NO DB reads during reprocess
         handlePutDirEventReprocess(kv.getValue(), workerMap);
 
@@ -300,11 +300,11 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       }
       return null;
     };
-    
+
     LOG.debug("Starting dirTable parallel iteration");
     long dirStartTime = System.currentTimeMillis();
-    
-    try (ParallelTableIteratorOperation<String, OmDirectoryInfo> parallelIter = 
+
+    try (ParallelTableIteratorOperation<String, OmDirectoryInfo> parallelIter =
         new ParallelTableIteratorOperation<>(omMetadataManager, dirTable, StringCodec.get(),
             maxIterators, maxWorkers, maxKeysInMemory, nsSummaryFlushToDBMaxThreshold)) {
       parallelIter.performTaskOnTableVals("NSSummaryTaskWithFSO-dirTable", null, null, kvOperation);
@@ -312,7 +312,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       LOG.error("Unable to process dirTable in parallel", ex);
       return false;
     }
-    
+
     long dirEndTime = System.currentTimeMillis();
     LOG.debug("Completed dirTable parallel iteration in {} ms", (dirEndTime - dirStartTime));
 
@@ -355,7 +355,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       try {
         // Check if async flusher has failed - stop immediately if so
         asyncFlusher.checkForFailures();
-        
+
         // Update immediate parent only, NO DB reads during reprocess
         handlePutKeyEventReprocess(kv.getValue(), workerMap);
 
@@ -373,7 +373,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
 
     LOG.debug("Starting fileTable parallel iteration");
     long fileStartTime = System.currentTimeMillis();
-    
+
     try (ParallelTableIteratorOperation<String, OmKeyInfo> parallelIter =
              new ParallelTableIteratorOperation<>(omMetadataManager, fileTable, StringCodec.get(),
                  maxIterators, maxWorkers, maxKeysInMemory, nsSummaryFlushToDBMaxThreshold)) {
@@ -382,7 +382,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       LOG.error("Unable to process fileTable in parallel", ex);
       return false;
     }
-    
+
     long fileEndTime = System.currentTimeMillis();
     LOG.debug("Completed fileTable parallel iteration in {} ms", (fileEndTime - fileStartTime));
 
