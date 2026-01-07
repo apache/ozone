@@ -506,7 +506,7 @@ class TestObjectPut {
 
   private HttpHeaders newMockHttpHeaders() {
     HttpHeaders httpHeaders = mock(HttpHeaders.class);
-    when(httpHeaders.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
+    when(httpHeaders.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("UNSIGNED-PAYLOAD");
     return httpHeaders;
   }
 
