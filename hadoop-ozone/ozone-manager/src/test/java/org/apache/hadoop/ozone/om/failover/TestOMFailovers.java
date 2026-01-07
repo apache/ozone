@@ -125,7 +125,6 @@ public class TestOMFailovers {
     protected void loadOMClientConfigs(ConfigurationSource config,
         String omSvcId) {
       HashMap<String, OMProxyInfo<OzoneManagerProtocolPB>> omProxyInfos = new HashMap<>();
-      HashMap<String, InetSocketAddress> omNodeAddressMap = new HashMap<>();
       ArrayList<String> omNodeIDList = new ArrayList<>();
 
       for (int i = 1; i <= 3; i++) {
