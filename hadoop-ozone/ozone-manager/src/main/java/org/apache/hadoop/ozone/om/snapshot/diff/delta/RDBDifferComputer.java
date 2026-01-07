@@ -74,7 +74,8 @@ class RDBDifferComputer extends FileLinkDeltaFileComputer {
       try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider snapProvider =
                getLocalDataProvider(toSnapshot.getSnapshotId(), fromSnapshot.getSnapshotId())) {
         final DifferSnapshotInfo fromDSI = toDifferSnapshotInfo(getActiveMetadataManager(), fromSnapshot,
-            snapProvider.getPreviousSnapshotLocalData());
+            snapProvider.getPreviousSnapshotLocalData().orElseThrow(() -> new IOException("Missing previous snapshot " +
+                "local data " + fromSnapshot.getSnapshotId())));
         final DifferSnapshotInfo toDSI = toDifferSnapshotInfo(getActiveMetadataManager(), toSnapshot,
             snapProvider.getSnapshotLocalData());
         final Map<Integer, Integer> versionMap = snapProvider.getSnapshotLocalData().getVersionSstFileInfos().entrySet()

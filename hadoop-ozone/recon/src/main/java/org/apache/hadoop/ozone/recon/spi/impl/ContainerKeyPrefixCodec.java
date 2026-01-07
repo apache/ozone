@@ -19,9 +19,9 @@ package org.apache.hadoop.ozone.recon.spi.impl;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-import com.google.common.base.Preconditions;
 import com.google.common.primitives.Longs;
 import java.nio.ByteBuffer;
+import java.util.Objects;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.db.Codec;
@@ -53,7 +53,7 @@ public final class ContainerKeyPrefixCodec
 
   @Override
   public byte[] toPersistedFormat(ContainerKeyPrefix containerKeyPrefix) {
-    Preconditions.checkNotNull(containerKeyPrefix,
+    Objects.requireNonNull(containerKeyPrefix,
             "Null object can't be converted to byte array.");
     byte[] containerIdBytes = Longs.toByteArray(containerKeyPrefix
         .getContainerId());

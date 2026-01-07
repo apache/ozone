@@ -24,7 +24,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.CopyOnWriteArrayList;
+import net.jcip.annotations.Immutable;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
@@ -38,9 +38,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeI
 /**
  * A class that encapsulates the OmVolumeArgs Args.
  */
-// not yet @Immutable, needs HDDS-13941
+@Immutable
 public final class OmVolumeArgs extends WithObjectID
-    implements CopyObject<OmVolumeArgs>, Auditable {
+    implements CopyObject<OmVolumeArgs> {
   private static final Codec<OmVolumeArgs> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(VolumeInfo.getDefaultInstance()),
       OmVolumeArgs::getFromProtobuf,
@@ -55,7 +55,7 @@ public final class OmVolumeArgs extends WithObjectID
   private final long quotaInBytes;
   private final long quotaInNamespace;
   private final long usedNamespace;
-  private final CopyOnWriteArrayList<OzoneAcl> acls;
+  private final ImmutableList<OzoneAcl> acls;
   /**
    * Reference count on this Ozone volume.
    *
@@ -78,7 +78,7 @@ public final class OmVolumeArgs extends WithObjectID
     this.quotaInBytes = b.quotaInBytes;
     this.quotaInNamespace = b.quotaInNamespace;
     this.usedNamespace = b.usedNamespace;
-    this.acls = new CopyOnWriteArrayList<>(b.acls);
+    this.acls = b.acls.build();
     this.creationTime = b.creationTime;
     this.modificationTime = b.modificationTime;
     this.refCount = b.refCount;
@@ -91,18 +91,6 @@ public final class OmVolumeArgs extends WithObjectID
   public long getRefCount() {
     Preconditions.checkState(refCount >= 0L, "refCount should not be negative");
     return refCount;
-  }
-
-  public boolean addAcl(OzoneAcl ozoneAcl) {
-    return OzoneAclUtil.addAcl(acls, ozoneAcl);
-  }
-
-  public boolean setAcls(List<OzoneAcl> ozoneAcls) {
-    return OzoneAclUtil.setAcl(acls, ozoneAcls);
-  }
-
-  public boolean removeAcl(OzoneAcl ozoneAcl) {
-    return OzoneAclUtil.removeAcl(acls, ozoneAcl);
   }
 
   /**
@@ -197,25 +185,6 @@ public final class OmVolumeArgs extends WithObjectID
   }
 
   @Override
-  public Map<String, String> toAuditMap() {
-    Map<String, String> auditMap = new LinkedHashMap<>();
-    auditMap.put(OzoneConsts.ADMIN, this.adminName);
-    auditMap.put(OzoneConsts.OWNER, this.ownerName);
-    auditMap.put(OzoneConsts.VOLUME, this.volume);
-    auditMap.put(OzoneConsts.CREATION_TIME, String.valueOf(this.creationTime));
-    auditMap.put(OzoneConsts.MODIFICATION_TIME,
-        String.valueOf(this.modificationTime));
-    auditMap.put(OzoneConsts.QUOTA_IN_BYTES, String.valueOf(this.quotaInBytes));
-    auditMap.put(OzoneConsts.QUOTA_IN_NAMESPACE,
-        String.valueOf(this.quotaInNamespace));
-    auditMap.put(OzoneConsts.USED_NAMESPACE,
-        String.valueOf(this.usedNamespace));
-    auditMap.put(OzoneConsts.OBJECT_ID, String.valueOf(this.getObjectID()));
-    auditMap.put(OzoneConsts.UPDATE_ID, String.valueOf(this.getUpdateID()));
-    return auditMap;
-  }
-
-  @Override
   public boolean equals(Object o) {
     if (this == o) {
       return true;
@@ -235,7 +204,7 @@ public final class OmVolumeArgs extends WithObjectID
   /**
    * Builder for OmVolumeArgs.
    */
-  public static class Builder extends WithObjectID.Builder<OmVolumeArgs> {
+  public static class Builder extends WithObjectID.Builder<OmVolumeArgs> implements Auditable {
     private String adminName;
     private String ownerName;
     private String volume;
@@ -244,7 +213,7 @@ public final class OmVolumeArgs extends WithObjectID
     private long quotaInBytes;
     private long quotaInNamespace;
     private long usedNamespace;
-    private final List<OzoneAcl> acls;
+    private final AclListBuilder acls;
     private long refCount;
 
     @Override
@@ -263,10 +232,14 @@ public final class OmVolumeArgs extends WithObjectID
      * Constructs a builder.
      */
     public Builder() {
-      this(new ArrayList<>());
+      this(AclListBuilder.empty());
     }
 
     private Builder(List<OzoneAcl> acls) {
+      this(AclListBuilder.copyOf(acls));
+    }
+
+    private Builder(AclListBuilder acls) {
       this.acls = acls;
       quotaInBytes = OzoneConsts.QUOTA_RESET;
       quotaInNamespace = OzoneConsts.QUOTA_RESET;
@@ -274,7 +247,7 @@ public final class OmVolumeArgs extends WithObjectID
 
     private Builder(OmVolumeArgs omVolumeArgs) {
       super(omVolumeArgs);
-      this.acls = omVolumeArgs.acls;
+      this.acls = AclListBuilder.of(omVolumeArgs.acls);
       this.adminName = omVolumeArgs.adminName;
       this.ownerName = omVolumeArgs.ownerName;
       this.volume = omVolumeArgs.volume;
@@ -335,19 +308,27 @@ public final class OmVolumeArgs extends WithObjectID
     }
 
     @Override
-    public Builder addMetadata(String key, String value) {
-      super.addMetadata(key, value);
-      return this;
-    }
-
-    @Override
     public Builder addAllMetadata(Map<String, String> additionalMetaData) {
       super.addAllMetadata(additionalMetaData);
       return this;
     }
 
-    public Builder addOzoneAcls(OzoneAcl acl) {
-      OzoneAclUtil.addAcl(acls, acl);
+    public AclListBuilder acls() {
+      return acls;
+    }
+
+    public Builder addAcl(OzoneAcl acl) {
+      acls.add(acl);
+      return this;
+    }
+
+    public Builder setAcls(List<OzoneAcl> newList) {
+      acls.set(newList);
+      return this;
+    }
+
+    public Builder removeAcl(OzoneAcl acl) {
+      acls.remove(acl);
       return this;
     }
 
@@ -384,6 +365,25 @@ public final class OmVolumeArgs extends WithObjectID
     @Override
     protected OmVolumeArgs buildObject() {
       return new OmVolumeArgs(this);
+    }
+
+    @Override
+    public Map<String, String> toAuditMap() {
+      Map<String, String> auditMap = new LinkedHashMap<>();
+      auditMap.put(OzoneConsts.ADMIN, this.adminName);
+      auditMap.put(OzoneConsts.OWNER, this.ownerName);
+      auditMap.put(OzoneConsts.VOLUME, this.volume);
+      auditMap.put(OzoneConsts.CREATION_TIME, String.valueOf(this.creationTime));
+      auditMap.put(OzoneConsts.MODIFICATION_TIME,
+          String.valueOf(this.modificationTime));
+      auditMap.put(OzoneConsts.QUOTA_IN_BYTES, String.valueOf(this.quotaInBytes));
+      auditMap.put(OzoneConsts.QUOTA_IN_NAMESPACE,
+          String.valueOf(this.quotaInNamespace));
+      auditMap.put(OzoneConsts.USED_NAMESPACE,
+          String.valueOf(this.usedNamespace));
+      auditMap.put(OzoneConsts.OBJECT_ID, String.valueOf(this.getObjectID()));
+      auditMap.put(OzoneConsts.UPDATE_ID, String.valueOf(this.getUpdateID()));
+      return auditMap;
     }
   }
 
@@ -442,6 +442,6 @@ public final class OmVolumeArgs extends WithObjectID
 
   @Override
   public OmVolumeArgs copyObject() {
-    return toBuilder().build();
+    return this;
   }
 }

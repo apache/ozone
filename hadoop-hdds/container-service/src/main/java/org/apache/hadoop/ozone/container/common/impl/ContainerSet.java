@@ -236,6 +236,29 @@ public class ContainerSet implements Iterable<Container<?>> {
   }
 
   /**
+   * Update Container to container map.
+   * @param container container to be added
+   * @return If container is added to containerMap returns true, otherwise
+   * false
+   */
+  public Container updateContainer(Container<?> container) throws
+      StorageContainerException {
+    Objects.requireNonNull(container, "container cannot be null");
+
+    long containerId = container.getContainerData().getContainerID();
+    if (!containerMap.containsKey(containerId)) {
+      LOG.error("Container doesn't exists with container Id {}", containerId);
+      throw new StorageContainerException("Container doesn't exist with " +
+          "container Id " + containerId,
+          ContainerProtos.Result.CONTAINER_NOT_FOUND);
+    } else {
+      LOG.debug("Container with container Id {} is updated to containerMap",
+          containerId);
+      return containerMap.put(containerId, container);
+    }
+  }
+
+  /**
    * Returns the Container with specified containerId.
    * @param containerId ID of the container to get
    * @return Container

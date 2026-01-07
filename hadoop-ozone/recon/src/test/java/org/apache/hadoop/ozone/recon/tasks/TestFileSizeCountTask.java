@@ -134,6 +134,7 @@ public class TestFileSizeCountTask {
     // Note: Even though legacy and OBS share the same underlying table, we simulate OBS here.
     when(omMetadataManager.getKeyTable(eq(BucketLayout.OBJECT_STORE)))
         .thenReturn(keyTableOBS);
+    when(keyTableOBS.getName()).thenReturn("keyTable");  // Mock table name for parallelization
     TypedTable.TypedTableIterator mockIterOBS = mock(TypedTable.TypedTableIterator.class);
     when(keyTableOBS.iterator()).thenReturn(mockIterOBS);
     // Simulate three keys then end.
@@ -146,6 +147,7 @@ public class TestFileSizeCountTask {
     TypedTable<String, OmKeyInfo> keyTableFSO = mock(TypedTable.class);
     when(omMetadataManager.getKeyTable(eq(BucketLayout.FILE_SYSTEM_OPTIMIZED)))
         .thenReturn(keyTableFSO);
+    when(keyTableFSO.getName()).thenReturn("fileTable");  // Mock table name for parallelization
     TypedTable.TypedTableIterator mockIterFSO = mock(TypedTable.TypedTableIterator.class);
     when(keyTableFSO.iterator()).thenReturn(mockIterFSO);
     when(mockIterFSO.hasNext()).thenReturn(true, true, true, false);

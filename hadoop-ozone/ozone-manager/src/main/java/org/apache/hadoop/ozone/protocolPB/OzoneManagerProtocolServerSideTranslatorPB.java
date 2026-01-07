@@ -64,7 +64,11 @@ import org.slf4j.LoggerFactory;
 public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerProtocolPB {
   private static final Logger LOG = LoggerFactory .getLogger(OzoneManagerProtocolServerSideTranslatorPB.class);
   private static final String OM_REQUESTS_PACKAGE = "org.apache.hadoop.ozone";
+  // same as hadoop ipc config defaults
+  public static final String MAXIMUM_RESPONSE_LENGTH = "ipc.maximum.response.length";
+  public static final int MAXIMUM_RESPONSE_LENGTH_DEFAULT = 134217728;
 
+  private final int maxResponseLength;
   private final OzoneManagerRatisServer omRatisServer;
   private final RequestHandler handler;
   private final OzoneManager ozoneManager;
@@ -97,6 +101,8 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
         .fromPackage(OM_REQUESTS_PACKAGE)
         .withinContext(ValidationContext.of(ozoneManager.getVersionManager(), ozoneManager.getMetadataManager()))
         .load();
+    maxResponseLength = ozoneManager.getConfiguration()
+        .getInt(MAXIMUM_RESPONSE_LENGTH, MAXIMUM_RESPONSE_LENGTH_DEFAULT);
   }
 
   /**
@@ -120,6 +126,8 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
     OMResponse response = dispatcher.processRequest(validatedRequest,
         this::processRequest, request.getCmdType(), request.getTraceID());
 
+    logLargeResponseIfNeeded(response);
+
     return captureLatencyNs(perfMetrics.getValidateResponseLatencyNs(),
         () -> requestValidations.validateResponse(request, response));
   }
@@ -141,6 +149,26 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       }
     }
     return response;
+  }
+
+  /**
+   * Logs a warning if the OMResponse size exceeds half of the IPC maximum
+   * response size threshold.
+   *
+   * @param response The OMResponse to check
+   */
+  @VisibleForTesting
+  public void logLargeResponseIfNeeded(OMResponse response) {
+    try {
+      long warnThreshold = maxResponseLength / 2;
+      long respSize = response.getSerializedSize();
+      if (respSize > warnThreshold) {
+        LOG.warn("Large OMResponse detected: cmd={} size={}B threshold={}B ",
+            response.getCmdType(), respSize, warnThreshold);
+      }
+    } catch (Exception e) {
+      LOG.info("Failed to log response size", e);
+    }
   }
 
   private OMResponse internalProcessRequest(OMRequest request) throws ServiceException {
