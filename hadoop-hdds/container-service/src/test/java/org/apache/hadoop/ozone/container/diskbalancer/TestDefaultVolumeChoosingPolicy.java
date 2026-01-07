@@ -27,6 +27,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -118,9 +119,13 @@ public class TestDefaultVolumeChoosingPolicy {
     private final boolean shouldFindPair;
     private final String expectedSourceDisk;
     private final String expectedDestinationDisk;
+    private final Integer expectedSourceIndex;
+    private final Integer expectedDestinationIndex;
 
+    @SuppressWarnings("checkstyle:parameternumber")
     public TestScenario(String name, List<VolumeTestConfig> volumes, double thresholdPercentage,
-        long containerSize, boolean shouldFindPair, String expectedSourceDisk, String expectedDestinationDisk) {
+        long containerSize, boolean shouldFindPair, String expectedSourceDisk, String expectedDestinationDisk,
+        Integer expectedSourceIndex, Integer expectedDestinationIndex) {
       this.name = name;
       this.volumes = volumes;
       this.thresholdPercentage = thresholdPercentage;
@@ -128,6 +133,8 @@ public class TestDefaultVolumeChoosingPolicy {
       this.shouldFindPair = shouldFindPair;
       this.expectedSourceDisk = expectedSourceDisk;
       this.expectedDestinationDisk = expectedDestinationDisk;
+      this.expectedSourceIndex = expectedSourceIndex;
+      this.expectedDestinationIndex = expectedDestinationIndex;
     }
 
     public String getName() {
@@ -156,6 +163,14 @@ public class TestDefaultVolumeChoosingPolicy {
 
     public String getExpectedDestinationDisk() {
       return expectedDestinationDisk;
+    }
+
+    public Integer getExpectedSourceIndex() {
+      return expectedSourceIndex;
+    }
+
+    public Integer getExpectedDestinationIndex() {
+      return expectedDestinationIndex;
     }
 
     @Override
@@ -226,7 +241,7 @@ public class TestDefaultVolumeChoosingPolicy {
         StorageVolume.VolumeType.DATA_VOLUME, null);
 
     // Use setVolumeMapForTesting to set only our test volumes
-    // This ensures no default volumes from configuration are included
+    // This replaces the entire volumeMap, removing any default volumes from configuration
     Map<String, StorageVolume> volumeMap = new HashMap<>();
     for (HddsVolume volume : volumes) {
       volumeMap.put(volume.getStorageDir().getAbsolutePath(), volume);
@@ -281,44 +296,80 @@ public class TestDefaultVolumeChoosingPolicy {
       // Verify source is the expected disk
       if (scenario.getExpectedSourceDisk() != null) {
         HddsVolume expectedSource = diskNameToVolume.get(scenario.getExpectedSourceDisk());
-        assertNotNull(expectedSource, "Expected source disk not found: " + scenario.getExpectedSourceDisk());
-        assertTrue(result.getLeft().equals(expectedSource),
-            "Expected source disk: " + scenario.getExpectedSourceDisk() +
-            ", but got: " + getVolumeName(result.getLeft(), diskNameToVolume));
+        assertNotNull(expectedSource);
+        assertTrue(result.getLeft().equals(expectedSource));
       }
 
       // Verify destination is the expected disk (or one of the valid options)
       if (scenario.getExpectedDestinationDisk() != null) {
         HddsVolume expectedDest = diskNameToVolume.get(scenario.getExpectedDestinationDisk());
-        assertNotNull(expectedDest, "Expected destination disk not found: " + scenario.getExpectedDestinationDisk());
-        assertTrue(result.getRight().equals(expectedDest),
-            "Expected destination disk: " + scenario.getExpectedDestinationDisk() +
-            ", but got: " + getVolumeName(result.getRight(), diskNameToVolume));
+        assertNotNull(expectedDest);
+        assertTrue(result.getRight().equals(expectedDest));
       }
 
-      // Verify source is the highest utilization volume
-      VolumeFixedUsage sourceUsage = null;
+      // Filter volumeUsages to only include volumes from our test scenario
+      // This excludes any extra volumes that might be added from default configuration
+      List<VolumeFixedUsage> testVolumeUsages = new ArrayList<>();
       for (VolumeFixedUsage usage : volumeUsages) {
-        if (usage.getVolume().equals(result.getLeft())) {
-          sourceUsage = usage;
-          break;
+        if (diskNameToVolume.containsValue(usage.getVolume())) {
+          testVolumeUsages.add(usage);
         }
       }
-      assertNotNull(sourceUsage);
+      // Sort by utilization to ensure consistent ordering
+      testVolumeUsages.sort(Comparator.comparingDouble(VolumeFixedUsage::getUtilization));
 
-      // Verify destination has lower utilization than source
-      VolumeFixedUsage destUsage = null;
-      for (VolumeFixedUsage usage : volumeUsages) {
-        if (usage.getVolume().equals(result.getRight())) {
-          destUsage = usage;
-          break;
+      // Verify source and destination indices match expected values
+      // Since volumes in TestScenario are ordered from lowest to highest utilization,
+      // and testVolumeUsages are sorted ascending (lowest to highest),
+      // we can verify that the selected volumes are at the expected indices
+      int sourceIndex = -1;
+      int destIndex = -1;
+      for (int i = 0; i < testVolumeUsages.size(); i++) {
+        if (testVolumeUsages.get(i).getVolume().equals(result.getLeft())) {
+          sourceIndex = i;
+        }
+        if (testVolumeUsages.get(i).getVolume().equals(result.getRight())) {
+          destIndex = i;
         }
       }
-      assertNotNull(destUsage);
-      assertTrue(destUsage.getUtilization() < sourceUsage.getUtilization(),
-          "Destination should have lower utilization than source");
+      assertTrue(sourceIndex >= 0);
+      assertTrue(destIndex >= 0);
+
+      // Verify source is at the expected index (should be the highest utilization)
+      if (scenario.getExpectedSourceIndex() != null) {
+        assertTrue(sourceIndex == scenario.getExpectedSourceIndex());
+
+        // Verify that source has the highest utilization
+        double sourceUtilization = testVolumeUsages.get(sourceIndex).getUtilization();
+        for (int i = 0; i < testVolumeUsages.size(); i++) {
+          if (i != sourceIndex) {
+            double otherUtilization = testVolumeUsages.get(i).getUtilization();
+            assertTrue(sourceUtilization >= otherUtilization);
+          }
+        }
+      }
+
+      // Verify destination is at the expected index (should be the lowest utilization among valid destinations)
+      if (scenario.getExpectedDestinationIndex() != null) {
+        assertTrue(destIndex == scenario.getExpectedDestinationIndex());
+
+        // Verify that destination has lower utilization than source
+        double destUtilization = testVolumeUsages.get(destIndex).getUtilization();
+        double sourceUtilization = testVolumeUsages.get(sourceIndex).getUtilization();
+        assertTrue(destUtilization < sourceUtilization);
+
+        // Verify that no volume with lower index (lower utilization) has sufficient space
+        // If a volume at a lower index had sufficient space, it would have been chosen instead
+        for (int i = 0; i < destIndex; i++) {
+          VolumeFixedUsage lowerUtilUsage = testVolumeUsages.get(i);
+          long usableSpace = lowerUtilUsage.computeUsableSpace();
+          // Policy checks: containerSize < computeUsableSpace() to see if there's enough space
+          // So if containerSize >= usableSpace, there's NOT enough space (correct - volume wasn't chosen)
+          assertTrue(scenario.getContainerSize() >= usableSpace);
+        }
+      }
     } else {
-      assertNull(result, "Should not find a valid pair for this scenario");
+      assertNull(result);
     }
   }
 
@@ -331,37 +382,41 @@ public class TestDefaultVolumeChoosingPolicy {
         // Scenario 1: One volume beyond threshold, no volumes under threshold
         // Disk1: 30%, Disk2: 30%, Disk3: 40%, Threshold: 5%
         // Ideal: 33.33%, Range: (28.33%, 38.33%), Out of range: Disk3
-        // Expected source: Disk3, Expected destination: Disk1 or Disk2
+        // Expected source: Disk3 (highest) at index 2, Expected destination: Disk1 or Disk2 (lowest) at index 0 or 1
         Arguments.arguments(new TestScenario(
             "OneVolumeBeyondThresholdNoVolumesUnderThreshold",
             Arrays.asList(
-                new VolumeTestConfig("disk1", 0.30),
-                new VolumeTestConfig("disk2", 0.30),
-                new VolumeTestConfig("disk3", 0.40)
+                new VolumeTestConfig("disk1", 0.30),  // Lowest utilization - index 0
+                new VolumeTestConfig("disk2", 0.30),  // Same as disk1 - index 1
+                new VolumeTestConfig("disk3", 0.40)   // Highest utilization - index 2
             ),
             5.0,
             DEFAULT_CONTAINER_SIZE,
             true,
-            "disk3",  // Expected source
-            null      // Destination can be disk1 or disk2 (both valid) so only check source
+            "disk3",  // Expected source (highest)
+            null,     // Destination can be disk1 or disk2 (both valid) so only check source
+            2,        // Expected source index (highest utilization)
+            null      // Destination index can be 0 or 1 (both have same utilization)
         )),
 
         // Scenario 2: Volumes both above and below threshold
         // Disk1: 90%, Disk2: 85%, Disk3: 15%, Threshold: 10%
         // Ideal: 63.33%, Range: (53.33%, 73.33%), Out of range: Disk1, Disk2, Disk3
-        // Expected source: Disk1 (highest), Expected destination: Disk3 (lowest)
+        // Expected source: Disk1 (highest) at index 2, Expected destination: Disk3 (lowest) at index 0
         Arguments.arguments(new TestScenario(
             "VolumesAboveAndBelowThreshold",
             Arrays.asList(
-                new VolumeTestConfig("disk1", 0.90),
-                new VolumeTestConfig("disk2", 0.85),
-                new VolumeTestConfig("disk3", 0.15)
+                new VolumeTestConfig("disk3", 0.15),  // Lowest utilization - index 0
+                new VolumeTestConfig("disk2", 0.85),  // Middle utilization - index 1
+                new VolumeTestConfig("disk1", 0.90)   // Highest utilization - index 2
             ),
             10.0,
             DEFAULT_CONTAINER_SIZE,
             true,
-            "disk1",  // Expected source
-            "disk3"   // Expected destination
+            "disk1",  // Expected source (highest)
+            "disk3",  // Expected destination (lowest)
+            2,        // Expected source index (highest utilization)
+            0         // Expected destination index (lowest utilization)
         )),
 
         // Scenario 3: All volumes within threshold
@@ -371,105 +426,117 @@ public class TestDefaultVolumeChoosingPolicy {
         Arguments.arguments(new TestScenario(
             "AllVolumesWithinThreshold",
             Arrays.asList(
-                new VolumeTestConfig("disk1", 0.30),
-                new VolumeTestConfig("disk2", 0.30),
-                new VolumeTestConfig("disk3", 0.33)
+                new VolumeTestConfig("disk1", 0.30),  // Lowest utilization
+                new VolumeTestConfig("disk2", 0.30),  // Same as disk1
+                new VolumeTestConfig("disk3", 0.33)   // Highest utilization
             ),
             10.0,
             DEFAULT_CONTAINER_SIZE,
             false,
             null,     // No pair expected
-            null
+            null,
+            null,     // No source index expected
+            null      // No destination index expected
         )),
 
         // Scenario 4: One volume under threshold, no volumes above threshold
         // Disk1: 30%, Disk2: 30%, Disk3: 20%
         // Ideal: 26.67%, Range: (21.67%, 31.67%), Out of range: Disk3
-        // Expected source: Disk1 or Disk2, Expected destination: Disk3
+        // Expected source: Disk1 or Disk2 (highest) at index 1 or 2, Expected destination: Disk3 (lowest) at index 0
         Arguments.arguments(new TestScenario(
             "OneVolumeUnderThresholdNoVolumesAbove",
             Arrays.asList(
-                new VolumeTestConfig("disk1", 0.30),
-                new VolumeTestConfig("disk2", 0.30),
-                new VolumeTestConfig("disk3", 0.20)
+                new VolumeTestConfig("disk3", 0.20),  // Lowest utilization - index 0
+                new VolumeTestConfig("disk1", 0.30),  // Middle utilization - index 1
+                new VolumeTestConfig("disk2", 0.30)   // Highest utilization (tied with disk1) - index 2
             ),
             5.0,
             DEFAULT_CONTAINER_SIZE,
             true,
-            null,     // Source can be disk1 or disk2 (both valid)
-            "disk3"    // Expected destination
+            null,     // Source can be disk1 or disk2 (both valid, highest)
+            "disk3",  // Expected destination (lowest)
+            null,     // Source index can be 1 or 2 (both have same utilization)
+            0         // Expected destination index (lowest utilization)
         )),
 
         // Scenario 5: Extreme imbalance - one very high, others very low
         // Disk1: 95%, Disk2: 5%, Disk3: 5%, Threshold: 10%
         // Ideal: 35%, Range: (25%, 45%), Out of range: Disk1, Disk2, Disk3
-        // Expected source: Disk1, Expected destination: Disk2 or Disk3
+        // Expected source: Disk1 (highest) at index 2, Expected destination: Disk2 or Disk3 (lowest) at index 0 or 1
         Arguments.arguments(new TestScenario(
             "ExtremeImbalance",
             Arrays.asList(
-                new VolumeTestConfig("disk1", 0.95),
-                new VolumeTestConfig("disk2", 0.05),
-                new VolumeTestConfig("disk3", 0.05)
+                new VolumeTestConfig("disk2", 0.05),  // Lowest utilization - index 0
+                new VolumeTestConfig("disk3", 0.05),  // Same as disk2 - index 1
+                new VolumeTestConfig("disk1", 0.95)   // Highest utilization - index 2
             ),
             10.0,
             DEFAULT_CONTAINER_SIZE,
             true,
-            "disk1",  // Expected source
-            null      // Destination can be disk2 or disk3
+            "disk1",  // Expected source (highest)
+            null,     // Destination can be disk2 or disk3 (lowest)
+            2,        // Expected source index (highest utilization)
+            null      // Destination index can be 0 or 1 (both have same utilization)
         )),
 
         // Scenario 6: Multiple volumes above threshold, one below
         // Disk1: 80%, Disk2: 75%, Disk3: 20%, Threshold: 10%
         // Ideal: 58.33%, Range: (48.33%, 68.33%), Out of range: Disk1, Disk2, Disk3
-        // Expected source: Disk1 (highest), Expected destination: Disk3 (lowest)
+        // Expected source: Disk1 (highest) at index 2, Expected destination: Disk3 (lowest) at index 0
         Arguments.arguments(new TestScenario(
             "MultipleVolumesAboveOneBelow",
             Arrays.asList(
-                new VolumeTestConfig("disk1", 0.80),
-                new VolumeTestConfig("disk2", 0.75),
-                new VolumeTestConfig("disk3", 0.20)
+                new VolumeTestConfig("disk3", 0.20),  // Lowest utilization - index 0
+                new VolumeTestConfig("disk2", 0.75),  // Middle utilization - index 1
+                new VolumeTestConfig("disk1", 0.80)   // Highest utilization - index 2
             ),
             10.0,
             DEFAULT_CONTAINER_SIZE,
             true,
-            "disk1",  // Expected source
-            "disk3"    // Expected destination
+            "disk1",  // Expected source (highest)
+            "disk3",  // Expected destination (lowest)
+            2,        // Expected source index (highest utilization)
+            0         // Expected destination index (lowest utilization)
         )),
 
         // Scenario 7: Edge case - volumes at threshold boundaries
         // Disk1: 50%, Disk2: 40%, Disk3: 60%, Threshold: 10%
         // Ideal: 50%, Range: (40%, 60%), Out of range: Disk3 (at upper), Disk2 (at lower)
-        // Expected source: Disk3 (highest), Expected destination: Disk2 (lowest)
+        // Expected source: Disk3 (highest) at index 2, Expected destination: Disk2 (lowest) at index 0
         Arguments.arguments(new TestScenario(
             "VolumesAtThresholdBoundaries",
             Arrays.asList(
-                new VolumeTestConfig("disk1", 0.50),
-                new VolumeTestConfig("disk2", 0.40),
-                new VolumeTestConfig("disk3", 0.60)
+                new VolumeTestConfig("disk2", 0.40),  // Lowest utilization - index 0
+                new VolumeTestConfig("disk1", 0.50),  // Middle utilization - index 1
+                new VolumeTestConfig("disk3", 0.60)   // Highest utilization - index 2
             ),
             10.0,
             DEFAULT_CONTAINER_SIZE,
             true,
-            "disk3",  // Expected source
-            "disk2"    // Expected destination
+            "disk3",  // Expected source (highest)
+            "disk2",  // Expected destination (lowest)
+            2,        // Expected source index (highest utilization)
+            0         // Expected destination index (lowest utilization)
         )),
 
         // Scenario 8: Small threshold with moderate imbalance
         // Disk1: 35%, Disk2: 30%, Disk3: 30%, Threshold: 2%
         // Ideal: 31.67%, Range: (29.67%, 33.67%), Out of range: Disk1
-        // Expected source: Disk1, Expected destination: Disk2 or Disk3
+        // Expected source: Disk1 (highest) at index 2, Expected destination: Disk2 or Disk3 (lowest) at index 0 or 1
         Arguments.arguments(new TestScenario(
             "SmallThresholdModerateImbalance",
             Arrays.asList(
-                new VolumeTestConfig("disk1", 0.35),
-                new VolumeTestConfig("disk2", 0.30),
-                new VolumeTestConfig("disk3", 0.30)
+                new VolumeTestConfig("disk2", 0.30),  // Lowest utilization - index 0
+                new VolumeTestConfig("disk3", 0.30),  // Same as disk2 - index 1
+                new VolumeTestConfig("disk1", 0.35)   // Highest utilization - index 2
             ),
             2.0,
             DEFAULT_CONTAINER_SIZE,
             true,
-            "disk1",  // Expected source
-            null      // Destination can be disk2 or disk3
+            "disk1",  // Expected source (highest)
+            null,     // Destination can be disk2 or disk3 (lowest)
+            2,        // Expected source index (highest utilization)
+            null      // Destination index can be 0 or 1 (both have same utilization)
         )),
 
         // Scenario 9: Best destination has low utilization but insufficient space
@@ -483,15 +550,17 @@ public class TestDefaultVolumeChoosingPolicy {
         Arguments.arguments(new TestScenario(
             "BestDestInsufficientSpace",
             Arrays.asList(
-                new VolumeTestConfig("disk1", 0.90),
-                new VolumeTestConfig("disk2", 0.10, 500L * MB), // Small capacity
-                new VolumeTestConfig("disk3", 0.20)
+                new VolumeTestConfig("disk2", 0.10, 500L * MB), // Lowest utilization, small capacity - index 0
+                new VolumeTestConfig("disk3", 0.20),  // Second lowest - index 1
+                new VolumeTestConfig("disk1", 0.90)   // Highest utilization - index 2
             ),
             10.0,
             500L * MB, // Container size larger than disk2's available space
             true,
-            "disk1",  // Expected source
-            "disk3"    // Should skip disk2 and pick disk3
+            "disk1",  // Expected source (highest)
+            "disk3",  // Should skip disk2 and pick disk3
+            2,        // Expected source index (highest utilization)
+            1         // Expected destination index (disk3 at index 1, since disk2 at index 0 doesn't have enough space)
         )),
 
         // Scenario 10: Volumes just inside threshold boundaries
@@ -501,31 +570,35 @@ public class TestDefaultVolumeChoosingPolicy {
         Arguments.arguments(new TestScenario(
             "VolumesJustInsideThresholdBoundaries",
             Arrays.asList(
-                new VolumeTestConfig("disk1", 0.4001), // Just above lower threshold (40%)
-                new VolumeTestConfig("disk2", 0.5999)  // Just below upper threshold (60%)
+                new VolumeTestConfig("disk1", 0.4001), // Lowest utilization - index 0
+                new VolumeTestConfig("disk2", 0.5999)  // Highest utilization - index 1
             ),
             10.0,
             DEFAULT_CONTAINER_SIZE,
             false,    // Should not find pair - both volumes are within threshold
             null,
-            null
+            null,
+            null,     // No source index expected
+            null      // No destination index expected
         )),
 
         // Scenario 10b: Volumes just outside threshold boundaries
         // Disk1: 39.99%, Disk2: 60.01%, Threshold: 10%
         // Ideal: 50%, Range: (40%, 60%), Out of range: Disk1 (just below lower), Disk2 (just above upper)
-        // Expected: Pair should be found - Disk2 as source, Disk1 as destination
+        // Expected: Pair should be found - Disk2 as source at index 1, Disk1 as destination at index 0
         Arguments.arguments(new TestScenario(
             "VolumesJustOutsideThresholdBoundaries",
             Arrays.asList(
-                new VolumeTestConfig("disk1", 0.3999), // Just below lower threshold (40%)
-                new VolumeTestConfig("disk2", 0.6001)  // Just above upper threshold (60%)
+                new VolumeTestConfig("disk1", 0.3999), // Lowest utilization - index 0
+                new VolumeTestConfig("disk2", 0.6001)  // Highest utilization - index 1
             ),
             10.0,
             DEFAULT_CONTAINER_SIZE,
             true,     // Should find pair - volumes are outside threshold
-            "disk2",  // Expected source (higher utilization)
-            "disk1"   // Expected destination (lower utilization)
+            "disk2",  // Expected source (highest utilization)
+            "disk1",  // Expected destination (lowest utilization)
+            1,        // Expected source index (highest utilization)
+            0         // Expected destination index (lowest utilization)
         )),
 
         // Scenario 11: No volumes have enough free space
@@ -539,15 +612,17 @@ public class TestDefaultVolumeChoosingPolicy {
         Arguments.arguments(new TestScenario(
             "NoVolumesHaveEnoughFreeSpace",
             Arrays.asList(
-                new VolumeTestConfig("disk1", 0.90),  // Highest -> index 0
-                new VolumeTestConfig("disk2", 0.10, 500L * MB), // Small capacity -> index 1
-                new VolumeTestConfig("disk3", 0.20, 500L * MB)  // Small capacity -> index 2
+                new VolumeTestConfig("disk2", 0.10, 500L * MB), // Lowest utilization - index 0
+                new VolumeTestConfig("disk3", 0.20, 500L * MB), // Second lowest - index 1
+                new VolumeTestConfig("disk1", 0.90)   // Highest utilization - index 2
             ),
             10.0,
             500L * MB, // Container size larger than both disk2's and disk3's available space
             false,     // Should not find pair - no destination has enough space
             null,
-            null
+            null,
+            null,     // No source index expected
+            null      // No destination index expected
         )),
 
         // Scenario 12: Only one volume
@@ -557,13 +632,15 @@ public class TestDefaultVolumeChoosingPolicy {
         Arguments.arguments(new TestScenario(
             "OnlyOneVolume",
             Arrays.asList(
-                new VolumeTestConfig("disk1", 0.80)
+                new VolumeTestConfig("disk1", 0.80)  // Only volume
             ),
             10.0,
             DEFAULT_CONTAINER_SIZE,
             false,    // Should not find pair - need at least 2 volumes
             null,
-            null
+            null,
+            null,     // No source index expected
+            null      // No destination index expected
         )),
 
         // Scenario 13: Zero volumes (empty volume set)
@@ -576,7 +653,9 @@ public class TestDefaultVolumeChoosingPolicy {
             DEFAULT_CONTAINER_SIZE,
             false,    // Should not find pair - no volumes available
             null,
-            null
+            null,
+            null,     // No source index expected
+            null      // No destination index expected
         ))
     );
   }
