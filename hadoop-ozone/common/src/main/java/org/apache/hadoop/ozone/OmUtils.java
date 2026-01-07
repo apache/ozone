@@ -365,6 +365,7 @@ public final class OmUtils {
           "This could possibly indicate a faulty JRE");
     }
   }
+  
   /**
    * Get a collection of all active omNodeIds (excluding decommissioned nodes)
    * for the given omServiceId.
