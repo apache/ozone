@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.diskbalancer;
 
 import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.getVolumeUsages;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -250,18 +251,6 @@ public class TestDefaultVolumeChoosingPolicy {
   }
 
   /**
-   * Helper method to get disk name from volume.
-   */
-  private String getVolumeName(HddsVolume volume, Map<String, HddsVolume> diskNameToVolume) {
-    for (Map.Entry<String, HddsVolume> entry : diskNameToVolume.entrySet()) {
-      if (entry.getValue().equals(volume)) {
-        return entry.getKey();
-      }
-    }
-    return "unknown";
-  }
-
-  /**
    * Generic test method that can be reused for different scenarios.
    *
    * @param scenario Test scenario configuration
@@ -297,14 +286,14 @@ public class TestDefaultVolumeChoosingPolicy {
       if (scenario.getExpectedSourceDisk() != null) {
         HddsVolume expectedSource = diskNameToVolume.get(scenario.getExpectedSourceDisk());
         assertNotNull(expectedSource);
-        assertTrue(result.getLeft().equals(expectedSource));
+        assertEquals(expectedSource, result.getLeft());
       }
 
       // Verify destination is the expected disk (or one of the valid options)
       if (scenario.getExpectedDestinationDisk() != null) {
         HddsVolume expectedDest = diskNameToVolume.get(scenario.getExpectedDestinationDisk());
         assertNotNull(expectedDest);
-        assertTrue(result.getRight().equals(expectedDest));
+        assertEquals(expectedDest, result.getRight());
       }
 
       // Filter volumeUsages to only include volumes from our test scenario
@@ -337,7 +326,7 @@ public class TestDefaultVolumeChoosingPolicy {
 
       // Verify source is at the expected index (should be the highest utilization)
       if (scenario.getExpectedSourceIndex() != null) {
-        assertTrue(sourceIndex == scenario.getExpectedSourceIndex());
+        assertEquals(scenario.getExpectedSourceIndex(), sourceIndex);
 
         // Verify that source has the highest utilization
         double sourceUtilization = testVolumeUsages.get(sourceIndex).getUtilization();
@@ -351,7 +340,7 @@ public class TestDefaultVolumeChoosingPolicy {
 
       // Verify destination is at the expected index (should be the lowest utilization among valid destinations)
       if (scenario.getExpectedDestinationIndex() != null) {
-        assertTrue(destIndex == scenario.getExpectedDestinationIndex());
+        assertEquals(scenario.getExpectedDestinationIndex(), destIndex);
 
         // Verify that destination has lower utilization than source
         double destUtilization = testVolumeUsages.get(destIndex).getUtilization();
