@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.om.ha;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -66,7 +65,7 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
   }
 
   @Override
-  protected void loadOMClientConfigs(ConfigurationSource config, String omSvcId)
+  protected void initOmProxiesFromConfigs(ConfigurationSource config, String omSvcId)
       throws IOException {
     Map<String, OMProxyInfo<T>> omProxies = new HashMap<>();
 
@@ -107,7 +106,8 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
           + OZONE_OM_ADDRESS_KEY);
     }
     setOmProxies(omProxies);
-    setOmNodeIDList(omNodeIDList);
+    Collections.shuffle(omNodeIDList);
+    setOmNodesInOrder(omNodeIDList);
   }
 
   /**
@@ -183,14 +183,5 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
       }
     }
   }
-
-  @VisibleForTesting
-  protected void setProxiesForTesting(
-      Map<String, OMProxyInfo<T>> setOMProxies,
-      List<String> setOMNodeIDList) {
-    setOmProxies(setOMProxies);
-    setOmNodeIDList(setOMNodeIDList);
-  }
-
 }
 

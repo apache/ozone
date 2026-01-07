@@ -121,7 +121,7 @@ public class TestOMFailovers {
     }
 
     @Override
-    protected void loadOMClientConfigs(ConfigurationSource config,
+    protected void initOmProxiesFromConfigs(ConfigurationSource config,
         String omSvcId) {
       HashMap<String, OMProxyInfo<OzoneManagerProtocolPB>> omProxyInfos = new HashMap<>();
       ArrayList<String> omNodeIDList = new ArrayList<>();
@@ -133,7 +133,8 @@ public class TestOMFailovers {
         omProxyInfos.put(nodeId, omProxyInfo);
         omNodeIDList.add(nodeId);
       }
-      setProxiesForTesting(omProxyInfos, omNodeIDList);
+      setOmProxies(omProxyInfos);
+      setOmNodesInOrder(omNodeIDList);
     }
 
     @Override

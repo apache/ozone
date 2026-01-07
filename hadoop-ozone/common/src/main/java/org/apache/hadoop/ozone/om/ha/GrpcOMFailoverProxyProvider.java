@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -63,7 +64,7 @@ public class GrpcOMFailoverProxyProvider<T> extends
   }
 
   @Override
-  protected void loadOMClientConfigs(ConfigurationSource config, String omSvcId)
+  protected void initOmProxiesFromConfigs(ConfigurationSource config, String omSvcId)
       throws IOException {
 
     Collection<String> omNodeIds = OmUtils.getActiveNonListenerOMNodeIds(config, omSvcId);
@@ -102,7 +103,8 @@ public class GrpcOMFailoverProxyProvider<T> extends
           + OZONE_OM_ADDRESS_KEY);
     }
     setOmProxies(omProxies);
-    setOmNodeIDList(omNodeIDList);
+    Collections.shuffle(omNodeIDList);
+    setOmNodesInOrder(omNodeIDList);
   }
 
   private T createOMProxy() throws IOException {
@@ -154,6 +156,6 @@ public class GrpcOMFailoverProxyProvider<T> extends
   }
 
   public List<String> getGrpcOmNodeIDList() {
-    return getOmNodeIDList();
+    return getOmNodesInOrder();
   }
 }
