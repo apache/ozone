@@ -22,6 +22,8 @@ import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -105,6 +107,10 @@ public class S3RevokeSTSTokenRequest extends OMClientRequest {
     auditMap.put(OzoneConsts.S3_REVOKESTSTOKEN_USER, userInfo.getUserName());
     markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.REVOKE_STS_TOKEN, auditMap, null, userInfo));
+
+    // Update the cache immediately so subsequent validation checks see the revocation
+    ozoneManager.getMetadataManager().getS3RevokedStsTokenTable().addCacheEntry(
+        new CacheKey<>(sessionToken), CacheValue.get(context.getIndex(), CLOCK.millis()));
 
     LOG.info("Marked STS session token '{}' as revoked.", sessionToken);
     return omClientResponse;
