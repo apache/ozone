@@ -883,7 +883,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
             "check chain", containerInfo.containerID());
         // Container remains HEALTHY (set at start of loop)
       }
-      // Apply final health state from report to container (short value)
+      // Apply final health state from report to container
       containerInfo.setHealthState(report.getContainerHealthState());
       return handled;
     }

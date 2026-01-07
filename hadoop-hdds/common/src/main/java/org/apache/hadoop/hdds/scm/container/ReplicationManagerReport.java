@@ -54,8 +54,7 @@ public class ReplicationManagerReport {
 
   private final Map<String, LongAdder> stats;
   private final Map<String, List<ContainerID>> containerSample = new ConcurrentHashMap<>();
-  // Store as short value (2 bytes) instead of enum reference (8 bytes) for memory efficiency
-  private short containerHealthStateValue = 0;  // 0 = HEALTHY
+  private ContainerHealthState containerHealthState = ContainerHealthState.HEALTHY;
 
   public static ReplicationManagerReport fromProtobuf(
       HddsProtos.ReplicationManagerReportProto proto) {
@@ -88,7 +87,7 @@ public class ReplicationManagerReport {
 
   public void incrementAndSample(ContainerHealthState stat, ContainerInfo containerInfo) {
     incrementAndSample(stat.name(), containerInfo.containerID());
-    containerHealthStateValue = stat.getValue();
+    containerHealthState = stat;
   }
 
   public void increment(HddsProtos.LifeCycleState stat) {
@@ -107,12 +106,12 @@ public class ReplicationManagerReport {
     return reportTimeStamp;
   }
 
-  public short getContainerHealthState() {
-    return containerHealthStateValue;
+  public ContainerHealthState getContainerHealthState() {
+    return containerHealthState;
   }
 
   public void resetContainerHealthState() {
-    this.containerHealthStateValue = 0;  // 0 = HEALTHY
+    this.containerHealthState = ContainerHealthState.HEALTHY;
   }
 
   /**

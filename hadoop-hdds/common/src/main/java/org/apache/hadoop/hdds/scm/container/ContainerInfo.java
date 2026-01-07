@@ -86,8 +86,7 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
   // container replica should have the same sequenceId.
   private long sequenceId;
   // Health state of the container (determined by ReplicationManager)
-  // Stored as short value (2 bytes) instead of enum reference (8 bytes) for memory efficiency
-  private short healthStateValue;
+  private ContainerHealthState healthState;
 
   private ContainerInfo(Builder b) {
     containerID = ContainerID.valueOf(b.containerID);
@@ -102,7 +101,7 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
     sequenceId = b.sequenceId;
     replicationConfig = b.replicationConfig;
     clock = b.clock;
-    healthStateValue = b.healthState != null ? b.healthState.getValue() : ContainerHealthState.HEALTHY.getValue();
+    healthState = b.healthState != null ? b.healthState : ContainerHealthState.HEALTHY;
   }
 
   public static Codec<ContainerInfo> getCodec() {
@@ -253,17 +252,16 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
    * @return ContainerHealthState
    */
   public ContainerHealthState getHealthState() {
-    return ContainerHealthState.fromValue(healthStateValue);
+    return healthState;
   }
 
   /**
-   * Set the health state of the container using the short value.
-   * Stores as 2-byte short for memory efficiency.
+   * Set the health state of the container.
    *
-   * @param stateValue The health state value (from ContainerHealthState.getValue())
+   * @param newHealthState The new health state
    */
-  public void setHealthState(short stateValue) {
-    this.healthStateValue = stateValue;
+  public void setHealthState(ContainerHealthState newHealthState) {
+    this.healthState = newHealthState;
   }
 
   @JsonIgnore
