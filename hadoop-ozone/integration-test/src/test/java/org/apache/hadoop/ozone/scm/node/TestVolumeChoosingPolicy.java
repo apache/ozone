@@ -68,8 +68,9 @@ public class TestVolumeChoosingPolicy {
   private static final int NUM_THREADS = 10;
   private static final int NUM_ITERATIONS = 10000;
   private static final double THRESHOLD = 10; // 10% threshold
+  private static final long DEFAULT_CONTAINER_SIZE = 100L * 1024 * 1024; // 100MB
 
-  private static final OzoneConfiguration CONF = new OzoneConfiguration();
+  private OzoneConfiguration conf;
 
   @TempDir
   private Path baseDir;
@@ -84,6 +85,8 @@ public class TestVolumeChoosingPolicy {
 
   @BeforeEach
   public void setup() throws Exception {
+    // Create a fresh configuration for each test to avoid interference between tests
+    conf = new OzoneConfiguration();
     hddsVolumes = new ArrayList<>();
     createVolumes();
     volumeChoosingPolicy = new DefaultVolumeChoosingPolicy(new ReentrantLock());
@@ -114,12 +117,14 @@ public class TestVolumeChoosingPolicy {
   @Test
   @Timeout(30)
   public void testVolumeChoosingFailureDueToDiskFull() {
+    // Create a separate configuration for this test to avoid affecting other tests
+    OzoneConfiguration testConf = new OzoneConfiguration();
     // update volume configure, set a huge min free space
-    CONF.set("hdds.datanode.volume.min.free.space", "990GB");
+    testConf.set("hdds.datanode.volume.min.free.space", "990GB");
     for (StorageVolume volume: volumeSet.getVolumesList()) {
-      volume.setConf(CONF);
+      volume.setConf(testConf);
     }
-    assertNull(volumeChoosingPolicy.chooseVolume(volumeSet, THRESHOLD, deltaSizes, 0));
+    assertNull(volumeChoosingPolicy.chooseVolume(volumeSet, THRESHOLD, deltaSizes, DEFAULT_CONTAINER_SIZE));
     assertEquals(NUM_VOLUMES, volumeSet.getVolumesList().size());
   }
 
@@ -174,20 +179,27 @@ public class TestVolumeChoosingPolicy {
 
             long threadStart = System.nanoTime();
             try {
-              Pair<HddsVolume, HddsVolume> pair = policy.chooseVolume(volumeSet, THRESHOLD, deltaSizes, 0);
+              // Use a reasonable container size for the policy check
+              // The policy checks if containerSize < computeUsableSpace()
+              Pair<HddsVolume, HddsVolume> pair = policy.chooseVolume(
+                  volumeSet, THRESHOLD, deltaSizes, DEFAULT_CONTAINER_SIZE);
 
               if (pair == null) {
                 volumeNotChosen++;
               } else {
                 volumeChosen++;
-                // Note: In a real DiskBalancerService, after a successful choice,
-                // the committed bytes on the destination and delta on the source
-                // would be reverted/adjusted once the move completes or fails.
-                // This simulation focuses on the state before the policy makes a choice,
-                // assuming some background activity. For simplicity, we are not
-                // reverting these simulated incCommittedBytes or deltaSizes updates
-                // within this loop for each "chosen" pair. The random updates
-                // provide the dynamic background.
+                HddsVolume sourceVolume = pair.getLeft();
+
+                // The policy automatically calls destVolume.incCommittedBytes(containerSize)
+                // when a pair is chosen, so we need to simulate the corresponding
+                // deltaMap update for the source volume (negative value = space to be freed)
+                // This aligns with how DiskBalancerService updates deltaSizes after choosing
+                deltaSizes.compute(sourceVolume, (k, v) -> (v == null ? 0L : v) - DEFAULT_CONTAINER_SIZE);
+                
+                // Note: In a real DiskBalancerService, after a successful container move,
+                // the committed bytes on the destination would be adjusted and the delta
+                // on the source would be cleared. For this performance test, we simulate
+                // the ongoing state changes that occur during disk balancing operations.
               }
             } catch (Exception e) {
               failures++;
@@ -229,10 +241,12 @@ public class TestVolumeChoosingPolicy {
     // set a dummy path for initialisation, as we will override its internal volumeMap.
     String initialDnDir = baseDir.resolve("initialDnDir").toFile().getAbsolutePath();
     Files.createDirectories(baseDir.resolve("initialDnDir"));
-    CONF.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, initialDnDir);
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, initialDnDir);
+    conf.set("hdds.datanode.volume.min.free.space", "20GB");
+    conf.setFloat("hdds.datanode.volume.min.free.space.percent", 0.02f);
 
     StateContext mockContext = mock(StateContext.class);
-    volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), CONF,
+    volumeSet = new MutableVolumeSet(UUID.randomUUID().toString(), conf,
         mockContext, StorageVolume.VolumeType.DATA_VOLUME, null);
 
     // This map will replace the one inside 'volumeSet'
@@ -254,9 +268,11 @@ public class TestVolumeChoosingPolicy {
       SpaceUsageCheckFactory factory = MockSpaceUsageCheckFactory.of(
           source, Duration.ZERO, SpaceUsagePersistence.None.INSTANCE);
       HddsVolume volume = new HddsVolume.Builder(volumePath)
-          .conf(CONF)
+          .conf(conf)
           .usageCheckFactory(factory)
           .build();
+      // Ensure configuration is applied to the volume
+      volume.setConf(conf);
       hddsVolumes.add(volume);
       newVolumeMap.put(volume.getStorageDir().getPath(), volume);
     }

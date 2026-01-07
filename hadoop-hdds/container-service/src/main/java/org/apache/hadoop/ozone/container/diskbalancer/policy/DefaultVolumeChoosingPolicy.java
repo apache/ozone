@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -67,21 +68,48 @@ public class DefaultVolumeChoosingPolicy implements DiskBalancerVolumeChoosingPo
           .sorted(Comparator.comparingDouble(VolumeFixedUsage::getUtilization))
           .collect(Collectors.toList());
 
-      // Calculate the actual threshold and check src
-      final double actualThreshold = getIdealUsage(volumeUsages) + thresholdPercentage / 100;
-      final VolumeFixedUsage src = volumeUsages.get(volumeUsages.size() - 1);
-      if (src.getUtilization() < actualThreshold) {
-        return null; // all volumes are under the threshold
+      // Calculate ideal usage and threshold range
+      final double idealUsage = getIdealUsage(volumeUsages);
+      final double actualThreshold = thresholdPercentage / 100.0;
+      final double lowerThreshold = idealUsage - actualThreshold;
+      final double upperThreshold = idealUsage + actualThreshold;
+
+      // Log all volume information for investigation
+      if (LOG.isDebugEnabled()) {
+        logVolumeBalancingState(volumeUsages, idealUsage, thresholdPercentage,
+            lowerThreshold, upperThreshold, containerSize, deltaMap);
       }
 
-      // Find dst
+      // Get highest and lowest utilization volumes
+      final VolumeFixedUsage highestUsage = volumeUsages.get(volumeUsages.size() - 1);
+      final VolumeFixedUsage lowestUsage = volumeUsages.get(0);
+
+      // Only return null if highest is below upper threshold AND lowest is above lower threshold
+      // This means all volumes are strictly within the range (not at boundaries)
+      if (highestUsage.getUtilization() < upperThreshold &&
+          lowestUsage.getUtilization() > lowerThreshold) {
+        // All volumes are strictly within threshold range, no balancing needed
+        return null;
+      }
+
+      // Determine source volume: highest utilization volume (if above threshold)
+      final VolumeFixedUsage src = highestUsage;
+
+      // Find destination volume: lowest utilization volume that has enough space
+      // Prefer volumes below threshold, but accept any volume with lower utilization than source
       for (int i = 0; i < volumeUsages.size() - 1; i++) {
         final VolumeFixedUsage dstUsage = volumeUsages.get(i);
         final HddsVolume dst = dstUsage.getVolume();
 
-        if (containerSize < dstUsage.computeUsableSpace()) {
+        // Check if destination has enough space and has lower utilization than source
+        if (dstUsage.getUtilization() < src.getUtilization() &&
+            containerSize < dstUsage.computeUsableSpace()) {
           // Found dst, reserve space and return
           dst.incCommittedBytes(containerSize);
+          LOG.debug("Chosen volume pair for disk balancing: source={} (utilization={}), " +
+                  "destination={} (utilization={})",
+              src.getVolume().getStorageID(), src.getUtilization(),
+              dst.getStorageID(), dstUsage.getUtilization());
           return Pair.of(src.getVolume(), dst);
         }
         LOG.debug("Destination volume {} does not have enough space, trying next volume.",
@@ -91,6 +119,38 @@ public class DefaultVolumeChoosingPolicy implements DiskBalancerVolumeChoosingPo
       return null;
     } finally {
       lock.unlock();
+    }
+  }
+
+  /**
+   * Logs all volume information for disk balancing investigation.
+   *
+   * @param volumeUsages List of volume usages (sorted by utilization ascending)
+   * @param idealUsage Calculated ideal usage
+   * @param thresholdPercentage Threshold percentage
+   * @param lowerThreshold Lower threshold bound
+   * @param upperThreshold Upper threshold bound
+   * @param containerSize Container size to be moved
+   * @param deltaMap Map of volume deltas
+   */
+  private void logVolumeBalancingState(List<VolumeFixedUsage> volumeUsages,
+      double idealUsage, double thresholdPercentage, double lowerThreshold,
+      double upperThreshold, long containerSize, Map<HddsVolume, Long> deltaMap) {
+    LOG.debug("Disk balancing state - idealUsage={}, thresholdPercentage={}%, " +
+            "thresholdRange=({}, {}), containerSize={}",
+        String.format("%.10f", idealUsage), thresholdPercentage,
+        String.format("%.10f", lowerThreshold), String.format("%.10f", upperThreshold),
+        containerSize);
+    for (int i = 0; i < volumeUsages.size(); i++) {
+      VolumeFixedUsage vfu = volumeUsages.get(i);
+      HddsVolume vol = vfu.getVolume();
+      SpaceUsageSource.Fixed usage = vfu.getUsage();
+      long usableSpace = vfu.computeUsableSpace();
+      LOG.debug("Volume[{}] - disk={}, utilization={}, capacity={}, " +
+              "effectiveUsed={}, available={}, usableSpace={}, committedBytes={}, delta={}",
+          i, vol.getStorageID(), String.format("%.10f", vfu.getUtilization()),
+          usage.getCapacity(), vfu.getEffectiveUsed(), usage.getAvailable(),
+          usableSpace, vol.getCommittedBytes(), deltaMap.getOrDefault(vol, 0L));
     }
   }
 }
