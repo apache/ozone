@@ -120,8 +120,7 @@ public class TestDefaultVolumeChoosingPolicy {
     private final String expectedDestinationDisk;
 
     public TestScenario(String name, List<VolumeTestConfig> volumes, double thresholdPercentage,
-                       long containerSize, boolean shouldFindPair,
-                       String expectedSourceDisk, String expectedDestinationDisk) {
+        long containerSize, boolean shouldFindPair, String expectedSourceDisk, String expectedDestinationDisk) {
       this.name = name;
       this.volumes = volumes;
       this.thresholdPercentage = thresholdPercentage;
@@ -204,7 +203,7 @@ public class TestDefaultVolumeChoosingPolicy {
       throws IOException {
     List<HddsVolume> volumes = new ArrayList<>();
     for (VolumeTestConfig config : configs) {
-      long capacity = config.getCustomCapacity() != null ? 
+      long capacity = config.getCustomCapacity() != null ?
           config.getCustomCapacity() : VOLUME_CAPACITY;
       HddsVolume volume = createVolume(config.getName(), config.getUtilization(), capacity);
       volumes.add(volume);
@@ -225,7 +224,7 @@ public class TestDefaultVolumeChoosingPolicy {
     testConf.set("hdds.datanode.dir.key", "");
     volumeSet = new MutableVolumeSet(datanodeUuid, testConf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
-    
+
     // Use setVolumeMapForTesting to set only our test volumes
     // This ensures no default volumes from configuration are included
     Map<String, StorageVolume> volumeMap = new HashMap<>();
@@ -284,7 +283,7 @@ public class TestDefaultVolumeChoosingPolicy {
         HddsVolume expectedSource = diskNameToVolume.get(scenario.getExpectedSourceDisk());
         assertNotNull(expectedSource, "Expected source disk not found: " + scenario.getExpectedSourceDisk());
         assertTrue(result.getLeft().equals(expectedSource),
-            "Expected source disk: " + scenario.getExpectedSourceDisk() + 
+            "Expected source disk: " + scenario.getExpectedSourceDisk() +
             ", but got: " + getVolumeName(result.getLeft(), diskNameToVolume));
       }
 
@@ -293,7 +292,7 @@ public class TestDefaultVolumeChoosingPolicy {
         HddsVolume expectedDest = diskNameToVolume.get(scenario.getExpectedDestinationDisk());
         assertNotNull(expectedDest, "Expected destination disk not found: " + scenario.getExpectedDestinationDisk());
         assertTrue(result.getRight().equals(expectedDest),
-            "Expected destination disk: " + scenario.getExpectedDestinationDisk() + 
+            "Expected destination disk: " + scenario.getExpectedDestinationDisk() +
             ", but got: " + getVolumeName(result.getRight(), diskNameToVolume));
       }
 
@@ -493,6 +492,91 @@ public class TestDefaultVolumeChoosingPolicy {
             true,
             "disk1",  // Expected source
             "disk3"    // Should skip disk2 and pick disk3
+        )),
+
+        // Scenario 10: Volumes just inside threshold boundaries
+        // Disk1: 40.01%, Disk2: 59.99%, Threshold: 10%
+        // Ideal: 50%, Range: (40%, 60%), Out of range: None (both are just inside)
+        // Expected: No pair should be found as all volumes are within threshold
+        Arguments.arguments(new TestScenario(
+            "VolumesJustInsideThresholdBoundaries",
+            Arrays.asList(
+                new VolumeTestConfig("disk1", 0.4001), // Just above lower threshold (40%)
+                new VolumeTestConfig("disk2", 0.5999)  // Just below upper threshold (60%)
+            ),
+            10.0,
+            DEFAULT_CONTAINER_SIZE,
+            false,    // Should not find pair - both volumes are within threshold
+            null,
+            null
+        )),
+
+        // Scenario 10b: Volumes just outside threshold boundaries
+        // Disk1: 39.99%, Disk2: 60.01%, Threshold: 10%
+        // Ideal: 50%, Range: (40%, 60%), Out of range: Disk1 (just below lower), Disk2 (just above upper)
+        // Expected: Pair should be found - Disk2 as source, Disk1 as destination
+        Arguments.arguments(new TestScenario(
+            "VolumesJustOutsideThresholdBoundaries",
+            Arrays.asList(
+                new VolumeTestConfig("disk1", 0.3999), // Just below lower threshold (40%)
+                new VolumeTestConfig("disk2", 0.6001)  // Just above upper threshold (60%)
+            ),
+            10.0,
+            DEFAULT_CONTAINER_SIZE,
+            true,     // Should find pair - volumes are outside threshold
+            "disk2",  // Expected source (higher utilization)
+            "disk1"   // Expected destination (lower utilization)
+        )),
+
+        // Scenario 11: No volumes have enough free space
+        // Disk1: 90% (Source, highest)
+        // Disk2: 10% (Destination candidate, but insufficient space)
+        // Disk3: 20% (Destination candidate, but insufficient space)
+        // Disk2: capacity=500MB, 10% used=50MB, available=450MB
+        // Disk3: capacity=500MB, 20% used=100MB, available=400MB
+        // Container size 500MB > available space on both disk2 and disk3, so both are rejected
+        // No valid destination found
+        Arguments.arguments(new TestScenario(
+            "NoVolumesHaveEnoughFreeSpace",
+            Arrays.asList(
+                new VolumeTestConfig("disk1", 0.90),  // Highest -> index 0
+                new VolumeTestConfig("disk2", 0.10, 500L * MB), // Small capacity -> index 1
+                new VolumeTestConfig("disk3", 0.20, 500L * MB)  // Small capacity -> index 2
+            ),
+            10.0,
+            500L * MB, // Container size larger than both disk2's and disk3's available space
+            false,     // Should not find pair - no destination has enough space
+            null,
+            null
+        )),
+
+        // Scenario 12: Only one volume
+        // Disk1: 80%
+        // Cannot balance with only one volume
+        // Expected: No pair should be found
+        Arguments.arguments(new TestScenario(
+            "OnlyOneVolume",
+            Arrays.asList(
+                new VolumeTestConfig("disk1", 0.80)
+            ),
+            10.0,
+            DEFAULT_CONTAINER_SIZE,
+            false,    // Should not find pair - need at least 2 volumes
+            null,
+            null
+        )),
+
+        // Scenario 13: Zero volumes (empty volume set)
+        // No volumes at all
+        // Expected: No pair should be found
+        Arguments.arguments(new TestScenario(
+            "ZeroVolumes",
+            Arrays.asList(), // Empty list
+            10.0,
+            DEFAULT_CONTAINER_SIZE,
+            false,    // Should not find pair - no volumes available
+            null,
+            null
         ))
     );
   }

@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -73,13 +74,17 @@ public class DefaultVolumeChoosingPolicy implements DiskBalancerVolumeChoosingPo
       final double lowerThreshold = idealUsage - actualThreshold;
       final double upperThreshold = idealUsage + actualThreshold;
 
+      // Log all volume information for investigation
+      logVolumeBalancingState(volumeUsages, idealUsage, thresholdPercentage,
+          lowerThreshold, upperThreshold, containerSize, deltaMap);
+
       // Try source candidates from highest to second-highest utilization
       // For each source, try destinations from the lowest utilization up
       for (int s = volumeUsages.size() - 1; s > 0; s--) {
         for (int d = 0; d < s; d++) {
           final VolumeFixedUsage srcUsage = volumeUsages.get(s);
           final VolumeFixedUsage dstUsage = volumeUsages.get(d);
-          
+
           // If volume[s] was already below the Upper Threshold, then volume[s-1] is definitely below it too.
           // So technically, if we hit this condition, we are done with all balancing for the node.
           if (srcUsage.getUtilization() < upperThreshold && dstUsage.getUtilization() > lowerThreshold) {
@@ -90,7 +95,12 @@ public class DefaultVolumeChoosingPolicy implements DiskBalancerVolumeChoosingPo
           if (containerSize < dstUsage.computeUsableSpace()) {
             // Found dst, reserve space and return
             dst.incCommittedBytes(containerSize);
-            return Pair.of(srcUsage.getVolume(), dst);
+            HddsVolume src = srcUsage.getVolume();
+            LOG.debug("Chosen volume pair for disk balancing: source={} (utilization={}), " +
+                    "destination={} (utilization={})",
+                src.getStorageID(), srcUsage.getUtilization(),
+                dst.getStorageID(), dstUsage.getUtilization());
+            return Pair.of(src, dst);
           }
           LOG.debug("Destination volume {} does not have enough space, trying next volume.",
               dst.getStorageID());
@@ -100,6 +110,38 @@ public class DefaultVolumeChoosingPolicy implements DiskBalancerVolumeChoosingPo
       return null;
     } finally {
       lock.unlock();
+    }
+  }
+
+  /**
+   * Logs all volume information for disk balancing investigation.
+   *
+   * @param volumeUsages List of volume usages (sorted by utilization ascending)
+   * @param idealUsage Calculated ideal usage
+   * @param thresholdPercentage Threshold percentage
+   * @param lowerThreshold Lower threshold bound
+   * @param upperThreshold Upper threshold bound
+   * @param containerSize Container size to be moved
+   * @param deltaMap Map of volume deltas
+   */
+  private void logVolumeBalancingState(List<VolumeFixedUsage> volumeUsages,
+      double idealUsage, double thresholdPercentage, double lowerThreshold,
+      double upperThreshold, long containerSize, Map<HddsVolume, Long> deltaMap) {
+    LOG.debug("Disk balancing state - idealUsage={}, thresholdPercentage={}%, " +
+            "thresholdRange=({}, {}), containerSize={}",
+        String.format("%.10f", idealUsage), thresholdPercentage,
+        String.format("%.10f", lowerThreshold), String.format("%.10f", upperThreshold),
+        containerSize);
+    for (int i = 0; i < volumeUsages.size(); i++) {
+      VolumeFixedUsage vfu = volumeUsages.get(i);
+      HddsVolume vol = vfu.getVolume();
+      SpaceUsageSource.Fixed usage = vfu.getUsage();
+      long usableSpace = vfu.computeUsableSpace();
+      LOG.debug("Volume[{}] - disk={}, utilization={}, capacity={}, " +
+              "effectiveUsed={}, available={}, usableSpace={}, committedBytes={}, delta={}",
+          i, vol.getStorageID(), String.format("%.10f", vfu.getUtilization()),
+          usage.getCapacity(), vfu.getEffectiveUsed(), usage.getAvailable(),
+          usableSpace, vol.getCommittedBytes(), deltaMap.getOrDefault(vol, 0L));
     }
   }
 }
