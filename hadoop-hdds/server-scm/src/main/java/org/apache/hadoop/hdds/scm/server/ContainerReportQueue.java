@@ -48,13 +48,13 @@ public class ContainerReportQueue
    * i.e. report execution from multiple datanode will be executed in same
    * order as added to queue.
    */
-  private LinkedBlockingQueue<String> orderingQueue
+  private final LinkedBlockingQueue<String> orderingQueue
       = new LinkedBlockingQueue<>();
-  private Map<String, List<ContainerReport>> dataMap = new HashMap<>();
+  private final Map<String, List<ContainerReport>> dataMap = new HashMap<>();
 
   private int capacity = 0;
 
-  private AtomicInteger droppedCount = new AtomicInteger();
+  private final AtomicInteger droppedCount = new AtomicInteger();
 
   public ContainerReportQueue() {
     this(100000);
@@ -232,7 +232,7 @@ public class ContainerReportQueue
   public void put(@Nonnull ContainerReport value) throws InterruptedException {
     Objects.requireNonNull(value);
     while (!addValue(value)) {
-      Thread.currentThread().sleep(10);
+      Thread.sleep(10);
     }
   }
 
@@ -246,7 +246,7 @@ public class ContainerReportQueue
         return true;
       }
       long startTime = Time.monotonicNow();
-      Thread.currentThread().sleep(10);
+      Thread.sleep(10);
       long timeDiff = Time.monotonicNow() - startTime;
       timeoutMillis -= timeDiff;
     }
