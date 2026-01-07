@@ -75,8 +75,10 @@ public class DefaultVolumeChoosingPolicy implements DiskBalancerVolumeChoosingPo
       final double upperThreshold = idealUsage + actualThreshold;
 
       // Log all volume information for investigation
-      logVolumeBalancingState(volumeUsages, idealUsage, thresholdPercentage,
-          lowerThreshold, upperThreshold, containerSize, deltaMap);
+      if (LOG.isDebugEnabled()) {
+        logVolumeBalancingState(volumeUsages, idealUsage, thresholdPercentage,
+            lowerThreshold, upperThreshold, containerSize, deltaMap);
+      }
 
       // Get highest and lowest utilization volumes
       final VolumeFixedUsage highestUsage = volumeUsages.get(volumeUsages.size() - 1);
