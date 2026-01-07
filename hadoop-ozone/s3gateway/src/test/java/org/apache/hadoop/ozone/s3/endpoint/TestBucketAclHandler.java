@@ -256,4 +256,75 @@ public class TestBucketAclHandler {
         eq(S3GAction.PUT_ACL),
         any(OS3Exception.class));
   }
+
+  // ===== GET Request Tests =====
+
+  @Test
+  public void testHandleGetRequestWithAclQueryParam() throws Exception {
+    assertNotNull(aclHandler.handleGetRequest(BUCKET_NAME),
+        "Handler should handle request with ?acl param");
+  }
+
+  @Test
+  public void testHandleGetRequestWithoutAclQueryParam() throws Exception {
+    // Remove "acl" query parameter - handler should not handle request
+    aclHandler.queryParamsForTest().unset("acl");
+
+    assertNull(aclHandler.handleGetRequest(BUCKET_NAME),
+        "Handler should return null without ?acl param");
+  }
+
+  @Test
+  public void testHandleGetRequestSucceeds() throws Exception {
+    assertSucceeds(() -> aclHandler.handleGetRequest(BUCKET_NAME));
+  }
+
+  @Test
+  public void testHandleGetRequestBucketNotFound() {
+    assertThrows(OS3Exception.class,
+        () -> aclHandler.handleGetRequest("nonexistent-bucket"),
+        "Should throw OS3Exception for non-existent bucket");
+  }
+
+  @Test
+  public void testHandleGetRequestReturnsCorrectAclStructure() throws Exception {
+    // First set some ACL
+    when(headers.getHeaderString(S3Acl.GRANT_READ))
+        .thenReturn("id=\"testuser\"");
+    aclHandler.handlePutRequest(BUCKET_NAME, null);
+
+    // Now get ACL
+    Response response = aclHandler.handleGetRequest(BUCKET_NAME);
+
+    assertNotNull(response);
+    S3BucketAcl result = (S3BucketAcl) response.getEntity();
+    assertNotNull(result.getOwner());
+    assertNotNull(result.getAclList());
+    assertNotNull(result.getAclList().getGrantList());
+  }
+
+  @Test
+  public void testAuditLoggingOnGetSuccess() throws Exception {
+    BucketAclHandler spyHandler = spy(aclHandler);
+
+    Response response = spyHandler.handleGetRequest(BUCKET_NAME);
+
+    assertNotNull(response);
+    // Verify that auditReadSuccess was called with GET_ACL action
+    verify(spyHandler, times(1)).auditReadSuccess(eq(S3GAction.GET_ACL));
+  }
+
+  @Test
+  public void testAuditLoggingOnGetBucketNotFound() throws Exception {
+    BucketAclHandler spyHandler = spy(aclHandler);
+
+    // This should throw exception for non-existent bucket
+    assertThrows(OS3Exception.class,
+        () -> spyHandler.handleGetRequest("nonexistent-bucket"));
+
+    // Verify that auditReadFailure was called with GET_ACL action
+    verify(spyHandler, times(1)).auditReadFailure(
+        eq(S3GAction.GET_ACL),
+        any(OS3Exception.class));
+  }
 }

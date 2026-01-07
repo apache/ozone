@@ -22,6 +22,7 @@ import static java.net.HttpURLConnection.HTTP_NOT_IMPLEMENTED;
 import static java.net.HttpURLConnection.HTTP_OK;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -79,6 +80,18 @@ public class TestBucketAcl {
     }
   }
 
+  /**
+   * Helper method to get ACL from bucket and validate response.
+   */
+  private S3BucketAcl getBucketAcl(String bucketName) throws Exception {
+    Response response = bucketEndpoint.get(bucketName);
+    assertEquals(HTTP_OK, response.getStatus(),
+        "GET ACL should return HTTP_OK");
+    assertTrue(response.getEntity() instanceof S3BucketAcl,
+        "Response entity should be S3BucketAcl");
+    return (S3BucketAcl) response.getEntity();
+  }
+
   @Test
   public void testGetAcl() throws Exception {
     when(parameterMap.containsKey(ACL_MARKER)).thenReturn(true);
@@ -105,7 +118,7 @@ public class TestBucketAcl {
     Response response =
         bucketEndpoint.put(BUCKET_NAME, null);
     assertEquals(HTTP_OK, response.getStatus());
-    S3BucketAcl getResponse = bucketEndpoint.getAcl(BUCKET_NAME);
+    S3BucketAcl getResponse = getBucketAcl(BUCKET_NAME);
     assertEquals(1, getResponse.getAclList().getGrantList().size());
     assertEquals(S3Acl.ACLType.READ.getValue(),
         getResponse.getAclList().getGrantList().get(0).getPermission());
@@ -119,7 +132,7 @@ public class TestBucketAcl {
     Response response =
         bucketEndpoint.put(BUCKET_NAME, null);
     assertEquals(HTTP_OK, response.getStatus());
-    S3BucketAcl getResponse = bucketEndpoint.getAcl(BUCKET_NAME);
+    S3BucketAcl getResponse = getBucketAcl(BUCKET_NAME);
     assertEquals(1, getResponse.getAclList().getGrantList().size());
     assertEquals(S3Acl.ACLType.WRITE.getValue(),
         getResponse.getAclList().getGrantList().get(0).getPermission());
@@ -133,8 +146,7 @@ public class TestBucketAcl {
     Response response =
         bucketEndpoint.put(BUCKET_NAME, null);
     assertEquals(HTTP_OK, response.getStatus());
-    S3BucketAcl getResponse =
-        bucketEndpoint.getAcl(BUCKET_NAME);
+    S3BucketAcl getResponse = getBucketAcl(BUCKET_NAME);
     assertEquals(1, getResponse.getAclList().getGrantList().size());
     assertEquals(S3Acl.ACLType.READ_ACP.getValue(),
         getResponse.getAclList().getGrantList().get(0).getPermission());
@@ -148,7 +160,7 @@ public class TestBucketAcl {
     Response response =
         bucketEndpoint.put(BUCKET_NAME, null);
     assertEquals(HTTP_OK, response.getStatus());
-    S3BucketAcl getResponse = bucketEndpoint.getAcl(BUCKET_NAME);
+    S3BucketAcl getResponse = getBucketAcl(BUCKET_NAME);
     assertEquals(1, getResponse.getAclList().getGrantList().size());
     assertEquals(S3Acl.ACLType.WRITE_ACP.getValue(),
         getResponse.getAclList().getGrantList().get(0).getPermission());
@@ -162,7 +174,7 @@ public class TestBucketAcl {
     Response response =
         bucketEndpoint.put(BUCKET_NAME, null);
     assertEquals(HTTP_OK, response.getStatus());
-    S3BucketAcl getResponse = bucketEndpoint.getAcl(BUCKET_NAME);
+    S3BucketAcl getResponse = getBucketAcl(BUCKET_NAME);
     assertEquals(1, getResponse.getAclList().getGrantList().size());
     assertEquals(S3Acl.ACLType.FULL_CONTROL.getValue(),
         getResponse.getAclList().getGrantList().get(0).getPermission());
@@ -184,7 +196,7 @@ public class TestBucketAcl {
     Response response =
         bucketEndpoint.put(BUCKET_NAME, null);
     assertEquals(HTTP_OK, response.getStatus());
-    S3BucketAcl getResponse = bucketEndpoint.getAcl(BUCKET_NAME);
+    S3BucketAcl getResponse = getBucketAcl(BUCKET_NAME);
     assertEquals(5, getResponse.getAclList().getGrantList().size());
   }
 
@@ -197,7 +209,7 @@ public class TestBucketAcl {
     Response response =
         bucketEndpoint.put(BUCKET_NAME, null);
     assertEquals(HTTP_OK, response.getStatus());
-    S3BucketAcl getResponse = bucketEndpoint.getAcl(BUCKET_NAME);
+    S3BucketAcl getResponse = getBucketAcl(BUCKET_NAME);
     assertEquals(1, getResponse.getAclList().getGrantList().size());
     assertEquals(S3Acl.ACLType.READ.getValue(),
         getResponse.getAclList().getGrantList().get(0).getPermission());
@@ -214,7 +226,7 @@ public class TestBucketAcl {
     response =
         bucketEndpoint.put(BUCKET_NAME, null);
     assertEquals(HTTP_OK, response.getStatus());
-    getResponse = bucketEndpoint.getAcl(BUCKET_NAME);
+    getResponse = getBucketAcl(BUCKET_NAME);
     assertEquals(1, getResponse.getAclList().getGrantList().size());
     assertEquals(S3Acl.ACLType.WRITE.getValue(),
         getResponse.getAclList().getGrantList().get(0).getPermission());
@@ -241,7 +253,7 @@ public class TestBucketAcl {
     Response response =
         bucketEndpoint.put(BUCKET_NAME, inputBody);
     assertEquals(HTTP_OK, response.getStatus());
-    S3BucketAcl getResponse = bucketEndpoint.getAcl(BUCKET_NAME);
+    S3BucketAcl getResponse = getBucketAcl(BUCKET_NAME);
     assertEquals(2, getResponse.getAclList().getGrantList().size());
   }
 
@@ -251,7 +263,7 @@ public class TestBucketAcl {
     when(headers.getHeaderString(S3Acl.GRANT_READ))
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
     OS3Exception e = assertThrows(OS3Exception.class, () ->
-        bucketEndpoint.getAcl("bucket-not-exist"));
+        bucketEndpoint.get("bucket-not-exist"));
     assertEquals(e.getHttpCode(), HTTP_NOT_FOUND);
   }
 }

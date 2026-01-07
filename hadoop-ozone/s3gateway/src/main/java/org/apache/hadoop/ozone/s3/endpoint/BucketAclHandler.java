@@ -27,8 +27,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import javax.annotation.PostConstruct;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -38,6 +41,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
+import org.apache.hadoop.ozone.s3.endpoint.S3BucketAcl.Grant;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
@@ -64,6 +68,64 @@ public class BucketAclHandler extends EndpointBase implements BucketOperationHan
    */
   private boolean shouldHandle() {
     return queryParams().get(QueryParams.ACL) != null;
+  }
+
+  /**
+   * Implement acl get.
+   * <p>
+   * see: https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketAcl.html
+   */
+  @Override
+  public Response handleGetRequest(String bucketName)
+      throws IOException, OS3Exception {
+
+    if (!shouldHandle()) {
+      return null;  // Not responsible for this request
+    }
+
+    long startNanos = Time.monotonicNowNanos();
+    S3GAction s3GAction = S3GAction.GET_ACL;
+
+    try {
+      OzoneBucket bucket = getBucket(bucketName);
+      S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
+      S3Owner owner = S3Owner.of(bucket.getOwner());
+
+      S3BucketAcl result = new S3BucketAcl();
+      result.setOwner(owner);
+
+      // TODO: remove this duplication avoid logic when ACCESS and DEFAULT scope
+      // TODO: are merged.
+      // Use set to remove ACLs with different scopes(ACCESS and DEFAULT)
+      Set<Grant> grantSet = new HashSet<>();
+      // Return ACL list
+      for (OzoneAcl acl : bucket.getAcls()) {
+        List<Grant> grants = S3Acl.ozoneNativeAclToS3Acl(acl);
+        grantSet.addAll(grants);
+      }
+      ArrayList<Grant> grantList = new ArrayList<>();
+      grantList.addAll(grantSet);
+      result.setAclList(
+          new S3BucketAcl.AccessControlList(grantList));
+
+      getMetrics().updateGetAclSuccessStats(startNanos);
+      auditReadSuccess(s3GAction);
+      return Response.ok(result, MediaType.APPLICATION_XML_TYPE).build();
+    } catch (OMException ex) {
+      getMetrics().updateGetAclFailureStats(startNanos);
+      auditReadFailure(s3GAction, ex);
+      if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
+        throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
+      } else if (isAccessDenied(ex)) {
+        throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
+      } else {
+        throw newError(S3ErrorTable.INTERNAL_ERROR, bucketName, ex);
+      }
+    } catch (OS3Exception ex) {
+      getMetrics().updateGetAclFailureStats(startNanos);
+      auditReadFailure(s3GAction, ex);
+      throw ex;
+    }
   }
 
   /**
