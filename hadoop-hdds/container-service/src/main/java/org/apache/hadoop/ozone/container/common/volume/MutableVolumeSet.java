@@ -428,7 +428,7 @@ public class MutableVolumeSet implements VolumeSet {
       }
     }
     volumeMap.clear();
-    
+
     if (volumeHealthMetrics != null) {
       volumeHealthMetrics.unregister();
     }
