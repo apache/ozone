@@ -4917,7 +4917,7 @@
   </property>
 
   <property>
-    <name>ozone.lifecycle.service.move-to-trash.enabled</name>
+    <name>ozone.lifecycle.service.move.to.trash.enabled</name>
     <value>true</value>
     <tag>OZONE</tag>
     <description>When enabled KeyLifecycleService will move expired keys/dirs to trash if trash is available.

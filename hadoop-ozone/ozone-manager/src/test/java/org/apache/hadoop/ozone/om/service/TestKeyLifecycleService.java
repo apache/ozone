@@ -1595,7 +1595,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       GenericTestUtils.waitFor(() -> getKeyCount(FILE_SYSTEM_OPTIMIZED) - initialKeyCount == KEY_COUNT,
           WAIT_CHECK_INTERVAL, 1000);
 
-      // Make trash available, but disable move-to-trash in KeyLifecycleService.
+      // Make trash available, but disable move.to.trash in KeyLifecycleService.
       keyLifecycleService.setMoveToTrashEnabled(false);
       final float trashInterval = 0.5f; // 30 seconds
       conf.setFloat(FS_TRASH_INTERVAL_KEY, trashInterval);
@@ -1608,7 +1608,7 @@ class TestKeyLifecycleService extends OzoneTestBase {
       ZonedDateTime date = ZonedDateTime.now(ZoneOffset.UTC).plusSeconds(EXPIRE_SECONDS);
       createLifecyclePolicy(volumeName, bucketName, FILE_SYSTEM_OPTIMIZED, "", null, date.toString(), true);
 
-      // With move-to-trash disabled, keys should be deleted directly (not renamed).
+      // With move.to.trash disabled, keys should be deleted directly (not renamed).
       GenericTestUtils.waitFor(() ->
           (getDeletedKeyCount() - initialDeletedKeyCount) == KEY_COUNT, WAIT_CHECK_INTERVAL, 10000);
       assertEquals(initialRenamedKeyCount, metrics.getNumKeyRenamed().value());
