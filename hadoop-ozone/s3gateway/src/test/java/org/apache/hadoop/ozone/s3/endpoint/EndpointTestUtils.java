@@ -34,6 +34,15 @@ import org.apache.ratis.util.function.CheckedSupplier;
 /** Utilities for unit-testing S3 endpoints. */
 public final class EndpointTestUtils {
 
+  /** Get key content. */
+  public static Response get(
+      ObjectEndpoint subject,
+      String bucket,
+      String key
+  ) throws IOException, OS3Exception {
+    return subject.get(bucket, key, 0, null, 0, null, null);
+  }
+
   /** Get key tags. */
   public static Response getTagging(
       ObjectEndpoint subject,
@@ -41,6 +50,18 @@ public final class EndpointTestUtils {
       String key
   ) throws IOException, OS3Exception {
     return subject.get(bucket, key, 0, null, 0, null, "");
+  }
+
+  /** List parts of MPU. */
+  public static Response listParts(
+      ObjectEndpoint subject,
+      String bucket,
+      String key,
+      String uploadID,
+      int maxParts,
+      int nextPart
+  ) throws IOException, OS3Exception {
+    return subject.get(bucket, key, 0, uploadID, maxParts, String.valueOf(nextPart), null);
   }
 
   /** Put without content. */
@@ -96,6 +117,15 @@ public final class EndpointTestUtils {
         return subject.put(bucket, key, length, partNumber, uploadID, null, null, body);
       }
     }
+  }
+
+  /** Delete key. */
+  public static Response delete(
+      ObjectEndpoint subject,
+      String bucket,
+      String key
+  ) throws IOException, OS3Exception {
+    return subject.delete(bucket, key, null, null);
   }
 
   /** Delete key tags. */
@@ -168,10 +198,25 @@ public final class EndpointTestUtils {
     }
   }
 
+  /** Abort multipart upload. */
+  public static Response abortMultipartUpload(
+      ObjectEndpoint subject,
+      String bucket,
+      String key,
+      String uploadID
+  ) throws IOException, OS3Exception {
+    return subject.delete(bucket, key, uploadID, null);
+  }
+
   /** Verify response is success for {@code request}. */
   public static <E extends Exception> void assertSucceeds(CheckedSupplier<Response, E> request) throws E {
+    assertStatus(HttpStatus.SC_OK, request);
+  }
+
+  /** Verify response status for {@code request}. */
+  public static <E extends Exception> void assertStatus(int status, CheckedSupplier<Response, E> request) throws E {
     try (Response response = request.get()) {
-      assertEquals(HttpStatus.SC_OK, response.getStatus());
+      assertEquals(status, response.getStatus());
     }
   }
 
