@@ -561,23 +561,23 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       server.start();
 
       RaftServerRpc serverRpc = server.getServerRpc();
-      clientPort = getRealPort(serverRpc.getClientServerAddress(),
+      clientPort = updateDatanodePort(serverRpc.getClientServerAddress(),
           Port.Name.RATIS);
-      adminPort = getRealPort(serverRpc.getAdminServerAddress(),
+      adminPort = updateDatanodePort(serverRpc.getAdminServerAddress(),
           Port.Name.RATIS_ADMIN);
-      serverPort = getRealPort(serverRpc.getInetSocketAddress(),
+      serverPort = updateDatanodePort(serverRpc.getInetSocketAddress(),
           Port.Name.RATIS_SERVER);
       if (streamEnable) {
         DataStreamServerRpc dataStreamServerRpc =
             server.getDataStreamServerRpc();
-        getRealPort(dataStreamServerRpc.getInetSocketAddress(),
+        updateDatanodePort(dataStreamServerRpc.getInetSocketAddress(),
             Port.Name.RATIS_DATASTREAM);
       }
       isStarted = true;
     }
   }
 
-  private int getRealPort(InetSocketAddress address, Port.Name portName) {
+  private int updateDatanodePort(InetSocketAddress address, Port.Name portName) {
     int realPort = address.getPort();
     final Port port = DatanodeDetails.newPort(portName, realPort);
     datanodeDetails.setPort(port);
