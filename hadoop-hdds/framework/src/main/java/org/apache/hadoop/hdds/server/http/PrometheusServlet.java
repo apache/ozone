@@ -49,6 +49,7 @@ public class PrometheusServlet extends HttpServlet {
       String authorizationHeader = req.getHeader("Authorization");
       if (authorizationHeader == null
           || !authorizationHeader.startsWith(BEARER)
+          || authorizationHeader.length() <= BEARER.length()
           || !securityToken.equals(
               authorizationHeader.substring(BEARER.length() + 1))) {
         resp.setStatus(HttpServletResponse.SC_FORBIDDEN);
