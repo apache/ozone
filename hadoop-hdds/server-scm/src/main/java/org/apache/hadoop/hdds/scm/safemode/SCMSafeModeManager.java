@@ -183,6 +183,7 @@ public class SCMSafeModeManager implements SafeModeManager {
   public void forceExitSafeMode() {
     LOG.info("SCM force-exiting safe mode.");
     status.set(SafeModeStatus.OUT_OF_SAFE_MODE);
+    logSafeModeStatus();
     emitSafeModeStatus();
   }
 
@@ -274,22 +275,18 @@ public class SCMSafeModeManager implements SafeModeManager {
     int validatedCount = validatedRules.size();
     int preCheckValidatedCount = validatedPreCheckRules.size();
     StringBuilder statusLog = new StringBuilder();
-    statusLog.append(String.format(
-        "%nSCM SafeMode Status | state=%s preCheckComplete=%s validatedPreCheckRules=%d/%d validatedRules=%d/%d",
-        safeModeStatus.isInSafeMode() ? 
-            (safeModeStatus.isPreCheckComplete() ? "PRE_CHECKS_PASSED" : "INITIAL") : "OUT_OF_SAFE_MODE",
-        safeModeStatus.isPreCheckComplete(), preCheckValidatedCount, preCheckRules.size(), validatedCount,
-        exitRules.size()));
+    
+    statusLog.append("\nSCM SafeMode Status | state=").append(safeModeStatus.name())
+        .append(" preCheckComplete=").append(safeModeStatus.isPreCheckComplete())
+        .append(" validatedPreCheckRules=").append(preCheckValidatedCount)
+        .append("/").append(preCheckRules.size())
+        .append(" validatedRules=").append(validatedCount)
+        .append("/").append(exitRules.size());
     
     for (SafeModeExitRule<?> rule : exitRules.values()) {
       String name = rule.getRuleName();
       boolean isValidated = validatedRules.contains(name);
       String statusText = rule.getStatusText();
-      
-      if (statusText.endsWith(";")) {
-        statusText = statusText.substring(0, statusText.length() - 1);
-      }
-
       statusLog.append(String.format("%nSCM SafeMode Status | %s (%s) %s",
           name,
           isValidated ? "validated" : "waiting",

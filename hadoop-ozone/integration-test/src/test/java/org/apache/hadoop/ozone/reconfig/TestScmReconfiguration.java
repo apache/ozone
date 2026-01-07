@@ -116,4 +116,17 @@ public abstract class TestScmReconfiguration extends ReconfigurationTestBase {
     assertEquals(newValue, blockDeletingService.getBlockDeleteTXNum());
   }
 
+  @Test
+  void safeModeLogInterval() throws ReconfigurationException {
+
+    getSubject().reconfigurePropertyImpl(
+        HddsConfigKeys.HDDS_SCM_SAFEMODE_LOG_INTERVAL, "30s");
+
+    assertEquals(
+        "30s",
+        cluster().getStorageContainerManager()
+            .getConfiguration()
+            .get(HddsConfigKeys.HDDS_SCM_SAFEMODE_LOG_INTERVAL));
+  }
+
 }

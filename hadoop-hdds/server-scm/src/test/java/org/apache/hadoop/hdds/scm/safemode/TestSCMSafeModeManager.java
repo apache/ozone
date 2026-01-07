@@ -785,10 +785,11 @@ public class TestSCMSafeModeManager {
 
   /**
    * Test that each safemode rule's getStatusText is being logged periodically
-   * while SCM is in safe mode.
+   * while SCM is in safe mode, and that the logger stops with a final summary
+   * when safe mode is force-exited.
    */
   @Test
-  public void testSafeModePeriodicLogging() throws Exception {
+  public void testSafeModePeriodicLoggingStopsOnForceExit() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration(config);
     conf.set(HddsConfigKeys.HDDS_SCM_SAFEMODE_LOG_INTERVAL, "500ms");
     conf.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE, 3);
@@ -813,22 +814,115 @@ public class TestSCMSafeModeManager {
     assertTrue(scmSafeModeManager.getInSafeMode());
 
     try {
-      Map<String, Pair<Boolean, String>> ruleStatuses = scmSafeModeManager.getRuleStatus();
+      // Verify periodic logging is active while in safe mode
+      verifyPeriodicLoggingActive(logCapturer);
 
-      for (int i = 0; i < 3; i++) {
-        logCapturer.clearOutput();
-        // Wait for configured interval (500ms + small buffer) for next log message.
-        Thread.sleep(600);
-        String logOutput = logCapturer.getOutput();
+      logCapturer.clearOutput();
+      scmSafeModeManager.forceExitSafeMode();
+      assertFalse(scmSafeModeManager.getInSafeMode());
 
-        assertThat(logOutput).contains("SCM SafeMode Status | state=");
+      // Verify final summary was logged with OUT_OF_SAFE_MODE state
+      String exitLog = logCapturer.getOutput();
+      assertThat(exitLog).contains("SCM SafeMode Status | state=OUT_OF_SAFE_MODE");
+      assertThat(exitLog).contains("Stopped periodic Safe Mode logging");
+      assertThat(exitLog).contains("SCM force-exiting safe mode");
 
-        for (String ruleName : ruleStatuses.keySet()) {
-          assertThat(logOutput).contains("SCM SafeMode Status | " + ruleName);
-        }
-      }
     } finally {
       logCapturer.stopCapturing();
+    }
+  }
+
+  /**
+   * Test that each safemode rule's getStatusText is being logged periodically
+   * while SCM is in safe mode, and that the logger stops with a final summary
+   * when safe mode is exited normally.
+   */
+  @Test
+  public void testSafeModePeriodicLoggingStopsOnNormalExit() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration(config);
+    conf.set(HddsConfigKeys.HDDS_SCM_SAFEMODE_LOG_INTERVAL, "500ms");
+    conf.setInt(HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE, 1);
+
+    MockNodeManager mockNodeManager = new MockNodeManager(true, 3);
+    ContainerManager containerManager = mock(ContainerManager.class);
+    when(containerManager.getContainers(ReplicationType.RATIS)).thenReturn(new ArrayList<>());
+    
+    PipelineManagerImpl pipelineManager = PipelineManagerImpl.newPipelineManager(
+        conf,
+        SCMHAManagerStub.getInstance(true),
+        mockNodeManager,
+        scmMetadataStore.getPipelineTable(),
+        queue,
+        scmContext,
+        serviceManager,
+        Clock.system(ZoneOffset.UTC));
+
+    PipelineProvider<RatisReplicationConfig> mockRatisProvider =
+        new MockRatisPipelineProvider(mockNodeManager,
+            pipelineManager.getStateManager(), conf);
+    pipelineManager.setPipelineProvider(HddsProtos.ReplicationType.RATIS,
+        mockRatisProvider);
+    pipelineManager.getBackgroundPipelineCreator().stop();
+
+    GenericTestUtils.LogCapturer logCapturer =
+        GenericTestUtils.LogCapturer.captureLogs(SCMSafeModeManager.getLogger());
+
+    scmSafeModeManager = new SCMSafeModeManager(conf, mockNodeManager, pipelineManager,
+        containerManager, serviceManager, queue, scmContext);
+    scmSafeModeManager.start();
+    assertTrue(scmSafeModeManager.getInSafeMode());
+
+    try {
+      // Verify periodic logging is active while in safe mode
+      verifyPeriodicLoggingActive(logCapturer);
+      logCapturer.clearOutput();
+      
+      SCMDatanodeProtocolServer.NodeRegistrationContainerReport nodeReport =
+          HddsTestUtils.createNodeRegistrationContainerReport(new ArrayList<>());
+      queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT, nodeReport);
+      queue.fireEvent(SCMEvents.CONTAINER_REGISTRATION_REPORT, nodeReport);
+      queue.processAll(5000);
+      GenericTestUtils.waitFor(() -> scmSafeModeManager.getPreCheckComplete(), 100, 5000);
+      assertThat(logCapturer.getOutput()).contains("SCM SafeMode Status | state=PRE_CHECKS_PASSED");
+      
+      Pipeline pipeline = pipelineManager.createPipeline(
+          RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
+      pipeline = pipelineManager.getPipeline(pipeline.getId());
+      MockRatisPipelineProvider.markPipelineHealthy(pipeline);
+      firePipelineEvent(pipelineManager, pipeline);
+      queue.processAll(5000);
+      
+      GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(), 100, 5000);
+
+      // Verify final summary was logged with OUT_OF_SAFE_MODE state
+      String exitLog = logCapturer.getOutput();
+      assertThat(exitLog).contains("SCM SafeMode Status | state=OUT_OF_SAFE_MODE");
+      assertThat(exitLog).contains("Stopped periodic Safe Mode logging");
+      assertThat(exitLog).contains("SCM exiting safe mode");
+      assertFalse(scmSafeModeManager.getInSafeMode());
+      
+    } finally {
+      logCapturer.stopCapturing();
+    }
+  }
+  
+  /**
+   * Verifies that periodic safe mode logging is working.
+   * Checks that status messages are being logged at the configured interval.
+   */
+  private void verifyPeriodicLoggingActive(GenericTestUtils.LogCapturer logCapturer)
+      throws InterruptedException {
+    Map<String, Pair<Boolean, String>> ruleStatuses = scmSafeModeManager.getRuleStatus();
+    for (int i = 0; i < 2; i++) {
+      logCapturer.clearOutput();
+      // Wait for configured interval (500ms + small buffer) for next log message
+      Thread.sleep(600);
+      String logOutput = logCapturer.getOutput();
+
+      assertThat(logOutput).contains("SCM SafeMode Status | state=");
+      for (String ruleName : ruleStatuses.keySet()) {
+        assertThat(logOutput).contains("SCM SafeMode Status | " + ruleName);
+      }
     }
   }
 }
