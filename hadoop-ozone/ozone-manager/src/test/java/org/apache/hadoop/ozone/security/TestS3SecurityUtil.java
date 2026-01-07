@@ -157,7 +157,7 @@ public class TestS3SecurityUtil {
         when(s3SecretManager.hasS3Secret(anyString())).thenReturn(true);
       }
 
-      final String sessionToken = config.sessionToken;
+      final String sessionToken = "session-token";
       if (config.isTokenRevoked && config.revokedSTSTokenTable != null) {
         final long insertionTimeMillis = CLOCK.millis();
         config.revokedSTSTokenTable.put(sessionToken, insertionTimeMillis);
@@ -204,6 +204,7 @@ public class TestS3SecurityUtil {
         ENCRYPTION_KEY);
   }
 
+  @SuppressWarnings("SameParameterValue")
   private static OMRequest createRequestWithSessionToken(String sessionToken) {
     final S3Authentication s3Authentication = S3Authentication.newBuilder()
         .setAccessId("accessKeyId")
@@ -223,7 +224,6 @@ public class TestS3SecurityUtil {
    * Helper class to create various scenarios for testing.
    */
   private static class TestConfig {
-    private final String sessionToken = "session-token";
     private OMMetadataManager metadataManager = mock(OMMetadataManager.class);
     private Table<String, Long> revokedSTSTokenTable = new InMemoryTestTable<>();
     private boolean isTokenRevoked = false;
