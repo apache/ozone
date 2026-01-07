@@ -128,7 +128,7 @@ public class TestBucketAcl {
   @Test
   public void testReadACP() throws Exception {
     when(parameterMap.containsKey(ACL_MARKER)).thenReturn(true);
-    when(headers.getHeaderString(S3Acl.GRANT_READ_CAP))
+    when(headers.getHeaderString(S3Acl.GRANT_READ_ACP))
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
     Response response =
         bucketEndpoint.put(BUCKET_NAME, null);
@@ -143,7 +143,7 @@ public class TestBucketAcl {
   @Test
   public void testWriteACP() throws Exception {
     when(parameterMap.containsKey(ACL_MARKER)).thenReturn(true);
-    when(headers.getHeaderString(S3Acl.GRANT_WRITE_CAP))
+    when(headers.getHeaderString(S3Acl.GRANT_WRITE_ACP))
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
     Response response =
         bucketEndpoint.put(BUCKET_NAME, null);
@@ -175,9 +175,9 @@ public class TestBucketAcl {
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
     when(headers.getHeaderString(S3Acl.GRANT_WRITE))
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
-    when(headers.getHeaderString(S3Acl.GRANT_READ_CAP))
+    when(headers.getHeaderString(S3Acl.GRANT_READ_ACP))
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
-    when(headers.getHeaderString(S3Acl.GRANT_WRITE_CAP))
+    when(headers.getHeaderString(S3Acl.GRANT_WRITE_ACP))
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
     when(headers.getHeaderString(S3Acl.GRANT_FULL_CONTROL))
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");

@@ -543,6 +543,19 @@ public abstract class EndpointBase {
     ozoneConfiguration = conf;
   }
 
+  /**
+   * Copy dependencies from this endpoint to another endpoint.
+   * Used for initializing handler instances.
+   */
+  protected void copyDependenciesTo(EndpointBase target) {
+    target.setClient(this.client);
+    target.setOzoneConfiguration(this.ozoneConfiguration);
+    target.setContext(this.context);
+    target.setHeaders(this.headers);
+    target.setRequestIdentifier(this.requestIdentifier);
+    target.setSignatureInfo(this.signatureInfo);
+  }
+
   protected OzoneConfiguration getOzoneConfiguration() {
     return ozoneConfiguration;
   }
