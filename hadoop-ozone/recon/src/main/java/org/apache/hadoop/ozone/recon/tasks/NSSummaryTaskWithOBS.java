@@ -75,7 +75,7 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
 
   public boolean reprocessWithOBS(OMMetadataManager omMetadataManager) {
     // Create async flusher with queue capacity based on worker count
-    int queueCapacity = maxWorkers + 10;
+    int queueCapacity = maxWorkers * 2;
 
     try (NSSummaryAsyncFlusher asyncFlusher =
              NSSummaryAsyncFlusher.create(getReconNamespaceSummaryManager(),
@@ -145,6 +145,9 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
       return null;
     };
 
+    LOG.debug("Starting keyTable parallel iteration");
+    long keyStartTime = System.currentTimeMillis();
+    
     try (ParallelTableIteratorOperation<String, OmKeyInfo> parallelIter =
              new ParallelTableIteratorOperation<>(omMetadataManager, keyTable, StringCodec.get(),
                  maxIterators, maxWorkers, maxKeysInMemory, nsSummaryFlushToDBMaxThreshold)) {
@@ -153,6 +156,9 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
       LOG.error("Unable to process keyTable in parallel", ex);
       return false;
     }
+    
+    long keyEndTime = System.currentTimeMillis();
+    LOG.debug("Completed keyTable parallel iteration in {} ms", (keyEndTime - keyStartTime));
 
     // Submit any remaining worker maps
     for (Map<Long, NSSummary> remainingMap : allWorkerMaps.values()) {

@@ -236,7 +236,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
   public boolean reprocessWithFSO(OMMetadataManager omMetadataManager) {
     // We run reprocess in two phases with separate flushers so that directory
     // skeletons are fully persisted before file updates rely on them.
-    final int queueCapacity = maxWorkers + 10;
+    final int queueCapacity = maxWorkers * 2;
 
     try (NSSummaryAsyncFlusher dirFlusher =
              NSSummaryAsyncFlusher.create(getReconNamespaceSummaryManager(),
@@ -298,6 +298,9 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       return null;
     };
     
+    LOG.debug("Starting dirTable parallel iteration");
+    long dirStartTime = System.currentTimeMillis();
+    
     try (ParallelTableIteratorOperation<String, OmDirectoryInfo> parallelIter = 
         new ParallelTableIteratorOperation<>(omMetadataManager, dirTable, StringCodec.get(),
             maxIterators, maxWorkers, maxKeysInMemory, nsSummaryFlushToDBMaxThreshold)) {
@@ -306,6 +309,9 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       LOG.error("Unable to process dirTable in parallel", ex);
       return false;
     }
+    
+    long dirEndTime = System.currentTimeMillis();
+    LOG.debug("Completed dirTable parallel iteration in {} ms", (dirEndTime - dirStartTime));
 
     // Submit any remaining worker maps
     for (Map<Long, NSSummary> remainingMap : allWorkerMaps.values()) {
@@ -356,6 +362,9 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       return null;
     };
 
+    LOG.debug("Starting fileTable parallel iteration");
+    long fileStartTime = System.currentTimeMillis();
+    
     try (ParallelTableIteratorOperation<String, OmKeyInfo> parallelIter =
              new ParallelTableIteratorOperation<>(omMetadataManager, fileTable, StringCodec.get(),
                  maxIterators, maxWorkers, maxKeysInMemory, nsSummaryFlushToDBMaxThreshold)) {
@@ -364,6 +373,9 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       LOG.error("Unable to process fileTable in parallel", ex);
       return false;
     }
+    
+    long fileEndTime = System.currentTimeMillis();
+    LOG.debug("Completed fileTable parallel iteration in {} ms", (fileEndTime - fileStartTime));
 
     // Submit any remaining worker maps
     for (Map<Long, NSSummary> remainingMap : allWorkerMaps.values()) {

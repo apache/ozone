@@ -143,7 +143,7 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
   public void performTaskOnTableVals(String taskName, K startKey, K endKey,
       Function<Table.KeyValue<K, V>, Void> keyOperation) throws IOException, ExecutionException, InterruptedException {
     List<K> bounds = getBounds(startKey, endKey);
-    
+    LOG.debug("Length of the bounds - {}", bounds.size());
     // Fallback for small tables (no SST files yet - data only in memtable)
     if (bounds.size() < 2) {
       try (TableIterator<K, ? extends Table.KeyValue<K, V>> iter = table.iterator()) {

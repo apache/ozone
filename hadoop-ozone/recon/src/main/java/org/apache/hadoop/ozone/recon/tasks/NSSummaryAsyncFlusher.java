@@ -148,23 +148,27 @@ public final class NSSummaryAsyncFlusher implements Closeable {
         existingNSSummary = delta;
       } else {
         // Object exists in DB - merge delta into it
-        existingNSSummary.setNumOfFiles(
-            existingNSSummary.getNumOfFiles() + delta.getNumOfFiles());
-        existingNSSummary.setSizeOfFiles(
-            existingNSSummary.getSizeOfFiles() + delta.getSizeOfFiles());
-        existingNSSummary.setReplicatedSizeOfFiles(
-            existingNSSummary.getReplicatedSizeOfFiles() + delta.getReplicatedSizeOfFiles());
+        
+        // Skip numeric merging if delta has no file data (e.g., directory skeleton with zero counts)
+        if (delta.getNumOfFiles() > 0 || delta.getSizeOfFiles() > 0) {
+          existingNSSummary.setNumOfFiles(
+              existingNSSummary.getNumOfFiles() + delta.getNumOfFiles());
+          existingNSSummary.setSizeOfFiles(
+              existingNSSummary.getSizeOfFiles() + delta.getSizeOfFiles());
+          existingNSSummary.setReplicatedSizeOfFiles(
+              existingNSSummary.getReplicatedSizeOfFiles() + delta.getReplicatedSizeOfFiles());
 
-        // Merge file size buckets
-        int[] actualBucket = existingNSSummary.getFileSizeBucket();
-        int[] deltaBucket = delta.getFileSizeBucket();
-        for (int i = 0; i < actualBucket.length; i++) {
-          actualBucket[i] += deltaBucket[i];
+          // Merge file size buckets
+          int[] actualBucket = existingNSSummary.getFileSizeBucket();
+          int[] deltaBucket = delta.getFileSizeBucket();
+          for (int i = 0; i < actualBucket.length; i++) {
+            actualBucket[i] += deltaBucket[i];
+          }
+          existingNSSummary.setFileSizeBucket(actualBucket);
         }
 
-        // Merge child dirs
+        // Merge child dirs (needed for directory relationships)
         existingNSSummary.getChildDir().addAll(delta.getChildDir());
-        existingNSSummary.setFileSizeBucket(actualBucket);
 
         // Repair dirName if existing entry is missing it and delta has the value
         if (StringUtils.isEmpty(existingNSSummary.getDirName()) && StringUtils.isNotEmpty(delta.getDirName())) {
