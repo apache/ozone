@@ -33,6 +33,7 @@ import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.time.Clock;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
@@ -41,6 +42,7 @@ import org.apache.hadoop.hdds.utils.db.InMemoryTestTable;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
@@ -62,71 +64,106 @@ public class TestS3SecurityUtil {
 
   @Test
   public void testValidateS3CredentialFailsWhenTokenRevoked() throws Exception {
-    // If the revoked STS token table contains an entry for the temporary access key id extracted from the session
-    // token, validateS3Credential should reject the request with REVOKED_TOKEN
-    final OMMetadataManager metadataManager = mock(OMMetadataManager.class);
-    final Table<String, Long> revokedSTSTokenTable = new InMemoryTestTable<>();
+    // If the revoked STS token table contains an entry for the session token, the request should be rejected with
+    // REVOKED_TOKEN
     validateS3CredentialHelper(
-        "session-token-a", metadataManager, revokedSTSTokenTable, true, createSTSTokenIdentifier(),
-        REVOKED_TOKEN, "STS token has been revoked");
+        new TestConfig()
+            .setTokenRevoked(true)
+            .setExpectedResult(REVOKED_TOKEN)
+            .setExpectedMessage("STS token has been revoked"));
   }
 
   @Test
   public void testValidateS3CredentialWhenMetadataUnavailable() throws Exception {
     // If the metadata manager is not available, throws INTERNAL_ERROR
     validateS3CredentialHelper(
-        "session-token-b", null, null, false, createSTSTokenIdentifier(),
-        INTERNAL_ERROR, "Could not determine STS revocation: metadataManager is null");
+        new TestConfig()
+            .setMetadataManager(null)
+            .setExpectedResult(INTERNAL_ERROR)
+            .setExpectedMessage("Could not determine STS revocation: metadataManager is null"));
   }
 
   @Test
   public void testValidateS3CredentialSuccessWhenNotRevoked() throws Exception {
     // Normal case: token is NOT revoked and request is accepted
-    final OMMetadataManager metadataManager = mock(OMMetadataManager.class);
-    final Table<String, Long> revokedSTSTokenTable = new InMemoryTestTable<>();
-    validateS3CredentialHelper(
-        "session-token-c", metadataManager, revokedSTSTokenTable, false, createSTSTokenIdentifier(),
-        null, null);
+    validateS3CredentialHelper(new TestConfig());
   }
 
   @Test
   public void testValidateS3CredentialWhenMetadataManagerAvailableButRevokedTableNull() throws Exception {
     // If the revoked STS token table is not available, throws INTERNAL_ERROR
-    final OMMetadataManager metadataManager = mock(OMMetadataManager.class);
     validateS3CredentialHelper(
-        "session-token-d", metadataManager, null, false, createSTSTokenIdentifier(),
-        INTERNAL_ERROR, "Could not determine STS revocation: revokedStsTokenTable is null");
+        new TestConfig()
+            .setRevokedSTSTokenTable(null)
+            .setExpectedResult(INTERNAL_ERROR)
+            .setExpectedMessage("Could not determine STS revocation: revokedStsTokenTable is null"));
   }
 
   @Test
   public void testValidateS3CredentialWhenTableThrowsException() throws Exception {
     // If the revoked STS token table lookup throws, throws INTERNAL_ERROR (wrapped)
-    final OMMetadataManager metadataManager = mock(OMMetadataManager.class);
     final Table<String, Long> revokedSTSTokenTable = spy(new InMemoryTestTable<>());
     doThrow(new RuntimeException("lookup failed")).when(revokedSTSTokenTable).getIfExist(anyString());
+
     validateS3CredentialHelper(
-        "session-token-g", metadataManager, revokedSTSTokenTable, false, createSTSTokenIdentifier(),
-        INTERNAL_ERROR, "Could not determine STS revocation because of Exception: lookup failed");
+        new TestConfig()
+            .setRevokedSTSTokenTable(revokedSTSTokenTable)
+            .setExpectedResult(INTERNAL_ERROR)
+            .setExpectedMessage("Could not determine STS revocation because of Exception: lookup failed"));
   }
 
-  private void validateS3CredentialHelper(String sessionToken, OMMetadataManager metadataManager,
-      Table<String, Long> revokedSTSTokenTable, boolean isRevoked, STSTokenIdentifier stsTokenIdentifier,
-      OMException.ResultCodes expectedResult, String expectedMessageContents) throws Exception {
+  @Test
+  public void testValidateS3CredentialFailsWhenOriginalAccessKeyIdPrincipalRevoked() throws Exception {
+    // If the originalAccessKeyId principal is revoked, throws REVOKED_TOKEN
+    validateS3CredentialHelper(
+        new TestConfig()
+            .setOriginalAccessKeyIdRevoked(true)
+            .setExpectedResult(REVOKED_TOKEN)
+            .setExpectedMessage("STS token no longer valid: OriginalAccessKeyId principal revoked"));
+  }
 
+  @Test
+  public void testValidateS3CredentialFailsWhenOriginalAccessKeyIdCheckThrows() throws Exception {
+    // If checking originalAccessKeyId principal revocation fails, throws INTERNAL_ERROR
+    validateS3CredentialHelper(
+        new TestConfig()
+            .setShouldOriginalAccessKeyIdCheckThrowError(true)
+            .setExpectedResult(INTERNAL_ERROR)
+            .setExpectedMessage("Could not determine if original principal is revoked"));
+  }
+
+  private void validateS3CredentialHelper(TestConfig config) throws Exception {
     try (OzoneManager ozoneManager = mock(OzoneManager.class)) {
       when(ozoneManager.isSecurityEnabled()).thenReturn(true);
       when(ozoneManager.getSecretKeyClient()).thenReturn(mock(SecretKeyClient.class));
 
+      final OMMetadataManager metadataManager = config.metadataManager;
       when(ozoneManager.getMetadataManager()).thenReturn(metadataManager);
       if (metadataManager != null) {
-        when(metadataManager.getS3RevokedStsTokenTable()).thenReturn(revokedSTSTokenTable);
+        when(metadataManager.getS3RevokedStsTokenTable()).thenReturn(config.revokedSTSTokenTable);
       }
 
-      final String tempAccessKeyId = "temp-access-key-id";
-      if (isRevoked) {
-        final long insertionTimeMillis = CLOCK.millis();
-        revokedSTSTokenTable.put(sessionToken, insertionTimeMillis);
+      // Mock S3SecretManager to handle originalAccessKeyId checks
+      final S3SecretManager s3SecretManager = mock(S3SecretManager.class);
+      when(ozoneManager.getS3SecretManager()).thenReturn(s3SecretManager);
+      if (config.shouldOriginalAccessKeyIdCheckThrowError) {
+        when(s3SecretManager.hasS3Secret(anyString())).thenThrow(
+            new IOException("An error occurred while checking if s3Secret exists"));
+      } else if (config.isOriginalAccessKeyIdRevoked) {
+        // Returning false means secret does NOT exist -> principal is revoked
+        when(s3SecretManager.hasS3Secret(anyString())).thenReturn(false);
+      } else {
+        // Returning true means secret exists -> principal is valid
+        when(s3SecretManager.hasS3Secret(anyString())).thenReturn(true);
       }
+
+      final String sessionToken = config.sessionToken;
+      if (config.isTokenRevoked && config.revokedSTSTokenTable != null) {
+        final long insertionTimeMillis = CLOCK.millis();
+        config.revokedSTSTokenTable.put(sessionToken, insertionTimeMillis);
+      }
+
+      final STSTokenIdentifier stsTokenIdentifier = createSTSTokenIdentifier();
 
       try (MockedStatic<STSSecurityUtil> stsSecurityUtilMock = mockStatic(STSSecurityUtil.class, CALLS_REAL_METHODS);
            MockedStatic<AWSV4AuthValidator> awsV4AuthValidatorMock = mockStatic(
@@ -143,15 +180,15 @@ public class TestS3SecurityUtil {
 
         final OMRequest omRequest = createRequestWithSessionToken(sessionToken);
 
-        if (expectedResult != null) {
+        if (config.expectedResult != null) {
           final OMException omException = assertThrows(
               OMException.class, () -> S3SecurityUtil.validateS3Credential(omRequest, ozoneManager));
-          assertEquals(expectedResult, omException.getResult());
-          if (expectedMessageContents != null) {
+          assertEquals(config.expectedResult, omException.getResult());
+          if (config.expectedMessage != null) {
             assertTrue(
-                omException.getMessage().contains(expectedMessageContents),
-                "Expected exception message to contain: '" + expectedMessageContents + "' but was: '" +
-                omException.getMessage() + "'");
+                omException.getMessage().contains(config.expectedMessage),
+                "Expected exception message to contain: '" + config.expectedMessage + "' but was: '" +
+                    omException.getMessage() + "'");
           }
         } else {
           assertDoesNotThrow(() -> S3SecurityUtil.validateS3Credential(omRequest, ozoneManager));
@@ -180,5 +217,58 @@ public class TestS3SecurityUtil {
         .setCmdType(Type.CreateVolume)
         .setS3Authentication(s3Authentication)
         .build();
+  }
+
+  /**
+   * Helper class to create various scenarios for testing.
+   */
+  private static class TestConfig {
+    private final String sessionToken = "session-token";
+    private OMMetadataManager metadataManager = mock(OMMetadataManager.class);
+    private Table<String, Long> revokedSTSTokenTable = new InMemoryTestTable<>();
+    private boolean isTokenRevoked = false;
+    private boolean isOriginalAccessKeyIdRevoked = false;
+    private boolean shouldOriginalAccessKeyIdCheckThrowError = false;
+    private OMException.ResultCodes expectedResult = null;
+    private String expectedMessage = null;
+
+    @SuppressWarnings("SameParameterValue")
+    TestConfig setMetadataManager(OMMetadataManager metadataManager) {
+      this.metadataManager = metadataManager;
+      return this;
+    }
+
+    TestConfig setRevokedSTSTokenTable(Table<String, Long> table) {
+      this.revokedSTSTokenTable = table;
+      return this;
+    }
+
+    @SuppressWarnings("SameParameterValue")
+    TestConfig setTokenRevoked(boolean isRevoked) {
+      this.isTokenRevoked = isRevoked;
+      return this;
+    }
+
+    @SuppressWarnings("SameParameterValue")
+    TestConfig setOriginalAccessKeyIdRevoked(boolean isRevoked) {
+      this.isOriginalAccessKeyIdRevoked = isRevoked;
+      return this;
+    }
+
+    @SuppressWarnings("SameParameterValue")
+    TestConfig setShouldOriginalAccessKeyIdCheckThrowError(boolean isError) {
+      this.shouldOriginalAccessKeyIdCheckThrowError = isError;
+      return this;
+    }
+
+    TestConfig setExpectedResult(OMException.ResultCodes result) {
+      this.expectedResult = result;
+      return this;
+    }
+
+    TestConfig setExpectedMessage(String message) {
+      this.expectedMessage = message;
+      return this;
+    }
   }
 }
