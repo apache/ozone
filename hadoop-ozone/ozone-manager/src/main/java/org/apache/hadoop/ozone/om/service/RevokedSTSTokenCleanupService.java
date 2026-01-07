@@ -27,12 +27,14 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
@@ -65,6 +67,7 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
   // Dummy client ID to use for response, since this is triggered by a
   // service, not the client.
   private final ClientId clientId = ClientId.randomId();
+  private final int ratisByteLimit;
 
   /**
    * Creates a Revoked STS Token cleanup service.
@@ -83,6 +86,11 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
     this.suspended = new AtomicBoolean(false);
     this.runCount = new AtomicLong(0);
     this.submittedDeletedEntryCount = new AtomicLong(0);
+    int limit = (int) ozoneManager.getConfiguration().getStorageSize(
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT, StorageUnit.BYTES);
+    // Always go to 90% of max limit for request as other header(s) will be added
+    this.ratisByteLimit = (int) (limit * 0.9);
   }
 
   /**
@@ -126,11 +134,9 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
       runCount.incrementAndGet();
       final Table<String, Long> revokedStsTokenTable = metadataManager.getS3RevokedStsTokenTable();
 
-      // Collect entries that have existed for over 12 hours during the scan
-      final List<String> sessionTokensToCleanup = new ArrayList<>();
+      long deletedInRun = 0;
+      final List<String> batch = new ArrayList<>();
 
-      // Iterate over all entries in the revoked STS token table and remove
-      // those whose initialCreationTimeMillis is more than 12 hours
       try (Table.KeyValueIterator<String, Long> iterator = revokedStsTokenTable.iterator()) {
         iterator.seekToFirst();
         while (iterator.hasNext()) {
@@ -139,38 +145,64 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
           final Long initialCreationTimeMillis = entry.getValue();
 
           if (shouldCleanup(initialCreationTimeMillis)) {
-            sessionTokensToCleanup.add(sessionToken);
+            // Calculate the size this token would add to the protobuf message.
+            // Make a copy of the batch to do the size check
+            final List<String> batchCopyWithCandidate = new ArrayList<>(batch);
+            batchCopyWithCandidate.add(sessionToken);
+            int batchWithCandidateSize = getBatchSerializedSize(batchCopyWithCandidate);
+
+            // If adding this token would exceed the limit, submit the current batch
+            if (batchWithCandidateSize > ratisByteLimit) {
+              if (!batch.isEmpty()) {
+                if (submitCleanupRequest(batch)) {
+                  deletedInRun += batch.size();
+                } else {
+                  LOG.warn("Failed to submit batch of {} revoked tokens.", batch.size());
+                }
+                batch.clear();
+
+                // Re-calculate the size of the candidate token alone in an empty batch
+                // to check if it exceeds the limit by itself.
+                final List<String> singleCandidateBatch = new ArrayList<>();
+                singleCandidateBatch.add(sessionToken);
+                batchWithCandidateSize = getBatchSerializedSize(singleCandidateBatch);
+              }
+
+              // Check if the single token exceeds the limit (either strictly single or after flush)
+              if (batchWithCandidateSize > ratisByteLimit) {
+                LOG.error(
+                    "Single revoked STS Token size ({}) would exceed the ratisByteLimit ({}). SessionToken " +
+                    "initialCreationTimeMillis: {}", batchWithCandidateSize, ratisByteLimit, initialCreationTimeMillis);
+                continue;
+              }
+            }
+            batch.add(sessionToken);
           }
         }
       } catch (IOException e) {
-        // IO exceptions while iterating should be logged and retried next run.
         LOG.error("Failure while scanning s3RevokedStsTokenTable.  It will be retried in the next interval", e);
-        return BackgroundTaskResult.EmptyTaskResult.newResult();
-      }
-
-      final long deletedInRun;
-      if (!sessionTokensToCleanup.isEmpty()) {
-        LOG.info("Found {} revoked STS token entries to clean up.", sessionTokensToCleanup.size());
-        final boolean success = submitCleanupRequest(sessionTokensToCleanup);
-        if (success) {
-          deletedInRun = sessionTokensToCleanup.size();
-        } else {
-          deletedInRun = 0;
-          LOG.warn(
-              "RevokedSTSTokenCleanupService failed to submit cleanup request. Expired entries will be retried in " +
-              "the next run.");
+        if (deletedInRun == 0) {
+          return BackgroundTaskResult.EmptyTaskResult.newResult();
         }
-      } else {
-        return BackgroundTaskResult.EmptyTaskResult.newResult();
       }
 
+      // Submit any remaining tokens
+      if (!batch.isEmpty()) {
+        if (submitCleanupRequest(batch)) {
+          deletedInRun += batch.size();
+        } else {
+          LOG.warn("Failed to submit final batch of {} revoked tokens.", batch.size());
+        }
+      }
+
+      // Update stats
       if (deletedInRun > 0) {
         submittedDeletedEntryCount.addAndGet(deletedInRun);
+        LOG.info("Found and removed {} revoked STS token entries.", deletedInRun);
       }
 
       final long elapsed = Time.monotonicNow() - startTime;
-      LOG.info(
-          "RevokedSTSTokenCleanupService run completed. deletedEntriesInRun={}, totalDeletedEntries={}, " +
+      LOG.info("RevokedSTSTokenCleanupService run completed. deletedEntriesInRun={}, totalDeletedEntries={}, " +
           "elapsedTimeMs={}", deletedInRun, submittedDeletedEntryCount.get(), elapsed);
 
       final long resultCount = deletedInRun;
@@ -217,6 +249,14 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
         LOG.error("Revoked STS token cleanup request failed. Will retry at next run.", e);
         return false;
       }
+    }
+
+    private int getBatchSerializedSize(List<String> sessionTokenBatch) {
+      final DeleteRevokedSTSTokensRequest request = DeleteRevokedSTSTokensRequest.newBuilder()
+          .addAllSessionToken(sessionTokenBatch)
+          .build();
+
+      return request.getSerializedSize();
     }
   }
 }

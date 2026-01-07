@@ -26,10 +26,16 @@ import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 import com.google.protobuf.ServiceException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.utils.db.StringInMemoryTestTable;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
@@ -50,16 +56,19 @@ public class TestRevokedSTSTokenCleanupService {
   private OzoneManager ozoneManager;
   private StringInMemoryTestTable<Long> revokedStsTokenTable;
   private TestClock testClock;
+  private OzoneConfiguration ozoneConfiguration;
 
   @BeforeEach
   public void setUp() {
     testClock = TestClock.newInstance();
     ozoneManager = mock(OzoneManager.class);
+    ozoneConfiguration = new OzoneConfiguration();
     final OMMetadataManager omMetadataManager = mock(OMMetadataManager.class);
     revokedStsTokenTable = new StringInMemoryTestTable<>();
 
     when(ozoneManager.isLeaderReady()).thenReturn(true);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
+    when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
     when(ozoneManager.getThreadNamePrefix()).thenReturn("om-");
     when(omMetadataManager.getS3RevokedStsTokenTable()).thenReturn(revokedStsTokenTable);
   }
@@ -207,6 +216,145 @@ public class TestRevokedSTSTokenCleanupService {
     }
   }
 
+  @Test
+  public void submitsMultipleRequestsWhenBatchSizeIsExceeded() throws Exception {
+    // If the tokens exceed the configured batch size, multiple requests should be submitted
+    final long nowMillis = testClock.millis();
+
+    // Create 10 expired tokens
+    for (int i = 0; i < 10; i++) {
+      revokedStsTokenTable.put("session-token-" + i, nowMillis - TimeUnit.HOURS.toMillis(13));
+    }
+
+    // Set a very small ratisByteLimit (100 bytes) to force batching. A single token request will be small, but 10
+    // will exceed this. The effective limit will be 90 bytes (90% of 100).
+    ozoneConfiguration.setStorageSize(
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT, 100, StorageUnit.BYTES);
+
+    final List<OMRequest> capturedRequests = new ArrayList<>();
+
+    try (MockedStatic<OzoneManagerRatisUtils> ozoneManagerRatisUtilsMock = mockStatic(OzoneManagerRatisUtils.class)) {
+      mockRatisSubmitAndCaptureRequests(ozoneManagerRatisUtilsMock, capturedRequests);
+
+      // Run the cleanup service
+      final RevokedSTSTokenCleanupService revokedSTSTokenCleanupService = createAndRunCleanupService();
+
+      assertThat(revokedSTSTokenCleanupService.getRunCount()).isEqualTo(1);
+      // There should be multiple requests
+      assertThat(capturedRequests.size()).isEqualTo(2);
+
+      // Verify all tokens were included across the requests
+      final int totalTokens = capturedRequests.stream()
+          .mapToInt(r -> r.getDeleteRevokedSTSTokensRequest().getSessionTokenList().size())
+          .sum();
+      assertThat(totalTokens).isEqualTo(10);
+      assertThat(revokedSTSTokenCleanupService.getSubmittedDeletedEntryCount()).isEqualTo(10);
+    }
+  }
+
+  @Test
+  public void testSingleOversizedExpiredTokenAndItIsTheOnlyExpiredToken() throws Exception {
+    // One sessionToken is larger than the ratisByteLimit, and it is the only expired token
+    final long nowMillis = testClock.millis();
+    // Serialized size for largeToken is 102 > 90 (the effective ratisByteLimit) .
+    final String largeToken = new String(new char[100]).replace('\0', 'a');
+    revokedStsTokenTable.put(largeToken, nowMillis - TimeUnit.HOURS.toMillis(13));
+
+    ozoneConfiguration.setStorageSize(
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT, 100, StorageUnit.BYTES);
+
+    final List<OMRequest> capturedRequests = new ArrayList<>();
+
+    try (MockedStatic<OzoneManagerRatisUtils> ozoneManagerRatisUtilsMock = mockStatic(OzoneManagerRatisUtils.class)) {
+      mockRatisSubmitAndCaptureRequests(ozoneManagerRatisUtilsMock, capturedRequests);
+
+      final RevokedSTSTokenCleanupService revokedSTSTokenCleanupService = createAndRunCleanupService();
+
+      assertThat(revokedSTSTokenCleanupService.getRunCount()).isEqualTo(1);
+      // Single token exceeding ratisByteLimit is skipped
+      assertThat(capturedRequests).isEmpty();
+      assertThat(revokedSTSTokenCleanupService.getSubmittedDeletedEntryCount()).isZero();
+    }
+  }
+
+  @Test
+  public void testSingleOversizedExpiredTokenAndThereAreMultipleExpiredTokens() throws Exception {
+    // One sessionToken is larger than the ratisByteLimit, and it is not the only expired token
+    final long nowMillis = testClock.millis();
+    final String smallToken = "session-token-j";
+    final String largeToken = "session-token-k-" + new String(new char[90]).replace('\0', 'a'); // > 90 bytes
+
+    revokedStsTokenTable.put(smallToken, nowMillis - TimeUnit.HOURS.toMillis(13));
+    revokedStsTokenTable.put(largeToken, nowMillis - TimeUnit.HOURS.toMillis(13));
+
+    ozoneConfiguration.setStorageSize(
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT, 100, StorageUnit.BYTES);
+
+    final List<OMRequest> capturedRequests = new ArrayList<>();
+
+    try (MockedStatic<OzoneManagerRatisUtils> ozoneManagerRatisUtilsMock = mockStatic(OzoneManagerRatisUtils.class)) {
+      mockRatisSubmitAndCaptureRequests(ozoneManagerRatisUtilsMock, capturedRequests);
+
+      final RevokedSTSTokenCleanupService revokedSTSTokenCleanupService = createAndRunCleanupService();
+
+      assertThat(revokedSTSTokenCleanupService.getRunCount()).isEqualTo(1);
+      assertThat(capturedRequests).hasSize(1);
+      assertThat(revokedSTSTokenCleanupService.getSubmittedDeletedEntryCount()).isEqualTo(1);
+    }
+  }
+
+  @Test
+  public void testExpiredAndNonExpiredTokensWithSmallRatisByteLimit() throws Exception {
+    // Expired and non-expired entries with ratisByteLimit of 100
+    final long nowMillis = testClock.millis();
+
+    revokedStsTokenTable.put("session-token-l", nowMillis - TimeUnit.HOURS.toMillis(13));
+    revokedStsTokenTable.put("session-token-m", nowMillis - TimeUnit.HOURS.toMillis(1)); // Should be skipped
+    revokedStsTokenTable.put("session-token-n", nowMillis - TimeUnit.HOURS.toMillis(13));
+
+    ozoneConfiguration.setStorageSize(
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT, 100, StorageUnit.BYTES);
+
+    final List<OMRequest> capturedRequests = new ArrayList<>();
+
+    try (MockedStatic<OzoneManagerRatisUtils> ozoneManagerRatisUtilsMock = mockStatic(OzoneManagerRatisUtils.class)) {
+      mockRatisSubmitAndCaptureRequests(ozoneManagerRatisUtilsMock, capturedRequests);
+
+      final RevokedSTSTokenCleanupService revokedSTSTokenCleanupService = createAndRunCleanupService();
+
+      assertThat(revokedSTSTokenCleanupService.getRunCount()).isEqualTo(1);
+      // session-token-l and session-token-n fit in one batch.  session-token-m is ignored because it is not expired.
+      assertThat(capturedRequests).hasSize(1);
+      assertThat(capturedRequests.get(0).getDeleteRevokedSTSTokensRequest().getSessionTokenList())
+          .containsExactly("session-token-l", "session-token-n");
+      assertThat(revokedSTSTokenCleanupService.getSubmittedDeletedEntryCount()).isEqualTo(2);
+    }
+  }
+
+  @Test
+  public void testExpiredTokenMatchesRatisByteLimitExactly() throws Exception {
+    // Force small batch of 100 bytes and test when the batch size is exactly ratisByteLimit
+    final long nowMillis = testClock.millis();
+    final String tokenMatchingRatisByteLimitWhenSerialized = new String(new char[88]).replace('\0', 'a');
+
+    revokedStsTokenTable.put(tokenMatchingRatisByteLimitWhenSerialized, nowMillis - TimeUnit.HOURS.toMillis(13));
+
+    ozoneConfiguration.setStorageSize(
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT, 100, StorageUnit.BYTES);
+
+    final List<OMRequest> capturedRequests = new ArrayList<>();
+
+    try (MockedStatic<OzoneManagerRatisUtils> ozoneManagerRatisUtilsMock = mockStatic(OzoneManagerRatisUtils.class)) {
+      mockRatisSubmitAndCaptureRequests(ozoneManagerRatisUtilsMock, capturedRequests);
+
+      final RevokedSTSTokenCleanupService revokedSTSTokenCleanupService = createAndRunCleanupService();
+
+      assertThat(revokedSTSTokenCleanupService.getRunCount()).isEqualTo(1);
+      assertThat(capturedRequests).hasSize(1);
+      assertThat(revokedSTSTokenCleanupService.getSubmittedDeletedEntryCount()).isEqualTo(1);
+    }
+  }
+
   private RevokedSTSTokenCleanupService createAndRunCleanupService() throws Exception {
     final RevokedSTSTokenCleanupService revokedSTSTokenCleanupService =
         new RevokedSTSTokenCleanupService(1, TimeUnit.HOURS, 1_000, ozoneManager);
@@ -216,13 +364,12 @@ public class TestRevokedSTSTokenCleanupService {
 
   private void mockRatisSubmitAndCapture(MockedStatic<OzoneManagerRatisUtils> ozoneManagerRatisUtilsMock,
       AtomicReference<OMRequest> capturedRequest) {
-    ozoneManagerRatisUtilsMock.when(
-        () -> OzoneManagerRatisUtils.submitRequest(any(), any(), any(), anyLong()))
-        .thenAnswer(invocation -> {
-          final OMRequest omRequest = invocation.getArgument(1);
-          capturedRequest.set(omRequest);
-          return buildOkResponse(omRequest);
-        });
+    mockRatisSubmit(ozoneManagerRatisUtilsMock, capturedRequest::set);
+  }
+
+  private void mockRatisSubmitAndCaptureRequests(MockedStatic<OzoneManagerRatisUtils> ozoneManagerRatisUtilsMock,
+      List<OMRequest> capturedRequests) {
+    mockRatisSubmit(ozoneManagerRatisUtilsMock, capturedRequests::add);
   }
 
   private void mockRatisSubmitToFail(MockedStatic<OzoneManagerRatisUtils> ozoneManagerRatisUtilsMock,
@@ -251,6 +398,17 @@ public class TestRevokedSTSTokenCleanupService {
         .setStatus(OK)
         .setSuccess(true)
         .build();
+  }
+
+  private void mockRatisSubmit(MockedStatic<OzoneManagerRatisUtils> ozoneManagerRatisUtilsMock,
+      Consumer<OMRequest> requestConsumer) {
+    ozoneManagerRatisUtilsMock.when(
+            () -> OzoneManagerRatisUtils.submitRequest(any(), any(), any(), anyLong()))
+        .thenAnswer(invocation -> {
+          final OMRequest omRequest = invocation.getArgument(1);
+          requestConsumer.accept(omRequest);
+          return buildOkResponse(omRequest);
+        });
   }
 }
 
