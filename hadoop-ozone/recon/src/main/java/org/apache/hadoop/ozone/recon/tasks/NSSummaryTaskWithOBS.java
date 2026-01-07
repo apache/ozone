@@ -125,6 +125,9 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
             .getBucketTable().getSkipCache(bucketDBKey);
 
         if (omBucketInfo != null && omBucketInfo.getBucketLayout() == BUCKET_LAYOUT) {
+          // Check if async flusher has failed - stop immediately if so
+          asyncFlusher.checkForFailures();
+          
           setKeyParentID(keyInfo);
           // Use reprocess-specific method (no DB reads)
           handlePutKeyEventReprocess(keyInfo, workerMap);
@@ -167,6 +170,9 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
           asyncFlusher.submitForFlush(remainingMap);
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
+          return false;
+        } catch (IOException e) {
+          LOG.error("Failed to submit remaining map for flush", e);
           return false;
         }
       }

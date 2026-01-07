@@ -43,13 +43,15 @@ public final class NSSummaryAsyncFlusher implements Closeable {
   private final Thread backgroundFlusher;
   private final AtomicReference<FlushState> state =
       new AtomicReference<>(FlushState.RUNNING);
+  private volatile Exception failureCause = null;
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private final String taskName;
 
   private enum FlushState {
     RUNNING,
     STOPPING,
-    STOPPED
+    STOPPED,
+    FAILED
   }
   
   private NSSummaryAsyncFlusher(ReconNamespaceSummaryManager reconNamespaceSummaryManager,
@@ -80,10 +82,34 @@ public final class NSSummaryAsyncFlusher implements Closeable {
   /**
    * Submit a worker map for async flushing.
    * Blocks if queue is full (natural backpressure).
+   * @throws IOException if the async flusher has failed
    */
-  public void submitForFlush(Map<Long, NSSummary> workerMap) throws InterruptedException {
+  public void submitForFlush(Map<Long, NSSummary> workerMap) 
+      throws InterruptedException, IOException {
+    // Check if flusher has failed - reject new submissions
+    if (state.get() == FlushState.FAILED) {
+      throw new IOException(taskName + ": Cannot submit - async flusher has failed", 
+          failureCause);
+    }
+    
     flushQueue.put(workerMap);
-    LOG.debug("{}: Submitted map with {} entries, queue size now {}", taskName, workerMap.size(), flushQueue.size());
+    LOG.debug("{}: Submitted map with {} entries, queue size now {}", 
+        taskName, workerMap.size(), flushQueue.size());
+  }
+  
+  /**
+   * Check if the async flusher has encountered any failures.
+   * Workers should call this periodically to detect failures fast.
+   * @throws IOException if a failure has occurred
+   */
+  public void checkForFailures() throws IOException {
+    if (state.get() == FlushState.FAILED && failureCause != null) {
+      if (failureCause instanceof IOException) {
+        throw (IOException) failureCause;
+      } else {
+        throw new IOException(taskName + ": Async flusher failed", failureCause);
+      }
+    }
   }
   
   /**
@@ -116,13 +142,33 @@ public final class NSSummaryAsyncFlusher implements Closeable {
         LOG.info("{}: Flusher thread interrupted", taskName);
         Thread.currentThread().interrupt();
         break;
+      } catch (IOException e) {
+        // For DB write errors
+        LOG.error("{}: FATAL - DB write failed, stopping async flusher. " +
+            "Remaining {} batches in queue will NOT be processed. " +
+            "Workers will be stopped immediately.",
+            taskName, flushQueue.size(), e);
+        failureCause = e;
+        state.set(FlushState.FAILED);
+        break;
       } catch (Exception e) {
-        LOG.error("{}: Error in flush loop", taskName, e);
-        // Continue processing other batches
+        // Other unexpected errors are also fatal
+        LOG.error("{}: FATAL - Unexpected error in flush loop, stopping async flusher. " +
+            "Remaining {} batches in queue will NOT be processed. " +
+            "Workers will be stopped immediately.",
+            taskName, flushQueue.size(), e);
+        failureCause = e;
+        state.set(FlushState.FAILED);
+        break;
       }
     }
-    state.set(FlushState.STOPPED);
-    LOG.info("{}: Async flusher stopped", taskName);
+    
+    // Only set STOPPED if we didn't fail
+    if (state.get() != FlushState.FAILED) {
+      state.set(FlushState.STOPPED);
+    }
+    
+    LOG.info("{}: Async flusher stopped with state: {}", taskName, state.get());
   }
 
   /**
@@ -254,6 +300,10 @@ public final class NSSummaryAsyncFlusher implements Closeable {
       // Tell the background thread to stop once the queue is drained.
       state.set(FlushState.STOPPING);
       backgroundFlusher.join();
+      
+      // Check if there were any failures during processing
+      checkForFailures();
+      
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new IOException("Interrupted while shutting down async flusher", e);

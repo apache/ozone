@@ -283,6 +283,9 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       Map<Long, NSSummary> workerMap = allWorkerMaps.computeIfAbsent(threadId, k -> new HashMap<>());
 
       try {
+        // Check if async flusher has failed - stop immediately if so
+        asyncFlusher.checkForFailures();
+        
         // Update immediate parent only, NO DB reads during reprocess
         handlePutDirEventReprocess(kv.getValue(), workerMap);
 
@@ -321,6 +324,9 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
           return false;
+        } catch (IOException e) {
+          LOG.error("Failed to submit remaining map for flush", e);
+          return false;
         }
       }
     }
@@ -347,6 +353,9 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
       Map<Long, NSSummary> workerMap = allWorkerMaps.computeIfAbsent(threadId, k -> new HashMap<>());
 
       try {
+        // Check if async flusher has failed - stop immediately if so
+        asyncFlusher.checkForFailures();
+        
         // Update immediate parent only, NO DB reads during reprocess
         handlePutKeyEventReprocess(kv.getValue(), workerMap);
 
@@ -384,6 +393,9 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
           asyncFlusher.submitForFlush(remainingMap);
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
+          return false;
+        } catch (IOException e) {
+          LOG.error("Failed to submit remaining map for flush", e);
           return false;
         }
       }
