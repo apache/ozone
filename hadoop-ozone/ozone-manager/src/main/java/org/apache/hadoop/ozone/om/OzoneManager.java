@@ -1948,16 +1948,16 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     keyManager.start(configuration);
 
-    final long revokedSTSTokenCleanupInterval = configuration.getTimeDuration(
-        OMConfigKeys.OZONE_OM_REVOKED_STS_TOKEN_CLEANUP_SERVICE_INTERVAL,
-        OMConfigKeys.OZONE_OM_REVOKED_STS_TOKEN_CLEANUP_SERVICE_INTERVAL_DEFAULT,
+    final long stsTokenCleanupInterval = configuration.getTimeDuration(
+        OMConfigKeys.OZONE_OM_STS_TOKEN_CLEANUP_SERVICE_INTERVAL,
+        OMConfigKeys.OZONE_OM_STS_TOKEN_CLEANUP_SERVICE_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
-    final long revokedSTSTokenCleanupTimeout = configuration.getTimeDuration(
-        OMConfigKeys.OZONE_OM_REVOKED_STS_TOKEN_CLEANUP_SERVICE_TIMEOUT,
-        OMConfigKeys.OZONE_OM_REVOKED_STS_TOKEN_CLEANUP_SERVICE_TIMEOUT_DEFAULT,
+    final long stsTokenCleanupTimeout = configuration.getTimeDuration(
+        OMConfigKeys.OZONE_OM_STS_TOKEN_CLEANUP_SERVICE_TIMEOUT,
+        OMConfigKeys.OZONE_OM_STS_TOKEN_CLEANUP_SERVICE_TIMEOUT_DEFAULT,
         TimeUnit.MILLISECONDS);
     revokedSTSTokenCleanupService = new RevokedSTSTokenCleanupService(
-        revokedSTSTokenCleanupInterval, TimeUnit.MILLISECONDS, revokedSTSTokenCleanupTimeout, this);
+        stsTokenCleanupInterval, TimeUnit.MILLISECONDS, stsTokenCleanupTimeout, this);
     revokedSTSTokenCleanupService.start();
 
     try {
