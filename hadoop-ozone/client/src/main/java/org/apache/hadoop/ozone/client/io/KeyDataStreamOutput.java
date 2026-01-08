@@ -19,9 +19,11 @@ package org.apache.hadoop.ozone.client.io;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -44,6 +46,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.ratis.util.function.CheckedRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -81,6 +84,12 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
    * This is essential for operations like S3 put to ensure atomicity.
    */
   private boolean atomicKeyCreation;
+
+  private List<CheckedRunnable<IOException>> preCommits = Collections.emptyList();
+
+  public void setPreCommits(@Nonnull List<CheckedRunnable<IOException>> preCommits) {
+    this.preCommits = preCommits;
+  }
 
   @VisibleForTesting
   public List<BlockDataStreamOutputEntry> getStreamEntries() {
@@ -430,6 +439,9 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
         Preconditions.checkArgument(expectedSize == offset,
             String.format("Expected: %d and actual %d write sizes do not match",
                 expectedSize, offset));
+      }
+      for (CheckedRunnable<IOException> preCommit : preCommits) {
+        preCommit.run();
       }
       blockDataStreamOutputEntryPool.commitKey(offset);
     } finally {

@@ -75,6 +75,14 @@ public final class OmDirectoryInfo extends WithParentObjectId {
     return new Builder(this);
   }
 
+  public static Builder builderFromOmKeyInfo(OmKeyInfo keyInfo) {
+    return new Builder(keyInfo);
+  }
+
+  public OmKeyInfo.Builder toKeyInfoBuilder() {
+    return OmKeyInfo.builderFromOmDirectoryInfo(this);
+  }
+
   /**
    * Builder for Directory Info.
    */
@@ -98,6 +106,14 @@ public final class OmDirectoryInfo extends WithParentObjectId {
       this.creationTime = obj.creationTime;
       this.modificationTime = obj.modificationTime;
       this.acls = AclListBuilder.of(obj.acls);
+    }
+
+    private Builder(OmKeyInfo keyInfo) {
+      super(keyInfo);
+      this.name = keyInfo.getFileName();
+      this.creationTime = keyInfo.getCreationTime();
+      this.modificationTime = keyInfo.getModificationTime();
+      this.acls = AclListBuilder.of(keyInfo.getAcls());
     }
 
     @Override
@@ -180,7 +196,7 @@ public final class OmDirectoryInfo extends WithParentObjectId {
     return modificationTime;
   }
 
-  public List<OzoneAcl> getAcls() {
+  public ImmutableList<OzoneAcl> getAcls() {
     return acls;
   }
 

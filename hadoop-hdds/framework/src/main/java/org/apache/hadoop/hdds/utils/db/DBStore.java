@@ -198,7 +198,7 @@ public interface DBStore extends UncheckedAutoCloseable, BatchOperationHandler {
     KeyValue<KEY, Object> defaultNullValue = newKeyValue(null, null);
     Comparator<KeyValue<KEY, Object>> comparator = Comparator.comparing(KeyValue::getKey, keyComparator);
     return new MinHeapMergeIterator<KeyValue<KEY, Object>, Table.KeyValueIterator<KEY, Object>,
-        KeyValue<KEY, Collection<Object>>>(table.length + 1, comparator) {
+        KeyValue<KEY, Collection<Object>>>(table.length, comparator) {
       @Override
       protected Table.KeyValueIterator<KEY, Object> getIterator(int idx) throws IOException {
         return table[idx].iterator(prefix);

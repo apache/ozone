@@ -381,11 +381,6 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
-  public void deleteRangeWithBatch(BatchOperation batch, KEY beginKey, KEY endKey) throws CodecException {
-    rawTable.deleteRangeWithBatch(batch, encodeKey(beginKey), encodeKey(endKey));
-  }
-
-  @Override
   public void deleteRange(KEY beginKey, KEY endKey) throws RocksDatabaseException, CodecException {
     rawTable.deleteRange(encodeKey(beginKey), encodeKey(endKey));
   }
