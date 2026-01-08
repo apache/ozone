@@ -145,6 +145,8 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.ozone.util.ProtobufUtils;
 import org.apache.hadoop.security.token.Token;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class is the client-side translator to translate the requests made on
@@ -162,6 +164,8 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   private final StorageContainerLocationProtocolPB rpcProxy;
   private final SCMContainerLocationFailoverProxyProvider fpp;
+  private static final Logger LOG =
+      LoggerFactory.getLogger(StorageContainerLocationProtocolClientSideTranslatorPB.class);
 
   /**
    * Creates a new StorageContainerLocationProtocolClientSideTranslatorPB.
@@ -868,6 +872,50 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
     return resp.getExitedSafeMode();
 
+  }
+
+  @Override
+  public boolean inSafeModeForNode(String nodeId) throws IOException {
+    InSafeModeRequestProto request = InSafeModeRequestProto.getDefaultInstance();
+
+    try {
+      StorageContainerLocationProtocolPB proxy = fpp.getProxyForNode(nodeId);
+      ScmContainerLocationRequest wrapper = ScmContainerLocationRequest.newBuilder()
+          .setCmdType(Type.InSafeMode)
+          .setVersion(ClientVersion.CURRENT_VERSION)
+          .setTraceID(TracingUtil.exportCurrentSpan())
+          .setInSafeModeRequest(request)
+          .build();
+      ScmContainerLocationResponse response = proxy.submitRequest(NULL_RPC_CONTROLLER, wrapper);
+      return response.getInSafeModeResponse().getInSafeMode();
+    } catch (Exception e) {
+      throw new IOException("Failed to get safe mode status from SCM node " + nodeId, e);
+    }
+  }
+
+  @Override
+  public Map<String, Pair<Boolean, String>> getSafeModeRuleStatusesForNode(String nodeId) throws IOException {
+    GetSafeModeRuleStatusesRequestProto request = GetSafeModeRuleStatusesRequestProto.getDefaultInstance();
+
+    try {
+      StorageContainerLocationProtocolPB proxy = fpp.getProxyForNode(nodeId);
+      ScmContainerLocationRequest wrapper = ScmContainerLocationRequest.newBuilder()
+          .setCmdType(Type.GetSafeModeRuleStatuses)
+          .setVersion(ClientVersion.CURRENT_VERSION)
+          .setTraceID(TracingUtil.exportCurrentSpan())
+          .setGetSafeModeRuleStatusesRequest(request)
+          .build();
+      ScmContainerLocationResponse response = proxy.submitRequest(NULL_RPC_CONTROLLER, wrapper);
+
+      Map<String, Pair<Boolean, String>> ruleStatuses = new HashMap<>();
+      for (SafeModeRuleStatusProto statusProto :
+          response.getGetSafeModeRuleStatusesResponse().getSafeModeRuleStatusesProtoList()) {
+        ruleStatuses.put(statusProto.getRuleName(), Pair.of(statusProto.getValidate(), statusProto.getStatusText()));
+      }
+      return ruleStatuses;
+    } catch (Exception e) {
+      throw new IOException("Failed to get safe mode rule statuses from SCM node " + nodeId, e);
+    }
   }
 
   @Override

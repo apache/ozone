@@ -33,6 +33,10 @@ public abstract class ScmSubcommand extends AbstractSubcommand implements Callab
 
   protected abstract void execute(ScmClient client) throws IOException;
 
+  protected ScmOption getScmOption() {
+    return scmOption;
+  }
+
   @Override
   public final Void call() throws Exception {
     try (ScmClient scmClient = scmOption.createScmClient()) {

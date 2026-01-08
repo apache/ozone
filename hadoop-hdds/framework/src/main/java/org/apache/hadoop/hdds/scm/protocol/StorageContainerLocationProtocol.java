@@ -74,6 +74,14 @@ public interface StorageContainerLocationProtocol extends Closeable {
       Type.ForceExitSafeMode));
 
   /**
+   * Read-only commands that can execute on followers without leader check.
+   * These commands respect the --scm parameter and query the specified SCM.
+   */
+  Set<Type> FOLLOWER_READABLE_COMMAND_TYPE = Collections.unmodifiableSet(EnumSet.of(
+      Type.InSafeMode,
+      Type.GetSafeModeRuleStatuses));
+  
+  /**
    * Asks SCM where a container should be allocated. SCM responds with the
    * set of datanodes that should be used creating this container.
    *
@@ -389,6 +397,26 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @throws IOException
    */
   boolean forceExitSafeMode() throws IOException;
+
+  /**
+   * Check if a specific SCM node is in safe mode.
+   * In HA clusters, queries the specified node.
+   *
+   * @param nodeId SCM node ID to query
+   * @return true if the node is in safe mode, false otherwise
+   * @throws IOException
+   */
+  boolean inSafeModeForNode(String nodeId) throws IOException;
+
+  /**
+   * Get safe mode rule statuses from a specific SCM node.
+   * In HA clusters, queries the specified node.
+   *
+   * @param nodeId SCM node ID to query
+   * @return Map of rule name to rule status
+   * @throws IOException
+   */
+  Map<String, Pair<Boolean, String>> getSafeModeRuleStatusesForNode(String nodeId) throws IOException;
 
   /**
    * Start ReplicationManager.

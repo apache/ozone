@@ -478,6 +478,16 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
+  public boolean inSafeModeForNode(String nodeId) throws IOException {
+    return storageContainerLocationClient.inSafeModeForNode(nodeId);
+  }
+
+  @Override
+  public Map<String, Pair<Boolean, String>> getSafeModeRuleStatusesForNode(String nodeId) throws IOException {
+    return storageContainerLocationClient.getSafeModeRuleStatusesForNode(nodeId);
+  }
+
+  @Override
   public void startReplicationManager() throws IOException {
     storageContainerLocationClient.startReplicationManager();
   }

@@ -1033,6 +1033,24 @@ public class SCMClientProtocolServer implements
     }
   }
 
+  @Override
+  public boolean inSafeModeForNode(String nodeId) throws IOException {
+    boolean result = inSafeMode();
+    AUDIT.logReadSuccess(
+        buildAuditMessageForSuccess(SCMAction.IN_SAFE_MODE, null)
+    );
+    return result;
+  }
+
+  @Override
+  public Map<String, Pair<Boolean, String>> getSafeModeRuleStatusesForNode(String nodeId) throws IOException {
+    Map<String, Pair<Boolean, String>> result = getSafeModeRuleStatuses();
+    AUDIT.logReadSuccess(
+        buildAuditMessageForSuccess(SCMAction.GET_SAFE_MODE_RULE_STATUSES, null)
+    );
+    return result;
+  }
+
   /**
    * Force SCM out of Safe mode.
    *
