@@ -60,8 +60,8 @@ public class TestPrometheusServletAuthorization {
   }
 
   @ParameterizedTest(name = "Authorization header \"{0}\" must return 403")
-  @ValueSource(strings = {"Bearer", "Bearer "})
-  public void testInvalidBearerAuthorizationReturns403(
+  @ValueSource(strings = {"Bearer ", "Bearer wrongToken"})
+  public void testInvalidAuthorizationHeaderReturns403(
       String authorizationHeader) throws Exception {
     PrometheusServlet servlet = new PrometheusServlet();
     ServletContext context = mock(ServletContext.class);
