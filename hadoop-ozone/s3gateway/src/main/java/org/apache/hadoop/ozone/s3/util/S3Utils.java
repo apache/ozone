@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.s3.util;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BAD_DIGEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_STORAGE_CLASS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.AWS_CHUNKED;
@@ -32,10 +33,12 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Objects;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -220,6 +223,25 @@ public final class S3Utils {
    */
   public static String wrapInQuotes(String value) {
     return StringUtils.wrap(value, '\"');
+  }
+
+  /**
+   * Validates the client provided Content-MD5 against the server's MD5.
+   *
+   * @param clientMD5  Base64 encoded MD5 provided by the client
+   * @param serverMD5  Hexadecimal encoded MD5 stored on the server
+   * @param resource   Resource identifier used when constructing error responses
+   * @throws OS3Exception if clientMD5 is null or does not match serverMD5
+   */
+  public static void validateContentMD5(String clientMD5, String serverMD5, String resource)
+      throws OS3Exception {
+    if (clientMD5 == null) {
+      throw newError(BAD_DIGEST, resource);
+    }
+
+    if (!Hex.encodeHexString(Base64.getDecoder().decode(clientMD5)).equals(serverMD5)) {
+      throw newError(BAD_DIGEST, resource);
+    }
   }
 
 }

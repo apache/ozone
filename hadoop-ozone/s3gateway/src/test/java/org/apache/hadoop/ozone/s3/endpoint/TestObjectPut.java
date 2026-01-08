@@ -56,7 +56,9 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.Base64;
 import java.util.Map;
 import java.util.stream.Stream;
 import javax.ws.rs.core.HttpHeaders;
@@ -502,6 +504,40 @@ class TestObjectPut {
   public void testPutEmptyObject() throws Exception {
     assertSucceeds(() -> putObject(""));
     assertEquals(0, bucket.getKey(KEY_NAME).getDataSize());
+  }
+
+  @Test
+  public void testPutObjectWithContentMD5() throws Exception {
+    // GIVEN
+    byte[] contentBytes = CONTENT.getBytes(StandardCharsets.UTF_8);
+    byte[] md5Bytes = MessageDigest.getInstance("MD5").digest(contentBytes);
+    String md5Base64 = Base64.getEncoder().encodeToString(md5Bytes);
+
+    when(headers.getHeaderString("Content-MD5")).thenReturn(md5Base64);
+
+    // WHEN
+    assertSucceeds(() -> putObject(CONTENT));
+
+    // THEN
+    OzoneKeyDetails keyDetails = assertKeyContent(bucket, KEY_NAME, CONTENT);
+    assertEquals(CONTENT.length(), keyDetails.getDataSize());
+    assertNotNull(keyDetails.getMetadata());
+    assertThat(keyDetails.getMetadata().get(OzoneConsts.ETAG)).isNotEmpty();
+  }
+
+  @Test
+  public void testPutObjectWithWrongContentMD5() throws Exception {
+    // GIVEN
+    byte[] wrongContentBytes = "wrong".getBytes(StandardCharsets.UTF_8);
+    byte[] wrongMd5Bytes = MessageDigest.getInstance("MD5").digest(wrongContentBytes);
+    String wrongMd5Base64 = Base64.getEncoder().encodeToString(wrongMd5Bytes);
+
+    // WHEN
+    when(headers.getHeaderString("Content-MD5")).thenReturn(wrongMd5Base64);
+
+    // WHEN/THEN
+    OS3Exception ex = assertErrorResponse(S3ErrorTable.BAD_DIGEST, () -> putObject(CONTENT));
+    assertThat(ex.getErrorMessage()).contains(S3ErrorTable.BAD_DIGEST.getErrorMessage());
   }
 
   private HttpHeaders newMockHttpHeaders() {

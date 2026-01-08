@@ -41,7 +41,9 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.Base64;
 import java.util.UUID;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
@@ -161,7 +163,7 @@ public class TestPartUpload {
       when(rest.getSha256DigestInstance()).thenReturn(sha256Digest);
       if (enableDataStream) {
         streaming.when(() -> ObjectEndpointStreaming.createMultipartKey(any(), any(), anyLong(), anyInt(), any(),
-                anyInt(), any(), any()))
+                anyInt(), any(), any(), any()))
             .thenThrow(IOException.class);
       } else {
         ioutils.when(() -> IOUtils.copyLarge(any(InputStream.class), any(OutputStream.class), anyLong(),
@@ -179,6 +181,56 @@ public class TestPartUpload {
         verify(sha256Digest, times(1)).reset();
       }
     }
+  }
+
+  @Test
+  public void testPartUploadWithContentMD5() throws Exception {
+    String content = "Multipart Upload Part";
+    byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
+    byte[] md5Bytes = MessageDigest.getInstance("MD5").digest(contentBytes);
+    String md5Base64 = Base64.getEncoder().encodeToString(md5Bytes);
+
+    HttpHeaders headersWithMD5 = mock(HttpHeaders.class);
+    when(headersWithMD5.getHeaderString("Content-MD5")).thenReturn(md5Base64);
+    when(headersWithMD5.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
+    when(headersWithMD5.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("STANDARD");
+
+    ObjectEndpoint endpoint = EndpointBuilder.newObjectEndpointBuilder()
+        .setHeaders(headersWithMD5)
+        .setClient(client)
+        .build();
+
+    String uploadID = initiateMultipartUpload(endpoint, OzoneConsts.S3_BUCKET, OzoneConsts.KEY);
+
+    try (Response response = put(endpoint, OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 1, uploadID, content)) {
+      assertNotNull(response.getHeaderString(OzoneConsts.ETAG));
+      assertEquals(200, response.getStatus());
+    }
+
+    assertContentLength(uploadID, OzoneConsts.KEY, content.length());
+  }
+
+  @Test
+  public void testPartUploadWithWrongContentMD5() throws Exception {
+    String content = "Multipart Upload Part";
+    byte[] wrongContentBytes = "wrong content".getBytes(StandardCharsets.UTF_8);
+    byte[] wrongMd5Bytes = MessageDigest.getInstance("MD5").digest(wrongContentBytes);
+    String wrongMd5Base64 = Base64.getEncoder().encodeToString(wrongMd5Bytes);
+
+    HttpHeaders headersWithWrongMD5 = mock(HttpHeaders.class);
+    when(headersWithWrongMD5.getHeaderString("Content-MD5")).thenReturn(wrongMd5Base64);
+    when(headersWithWrongMD5.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
+    when(headersWithWrongMD5.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("STANDARD");
+
+    ObjectEndpoint endpoint = EndpointBuilder.newObjectEndpointBuilder()
+        .setHeaders(headersWithWrongMD5)
+        .setClient(client)
+        .build();
+
+    String uploadID = initiateMultipartUpload(endpoint, OzoneConsts.S3_BUCKET, OzoneConsts.KEY);
+
+    assertErrorResponse(S3ErrorTable.BAD_DIGEST,
+        () -> put(endpoint, OzoneConsts.S3_BUCKET, OzoneConsts.KEY, 1, uploadID, content));
   }
 
   private void assertContentLength(String uploadID, String key,

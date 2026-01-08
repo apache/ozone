@@ -316,7 +316,7 @@ public class ObjectEndpoint extends EndpointBase {
       Map<String, String> tags = getTaggingFromHeaders(getHeaders());
 
       long putLength;
-      String eTag = null;
+      final String eTag;
       if (datastreamEnabled && !enableEC && length > datastreamMinLength) {
         perf.appendStreamMode();
         Pair<String, Long> keyWriteResult = ObjectEndpointStreaming
@@ -340,18 +340,29 @@ public class ObjectEndpoint extends EndpointBase {
               .toLowerCase();
           output.getMetadata().put(OzoneConsts.ETAG, eTag);
 
+          List<CheckedRunnable<IOException>> preCommits = new ArrayList<>();
+
+          String clientContentMD5 = getHeaders().getHeaderString(S3Consts.CHECKSUM_HEADER);
+          if (clientContentMD5 != null) {
+            CheckedRunnable<IOException> checkContentMD5Hook = () -> {
+              S3Utils.validateContentMD5(clientContentMD5, eTag, keyPath);
+            };
+            preCommits.add(checkContentMD5Hook);
+          }
+
           // If sha256Digest exists, this request must validate x-amz-content-sha256
           MessageDigest sha256Digest = multiDigestInputStream.getMessageDigest(OzoneConsts.FILE_HASH);
           if (sha256Digest != null) {
             final String actualSha256 = DatatypeConverter.printHexBinary(
                 sha256Digest.digest()).toLowerCase();
-            CheckedRunnable<IOException> preCommit = () -> {
+            CheckedRunnable<IOException> checkSha256Hook = () -> {
               if (!amzContentSha256Header.equals(actualSha256)) {
                 throw S3ErrorTable.newError(S3ErrorTable.X_AMZ_CONTENT_SHA256_MISMATCH, keyPath);
               }
             };
-            output.getKeyOutputStream().setPreCommits(Collections.singletonList(preCommit));
+            preCommits.add(checkSha256Hook);
           }
+          output.getKeyOutputStream().setPreCommits(preCommits);
         }
       }
       getMetrics().incPutKeySuccessLength(putLength);
@@ -986,7 +997,7 @@ public class ObjectEndpoint extends EndpointBase {
         perf.appendStreamMode();
         return ObjectEndpointStreaming
             .createMultipartKey(ozoneBucket, key, length, partNumber,
-                uploadID, chunkSize, multiDigestInputStream, perf);
+                uploadID, chunkSize, multiDigestInputStream, perf, getHeaders());
       }
       // OmMultipartCommitUploadPartInfo can only be gotten after the
       // OzoneOutputStream is closed, so we need to save the OzoneOutputStream
@@ -1066,8 +1077,15 @@ public class ObjectEndpoint extends EndpointBase {
           putLength = IOUtils.copyLarge(multiDigestInputStream, ozoneOutputStream, 0, length,
               new byte[getIOBufferSize(length)]);
           byte[] digest = multiDigestInputStream.getMessageDigest(OzoneConsts.MD5_HASH).digest();
-          ozoneOutputStream.getMetadata()
-              .put(OzoneConsts.ETAG, DatatypeConverter.printHexBinary(digest).toLowerCase());
+          String eTag = DatatypeConverter.printHexBinary(digest).toLowerCase();
+          String clientContentMD5 = getHeaders().getHeaderString(S3Consts.CHECKSUM_HEADER);
+          if (clientContentMD5 != null) {
+            CheckedRunnable<IOException> checkContentMD5Hook = () -> {
+              S3Utils.validateContentMD5(clientContentMD5, eTag, key);
+            };
+            ozoneOutputStream.getKeyOutputStream().setPreCommits(Collections.singletonList(checkContentMD5Hook));
+          }
+          ozoneOutputStream.getMetadata().put(OzoneConsts.ETAG, eTag);
           outputStream = ozoneOutputStream;
         }
         getMetrics().incPutKeySuccessLength(putLength);
