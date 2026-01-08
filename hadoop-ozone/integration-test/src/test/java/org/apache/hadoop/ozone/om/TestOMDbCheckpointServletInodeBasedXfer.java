@@ -81,8 +81,6 @@ import javax.servlet.ServletOutputStream;
 import javax.servlet.WriteListener;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
-import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -90,7 +88,6 @@ import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.Archiver;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -417,7 +414,6 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     // Create dummy files: one SST, one non-SST
     Path sstFile = dbDir.resolve("test.sst");
     Files.write(sstFile, "sst content".getBytes(StandardCharsets.UTF_8)); // Write some content to make it non-empty
-
     Path nonSstFile = dbDir.resolve("test.log");
     Files.write(nonSstFile, "log content".getBytes(StandardCharsets.UTF_8));
     Set<String> sstFilesToExclude = new HashSet<>();
@@ -434,22 +430,23 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
       omdbArchiver.recordFileEntry(sourceFile, invocation.getArgument(1));
       return null;
     }).when(omDbArchiverSpy).recordFileEntry(any(), anyString());
-      boolean success = omDbCheckpointServletMock.collectFilesFromDir(
-          sstFilesToExclude, dbDir, maxTotalSstSize, expectOnlySstFiles, omDbArchiverSpy);
-      assertTrue(success);
-      verify(omDbArchiverSpy, times(fileNames.size())).recordFileEntry(any(), anyString());
-      boolean containsNonSstFile = false;
-      for (String fileName : fileNames) {
-        if (expectOnlySstFiles) {
-          assertTrue(fileName.endsWith(".sst"), "File is not an SST File");
-        } else {
-          containsNonSstFile = true;
-        }
+    boolean success =
+        omDbCheckpointServletMock.collectFilesFromDir(sstFilesToExclude, dbDir, maxTotalSstSize, expectOnlySstFiles,
+            omDbArchiverSpy);
+    assertTrue(success);
+    verify(omDbArchiverSpy, times(fileNames.size())).recordFileEntry(any(), anyString());
+    boolean containsNonSstFile = false;
+    for (String fileName : fileNames) {
+      if (expectOnlySstFiles) {
+        assertTrue(fileName.endsWith(".sst"), "File is not an SST File");
+      } else {
+        containsNonSstFile = true;
       }
+    }
 
-      if (!expectOnlySstFiles) {
-        assertTrue(containsNonSstFile, "SST File is not expected");
-      }
+    if (!expectOnlySstFiles) {
+      assertTrue(containsNonSstFile, "SST File is not expected");
+    }
   }
 
   /**
