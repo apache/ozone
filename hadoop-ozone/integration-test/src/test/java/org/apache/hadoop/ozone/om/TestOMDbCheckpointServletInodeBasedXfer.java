@@ -36,8 +36,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.anyCollection;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anySet;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.doAnswer;
@@ -45,7 +45,6 @@ import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -124,7 +123,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.MockedStatic;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.DBOptions;
@@ -237,6 +235,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         .writeDbDataToStream(any(), any(), any(), any(), any());
     doCallRealMethod().when(omDbCheckpointServletMock)
         .collectFilesFromDir(any(), any(), any(), anyBoolean(), any());
+    doCallRealMethod().when(omDbCheckpointServletMock).collectDbDataToTransfer(any(), any(), any());
 
     when(omDbCheckpointServletMock.getBootstrapStateLock())
         .thenReturn(lock);
@@ -427,28 +426,18 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     Path tmpDir = folder.resolve("tmp");
     Files.createDirectories(tmpDir);
     omdbArchiver.setTmpDir(tmpDir);
-    TarArchiveOutputStream mockArchiveOutputStream = mock(TarArchiveOutputStream.class);
+    OMDBArchiver omDbArchiverSpy = spy(omdbArchiver);
     List<String> fileNames = new ArrayList<>();
-    try (MockedStatic<Archiver> archiverMock = mockStatic(Archiver.class)) {
-      archiverMock.when(() -> Archiver.linkAndIncludeFile(any(), any(), any(), any())).thenAnswer(invocation -> {
-        // Get the actual mockArchiveOutputStream passed from writeDBToArchive
-        TarArchiveOutputStream aos = invocation.getArgument(2);
-        File sourceFile = invocation.getArgument(0);
-        String fileId = invocation.getArgument(1);
-        fileNames.add(sourceFile.getName());
-        aos.putArchiveEntry(new TarArchiveEntry(sourceFile, fileId));
-        aos.write(new byte[100], 0, 100); // Simulate writing
-        aos.closeArchiveEntry();
-        return 100L;
-      });
+    doAnswer((invocation) -> {
+      File sourceFile = invocation.getArgument(0);
+      fileNames.add(sourceFile.getName());
+      omdbArchiver.recordFileEntry(sourceFile, invocation.getArgument(1));
+      return null;
+    }).when(omDbArchiverSpy).recordFileEntry(any(), anyString());
       boolean success = omDbCheckpointServletMock.collectFilesFromDir(
-          sstFilesToExclude, dbDir, maxTotalSstSize, expectOnlySstFiles, omdbArchiver);
+          sstFilesToExclude, dbDir, maxTotalSstSize, expectOnlySstFiles, omDbArchiverSpy);
       assertTrue(success);
-      verify(mockArchiveOutputStream, times(fileNames.size())).putArchiveEntry(any());
-      verify(mockArchiveOutputStream, times(fileNames.size())).closeArchiveEntry();
-      verify(mockArchiveOutputStream, times(fileNames.size())).write(any(byte[].class), anyInt(),
-          anyInt()); // verify write was called once
-
+      verify(omDbArchiverSpy, times(fileNames.size())).recordFileEntry(any(), anyString());
       boolean containsNonSstFile = false;
       for (String fileName : fileNames) {
         if (expectOnlySstFiles) {
@@ -461,7 +450,6 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
       if (!expectOnlySstFiles) {
         assertTrue(containsNonSstFile, "SST File is not expected");
       }
-    }
   }
 
   /**
