@@ -21,8 +21,8 @@ import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static java.net.HttpURLConnection.HTTP_NOT_IMPLEMENTED;
 import static java.net.HttpURLConnection.HTTP_OK;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -85,11 +85,8 @@ public class TestBucketAcl {
    */
   private S3BucketAcl getBucketAcl(String bucketName) throws Exception {
     Response response = bucketEndpoint.get(bucketName);
-    assertEquals(HTTP_OK, response.getStatus(),
-        "GET ACL should return HTTP_OK");
-    assertTrue(response.getEntity() instanceof S3BucketAcl,
-        "Response entity should be S3BucketAcl");
-    return (S3BucketAcl) response.getEntity();
+    assertEquals(HTTP_OK, response.getStatus());
+    return assertInstanceOf(S3BucketAcl.class, response.getEntity());
   }
 
   @Test

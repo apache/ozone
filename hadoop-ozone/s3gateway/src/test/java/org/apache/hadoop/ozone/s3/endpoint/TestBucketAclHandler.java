@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.s3.endpoint;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NOT_IMPLEMENTED;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -260,12 +261,6 @@ public class TestBucketAclHandler {
   // ===== GET Request Tests =====
 
   @Test
-  public void testHandleGetRequestWithAclQueryParam() throws Exception {
-    assertNotNull(aclHandler.handleGetRequest(BUCKET_NAME),
-        "Handler should handle request with ?acl param");
-  }
-
-  @Test
   public void testHandleGetRequestWithoutAclQueryParam() throws Exception {
     // Remove "acl" query parameter - handler should not handle request
     aclHandler.queryParamsForTest().unset("acl");
@@ -297,7 +292,7 @@ public class TestBucketAclHandler {
     Response response = aclHandler.handleGetRequest(BUCKET_NAME);
 
     assertNotNull(response);
-    S3BucketAcl result = (S3BucketAcl) response.getEntity();
+    S3BucketAcl result = assertInstanceOf(S3BucketAcl.class, response.getEntity());
     assertNotNull(result.getOwner());
     assertNotNull(result.getAclList());
     assertNotNull(result.getAclList().getGrantList());
