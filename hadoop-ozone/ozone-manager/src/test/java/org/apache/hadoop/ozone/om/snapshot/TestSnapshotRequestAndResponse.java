@@ -159,6 +159,7 @@ public class TestSnapshotRequestAndResponse {
     when(ozoneManager.getOmSnapshotIntMetrics()).thenReturn(omSnapshotIntMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.isFilesystemSnapshotEnabled()).thenReturn(true);
+    when(ozoneManager.getAclsEnabled()).thenReturn(true);
     when(ozoneManager.isAdmin(any())).thenReturn(isAdmin);
     when(ozoneManager.isOwner(any(), any())).thenReturn(false);
     when(ozoneManager.getBucketOwner(any(), any(),
