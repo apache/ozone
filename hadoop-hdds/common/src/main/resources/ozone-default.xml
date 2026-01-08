@@ -87,7 +87,7 @@
     <tag>OZONE, CONTAINER, MANAGEMENT</tag>
     <description>For the deprecated FilePerChunkStrategy, this determines whether the chunk writes
       in the container happen as sync I/0 or buffered I/O operation. For FilePerBlockStrategy, this
-      the sync I/O operation only happens before block file is closed.
+      sync I/O operation only happens before block file is closed.
     </description>
   </property>
   <property>
