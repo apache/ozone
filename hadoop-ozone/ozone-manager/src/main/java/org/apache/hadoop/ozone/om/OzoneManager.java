@@ -3526,9 +3526,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     final UserGroupInformation ugi = getRemoteUser();
     // Check Ozone admin privilege
-    if (!isAdmin(ugi)) {
-      throw new OMException("Only Ozone admins are allowed to trigger "
-          + "Ranger background sync manually", PERMISSION_DENIED);
+    if (getAclsEnabled()) {
+      if (!isAdmin(ugi)) {
+        throw new OMException("Only Ozone admins are allowed to trigger "
+            + "Ranger background sync manually", PERMISSION_DENIED);
+      }
     }
 
     // Check if MT manager is inited
@@ -3566,9 +3568,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     final UserGroupInformation ugi = getRemoteUser();
     // Check Ozone admin privilege
-    if (!isAdmin(ugi)) {
-      throw new OMException("Only Ozone admins are allowed to trigger "
-          + "snapshot defragmentation manually", PERMISSION_DENIED);
+    if (getAclsEnabled()) {
+      if (!isAdmin(ugi)) {
+        throw new OMException("Only Ozone admins are allowed to trigger "
+            + "snapshot defragmentation manually", PERMISSION_DENIED);
+      }
     }
 
     // Get the SnapshotDefragService from KeyManager
@@ -3622,13 +3626,15 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     metrics.incNumTenantLists();
 
-    final UserGroupInformation ugi = getRemoteUser();
-    if (!isAdmin(ugi)) {
-      final OMException omEx = new OMException(
-          "Only Ozone admins are allowed to list tenants.", PERMISSION_DENIED);
-      AUDIT.logReadFailure(buildAuditMessageForFailure(
-          OMAction.LIST_TENANT, new LinkedHashMap<>(), omEx));
-      throw omEx;
+    if (getAclsEnabled()) {
+      final UserGroupInformation ugi = getRemoteUser();
+      if (!isAdmin(ugi)) {
+        final OMException omEx = new OMException(
+            "Only Ozone admins are allowed to list tenants.", PERMISSION_DENIED);
+        AUDIT.logReadFailure(buildAuditMessageForFailure(
+            OMAction.LIST_TENANT, new LinkedHashMap<>(), omEx));
+        throw omEx;
+      }
     }
 
     final Table<String, OmDBTenantState> tenantStateTable =
@@ -4593,10 +4599,12 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * Check ozone admin privilege, throws exception if not admin.
    */
   private void checkAdminUserPrivilege(String operation) throws IOException {
-    final UserGroupInformation ugi = getRemoteUser();
-    if (!isAdmin(ugi)) {
-      throw new OMException("Only Ozone admins are allowed to " + operation,
-          PERMISSION_DENIED);
+    if (getAclsEnabled()) {
+      final UserGroupInformation ugi = getRemoteUser();
+      if (!isAdmin(ugi)) {
+        throw new OMException("Only Ozone admins are allowed to " + operation,
+            PERMISSION_DENIED);
+      }
     }
   }
 

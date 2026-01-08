@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.s3secret;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED_DEFAULT;
+
 import java.io.IOException;
 import java.security.Principal;
 import javax.inject.Inject;
@@ -46,11 +49,13 @@ public class S3SecretAdminFilter implements ContainerRequestFilter {
 
   @Override
   public void filter(ContainerRequestContext requestContext) throws IOException {
-    final Principal userPrincipal = requestContext.getSecurityContext().getUserPrincipal();
-    if (null != userPrincipal) {
-      UserGroupInformation user = UserGroupInformation.createRemoteUser(userPrincipal.getName());
-      if (!OzoneAdmins.isS3Admin(user, conf)) {
-        requestContext.abortWith(Response.status(Status.FORBIDDEN).build());
+    if (conf.getBoolean(OZONE_ACL_ENABLED, OZONE_ACL_ENABLED_DEFAULT)) {
+      final Principal userPrincipal = requestContext.getSecurityContext().getUserPrincipal();
+      if (null != userPrincipal) {
+        UserGroupInformation user = UserGroupInformation.createRemoteUser(userPrincipal.getName());
+        if (!OzoneAdmins.isS3Admin(user, conf)) {
+          requestContext.abortWith(Response.status(Status.FORBIDDEN).build());
+        }
       }
     }
   }

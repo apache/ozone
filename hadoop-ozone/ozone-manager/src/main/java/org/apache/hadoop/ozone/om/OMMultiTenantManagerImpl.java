@@ -718,7 +718,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
     } else {
       return isTenantAdmin(callerUgi.getShortUserName(), tenantId, delegated)
           || isTenantAdmin(callerUgi.getUserName(), tenantId, delegated)
-          || ozoneManager.isAdmin(callerUgi);
+          || (ozoneManager.getAclsEnabled() && ozoneManager.isAdmin(callerUgi));
     }
   }
 
@@ -897,11 +897,12 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
 
   @Override
   public void checkAdmin() throws OMException {
-
-    final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
-    if (!ozoneManager.isAdmin(ugi)) {
-      throw new OMException("User '" + ugi.getShortUserName() +
-          "' is not an Ozone admin", OMException.ResultCodes.PERMISSION_DENIED);
+    if (ozoneManager.getAclsEnabled()) {
+      final UserGroupInformation ugi = ProtobufRpcEngine.Server.getRemoteUser();
+      if (!ozoneManager.isAdmin(ugi)) {
+        throw new OMException("User '" + ugi.getShortUserName() +
+            "' is not an Ozone admin", OMException.ResultCodes.PERMISSION_DENIED);
+      }
     }
   }
 
