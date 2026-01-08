@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -50,6 +51,7 @@ import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.pipeline.MockRatisPipelineProvider;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
@@ -60,6 +62,7 @@ import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.TestClock;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.Mockito;
 
 /**
  * This class tests OneReplicaPipelineSafeModeRule.
@@ -193,35 +196,43 @@ public class TestOneReplicaPipelineSafeModeRule {
   }
 
   @Test
-  public void testOneReplicaPipelineRuleWithReportProcessingFalse() throws Exception {
-    // As with 30 nodes, We can create 7 pipelines with replication factor 3.
-    int totalNodes = 30;
-    int ratisPipelineCount = 7;
-    int standalonePipelineCount = 0;
+  public void testOneReplicaPipelineRuleWithReportProcessingFalse() {
+    EventQueue localEventQueue = new EventQueue();
+    PipelineManager mockedPipelineManager = mock(PipelineManager.class);
+    SCMSafeModeManager mockedSafeModeManager = mock(SCMSafeModeManager.class);
+    SafeModeMetrics mockedMetrics = mock(SafeModeMetrics.class);
+    when(mockedSafeModeManager.getSafeModeMetrics()).thenReturn(mockedMetrics);
 
-    setup(totalNodes, ratisPipelineCount, standalonePipelineCount);
+    OzoneConfiguration conf = new OzoneConfiguration();
 
-    // Disable validation based on report processing.
-    rule.setValidateBasedOnReportProcessing(false);
+    PipelineID pipelineID = PipelineID.randomId();
+    Pipeline mockedPipeline = mock(Pipeline.class);
+    when(mockedPipeline.getId()).thenReturn(pipelineID);
 
-    List<Pipeline> pipelines = pipelineManager.getPipelines();
-    assertFalse(pipelines.isEmpty());
+    // First validate(): pipeline has no nodes -> not counted as reported.
+    // Second validate(): pipeline has at least one node -> counted as reported.
+    when(mockedPipeline.getNodeSet())
+        .thenReturn(java.util.Collections.emptySet(),
+            new java.util.HashSet<>(
+                java.util.Collections.singletonList(mock(DatanodeDetails.class))));
 
-    // Pick the first pipeline and remove all nodes to make nodeSet.size() = 0 for the first pipeline.
-    Pipeline targetPipeline = pipelines.get(0);
-    List<DatanodeDetails> removedNodes = targetPipeline.removeAllFromNodeStatus();
+    when(mockedPipelineManager.getPipelines(
+        Mockito.any(ReplicationConfig.class),
+        Mockito.eq(Pipeline.PipelineState.OPEN)))
+        .thenReturn(java.util.Collections.singletonList(mockedPipeline));
 
-    // Validation should now fail because not all pipelines must meet at least one replica condition.
-    assertFalse(rule.validate());
+    OneReplicaPipelineSafeModeRule localRule =
+        new OneReplicaPipelineSafeModeRule(localEventQueue, mockedPipelineManager,
+            mockedSafeModeManager, conf);
 
-    // Re-add only one DN from first pipeline to meet one replica criteria.
-    targetPipeline.setInNodeStatus(removedNodes);
+    localRule.setValidateBasedOnReportProcessing(false);
 
-    // Now the rule should validate successfully
-    assertTrue(rule.validate());
+    // With no nodes in the pipeline, the rule should not be satisfied.
+    assertFalse(localRule.validate());
 
-    // Assert that the pipeline got added back to the reported set
-    assertTrue(rule.getReportedPipelineIDSet().contains(targetPipeline.getId()));
+    // After at least one node is present in the pipeline, the rule should pass.
+    assertTrue(localRule.validate());
+    assertTrue(localRule.getReportedPipelineIDSet().contains(pipelineID));
   }
 
   private void createPipelines(int count,
