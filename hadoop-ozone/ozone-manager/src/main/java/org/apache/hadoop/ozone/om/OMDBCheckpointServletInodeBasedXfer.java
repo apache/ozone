@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.hdds.utils.Archiver.includeFile;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
 import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT;
@@ -168,14 +169,6 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
       LOG.error(
           "Unable to process metadata snapshot request. ", e);
       response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-    } finally {
-      try {
-        if (tmpdir != null) {
-          FileUtils.deleteDirectory(tmpdir.toFile());
-        }
-      } catch (IOException e) {
-        LOG.error("unable to delete: " + tmpdir, e.toString());
-      }
     }
     try {
       Instant start = Instant.now();
@@ -187,6 +180,14 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
           "stream: {} milliseconds", duration);
     } catch (IOException e) {
       LOG.error("unable to write to archive stream", e);
+    } finally {
+      try {
+        if (tmpdir != null) {
+          FileUtils.deleteDirectory(tmpdir.toFile());
+        }
+      } catch (IOException e) {
+        LOG.error("unable to delete: " + tmpdir, e.toString());
+      }
     }
 
   }
@@ -368,7 +369,10 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
     }
     for (Path snapshotLocalPropertyYaml : snapshotLocalPropertyFiles) {
       File yamlFile = snapshotLocalPropertyYaml.toFile();
-      omdbArchiver.recordFileEntry(yamlFile, yamlFile.getName(), getDbStore());
+      if (omdbArchiver.getHardLinkFileMap() != null) {
+        omdbArchiver.getHardLinkFileMap().put(yamlFile.getAbsolutePath(), yamlFile.getName());
+      }
+      omdbArchiver.recordFileEntry(yamlFile, yamlFile.getName());
     }
   }
 
@@ -489,12 +493,20 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
           continue;
         }
         String fileId = OmSnapshotUtils.getFileInodeAndLastModifiedTimeString(dbFile);
+        if (omdbArchiver.getHardLinkFileMap() != null) {
+          String path = dbFile.toFile().getAbsolutePath();
+          // if the file is in the om checkpoint dir, then we need to change the path to point to the OM DB.
+          if (path.contains(OM_CHECKPOINT_DIR)) {
+            path = getDbStore().getDbLocation().toPath().resolve(dbFile.getFileName()).toAbsolutePath().toString();
+          }
+          omdbArchiver.getHardLinkFileMap().put(path, fileId);
+        }
         if (!sstFilesToExclude.contains(fileId)) {
           long fileSize = Files.size(dbFile);
           if (maxTotalSstSize.get() - fileSize <= 0) {
             return false;
           }
-          bytesRecorded += omdbArchiver.recordFileEntry(dbFile.toFile(), fileId, getDbStore());
+          bytesRecorded += omdbArchiver.recordFileEntry(dbFile.toFile(), fileId);
           filesWritten++;
           maxTotalSstSize.addAndGet(-fileSize);
           sstFilesToExclude.add(fileId);
