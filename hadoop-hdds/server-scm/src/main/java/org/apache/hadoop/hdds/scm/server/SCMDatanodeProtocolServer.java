@@ -43,7 +43,6 @@ import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
-import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.TextFormat;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -130,7 +129,7 @@ public class SCMDatanodeProtocolServer implements
   private final InetSocketAddress datanodeRpcAddress;
   private final SCMDatanodeHeartbeatDispatcher heartbeatDispatcher;
   private final EventPublisher eventPublisher;
-  private ProtocolMessageMetrics<ProtocolMessageEnum> protocolMessageMetrics;
+  private ProtocolMessageMetrics<StorageContainerDatanodeProtocolProtos.Type> protocolMessageMetrics;
 
   private final SCMContext scmContext;
 
@@ -491,11 +490,11 @@ public class SCMDatanodeProtocolServer implements
    * Get the ProtocolMessageMetrics for this server.
    * @return ProtocolMessageMetrics
    */
-  protected ProtocolMessageMetrics<ProtocolMessageEnum>
+  protected ProtocolMessageMetrics<StorageContainerDatanodeProtocolProtos.Type>
         getProtocolMessageMetrics() {
     return ProtocolMessageMetrics
         .create("SCMDatanodeProtocol", "SCM Datanode protocol",
-            StorageContainerDatanodeProtocolProtos.Type.values());
+            StorageContainerDatanodeProtocolProtos.Type.class);
   }
 
   /**
