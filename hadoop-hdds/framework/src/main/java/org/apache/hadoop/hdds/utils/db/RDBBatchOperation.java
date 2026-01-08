@@ -161,6 +161,7 @@ public final class RDBBatchOperation implements BatchOperation {
       return 0;
     }
 
+    @Override
     int totalLength() {
       return keyLen() + valLen();
     }
