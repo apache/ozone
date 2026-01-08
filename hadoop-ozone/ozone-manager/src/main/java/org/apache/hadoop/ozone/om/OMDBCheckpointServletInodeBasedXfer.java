@@ -81,6 +81,7 @@ import org.apache.hadoop.util.Time;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ratis.util.UncheckedAutoCloseable;
+import org.apache.ratis.util.function.CheckedSupplier;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -295,7 +296,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
             }
             writeDBToArchive(sstFilesToExclude, getCompactionLogDir(), maxTotalSstSize, archiveOutputStream, tmpdir,
                 hardLinkFileMap, false);
-            writeDBToArchive(sstFilesToExclude, sstBackupFiles.stream(), maxTotalSstSize, archiveOutputStream, tmpdir,
+            writeDBToArchive(sstFilesToExclude, sstBackupFiles::stream, maxTotalSstSize, archiveOutputStream, tmpdir,
                 hardLinkFileMap, false);
             Collection<Path> snapshotLocalPropertyFiles = getSnapshotLocalDataPaths(localDataManager,
                 snapshotInCheckpoint.keySet());
@@ -458,7 +459,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
       LOG.warn("DB directory {} does not exist. Skipping.", dbDir);
       return true;
     }
-    return writeDBToArchive(sstFilesToExclude, Files.list(dbDir),
+    return writeDBToArchive(sstFilesToExclude, () -> Files.list(dbDir),
         maxTotalSstSize, archiveOutputStream, tmpDir, hardLinkFileMap, onlySstFile);
   }
 
@@ -483,13 +484,13 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
    * @throws IOException if an I/O error occurs
    */
   @SuppressWarnings("checkstyle:ParameterNumber")
-  private boolean writeDBToArchive(Set<String> sstFilesToExclude, Stream<Path> files, AtomicLong maxTotalSstSize,
-      ArchiveOutputStream<TarArchiveEntry> archiveOutputStream, Path tmpDir,
+  private boolean writeDBToArchive(Set<String> sstFilesToExclude, CheckedSupplier<Stream<Path>, IOException> files,
+      AtomicLong maxTotalSstSize, ArchiveOutputStream<TarArchiveEntry> archiveOutputStream, Path tmpDir,
       Map<String, String> hardLinkFileMap, boolean onlySstFile) throws IOException {
     long bytesWritten = 0L;
     int filesWritten = 0;
     long lastLoggedTime = Time.monotonicNow();
-    try (Stream<Path> autoCloseFiles = files) {
+    try (Stream<Path> autoCloseFiles = files.get()) {
       Iterable<Path> iterable = autoCloseFiles::iterator;
       for (Path dbFile : iterable) {
         if (!Files.isDirectory(dbFile)) {

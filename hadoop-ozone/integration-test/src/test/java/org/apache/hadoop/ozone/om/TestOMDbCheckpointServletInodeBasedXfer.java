@@ -166,6 +166,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
   @AfterEach
   void shutdown() {
     IOUtils.closeQuietly(client, cluster);
+    cluster = null;
   }
 
   private void setupCluster() throws Exception {
@@ -288,8 +289,6 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
 
   @Test
   public void testWriteDBToArchiveClosesFilesListStream() throws Exception {
-    cluster = mock(MiniOzoneCluster.class);
-
     OMDBCheckpointServletInodeBasedXfer servlet = new OMDBCheckpointServletInodeBasedXfer();
 
     final Path dbDir = Files.createTempDirectory(folder, "dbdir-");
