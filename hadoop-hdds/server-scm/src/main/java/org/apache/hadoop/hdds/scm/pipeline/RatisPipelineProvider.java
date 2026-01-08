@@ -82,9 +82,9 @@ public class RatisPipelineProvider
     this.pipelineNumberLimit = conf.getInt(
         ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT,
         ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT_DEFAULT);
-    String dnLimit = conf.get(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT);
-    this.maxPipelinePerDatanode = dnLimit == null ? 0 :
-        Integer.parseInt(dnLimit);
+    this.maxPipelinePerDatanode = conf.getInt(
+        ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT,
+        ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT);
     this.containerSizeBytes = (long) this.conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
