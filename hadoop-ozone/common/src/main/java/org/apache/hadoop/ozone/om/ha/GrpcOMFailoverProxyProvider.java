@@ -102,9 +102,8 @@ public class GrpcOMFailoverProxyProvider<T> extends
           "addresses for OM. Please configure the system with "
           + OZONE_OM_ADDRESS_KEY);
     }
-    setOmProxies(omProxies);
     Collections.shuffle(omNodeIDList);
-    setOmNodesInOrder(omNodeIDList);
+    initOmProxies(omProxies, omNodeIDList);
   }
 
   private T createOMProxy() throws IOException {

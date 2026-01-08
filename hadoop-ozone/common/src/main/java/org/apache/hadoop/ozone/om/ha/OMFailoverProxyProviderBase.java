@@ -138,7 +138,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
   /**
    * Initialize the OM proxies from the configuration and the OM service ID.
    * The implementation initialize the OM proxies and ordered OM node ID list
-   * through {@link #setOmProxies(Map)} and {@link #setOmNodesInOrder(List)} respectively.
+   * through {@link #initOmProxies(Map, List)}
    * @param config configuration containing OM node information
    * @param omSvcId OM service ID
    * @throws IOException if any exception occurs while trying to initialize the proxy.
@@ -466,12 +466,20 @@ public abstract class OMFailoverProxyProviderBase<T> implements
     return conf;
   }
 
-  protected synchronized void setOmProxies(Map<String, OMProxyInfo<T>> omProxies) {
-    this.omProxies = omProxies;
-  }
-
-  protected synchronized void setOmNodesInOrder(List<String> omNodesInOrder) {
-    this.omNodesInOrder = Collections.unmodifiableList(omNodesInOrder);
+  /**
+   * Initialize the OM proxy map and the OM nodes ordering.
+   * @param omProxyMap OM Node ID to OMProxyInfo map
+   * @param omNodesInOrderList Ordered list of OM Node ID to define failover ordering.
+   */
+  protected synchronized void initOmProxies(Map<String, OMProxyInfo<T>> omProxyMap, List<String> omNodesInOrderList) {
+    Objects.requireNonNull(omProxyMap, "omProxyMap == null");
+    Objects.requireNonNull(omProxyMap, "omNodesInOrderList == null");
+    Preconditions.checkState(omProxyMap.size() == omNodesInOrderList.size(),
+        "omProxyMap and omNodesInOrderList should have the same size");
+    Preconditions.checkState(omProxyMap.keySet().equals(new HashSet<>(omNodesInOrderList)),
+        "the OM node IDs of omProxies keys should be the same as omNodesInOrder");
+    this.omProxies = omProxyMap;
+    this.omNodesInOrder = Collections.unmodifiableList(omNodesInOrderList);
   }
 
   protected synchronized List<String> getOmNodesInOrder() {
