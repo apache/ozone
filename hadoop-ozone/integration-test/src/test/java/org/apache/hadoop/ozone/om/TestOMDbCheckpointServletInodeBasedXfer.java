@@ -71,6 +71,7 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -283,6 +284,33 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     } else {
       assertTrue(obtainedFilesUnderMaxLimit);
     }
+  }
+
+  @Test
+  public void testWriteDBToArchiveClosesFilesListStream() throws Exception {
+    cluster = mock(MiniOzoneCluster.class);
+
+    OMDBCheckpointServletInodeBasedXfer servlet = new OMDBCheckpointServletInodeBasedXfer();
+
+    final Path dbDir = Files.createTempDirectory(folder, "dbdir-");
+    final AtomicBoolean closed = new AtomicBoolean(false);
+    final Stream<Path> stream = Stream.<Path>empty().onClose(() -> closed.set(true));
+
+    // Do not use CALLS_REAL_METHODS for java.nio.file.Files: internal/private static
+    // methods (eg Files.provider()) get intercepted too and Mockito will try to invoke
+    // them reflectively, which fails on JDK9+ without --add-opens.
+    try (MockedStatic<Files> files = mockStatic(Files.class);
+         TarArchiveOutputStream tar = new TarArchiveOutputStream(new java.io.ByteArrayOutputStream())) {
+      files.when(() -> Files.exists(dbDir)).thenReturn(true);
+      files.when(() -> Files.list(dbDir)).thenReturn(stream);
+
+      boolean result = servlet.writeDBToArchive(
+          new HashSet<>(), dbDir, new AtomicLong(Long.MAX_VALUE),
+          tar, folder, null, true);
+      assertTrue(result);
+    }
+
+    assertTrue(closed.get(), "Files.list() stream should be closed to avoid FD leaks");
   }
 
   @ParameterizedTest
