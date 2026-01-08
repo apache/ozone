@@ -21,19 +21,28 @@ import static org.apache.hadoop.security.authentication.util.KerberosName.DEFAUL
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.Optional;
 import java.util.UUID;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ipc.ExternalCall;
 import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
@@ -281,6 +290,41 @@ public class TestS3RevokeSTSTokenRequest {
       ex = assertThrows(OMException.class, () -> omClientRequest.preExecute(ozoneManager));
     }
     assertEquals(OMException.ResultCodes.USER_MISMATCH, ex.getResult());
+  }
+
+  @Test
+  public void testValidateAndUpdateCacheUpdatesCacheImmediately() throws Exception {
+    final String tempAccessKeyId = "ASIA4567891230";
+    final String originalAccessKeyId = "original-access-key-id";
+    final String sessionToken = createSessionToken(tempAccessKeyId, originalAccessKeyId);
+
+    final OzoneManager ozoneManager = mock(OzoneManager.class);
+    final OMMetadataManager omMetadataManager = mock(OMMetadataManager.class);
+    @SuppressWarnings("unchecked")
+    final Table<String, Long> s3RevokedStsTokenTable = mock(Table.class);
+    final ExecutionContext context = mock(ExecutionContext.class);
+    final AuditLogger auditLogger = mock(AuditLogger.class);
+
+    when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
+    when(omMetadataManager.getS3RevokedStsTokenTable()).thenReturn(s3RevokedStsTokenTable);
+    when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
+
+    final OzoneManagerProtocolProtos.RevokeSTSTokenRequest revokeRequest =
+        OzoneManagerProtocolProtos.RevokeSTSTokenRequest.newBuilder()
+            .setSessionToken(sessionToken)
+            .build();
+
+    final OMRequest omRequest = OMRequest.newBuilder()
+        .setClientId(UUID.randomUUID().toString())
+        .setCmdType(Type.RevokeSTSToken)
+        .setRevokeSTSTokenRequest(revokeRequest)
+        .build();
+
+    final S3RevokeSTSTokenRequest s3RevokeSTSTokenRequest = new S3RevokeSTSTokenRequest(omRequest);
+    final OMClientResponse omClientResponse = s3RevokeSTSTokenRequest.validateAndUpdateCache(ozoneManager, context);
+
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, omClientResponse.getOMResponse().getStatus());
+    verify(s3RevokedStsTokenTable).addCacheEntry(eq(new CacheKey<>(sessionToken)), any(CacheValue.class));
   }
 
   /**

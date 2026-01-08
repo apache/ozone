@@ -17,10 +17,13 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
@@ -28,6 +31,7 @@ import java.util.Map;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.junit.jupiter.api.Test;
 
@@ -112,6 +116,20 @@ public class TestEndpointBase {
     Map<String, String> customMetadata = endpointBase.getCustomMetadataFromHeaders(s3requestHeaders);
 
     assertEquals(value, customMetadata.get(key));
+  }
+
+  @Test
+  public void testAccessDeniedResultCodes() {
+    final EndpointBase endpointBase = new EndpointBase() {
+      @Override
+      public void init() { }
+    };
+
+    assertTrue(endpointBase.isAccessDenied(new OMException(ResultCodes.PERMISSION_DENIED)));
+    assertTrue(endpointBase.isAccessDenied(new OMException(ResultCodes.INVALID_TOKEN)));
+    assertTrue(endpointBase.isAccessDenied(new OMException(ResultCodes.REVOKED_TOKEN)));
+    assertFalse(endpointBase.isAccessDenied(new OMException(ResultCodes.INTERNAL_ERROR)));
+    assertFalse(endpointBase.isAccessDenied(new OMException(ResultCodes.BUCKET_NOT_FOUND)));
   }
 
 }

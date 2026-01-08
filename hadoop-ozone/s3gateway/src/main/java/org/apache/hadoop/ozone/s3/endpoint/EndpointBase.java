@@ -537,7 +537,8 @@ public abstract class EndpointBase implements Auditor {
   protected boolean isAccessDenied(OMException ex) {
     ResultCodes result = ex.getResult();
     return result == ResultCodes.PERMISSION_DENIED
-        || result == ResultCodes.INVALID_TOKEN;
+        || result == ResultCodes.INVALID_TOKEN
+        || result == ResultCodes.REVOKED_TOKEN;
   }
 
 }
