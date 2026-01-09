@@ -118,7 +118,7 @@ public class TestOMDBArchiver {
           .as("File %s should exist in extracted archive", fileName).isTrue();
       assertThat(extractedFile.length())
           .as("File %s should have content", fileName)
-          .isEqualTo("dummy".getBytes().length);
+          .isEqualTo("dummy".getBytes(StandardCharsets.UTF_8).length);
 
       byte[] content = Files.readAllBytes(extractedFile.toPath());
       assertThat(new String(content,
