@@ -36,7 +36,7 @@ The reconfiguration is performed asynchronously, and you can check the status to
 ## Command Reference
 
 ```shell
-ozone admin reconfig --service=[OM|SCM|DATANODE] --address=<ip:port> <operation>
+ozone admin reconfig --service=[OM|SCM|DATANODE] --address=<ip:port|hostname:port> <operation>
 ```
 
 ### Options
@@ -44,7 +44,7 @@ ozone admin reconfig --service=[OM|SCM|DATANODE] --address=<ip:port> <operation>
 | Option | Description |
 |--------|-------------|
 | `--service` | The service type: `OM`, `SCM`, or `DATANODE` |
-| `--address` | RPC address of the target server (e.g., `hadoop1:9862`) |
+| `--address` | RPC address of the target server (e.g., `hadoop1:9862` or `192.168.1.10:9862`). Required unless `--in-service-datanodes` is specified. |
 | `--in-service-datanodes` | (DataNode only) Apply to all IN_SERVICE datanodes |
 
 ### Operations
