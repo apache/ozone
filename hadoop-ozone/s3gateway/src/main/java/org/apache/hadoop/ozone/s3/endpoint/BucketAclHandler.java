@@ -30,7 +30,6 @@ import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import javax.annotation.PostConstruct;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
@@ -315,11 +314,5 @@ public class BucketAclHandler extends EndpointBase implements BucketOperationHan
     }
 
     return ozoneAclList;
-  }
-
-  @Override
-  @PostConstruct
-  public void init() {
-    // No initialization needed for BucketAclHandler
   }
 }

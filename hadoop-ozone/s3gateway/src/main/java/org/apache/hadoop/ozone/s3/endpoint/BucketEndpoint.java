@@ -35,7 +35,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import javax.annotation.PostConstruct;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.HEAD;
@@ -547,8 +546,7 @@ public class BucketEndpoint extends EndpointBase {
   }
 
   @Override
-  @PostConstruct
-  public void init() {
+  protected void init() {
     listKeysShallowEnabled = getOzoneConfiguration().getBoolean(
         OZONE_S3G_LIST_KEYS_SHALLOW_ENABLED,
         OZONE_S3G_LIST_KEYS_SHALLOW_ENABLED_DEFAULT);
@@ -556,12 +554,13 @@ public class BucketEndpoint extends EndpointBase {
         OZONE_S3G_LIST_MAX_KEYS_LIMIT,
         OZONE_S3G_LIST_MAX_KEYS_LIMIT_DEFAULT);
 
-    // Initialize PUT handlers
-    BucketAclHandler aclHandler = new BucketAclHandler();
-    copyDependenciesTo(aclHandler);
-    aclHandler.initialization();
-
+    // initialize handlers
     handlers = new ArrayList<>();
-    handlers.add(aclHandler);
+    addHandler(new BucketAclHandler());
+  }
+
+  private <T extends EndpointBase & BucketOperationHandler> void addHandler(T handler) {
+    copyDependenciesTo(handler);
+    handlers.add(handler);
   }
 }
