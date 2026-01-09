@@ -62,8 +62,16 @@ public class OMDBArchiver {
     this.tmpDir = tmpDir;
   }
 
+  public Path getTmpDir() {
+    return tmpDir;
+  }
+
   public Map<String, String> getHardLinkFileMap() {
     return hardLinkFileMap;
+  }
+
+  public Map<String, File> getFilesToWriteIntoTarball() {
+    return filesToWriteIntoTarball;
   }
 
   public void setHardLinkFileMap(Map<String, String> hardLinkFileMap) {
