@@ -136,6 +136,23 @@ public final class RDBBatchOperation implements BatchOperation {
     }
   }
 
+  private abstract static class Op implements Closeable {
+    private final AtomicBoolean closed = new AtomicBoolean(false);
+
+    abstract void apply(ColumnFamily family, ManagedWriteBatch batch) throws RocksDatabaseException;
+
+    abstract int totalLength();
+
+    boolean closeImpl() {
+      return closed.compareAndSet(false, true);
+    }
+
+    @Override
+    public final void close() {
+      closeImpl();
+    }
+  }
+
   private abstract static class SingleKeyOp extends Op {
     private final CodecBuffer keyBuffer;
     private final Bytes keyBytes;
@@ -176,22 +193,6 @@ public final class RDBBatchOperation implements BatchOperation {
     }
   }
 
-  private abstract static class Op implements Closeable {
-    private final AtomicBoolean closed = new AtomicBoolean(false);
-
-    abstract void apply(ColumnFamily family, ManagedWriteBatch batch) throws RocksDatabaseException;
-
-    abstract int totalLength();
-
-    boolean closeImpl() {
-      return closed.compareAndSet(false, true);
-    }
-
-    @Override
-    public final void close() {
-      closeImpl();
-    }
-  }
 
   /**
    * Delete operation to be applied to a {@link ColumnFamily} batch.

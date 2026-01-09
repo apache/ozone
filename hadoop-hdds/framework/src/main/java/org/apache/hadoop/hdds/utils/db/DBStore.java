@@ -179,39 +179,4 @@ public interface DBStore extends UncheckedAutoCloseable, BatchOperationHandler {
   boolean isClosed();
 
   String getSnapshotsParentDir();
-
-  /**
-   * Creates an iterator that merges multiple tables into a single iterator,
-   * grouping values with the same key across the tables.
-   *
-   * @param <KEY> the type of keys for the tables
-   * @param keyComparator the comparator used to compare keys from different tables
-   * @param prefix the prefix used to filter entries of each table
-   * @param table one or more tables to merge
-   * @return a closable iterator over merged key-value pairs, where each key corresponds
-   *         to a collection of values from the tables
-   */
-  default <KEY> ClosableIterator<KeyValue<KEY, List<Object>>> getMergeIterator(
-      Comparator<KEY> keyComparator, KEY prefix, Table<KEY, Object>... table) {
-    List<Object> tableValues = IntStream.range(0, table.length).mapToObj(i -> null).collect(Collectors.toList());
-    KeyValue<KEY, Object> defaultNullValue = newKeyValue(null, null);
-    Comparator<KeyValue<KEY, Object>> comparator = Comparator.comparing(KeyValue::getKey, keyComparator);
-    return new MinHeapMergeIterator<KeyValue<KEY, Object>, Table.KeyValueIterator<KEY, Object>,
-        KeyValue<KEY, List<Object>>>(table.length, comparator) {
-      @Override
-      protected Table.KeyValueIterator<KEY, Object> getIterator(int idx) throws IOException {
-        return table[idx].iterator(prefix);
-      }
-
-      @Override
-      protected KeyValue<KEY, List<Object>> merge(Map<Integer, KeyValue<KEY, Object>> keysToMerge) {
-        KEY key = keysToMerge.values().stream().findAny()
-            .orElseThrow(() -> new NoSuchElementException("No keys found")).getKey();
-        for (int i = 0; i < tableValues.size(); i++) {
-          tableValues.set(i, keysToMerge.getOrDefault(i, defaultNullValue).getValue());
-        }
-        return newKeyValue(key, tableValues);
-      }
-    };
-  }
 }
