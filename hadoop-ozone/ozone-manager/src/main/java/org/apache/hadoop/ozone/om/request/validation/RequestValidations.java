@@ -101,7 +101,7 @@ public class RequestValidations {
 
     List<Method> validations = registry.validationsFor(request.getCmdType(), POST_PROCESS, this.getVersions(request));
 
-    OMResponse validatedResponse = response.toBuilder().build();
+    OMResponse validatedResponse = response;
     try {
       for (Method m : validations) {
         LOG.debug("Running the {} request post-process validation from {}.{}",
