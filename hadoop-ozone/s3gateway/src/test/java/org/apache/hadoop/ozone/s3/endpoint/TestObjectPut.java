@@ -526,7 +526,6 @@ class TestObjectPut {
     assertThat(keyDetails.getMetadata().get(OzoneConsts.ETAG)).isNotEmpty();
   }
 
-
   public static Stream<Arguments> wrongContentMD5Provider() throws NoSuchAlgorithmException {
     byte[] wrongContentBytes = "wrong".getBytes(StandardCharsets.UTF_8);
     byte[] wrongMd5Bytes = MessageDigest.getInstance("MD5").digest(wrongContentBytes);
