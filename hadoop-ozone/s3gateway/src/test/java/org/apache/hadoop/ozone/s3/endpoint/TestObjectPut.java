@@ -58,6 +58,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -525,15 +526,23 @@ class TestObjectPut {
     assertThat(keyDetails.getMetadata().get(OzoneConsts.ETAG)).isNotEmpty();
   }
 
-  @Test
-  public void testPutObjectWithWrongContentMD5() throws Exception {
-    // GIVEN
+
+  public static Stream<Arguments> wrongContentMD5Provider() throws NoSuchAlgorithmException {
     byte[] wrongContentBytes = "wrong".getBytes(StandardCharsets.UTF_8);
     byte[] wrongMd5Bytes = MessageDigest.getInstance("MD5").digest(wrongContentBytes);
     String wrongMd5Base64 = Base64.getEncoder().encodeToString(wrongMd5Bytes);
+    return Stream.of(
+        Arguments.arguments(wrongMd5Base64),
+        Arguments.arguments("invalid-base64")
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("wrongContentMD5Provider")
+  public void testPutObjectWithWrongContentMD5(String wrongContentMD5) throws Exception {
 
     // WHEN
-    when(headers.getHeaderString("Content-MD5")).thenReturn(wrongMd5Base64);
+    when(headers.getHeaderString("Content-MD5")).thenReturn(wrongContentMD5);
 
     // WHEN/THEN
     OS3Exception ex = assertErrorResponse(S3ErrorTable.BAD_DIGEST, () -> putObject(CONTENT));

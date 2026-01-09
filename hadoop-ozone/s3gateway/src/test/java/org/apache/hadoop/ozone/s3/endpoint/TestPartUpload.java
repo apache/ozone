@@ -43,8 +43,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 import java.util.UUID;
+import java.util.stream.Stream;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.IOUtils;
@@ -60,6 +62,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.Parameter;
 import org.junit.jupiter.params.ParameterizedClass;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 
@@ -210,15 +215,23 @@ public class TestPartUpload {
     assertContentLength(uploadID, OzoneConsts.KEY, content.length());
   }
 
-  @Test
-  public void testPartUploadWithWrongContentMD5() throws Exception {
-    String content = "Multipart Upload Part";
-    byte[] wrongContentBytes = "wrong content".getBytes(StandardCharsets.UTF_8);
+  public static Stream<Arguments> wrongContentMD5Provider() throws NoSuchAlgorithmException {
+    byte[] wrongContentBytes = "wrong".getBytes(StandardCharsets.UTF_8);
     byte[] wrongMd5Bytes = MessageDigest.getInstance("MD5").digest(wrongContentBytes);
     String wrongMd5Base64 = Base64.getEncoder().encodeToString(wrongMd5Bytes);
+    return Stream.of(
+        Arguments.arguments(wrongMd5Base64),
+        Arguments.arguments("invalid-base64")
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("wrongContentMD5Provider")
+  public void testPartUploadWithWrongContentMD5(String wrongContentMD5) throws Exception {
+    String content = "Multipart Upload Part";
 
     HttpHeaders headersWithWrongMD5 = mock(HttpHeaders.class);
-    when(headersWithWrongMD5.getHeaderString("Content-MD5")).thenReturn(wrongMd5Base64);
+    when(headersWithWrongMD5.getHeaderString("Content-MD5")).thenReturn(wrongContentMD5);
     when(headersWithWrongMD5.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
     when(headersWithWrongMD5.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("STANDARD");
 

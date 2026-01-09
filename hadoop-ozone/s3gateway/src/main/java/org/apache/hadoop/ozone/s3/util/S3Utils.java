@@ -226,12 +226,12 @@ public final class S3Utils {
   }
 
   /**
-   * Validates the client provided Content-MD5 against the server's MD5.
+   * Validates the Content-MD5 header against the actual MD5 hash.
    *
-   * @param clientMD5  Base64 encoded MD5 provided by the client
-   * @param serverMD5  Hexadecimal encoded MD5 stored on the server
-   * @param resource   Resource identifier used when constructing error responses
-   * @throws OS3Exception if clientMD5 is null or does not match serverMD5
+   * @param clientMD5 the base64-encoded MD5 from Content-MD5 header
+   * @param serverMD5 the hex-encoded MD5 hash of the data
+   * @param resource  the resource path for error messages
+   * @throws OS3Exception if the MD5 values do not match
    */
   public static void validateContentMD5(String clientMD5, String serverMD5, String resource)
       throws OS3Exception {
@@ -239,7 +239,11 @@ public final class S3Utils {
       throw newError(BAD_DIGEST, resource);
     }
 
-    if (!Hex.encodeHexString(Base64.getDecoder().decode(clientMD5)).equals(serverMD5)) {
+    try {
+      if (!Hex.encodeHexString(Base64.getDecoder().decode(clientMD5)).equals(serverMD5)) {
+        throw newError(BAD_DIGEST, resource);
+      }
+    } catch (IllegalArgumentException ex) {
       throw newError(BAD_DIGEST, resource);
     }
   }
