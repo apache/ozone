@@ -184,7 +184,7 @@ To list properties across all datanodes:
 
 ```shell
 $ ozone admin reconfig --service=DATANODE --in-service-datanodes properties
-Datanode: Node [hadoop1:19864] Reconfigurable properties:
+DN: Node [hadoop1:19864] Reconfigurable properties:
 hdds.datanode.block.deleting.limit.per.interval
 Datanode: Node [hadoop2:19864] Reconfigurable properties:
 hdds.datanode.block.deleting.limit.per.interval
