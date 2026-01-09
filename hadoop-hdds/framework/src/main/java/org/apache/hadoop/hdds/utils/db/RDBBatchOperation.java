@@ -193,7 +193,6 @@ public final class RDBBatchOperation implements BatchOperation {
     }
   }
 
-
   /**
    * Delete operation to be applied to a {@link ColumnFamily} batch.
    */

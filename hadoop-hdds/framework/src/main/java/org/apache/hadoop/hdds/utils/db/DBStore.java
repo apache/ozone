@@ -17,22 +17,13 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import static org.apache.hadoop.hdds.utils.db.Table.newKeyValue;
-
 import java.io.File;
-import java.io.IOException;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
-import org.apache.hadoop.ozone.util.ClosableIterator;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 
