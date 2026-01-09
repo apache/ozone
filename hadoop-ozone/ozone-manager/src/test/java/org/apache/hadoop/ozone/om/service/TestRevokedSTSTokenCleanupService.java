@@ -355,6 +355,39 @@ public class TestRevokedSTSTokenCleanupService {
     }
   }
 
+  @Test
+  public void testCallIdCountIncreasesAcrossBatches() throws Exception {
+    // Force small batch of 40 bytea (which should trigger multiple calls to OzoneManagerRatisUtils.submitRequest)
+    // and ensure the callIdCount increases across each batch
+    // session-token-1 and session-token-2 are in first batch, and session-token-3 is in second batch.
+    final long nowMillis = testClock.millis();
+
+    revokedStsTokenTable.put("session-token-1", nowMillis - TimeUnit.HOURS.toMillis(13));
+    revokedStsTokenTable.put("session-token-2", nowMillis - TimeUnit.HOURS.toMillis(13));
+    revokedStsTokenTable.put("session-token-3", nowMillis - TimeUnit.HOURS.toMillis(13));
+
+    ozoneConfiguration.setStorageSize(OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT, 40, StorageUnit.BYTES);
+
+    final List<Long> capturedCallIdCounts = new ArrayList<>();
+
+    try (MockedStatic<OzoneManagerRatisUtils> ozoneManagerRatisUtilsMock = mockStatic(OzoneManagerRatisUtils.class)) {
+      // Capture the callIdCount (4th argument)
+      ozoneManagerRatisUtilsMock.when(
+          () -> OzoneManagerRatisUtils.submitRequest(any(), any(), any(), anyLong()))
+          .thenAnswer(invocation -> {
+            capturedCallIdCounts.add(invocation.getArgument(3));
+            return buildOkResponse(invocation.getArgument(1));
+          });
+
+      final RevokedSTSTokenCleanupService revokedSTSTokenCleanupService = createAndRunCleanupService();
+
+      assertThat(revokedSTSTokenCleanupService.getRunCount()).isEqualTo(1);
+      assertThat(revokedSTSTokenCleanupService.getSubmittedDeletedEntryCount()).isEqualTo(3);
+      assertThat(capturedCallIdCounts).hasSize(2);
+      assertThat(capturedCallIdCounts.get(1)).isGreaterThan(capturedCallIdCounts.get(0));
+    }
+  }
+
   private RevokedSTSTokenCleanupService createAndRunCleanupService() throws Exception {
     final RevokedSTSTokenCleanupService revokedSTSTokenCleanupService =
         new RevokedSTSTokenCleanupService(1, TimeUnit.HOURS, 1_000, ozoneManager);

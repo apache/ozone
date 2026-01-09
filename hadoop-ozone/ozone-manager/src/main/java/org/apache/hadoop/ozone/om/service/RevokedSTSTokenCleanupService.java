@@ -64,6 +64,7 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
   private final AtomicBoolean suspended;
   private final AtomicLong runCount;
   private final AtomicLong submittedDeletedEntryCount;
+  private final AtomicLong callIdCount;
   // Dummy client ID to use for response, since this is triggered by a
   // service, not the client.
   private final ClientId clientId = ClientId.randomId();
@@ -86,6 +87,7 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
     this.suspended = new AtomicBoolean(false);
     this.runCount = new AtomicLong(0);
     this.submittedDeletedEntryCount = new AtomicLong(0);
+    this.callIdCount = new AtomicLong(0);
     int limit = (int) ozoneManager.getConfiguration().getStorageSize(
         OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
         OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT, StorageUnit.BYTES);
@@ -203,7 +205,8 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
 
       final long elapsed = Time.monotonicNow() - startTime;
       LOG.info("RevokedSTSTokenCleanupService run completed. deletedEntriesInRun={}, totalDeletedEntries={}, " +
-          "elapsedTimeMs={}", deletedInRun, submittedDeletedEntryCount.get(), elapsed);
+          "callIdCount={}, elapsedTimeMs={}", deletedInRun, submittedDeletedEntryCount.get(), callIdCount.get(),
+          elapsed);
 
       final long resultCount = deletedInRun;
       return () -> (int) resultCount;
@@ -243,7 +246,7 @@ public class RevokedSTSTokenCleanupService extends BackgroundService {
 
       try {
         final OMResponse omResponse = OzoneManagerRatisUtils.submitRequest(
-            ozoneManager, omRequest, clientId, runCount.get());
+            ozoneManager, omRequest, clientId, callIdCount.incrementAndGet());
         return omResponse != null && omResponse.getSuccess();
       } catch (ServiceException e) {
         LOG.error("Revoked STS token cleanup request failed. Will retry at next run.", e);
