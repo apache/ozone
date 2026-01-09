@@ -357,7 +357,7 @@ public class TestRevokedSTSTokenCleanupService {
 
   @Test
   public void testCallIdCountIncreasesAcrossBatches() throws Exception {
-    // Force small batch of 40 bytea (which should trigger multiple calls to OzoneManagerRatisUtils.submitRequest)
+    // Force small batch of 40 bytes (which should trigger multiple calls to OzoneManagerRatisUtils.submitRequest)
     // and ensure the callIdCount increases across each batch
     // session-token-1 and session-token-2 are in first batch, and session-token-3 is in second batch.
     final long nowMillis = testClock.millis();
