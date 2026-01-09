@@ -158,6 +158,7 @@ enum Type {
   DeleteObjectTagging = 142;
   AssumeRole = 143;
   RevokeSTSToken = 144;
+  DeleteRevokedSTSTokens = 145;
 }
 
 enum SafeMode {
@@ -308,6 +309,7 @@ message OMRequest {
   repeated SetSnapshotPropertyRequest       SetSnapshotPropertyRequests    = 143;
   optional AssumeRoleRequest                assumeRoleRequest              = 144;
   optional RevokeSTSTokenRequest            revokeSTSTokenRequest          = 145;
+  optional DeleteRevokedSTSTokensRequest    deleteRevokedSTSTokensRequest  = 146;
 }
 
 message OMResponse {
@@ -438,11 +440,12 @@ message OMResponse {
   optional GetQuotaRepairStatusResponse      GetQuotaRepairStatusResponse   = 136;
   optional StartQuotaRepairResponse          StartQuotaRepairResponse       = 137;
 
-  optional GetObjectTaggingResponse          getObjectTaggingResponse      = 140;
-  optional PutObjectTaggingResponse          putObjectTaggingResponse      = 141;
-  optional DeleteObjectTaggingResponse       deleteObjectTaggingResponse   = 142;
-  optional AssumeRoleResponse                assumeRoleResponse            = 143;
-  optional RevokeSTSTokenResponse            revokeSTSTokenResponse        = 144;
+  optional GetObjectTaggingResponse          getObjectTaggingResponse       = 140;
+  optional PutObjectTaggingResponse          putObjectTaggingResponse       = 141;
+  optional DeleteObjectTaggingResponse       deleteObjectTaggingResponse    = 142;
+  optional AssumeRoleResponse                assumeRoleResponse             = 143;
+  optional RevokeSTSTokenResponse            revokeSTSTokenResponse         = 144;
+  optional DeleteRevokedSTSTokensResponse    deleteRevokedSTSTokensResponse = 145;
 }
 
 enum Status {
@@ -2391,6 +2394,17 @@ message RevokeSTSTokenRequest {
 }
 
 message RevokeSTSTokenResponse {
+}
+
+/**
+ This will contain a list of revoked STS session tokens whose entries should be removed from
+ the s3RevokedStsTokenTable.
+*/
+message DeleteRevokedSTSTokensRequest {
+  repeated string sessionToken = 1;
+}
+
+message DeleteRevokedSTSTokensResponse {
 }
 
 /**

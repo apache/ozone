@@ -4858,4 +4858,25 @@
     <value>5m</value>
     <description>Interval for cleaning up orphan snapshot local data versions corresponding to snapshots</description>
   </property>
+
+  <property>
+    <name>ozone.om.sts.token.cleanup.service.interval</name>
+    <value>3h</value>
+    <tag>OZONE, OM, PERFORMANCE, SECURITY</tag>
+    <description>
+      A background job that periodically checks revoked STS token entries and
+      deletes ones that have existed for 12 hours. This entry controls the interval of this
+      cleanup check. Unit could be defined with postfix (ns,ms,s,m,h,d).
+    </description>
+  </property>
+  <property>
+    <name>ozone.om.sts.token.cleanup.service.timeout</name>
+    <value>15m</value>
+    <tag>OZONE, OM, PERFORMANCE, SECURITY</tag>
+    <description>
+      A timeout value for the revoked STS token cleanup service. If this is set
+      greater than 0, the service will stop waiting for the deletion
+      completion after this time. Unit could be defined with postfix (ns,ms,s,m,h,d).
+    </description>
+  </property>
 </configuration>

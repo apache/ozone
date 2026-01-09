@@ -344,6 +344,7 @@ public final class OmUtils {
     case QuotaRepair:
     case PutObjectTagging:
     case DeleteObjectTagging:
+    case DeleteRevokedSTSTokens:
     case UnknownCommand:
       return false;
     case EchoRPC:
@@ -364,7 +365,7 @@ public final class OmUtils {
           "This could possibly indicate a faulty JRE");
     }
   }
-
+  
   /**
    * Get a collection of all active omNodeIds (excluding decommissioned nodes)
    * for the given omServiceId.

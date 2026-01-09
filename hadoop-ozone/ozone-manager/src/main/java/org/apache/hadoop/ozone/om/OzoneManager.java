@@ -287,6 +287,7 @@ import org.apache.hadoop.ozone.om.service.CompactDBService;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.om.service.QuotaRepairTask;
+import org.apache.hadoop.ozone.om.service.RevokedSTSTokenCleanupService;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
@@ -438,6 +439,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final boolean isSpnegoEnabled;
   private final SecurityConfig secConfig;
   private S3SecretManager s3SecretManager;
+  private RevokedSTSTokenCleanupService revokedSTSTokenCleanupService;
   private final boolean isOmGrpcServerEnabled;
   private volatile boolean isOmRpcServerRunning = false;
   private volatile boolean isOmGrpcServerRunning = false;
@@ -1946,6 +1948,18 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     keyManager.start(configuration);
 
+    final long stsTokenCleanupInterval = configuration.getTimeDuration(
+        OMConfigKeys.OZONE_OM_STS_TOKEN_CLEANUP_SERVICE_INTERVAL,
+        OMConfigKeys.OZONE_OM_STS_TOKEN_CLEANUP_SERVICE_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    final long stsTokenCleanupTimeout = configuration.getTimeDuration(
+        OMConfigKeys.OZONE_OM_STS_TOKEN_CLEANUP_SERVICE_TIMEOUT,
+        OMConfigKeys.OZONE_OM_STS_TOKEN_CLEANUP_SERVICE_TIMEOUT_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    revokedSTSTokenCleanupService = new RevokedSTSTokenCleanupService(
+        stsTokenCleanupInterval, TimeUnit.MILLISECONDS, stsTokenCleanupTimeout, this);
+    revokedSTSTokenCleanupService.start();
+
     try {
       httpServer = new OzoneManagerHttpServer(configuration, this);
       httpServer.start();
@@ -2523,6 +2537,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
       if (edekCacheLoader != null) {
         edekCacheLoader.shutdown();
+      }
+      if (revokedSTSTokenCleanupService != null) {
+        revokedSTSTokenCleanupService.shutdown();
       }
       return true;
     } catch (Exception e) {
