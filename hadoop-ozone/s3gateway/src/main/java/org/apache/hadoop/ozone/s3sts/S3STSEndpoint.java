@@ -132,6 +132,12 @@ public class S3STSEndpoint extends S3STSEndpointBase {
             .build();
       }
 
+      if (version == null || !version.equals("2011-06-15")) {
+        return Response.status(Response.Status.BAD_REQUEST)
+            .entity("Invalid or missing Version parameter. Supported version is 2011-06-15.")
+            .build();
+      }
+
       switch (action) {
       case ASSUME_ROLE_ACTION:
         return handleAssumeRole(roleArn, roleSessionName, duration);
@@ -196,12 +202,8 @@ public class S3STSEndpoint extends S3STSEndpointBase {
               "contain only alphanumeric characters, +, =, ,, ., @, -")
           .build();
     }
-    // TODO: Add a validation if a user is not an admin but still allowed to call AssumeRole
-    // TODO: Convert roleArn to a valid Ozone ACL
-    // TODO: Validate requested ACLs
-    // TODO: Create a new S3 credentials for this role session
-    // TODO: Add validated ACLs for the new credentials
-    // TODO: How do we handle expired credentials? We don't support renewal?
+
+    // TODO: Integrate with Ozone Manager to get actual temporary credentials
     // String dummyCredentials = getClient().getObjectStore().getS3StsToken(userNameFromRequest());
     // Generate AssumeRole response
     String responseXml = generateAssumeRoleResponse(roleArn, roleSessionName, duration);
@@ -210,9 +212,6 @@ public class S3STSEndpoint extends S3STSEndpointBase {
         .header("Content-Type", "text/xml")
         .build();
   }
-
-  // TODO: implement private List<OzoneAcl> toOzoneAcls(String roleArn) to convert roleArn to Ozone ACLs
-  // TODO: implement private List<OzoneAcl> checkAclSubset(List<OzoneAcl> requestedAcls) to validate requested ACLs
 
   private boolean isValidRoleSessionName(String roleSessionName) {
     if (roleSessionName.length() < 2 || roleSessionName.length() > 64) {
@@ -260,8 +259,7 @@ public class S3STSEndpoint extends S3STSEndpointBase {
         assumedRoleId, roleArn, requestId);
   }
 
-  // Helper methods to generate random alphanumeric and base64 strings for mock credentials.
-  // TODO: these should be replaced with actual credential generation logic.
+  // TODO: this method should be removed once actual credential response from OM is implemented and used in the endpoint
   private String generateRandomAlphanumeric(int length) {
     String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     StringBuilder sb = new StringBuilder();
@@ -272,6 +270,7 @@ public class S3STSEndpoint extends S3STSEndpointBase {
     return sb.toString();
   }
 
+  // TODO: this method should be removed once actual credential response from OM is implemented and used in the endpoint
   private String generateRandomBase64(int length) {
     String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     StringBuilder sb = new StringBuilder();
@@ -282,6 +281,7 @@ public class S3STSEndpoint extends S3STSEndpointBase {
     return sb.toString();
   }
 
+  // TODO: this method should be removed once actual credential response from OM is implemented and used in the endpoint
   private String generateSessionToken() {
     byte[] tokenBytes = new byte[128];
     Random random = new Random();
@@ -291,6 +291,7 @@ public class S3STSEndpoint extends S3STSEndpointBase {
     return Base64.getEncoder().encodeToString(tokenBytes);
   }
 
+  // TODO: this method should be removed once actual credential response from OM is implemented and used in the endpoint
   private String getExpirationTime(int durationSeconds) {
     Instant expiration = Instant.now().plusSeconds(durationSeconds);
     return DateTimeFormatter.ISO_INSTANT.format(expiration);

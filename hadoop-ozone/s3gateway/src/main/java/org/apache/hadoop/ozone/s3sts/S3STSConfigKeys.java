@@ -34,6 +34,13 @@ public final class S3STSConfigKeys {
       "ozone.s3g.sts.https-address";
   public static final int OZONE_S3G_STS_HTTP_BIND_PORT_DEFAULT = 9880;
   public static final int OZONE_S3G_STS_HTTPS_BIND_PORT_DEFAULT = 9881;
+  // Max payload default size for STS AssumeRole API calls (32 KB)
+  // as STS AssumeRole has these parameters required in payload:
+  // Action=AssumeRole&RoleArn=...&RoleSessionName=...&DurationSeconds=...
+  // where RoleArn max length is 2048 and max bytes per character in UTF-8 encoding is 12
+  // (2048 * 12 = 24576) + other parameters and overheads, so setting to 32 KB
+  // this limit can be adjusted via configuration if needed.
+  public static final int OZONE_S3G_STS_PAYLOAD_HASH_MAX_VALUE = 32768;
 
   /**
    * Never constructed.

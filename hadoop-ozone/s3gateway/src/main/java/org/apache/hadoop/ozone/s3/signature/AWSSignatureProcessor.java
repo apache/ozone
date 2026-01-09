@@ -18,9 +18,11 @@
 package org.apache.hadoop.ozone.s3.signature;
 
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PAYLOAD_TOO_LARGE;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.UNSIGNED_PAYLOAD;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
+import static org.apache.hadoop.ozone.s3sts.S3STSConfigKeys.OZONE_S3G_STS_PAYLOAD_HASH_MAX_VALUE;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.ByteArrayInputStream;
@@ -142,6 +144,7 @@ public class AWSSignatureProcessor implements SignatureProcessor {
       //    - STREAMING-AWS4-ECDSA-P256-SHA256-PAYLOAD-TRAILER
       return contentSignatureHeaderValue;
     }
+    // For STS payload hash is calculated over the body
     InputStream in = context.getEntityStream();
     byte[] body = readAllBytes(in);
     String payloadHash = Hex.encode(MessageDigest.getInstance("SHA-256").digest(body));
@@ -160,12 +163,17 @@ public class AWSSignatureProcessor implements SignatureProcessor {
     return message;
   }
 
-  private byte[] readAllBytes(InputStream in) throws IOException {
+  private byte[] readAllBytes(InputStream in) throws OS3Exception, IOException {
     ByteArrayOutputStream buffer = new ByteArrayOutputStream();
     byte[] chunk = new byte[8192];
+    int totalRead = 0;
     int n;
     while ((n = in.read(chunk)) != -1) {
+      if (totalRead + n > OZONE_S3G_STS_PAYLOAD_HASH_MAX_VALUE) {
+        throw PAYLOAD_TOO_LARGE;
+      }
       buffer.write(chunk, 0, n);
+      totalRead += n;
     }
     return buffer.toByteArray();
   }

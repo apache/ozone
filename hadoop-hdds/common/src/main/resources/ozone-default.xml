@@ -2037,6 +2037,8 @@
     <tag>OZONE, S3GATEWAY</tag>
     <description>
       The bind host for the S3 Gateway STS HTTP server.
+      If this optional address is set, it overrides only the hostname portion of
+      ozone.s3g.sts.http-address.
       If not set, the value of ozone.s3g.http-bind-host is used.
     </description>
   </property>
@@ -2054,6 +2056,8 @@
     <tag>OZONE, S3GATEWAY</tag>
     <description>
       The bind host for the S3 Gateway STS HTTPS server.
+      If this optional address is set, it overrides only the hostname portion of
+      ozone.s3g.sts.http-address.
       If not set, the value of ozone.s3g.https-bind-host is used.
     </description>
   </property>

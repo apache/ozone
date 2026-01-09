@@ -38,6 +38,8 @@ import org.mockito.Mock;
  */
 public class TestSTS {
   private S3STSEndpoint endpoint;
+  private static final String ROLE_ARN = "arn:aws:iam::123456789012:role/test-role";
+  private static final String ROLE_SESSION_NAME = "test-session";
 
   @Mock
   private ContainerRequestContext context;
@@ -61,11 +63,8 @@ public class TestSTS {
 
   @Test
   public void testStsAssumeRole() throws Exception {
-    String roleArn = "arn:aws:iam::123456789012:role/test-role";
-    String roleSessionName = "test-session";
-
     Response response = endpoint.get(
-        "AssumeRole", roleArn, roleSessionName, 3600, "2011-06-15");
+        "AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15");
 
     assertEquals(200, response.getStatus());
 
@@ -76,16 +75,13 @@ public class TestSTS {
     assertTrue(responseXml.contains("SecretAccessKey"));
     assertTrue(responseXml.contains("SessionToken"));
     assertTrue(responseXml.contains("AssumedRoleUser"));
-    assertTrue(responseXml.contains(roleArn));
+    assertTrue(responseXml.contains(ROLE_ARN));
   }
 
   @Test
   public void testStsInvalidDuration() throws Exception {
-    String roleArn = "arn:aws:iam::123456789012:role/test-role";
-    String roleSessionName = "test-session";
-
     Response response = endpoint.get(
-        "AssumeRole", roleArn, roleSessionName, -1, "2011-06-15");
+        "AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, -1, "2011-06-15");
 
     assertEquals(400, response.getStatus());
     String errorMessage = (String) response.getEntity();
@@ -94,14 +90,21 @@ public class TestSTS {
 
   @Test
   public void testStsUnsupportedAction() throws Exception {
-    String roleArn = "arn:aws:iam::123456789012:role/test-role";
-    String roleSessionName = "test-session";
-
     Response response = endpoint.get(
-        "UnsupportedAction", roleArn, roleSessionName, 3600, "2011-06-15");
+        "UnsupportedAction", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15");
 
     assertEquals(400, response.getStatus());
     String errorMessage = (String) response.getEntity();
     assertTrue(errorMessage.contains("Unsupported Action"));
+  }
+
+  @Test
+  public void testStsInvalidVersion() throws Exception {
+    Response response = endpoint.get(
+        "AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2000-01-01");
+
+    assertEquals(400, response.getStatus());
+    String errorMessage = (String) response.getEntity();
+    assertTrue(errorMessage.contains("Invalid or missing Version parameter. Supported version is 2011-06-15."));
   }
 }

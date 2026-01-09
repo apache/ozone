@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.s3;
 import static java.net.HttpURLConnection.HTTP_BAD_REQUEST;
 import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.PAYLOAD_TOO_LARGE;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
 import static org.apache.hadoop.ozone.s3.signature.AWSSignatureProcessor.DATE_FORMATTER;
 import static org.apache.hadoop.ozone.s3.signature.SignatureParser.AUTHORIZATION_HEADER;
@@ -28,6 +29,7 @@ import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.CONTENT_TY
 import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.HOST_HEADER;
 import static org.apache.hadoop.ozone.s3.signature.StringToSignProducer.X_AMAZ_DATE;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
+import static org.apache.hadoop.ozone.s3sts.S3STSConfigKeys.OZONE_S3G_STS_PAYLOAD_HASH_MAX_VALUE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -35,6 +37,8 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
@@ -117,6 +121,24 @@ public class TestAuthorizationFilter {
             "application/octet-stream",
             "/",
             S3_AUTHINFO_CREATION_ERROR.getErrorMessage()
+        ),
+        // Too huge payload for signature V4 of STS request
+        arguments(
+            "POST",
+            "AWS4-HMAC-SHA256 Credential=testuser1/" + CURDATE +
+            "/us-east-1/sts/aws4_request, " +
+                "SignedHeaders=content-type;host;" +
+                "x-amz-date, " +
+                "Signature" +
+                "=56ec73ba1974f8feda8365c3caef89c5d4a688d5f9baccf47" +
+                "65f46a14cd745ad",
+            "Content-SHA",
+            "s3g:9880",
+            "Content-SHA",
+            DATETIME,
+            "application/x-www-form-urlencoded; charset=utf-8",
+            "/sts",
+            PAYLOAD_TOO_LARGE.getErrorMessage()
         )
     );
   }
@@ -132,6 +154,10 @@ public class TestAuthorizationFilter {
     try {
       ContainerRequestContext context = setupContext(method, authHeader,
           contentMd5, host, amzContentSha256, date, contentType, path);
+
+      byte[] payloadBytes = new byte[OZONE_S3G_STS_PAYLOAD_HASH_MAX_VALUE + 1];
+      InputStream payLoadStream = new ByteArrayInputStream(payloadBytes);
+      when(context.getEntityStream()).thenReturn(payLoadStream);
 
       AWSSignatureProcessor awsSignatureProcessor = new AWSSignatureProcessor();
       awsSignatureProcessor.setContext(context);
