@@ -45,6 +45,7 @@ import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -121,6 +122,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.MockedStatic;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.DBOptions;
@@ -293,14 +295,12 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     // Do not use CALLS_REAL_METHODS for java.nio.file.Files: internal/private static
     // methods (eg Files.provider()) get intercepted too and Mockito will try to invoke
     // them reflectively, which fails on JDK9+ without --add-opens.
-    try (MockedStatic<Files> files = mockStatic(Files.class);
-         TarArchiveOutputStream tar = new TarArchiveOutputStream(new java.io.ByteArrayOutputStream())) {
+    try (MockedStatic<Files> files = mockStatic(Files.class)) {
       files.when(() -> Files.exists(dbDir)).thenReturn(true);
       files.when(() -> Files.list(dbDir)).thenReturn(stream);
 
-      boolean result = servlet.writeDBToArchive(
-          new HashSet<>(), dbDir, new AtomicLong(Long.MAX_VALUE),
-          tar, folder, null, true);
+      boolean result = servlet.collectFilesFromDir(new HashSet<>(), dbDir,
+          new AtomicLong(Long.MAX_VALUE), true, new OMDBArchiver());
       assertTrue(result);
     }
 

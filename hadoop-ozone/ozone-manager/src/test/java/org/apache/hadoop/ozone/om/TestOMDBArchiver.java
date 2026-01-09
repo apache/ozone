@@ -22,8 +22,9 @@ import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -56,7 +57,7 @@ public class TestOMDBArchiver {
     assertThat(omdbArchiver.getFilesToWriteIntoTarball()).isNotNull();
     assertThat(omdbArchiver.getTmpDir()).isEqualTo(tmpDir);
     File dummyFile = new File(tmpDir.toFile(), "dummy.txt");
-    Files.write(dummyFile.toPath(), "dummy".getBytes());
+    Files.write(dummyFile.toPath(), "dummy".getBytes(StandardCharsets.UTF_8));
     String entryName = "dummy-hardlink.txt";
     long result = omdbArchiver.recordFileEntry(dummyFile, entryName);
     assertThat(omdbArchiver.getFilesToWriteIntoTarball().size()).isEqualTo(1);
@@ -89,7 +90,7 @@ public class TestOMDBArchiver {
     for (int i = 0; i < 10; i++) {
       String fileName = "hardlink-" + i;
       File dummyFile = new File(tmpDir.toFile(), fileName);
-      Files.write(dummyFile.toPath(), "dummy".getBytes());
+      Files.write(dummyFile.toPath(), "dummy".getBytes(StandardCharsets.UTF_8));
       omdbArchiver.getFilesToWriteIntoTarball().put(fileName, dummyFile);
       hardLinkFileMap.put(dummyFile.getAbsolutePath(), dummyFile.getName());
     }
@@ -98,7 +99,7 @@ public class TestOMDBArchiver {
     File tarFile = new File(folder.toFile(), "test-archive.tar");
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set("ozone.metadata.dirs", String.valueOf(folder.toAbsolutePath()));
-    try (FileOutputStream outputStream = new FileOutputStream(tarFile)) {
+    try (OutputStream outputStream = Files.newOutputStream(tarFile.toPath())) {
       omdbArchiver.setCompleted(completed);
       omdbArchiver.writeToArchive(conf, outputStream);
     }
@@ -120,7 +121,8 @@ public class TestOMDBArchiver {
           .isEqualTo("dummy".getBytes().length);
 
       byte[] content = Files.readAllBytes(extractedFile.toPath());
-      assertThat(new String(content)).isEqualTo("dummy");
+      assertThat(new String(content,
+          StandardCharsets.UTF_8)).isEqualTo("dummy");
     }
 
     if (completed) {
