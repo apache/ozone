@@ -26,6 +26,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVIC
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_DELETE_CACHED_DIRECTORY_MAX_COUNT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_MOVE_TO_TRASH_ENABLED;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_MOVE_TO_TRASH_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.OBJECT_STORE;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -109,6 +111,7 @@ public class KeyLifecycleService extends BackgroundService {
   private long cachedDirMaxCount;
   private final AtomicBoolean suspended;
   private final AtomicBoolean isServiceEnabled;
+  private final AtomicBoolean moveToTrashEnabled;
   private KeyLifecycleServiceMetrics metrics;
   // A set of bucket name that have LifecycleActionTask scheduled
   private final ConcurrentHashMap<String, LifecycleActionTask> inFlight;
@@ -137,6 +140,8 @@ public class KeyLifecycleService extends BackgroundService {
     this.metrics = KeyLifecycleServiceMetrics.create();
     this.isServiceEnabled = new AtomicBoolean(conf.getBoolean(OZONE_KEY_LIFECYCLE_SERVICE_ENABLED,
         OZONE_KEY_LIFECYCLE_SERVICE_ENABLED_DEFAULT));
+    this.moveToTrashEnabled = new AtomicBoolean(conf.getBoolean(OZONE_KEY_LIFECYCLE_SERVICE_MOVE_TO_TRASH_ENABLED,
+        OZONE_KEY_LIFECYCLE_SERVICE_MOVE_TO_TRASH_ENABLED_DEFAULT));
     this.inFlight = new ConcurrentHashMap();
     this.omMetadataManager = ozoneManager.getMetadataManager();
     int limit = (int) conf.getStorageSize(
@@ -812,7 +817,7 @@ public class KeyLifecycleService extends BackgroundService {
     }
 
     private void handleAndClearFullList(OmBucketInfo bucket, LimitedExpiredObjectList keysList, boolean dir) {
-      if (bucket.getBucketLayout() != OBJECT_STORE && ozoneTrash != null) {
+      if (moveToTrashEnabled.get() && bucket.getBucketLayout() != OBJECT_STORE && ozoneTrash != null) {
         moveToTrash(bucket, keysList, dir);
       } else {
         sendDeleteKeysRequestAndClearList(bucket.getVolumeName(), bucket.getBucketName(), keysList, dir);
@@ -1080,6 +1085,11 @@ public class KeyLifecycleService extends BackgroundService {
   @VisibleForTesting
   public void setOzoneTrash(OzoneTrash ozoneTrash) {
     this.ozoneTrash = ozoneTrash;
+  }
+
+  @VisibleForTesting
+  public void setMoveToTrashEnabled(boolean enabled) {
+    this.moveToTrashEnabled.set(enabled);
   }
 
   /**
