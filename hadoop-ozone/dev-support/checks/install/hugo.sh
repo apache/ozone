@@ -23,7 +23,7 @@ _install_hugo() {
   local os=$(uname -s)
   local arch=$(uname -m)
 
-  mkdir bin
+  mkdir -p bin
 
   case "${arch}" in
     x86_64)

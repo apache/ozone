@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Collections;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -98,8 +99,7 @@ public class TestOmVolumeArgs {
         .setObjectID(1L)
         .setUpdateID(1L)
         .setQuotaInBytes(Long.MAX_VALUE)
-        .addMetadata("key1", "value1")
-        .addMetadata("key2", "value2")
+        .addAllMetadata(ImmutableMap.of("key1", "value1", "key2", "value2"))
         .addAcl(USER1_READ)
         .build();
   }

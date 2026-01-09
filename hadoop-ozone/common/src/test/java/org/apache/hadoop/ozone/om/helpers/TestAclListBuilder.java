@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import static java.util.Arrays.asList;
-import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
@@ -29,7 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.junit.jupiter.api.Test;
@@ -43,28 +42,21 @@ class TestAclListBuilder {
   private static final OzoneAcl ALICE_READ_WRITE = ALICE_READ.add(ALICE_WRITE);
   private static final OzoneAcl BOB_READ = OzoneAcl.of(USER, "bob", ACCESS, READ);
 
-  public static Stream<List<OzoneAcl>> initialLists() {
+  public static Stream<ImmutableList<OzoneAcl>> initialLists() {
     return Stream.of(
-        emptyList(),
-        singletonList(ALICE_READ),
-        asList(ALICE_READ, ALICE_WRITE)
+        ImmutableList.of(),
+        ImmutableList.of(ALICE_READ),
+        ImmutableList.of(ALICE_READ, ALICE_WRITE)
     );
-  }
-
-  @Test
-  void returnsInitialListIfUnchanged() {
-    ImmutableList<OzoneAcl> list = ImmutableList.copyOf(asList(ALICE_READ, ALICE_WRITE));
-    AclListBuilder subject = AclListBuilder.of(list);
-
-    assertThat(subject.build())
-        .isSameAs(list);
   }
 
   @Test
   void testAdd() {
     testAdd(subject -> {
-      subject.add(ALICE_WRITE);
-      subject.add(BOB_READ);
+      boolean added = false;
+      added |= subject.add(ALICE_WRITE);
+      added |= subject.add(BOB_READ);
+      return added;
     });
   }
 
@@ -74,13 +66,10 @@ class TestAclListBuilder {
   }
 
   // op should be adding ALICE_WRITE and BOB_READ
-  private void testAdd(Consumer<AclListBuilder> op) {
+  private void testAdd(Predicate<AclListBuilder> op) {
     AclListBuilder subject = AclListBuilder.copyOf(singletonList(ALICE_READ));
 
-    op.accept(subject);
-
-    assertThat(subject.isChanged())
-        .isTrue();
+    assertChangedBy(subject, op);
     assertThat(subject.build())
         .contains(ALICE_READ_WRITE)
         .contains(BOB_READ)
@@ -89,28 +78,22 @@ class TestAclListBuilder {
 
   @ParameterizedTest
   @MethodSource("initialLists")
-  void testSetSame(List<OzoneAcl> initialList) {
-    AclListBuilder subject = AclListBuilder.copyOf(initialList);
+  void testSetSame(ImmutableList<OzoneAcl> initialList) {
+    AclListBuilder subject = AclListBuilder.of(initialList);
 
-    subject.set(initialList);
-
-    assertThat(subject.isChanged())
-        .isFalse();
+    assertUnchangedBy(subject, b -> b.set(initialList));
     assertThat(subject.build())
-        .isEqualTo(initialList);
+        .isSameAs(initialList);
   }
 
   @ParameterizedTest
   @MethodSource("initialLists")
-  void testSetEqual(List<OzoneAcl> initialList) {
-    AclListBuilder subject = AclListBuilder.copyOf(initialList);
+  void testSetEqual(ImmutableList<OzoneAcl> initialList) {
+    AclListBuilder subject = AclListBuilder.of(initialList);
 
-    subject.set(new ArrayList<>(initialList));
-
-    assertThat(subject.isChanged())
-        .isFalse();
+    assertUnchangedBy(subject, b -> b.set(new ArrayList<>(initialList)));
     assertThat(subject.build())
-        .isEqualTo(initialList);
+        .isSameAs(initialList);
   }
 
   @ParameterizedTest
@@ -120,10 +103,7 @@ class TestAclListBuilder {
     List<OzoneAcl> differentList = new ArrayList<>(initialList);
     differentList.add(BOB_READ);
 
-    subject.set(differentList);
-
-    assertThat(subject.isChanged())
-        .isTrue();
+    assertChangedBy(subject, b -> b.set(differentList));
     assertThat(subject.build())
         .isEqualTo(differentList);
   }
@@ -132,12 +112,28 @@ class TestAclListBuilder {
   void testRemove() {
     AclListBuilder subject = AclListBuilder.copyOf(asList(ALICE_READ_WRITE, BOB_READ));
 
-    subject.remove(ALICE_WRITE);
-    subject.remove(BOB_READ);
-
-    assertThat(subject.isChanged())
-        .isTrue();
+    assertChangedBy(subject, b -> b.remove(ALICE_WRITE));
+    assertChangedBy(subject, b -> b.remove(BOB_READ));
     assertThat(subject.build())
         .isEqualTo(singletonList(ALICE_READ));
+  }
+
+  private static void assertUnchangedBy(AclListBuilder subject, Predicate<AclListBuilder> op) {
+    final boolean wasChanged = subject.isChanged();
+    assertThat(op.test(subject))
+        .isFalse();
+    assertThat(subject.isChanged())
+        .isEqualTo(wasChanged);
+  }
+
+  private static void assertChangedBy(AclListBuilder subject, Predicate<AclListBuilder> op) {
+    assertThat(op.test(subject)).isTrue();
+    assertThat(subject.isChanged()).isTrue();
+
+    // already made the same change
+    assertThat(op.test(subject)).isFalse();
+    assertThat(subject.isChanged())
+        .describedAs("isChanged() should not be reset by no-op change")
+        .isTrue();
   }
 }

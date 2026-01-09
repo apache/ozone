@@ -65,6 +65,8 @@ public class TestReconContainerEndpoint {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
+    // Configure multiple task threads for concurrent task execution
+    conf.setInt("ozone.recon.task.thread.count", 6);
     recon = new ReconService(conf);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)

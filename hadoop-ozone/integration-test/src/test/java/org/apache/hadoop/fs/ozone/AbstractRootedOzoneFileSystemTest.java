@@ -405,6 +405,19 @@ abstract class AbstractRootedOzoneFileSystemTest {
   }
 
   @Test
+  void testListLocatedStatusForZeroByteFile() throws Exception {
+    Path parent = new Path(bucketPath, "testListLocatedStatusForZeroByteFile");
+    Path path = new Path(parent, "key1");
+
+    try {
+      OzoneFileSystemTests.listLocatedStatusForZeroByteFile(fs, path);
+    } finally {
+      // Cleanup
+      fs.delete(parent, true);
+    }
+  }
+
+  @Test
   void testListStatus() throws Exception {
     Path parent = new Path(bucketPath, "testListStatus");
     Path file1 = new Path(parent, "key1");
@@ -1704,6 +1717,14 @@ abstract class AbstractRootedOzoneFileSystemTest {
       Collection<FileStatus> res) {
     assertEquals(expectedSize, res.size());
     res.forEach(e -> assertEquals(expectedOwner, e.getOwner()));
+  }
+
+  @Test
+  void testGetTrashRoot() {
+    String testKeyName = "keyToBeDeleted";
+    Path keyPath1 = new Path(bucketPath, testKeyName);
+    assertEquals(new Path(rootPath + volumeName + "/" + bucketName + "/" +
+        TRASH_PREFIX + "/" +  USER1 + "/"), userOfs.getTrashRoot(keyPath1));
   }
 
   /**

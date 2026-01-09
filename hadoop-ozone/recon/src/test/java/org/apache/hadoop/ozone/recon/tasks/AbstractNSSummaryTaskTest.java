@@ -159,7 +159,7 @@ public abstract class AbstractNSSummaryTaskTest {
 
     List<NSSummary> result = new ArrayList<>();
     NSSummary staleNSSummary = new NSSummary();
-    RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
+    RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation();
     getReconNamespaceSummaryManager().batchStoreNSSummaries(rdbBatchOperation, -1L, staleNSSummary);
     getReconNamespaceSummaryManager().commitBatchOperation(rdbBatchOperation);
 
@@ -239,7 +239,7 @@ public abstract class AbstractNSSummaryTaskTest {
   }
 
   protected static OmDirectoryInfo buildOmDirInfo(String dirName, long objectId, long parentObjectId) {
-    return new OmDirectoryInfo.Builder()
+    return OmDirectoryInfo.newBuilder()
         .setName(dirName)
         .setObjectID(objectId)
         .setParentObjectID(parentObjectId)

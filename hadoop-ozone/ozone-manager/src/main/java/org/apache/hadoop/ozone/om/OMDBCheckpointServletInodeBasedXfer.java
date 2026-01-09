@@ -189,7 +189,6 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         LOG.error("unable to delete: " + tmpdir, e.toString());
       }
     }
-
   }
 
   Path getSstBackupDir() {
@@ -301,7 +300,9 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
                   snapshotLocalDataManager);
             }
             collectFilesFromDir(sstFilesToExclude, getCompactionLogDir(), maxTotalSstSize, false, omdbArchiver);
-            collectFilesFromDir(sstFilesToExclude, sstBackupFiles.stream(), maxTotalSstSize, false, omdbArchiver);
+            try (Stream<Path> backupFiles = sstBackupFiles.stream()) {
+              collectFilesFromDir(sstFilesToExclude, backupFiles, maxTotalSstSize, false, omdbArchiver);
+            }
             Collection<Path> snapshotLocalPropertyFiles = getSnapshotLocalDataPaths(localDataManager,
                 snapshotInCheckpoint.keySet());
             // This is done to ensure all data to be copied correctly is flushed in the snapshot DB
@@ -460,9 +461,9 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
       LOG.warn("DB directory {} does not exist. Skipping.", dbDir);
       return true;
     }
-    Stream<Path> files = Files.list(dbDir);
-    return collectFilesFromDir(sstFilesToExclude, files,
-        maxTotalSstSize, onlySstFile, omdbArchiver);
+    try (Stream<Path> files = Files.list(dbDir)) {
+      return collectFilesFromDir(sstFilesToExclude, files, maxTotalSstSize, onlySstFile, omdbArchiver);
+    }
   }
 
   /**

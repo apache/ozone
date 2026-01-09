@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -177,6 +178,20 @@ public final class ContainerLogger {
     }
   }
 
+  /**
+   * Logged when a container is successfully moved from one data volume to another.
+   *
+   * @param containerId The ID of the moved container.
+   * @param sourceVolume The source volume path.
+   * @param destinationVolume The destination volume path.
+   * @param containerSize The size of data moved from container in bytes.
+   * @param timeTaken The time taken for the move in milliseconds.
+   */
+  public static void logMoveSuccess(long containerId, StorageVolume sourceVolume,
+      StorageVolume destinationVolume, long containerSize, long timeTaken) {
+    LOG.info(getMessage(containerId, sourceVolume, destinationVolume, containerSize, timeTaken));
+  }
+
   private static String getMessage(ContainerData containerData,
                                    String message) {
     return String.join(FIELD_SEPARATOR, getMessage(containerData), message);
@@ -190,5 +205,15 @@ public final class ContainerLogger {
         "State=" + containerData.getState(),
         "Volume=" + containerData.getVolume(),
         "DataChecksum=" + checksumToString(containerData.getDataChecksum()));
+  }
+
+  private static String getMessage(long containerId, StorageVolume sourceVolume,
+      StorageVolume destinationVolume, long containerSize, long timeTaken) {
+    return String.join(FIELD_SEPARATOR,
+        "ID=" + containerId,
+        "SrcVolume=" + sourceVolume,
+        "DestVolume=" + destinationVolume,
+        "Size=" + containerSize + " bytes",
+        "TimeTaken=" + timeTaken + " ms");
   }
 }

@@ -658,7 +658,7 @@ public class RpcClient implements ClientProtocol {
         .setOwner(owner);
 
     if (bucketArgs.getAcls() != null) {
-      builder.setAcls(bucketArgs.getAcls());
+      builder.acls().addAll(bucketArgs.getAcls());
     }
 
     // Link bucket default acl
@@ -1601,25 +1601,10 @@ public class RpcClient implements ClientProtocol {
             Collections.singletonList(keyLocationInfoGroup);
 
         keyInfo.setKeyLocationVersions(keyLocationInfoGroups);
-        OmKeyInfo dnKeyInfo = new OmKeyInfo.Builder()
-            .setVolumeName(keyInfo.getVolumeName())
-            .setBucketName(keyInfo.getBucketName())
-            .setKeyName(keyInfo.getKeyName())
-            .setOmKeyLocationInfos(keyInfo.getKeyLocationVersions())
-            .setDataSize(keyInfo.getDataSize())
-            .setCreationTime(keyInfo.getCreationTime())
-            .setModificationTime(keyInfo.getModificationTime())
+        OmKeyInfo dnKeyInfo = keyInfo.toBuilder()
             .setReplicationConfig(replicationConfig instanceof ECReplicationConfig
                     ? RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE)
                     : keyInfo.getReplicationConfig())
-            .setFileEncryptionInfo(keyInfo.getFileEncryptionInfo())
-            .setAcls(keyInfo.getAcls())
-            .setObjectID(keyInfo.getObjectID())
-            .setUpdateID(keyInfo.getUpdateID())
-            .setParentObjectID(keyInfo.getParentObjectID())
-            .setFileChecksum(keyInfo.getFileChecksum())
-            .setOwnerName(keyInfo.getOwnerName())
-            .addAllMetadata(keyInfo.getMetadata())
             .build();
         dnKeyInfo.setKeyLocationVersions(keyLocationInfoGroups);
 

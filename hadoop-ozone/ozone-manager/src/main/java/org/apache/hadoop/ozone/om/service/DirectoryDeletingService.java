@@ -397,7 +397,9 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         keyManager.getPendingDeletionSubDirs(volumeBucketId.getVolumeId(), volumeBucketId.getBucketId(),
             pendingDeletedDirInfo, keyInfo -> true, remainingNum);
     List<OmKeyInfo> subDirs = subDirDeleteResult.getKeysToDelete();
-    subDirs.forEach(omKeyInfo -> omKeyInfo.setAcls(Collections.emptyList()));
+    subDirs = subDirs.stream()
+        .map(omKeyInfo -> omKeyInfo.toBuilder().setAcls(Collections.emptyList()).build())
+        .collect(Collectors.toList());
     remainNum.addAndGet(-subDirs.size());
 
     OMMetadataManager omMetadataManager = keyManager.getMetadataManager();
@@ -417,7 +419,9 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
         keyManager.getPendingDeletionSubFiles(volumeBucketId.getVolumeId(), volumeBucketId.getBucketId(),
             pendingDeletedDirInfo, keyInfo -> purgeDir || reclaimableFileFilter.apply(keyInfo), remainingNum);
     List<OmKeyInfo> subFiles = subFileDeleteResult.getKeysToDelete();
-    subFiles.forEach(omKeyInfo -> omKeyInfo.setAcls(Collections.emptyList()));
+    subFiles = subFiles.stream()
+        .map(omKeyInfo -> omKeyInfo.toBuilder().setAcls(Collections.emptyList()).build())
+        .collect(Collectors.toList());
     remainNum.addAndGet(-subFiles.size());
 
     if (LOG.isDebugEnabled()) {
