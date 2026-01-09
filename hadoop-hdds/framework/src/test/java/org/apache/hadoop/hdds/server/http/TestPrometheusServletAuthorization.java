@@ -25,83 +25,86 @@ import static org.mockito.Mockito.when;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.stream.Stream;
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
- * Test Prometheus Servlet.
+ * Tests authorization behavior of {@link PrometheusServlet}.
  */
 public class TestPrometheusServletAuthorization {
+
+  private static final String SECURITY_TOKEN = "mytoken";
+  private PrometheusServlet servlet;
+  private PrometheusMetricsSink sink;
+
+  @BeforeEach
+  public void setup() throws Exception {
+    sink = mock(PrometheusMetricsSink.class);
+    servlet = new PrometheusServlet();
+    ServletContext context = mock(ServletContext.class);
+    when(context.getAttribute(PrometheusServlet.SECURITY_TOKEN))
+        .thenReturn(SECURITY_TOKEN);
+    when(context.getAttribute(BaseHttpServer.PROMETHEUS_SINK))
+        .thenReturn(sink);
+    ServletConfig config = mock(ServletConfig.class);
+    when(config.getServletContext()).thenReturn(context);
+
+    servlet.init(config);
+  }
+
+  /**
+   * Prepare tests data.
+   * @return Invalid authorization header values.
+   */
+  private static Stream<String> invalidAuthorizationHeaders() {
+    return Stream.of(
+        null,
+        "Bearer",
+        "Bearer ",
+        "Bearer wrongToken"
+    );
+  }
+
+  private HttpServletResponse invokeServlet(
+      String authorizationHeader) throws Exception {
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    when(req.getHeader("Authorization"))
+        .thenReturn(authorizationHeader);
+    HttpServletResponse resp = mock(HttpServletResponse.class);
+    when(resp.getWriter())
+        .thenReturn(new PrintWriter(new StringWriter()));
+    servlet.doGet(req, resp);
+    return resp;
+  }
+
   @Test
   public void testValidBearerTokenAllowsPrometheusAccess() throws Exception {
-    PrometheusServlet servlet = new PrometheusServlet();
-    ServletContext context = mock(ServletContext.class);
-    when(context.getAttribute(PrometheusServlet.SECURITY_TOKEN))
-        .thenReturn("mytoken");
-    PrometheusMetricsSink sink = mock(PrometheusMetricsSink.class);
-    when(context.getAttribute(BaseHttpServer.PROMETHEUS_SINK))
-        .thenReturn(sink);
-    ServletConfig config = mock(ServletConfig.class);
-    when(config.getServletContext()).thenReturn(context);
-    servlet.init(config);
-
-    HttpServletRequest req = mock(HttpServletRequest.class);
-    when(req.getHeader("Authorization")).thenReturn("Bearer mytoken");
-    HttpServletResponse resp = mock(HttpServletResponse.class);
-    when(resp.getWriter()).thenReturn(new PrintWriter(new StringWriter()));
-    servlet.doGet(req, resp);
+    HttpServletResponse resp =
+        invokeServlet("Bearer mytoken");
+    //verify writeMetrics() was called only once.
     verify(sink).writeMetrics(any());
-    verify(resp, never()).setStatus(HttpServletResponse.SC_FORBIDDEN);
+    //verify setStatus(403) was never called.
+    verify(resp, never())
+        .setStatus(HttpServletResponse.SC_FORBIDDEN);
   }
 
-  @ParameterizedTest(name = "Authorization header \"{0}\" must return 403")
-  @ValueSource(strings = {"Bearer ", "Bearer wrongToken"})
-  public void testInvalidAuthorizationHeaderReturns403(
+  @ParameterizedTest(name = "Invalid Authorization header [{0}] must return 403")
+  @MethodSource("invalidAuthorizationHeaders")
+  public void testInvalidAuthorizationHeadersReturn403(
       String authorizationHeader) throws Exception {
-    PrometheusServlet servlet = new PrometheusServlet();
-    ServletContext context = mock(ServletContext.class);
-    when(context.getAttribute(PrometheusServlet.SECURITY_TOKEN))
-        .thenReturn("mytoken");
-    PrometheusMetricsSink sink = mock(PrometheusMetricsSink.class);
-    when(context.getAttribute(BaseHttpServer.PROMETHEUS_SINK))
-        .thenReturn(sink);
-    ServletConfig config = mock(ServletConfig.class);
-    when(config.getServletContext()).thenReturn(context);
-    servlet.init(config);
-
-    HttpServletRequest req = mock(HttpServletRequest.class);
-    when(req.getHeader("Authorization")).thenReturn(authorizationHeader);
-    HttpServletResponse resp = mock(HttpServletResponse.class);
-    when(resp.getWriter()).thenReturn(new PrintWriter(new StringWriter()));
-    servlet.doGet(req, resp);
-    verify(resp).setStatus(HttpServletResponse.SC_FORBIDDEN);
-    verify(sink, never()).writeMetrics(any());
-  }
-
-  @Test
-  public void testNullAuthorizationHeaderReturnsForbidden() throws Exception {
-    PrometheusServlet servlet = new PrometheusServlet();
-    ServletContext context = mock(ServletContext.class);
-    when(context.getAttribute(PrometheusServlet.SECURITY_TOKEN))
-        .thenReturn("mytoken");
-    PrometheusMetricsSink sink = mock(PrometheusMetricsSink.class);
-    when(context.getAttribute(BaseHttpServer.PROMETHEUS_SINK))
-        .thenReturn(sink);
-    ServletConfig config = mock(ServletConfig.class);
-    when(config.getServletContext()).thenReturn(context);
-    servlet.init(config);
-
-    HttpServletRequest req = mock(HttpServletRequest.class);
-    when(req.getHeader("Authorization")).thenReturn(null);
-    HttpServletResponse resp = mock(HttpServletResponse.class);
-    when(resp.getWriter()).thenReturn(new PrintWriter(new StringWriter()));
-    servlet.doGet(req, resp);
-    verify(resp).setStatus(HttpServletResponse.SC_FORBIDDEN);
+    HttpServletResponse resp =
+        invokeServlet(authorizationHeader);
+    //verify setStatus(403) was called only once.
+    verify(resp)
+        .setStatus(HttpServletResponse.SC_FORBIDDEN);
+    //verify writeMetrics() was never called.
     verify(sink, never()).writeMetrics(any());
   }
 }
