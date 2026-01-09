@@ -73,43 +73,16 @@
     creates: "/tmp/{{ local_ozone_dirname }}.tar.gz"
   when: _src_mode == 'local'
 
-- name: "Local | Stage tarball to remote /tmp via rsync"
-  delegate_to: localhost
-  become: false
-  vars:
-    ansible_become: false
-  synchronize:
-    src: "/tmp/{{ local_ozone_dirname }}.tar.gz"
-    dest: "/tmp/{{ local_ozone_dirname }}.tar.gz"
-    mode: push
-    rsync_opts:
-      - "--partial"
-      - "--inplace"
-  async: 7200
-  poll: 0
-  register: rsync_job
-  when: _src_mode == 'local'
-
-- name: "Local | Wait for rsync completion"
-  async_status:
-    jid: "{{ rsync_job.ansible_job_id }}"
-  register: rsync_status
-  until: rsync_status.finished
-  retries: 720
-  delay: 5
-  when: _src_mode == 'local'
-
-- name: "Local | Unarchive uploaded tarball to install_base"
+- name: "Local | Unarchive local tarball to install_base"
   unarchive:
-    src: "/tmp/{{ local_ozone_dirname }}.tar.gz"
-    dest: "{{ install_base }}"
-    mode: "u+rwX,g+rX,o+rX"
-    remote_src: true
+    src: "/tmp/{{ local_ozone_dirname }}.tar.gz"    # on controller
+    dest: "{{ install_base }}"                      # on remote
+    remote_src: false                               # transfer then extract
+    owner: "{{ service_user }}"
+    group: "{{ service_group }}"
     keep_newer: true
-    creates: "{{ install_base }}/{{ local_ozone_dirname }}/bin/ozone"
   when: _src_mode == 'local'
   become: true
-  become_user: "{{ service_user }}"
 
 - name: "Local | Link current"
   file:
@@ -120,5 +93,4 @@
     group: "{{ service_group }}"
   when: _src_mode == 'local'
   become: true
-
 
