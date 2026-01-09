@@ -66,6 +66,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
+import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -91,6 +92,7 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerProtocolServer;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.SecurityUtil;
@@ -342,9 +344,12 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
         LOG.error("HttpServer failed to start.", ex);
       }
 
+      DiskBalancerProtocol diskBalancerProtocol =
+          new DiskBalancerProtocolServer(datanodeStateMachine,
+              this::checkAdminPrivilege);
       clientProtocolServer = new HddsDatanodeClientProtocolServer(
           datanodeDetails, conf, HddsVersionInfo.HDDS_VERSION_INFO,
-          reconfigurationHandler);
+          reconfigurationHandler, diskBalancerProtocol);
 
       int clientRpcport = clientProtocolServer.getClientRpcAddress().getPort();
       serviceRuntimeInfo.setClientRpcPort(String.valueOf(clientRpcport));

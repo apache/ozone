@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_ENABLED_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS;
@@ -90,6 +92,9 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume.VolumeType;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolumeChecker;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerConfiguration;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerInfo;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.StaleRecoveringContainerScrubbingService;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStoreImpl;
@@ -132,6 +137,7 @@ public class OzoneContainer {
   private final StaleRecoveringContainerScrubbingService
       recoveringContainerScrubbingService;
   private final GrpcTlsConfig tlsClientConfig;
+  private DiskBalancerService diskBalancerService;
   private final AtomicReference<InitializingStatus> initializingStatus;
   private final ReplicationServer replicationServer;
   private DatanodeDetails datanodeDetails;
@@ -156,6 +162,7 @@ public class OzoneContainer {
    * @throws DiskOutOfSpaceException
    * @throws IOException
    */
+  @SuppressWarnings("checkstyle:methodlength")
   public OzoneContainer(HddsDatanodeService hddsDatanodeService,
       DatanodeDetails datanodeDetails, ConfigurationSource conf,
       StateContext context, CertificateClient certClient,
@@ -259,6 +266,21 @@ public class OzoneContainer {
             datanodeDetails.threadNamePrefix(),
             checksumTreeManager,
             context.getParent().getReconfigurationHandler());
+
+    if (conf.getBoolean(HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY,
+        HDDS_DATANODE_DISK_BALANCER_ENABLED_DEFAULT)) {
+      Duration diskBalancerSvcInterval = conf.getObject(
+          DiskBalancerConfiguration.class).getDiskBalancerInterval();
+      Duration diskBalancerSvcTimeout = conf.getObject(
+          DiskBalancerConfiguration.class).getDiskBalancerTimeout();
+      diskBalancerService =
+          new DiskBalancerService(this, diskBalancerSvcInterval.toMillis(),
+              diskBalancerSvcTimeout.toMillis(), TimeUnit.MILLISECONDS, 1,
+              config);
+    } else {
+      diskBalancerService = null;
+      LOG.info("Disk Balancer is disabled.");
+    }
 
     Duration recoveringContainerScrubbingSvcInterval =
         dnConf.getRecoveringContainerScrubInterval();
@@ -552,6 +574,10 @@ public class OzoneContainer {
     writeChannel.start();
     readChannel.start();
     blockDeletingService.start();
+
+    if (diskBalancerService != null) {
+      diskBalancerService.start();
+    }
     recoveringContainerScrubbingService.start();
 
     initHddsVolumeContainer();
@@ -582,6 +608,9 @@ public class OzoneContainer {
       dbCompactionExecutorService.shutdown();
     }
     blockDeletingService.shutdown();
+    if (diskBalancerService != null) {
+      diskBalancerService.shutdown();
+    }
     recoveringContainerScrubbingService.shutdown();
     IOUtils.closeQuietly(metrics);
     ContainerMetrics.remove();
@@ -714,5 +743,16 @@ public class OzoneContainer {
 
   public WitnessedContainerMetadataStore getWitnessedContainerMetadataStore() {
     return witnessedContainerMetadataStore;
+  }
+
+  public DiskBalancerInfo getDiskBalancerInfo() {
+    if (diskBalancerService == null) {
+      return null;
+    }
+    return diskBalancerService.getDiskBalancerInfo();
+  }
+
+  public DiskBalancerService getDiskBalancerService() {
+    return diskBalancerService;
   }
 }
