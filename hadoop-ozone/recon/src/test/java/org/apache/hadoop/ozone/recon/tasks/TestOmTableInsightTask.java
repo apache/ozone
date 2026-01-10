@@ -41,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -867,7 +868,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
   }
 
   @Test
-  public void testParallelIterationWithByteArrayCodec()
+  public void testParallelIteratorDoesNotCollectKeysInMemory()
       throws Exception {
     // Parallel processing is enabled only for string tables (tables with string keys).
     OmTableInsightTask task =
@@ -897,7 +898,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
         (Table.KeyValue<String, byte[]>) mock(Table.KeyValue.class);
 
     when(kv.getKey()).thenReturn("/vol1/buck1/key-001");
-    when(kv.getValue()).thenReturn("v".getBytes());
+    when(kv.getValue()).thenReturn(new byte[] { 'v' });
 
     // Simulate KeyValueIterator with 5 entries.
     when(kvIterator.hasNext())
@@ -925,5 +926,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     // Validate iterator count
     assertEquals(5L, count,
         "Parallel iterator must count all keys");
+    // Verify that the parallel processing uses table.iterator()
+    verify(mockTable).iterator();
   }
 }
