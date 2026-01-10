@@ -901,7 +901,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     when(kv.getKey()).thenReturn(
         new String("/vol1/buck1/key-001".getBytes(StandardCharsets.UTF_8),
             StandardCharsets.UTF_8));
-    when(kv.getValue()).thenReturn(new byte[] { 'v' });
+    when(kv.getValue()).thenReturn(new byte[] {'v'});
 
     // Simulate KeyValueIterator with 5 entries.
     when(kvIterator.hasNext())
