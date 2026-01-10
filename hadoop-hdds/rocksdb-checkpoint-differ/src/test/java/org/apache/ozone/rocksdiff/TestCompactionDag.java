@@ -22,8 +22,6 @@ import static java.util.concurrent.TimeUnit.MINUTES;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT;
@@ -63,7 +61,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
@@ -76,8 +73,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.mockito.MockedStatic;
-import org.mockito.Mockito;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
@@ -163,31 +158,22 @@ public class TestCompactionDag {
         OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE,
         OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE_DEFAULT))
         .thenReturn(2000);
+    ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
+    Function<Boolean, UncheckedAutoCloseable> dummyLock = (readLock) -> {
+      if (readLock) {
+        readWriteLock.readLock().lock();
+        return (UncheckedAutoCloseable) () -> readWriteLock.readLock().unlock();
+      } else {
+        readWriteLock.writeLock().lock();
+        return (UncheckedAutoCloseable) () -> readWriteLock.writeLock().unlock();
+      }
+    };
+    rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(METADATA_DIR_NAME,
+        SST_BACK_UP_DIR_NAME,
+        COMPACTION_LOG_DIR_NAME,
+        ACTIVE_DB_DIR_NAME,
+        config, dummyLock);
 
-    when(config.getBoolean(
-        OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB,
-        OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT)).thenReturn(true);
-
-    try (MockedStatic<ManagedRawSSTFileReader> mockedRawSSTReader =
-             Mockito.mockStatic(ManagedRawSSTFileReader.class)) {
-      mockedRawSSTReader.when(ManagedRawSSTFileReader::loadLibrary)
-          .thenReturn(true);
-      ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
-      Function<Boolean, UncheckedAutoCloseable> dummyLock = (readLock) -> {
-        if (readLock) {
-          readWriteLock.readLock().lock();
-          return (UncheckedAutoCloseable) () -> readWriteLock.readLock().unlock();
-        } else {
-          readWriteLock.writeLock().lock();
-          return (UncheckedAutoCloseable) () -> readWriteLock.writeLock().unlock();
-        }
-      };
-      rocksDBCheckpointDiffer = new RocksDBCheckpointDiffer(METADATA_DIR_NAME,
-          SST_BACK_UP_DIR_NAME,
-          COMPACTION_LOG_DIR_NAME,
-          ACTIVE_DB_DIR_NAME,
-          config, dummyLock);
-    }
 
     ManagedColumnFamilyOptions cfOpts = new ManagedColumnFamilyOptions();
     cfOpts.optimizeUniversalStyleCompaction();

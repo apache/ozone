@@ -131,7 +131,7 @@ jobs:
           java-version: ${{ github.event.inputs.java-version }}
       - name: Build (most) of Ozone
         run: |
-          args="-DskipRecon -DskipShade -Dmaven.javadoc.skip=true -Drocks_tools_native"
+          args="-DskipRecon -DskipShade -Dmaven.javadoc.skip=true"
           if [[ "$RATIS_VERSION" != "" ]]; then
             args="$args -Dratis.version=${{ needs.ratis.outputs.ratis-version }}"
             args="$args -Dratis.thirdparty.version=${{ needs.ratis.outputs.thirdparty-version }}"
@@ -201,7 +201,7 @@ jobs:
             export OZONE_REPO_CACHED=true
           fi
 
-          args="-DexcludedGroups=slow|unhealthy -DskipShade -Drocks_tools_native"
+          args="-DexcludedGroups=slow|unhealthy -DskipShade"
           if [[ "$RATIS_VERSION" != "" ]]; then
             args="$args -Dratis.version=${{ needs.ratis.outputs.ratis-version }}"
             args="$args -Dratis.thirdparty.version=${{ needs.ratis.outputs.thirdparty-version }}"

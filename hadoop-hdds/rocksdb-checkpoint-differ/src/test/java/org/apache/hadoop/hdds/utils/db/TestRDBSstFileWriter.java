@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_PROPERTY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.google.common.collect.ImmutableList;
@@ -25,13 +24,16 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Queue;
+import java.util.function.Function;
 import org.apache.hadoop.hdds.StringUtils;
+import org.apache.hadoop.hdds.utils.db.ManagedRawSstFileIterator.KeyValue;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
+import org.rocksdb.EntryType;
 
 /**
  * Test for RDBSstFileWriter.
@@ -41,10 +43,8 @@ public class TestRDBSstFileWriter {
   @TempDir
   private Path path;
 
-  @EnabledIfSystemProperty(named = ROCKS_TOOLS_NATIVE_PROPERTY, matches = "true")
   @Test
   public void testSstFileTombstoneCreationWithCodecBufferReuse() throws IOException {
-    ManagedRawSSTFileReader.tryLoadLibrary();
     Path sstPath = path.resolve("test.sst").toAbsolutePath();
     try (CodecBuffer codecBuffer = CodecBuffer.allocateDirect(1024);
          RDBSstFileWriter sstFileWriter = new RDBSstFileWriter(sstPath.toFile());
@@ -75,15 +75,14 @@ public class TestRDBSstFileWriter {
     }
     Assertions.assertTrue(sstPath.toFile().exists());
     try (ManagedOptions options = new ManagedOptions();
-         ManagedRawSSTFileReader reader = new ManagedRawSSTFileReader(options, sstPath.toString(), 1024);
-         ManagedRawSSTFileIterator<ManagedRawSSTFileIterator.KeyValue> itr =
-             reader.newIterator(kv -> kv, null, null, IteratorType.KEY_AND_VALUE)) {
+         ManagedRawSstFileIterator<KeyValue> itr = new ManagedRawSstFileIterator<>(sstPath.toString(), options,
+             Optional.empty(), Optional.empty(), IteratorType.KEY_AND_VALUE, Function.identity())) {
 
       int idx = 0;
       List<String> keys = ImmutableList.of("key1", "key1_rename");
       while (itr.hasNext()) {
-        ManagedRawSSTFileIterator.KeyValue kv = itr.next();
-        assertEquals(idx, kv.getType());
+        KeyValue kv = itr.next();
+        assertEquals(idx, kv.getType() == EntryType.kEntryDelete ? 0 : 1);
         assertEquals(keys.get(idx), keys.get(idx++));
         assertEquals(0, kv.getValue().readableBytes());
       }

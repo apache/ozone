@@ -17,9 +17,6 @@
 
 package org.apache.hadoop.ozone.debug;
 
-import static org.apache.hadoop.hdds.utils.NativeConstants.ROCKS_TOOLS_NATIVE_LIBRARY_NAME;
-
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -27,8 +24,6 @@ import java.util.function.Supplier;
 import org.apache.hadoop.crypto.OpensslCipher;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.cli.DebugSubcommand;
-import org.apache.hadoop.hdds.utils.NativeLibraryLoader;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.apache.hadoop.io.erasurecode.ErasureCodeNative;
 import org.apache.hadoop.util.NativeCodeLoader;
 import org.kohsuke.MetaInfServices;
@@ -54,15 +49,6 @@ public class CheckNative extends AbstractSubcommand implements Callable<Void>, D
         NativeCodeLoader.isNativeCodeLoaded() ? OpensslCipher.getLoadingFailureReason() : "",
         OpensslCipher::getLibraryName
     ));
-
-    // Ozone
-    ManagedRocksObjectUtils.loadRocksDBLibrary();
-    NativeLibraryLoader.getInstance().loadLibrary(
-        ROCKS_TOOLS_NATIVE_LIBRARY_NAME,
-        Collections.singletonList(ManagedRocksObjectUtils.getRocksDBLibFileName()));
-    results.put("rocks-tools", checkLibrary(
-        NativeLibraryLoader.isLibraryLoaded(ROCKS_TOOLS_NATIVE_LIBRARY_NAME),
-        NativeLibraryLoader::getJniLibraryFileName));
 
     final int maxLength = results.keySet().stream()
         .mapToInt(String::length)
