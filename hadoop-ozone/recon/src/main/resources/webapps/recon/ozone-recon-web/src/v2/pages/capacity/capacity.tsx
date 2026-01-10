@@ -83,7 +83,7 @@ const Capacity: React.FC<object> = () => {
     CONSTANTS.DEFAULT_DN_PENDING_DELETION,
     {
       retryAttempts: 2,
-      initialFetch: false,
+      initialFetch: true,
       onError: (error) => showDataFetchError(error)
     }
   );
@@ -305,7 +305,21 @@ const Capacity: React.FC<object> = () => {
             loading={dnPendingDeletes.loading || dnPendingDeletes.data.status !== "FINISHED"}
             showDropdown={true}
             handleSelect={setSelectedDatanode}
-            dropdownItems={storageDistribution.data.dataNodeUsage.map(datanode => datanode.hostName)}
+            dropdownItems={storageDistribution.data.dataNodeUsage.map(datanode => ({
+              label: (
+                <span className='dn-select-option-label'>
+                  {datanode.hostName}
+                  <span className='dn-select-option-uuid'>{datanode.datanodeUuid}</span>
+                </span>
+              ),
+              value: datanode.hostName
+            }))}
+            disabledOpts={
+              (dnPendingDeletes.data.pendingDeletionPerDataNode ?? [])
+                .filter(dn => dn.pendingBlockSize === -1)
+                .map(dn => dn.hostName)
+            }
+            optsClass={'dn-select-option'}
             dataDetails={[{
               title: 'USED SPACE',
               size: (selectedDNDetails.used ?? 0) + (selectedDNDetails.pendingBlockSize ?? 0),

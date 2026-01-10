@@ -35,7 +35,12 @@ type CapacityDetailProps = {
   title: string | React.ReactNode;
   showDropdown: boolean;
   dataDetails: DataDetailItem[];
-  dropdownItems?: string[];
+  dropdownItems?: {
+    label: React.ReactNode | string;
+    value: string;
+  }[];
+  disabledOpts?: string[];
+  optsClass?: string;
   handleSelect?: React.Dispatch<React.SetStateAction<string>>
   loading: boolean;
   extra?: React.ReactNode;
@@ -87,12 +92,24 @@ const getEchartOptions = (title: string | React.ReactNode, data: DataDetailItem)
 
 
 const CapacityDetail: React.FC<CapacityDetailProps> = (
-  { title, showDropdown, dropdownItems, dataDetails, handleSelect, loading, extra }
+  {
+    title,
+    showDropdown,
+    dropdownItems,
+    disabledOpts,
+    optsClass,
+    dataDetails,
+    handleSelect,
+    loading,
+    extra
+  }
 ) => {
 
   const options = dropdownItems?.map((item) => ({
-    label: item,
-    value: item,
+    label: item.label,
+    value: item.value,
+    ...(disabledOpts?.includes(item.value) && { disabled: true }),
+    ...(optsClass && { className: optsClass }),
   })) ?? [];
 
   return (
@@ -101,6 +118,7 @@ const CapacityDetail: React.FC<CapacityDetailProps> = (
         <div className='node-select-container'>
           <strong>Node Selector:</strong>
           <Select
+            showSearch
             defaultValue={options?.[0]?.value}
             options={options}
             onChange={handleSelect}

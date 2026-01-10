@@ -6972,7 +6972,7 @@
       {
         "hostName": "ozone-datanode-4.ozone_default",
         "datanodeUuid": "17e2562a-dae8-416f-a749-7d4e8a0a781e",
-        "pendingBlockSize": 1240
+        "pendingBlockSize": -1
       },
       {
         "hostName": "ozone-datanode-7.ozone_default",
@@ -6982,7 +6982,7 @@
       {
         "hostName": "ozone-datanode-1.ozone_default",
         "datanodeUuid": "d3ade292-6ec1-47b2-bd9e-045c1acc2c29",
-        "pendingBlockSize": 3730
+        "pendingBlockSize": -1
       },
       {
         "hostName": "ozone-datanode-2.ozone_default",
