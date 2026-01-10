@@ -192,7 +192,7 @@ Check access                          | not implemented in Ozone FileSystem API
 
 HttpFS supports proxy user (user impersonation) functionality, which allows a user to perform operations on behalf of another user. This is useful when HttpFS is used as a gateway and you want to allow certain users to impersonate other users.
 
-To configure proxy users, you need to add the following properties to `httpfs-site.xml`:
+To configure proxy users, you need to add the following properties to `httpfs-site.xml`.
 
 ### Configuration Properties
 
