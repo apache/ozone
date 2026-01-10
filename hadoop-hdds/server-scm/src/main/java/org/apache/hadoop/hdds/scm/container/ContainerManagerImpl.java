@@ -386,9 +386,11 @@ public class ContainerManagerImpl implements ContainerManager {
   private int getOpenContainerCountPerPipeline(Pipeline pipeline) {
     int minContainerCountPerDn = numContainerPerVolume *
         pipelineManager.minHealthyVolumeNum(pipeline);
-    int minPipelineCountPerDn = pipelineManager.minPipelineLimit(pipeline);
-    return (int) Math.ceil(
-        ((double) minContainerCountPerDn / minPipelineCountPerDn));
+    int minPipelineCountPerDn = Math.max(1, pipelineManager.minPipelineLimit(pipeline));
+    if (minContainerCountPerDn <= 0) {
+      return 0;
+    }
+    return (minContainerCountPerDn + minPipelineCountPerDn - 1) / minPipelineCountPerDn;
   }
 
   /**
