@@ -897,7 +897,7 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     Table.KeyValue<String, byte[]> kv =
         (Table.KeyValue<String, byte[]>) mock(Table.KeyValue.class);
 
-    when(kv.getKey()).thenReturn("/vol1/buck1/key-001");
+    when(kv.getKey()).thenReturn(new String(new char[] {'v'}));
     when(kv.getValue()).thenReturn(new byte[] { 'v' });
 
     // Simulate KeyValueIterator with 5 entries.
