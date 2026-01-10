@@ -207,7 +207,7 @@ public class OmTableInsightTask implements ReconOmTask {
 
     try (ParallelTableIteratorOperation<String, byte[]> parallelIter = new ParallelTableIteratorOperation<>(
         omMetadataManager, table, StringCodec.get(),
-        maxIterators, workerCount, maxKeysInMemory, loggingThreshold)) {
+        maxIterators, loggingThreshold)) {
       
       parallelIter.performTaskOnTableVals(getTaskName(), null, null, kv -> {
         if (kv != null) {
