@@ -45,6 +45,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -897,7 +898,9 @@ public class TestOmTableInsightTask extends AbstractReconSqlDBTest {
     Table.KeyValue<String, byte[]> kv =
         (Table.KeyValue<String, byte[]>) mock(Table.KeyValue.class);
 
-    when(kv.getKey()).thenReturn(new String(new char[] {'v'}));
+    when(kv.getKey()).thenReturn(
+        new String("/vol1/buck1/key-001".getBytes(StandardCharsets.UTF_8),
+            StandardCharsets.UTF_8));
     when(kv.getValue()).thenReturn(new byte[] { 'v' });
 
     // Simulate KeyValueIterator with 5 entries.
