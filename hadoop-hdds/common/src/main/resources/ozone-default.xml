@@ -4882,7 +4882,7 @@
 
   <property>
     <name>net.topology.node.switch.mapping.impl</name>
-    <value>org.apache.hadoop.net.ScriptBasedMapping</value>
+    <value>org.apache.hadoop.net.TableMapping</value>
     <tag>OZONE, SCM</tag>
     <description>
       The default implementation of the DNSToSwitchMapping. It
