@@ -1569,18 +1569,23 @@ public class SCMNodeManager implements NodeManager {
    */
   @Override
   public int minHealthyVolumeNum(List<DatanodeDetails> dnList) {
-    List<Integer> volumeCountList = new ArrayList<>(dnList.size());
+    Preconditions.checkArgument(!dnList.isEmpty());
+    int min = Integer.MAX_VALUE;
+    boolean found = false;
+
     for (DatanodeDetails dn : dnList) {
       try {
-        volumeCountList.add(nodeStateManager.getNode(dn).
-                getHealthyVolumeCount());
+        int healthy = nodeStateManager.getNode(dn).getHealthyVolumeCount();
+        min = Math.min(min, healthy);
+        found = true;
       } catch (NodeNotFoundException e) {
         LOG.warn("Cannot generate NodeStat, datanode {} not found.",
-                dn.getID());
+            dn.getID());
       }
     }
-    Preconditions.checkArgument(!volumeCountList.isEmpty());
-    return Collections.min(volumeCountList);
+
+    Preconditions.checkArgument(found);
+    return min;
   }
 
   @Override
@@ -1621,12 +1626,13 @@ public class SCMNodeManager implements NodeManager {
    */
   @Override
   public int minPipelineLimit(List<DatanodeDetails> dnList) {
-    List<Integer> pipelineCountList = new ArrayList<>(dnList.size());
+    Preconditions.checkArgument(!dnList.isEmpty());
+
+    int min = Integer.MAX_VALUE;
     for (DatanodeDetails dn : dnList) {
-      pipelineCountList.add(pipelineLimit(dn));
+      min = Math.min(min, pipelineLimit(dn));
     }
-    Preconditions.checkArgument(!pipelineCountList.isEmpty());
-    return Collections.min(pipelineCountList);
+    return min;
   }
 
   @Override
