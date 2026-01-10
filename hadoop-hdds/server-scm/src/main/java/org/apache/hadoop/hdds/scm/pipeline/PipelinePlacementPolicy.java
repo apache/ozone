@@ -76,8 +76,9 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     super(nodeManager, conf);
     this.nodeManager = nodeManager;
     this.stateManager = stateManager;
-    String dnLimit = conf.get(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT);
-    this.heavyNodeCriteria = dnLimit == null ? 0 : Integer.parseInt(dnLimit);
+    this.heavyNodeCriteria = conf.getInt(
+        ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT,
+        ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT);
   }
 
   public static int currentRatisThreePipelineCount(
