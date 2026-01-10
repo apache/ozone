@@ -241,7 +241,7 @@ In this example, the user `knoxuser` is allowed to impersonate any user from any
 
 If you encounter an error like:
 ```
-User: knox/master4.local@REALM is not allowed to impersonate user01
+User: user/host@REALM is not allowed to impersonate user01
 ```
 
 This indicates that the proxy user configuration is missing or incorrect. Ensure that:
