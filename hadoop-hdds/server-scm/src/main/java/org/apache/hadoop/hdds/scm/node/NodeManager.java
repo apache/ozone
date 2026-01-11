@@ -421,9 +421,5 @@ public interface NodeManager extends StorageContainerNodeProtocol,
 
   }
 
-  default int openContainerLimit(List<DatanodeDetails> dnList,
-      int numContainerPerVolume) {
-    throw new UnsupportedOperationException(
-        "openContainerLimit is not supported by this NodeManager implementation");
-  }
+  int openContainerLimit(List<DatanodeDetails> dnList, int numContainerPerVolume);
 }
