@@ -345,4 +345,10 @@ public class MockPipelineManager implements PipelineManager {
   public boolean hasEnoughSpace(Pipeline pipeline, long containerSize) {
     return false;
   }
+
+  @Override
+  public int openContainerLimit(Pipeline pipeline, int numContainerPerVolume) {
+    // For tests that do not care about this limit, return a large value.
+    return Integer.MAX_VALUE;
+  }
 }

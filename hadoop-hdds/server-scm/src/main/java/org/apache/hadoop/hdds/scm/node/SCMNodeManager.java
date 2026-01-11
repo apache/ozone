@@ -1589,6 +1589,44 @@ public class SCMNodeManager implements NodeManager {
   }
 
   @Override
+  public int openContainerLimit(List<DatanodeDetails> dnList,
+      int numContainerPerVolume) {
+    Preconditions.checkArgument(dnList != null && !dnList.isEmpty(),
+        "dnList must not be empty");
+
+    int min = Integer.MAX_VALUE;
+
+    for (DatanodeDetails dn : dnList) {
+      int perDn = openContainerLimit(dn, numContainerPerVolume);
+      min = Math.min(min, perDn);
+    }
+
+    return min == Integer.MAX_VALUE ? 0 : min;
+  }
+
+  private int openContainerLimit(DatanodeDetails dn,
+      int numContainerPerVolume) {
+    try {
+      int healthy = nodeStateManager.getNode(dn).getHealthyVolumeCount();
+      if (healthy <= 0) {
+        return 0;
+      }
+
+      int capacity = numContainerPerVolume * healthy;
+
+      int pipelineLimit = pipelineLimit(dn); // SCMNodeManager already has this
+      int denom = Math.max(1, pipelineLimit); // avoid division-by-zero
+
+      return (int) Math.ceil(((double) capacity) / denom);
+
+    } catch (NodeNotFoundException e) {
+      LOG.warn("Cannot compute open container limit, datanode {} not found.",
+          dn.getID());
+      return 0;
+    }
+  }
+
+  @Override
   public int totalHealthyVolumeCount() {
     int sum = 0;
     for (DatanodeInfo dn : nodeStateManager.getNodes(IN_SERVICE, HEALTHY)) {

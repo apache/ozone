@@ -355,7 +355,7 @@ public class ContainerManagerImpl implements ContainerManager {
     try {
       synchronized (pipeline.getId()) {
         containerIDs = getContainersForOwner(pipeline, owner);
-        if (containerIDs.size() < getOpenContainerCountPerPipeline(pipeline)) {
+        if (containerIDs.size() < pipelineManager.openContainerLimit(pipeline, numContainerPerVolume)) {
           if (pipelineManager.hasEnoughSpace(pipeline, maxContainerSize)) {
             allocateContainer(pipeline, owner);
             containerIDs = getContainersForOwner(pipeline, owner);
@@ -381,18 +381,6 @@ public class ContainerManagerImpl implements ContainerManager {
       LOG.warn("Container allocation failed on pipeline={}", pipeline, e);
       return null;
     }
-  }
-
-  private int getOpenContainerCountPerPipeline(Pipeline pipeline) {
-    int minContainerCountPerDn = numContainerPerVolume *
-        pipelineManager.minHealthyVolumeNum(pipeline);
-    int minPipelineCountPerDn = pipelineManager.minPipelineLimit(pipeline);
-    // Defensive guard: avoid division by zero
-    if (minPipelineCountPerDn <= 0) {
-      minPipelineCountPerDn = 1;
-    }
-    return (int) Math.ceil(
-        ((double) minContainerCountPerDn / minPipelineCountPerDn));
   }
 
   /**

@@ -680,6 +680,11 @@ public class PipelineManagerImpl implements PipelineManager {
     return nodeManager.minPipelineLimit(pipeline.getNodes());
   }
 
+  @Override
+  public int openContainerLimit(Pipeline pipeline, int numContainerPerVolume) {
+    return nodeManager.openContainerLimit(pipeline.getNodes(), numContainerPerVolume);
+  }
+
   /**
    * Activates a dormant pipeline.
    *

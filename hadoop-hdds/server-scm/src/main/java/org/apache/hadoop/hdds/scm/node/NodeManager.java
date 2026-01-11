@@ -424,4 +424,10 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   default void removeNode(DatanodeDetails datanodeDetails) throws NodeNotFoundException, IOException {
 
   }
+
+  default int openContainerLimit(List<DatanodeDetails> dnList,
+      int numContainerPerVolume) {
+    throw new UnsupportedOperationException(
+        "openContainerLimit is not supported by this NodeManager implementation");
+  }
 }

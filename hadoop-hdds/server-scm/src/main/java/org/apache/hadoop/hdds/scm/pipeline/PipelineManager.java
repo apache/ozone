@@ -224,4 +224,6 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
    * containerSize, otherwise true
    */
   boolean hasEnoughSpace(Pipeline pipeline, long containerSize);
+
+  int openContainerLimit(Pipeline pipeline, int numContainerPerVolume);
 }
