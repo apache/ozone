@@ -38,6 +38,7 @@ import { useApiData } from '@/v2/hooks/useAPIData.hook';
 import * as CONSTANTS from '@/v2/constants/capacity.constants';
 import { UtilizationResponse, SCMPendingDeletion, OMPendingDeletion, DNPendingDeletion, DataNodeUsage } from '@/v2/types/capacity.types';
 import { useAutoReload } from '@/v2/hooks/useAutoReload.hook';
+import { AUTO_RELOAD_INTERVAL_DEFAULT } from '@/constants/autoReload.constants';
 
 type CapacityState = {
   isDNPending: boolean;
@@ -45,6 +46,7 @@ type CapacityState = {
 };
 
 const Capacity: React.FC<object> = () => {
+  const PENDING_POLL_INTERVAL = 5 * 1000;
 
   const [state, setState] = React.useState<CapacityState>({
     isDNPending: true,
@@ -83,7 +85,7 @@ const Capacity: React.FC<object> = () => {
     CONSTANTS.DEFAULT_DN_PENDING_DELETION,
     {
       retryAttempts: 2,
-      initialFetch: true,
+      initialFetch: false,
       onError: (error) => showDataFetchError(error)
     }
   );
@@ -101,12 +103,13 @@ const Capacity: React.FC<object> = () => {
   const loadDNData = () => {
     dnPendingDeletes.refetch();
     setState({
-      isDNPending: dnPendingDeletes.data.status === "FINISHED",
+      isDNPending: dnPendingDeletes.data.status !== "FINISHED",
       lastUpdated: Number(moment())
     })
   }
 
   const autoReload = useAutoReload(loadDNData);
+  const lastIntervalRef = React.useRef<number>(AUTO_RELOAD_INTERVAL_DEFAULT);
 
   const selectedDNDetails: DataNodeUsage & { pendingBlockSize: number } = React.useMemo(() => {
     const selected = storageDistribution.data.dataNodeUsage.find(datanode => datanode.hostName === selectedDatanode)
@@ -129,6 +132,22 @@ const Capacity: React.FC<object> = () => {
       }
     }
   }, [selectedDatanode, storageDistribution.data.dataNodeUsage, dnPendingDeletes.data.pendingDeletionPerDataNode]);
+
+  // Dynamically adjust polling interval based on DN pending status
+  React.useEffect(() => {
+    const pending = dnPendingDeletes.loading || dnPendingDeletes.data.status !== "FINISHED";
+    const targetInterval = pending ? PENDING_POLL_INTERVAL : AUTO_RELOAD_INTERVAL_DEFAULT;
+
+    if (!autoReload.isPolling) {
+      lastIntervalRef.current = targetInterval;
+      return;
+    }
+
+    if (lastIntervalRef.current !== targetInterval) {
+      lastIntervalRef.current = targetInterval;
+      autoReload.startPolling(targetInterval);
+    }
+  }, [dnPendingDeletes.loading, dnPendingDeletes.data.status, autoReload.isPolling, autoReload.startPolling]);
 
   const dnReportStatus = (
     (dnPendingDeletes.data.totalNodeQueriesFailed ?? 0) > 0
@@ -176,7 +195,7 @@ const Capacity: React.FC<object> = () => {
       <div className='page-header-v2'>
         Cluster Capacity
         <AutoReloadPanel
-          isLoading={state.isDNPending}
+          isLoading={dnPendingDeletes.loading}
           lastRefreshed={state.lastUpdated}
           togglePolling={autoReload.handleAutoReloadToggle}
           onReload={loadDNData} />
@@ -243,14 +262,14 @@ const Capacity: React.FC<object> = () => {
             color: '#f4a233'
           }, {
             title: (
-              dnPendingDeletes.data.status === "FINISHED"
-              ? 'PENDING DELETION'
-              : (
+              dnPendingDeletes.data.status !== "FINISHED" || dnPendingDeletes.loading
+              ? (
                 <span>
                   PENDING DELETION
                   <WrappedInfoIcon title="DN pending deletion data is not yet available. It will be fetched once the pending deletion scan is finished on all datanodes." />
                 </span>
               )
+              : 'PENDING DELETION' 
             ),
             value: (
               omPendingDeletes.data.totalSize
@@ -306,12 +325,7 @@ const Capacity: React.FC<object> = () => {
             showDropdown={true}
             handleSelect={setSelectedDatanode}
             dropdownItems={storageDistribution.data.dataNodeUsage.map(datanode => ({
-              label: (
-                <span className='dn-select-option-label'>
-                  {datanode.hostName}
-                  <span className='dn-select-option-uuid'>{datanode.datanodeUuid}</span>
-                </span>
-              ),
+              label: datanode.hostName,
               value: datanode.hostName
             }))}
             disabledOpts={
