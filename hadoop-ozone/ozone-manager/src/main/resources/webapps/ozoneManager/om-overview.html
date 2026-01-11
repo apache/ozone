@@ -132,14 +132,14 @@
                   <tbody>
                       <tr>
                           <td>Active Object Store</td>
-                          <td>{{$ctrl.formatBytes($ctrl.overview.jmx.AosReclaimedSizeLast)}}</td>
+                          <td>{{$ctrl.formatBytes($ctrl.overview.jmx.AosReclaimedSizeLast || 0)}}</td>
                           <td>{{$ctrl.overview.jmx.AosKeysReclaimedLast || 0}}</td>
                           <td>{{$ctrl.overview.jmx.AosKeysIteratedLast || 0}}</td>
                           <td>{{$ctrl.overview.jmx.AosKeysNotReclaimableLast || 0}}</td>
                       </tr>
                       <tr>
                           <td>Snapshots</td>
-                          <td>{{$ctrl.formatBytes($ctrl.overview.jmx.SnapReclaimedSizeLast)}}</td>
+                          <td>{{$ctrl.formatBytes($ctrl.overview.jmx.SnapReclaimedSizeLast || 0)}}</td>
                           <td>{{$ctrl.overview.jmx.SnapKeysReclaimedLast || 0}}</td>
                           <td>{{$ctrl.overview.jmx.SnapKeysIteratedLast || 0}}</td>
                           <td>{{$ctrl.overview.jmx.SnapKeysNotReclaimableLast || 0}}</td>
