@@ -306,7 +306,7 @@ public class TestBlockManager {
     }
     CompletableFuture.allOf(futureList.toArray(new CompletableFuture[0])).get();
     Pipeline pipeline = pipelineManager.getPipelines(replicationConfig).get(0);
-    int expectedContainers = pipelineManager.openContainerLimit(pipeline, numContainerPerOwnerInPipeline);
+    int expectedContainers = pipelineManager.openContainerLimit(pipeline.getNodes());
     assertEquals(1, pipelineManager.getPipelines(replicationConfig).size());
     assertEquals(expectedContainers, allocatedBlockMap.size());
     assertEquals(expectedContainers, allocatedBlockMap.values().size());
@@ -428,7 +428,7 @@ public class TestBlockManager {
     Pipeline pipeline =
         pipelineManager.getPipelines(replicationConfig).get(0);
     int expectedContainers =
-        pipelineManager.openContainerLimit(pipeline, numContainerPerOwnerInPipeline);
+        pipelineManager.openContainerLimit(pipeline.getNodes());
     assertEquals(expectedContainers, pipelineManager.getNumberOfContainers(pipeline.getId()));
     assertEquals(expectedContainers, allocatedBlockMap.size());
     assertEquals(expectedContainers, allocatedBlockMap.values().size());
@@ -591,7 +591,6 @@ public class TestBlockManager {
   private int expectedContainersPerPipeline() {
     Pipeline pipeline = pipelineManager.getPipelines(replicationConfig).get(0);
 
-    return pipelineManager.openContainerLimit(pipeline,
-        numContainerPerOwnerInPipeline);
+    return pipelineManager.openContainerLimit(pipeline.getNodes());
   }
 }

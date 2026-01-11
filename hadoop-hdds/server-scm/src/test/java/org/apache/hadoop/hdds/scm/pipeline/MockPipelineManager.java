@@ -337,7 +337,7 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public int openContainerLimit(Pipeline pipeline, int numContainerPerVolume) {
+  public int openContainerLimit(List<DatanodeDetails> datanodes) {
     // For tests that do not care about this limit, return a large value.
     return Integer.MAX_VALUE;
   }

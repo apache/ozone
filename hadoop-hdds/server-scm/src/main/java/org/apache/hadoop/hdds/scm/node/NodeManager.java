@@ -421,5 +421,5 @@ public interface NodeManager extends StorageContainerNodeProtocol,
 
   }
 
-  int openContainerLimit(List<DatanodeDetails> dnList, int numContainerPerVolume);
+  int openContainerLimit(List<DatanodeDetails> datanodes);
 }

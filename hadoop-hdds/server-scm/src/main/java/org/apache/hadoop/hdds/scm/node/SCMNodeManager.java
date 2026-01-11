@@ -140,6 +140,7 @@ public class SCMNodeManager implements NodeManager {
   private final SCMContext scmContext;
   private final Map<SCMCommandProto.Type,
       BiConsumer<DatanodeDetails, SCMCommand<?>>> sendCommandNotifyMap;
+  private final int numContainerPerVolume;
 
   /**
    * Lock used to synchronize some operation in Node manager to ensure a
@@ -197,6 +198,9 @@ public class SCMNodeManager implements NodeManager {
             ScmConfigKeys.OZONE_SCM_PIPELINE_PER_METADATA_VOLUME_DEFAULT);
     String dnLimit = conf.get(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT);
     this.heavyNodeCriteria = dnLimit == null ? 0 : Integer.parseInt(dnLimit);
+    this.numContainerPerVolume = conf.getInt(
+        ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
+        ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
     this.scmContext = scmContext;
     this.sendCommandNotifyMap = new HashMap<>();
   }
@@ -1567,45 +1571,20 @@ public class SCMNodeManager implements NodeManager {
    * Returns the open container limit for a pipeline based on the given
    * datanodes and containers-per-volume configuration.
    */
-  @Override
-  public int openContainerLimit(List<DatanodeDetails> dnList,
-      int numContainerPerVolume) {
-    Preconditions.checkArgument(dnList != null && !dnList.isEmpty(),
-        "dnList must not be empty");
-
+  public int openContainerLimit(List<DatanodeDetails> datanodes) {
     int min = Integer.MAX_VALUE;
-
-    for (DatanodeDetails dn : dnList) {
-      int perDn = openContainerLimit(dn, numContainerPerVolume);
-      min = Math.min(min, perDn);
-    }
-
-    return min == Integer.MAX_VALUE ? 0 : min;
-  }
-
-  /**
-   * Returns the open container limit contributed by a single datanode.
-   */
-  private int openContainerLimit(DatanodeDetails dn,
-      int numContainerPerVolume) {
-    try {
-      int healthy = nodeStateManager.getNode(dn).getHealthyVolumeCount();
-      if (healthy <= 0) {
+    for (DatanodeDetails dn : datanodes) {
+      final int pipelineLimit = pipelineLimit(dn);
+      if (pipelineLimit <= 0) {
         return 0;
       }
 
-      int capacity = numContainerPerVolume * healthy;
-
-      int pipelineLimit = pipelineLimit(dn); // SCMNodeManager already has this
-      int denom = Math.max(1, pipelineLimit); // avoid division-by-zero
-
-      return (int) Math.ceil(((double) capacity) / denom);
-
-    } catch (NodeNotFoundException e) {
-      LOG.warn("Cannot compute open container limit, datanode {} not found.",
-          dn.getID());
-      return 0;
+      final int containerLimit = 1 + (numContainerPerVolume * getHealthyVolumeCount(dn) - 1) / pipelineLimit;
+      if (containerLimit < min) {
+        min = containerLimit;
+      }
     }
+    return min;
   }
 
   @Override
@@ -1639,6 +1618,15 @@ public class SCMNodeManager implements NodeManager {
           dn.getID());
     }
     return 0;
+  }
+
+  private int getHealthyVolumeCount(DatanodeDetails dn) {
+    try {
+      return nodeStateManager.getNode(dn).getHealthyVolumeCount();
+    } catch (NodeNotFoundException e) {
+      LOG.warn("Failed to getHealthyVolumeCount, datanode {} not found.", dn.getID());
+      return 0;
+    }
   }
 
   @Override

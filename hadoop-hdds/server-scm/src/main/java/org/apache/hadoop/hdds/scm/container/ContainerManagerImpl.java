@@ -355,7 +355,7 @@ public class ContainerManagerImpl implements ContainerManager {
     try {
       synchronized (pipeline.getId()) {
         containerIDs = getContainersForOwner(pipeline, owner);
-        if (containerIDs.size() < pipelineManager.openContainerLimit(pipeline, numContainerPerVolume)) {
+        if (containerIDs.size() < pipelineManager.openContainerLimit(pipeline.getNodes())) {
           if (pipelineManager.hasEnoughSpace(pipeline, maxContainerSize)) {
             allocateContainer(pipeline, owner);
             containerIDs = getContainersForOwner(pipeline, owner);

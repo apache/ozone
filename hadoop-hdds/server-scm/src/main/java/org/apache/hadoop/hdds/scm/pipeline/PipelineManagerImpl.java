@@ -671,8 +671,8 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   @Override
-  public int openContainerLimit(Pipeline pipeline, int numContainerPerVolume) {
-    return nodeManager.openContainerLimit(pipeline.getNodes(), numContainerPerVolume);
+  public int openContainerLimit(List<DatanodeDetails> datanodes) {
+    return nodeManager.openContainerLimit(datanodes);
   }
 
   /**

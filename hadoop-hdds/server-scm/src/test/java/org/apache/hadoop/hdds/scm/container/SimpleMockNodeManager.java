@@ -375,7 +375,7 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
-  public int openContainerLimit(List<DatanodeDetails> dnList, int numContainerPerVolume) {
+  public int openContainerLimit(List<DatanodeDetails> datanodes) {
     return 9;
   }
 
