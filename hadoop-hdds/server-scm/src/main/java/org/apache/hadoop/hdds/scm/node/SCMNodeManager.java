@@ -1567,10 +1567,7 @@ public class SCMNodeManager implements NodeManager {
     }
   }
 
-  /**
-   * Returns the open container limit for a pipeline based on the given
-   * datanodes and containers-per-volume configuration.
-   */
+  @Override
   public int openContainerLimit(List<DatanodeDetails> datanodes) {
     int min = Integer.MAX_VALUE;
     for (DatanodeDetails dn : datanodes) {

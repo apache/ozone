@@ -76,8 +76,6 @@ public class ContainerManagerImpl implements ContainerManager {
   // Metrics related to operations should be moved to ProtocolServer
   private final SCMContainerManagerMetrics scmContainerManagerMetrics;
 
-  private final int numContainerPerVolume;
-
   @SuppressWarnings("java:S2245") // no need for secure random
   private final Random random = new Random();
 
@@ -107,10 +105,6 @@ public class ContainerManagerImpl implements ContainerManager {
         .setSCMDBTransactionBuffer(scmHaManager.getDBTransactionBuffer())
         .setContainerReplicaPendingOps(containerReplicaPendingOps)
         .build();
-
-    this.numContainerPerVolume = conf
-        .getInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
-            ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
 
     maxContainerSize = (long) conf.getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
