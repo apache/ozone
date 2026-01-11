@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -304,12 +305,16 @@ public class TestBlockManager {
       futureList.add(future);
     }
     CompletableFuture.allOf(futureList.toArray(new CompletableFuture[0])).get();
-
+    Pipeline pipeline = pipelineManager.getPipelines(replicationConfig).get(0);
+    int expectedContainers = pipelineManager.openContainerLimit(pipeline, numContainerPerOwnerInPipeline);
     assertEquals(1, pipelineManager.getPipelines(replicationConfig).size());
-    assertEquals(numContainerPerOwnerInPipeline, allocatedBlockMap.size());
-    assertEquals(numContainerPerOwnerInPipeline, allocatedBlockMap.values().size());
+    assertEquals(expectedContainers, allocatedBlockMap.size());
+    assertEquals(expectedContainers, allocatedBlockMap.values().size());
+    int floor = threadCount / expectedContainers;
+    int ceil = (threadCount + expectedContainers - 1) / expectedContainers;
     allocatedBlockMap.values().forEach(v -> {
-      assertEquals(numContainerPerOwnerInPipeline, v.size());
+      int sz = v.size();
+      assertTrue(sz == floor || sz == ceil, "Unexpected blocks per container: " + sz);
     });
   }
 
@@ -422,13 +427,15 @@ public class TestBlockManager {
         pipelineManager.getPipelines(replicationConfig).size());
     Pipeline pipeline =
         pipelineManager.getPipelines(replicationConfig).get(0);
+    int expectedContainers =
+        pipelineManager.openContainerLimit(pipeline, numContainerPerOwnerInPipeline);
     // the pipeline per raft log disk config is set to 1 by default
     int numContainers = (int)Math.ceil((double)
         (numContainerPerOwnerInPipeline *
             numContainerPerOwnerInPipeline) / numMetaDataVolumes);
-    assertEquals(numContainers, pipelineManager.getNumberOfContainers(pipeline.getId()));
-    assertEquals(numContainers, allocatedBlockMap.size());
-    assertEquals(numContainers, allocatedBlockMap.values().size());
+    assertEquals(expectedContainers, pipelineManager.getNumberOfContainers(pipeline.getId()));
+    assertEquals(expectedContainers, allocatedBlockMap.size());
+    assertEquals(expectedContainers, allocatedBlockMap.values().size());
   }
 
   @Test
@@ -526,7 +533,7 @@ public class TestBlockManager {
       } catch (IOException e) {
       }
       return verifyNumberOfContainersInPipelines(
-          numContainerPerOwnerInPipeline);
+          expectedContainersPerPipeline());
     }, 10, 1000);
 
     // close all the containers in all the pipelines
@@ -551,7 +558,7 @@ public class TestBlockManager {
       } catch (IOException e) {
       }
       return verifyNumberOfContainersInPipelines(
-          numContainerPerOwnerInPipeline);
+          expectedContainersPerPipeline());
     }, 10, 1000);
   }
 
@@ -583,5 +590,12 @@ public class TestBlockManager {
         }
       }
     }
+  }
+
+  private int expectedContainersPerPipeline() {
+    Pipeline pipeline = pipelineManager.getPipelines(replicationConfig).get(0);
+
+    return pipelineManager.openContainerLimit(pipeline,
+        numContainerPerOwnerInPipeline);
   }
 }

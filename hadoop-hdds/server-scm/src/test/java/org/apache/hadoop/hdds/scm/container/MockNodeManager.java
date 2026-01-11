@@ -925,7 +925,7 @@ public class MockNodeManager implements NodeManager {
 
   @Override
   public int openContainerLimit(List<DatanodeDetails> dnList, int numContainerPerVolume) {
-    return Integer.MAX_VALUE;
+    return 9;
   }
 
   @Override
