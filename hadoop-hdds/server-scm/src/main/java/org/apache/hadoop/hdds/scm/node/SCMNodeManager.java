@@ -1564,30 +1564,9 @@ public class SCMNodeManager implements NodeManager {
   }
 
   /**
-   * Returns the min of no healthy volumes reported out of the set
-   * of datanodes constituting the pipeline.
+   * Returns the open container limit for a pipeline based on the given
+   * datanodes and containers-per-volume configuration.
    */
-  @Override
-  public int minHealthyVolumeNum(List<DatanodeDetails> dnList) {
-    Preconditions.checkArgument(!dnList.isEmpty());
-    int min = Integer.MAX_VALUE;
-    boolean found = false;
-
-    for (DatanodeDetails dn : dnList) {
-      try {
-        int healthy = nodeStateManager.getNode(dn).getHealthyVolumeCount();
-        min = Math.min(min, healthy);
-        found = true;
-      } catch (NodeNotFoundException e) {
-        LOG.warn("Cannot generate NodeStat, datanode {} not found.",
-            dn.getID());
-      }
-    }
-
-    Preconditions.checkArgument(found);
-    return min;
-  }
-
   @Override
   public int openContainerLimit(List<DatanodeDetails> dnList,
       int numContainerPerVolume) {
@@ -1604,6 +1583,9 @@ public class SCMNodeManager implements NodeManager {
     return min == Integer.MAX_VALUE ? 0 : min;
   }
 
+  /**
+   * Returns the open container limit contributed by a single datanode.
+   */
   private int openContainerLimit(DatanodeDetails dn,
       int numContainerPerVolume) {
     try {
@@ -1657,20 +1639,6 @@ public class SCMNodeManager implements NodeManager {
           dn.getID());
     }
     return 0;
-  }
-
-  /**
-   * Returns the pipeline limit for set of datanodes.
-   */
-  @Override
-  public int minPipelineLimit(List<DatanodeDetails> dnList) {
-    Preconditions.checkArgument(!dnList.isEmpty());
-
-    int min = Integer.MAX_VALUE;
-    for (DatanodeDetails dn : dnList) {
-      min = Math.min(min, pipelineLimit(dn));
-    }
-    return min;
   }
 
   @Override

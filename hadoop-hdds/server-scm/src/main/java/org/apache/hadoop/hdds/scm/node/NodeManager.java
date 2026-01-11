@@ -393,13 +393,9 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    */
   NetworkTopology getClusterNetworkTopologyMap();
 
-  int minHealthyVolumeNum(List <DatanodeDetails> dnList);
-
   int totalHealthyVolumeCount();
 
   int pipelineLimit(DatanodeDetails dn);
-
-  int minPipelineLimit(List<DatanodeDetails> dn);
 
   /**
    * Gets the peers in all the pipelines for the particular datnode.

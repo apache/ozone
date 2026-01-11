@@ -913,23 +913,12 @@ public class MockNodeManager implements NodeManager {
   }
 
   @Override
-  public int minHealthyVolumeNum(List<DatanodeDetails> dnList) {
-    return numHealthyDisksPerDatanode;
-  }
-
-  @Override
   public int totalHealthyVolumeCount() {
     return healthyNodes.size() * numHealthyDisksPerDatanode;
   }
 
   @Override
   public int pipelineLimit(DatanodeDetails dn) {
-    // by default 1 single node pipeline and 1 three node pipeline
-    return numPipelinePerDatanode;
-  }
-
-  @Override
-  public int minPipelineLimit(List<DatanodeDetails> dn) {
     // by default 1 single node pipeline and 1 three node pipeline
     return numPipelinePerDatanode;
   }

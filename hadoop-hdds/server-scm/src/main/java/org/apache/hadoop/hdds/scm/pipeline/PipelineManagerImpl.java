@@ -671,16 +671,6 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   @Override
-  public int minHealthyVolumeNum(Pipeline pipeline) {
-    return nodeManager.minHealthyVolumeNum(pipeline.getNodes());
-  }
-
-  @Override
-  public int minPipelineLimit(Pipeline pipeline) {
-    return nodeManager.minPipelineLimit(pipeline.getNodes());
-  }
-
-  @Override
   public int openContainerLimit(Pipeline pipeline, int numContainerPerVolume) {
     return nodeManager.openContainerLimit(pipeline.getNodes(), numContainerPerVolume);
   }
