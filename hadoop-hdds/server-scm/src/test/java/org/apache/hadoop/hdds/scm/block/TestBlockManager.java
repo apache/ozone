@@ -429,10 +429,6 @@ public class TestBlockManager {
         pipelineManager.getPipelines(replicationConfig).get(0);
     int expectedContainers =
         pipelineManager.openContainerLimit(pipeline, numContainerPerOwnerInPipeline);
-    // the pipeline per raft log disk config is set to 1 by default
-    int numContainers = (int)Math.ceil((double)
-        (numContainerPerOwnerInPipeline *
-            numContainerPerOwnerInPipeline) / numMetaDataVolumes);
     assertEquals(expectedContainers, pipelineManager.getNumberOfContainers(pipeline.getId()));
     assertEquals(expectedContainers, allocatedBlockMap.size());
     assertEquals(expectedContainers, allocatedBlockMap.values().size());
