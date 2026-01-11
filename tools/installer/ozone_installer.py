@@ -55,6 +55,8 @@ def get_logger(log_path: Optional[Path] = None) -> logging.Logger:
         formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
         fh.setFormatter(formatter)
         logger.addHandler(fh)
+        sh = logging.StreamHandler(sys.stdout)
+        logger.addHandler(sh)
     return logger
 
 def parse_args(argv: List[str]) -> argparse.Namespace:
@@ -160,13 +162,12 @@ def _confirm_summary(rows: List[Tuple[str, str]], yes_mode: bool) -> bool:
     logger = get_logger()
     table = _render_table(rows)
     if click is not None:
-        click.echo(table)
-        logger.info("\n" + table)
+        logger.info(table)
         if yes_mode:
             return True
         return click.confirm("Proceed with these settings?", default=True)
     else:
-        logger.info("\n" + table)
+        logger.info(table)
         if yes_mode:
             return True
         answer = prompt("Proceed with these settings? (Y/n)", default="Y", yes_mode=False)
@@ -636,12 +637,13 @@ def main(argv: List[str]) -> int:
         except Exception:
             pass
 
-    try:
-        example_host = hosts[0]["host"] if hosts else "HOSTNAME"
-        logger.info(f"To view process logs: ssh to the node and read {install_base}/current/logs/ozone-{service_user}-<process>-<host>.log "
-                    f"(e.g., {install_base}/current/logs/ozone-{service_user}-recon-{example_host}.log)")
-    except Exception:
-        logger.info("All done.")
+        try:
+            example_host = hosts[0]["host"] if hosts else "HOSTNAME"
+            logger.info(f"To view process logs: ssh to the node and read {install_base}/current/logs/ozone-{service_user}-<process>-<host>.log "
+                        f"(e.g., {install_base}/current/logs/ozone-{service_user}-recon-{example_host}.log)")
+        except Exception:
+            pass
+    logger.info("All done.")
     return 0
 
 if __name__ == "__main__":
