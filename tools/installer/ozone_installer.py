@@ -100,18 +100,20 @@ def prompt(prompt_text: str, default: Optional[str] = None, secret: bool = False
         return default
     if click is not None and sys.stdout.isatty():
         try:
+            display = prompt_text
+            # logger.info(f"prompt_text: {prompt_text} , default: {default}")
+            if default:
+                display = f"{prompt_text} [default={default}]"
             if secret:
-                # Hide input for secrets (passwords)
-                return click.prompt(prompt_text, default=default, hide_input=True, show_default=default is not None)
-            return click.prompt(prompt_text, default=default, show_default=default is not None)
+                return click.prompt(display, default=default, hide_input=True, show_default=False)
+            return click.prompt(display, default=default, show_default=False)
         except (EOFError, KeyboardInterrupt):
             return default
     # Fallback to built-in input/getpass
     try:
+        text = f"{prompt_text}: "
         if default:
-            text = f"{prompt_text} [{default}]: "
-        else:
-            text = f"{prompt_text}: "
+            text = f"{prompt_text} [default={default}]: "
         if secret:
             import getpass
             val = getpass.getpass(text)
@@ -198,14 +200,14 @@ def choose_version_interactive(versions: List[str], default_version: str, yes_mo
         return versions[0]
     # Use click when available and interactive; otherwise fallback to basic prompt
     if click is not None and sys.stdout.isatty():
-        click.echo("Available Ozone versions:")
+        click.echo("Available Ozone versions (newest first):")
         for idx, ver in enumerate(versions, start=1):
             click.echo(f"  {idx}) {ver}")
         while True:
-            choice = click.prompt(
-                "Select number, type a version (e.g., 2.0.0) or 'local'",
+            choice = prompt(
+                "Select number, type a version (e.g., 2.1.0) or 'local'",
                 default="1",
-                show_default=True,
+                yes_mode=False,
             )
             if choice is None:
                 return versions[0]
@@ -227,7 +229,7 @@ def choose_version_interactive(versions: List[str], default_version: str, yes_mo
         for idx, ver in enumerate(versions, start=1):
             logger.info(f"  {idx}) {ver}")
         while True:
-            choice = prompt("Select version by number or type a version string (or 'local')", default="1", yes_mode=False)
+            choice = prompt("Select number, type a version (e.g., 2.1.0) or 'local'", default="1", yes_mode=False)
             if choice is None or str(choice).strip() == "":
                 return versions[0]
             choice = str(choice).strip()
@@ -240,7 +242,7 @@ def choose_version_interactive(versions: List[str], default_version: str, yes_mo
             # allow typing a specific version not listed
             if re.match(r"^[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9]+)?$", choice):
                 return choice
-            logger.info("Invalid selection. Please enter a number from the list, a valid version (e.g., 2.0.0) or 'local'.")
+            logger.info("Invalid selection. Please enter a number from the list, a valid version (e.g., 2.1.0) or 'local'.")
 
 def expand_braces(expr: str) -> List[str]:
     # Supports simple pattern like prefix{1..N}suffix
@@ -422,7 +424,7 @@ def main(argv: List[str]) -> int:
             ozone_version = selected
         else:
             # Fallback prompt if fetch failed
-            ozone_version = prompt("Ozone version (e.g., 2.0.0 | local)", default=DEFAULTS["ozone_version"], yes_mode=yes)
+            ozone_version = prompt("Ozone version (e.g., 2.1.0 | local)", default=DEFAULTS["ozone_version"], yes_mode=yes)
     jdk_major = args.jdk_version if args.jdk_version is not None else ((last_cfg.get("jdk_major") if last_cfg else None))
     if jdk_major is None:
         _jdk_val = prompt("JDK major (17|21)", default=str(DEFAULTS["jdk_major"]), yes_mode=yes)
@@ -634,8 +636,12 @@ def main(argv: List[str]) -> int:
         except Exception:
             pass
 
-
-    logger.info("All done.")
+    try:
+        example_host = hosts[0]["host"] if hosts else "HOSTNAME"
+        logger.info(f"To view process logs: ssh to the node and read {install_base}/current/logs/ozone-{service_user}-<process>-<host>.log "
+                    f"(e.g., {install_base}/current/logs/ozone-{service_user}-recon-{example_host}.log)")
+    except Exception:
+        logger.info("All done.")
     return 0
 
 if __name__ == "__main__":
