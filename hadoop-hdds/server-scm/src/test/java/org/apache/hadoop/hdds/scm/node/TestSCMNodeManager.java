@@ -2059,7 +2059,7 @@ public class TestSCMNodeManager {
    * Test that pipelineLimit() uses the default value when the config is not set.
    */
   @Test
-  public void testPipelineLimitDefaultIsTwoWhenUnset()
+  public void testUsesDefaultPipelineLimitWhenUnset()
       throws IOException, AuthenticationException {
 
     // Creates node manager with config without limit set
@@ -2071,10 +2071,9 @@ public class TestSCMNodeManager {
       // Registers datanode with healthy volumes
       DatanodeDetails dn = registerWithCapacity(nodeManager);
 
-      // Calls pipelineLimit() and verifies returns 2
+      // Calls pipelineLimit() and verifies returns default value
       int limit = nodeManager.pipelineLimit(dn);
       assertEquals(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT, limit);
-      assertEquals(2, limit);
     }
   }
 
