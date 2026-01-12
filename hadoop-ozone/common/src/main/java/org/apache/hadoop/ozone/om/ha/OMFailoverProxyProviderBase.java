@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.ha;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.protobuf.ServiceException;
 import java.io.Closeable;
 import java.io.IOException;
@@ -51,6 +50,7 @@ import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
+import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -122,12 +122,6 @@ public abstract class OMFailoverProxyProviderBase<T> implements
         OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT);
 
     initOmProxiesFromConfigs(conf, omServiceId);
-    Objects.requireNonNull(omProxies, "omProxies == null");
-    Objects.requireNonNull(omNodesInOrder, "omNodesInOrder == null");
-    Preconditions.checkState(omProxies.size() == omNodesInOrder.size(), 
-        "omProxies and omNodesInOrder should have the same size");
-    Preconditions.checkState(omProxies.keySet().equals(new HashSet<>(omNodesInOrder)),
-        "the OM node IDs of omProxies keys should be the same as omNodesInOrder");
 
     nextProxyIndex = 0;
     nextProxyOMNodeId = omNodesInOrder.get(nextProxyIndex);
@@ -474,9 +468,9 @@ public abstract class OMFailoverProxyProviderBase<T> implements
   protected synchronized void initOmProxies(Map<String, OMProxyInfo<T>> omProxyMap, List<String> omNodesInOrderList) {
     Objects.requireNonNull(omProxyMap, "omProxyMap == null");
     Objects.requireNonNull(omProxyMap, "omNodesInOrderList == null");
-    Preconditions.checkState(omProxyMap.size() == omNodesInOrderList.size(),
+    Preconditions.assertSame(omProxyMap.size(), omNodesInOrderList.size(),
         "omProxyMap and omNodesInOrderList should have the same size");
-    Preconditions.checkState(omProxyMap.keySet().equals(new HashSet<>(omNodesInOrderList)),
+    Preconditions.assertEquals(omProxyMap.keySet(), new HashSet<>(omNodesInOrderList),
         "the OM node IDs of omProxies keys should be the same as omNodesInOrder");
     this.omProxies = omProxyMap;
     this.omNodesInOrder = Collections.unmodifiableList(omNodesInOrderList);

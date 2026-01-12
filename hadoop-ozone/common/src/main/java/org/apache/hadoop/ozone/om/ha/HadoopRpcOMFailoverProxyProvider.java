@@ -116,25 +116,24 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
    */
   @Override
   public synchronized ProxyInfo<T> getProxy() {
-    ProxyInfo<T> current = getOMProxyMap().get(getCurrentProxyOMNodeId());
+    OMProxyInfo<T> current = getOMProxyMap().get(getCurrentProxyOMNodeId());
     return createOMProxyIfNeeded(current);
   }
 
   /**
    * Creates proxy object.
    */
-  protected ProxyInfo<T> createOMProxyIfNeeded(ProxyInfo<T> pi) {
-    if (pi.proxy == null) {
-      OMProxyInfo<T> omProxyInfo = (OMProxyInfo<T>) pi;
+  protected ProxyInfo<T> createOMProxyIfNeeded(OMProxyInfo<T> omProxyInfo) {
+    if (omProxyInfo.proxy == null) {
       try {
-        pi.proxy = createOMProxy(omProxyInfo.getAddress());
+        omProxyInfo.proxy = createOMProxy(omProxyInfo.getAddress());
       } catch (IOException ioe) {
         LOG.error("{} Failed to create RPC proxy to OM at {}",
             this.getClass().getSimpleName(), omProxyInfo.getAddress(), ioe);
         throw new RuntimeException(ioe);
       }
     }
-    return pi;
+    return omProxyInfo;
   }
 
   public Text getCurrentProxyDelegationToken() {

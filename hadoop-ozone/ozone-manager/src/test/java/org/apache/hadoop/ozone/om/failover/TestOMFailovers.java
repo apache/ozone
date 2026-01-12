@@ -112,12 +112,12 @@ public class TestOMFailovers {
     }
 
     @Override
-    protected ProxyInfo<OzoneManagerProtocolPB> createOMProxyIfNeeded(ProxyInfo<OzoneManagerProtocolPB> pi) {
-      if (pi.proxy == null) {
-        OMProxyInfo<OzoneManagerProtocolPB> omProxyInfo = (OMProxyInfo<OzoneManagerProtocolPB>) pi;
-        pi.proxy = new MockOzoneManagerProtocol(omProxyInfo.getNodeId(), testException);
+    protected ProxyInfo<OzoneManagerProtocolPB> createOMProxyIfNeeded(
+        OMProxyInfo<OzoneManagerProtocolPB> omProxyInfo) {
+      if (omProxyInfo.proxy == null) {
+        omProxyInfo.proxy = new MockOzoneManagerProtocol(omProxyInfo.getNodeId(), testException);
       }
-      return pi;
+      return omProxyInfo;
     }
 
     @Override
