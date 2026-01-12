@@ -236,7 +236,7 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
   public boolean reprocessWithFSO(OMMetadataManager omMetadataManager) {
     // We run reprocess in two phases with separate flushers so that directory
     // skeletons are fully persisted before file updates rely on them.
-    final int queueCapacity = maxWorkers * 2;
+    final int queueCapacity = maxWorkers * 10;
 
     try (NSSummaryAsyncFlusher dirFlusher =
              NSSummaryAsyncFlusher.create(getReconNamespaceSummaryManager(),
