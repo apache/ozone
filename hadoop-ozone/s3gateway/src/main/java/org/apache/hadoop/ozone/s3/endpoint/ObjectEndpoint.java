@@ -74,14 +74,14 @@ import java.text.ParseException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
-import javax.annotation.PostConstruct;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
-import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.HEAD;
 import javax.ws.rs.HeaderParam;
@@ -90,7 +90,6 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
-import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.MultivaluedMap;
@@ -124,6 +123,7 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
+import org.apache.hadoop.ozone.s3.MultiDigestInputStream;
 import org.apache.hadoop.ozone.s3.SignedChunksInputStream;
 import org.apache.hadoop.ozone.s3.UnsignedChunksInputStream;
 import org.apache.hadoop.ozone.s3.endpoint.S3Tagging.Tag;
@@ -139,6 +139,7 @@ import org.apache.hadoop.ozone.s3.util.S3Utils;
 import org.apache.hadoop.ozone.web.utils.OzoneUtils;
 import org.apache.hadoop.util.Time;
 import org.apache.http.HttpStatus;
+import org.apache.ratis.util.function.CheckedRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -155,6 +156,7 @@ public class ObjectEndpoint extends EndpointBase {
       LoggerFactory.getLogger(ObjectEndpoint.class);
 
   private static final ThreadLocal<MessageDigest> E_TAG_PROVIDER;
+  private static final ThreadLocal<MessageDigest> SHA_256_PROVIDER;
 
   static {
     E_TAG_PROVIDER = ThreadLocal.withInitial(() -> {
@@ -164,11 +166,19 @@ public class ObjectEndpoint extends EndpointBase {
         throw new RuntimeException(e);
       }
     });
+
+    SHA_256_PROVIDER = ThreadLocal.withInitial(() -> {
+      try {
+        return MessageDigest.getInstance(OzoneConsts.FILE_HASH);
+      } catch (NoSuchAlgorithmException e) {
+        throw new RuntimeException(e);
+      }
+    });
   }
 
   /*FOR the feature Overriding Response Header
   https://docs.aws.amazon.com/de_de/AmazonS3/latest/API/API_GetObject.html */
-  private Map<String, String> overrideQueryParameter;
+  private final Map<String, String> overrideQueryParameter;
   private int bufferSize;
   private int chunkSize;
   private boolean datastreamEnabled;
@@ -186,8 +196,7 @@ public class ObjectEndpoint extends EndpointBase {
   }
 
   @Override
-  @PostConstruct
-  public void init() {
+  protected void init() {
     bufferSize = (int) getOzoneConfiguration().getStorageSize(
         OZONE_S3G_CLIENT_BUFFER_SIZE_KEY,
         OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT, StorageUnit.BYTES);
@@ -209,24 +218,24 @@ public class ObjectEndpoint extends EndpointBase {
    * See: https://docs.aws.amazon.com/AmazonS3/latest/API/RESTObjectPUT.html for
    * more details.
    */
-  @SuppressWarnings({"checkstyle:MethodLength", "checkstyle:ParameterNumber"})
+  @SuppressWarnings("checkstyle:MethodLength")
   @PUT
   public Response put(
       @PathParam(BUCKET) String bucketName,
       @PathParam(PATH) String keyPath,
       @HeaderParam(HttpHeaders.CONTENT_LENGTH) long length,
-      @QueryParam(QueryParams.PART_NUMBER)  int partNumber,
-      @QueryParam(QueryParams.UPLOAD_ID) @DefaultValue("") String uploadID,
-      @QueryParam(QueryParams.TAGGING) String taggingMarker,
-      @QueryParam(QueryParams.ACL) String aclMarker,
-      final InputStream body) throws IOException, OS3Exception {
+      final InputStream body
+  ) throws IOException, OS3Exception {
+    final String aclMarker = queryParams().get(QueryParams.ACL);
+    final String taggingMarker = queryParams().get(QueryParams.TAGGING);
+    final String uploadID = queryParams().get(QueryParams.UPLOAD_ID);
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.CREATE_KEY;
     boolean auditSuccess = true;
     PerformanceStringBuilder perf = new PerformanceStringBuilder();
 
-    String copyHeader = null, storageType = null, storageConfig = null;
-    DigestInputStream digestInputStream = null;
+    String copyHeader = null;
+    MultiDigestInputStream multiDigestInputStream = null;
     try {
       if (aclMarker != null) {
         s3GAction = S3GAction.PUT_OBJECT_ACL;
@@ -248,17 +257,13 @@ public class ObjectEndpoint extends EndpointBase {
         }
         // If uploadID is specified, it is a request for upload part
         return createMultipartKey(volume, bucket, keyPath, length,
-            partNumber, uploadID, body, perf);
+            body, perf);
       }
 
       copyHeader = getHeaders().getHeaderString(COPY_SOURCE_HEADER);
-      storageType = getHeaders().getHeaderString(STORAGE_CLASS_HEADER);
-      storageConfig = getHeaders().getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + STORAGE_CONFIG_HEADER);
-      boolean storageTypeDefault = StringUtils.isEmpty(storageType);
 
       // Normal put object
-      ReplicationConfig replicationConfig =
-          getReplicationConfig(bucket, storageType, storageConfig);
+      ReplicationConfig replicationConfig = getReplicationConfig(bucket);
 
       boolean enableEC = false;
       if ((replicationConfig != null &&
@@ -271,8 +276,7 @@ public class ObjectEndpoint extends EndpointBase {
         //Copy object, as copy source available.
         s3GAction = S3GAction.COPY_OBJECT;
         CopyObjectResponse copyObjectResponse = copyObject(volume,
-            copyHeader, bucketName, keyPath, replicationConfig,
-            storageTypeDefault, perf);
+            bucketName, keyPath, replicationConfig, perf);
         return Response.status(Status.OK).entity(copyObjectResponse).header(
             "Connection", "close").build();
       }
@@ -302,7 +306,7 @@ public class ObjectEndpoint extends EndpointBase {
       // Normal put object
       S3ChunkInputStreamInfo chunkInputStreamInfo = getS3ChunkInputStreamInfo(body,
           length, amzDecodedLength, keyPath);
-      digestInputStream = chunkInputStreamInfo.getDigestInputStream();
+      multiDigestInputStream = chunkInputStreamInfo.getMultiDigestInputStream();
       length = chunkInputStreamInfo.getEffectiveLength();
 
       Map<String, String> customMetadata =
@@ -315,22 +319,37 @@ public class ObjectEndpoint extends EndpointBase {
         perf.appendStreamMode();
         Pair<String, Long> keyWriteResult = ObjectEndpointStreaming
             .put(bucket, keyPath, length, replicationConfig, chunkSize,
-                customMetadata, tags, digestInputStream, perf);
+                customMetadata, tags, multiDigestInputStream, getHeaders(), signatureInfo.isSignPayload(), perf);
         eTag = keyWriteResult.getKey();
         putLength = keyWriteResult.getValue();
       } else {
+        final String amzContentSha256Header =
+            validateSignatureHeader(getHeaders(), keyPath, signatureInfo.isSignPayload());
         try (OzoneOutputStream output = getClientProtocol().createKey(
             volume.getName(), bucketName, keyPath, length, replicationConfig,
             customMetadata, tags)) {
           long metadataLatencyNs =
               getMetrics().updatePutKeyMetadataStats(startNanos);
           perf.appendMetaLatencyNanos(metadataLatencyNs);
-          putLength = IOUtils.copyLarge(digestInputStream, output, 0, length,
+          putLength = IOUtils.copyLarge(multiDigestInputStream, output, 0, length,
               new byte[getIOBufferSize(length)]);
           eTag = DatatypeConverter.printHexBinary(
-                  digestInputStream.getMessageDigest().digest())
+                  multiDigestInputStream.getMessageDigest(OzoneConsts.MD5_HASH).digest())
               .toLowerCase();
           output.getMetadata().put(OzoneConsts.ETAG, eTag);
+
+          // If sha256Digest exists, this request must validate x-amz-content-sha256
+          MessageDigest sha256Digest = multiDigestInputStream.getMessageDigest(OzoneConsts.FILE_HASH);
+          if (sha256Digest != null) {
+            final String actualSha256 = DatatypeConverter.printHexBinary(
+                sha256Digest.digest()).toLowerCase();
+            CheckedRunnable<IOException> preCommit = () -> {
+              if (!amzContentSha256Header.equals(actualSha256)) {
+                throw S3ErrorTable.newError(S3ErrorTable.X_AMZ_CONTENT_SHA256_MISMATCH, keyPath);
+              }
+            };
+            output.getKeyOutputStream().setPreCommits(Collections.singletonList(preCommit));
+          }
         }
       }
       getMetrics().incPutKeySuccessLength(putLength);
@@ -383,8 +402,8 @@ public class ObjectEndpoint extends EndpointBase {
     } finally {
       // Reset the thread-local message digest instance in case of exception
       // and MessageDigest#digest is never called
-      if (digestInputStream != null) {
-        digestInputStream.getMessageDigest().reset();
+      if (multiDigestInputStream != null) {
+        multiDigestInputStream.resetDigests();
       }
       if (auditSuccess) {
         long opLatencyNs = getMetrics().updateCreateKeySuccessStats(startNanos);
@@ -403,17 +422,18 @@ public class ObjectEndpoint extends EndpointBase {
    * https://docs.aws.amazon.com/AmazonS3/latest/API/mpUploadListParts.html
    * for more details.
    */
-  @SuppressWarnings({"checkstyle:MethodLength", "checkstyle:ParameterNumber"})
+  @SuppressWarnings("checkstyle:MethodLength")
   @GET
   public Response get(
       @PathParam(BUCKET) String bucketName,
-      @PathParam(PATH) String keyPath,
-      @QueryParam(QueryParams.PART_NUMBER) int partNumber,
-      @QueryParam(QueryParams.UPLOAD_ID) String uploadId,
-      @QueryParam(QueryParams.MAX_PARTS) @DefaultValue("1000") int maxParts,
-      @QueryParam(QueryParams.PART_NUMBER_MARKER) String partNumberMarker,
-      @QueryParam(QueryParams.TAGGING) String taggingMarker)
-      throws IOException, OS3Exception {
+      @PathParam(PATH) String keyPath
+  ) throws IOException, OS3Exception {
+    final int maxParts = queryParams().getInt(QueryParams.MAX_PARTS, 1000);
+    final int partNumber = queryParams().getInt(QueryParams.PART_NUMBER, 0);
+    final String partNumberMarker = queryParams().get(QueryParams.PART_NUMBER_MARKER);
+    final String taggingMarker = queryParams().get(QueryParams.TAGGING);
+    final String uploadId = queryParams().get(QueryParams.UPLOAD_ID);
+
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.GET_KEY;
     PerformanceStringBuilder perf = new PerformanceStringBuilder();
@@ -720,10 +740,11 @@ public class ObjectEndpoint extends EndpointBase {
   @SuppressWarnings("emptyblock")
   public Response delete(
       @PathParam(BUCKET) String bucketName,
-      @PathParam(PATH) String keyPath,
-      @QueryParam(QueryParams.UPLOAD_ID) @DefaultValue("") String uploadId,
-      @QueryParam(QueryParams.TAGGING) String taggingMarker) throws
-      IOException, OS3Exception {
+      @PathParam(PATH) String keyPath
+  ) throws IOException, OS3Exception {
+    final String taggingMarker = queryParams().get(QueryParams.TAGGING);
+    final String uploadId = queryParams().get(QueryParams.UPLOAD_ID);
+
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.DELETE_KEY;
 
@@ -798,24 +819,20 @@ public class ObjectEndpoint extends EndpointBase {
   public Response initializeMultipartUpload(
       @PathParam(BUCKET) String bucket,
       @PathParam(PATH) String key
-  )
-      throws IOException, OS3Exception {
+  ) throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.INIT_MULTIPART_UPLOAD;
 
     try {
       OzoneBucket ozoneBucket = getBucket(bucket);
       S3Owner.verifyBucketOwnerCondition(getHeaders(), bucket, ozoneBucket.getOwner());
-      String storageType = getHeaders().getHeaderString(STORAGE_CLASS_HEADER);
-      String storageConfig = getHeaders().getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + STORAGE_CONFIG_HEADER);
 
       Map<String, String> customMetadata =
           getCustomMetadataFromHeaders(getHeaders().getRequestHeaders());
 
       Map<String, String> tags = getTaggingFromHeaders(getHeaders());
 
-      ReplicationConfig replicationConfig =
-          getReplicationConfig(ozoneBucket, storageType, storageConfig);
+      ReplicationConfig replicationConfig = getReplicationConfig(ozoneBucket);
 
       OmMultipartInfo multipartInfo =
           ozoneBucket.initiateMultipartUpload(key, replicationConfig, customMetadata, tags);
@@ -845,8 +862,9 @@ public class ObjectEndpoint extends EndpointBase {
     }
   }
 
-  private ReplicationConfig getReplicationConfig(OzoneBucket ozoneBucket,
-      String storageType, String storageConfig) throws OS3Exception {
+  private ReplicationConfig getReplicationConfig(OzoneBucket ozoneBucket) throws OS3Exception {
+    String storageType = getHeaders().getHeaderString(STORAGE_CLASS_HEADER);
+    String storageConfig = getHeaders().getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + STORAGE_CONFIG_HEADER);
 
     ReplicationConfig clientConfiguredReplicationConfig =
         OzoneClientUtils.getClientConfiguredReplicationConfig(getOzoneConfiguration());
@@ -863,9 +881,9 @@ public class ObjectEndpoint extends EndpointBase {
   public Response completeMultipartUpload(
       @PathParam(BUCKET) String bucket,
       @PathParam(PATH) String key,
-      @QueryParam(QueryParams.UPLOAD_ID) @DefaultValue("") String uploadID,
-      CompleteMultipartUploadRequest multipartUploadRequest)
-      throws IOException, OS3Exception {
+      CompleteMultipartUploadRequest multipartUploadRequest
+  ) throws IOException, OS3Exception {
+    final String uploadID = queryParams().get(QueryParams.UPLOAD_ID, "");
     long startNanos = Time.monotonicNowNanos();
     S3GAction s3GAction = S3GAction.COMPLETE_MULTIPART_UPLOAD;
     OzoneVolume volume = getVolume();
@@ -934,27 +952,26 @@ public class ObjectEndpoint extends EndpointBase {
     }
   }
 
-  @SuppressWarnings({"checkstyle:MethodLength", "checkstyle:ParameterNumber"})
+  @SuppressWarnings("checkstyle:MethodLength")
   private Response createMultipartKey(OzoneVolume volume, OzoneBucket ozoneBucket,
-      String key, long length, int partNumber, String uploadID,
+      String key, long length,
       final InputStream body, PerformanceStringBuilder perf)
       throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
+    final String uploadID = queryParams().get(QueryParams.UPLOAD_ID);
+    final int partNumber = queryParams().getInt(QueryParams.PART_NUMBER, 0);
     String copyHeader = null;
-    DigestInputStream digestInputStream = null;
+    MultiDigestInputStream multiDigestInputStream = null;
     final String bucketName = ozoneBucket.getName();
     try {
       String amzDecodedLength = getHeaders().getHeaderString(DECODED_CONTENT_LENGTH_HEADER);
       S3ChunkInputStreamInfo chunkInputStreamInfo = getS3ChunkInputStreamInfo(
           body, length, amzDecodedLength, key);
-      digestInputStream = chunkInputStreamInfo.getDigestInputStream();
+      multiDigestInputStream = chunkInputStreamInfo.getMultiDigestInputStream();
       length = chunkInputStreamInfo.getEffectiveLength();
 
       copyHeader = getHeaders().getHeaderString(COPY_SOURCE_HEADER);
-      String storageType = getHeaders().getHeaderString(STORAGE_CLASS_HEADER);
-      String storageConfig = getHeaders().getHeaderString(CUSTOM_METADATA_HEADER_PREFIX + STORAGE_CONFIG_HEADER);
-      ReplicationConfig replicationConfig =
-          getReplicationConfig(ozoneBucket, storageType, storageConfig);
+      ReplicationConfig replicationConfig = getReplicationConfig(ozoneBucket);
 
       boolean enableEC = false;
       if ((replicationConfig != null &&
@@ -967,7 +984,7 @@ public class ObjectEndpoint extends EndpointBase {
         perf.appendStreamMode();
         return ObjectEndpointStreaming
             .createMultipartKey(ozoneBucket, key, length, partNumber,
-                uploadID, chunkSize, digestInputStream, perf);
+                uploadID, chunkSize, multiDigestInputStream, perf);
       }
       // OmMultipartCommitUploadPartInfo can only be gotten after the
       // OzoneOutputStream is closed, so we need to save the OzoneOutputStream
@@ -1044,9 +1061,9 @@ public class ObjectEndpoint extends EndpointBase {
                 partNumber, uploadID)) {
           metadataLatencyNs =
               getMetrics().updatePutKeyMetadataStats(startNanos);
-          putLength = IOUtils.copyLarge(digestInputStream, ozoneOutputStream, 0, length,
+          putLength = IOUtils.copyLarge(multiDigestInputStream, ozoneOutputStream, 0, length,
               new byte[getIOBufferSize(length)]);
-          byte[] digest = digestInputStream.getMessageDigest().digest();
+          byte[] digest = multiDigestInputStream.getMessageDigest(OzoneConsts.MD5_HASH).digest();
           ozoneOutputStream.getMetadata()
               .put(OzoneConsts.ETAG, DatatypeConverter.printHexBinary(digest).toLowerCase());
           outputStream = ozoneOutputStream;
@@ -1095,8 +1112,8 @@ public class ObjectEndpoint extends EndpointBase {
     } finally {
       // Reset the thread-local message digest instance in case of exception
       // and MessageDigest#digest is never called
-      if (digestInputStream != null) {
-        digestInputStream.getMessageDigest().reset();
+      if (multiDigestInputStream != null) {
+        multiDigestInputStream.resetDigests();
       }
     }
   }
@@ -1199,12 +1216,14 @@ public class ObjectEndpoint extends EndpointBase {
     perf.appendSizeBytes(copyLength);
   }
 
-  @SuppressWarnings("checkstyle:ParameterNumber")
   private CopyObjectResponse copyObject(OzoneVolume volume,
-      String copyHeader, String destBucket, String destkey,
-      ReplicationConfig replicationConfig, boolean storageTypeDefault,
+      String destBucket, String destkey, ReplicationConfig replicationConfig,
       PerformanceStringBuilder perf)
       throws OS3Exception, IOException {
+    String copyHeader = getHeaders().getHeaderString(COPY_SOURCE_HEADER);
+    String storageType = getHeaders().getHeaderString(STORAGE_CLASS_HEADER);
+    boolean storageTypeDefault = StringUtils.isEmpty(storageType);
+
     long startNanos = Time.monotonicNowNanos();
     Pair<String, String> result = parseSourceHeader(copyHeader);
 
@@ -1475,6 +1494,11 @@ public class ObjectEndpoint extends EndpointBase {
     return E_TAG_PROVIDER.get();
   }
 
+  @VisibleForTesting
+  public MessageDigest getSha256DigestInstance() {
+    return SHA_256_PROVIDER.get();
+  }
+
   private String extractPartsCount(String eTag) {
     if (eTag.contains("-")) {
       String[] parts = eTag.replace("\"", "").split("-");
@@ -1524,23 +1548,30 @@ public class ObjectEndpoint extends EndpointBase {
       effectiveLength = contentLength;
     }
 
-    // DigestInputStream is used for ETag calculation
-    DigestInputStream digestInputStream = new DigestInputStream(chunkInputStream, getMessageDigestInstance());
-    return new S3ChunkInputStreamInfo(digestInputStream, effectiveLength);
+    // MessageDigest is used for ETag calculation
+    // and Sha256Digest is used for "x-amz-content-sha256" header verification
+    List<MessageDigest> digests = new ArrayList<>();
+    digests.add(getMessageDigestInstance());
+    if (!hasUnsignedPayload(amzContentSha256Header) && !hasMultiChunksPayload(amzContentSha256Header)) {
+      digests.add(getSha256DigestInstance());
+    }
+    MultiDigestInputStream multiDigestInputStream =
+        new MultiDigestInputStream(chunkInputStream, digests);
+    return new S3ChunkInputStreamInfo(multiDigestInputStream, effectiveLength);
   }
 
   @Immutable
   static final class S3ChunkInputStreamInfo {
-    private final DigestInputStream digestInputStream;
+    private final MultiDigestInputStream multiDigestInputStream;
     private final long effectiveLength;
 
-    S3ChunkInputStreamInfo(DigestInputStream digestInputStream, long effectiveLength) {
-      this.digestInputStream = digestInputStream;
+    S3ChunkInputStreamInfo(MultiDigestInputStream multiDigestInputStream, long effectiveLength) {
+      this.multiDigestInputStream = multiDigestInputStream;
       this.effectiveLength = effectiveLength;
     }
 
-    public DigestInputStream getDigestInputStream() {
-      return digestInputStream;
+    public MultiDigestInputStream getMultiDigestInputStream() {
+      return multiDigestInputStream;
     }
 
     public long getEffectiveLength() {

@@ -24,7 +24,6 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
@@ -73,7 +72,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
   private final RequestHandler handler;
   private final OzoneManager ozoneManager;
   private final OzoneProtocolMessageDispatcher<OMRequest, OMResponse,
-      ProtocolMessageEnum> dispatcher;
+      OzoneManagerProtocolProtos.Type> dispatcher;
   private final RequestValidations requestValidations;
   private final OMPerformanceMetrics perfMetrics;
 
@@ -87,7 +86,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
   public OzoneManagerProtocolServerSideTranslatorPB(
       OzoneManager impl,
       OzoneManagerRatisServer ratisServer,
-      ProtocolMessageMetrics<ProtocolMessageEnum> metrics) {
+      ProtocolMessageMetrics<OzoneManagerProtocolProtos.Type> metrics) {
     this.ozoneManager = impl;
     this.perfMetrics = impl.getPerfMetrics();
 

@@ -26,10 +26,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.primitives.UnsignedBytes;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -38,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
+import org.apache.hadoop.hdds.StringUtils;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -45,7 +48,7 @@ import org.junit.jupiter.api.Test;
  */
 class TestMinHeapMergeIterator {
 
-  private static final Comparator<String> STRING_COMPARATOR = String::compareTo;
+  private static final Comparator<byte[]> BYTE_COMPARATOR = UnsignedBytes.lexicographicalComparator();
 
   /**
    * A closeable iterator which tracks close() calls.
@@ -87,8 +90,8 @@ class TestMinHeapMergeIterator {
     private final String key;
     private final Set<Integer> sources;
 
-    private MergeResult(String key, Set<Integer> sources) {
-      this.key = key;
+    private MergeResult(byte[] key, Set<Integer> sources) {
+      this.key = StringUtils.bytes2String(key);
       this.sources = sources;
     }
 
@@ -104,17 +107,17 @@ class TestMinHeapMergeIterator {
   /**
    * Concrete implementation for tests.
    */
-  private static final class TestIterator extends MinHeapMergeIterator<String,
-      TrackingCloseableIterator<String>, MergeResult> {
+  private static final class TestIterator extends MinHeapMergeIterator<byte[],
+      TrackingCloseableIterator<byte[]>, MergeResult> {
 
-    private final List<TrackingCloseableIterator<String>> itrs;
+    private final List<TrackingCloseableIterator<byte[]>> itrs;
     private final List<MergeResult> merged = new ArrayList<>();
 
     private IOException ioExceptionAtIndex;
     private int exceptionIndex = -1;
 
-    private TestIterator(List<TrackingCloseableIterator<String>> itrs) {
-      super(itrs.size(), STRING_COMPARATOR);
+    private TestIterator(List<TrackingCloseableIterator<byte[]>> itrs) {
+      super(itrs.size(), BYTE_COMPARATOR);
       this.itrs = itrs;
     }
 
@@ -125,7 +128,7 @@ class TestMinHeapMergeIterator {
     }
 
     @Override
-    protected TrackingCloseableIterator<String> getIterator(int idx)
+    protected TrackingCloseableIterator<byte[]> getIterator(int idx)
         throws IOException {
       if (idx == exceptionIndex) {
         if (ioExceptionAtIndex != null) {
@@ -136,9 +139,9 @@ class TestMinHeapMergeIterator {
     }
 
     @Override
-    protected MergeResult merge(Map<Integer, String> keysToMerge) {
+    protected MergeResult merge(Map<Integer, byte[]> keysToMerge) {
       // All values in keysToMerge are expected to be equal (same key across iterators).
-      String key = keysToMerge.values().iterator().next();
+      byte[] key = keysToMerge.values().iterator().next();
       MergeResult r = new MergeResult(key, new HashSet<>(keysToMerge.keySet()));
       merged.add(r);
       return r;
@@ -149,14 +152,18 @@ class TestMinHeapMergeIterator {
     }
   }
 
+  private ImmutableList<byte[]> toBytesList(String... keys) {
+    return Arrays.stream(keys).map(StringUtils::string2Bytes).collect(ImmutableList.toImmutableList());
+  }
+
   @Test
   void testMergedOrderAndDuplicateGroupingAndAutoCloseOnExhaustion() {
-    TrackingCloseableIterator<String> itr0 =
-        new TrackingCloseableIterator<>(ImmutableList.of("a", "c", "e", "g"));
-    TrackingCloseableIterator<String> itr1 =
-        new TrackingCloseableIterator<>(ImmutableList.of("b", "c", "d", "g", "h"));
-    TrackingCloseableIterator<String> itr2 =
-        new TrackingCloseableIterator<>(ImmutableList.of("c", "e", "f", "h"));
+    TrackingCloseableIterator<byte[]> itr0 =
+        new TrackingCloseableIterator<>(toBytesList("a", "c", "e", "g"));
+    TrackingCloseableIterator<byte[]> itr1 =
+        new TrackingCloseableIterator<>(toBytesList("b", "c", "d", "g", "h"));
+    TrackingCloseableIterator<byte[]> itr2 =
+        new TrackingCloseableIterator<>(toBytesList("c", "e", "f", "h"));
 
     List<String> keys = new ArrayList<>();
     try (TestIterator mergeItr = new TestIterator(ImmutableList.of(itr0, itr1, itr2))) {
@@ -195,10 +202,10 @@ class TestMinHeapMergeIterator {
 
   @Test
   void testInitClosesEmptyIterators() {
-    TrackingCloseableIterator<String> empty =
+    TrackingCloseableIterator<byte[]> empty =
         new TrackingCloseableIterator<>(Collections.emptyList());
-    TrackingCloseableIterator<String> nonEmpty =
-        new TrackingCloseableIterator<>(ImmutableList.of("a"));
+    TrackingCloseableIterator<byte[]> nonEmpty =
+        new TrackingCloseableIterator<>(toBytesList("a"));
 
     try (TestIterator mergeItr = new TestIterator(ImmutableList.of(empty, nonEmpty))) {
       assertTrue(mergeItr.hasNext()); // triggers init
@@ -212,10 +219,10 @@ class TestMinHeapMergeIterator {
 
   @Test
   void testCloseClosesAllIterators() {
-    TrackingCloseableIterator<String> itr0 =
-        new TrackingCloseableIterator<>(ImmutableList.of("a", "c"));
-    TrackingCloseableIterator<String> itr1 =
-        new TrackingCloseableIterator<>(ImmutableList.of("b", "d"));
+    TrackingCloseableIterator<byte[]> itr0 =
+        new TrackingCloseableIterator<>(toBytesList("a", "c"));
+    TrackingCloseableIterator<byte[]> itr1 =
+        new TrackingCloseableIterator<>(toBytesList("b", "d"));
 
     try (TestIterator mergeItr = new TestIterator(ImmutableList.of(itr0, itr1))) {
       assertTrue(mergeItr.hasNext()); // triggers init
@@ -233,10 +240,10 @@ class TestMinHeapMergeIterator {
   @Test
   void testHasNextWrapsIOExceptionFromGetIterator() {
     IOException expected = new IOException("boom");
-    TrackingCloseableIterator<String> itr0 =
-        new TrackingCloseableIterator<>(ImmutableList.of("a"));
-    TrackingCloseableIterator<String> itr1 =
-        new TrackingCloseableIterator<>(ImmutableList.of("b"));
+    TrackingCloseableIterator<byte[]> itr0 =
+        new TrackingCloseableIterator<>(toBytesList("a"));
+    TrackingCloseableIterator<byte[]> itr1 =
+        new TrackingCloseableIterator<>(toBytesList("b"));
     TestIterator mergeItr = new TestIterator(ImmutableList.of(itr0, itr1));
     mergeItr.withGetIteratorIOException(1, expected);
     try (TestIterator ignored = mergeItr) {
@@ -253,10 +260,10 @@ class TestMinHeapMergeIterator {
 
   @Test
   void testHasNextWrapsRocksDBExceptionFromGetIteratorAndClosesOpenedIterators() throws Exception {
-    TrackingCloseableIterator<String> itr0 =
-        new TrackingCloseableIterator<>(ImmutableList.of("a", "b"));
-    TrackingCloseableIterator<String> itr1 =
-        new TrackingCloseableIterator<>(ImmutableList.of("c"));
+    TrackingCloseableIterator<byte[]> itr0 =
+        new TrackingCloseableIterator<>(toBytesList("a", "b"));
+    TrackingCloseableIterator<byte[]> itr1 =
+        new TrackingCloseableIterator<>(toBytesList("c"));
     RocksDatabaseException rdbEx = new RocksDatabaseException("rocks");
     TestIterator mergeItr = new TestIterator(ImmutableList.of(itr0, itr1));
     mergeItr.withGetIteratorIOException(1, rdbEx);
@@ -275,7 +282,7 @@ class TestMinHeapMergeIterator {
 
   @Test
   void testNextWhenEmptyThrowsNoSuchElement() {
-    TrackingCloseableIterator<String> empty =
+    TrackingCloseableIterator<byte[]> empty =
         new TrackingCloseableIterator<>(Collections.emptyList());
     try (TestIterator mergeItr = new TestIterator(ImmutableList.of(empty))) {
       assertFalse(mergeItr.hasNext());

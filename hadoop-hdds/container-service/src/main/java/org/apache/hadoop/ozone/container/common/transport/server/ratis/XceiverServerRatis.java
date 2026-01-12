@@ -130,9 +130,6 @@ public final class XceiverServerRatis implements XceiverServerSpi {
   private int adminPort;
   private int clientPort;
 
-  // TODO: https://issues.apache.org/jira/browse/HDDS-13558
-  @SuppressWarnings("PMD.SingularField")
-  private int dataStreamPort;
   private final RaftServer server;
   private final String name;
   private final List<ThreadPoolExecutor> chunkExecutors;
@@ -247,18 +244,19 @@ public final class XceiverServerRatis implements XceiverServerSpi {
 
   private void setUpRatisStream(RaftProperties properties) {
     // set the datastream config
+    final int requestedPort;
     if (conf.getBoolean(
         OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT,
         OzoneConfigKeys.
             HDDS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT_DEFAULT)) {
-      dataStreamPort = 0;
+      requestedPort = 0;
     } else {
-      dataStreamPort = conf.getInt(
+      requestedPort = conf.getInt(
           OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_PORT,
           OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_PORT_DEFAULT);
     }
     RatisHelper.enableNettyStreaming(properties);
-    NettyConfigKeys.DataStream.setPort(properties, dataStreamPort);
+    NettyConfigKeys.DataStream.setPort(properties, requestedPort);
     int dataStreamAsyncRequestThreadPoolSize =
         ratisServerConfig.getStreamRequestThreads();
     RaftServerConfigKeys.DataStream.setAsyncRequestThreadPoolSize(properties,
@@ -563,23 +561,23 @@ public final class XceiverServerRatis implements XceiverServerSpi {
       server.start();
 
       RaftServerRpc serverRpc = server.getServerRpc();
-      clientPort = getRealPort(serverRpc.getClientServerAddress(),
+      clientPort = updateDatanodePort(serverRpc.getClientServerAddress(),
           Port.Name.RATIS);
-      adminPort = getRealPort(serverRpc.getAdminServerAddress(),
+      adminPort = updateDatanodePort(serverRpc.getAdminServerAddress(),
           Port.Name.RATIS_ADMIN);
-      serverPort = getRealPort(serverRpc.getInetSocketAddress(),
+      serverPort = updateDatanodePort(serverRpc.getInetSocketAddress(),
           Port.Name.RATIS_SERVER);
       if (streamEnable) {
         DataStreamServerRpc dataStreamServerRpc =
             server.getDataStreamServerRpc();
-        dataStreamPort = getRealPort(dataStreamServerRpc.getInetSocketAddress(),
+        updateDatanodePort(dataStreamServerRpc.getInetSocketAddress(),
             Port.Name.RATIS_DATASTREAM);
       }
       isStarted = true;
     }
   }
 
-  private int getRealPort(InetSocketAddress address, Port.Name portName) {
+  private int updateDatanodePort(InetSocketAddress address, Port.Name portName) {
     int realPort = address.getPort();
     final Port port = DatanodeDetails.newPort(portName, realPort);
     datanodeDetails.setPort(port);
