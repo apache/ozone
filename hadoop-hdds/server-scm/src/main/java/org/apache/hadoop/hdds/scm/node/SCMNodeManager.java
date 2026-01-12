@@ -133,7 +133,7 @@ public class SCMNodeManager implements NodeManager {
   private final boolean useHostname;
   private final Map<String, Set<DatanodeID>> dnsToDnIdMap = new ConcurrentHashMap<>();
   private final int numPipelinesPerMetadataVolume;
-  private final int heavyNodeCriteria;
+  private final int datanodePipelineLimit;
   private final HDDSLayoutVersionManager scmLayoutVersionManager;
   private final EventPublisher scmNodeEventPublisher;
   private final SCMContext scmContext;
@@ -194,7 +194,7 @@ public class SCMNodeManager implements NodeManager {
     this.numPipelinesPerMetadataVolume =
         conf.getInt(ScmConfigKeys.OZONE_SCM_PIPELINE_PER_METADATA_VOLUME,
             ScmConfigKeys.OZONE_SCM_PIPELINE_PER_METADATA_VOLUME_DEFAULT);
-    this.heavyNodeCriteria = conf.getInt(
+    this.datanodePipelineLimit = conf.getInt(
         ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT,
         ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT);
     this.scmContext = scmContext;
@@ -1602,8 +1602,8 @@ public class SCMNodeManager implements NodeManager {
   @Override
   public int pipelineLimit(DatanodeDetails dn) {
     try {
-      if (heavyNodeCriteria > 0) {
-        return heavyNodeCriteria;
+      if (datanodePipelineLimit > 0) {
+        return datanodePipelineLimit;
       } else if (nodeStateManager.getNode(dn).getHealthyVolumeCount() > 0) {
         return numPipelinesPerMetadataVolume *
             nodeStateManager.getNode(dn).getMetaDataVolumeCount();
