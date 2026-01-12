@@ -345,7 +345,7 @@ public class TestBlockDataStreamOutput {
       }
 
       String keyName = getKeyName();
-      OzoneDataStreamOutput key = createKey(client, keyName, 0);
+      OzoneDataStreamOutput key = createKey(client, keyName, 1);
       KeyDataStreamOutput keyDataStreamOutput = (KeyDataStreamOutput) key.getByteBufStreamOutput();
       BlockDataStreamOutputEntry stream = keyDataStreamOutput.getStreamEntries().get(0);
 
