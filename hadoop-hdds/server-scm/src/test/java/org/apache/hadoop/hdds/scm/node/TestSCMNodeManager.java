@@ -1487,7 +1487,7 @@ public class TestSCMNodeManager {
    */
   @Test
   public void testScmStatsFromNodeReport()
-      throws IOException, InterruptedException, AuthenticationException {
+      throws IOException, InterruptedException, AuthenticationException, NodeNotFoundException {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000,
         MILLISECONDS);
@@ -1518,7 +1518,10 @@ public class TestSCMNodeManager {
       assertEquals(capacity * nodeCount, (long) nodeManager.getStats().getCapacity().get());
       assertEquals(used * nodeCount, (long) nodeManager.getStats().getScmUsed().get());
       assertEquals(remaining * nodeCount, (long) nodeManager.getStats().getRemaining().get());
-      assertEquals(1, nodeManager.minHealthyVolumeNum(dnList));
+      for (DatanodeDetails dn : dnList) {
+        assertEquals(1,
+            nodeManager.getNodeStateManager().getNode(dn).getHealthyVolumeCount());
+      }
       dnList.clear();
     }
   }
@@ -1576,7 +1579,7 @@ public class TestSCMNodeManager {
    */
   @Test
   public void tesVolumeInfoFromNodeReport()
-      throws IOException, InterruptedException, AuthenticationException {
+      throws IOException, InterruptedException, AuthenticationException, NodeNotFoundException {
     OzoneConfiguration conf = getConf();
     conf.setTimeDuration(OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL, 1000,
         MILLISECONDS);
@@ -1606,7 +1609,8 @@ public class TestSCMNodeManager {
       eventQueue.processAll(8000L);
 
       assertEquals(1, nodeManager.getNodeCount(NodeStatus.inServiceHealthy()));
-      assertEquals(volumeCount / 2, nodeManager.minHealthyVolumeNum(dnList));
+      assertEquals(volumeCount / 2,
+          nodeManager.getNodeStateManager().getNode(dn).getHealthyVolumeCount());
       dnList.clear();
     }
   }
