@@ -299,26 +299,12 @@ public final class RocksDatabase implements Closeable {
       return handle;
     }
 
-    public void batchDelete(ManagedWriteBatch writeBatch, byte[] key)
+    public void batchDelete(ManagedWriteBatch writeBatch, ByteBuffer key)
         throws RocksDatabaseException {
       try (UncheckedAutoCloseable ignored = acquire()) {
         writeBatch.delete(getHandle(), key);
       } catch (RocksDBException e) {
         throw toRocksDatabaseException(this, "batchDelete key " + bytes2String(key), e);
-      }
-    }
-
-    public void batchPut(ManagedWriteBatch writeBatch, byte[] key, byte[] value)
-        throws RocksDatabaseException {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("batchPut array key {}", bytes2String(key));
-        LOG.debug("batchPut array value {}", bytes2String(value));
-      }
-
-      try (UncheckedAutoCloseable ignored = acquire()) {
-        writeBatch.put(getHandle(), key, value);
-      } catch (RocksDBException e) {
-        throw toRocksDatabaseException(this, "batchPut key " + bytes2String(key), e);
       }
     }
 

@@ -3116,9 +3116,9 @@
       Expert only. Ozone RpcClient attempts talking to each OzoneManager
       ipc.client.connect.max.retries (default = 10) number of times before
       failing over to another OzoneManager, if available. This parameter
-      represents the number of times the client will failover before giving
-      up. This value is kept high so that client does not give up trying to
-      connect to OMs easily.
+      represents the number of times per request the client will failover
+      before giving up. This value is kept high so that client does not
+      give up trying to connect to OMs easily.
     </description>
   </property>
   <property>
@@ -4361,7 +4361,7 @@
       recon rocks DB containerKeyTable
     </description>
   </property>
-
+    
   <property>
     <name>ozone.recon.filesizecount.flush.db.max.threshold</name>
     <value>200000</value>

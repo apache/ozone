@@ -127,7 +127,6 @@ public class SCMNodeManager implements NodeManager {
   private final SCMNodeMetrics metrics;
   // Node manager MXBean
   private ObjectName nmInfoBean;
-  private final OzoneConfiguration conf;
   private final SCMStorageConfig scmStorageConfig;
   private final NetworkTopology clusterMap;
   private final Function<String, String> nodeResolver;
@@ -140,6 +139,7 @@ public class SCMNodeManager implements NodeManager {
   private final SCMContext scmContext;
   private final Map<SCMCommandProto.Type,
       BiConsumer<DatanodeDetails, SCMCommand<?>>> sendCommandNotifyMap;
+  private final NonWritableNodeFilter nonWritableNodeFilter;
 
   /**
    * Lock used to synchronize some operation in Node manager to ensure a
@@ -176,7 +176,6 @@ public class SCMNodeManager implements NodeManager {
       SCMContext scmContext,
       HDDSLayoutVersionManager layoutVersionManager,
       Function<String, String> nodeResolver) {
-    this.conf = conf;
     this.scmNodeEventPublisher = eventPublisher;
     this.nodeStateManager = new NodeStateManager(conf, eventPublisher,
         layoutVersionManager, scmContext);
@@ -200,6 +199,7 @@ public class SCMNodeManager implements NodeManager {
         ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT);
     this.scmContext = scmContext;
     this.sendCommandNotifyMap = new HashMap<>();
+    this.nonWritableNodeFilter = new NonWritableNodeFilter(conf);
   }
 
   @Override
@@ -1395,7 +1395,7 @@ public class SCMNodeManager implements NodeManager {
 
   private void nodeNonWritableStatistics(Map<String, String> nodeStatics) {
     int nonWritableNodesCount = (int) getAllNodes().parallelStream()
-        .filter(new NonWritableNodeFilter(conf))
+        .filter(nonWritableNodeFilter)
         .count();
 
     nodeStatics.put("NonWritableNodes", String.valueOf(nonWritableNodesCount));
@@ -1406,7 +1406,6 @@ public class SCMNodeManager implements NodeManager {
     private final long blockSize;
     private final long minRatisVolumeSizeBytes;
     private final long containerSize;
-    private final ConfigurationSource conf;
 
     NonWritableNodeFilter(ConfigurationSource conf) {
       blockSize = (long) conf.getStorageSize(
@@ -1421,13 +1420,12 @@ public class SCMNodeManager implements NodeManager {
           ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
           ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
           StorageUnit.BYTES);
-      this.conf = conf;
     }
 
     @Override
     public boolean test(DatanodeInfo dn) {
       return !dn.getNodeStatus().isNodeWritable()
-          || (!hasEnoughSpace(dn, minRatisVolumeSizeBytes, containerSize, conf)
+          || (!hasEnoughSpace(dn, minRatisVolumeSizeBytes, containerSize)
           && !hasEnoughCommittedVolumeSpace(dn));
     }
 
