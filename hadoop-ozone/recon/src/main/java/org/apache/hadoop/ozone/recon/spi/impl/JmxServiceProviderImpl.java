@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.recon.spi.impl;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HTTP_AUTH_TYPE;
+
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.util.Collections;
@@ -24,11 +26,13 @@ import java.util.List;
 import java.util.Map;
 import javax.inject.Singleton;
 import javax.ws.rs.core.Response;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.metrics.Metric;
 import org.apache.hadoop.ozone.recon.spi.MetricsServiceProvider;
+import org.apache.hadoop.security.SecurityUtil;
 
 /**
  * Implementation of the Jmx Metrics Service provider.
@@ -39,12 +43,14 @@ public class JmxServiceProviderImpl implements MetricsServiceProvider {
   public static final String JMX_INSTANT_QUERY_API = "qry";
   private URLConnectionFactory connectionFactory;
   private final String jmxEndpoint;
+  private final OzoneConfiguration configuration;
   private ReconUtils reconUtils;
 
   public JmxServiceProviderImpl(
       ReconUtils reconUtils,
       String jmxEndpoint,
-      URLConnectionFactory connectionFactory) {
+      URLConnectionFactory connectionFactory,
+      OzoneConfiguration configuration) {
     // Remove the trailing slash from endpoint url.
     if (jmxEndpoint != null && jmxEndpoint.endsWith("/")) {
       jmxEndpoint = jmxEndpoint.substring(0, jmxEndpoint.length() - 1);
@@ -52,6 +58,7 @@ public class JmxServiceProviderImpl implements MetricsServiceProvider {
     this.jmxEndpoint = jmxEndpoint;
     this.reconUtils = reconUtils;
     this.connectionFactory = connectionFactory;
+    this.configuration = configuration;
   }
 
   /**
@@ -69,7 +76,7 @@ public class JmxServiceProviderImpl implements MetricsServiceProvider {
     String url = String.format("%s?%s=%s", jmxEndpoint, api,
         queryString);
     return reconUtils.makeHttpCall(connectionFactory,
-        url, false);
+        url, isKerberosEnabled());
   }
 
   @Override
@@ -100,18 +107,25 @@ public class JmxServiceProviderImpl implements MetricsServiceProvider {
    */
   private List<Map<String, Object>> getMetrics(String api, String queryString)
       throws Exception {
-    HttpURLConnection urlConnection =
-        getMetricsResponse(api, queryString);
-    if (Response.Status.fromStatusCode(urlConnection.getResponseCode())
-        .getFamily() == Response.Status.Family.SUCCESSFUL) {
-      try (InputStream inputStream = urlConnection.getInputStream()) {
-        Map<String, Object> jsonMap = JsonUtils.getDefaultMapper().readValue(inputStream, Map.class);
-        Object beansObj = jsonMap.get("beans");
-        if (beansObj instanceof List) {
-          return (List<Map<String, Object>>) beansObj;
+    return SecurityUtil.doAsLoginUser(() -> {
+      HttpURLConnection urlConnection =
+          getMetricsResponse(api, queryString);
+      if (Response.Status.fromStatusCode(urlConnection.getResponseCode())
+          .getFamily() == Response.Status.Family.SUCCESSFUL) {
+        try (InputStream inputStream = urlConnection.getInputStream()) {
+          Map<String, Object> jsonMap = JsonUtils.getDefaultMapper().readValue(inputStream, Map.class);
+          Object beansObj = jsonMap.get("beans");
+          if (beansObj instanceof List) {
+            return (List<Map<String, Object>>) beansObj;
+          }
         }
       }
-    }
-    return Collections.emptyList();
+      return Collections.emptyList();
+    });
+  }
+
+  private boolean isKerberosEnabled() {
+    return configuration.get(HDDS_DATANODE_HTTP_AUTH_TYPE, "simple")
+        .equals("kerberos");
   }
 }

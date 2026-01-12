@@ -17,13 +17,13 @@
 
 package org.apache.hadoop.hdds.utils;
 
+import java.util.Collections;
+import java.util.EnumMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
-import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.MetricsTag;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
@@ -34,38 +34,40 @@ import org.apache.ratis.util.UncheckedAutoCloseable;
 /**
  * Metrics to count all the subtypes of a specific message.
  */
-public class ProtocolMessageMetrics<KEY> implements MetricsSource {
+public class ProtocolMessageMetrics<KEY extends Enum<KEY>> implements MetricsSource {
 
   private final String name;
 
   private final String description;
 
-  private final Map<KEY, AtomicLong> counters =
-      new ConcurrentHashMap<>();
-
-  private final Map<KEY, AtomicLong> elapsedTimes =
-      new ConcurrentHashMap<>();
+  private final Map<KEY, Stats> stats;
 
   private final AtomicInteger concurrency = new AtomicInteger(0);
 
-  public static <KEY> ProtocolMessageMetrics<KEY> create(String name,
-      String description, KEY[] types) {
-    return new ProtocolMessageMetrics<KEY>(name, description, types);
+  private static final MetricsInfo TYPE_TAG_INFO = Interns.info("type", "Message type");
+  private static final MetricsInfo COUNTER_INFO = Interns.info("counter", "Number of distinct calls");
+  private static final MetricsInfo TIME_INFO = Interns.info("time", "Sum of the duration of the calls");
+  private static final MetricsInfo CONCURRENCY_INFO = Interns.info("concurrency",
+      "Number of requests processed concurrently");
+
+  public static <KEY extends Enum<KEY>> ProtocolMessageMetrics<KEY> create(String name,
+      String description, Class<KEY> enumClass) {
+    return new ProtocolMessageMetrics<>(name, description, enumClass);
   }
 
   public ProtocolMessageMetrics(String name, String description,
-      KEY[] values) {
+      Class<KEY> enumClass) {
     this.name = name;
     this.description = description;
-    for (KEY value : values) {
-      counters.put(value, new AtomicLong(0));
-      elapsedTimes.put(value, new AtomicLong(0));
+    final EnumMap<KEY, Stats> map = new EnumMap<>(enumClass);
+    for (KEY value : enumClass.getEnumConstants()) {
+      map.put(value, new Stats());
     }
+    this.stats = Collections.unmodifiableMap(map);
   }
 
   public void increment(KEY key, long duration) {
-    counters.get(key).incrementAndGet();
-    elapsedTimes.get(key).addAndGet(duration);
+    stats.get(key).add(duration);
   }
 
   public UncheckedAutoCloseable measure(KEY key) {
@@ -73,8 +75,7 @@ public class ProtocolMessageMetrics<KEY> implements MetricsSource {
     concurrency.incrementAndGet();
     return () -> {
       concurrency.decrementAndGet();
-      counters.get(key).incrementAndGet();
-      elapsedTimes.get(key).addAndGet(Time.monotonicNow() - startTime);
+      stats.get(key).add(Time.monotonicNow() - startTime);
     };
   }
 
@@ -89,44 +90,36 @@ public class ProtocolMessageMetrics<KEY> implements MetricsSource {
 
   @Override
   public void getMetrics(MetricsCollector collector, boolean all) {
-    counters.forEach((key, value) -> {
-      MetricsRecordBuilder builder =
-          collector.addRecord(name);
-      builder.add(
-          new MetricsTag(Interns.info("type", "Message type"), key.toString()));
-      builder.addCounter(new MetricName("counter", "Number of distinct calls"),
-          value.longValue());
-      builder.addCounter(
-          new MetricName("time", "Sum of the duration of the calls"),
-          elapsedTimes.get(key).longValue());
-      builder.endRecord();
-
+    stats.forEach((key, stat) -> {
+      collector.addRecord(name)
+          .add(new MetricsTag(TYPE_TAG_INFO, key.toString()))
+          .addCounter(COUNTER_INFO, stat.counter())
+          .addCounter(TIME_INFO, stat.time())
+          .endRecord();
     });
-    MetricsRecordBuilder builder = collector.addRecord(name);
-    builder.addCounter(new MetricName("concurrency",
-            "Number of requests processed concurrently"), concurrency.get());
+    collector.addRecord(name)
+        .addCounter(CONCURRENCY_INFO, concurrency.get())
+        .endRecord();
   }
 
   /**
-   * Simple metrics info implementation.
+   * Holds counters for a single message type.
    */
-  public static class MetricName implements MetricsInfo {
-    private final String name;
-    private final String description;
+  private static final class Stats {
+    private final AtomicLong counter = new AtomicLong(0);
+    private final AtomicLong time = new AtomicLong(0);
 
-    public MetricName(String name, String description) {
-      this.name = name;
-      this.description = description;
+    void add(long duration) {
+      counter.incrementAndGet();
+      time.addAndGet(duration);
     }
 
-    @Override
-    public String name() {
-      return name;
+    long counter() {
+      return counter.get();
     }
 
-    @Override
-    public String description() {
-      return description;
+    long time() {
+      return time.get();
     }
   }
 }

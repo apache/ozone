@@ -150,6 +150,10 @@ public class EndpointBuilder<T extends EndpointBase> {
     return new EndpointBuilder<>(BucketEndpoint::new);
   }
 
+  public static EndpointBuilder<BucketAclHandler> newBucketAclHandlerBuilder() {
+    return new EndpointBuilder<>(BucketAclHandler::new);
+  }
+
   public static EndpointBuilder<ObjectEndpoint> newObjectEndpointBuilder() {
     return new EndpointBuilder<>(ObjectEndpoint::new);
   }
