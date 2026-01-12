@@ -118,6 +118,7 @@
             ctrl.Date = Date;
 
             ctrl.formatBytes = function(bytes, decimals) {
+               if (!bytes) return 'N/A';
                if(bytes == 0) return '0 Bytes';
                var k = 1024, // or 1024 for binary
                    dm = decimals + 1 || 3,

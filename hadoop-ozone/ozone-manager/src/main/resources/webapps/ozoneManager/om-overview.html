@@ -94,11 +94,11 @@
 
 <!-- Only display Deletion Progress on OM leader -->
 <div ng-show="$ctrl.role.Role.trim() === 'LEADER'">
-  <h2>Deletion Progress [since {{$ctrl.overview.jmx.MetricsResetTimeStamp * 1000 | date:'yyyy-MM-dd HH:mm:ss'}}]
+  <h2>Deletion Progress [{{$ctrl.overview.jmx.MetricsResetTimeStamp ? 'since ' + ($ctrl.overview.jmx.MetricsResetTimeStamp * 1000 | date:'yyyy-MM-dd HH:mm:ss') : 'Initializing'}}]
     &nbsp;&nbsp;•&nbsp;&nbsp;
     <b>Size Reclaimed:</b> {{$ctrl.formatBytes($ctrl.overview.jmx.ReclaimedSizeInInterval)}}
     &nbsp;&nbsp;•&nbsp;&nbsp;
-    <b>Keys Reclaimed:</b> {{$ctrl.overview.jmx.KeysReclaimedInInterval}}
+    <b>Keys Reclaimed:</b> {{$ctrl.overview.jmx.KeysReclaimedInInterval || 0}}
   </h2>
   <div class="mt-4">
       <div class="mt-3">
@@ -132,14 +132,14 @@
                   <tbody>
                       <tr>
                           <td>Active Object Store</td>
-                          <td>{{$ctrl.formatBytes($ctrl.overview.jmx.AosReclaimedSizeLast || 0)}}</td>
+                          <td>{{$ctrl.formatBytes($ctrl.overview.jmx.AosReclaimedSizeLast)}}</td>
                           <td>{{$ctrl.overview.jmx.AosKeysReclaimedLast || 0}}</td>
                           <td>{{$ctrl.overview.jmx.AosKeysIteratedLast || 0}}</td>
                           <td>{{$ctrl.overview.jmx.AosKeysNotReclaimableLast || 0}}</td>
                       </tr>
                       <tr>
                           <td>Snapshots</td>
-                          <td>{{$ctrl.formatBytes($ctrl.overview.jmx.SnapReclaimedSizeLast || 0)}}</td>
+                          <td>{{$ctrl.formatBytes($ctrl.overview.jmx.SnapReclaimedSizeLast)}}</td>
                           <td>{{$ctrl.overview.jmx.SnapKeysReclaimedLast || 0}}</td>
                           <td>{{$ctrl.overview.jmx.SnapKeysIteratedLast || 0}}</td>
                           <td>{{$ctrl.overview.jmx.SnapKeysNotReclaimableLast || 0}}</td>
