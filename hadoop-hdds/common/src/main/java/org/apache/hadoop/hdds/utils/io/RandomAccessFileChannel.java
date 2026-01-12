@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.utils.io;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -29,7 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** {@link RandomAccessFile} and its {@link FileChannel}. */
-public class RandomAccessFileChannel {
+public class RandomAccessFileChannel implements Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(RandomAccessFileChannel.class);
 
   private File blockFile;
