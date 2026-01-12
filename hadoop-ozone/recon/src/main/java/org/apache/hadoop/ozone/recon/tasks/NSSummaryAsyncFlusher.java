@@ -280,7 +280,7 @@ public final class NSSummaryAsyncFlusher implements Closeable {
    * Write merged map to DB using batch operation.
    */
   private void writeToDb(Map<Long, NSSummary> mergedMap) throws IOException {
-    try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
+    try (RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation()) {
       for (Map.Entry<Long, NSSummary> entry : mergedMap.entrySet()) {
         reconNamespaceSummaryManager.batchStoreNSSummaries(
             rdbBatchOperation, entry.getKey(), entry.getValue());

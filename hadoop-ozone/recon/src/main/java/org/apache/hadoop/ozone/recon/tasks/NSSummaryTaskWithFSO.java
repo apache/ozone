@@ -357,7 +357,8 @@ public class NSSummaryTaskWithFSO extends NSSummaryTaskDbEventHandler {
         asyncFlusher.checkForFailures();
 
         // Update immediate parent only, NO DB reads during reprocess
-        handlePutKeyEventReprocess(kv.getValue(), workerMap);
+        OmKeyInfo keyInfo = kv.getValue();
+        handlePutKeyEventReprocess(keyInfo, workerMap, keyInfo.getParentObjectID());
 
         // Submit to async queue when threshold reached
         if (workerMap.size() >= perWorkerThreshold) {

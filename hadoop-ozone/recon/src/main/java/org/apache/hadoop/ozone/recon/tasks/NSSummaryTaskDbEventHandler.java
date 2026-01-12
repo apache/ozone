@@ -124,8 +124,7 @@ public class NSSummaryTaskDbEventHandler {
    * Does not read from DB, only works with in-memory map.
    */
   protected void handlePutKeyEventReprocess(OmKeyInfo keyInfo, Map<Long,
-      NSSummary> nsSummaryMap) throws IOException {
-    long parentObjectId = keyInfo.getParentObjectID();
+      NSSummary> nsSummaryMap, long parentObjectId) throws IOException {
 
     // Get from local thread map only, no DB reads during reprocess
     NSSummary nsSummary = nsSummaryMap.get(parentObjectId);

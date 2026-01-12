@@ -128,9 +128,11 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
           // Check if async flusher has failed - stop immediately if so
           asyncFlusher.checkForFailures();
           
-          setKeyParentID(keyInfo);
+          // Look up parent ID for OBS keys (not populated in keyInfo from DB)
+          long parentObjectId = getKeyParentID(keyInfo);
+          
           // Use reprocess-specific method (no DB reads)
-          handlePutKeyEventReprocess(keyInfo, workerMap);
+          handlePutKeyEventReprocess(keyInfo, workerMap, parentObjectId);
 
           // Submit to async queue when threshold reached
           if (workerMap.size() >= perWorkerThreshold) {
