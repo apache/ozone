@@ -43,7 +43,6 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.InMemoryConfigurationForTesting;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -90,11 +89,11 @@ public class TestFileChecksumHelper {
 
   @BeforeEach
   public void init() throws IOException {
-    ConfigurationSource config = new InMemoryConfigurationForTesting();
+    InMemoryConfigurationForTesting config = new InMemoryConfigurationForTesting();
     OzoneClientConfig clientConfig = config.getObject(OzoneClientConfig.class);
     clientConfig.setChecksumType(ContainerProtos.ChecksumType.CRC32C);
 
-    ((InMemoryConfigurationForTesting)config).setFromObject(clientConfig);
+    config.setFromObject(clientConfig);
 
     rpcClient = new RpcClient(config, null) {
 

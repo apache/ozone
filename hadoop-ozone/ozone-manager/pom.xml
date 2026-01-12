@@ -271,8 +271,6 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-config</artifactId>
-      <version>${hdds.version}</version>
-      <classifier>tests</classifier>
       <type>test-jar</type>
       <scope>test</scope>
     </dependency>
