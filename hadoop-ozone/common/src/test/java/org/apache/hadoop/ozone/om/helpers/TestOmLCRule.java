@@ -222,7 +222,7 @@ class TestOmLCRule {
         .build();
 
     // Case 1: Tag key too long
-    String longKey = RandomStringUtils.randomAlphanumeric(129);
+    String longKey = RandomStringUtils.randomAlphanumeric(OmLifecycleUtils.MAX_TAG_KEY_LENGTH + 1);
     OmLCFilter filterKeyTooLong = getOmLCFilterBuilder(null, Pair.of(longKey, "value"), null).build();
     OmLCRule.Builder r1 = new OmLCRule.Builder()
         .setId("long-tag-key")
@@ -233,7 +233,7 @@ class TestOmLCRule {
         "A Tag's Key must be a length between 1 and 128");
 
     // Case 2: Tag value too long
-    String longValue = RandomStringUtils.randomAlphanumeric(257);
+    String longValue = RandomStringUtils.randomAlphanumeric(OmLifecycleUtils.MAX_TAG_VALUE_LENGTH + 1);
     OmLCFilter filterValueTooLong = getOmLCFilterBuilder(null, Pair.of("key", longValue), null).build();
     OmLCRule.Builder r2 = new OmLCRule.Builder()
         .setId("long-tag-value")
@@ -252,7 +252,7 @@ class TestOmLCRule {
         .build();
 
     // Case 1: Prefix too long
-    String longPrefix = RandomStringUtils.randomAlphanumeric(1025);
+    String longPrefix = RandomStringUtils.randomAlphanumeric(OmLifecycleUtils.MAX_PREFIX_LENGTH + 1);
     OmLCRule.Builder r1 = new OmLCRule.Builder()
         .setId("long-prefix")
         .setEnabled(true)

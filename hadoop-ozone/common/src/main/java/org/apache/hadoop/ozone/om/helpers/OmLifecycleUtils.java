@@ -25,6 +25,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 
@@ -50,7 +51,7 @@ public final class OmLifecycleUtils {
    * @throws OMException if the prefix is a trash path
    */
   public static void validateTrashPrefix(String prefix) throws OMException {
-    if (org.apache.commons.lang3.StringUtils.isEmpty(prefix)) {
+    if (StringUtils.isEmpty(prefix)) {
       return;
     }
     // Remove leading slash if present for validation
@@ -110,13 +111,12 @@ public final class OmLifecycleUtils {
       String key = entry.getKey();
       String value = entry.getValue();
 
-      if (key == null || key.isEmpty() ||
-          key.getBytes(StandardCharsets.UTF_8).length > MAX_TAG_KEY_LENGTH) {
+      if (StringUtils.isEmpty(key) || key.getBytes(StandardCharsets.UTF_8).length > MAX_TAG_KEY_LENGTH) {
         throw new OMException("A Tag's Key must be a length between 1 and " +
             MAX_TAG_KEY_LENGTH, OMException.ResultCodes.INVALID_REQUEST);
       }
 
-      if (value != null && value.getBytes(StandardCharsets.UTF_8).length > MAX_TAG_VALUE_LENGTH) {
+      if (!StringUtils.isEmpty(value) && value.getBytes(StandardCharsets.UTF_8).length > MAX_TAG_VALUE_LENGTH) {
         throw new OMException("A Tag's Value must be a length between 0 and " +
             MAX_TAG_VALUE_LENGTH, OMException.ResultCodes.INVALID_REQUEST);
       }
