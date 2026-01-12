@@ -169,7 +169,9 @@ public abstract class EndpointBase {
     init();
   }
 
-  public abstract void init();
+  protected void init() {
+    // hook method
+  }
 
   protected OzoneBucket getBucket(String bucketName)
       throws OS3Exception, IOException {
@@ -548,12 +550,15 @@ public abstract class EndpointBase {
    * Used for initializing handler instances.
    */
   protected void copyDependenciesTo(EndpointBase target) {
+    target.queryParams = queryParams;
+    target.s3Auth = s3Auth;
     target.setClient(this.client);
     target.setOzoneConfiguration(this.ozoneConfiguration);
     target.setContext(this.context);
     target.setHeaders(this.headers);
     target.setRequestIdentifier(this.requestIdentifier);
     target.setSignatureInfo(this.signatureInfo);
+    target.init();
   }
 
   protected OzoneConfiguration getOzoneConfiguration() {
