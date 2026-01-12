@@ -68,7 +68,7 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
     this.metadataManager = metadataManager;
     this.maxIteratorTasks = 2 * iteratorCount;  // Allow up to 10 pending iterator tasks
 
-    // Create team of 5 iterator threads with UNLIMITED queue
+    // Create team of iterator threads with UNLIMITED queue
     // LinkedBlockingQueue() with no size = can hold infinite pending tasks
     this.iteratorExecutor = new ThreadPoolExecutor(iteratorCount, iteratorCount, 1, TimeUnit.MINUTES,
                     new LinkedBlockingQueue<>());
@@ -130,7 +130,7 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
   public void performTaskOnTableVals(String taskName, K startKey, K endKey,
       Function<Table.KeyValue<K, V>, Void> keyOperation) throws IOException, ExecutionException, InterruptedException {
     List<K> bounds = getBounds(startKey, endKey);
-    
+    LOG.debug("Length of the bounds - {}", bounds.size());
     // Fallback for small tables (no SST files yet - data only in memtable)
     if (bounds.size() < 2) {
       try (TableIterator<K, ? extends Table.KeyValue<K, V>> iter = table.iterator()) {
@@ -150,7 +150,7 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
 
     // ===== PARALLEL PROCESSING SETUP =====
 
-    // Queue to track iterator threads (5 threads creating work)
+    // Queue to track iterator threads
     Queue<Future<?>> iterFutures = new LinkedList<>();
 
     AtomicLong keyCounter = new AtomicLong();
@@ -219,10 +219,9 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
     }
 
     // ===== STEP 7: WAIT FOR EVERYONE TO FINISH =====
-    // Wait for all 5 iterator threads to finish reading
+    // Wait for all iterator threads to finish reading
     waitForQueueSize(iterFutures, 0);
     
-    // Log final stats
     LOG.info("{}: Parallel iteration completed - Total keys processed: {}", taskName, keyCounter.get());
   }
 

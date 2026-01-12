@@ -19,7 +19,6 @@ package org.apache.ozone.rocksdiff;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.function.Function.identity;
-import static org.apache.commons.lang3.ArrayUtils.EMPTY_BYTE_ARRAY;
 import static org.apache.hadoop.hdds.utils.db.IteratorType.KEY_ONLY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED_DEFAULT;
@@ -75,16 +74,17 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CompactionLogEntryProto;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.Scheduler;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
+import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileIterator;
+import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileReader;
+import org.apache.hadoop.hdds.utils.db.RDBSstFileWriter;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedEnvOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileIterator;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileWriter;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.ozone.compaction.log.CompactionFileInfo;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
@@ -1322,8 +1322,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
             // Prune file.sst => pruned.sst.tmp
             Files.deleteIfExists(prunedSSTFilePath);
-            removeValueFromSSTFile(managedOptions, envOptions, sstFilePath.toFile().getAbsolutePath(),
-                prunedSSTFilePath.toFile().getAbsolutePath());
+            removeValueFromSSTFile(managedOptions, sstFilePath.toFile().getAbsolutePath(), prunedSSTFilePath.toFile());
 
             // Move pruned.sst.tmp => file.sst and replace existing file atomically.
             try (UncheckedAutoCloseable lock = getBootstrapStateLock().acquireReadLock()) {
@@ -1363,26 +1362,20 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     }
   }
 
-  private void removeValueFromSSTFile(ManagedOptions options, ManagedEnvOptions envOptions,
-      String sstFilePath, String prunedFilePath)
-      throws IOException {
-    try (ManagedRawSSTFileReader<Pair<byte[], Integer>> sstFileReader = new ManagedRawSSTFileReader<>(
-             options, sstFilePath, SST_READ_AHEAD_SIZE);
-         ManagedRawSSTFileIterator<Pair<byte[], Integer>> itr = sstFileReader.newIterator(
+  private void removeValueFromSSTFile(ManagedOptions options, String sstFilePath, File prunedFile) throws IOException {
+    try (ManagedRawSSTFileReader sstFileReader = new ManagedRawSSTFileReader(options, sstFilePath, SST_READ_AHEAD_SIZE);
+         ManagedRawSSTFileIterator<Pair<CodecBuffer, Integer>> itr = sstFileReader.newIterator(
              keyValue -> Pair.of(keyValue.getKey(), keyValue.getType()), null, null, KEY_ONLY);
-         ManagedSstFileWriter sstFileWriter = new ManagedSstFileWriter(envOptions, options);) {
-      sstFileWriter.open(prunedFilePath);
+         RDBSstFileWriter sstFileWriter = new RDBSstFileWriter(prunedFile);
+         CodecBuffer emptyCodecBuffer = CodecBuffer.getEmptyBuffer()) {
       while (itr.hasNext()) {
-        Pair<byte[], Integer> keyValue = itr.next();
+        Pair<CodecBuffer, Integer> keyValue = itr.next();
         if (keyValue.getValue() == 0) {
           sstFileWriter.delete(keyValue.getKey());
         } else {
-          sstFileWriter.put(keyValue.getKey(), EMPTY_BYTE_ARRAY);
+          sstFileWriter.put(keyValue.getKey(), emptyCodecBuffer);
         }
       }
-      sstFileWriter.finish();
-    } catch (RocksDBException ex) {
-      throw new RocksDatabaseException("Failed to write pruned entries for " + sstFilePath, ex);
     }
   }
 

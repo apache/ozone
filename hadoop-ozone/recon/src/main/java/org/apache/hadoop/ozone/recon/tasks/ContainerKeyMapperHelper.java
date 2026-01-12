@@ -430,7 +430,7 @@ public abstract class ContainerKeyMapperHelper {
                                    ReconContainerMetadataManager reconContainerMetadataManager)
       throws IOException {
 
-    try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
+    try (RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation()) {
 
       // Write container key mappings (local per-task data)
       localContainerKeyMap.keySet().forEach((ContainerKeyPrefix key) -> {

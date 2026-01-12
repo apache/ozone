@@ -1,0 +1,216 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.hadoop.ozone.debug.om;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.debug.OzoneDebug;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import picocli.CommandLine;
+
+/**
+ * Unit test for ContainerToKeyMapping tool.
+ */
+public class TestContainerToKeyMapping {
+
+  @TempDir
+  private Path tempDir;
+
+  private OMMetadataManager omMetadataManager;
+  private String dbPath;
+  private CommandLine cmd;
+  private StringWriter outWriter;
+
+  private static final String VOLUME_NAME = "vol1";
+  private static final String BUCKET_NAME = "bucket1";
+  private static final long VOLUME_ID = 100L;
+  private static final long BUCKET_ID = 200L;
+  private static final long DIR_ID = 300L;
+  private static final long FILE_ID = 400L;
+  private static final long CONTAINER_ID_1 = 1L;
+  private static final long CONTAINER_ID_2 = 2L;
+  private static final long UNREFERENCED_FILE_ID = 500L;
+  private static final long MISSING_DIR_ID = 999L;  // Non-existent parent
+
+  @BeforeEach
+  public void setup() throws Exception {
+    Path dbFile = tempDir.resolve("om.db");
+    dbPath = dbFile.toString();
+    
+    cmd = new OzoneDebug().getCmd();
+    outWriter = new StringWriter();
+    StringWriter errWriter = new StringWriter();
+    cmd.setOut(new PrintWriter(outWriter));
+    cmd.setErr(new PrintWriter(errWriter));
+    
+    OzoneConfiguration conf = new OzoneConfiguration();
+    omMetadataManager = new OmMetadataManagerImpl(conf,
+        tempDir.toFile(), "om.db", false);
+
+    createTestData();
+    
+    omMetadataManager.getStore().close();
+  }
+
+  @AfterEach
+  public void tearDown() throws Exception {
+    if (omMetadataManager != null && !omMetadataManager.getStore().isClosed()) {
+      omMetadataManager.getStore().close();
+    }
+  }
+
+  @Test
+  public void testContainerToKeyMapping() {
+    int exitCode = execute("--containers", String.valueOf(CONTAINER_ID_1));
+    assertEquals(0, exitCode);
+    
+    String output = outWriter.toString();
+
+    assertThat(output).contains("\"" + CONTAINER_ID_1 + "\"");
+    assertThat(output).contains("vol1/bucket1/dir1/file1");
+    assertThat(output).contains("\"numOfKeys\" : 1");
+  }
+
+  @Test
+  public void testNonExistentContainer() {
+    long nonExistentContainerId = 999L;
+    
+    int exitCode = execute("--containers", String.valueOf(nonExistentContainerId));
+    assertEquals(0, exitCode);
+    
+    String output = outWriter.toString();
+    assertThat(output).contains("\"" + nonExistentContainerId + "\"");
+    assertThat(output).contains("\"numOfKeys\" : 0");
+  }
+
+  @Test
+  public void testUnreferencedKeys() {
+    int exitCode = execute("--containers", String.valueOf(CONTAINER_ID_2));
+    assertEquals(0, exitCode);
+    
+    String output = outWriter.toString();
+
+    assertThat(output).contains("\"" + CONTAINER_ID_2 + "\"");
+    assertThat(output).contains("\"numOfKeys\" : 0");
+    assertThat(output).contains("\"unreferencedKeys\" : 1");
+  }
+
+  private void createTestData() throws Exception {
+    // Create volume
+    OmVolumeArgs volumeArgs = OmVolumeArgs.newBuilder()
+        .setVolume(VOLUME_NAME)
+        .setOwnerName("testUser")
+        .setAdminName("admin")
+        .setObjectID(VOLUME_ID)
+        .build();
+    omMetadataManager.getVolumeTable().put(
+        omMetadataManager.getVolumeKey(VOLUME_NAME), volumeArgs);
+
+    // Create FSO bucket
+    OmBucketInfo bucketInfo = OmBucketInfo.newBuilder()
+        .setVolumeName(VOLUME_NAME)
+        .setBucketName(BUCKET_NAME)
+        .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .setObjectID(BUCKET_ID)
+        .build();
+    omMetadataManager.getBucketTable().put(
+        omMetadataManager.getBucketKey(VOLUME_NAME, BUCKET_NAME), bucketInfo);
+
+    // Create directory
+    OmDirectoryInfo dirInfo = OmDirectoryInfo.newBuilder()
+        .setName("dir1")
+        .setObjectID(DIR_ID)
+        .setParentObjectID(BUCKET_ID)
+        .setUpdateID(1)
+        .build();
+    String dirKey = omMetadataManager.getOzonePathKey(VOLUME_ID, BUCKET_ID, BUCKET_ID, "dir1");
+    omMetadataManager.getDirectoryTable().put(dirKey, dirInfo);
+
+    // Create file with a block in container 1
+    OmKeyInfo keyInfo = createKeyInfo(
+        "file1", FILE_ID, DIR_ID, CONTAINER_ID_1);
+    String fileKey = omMetadataManager.getOzonePathKey(
+        VOLUME_ID, BUCKET_ID, DIR_ID, "file1");
+    omMetadataManager.getFileTable().put(fileKey, keyInfo);
+    
+    // Create unreferenced file (parent directory doesn't exist)
+    OmKeyInfo unreferencedKey = createKeyInfo(
+        "unreferencedFile", UNREFERENCED_FILE_ID, MISSING_DIR_ID, CONTAINER_ID_2);
+    String unreferencedFileKey = omMetadataManager.getOzonePathKey(
+        VOLUME_ID, BUCKET_ID, MISSING_DIR_ID, "unreferencedFile");
+    omMetadataManager.getFileTable().put(unreferencedFileKey, unreferencedKey);
+  }
+
+  /**
+   * Helper method to create OmKeyInfo with a block in specified container.
+   */
+  private OmKeyInfo createKeyInfo(String keyName, long objectId, long parentId, long containerId) {
+    OmKeyLocationInfo locationInfo = new OmKeyLocationInfo.Builder()
+        .setBlockID(new BlockID(containerId, 1L))
+        .setLength(1024)
+        .setOffset(0)
+        .build();
+
+    OmKeyLocationInfoGroup locationGroup = new OmKeyLocationInfoGroup(0,
+        Collections.singletonList(locationInfo));
+
+    return new OmKeyInfo.Builder()
+        .setVolumeName(VOLUME_NAME)
+        .setBucketName(BUCKET_NAME)
+        .setKeyName(keyName)
+        .setReplicationConfig(StandaloneReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE))
+        .setDataSize(1024)
+        .setObjectID(objectId)
+        .setParentObjectID(parentId)
+        .setUpdateID(1)
+        .addOmKeyLocationInfoGroup(locationGroup)
+        .build();
+  }
+
+  private int execute(String... args) {
+    List<String> argList = new ArrayList<>(Arrays.asList("om", "container-key-mapping", "--db", dbPath));
+    argList.addAll(Arrays.asList(args));
+
+    return cmd.execute(argList.toArray(new String[0]));
+  }
+}
+

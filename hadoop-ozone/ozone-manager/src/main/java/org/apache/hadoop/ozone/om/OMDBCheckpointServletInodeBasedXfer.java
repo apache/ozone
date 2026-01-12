@@ -295,8 +295,10 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
             }
             writeDBToArchive(sstFilesToExclude, getCompactionLogDir(), maxTotalSstSize, archiveOutputStream, tmpdir,
                 hardLinkFileMap, false);
-            writeDBToArchive(sstFilesToExclude, sstBackupFiles.stream(), maxTotalSstSize, archiveOutputStream, tmpdir,
-                hardLinkFileMap, false);
+            try (Stream<Path> backupFiles = sstBackupFiles.stream()) {
+              writeDBToArchive(sstFilesToExclude, backupFiles, maxTotalSstSize, archiveOutputStream, tmpdir,
+                  hardLinkFileMap, false);
+            }
             Collection<Path> snapshotLocalPropertyFiles = getSnapshotLocalDataPaths(localDataManager,
                 snapshotInCheckpoint.keySet());
             // This is done to ensure all data to be copied correctly is flushed in the snapshot DB
@@ -458,9 +460,10 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
       LOG.warn("DB directory {} does not exist. Skipping.", dbDir);
       return true;
     }
-    Stream<Path> files = Files.list(dbDir);
-    return writeDBToArchive(sstFilesToExclude, files,
-        maxTotalSstSize, archiveOutputStream, tmpDir, hardLinkFileMap, onlySstFile);
+    try (Stream<Path> files = Files.list(dbDir)) {
+      return writeDBToArchive(sstFilesToExclude, files,
+          maxTotalSstSize, archiveOutputStream, tmpDir, hardLinkFileMap, onlySstFile);
+    }
   }
 
   /**
