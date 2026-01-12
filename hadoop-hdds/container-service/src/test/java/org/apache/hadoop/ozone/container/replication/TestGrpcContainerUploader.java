@@ -29,7 +29,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.concurrent.CompletableFuture;
 import org.apache.commons.lang3.RandomUtils;
-import org.apache.hadoop.hdds.conf.InMemoryConfiguration;
+import org.apache.hadoop.hdds.conf.InMemoryConfigurationForTesting;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerRequest;
@@ -117,7 +117,7 @@ class TestGrpcContainerUploader {
 
   private static GrpcContainerUploader createSubject(
       GrpcReplicationClient client) {
-    return new GrpcContainerUploader(new InMemoryConfiguration(), null,
+    return new GrpcContainerUploader(new InMemoryConfigurationForTesting(), null,
         mock(ContainerController.class)) {
       @Override
       protected GrpcReplicationClient createReplicationClient(
