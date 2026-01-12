@@ -268,16 +268,6 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public int minHealthyVolumeNum(Pipeline pipeline) {
-    return 0;
-  }
-
-  @Override
-  public int minPipelineLimit(Pipeline pipeline) {
-    return 0;
-  }
-
-  @Override
   public void activatePipeline(final PipelineID pipelineID) {
   }
 
@@ -344,5 +334,11 @@ public class MockPipelineManager implements PipelineManager {
   @Override
   public boolean hasEnoughSpace(Pipeline pipeline, long containerSize) {
     return false;
+  }
+
+  @Override
+  public int openContainerLimit(List<DatanodeDetails> datanodes) {
+    // For tests that do not care about this limit, return a large value.
+    return Integer.MAX_VALUE;
   }
 }

@@ -140,6 +140,7 @@ public class SCMNodeManager implements NodeManager {
   private final Map<SCMCommandProto.Type,
       BiConsumer<DatanodeDetails, SCMCommand<?>>> sendCommandNotifyMap;
   private final NonWritableNodeFilter nonWritableNodeFilter;
+  private final int numContainerPerVolume;
 
   /**
    * Lock used to synchronize some operation in Node manager to ensure a
@@ -196,6 +197,9 @@ public class SCMNodeManager implements NodeManager {
             ScmConfigKeys.OZONE_SCM_PIPELINE_PER_METADATA_VOLUME_DEFAULT);
     String dnLimit = conf.get(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT);
     this.heavyNodeCriteria = dnLimit == null ? 0 : Integer.parseInt(dnLimit);
+    this.numContainerPerVolume = conf.getInt(
+        ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
+        ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
     this.scmContext = scmContext;
     this.sendCommandNotifyMap = new HashMap<>();
     this.nonWritableNodeFilter = new NonWritableNodeFilter(conf);
@@ -1561,24 +1565,21 @@ public class SCMNodeManager implements NodeManager {
     }
   }
 
-  /**
-   * Returns the min of no healthy volumes reported out of the set
-   * of datanodes constituting the pipeline.
-   */
   @Override
-  public int minHealthyVolumeNum(List<DatanodeDetails> dnList) {
-    List<Integer> volumeCountList = new ArrayList<>(dnList.size());
-    for (DatanodeDetails dn : dnList) {
-      try {
-        volumeCountList.add(nodeStateManager.getNode(dn).
-                getHealthyVolumeCount());
-      } catch (NodeNotFoundException e) {
-        LOG.warn("Cannot generate NodeStat, datanode {} not found.",
-                dn.getID());
+  public int openContainerLimit(List<DatanodeDetails> datanodes) {
+    int min = Integer.MAX_VALUE;
+    for (DatanodeDetails dn : datanodes) {
+      final int pipelineLimit = pipelineLimit(dn);
+      if (pipelineLimit <= 0) {
+        return 0;
+      }
+
+      final int containerLimit = 1 + (numContainerPerVolume * getHealthyVolumeCount(dn) - 1) / pipelineLimit;
+      if (containerLimit < min) {
+        min = containerLimit;
       }
     }
-    Preconditions.checkArgument(!volumeCountList.isEmpty());
-    return Collections.min(volumeCountList);
+    return min;
   }
 
   @Override
@@ -1614,17 +1615,13 @@ public class SCMNodeManager implements NodeManager {
     return 0;
   }
 
-  /**
-   * Returns the pipeline limit for set of datanodes.
-   */
-  @Override
-  public int minPipelineLimit(List<DatanodeDetails> dnList) {
-    List<Integer> pipelineCountList = new ArrayList<>(dnList.size());
-    for (DatanodeDetails dn : dnList) {
-      pipelineCountList.add(pipelineLimit(dn));
+  private int getHealthyVolumeCount(DatanodeDetails dn) {
+    try {
+      return nodeStateManager.getNode(dn).getHealthyVolumeCount();
+    } catch (NodeNotFoundException e) {
+      LOG.warn("Failed to getHealthyVolumeCount, datanode {} not found.", dn.getID());
+      return 0;
     }
-    Preconditions.checkArgument(!pipelineCountList.isEmpty());
-    return Collections.min(pipelineCountList);
   }
 
   @Override
