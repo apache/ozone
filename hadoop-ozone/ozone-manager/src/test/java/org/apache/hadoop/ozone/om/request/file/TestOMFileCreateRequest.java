@@ -38,7 +38,6 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -706,9 +705,6 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
    */
   @Test
   public void testZeroSizedFileShouldCallAllocateBlock() throws Exception {
-    // Reset the mock to clear any previous interactions
-    reset(scmBlockLocationProtocol);
-
     KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
         .setKeyName(keyName)
@@ -734,11 +730,6 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     verify(scmBlockLocationProtocol, atLeastOnce())
         .allocateBlock(anyLong(), anyInt(),
             any(ReplicationConfig.class), anyString(),
-            any(ExcludeList.class));
-
-    verify(scmBlockLocationProtocol, atLeastOnce())
-        .allocateBlock(anyLong(), anyInt(),
-            any(ReplicationConfig.class), anyString(),
             any(ExcludeList.class), anyString());
 
     // Verify key locations are present in the response
@@ -756,9 +747,6 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
    */
   @Test
   public void testFileWithoutDataSizeShouldAllocateBlock() throws Exception {
-    // Reset the mock to clear any previous interactions
-    reset(scmBlockLocationProtocol);
-
     // Setup mock to return valid blocks
     Pipeline pipeline = Pipeline.newBuilder()
         .setState(Pipeline.PipelineState.OPEN)

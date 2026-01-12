@@ -43,9 +43,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -289,13 +287,27 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     assertNotNull(omKeyInfo);
     assertNotNull(omKeyInfo.getLatestVersionLocations());
 
-    // As our data size is 100, and scmBlockSize is default to 1000, so we
-    // shall have only one block.
     List<OmKeyLocationInfo> omKeyLocationInfoList =
         omKeyInfo.getLatestVersionLocations().getLocationList();
-    assertEquals(1, omKeyLocationInfoList.size());
+    if (modifiedOmRequest.getCreateKeyRequest().getKeyArgs().getDataSize() > 0) {
+      // As our data size is 100, and scmBlockSize is default to 1000, so we
+      // shall have only one block.
+      assertEquals(1, omKeyLocationInfoList.size());
 
-    OmKeyLocationInfo omKeyLocationInfo = omKeyLocationInfoList.get(0);
+      OmKeyLocationInfo omKeyLocationInfo = omKeyLocationInfoList.get(0);
+      // Check data of the block
+      OzoneManagerProtocolProtos.KeyLocation keyLocation =
+          modifiedOmRequest.getCreateKeyRequest().getKeyArgs().getKeyLocations(0);
+
+      assertEquals(keyLocation.getBlockID().getContainerBlockID()
+          .getContainerID(), omKeyLocationInfo.getContainerID());
+      assertEquals(keyLocation.getBlockID().getContainerBlockID()
+          .getLocalID(), omKeyLocationInfo.getLocalID());
+    } else {
+      // When creating an empty key, there should not be any blocks
+      assertEquals(0, omKeyLocationInfoList.size());
+    }
+
 
     // Check modification time
     assertEquals(modifiedOmRequest.getCreateKeyRequest()
@@ -308,15 +320,6 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
       assertNotEquals(omKeyInfo.getModificationTime(),
           omKeyInfo.getCreationTime());
     }
-
-    // Check data of the block
-    OzoneManagerProtocolProtos.KeyLocation keyLocation =
-        modifiedOmRequest.getCreateKeyRequest().getKeyArgs().getKeyLocations(0);
-
-    assertEquals(keyLocation.getBlockID().getContainerBlockID()
-        .getContainerID(), omKeyLocationInfo.getContainerID());
-    assertEquals(keyLocation.getBlockID().getContainerBlockID()
-        .getLocalID(), omKeyLocationInfo.getLocalID());
   }
 
   @ParameterizedTest
@@ -647,7 +650,8 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
         keyArgs.getEcReplicationConfig().getData() : 1;
     long blockSize = ozoneManager.getScmBlockSize();
     long preAllocatedBlocks = Math.min(ozoneManager.getPreallocateBlocksMax(),
-        (keyArgs.getDataSize() - 1) / (blockSize * dataGroupSize) + 1);
+        keyArgs.getDataSize() > 0 ?
+            (keyArgs.getDataSize() - 1) / (blockSize * dataGroupSize) + 1 : 0);
 
     // Time should be set
     assertThat(keyArgs.getModificationTime()).isGreaterThan(0);
@@ -665,17 +669,19 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
           keyArgs.getKeyLocationsList();
       // KeyLocation should be set.
       assertEquals(preAllocatedBlocks, keyLocations.size());
-      assertEquals(CONTAINER_ID,
-          keyLocations.get(0).getBlockID().getContainerBlockID()
-              .getContainerID());
-      assertEquals(LOCAL_ID,
-          keyLocations.get(0).getBlockID().getContainerBlockID()
-              .getLocalID());
-      assertTrue(keyLocations.get(0).hasPipeline());
+      if (preAllocatedBlocks > 0) {
+        assertEquals(CONTAINER_ID,
+            keyLocations.get(0).getBlockID().getContainerBlockID()
+                .getContainerID());
+        assertEquals(LOCAL_ID,
+            keyLocations.get(0).getBlockID().getContainerBlockID()
+                .getLocalID());
+        assertTrue(keyLocations.get(0).hasPipeline());
 
-      assertEquals(0, keyLocations.get(0).getOffset());
+        assertEquals(0, keyLocations.get(0).getOffset());
 
-      assertEquals(scmBlockSize, keyLocations.get(0).getLength());
+        assertEquals(scmBlockSize, keyLocations.get(0).getLength());
+      }
     } else {
       // We don't create blocks for multipart key in createKey preExecute.
       assertEquals(0, keyArgs.getKeyLocationsList().size());
@@ -1089,9 +1095,6 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
    */
   @Test
   public void testEmptyKeyKeyDoesNotCallScmAllocateBlock() throws Exception {
-    // Reset the mock to clear any previous interactions
-    reset(scmBlockLocationProtocol);
-
     KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
         .setVolumeName(volumeName).setBucketName(bucketName)
         .setKeyName(keyName).setIsMultipartKey(false)
@@ -1137,14 +1140,10 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
   }
 
   /**
-   * Test that SCM's allocateBlock is still called when creating a key
-   * without explicitly setting dataSize (should use default scmBlockSize).
+   * Test that SCM's allocateBlock is not called when creating a key without specifying the dataSize.
    */
   @Test
   public void testKeyWithoutDataSizeCallsScmAllocateBlock() throws Exception {
-    // Reset the mock to clear any previous interactions
-    reset(scmBlockLocationProtocol);
-
     // Setup mock to return valid blocks
     Pipeline pipeline = Pipeline.newBuilder()
         .setState(Pipeline.PipelineState.OPEN)
@@ -1195,18 +1194,26 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     OMRequest modifiedOmRequest = omKeyCreateRequest.preExecute(ozoneManager);
 
-    verify(scmBlockLocationProtocol, atLeastOnce())
+    verify(scmBlockLocationProtocol, never())
         .allocateBlock(anyLong(), anyInt(),
             any(ReplicationConfig.class), anyString(),
             any(ExcludeList.class), anyString());
 
-    // Verify key locations are present in the response
+    verify(scmBlockLocationProtocol, never())
+        .allocateBlock(anyLong(), anyInt(),
+            any(ReplicationConfig.class), anyString(),
+            any(ExcludeList.class), anyString());
+
     assertTrue(modifiedOmRequest.hasCreateKeyRequest());
     CreateKeyRequest responseCreateKeyRequest =
         modifiedOmRequest.getCreateKeyRequest();
-    assertTrue(
-        responseCreateKeyRequest.getKeyArgs().getKeyLocationsCount() > 0,
-        "Key without explicit dataSize should have key locations allocated");
+    assertEquals(0,
+        responseCreateKeyRequest.getKeyArgs().getKeyLocationsCount(),
+        "Empty key should have no key locations");
+
+    assertEquals(0,
+        responseCreateKeyRequest.getKeyArgs().getDataSize(),
+        "Empty key should have dataSize of 0");
   }
 
   protected void addToKeyTable(String keyName) throws Exception {
