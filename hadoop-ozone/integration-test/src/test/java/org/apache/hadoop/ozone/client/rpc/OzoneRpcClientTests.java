@@ -5270,4 +5270,56 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     assertEquals(tags.size(), tagsRetrieved.size());
     assertThat(tagsRetrieved).containsAllEntriesOf(tags);
   }
+
+  @Test
+  public void testCreateEmptyKeySkipBlockAllocation()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    getStore().createVolume(volumeName);
+    OzoneVolume volume = getStore().getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    long initialAllocatedBlocks =
+        getCluster().getStorageContainerManager().getPipelineManager()
+            .getMetrics().getTotalNumBlocksAllocated();
+    // Don't write anything - this is an empty file
+    OzoneOutputStream out = bucket.createKey(keyName, 0);
+    out.close();
+
+    // createKey should skip block allocation if data size is 0
+    long currentAllocatedBlocks =
+        getCluster().getStorageContainerManager().getPipelineManager().getMetrics().getTotalNumBlocksAllocated();
+    assertEquals(initialAllocatedBlocks, currentAllocatedBlocks);
+  }
+
+  @Test
+  public void testCreateEmptyFileNotSkipBlockAllocation()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    getStore().createVolume(volumeName);
+    OzoneVolume volume = getStore().getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    long initialAllocatedBlocks =
+        getCluster().getStorageContainerManager().getPipelineManager().getMetrics().getTotalNumBlocksAllocated();
+    // Don't write anything - this is an empty file
+    OzoneOutputStream out = bucket.createFile(keyName, 0,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+        false,
+        false);
+    out.close();
+
+    // OM should call allocateBlock in OMFileCreateRequest regardless of data size
+    long currentAllocatedBlocks =
+        getCluster().getStorageContainerManager().getPipelineManager().getMetrics().getTotalNumBlocksAllocated();
+    assertEquals(initialAllocatedBlocks + 1, currentAllocatedBlocks);
+  }
 }

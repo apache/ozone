@@ -318,7 +318,7 @@ public class TestBlockDataStreamOutput {
       int dataLength = 400;
       String keyName = getKeyName();
       OzoneDataStreamOutput key = createKey(
-          client, keyName, 0);
+          client, keyName, dataLength);
       byte[] data =
           ContainerTestHelper.getFixedLengthString(keyString, dataLength)
               .getBytes(UTF_8);

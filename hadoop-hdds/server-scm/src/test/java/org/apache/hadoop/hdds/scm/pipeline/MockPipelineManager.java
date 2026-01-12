@@ -345,4 +345,9 @@ public class MockPipelineManager implements PipelineManager {
   public boolean hasEnoughSpace(Pipeline pipeline, long containerSize) {
     return false;
   }
+
+  @Override
+  public SCMPipelineMetrics getMetrics() {
+    return null;
+  }
 }

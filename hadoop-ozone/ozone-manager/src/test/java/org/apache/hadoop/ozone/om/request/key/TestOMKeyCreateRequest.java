@@ -39,6 +39,14 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -52,11 +60,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.KeyValue;
+import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OmConfig;
@@ -1068,6 +1082,131 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
 
     // Should not inherit parent ACCESS Acls
     assertThat(keyAcls).doesNotContain(parentAccessAcl);
+  }
+
+  /**
+   * Test that SCM's allocateBlock is not called when creating an empty key.
+   */
+  @Test
+  public void testEmptyKeyKeyDoesNotCallScmAllocateBlock() throws Exception {
+    // Reset the mock to clear any previous interactions
+    reset(scmBlockLocationProtocol);
+
+    KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
+        .setVolumeName(volumeName).setBucketName(bucketName)
+        .setKeyName(keyName).setIsMultipartKey(false)
+        .setFactor(
+            ((RatisReplicationConfig) replicationConfig).getReplicationFactor())
+        .setType(replicationConfig.getReplicationType())
+        .setLatestVersionLocation(true)
+        .setDataSize(0); // explicitly set data size to 0
+
+    CreateKeyRequest createKeyRequest =
+        CreateKeyRequest.newBuilder().setKeyArgs(keyArgs).build();
+
+    OMRequest omRequest = OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.CreateKey)
+        .setClientId(UUID.randomUUID().toString())
+        .setCreateKeyRequest(createKeyRequest).build();
+
+    OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(omRequest);
+
+    OMRequest modifiedOmRequest = omKeyCreateRequest.preExecute(ozoneManager);
+
+    // Verify that SCM's allocateBlock was never called
+    verify(scmBlockLocationProtocol, never())
+        .allocateBlock(anyLong(), anyInt(),
+            any(ReplicationConfig.class), anyString(),
+            any(ExcludeList.class), anyString());
+
+    verify(scmBlockLocationProtocol, never())
+        .allocateBlock(anyLong(), anyInt(),
+            any(ReplicationConfig.class), anyString(),
+            any(ExcludeList.class), anyString());
+
+    assertTrue(modifiedOmRequest.hasCreateKeyRequest());
+    CreateKeyRequest responseCreateKeyRequest =
+        modifiedOmRequest.getCreateKeyRequest();
+    assertEquals(0,
+        responseCreateKeyRequest.getKeyArgs().getKeyLocationsCount(),
+        "Empty key should have no key locations");
+
+    assertEquals(0,
+        responseCreateKeyRequest.getKeyArgs().getDataSize(),
+        "Empty key should have dataSize of 0");
+  }
+
+  /**
+   * Test that SCM's allocateBlock is still called when creating a key
+   * without explicitly setting dataSize (should use default scmBlockSize).
+   */
+  @Test
+  public void testKeyWithoutDataSizeCallsScmAllocateBlock() throws Exception {
+    // Reset the mock to clear any previous interactions
+    reset(scmBlockLocationProtocol);
+
+    // Setup mock to return valid blocks
+    Pipeline pipeline = Pipeline.newBuilder()
+        .setState(Pipeline.PipelineState.OPEN)
+        .setId(PipelineID.randomId())
+        .setReplicationConfig(
+            StandaloneReplicationConfig.getInstance(
+                org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE))
+        .setNodes(new ArrayList<>())
+        .build();
+
+    AllocatedBlock.Builder blockBuilder = new AllocatedBlock.Builder()
+        .setPipeline(pipeline)
+        .setContainerBlockID(new ContainerBlockID(CONTAINER_ID, LOCAL_ID));
+
+    when(scmBlockLocationProtocol.allocateBlock(
+            anyLong(), anyInt(),
+            any(ReplicationConfig.class), anyString(),
+            any(ExcludeList.class), anyString()))
+        .thenAnswer(invocation -> {
+          int num = invocation.getArgument(1);
+          List<AllocatedBlock> allocatedBlocks = new ArrayList<>(num);
+          for (int i = 0; i < num; i++) {
+            blockBuilder.setContainerBlockID(
+                new ContainerBlockID(CONTAINER_ID + i, LOCAL_ID + i));
+            allocatedBlocks.add(blockBuilder.build());
+          }
+          return allocatedBlocks;
+        });
+
+    // Create a key request without setting dataSize (should default to scmBlockSize)
+    KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
+        .setVolumeName(volumeName).setBucketName(bucketName)
+        .setKeyName(keyName).setIsMultipartKey(false)
+        .setFactor(
+            ((RatisReplicationConfig) replicationConfig).getReplicationFactor())
+        .setType(replicationConfig.getReplicationType())
+        .setLatestVersionLocation(true);
+
+    CreateKeyRequest createKeyRequest =
+        CreateKeyRequest.newBuilder().setKeyArgs(keyArgs).build();
+
+    OMRequest omRequest = OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.CreateKey)
+        .setClientId(UUID.randomUUID().toString())
+        .setCreateKeyRequest(createKeyRequest).build();
+
+    OMKeyCreateRequest omKeyCreateRequest = getOMKeyCreateRequest(omRequest);
+
+    OMRequest modifiedOmRequest = omKeyCreateRequest.preExecute(ozoneManager);
+
+    verify(scmBlockLocationProtocol, atLeastOnce())
+        .allocateBlock(anyLong(), anyInt(),
+            any(ReplicationConfig.class), anyString(),
+            any(ExcludeList.class), anyString());
+
+    // Verify key locations are present in the response
+    assertTrue(modifiedOmRequest.hasCreateKeyRequest());
+    CreateKeyRequest responseCreateKeyRequest =
+        modifiedOmRequest.getCreateKeyRequest();
+    assertTrue(
+        responseCreateKeyRequest.getKeyArgs().getKeyLocationsCount() > 0,
+        "Key without explicit dataSize should have key locations allocated");
   }
 
   protected void addToKeyTable(String keyName) throws Exception {
