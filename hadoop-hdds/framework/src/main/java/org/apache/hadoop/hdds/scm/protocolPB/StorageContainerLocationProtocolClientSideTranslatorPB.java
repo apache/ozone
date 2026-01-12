@@ -204,6 +204,34 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     return response;
   }
 
+  /**
+   * Helper method to wrap the request and send the message to a specific SCM node.
+   * This is used for operations that need to query a specific SCM node in an HA cluster.
+   *
+   * @param nodeId the SCM node ID to send the request to
+   * @param type the request type
+   * @param builderConsumer consumer to populate the request specific fields
+   * @return the response from the specified SCM node
+   */
+  private ScmContainerLocationResponse submitRequestToNode(
+      String nodeId,
+      StorageContainerLocationProtocolProtos.Type type,
+      Consumer<Builder> builderConsumer) throws IOException {
+    try {
+      StorageContainerLocationProtocolPB proxy = fpp.getProxyForNode(nodeId);
+      Builder builder = ScmContainerLocationRequest.newBuilder()
+          .setCmdType(type)
+          .setVersion(ClientVersion.CURRENT_VERSION)
+          .setTraceID(TracingUtil.exportCurrentSpan());
+      builderConsumer.accept(builder);
+      ScmContainerLocationRequest wrapper = builder.build();
+      
+      return proxy.submitRequest(NULL_RPC_CONTROLLER, wrapper);
+    } catch (ServiceException ex) {
+      throw ProtobufHelper.getRemoteException(ex);
+    }
+  }
+
   private ScmContainerLocationResponse submitRpcRequest(
       ScmContainerLocationRequest wrapper) throws ServiceException {
     if (!ADMIN_COMMAND_TYPE.contains(wrapper.getCmdType())) {
@@ -847,13 +875,21 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         submitRequest(Type.GetSafeModeRuleStatuses,
             builder -> builder.setGetSafeModeRuleStatusesRequest(request))
             .getGetSafeModeRuleStatusesResponse();
-    Map<String, Pair<Boolean, String>> map = new HashMap();
-    for (SafeModeRuleStatusProto statusProto :
-        response.getSafeModeRuleStatusesProtoList()) {
-      map.put(statusProto.getRuleName(),
+    return buildSafeModeRuleStatusesMap(response);
+  }
+
+  /**
+   * Helper method to build a map from GetSafeModeRuleStatusesResponseProto.
+   * Extracts rule names and their status information.
+   */
+  private Map<String, Pair<Boolean, String>> buildSafeModeRuleStatusesMap(
+      GetSafeModeRuleStatusesResponseProto response) {
+    Map<String, Pair<Boolean, String>> ruleStatuses = new HashMap<>();
+    for (SafeModeRuleStatusProto statusProto : response.getSafeModeRuleStatusesProtoList()) {
+      ruleStatuses.put(statusProto.getRuleName(),
           Pair.of(statusProto.getValidate(), statusProto.getStatusText()));
     }
-    return map;
+    return ruleStatuses;
   }
 
   /**
@@ -877,45 +913,19 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   @Override
   public boolean inSafeModeForNode(String nodeId) throws IOException {
     InSafeModeRequestProto request = InSafeModeRequestProto.getDefaultInstance();
-
-    try {
-      StorageContainerLocationProtocolPB proxy = fpp.getProxyForNode(nodeId);
-      ScmContainerLocationRequest wrapper = ScmContainerLocationRequest.newBuilder()
-          .setCmdType(Type.InSafeMode)
-          .setVersion(ClientVersion.CURRENT_VERSION)
-          .setTraceID(TracingUtil.exportCurrentSpan())
-          .setInSafeModeRequest(request)
-          .build();
-      ScmContainerLocationResponse response = proxy.submitRequest(NULL_RPC_CONTROLLER, wrapper);
-      return response.getInSafeModeResponse().getInSafeMode();
-    } catch (Exception e) {
-      throw new IOException("Failed to get safe mode status from SCM node " + nodeId, e);
-    }
+    return submitRequestToNode(nodeId, Type.InSafeMode,
+        builder -> builder.setInSafeModeRequest(request))
+        .getInSafeModeResponse().getInSafeMode();
   }
 
   @Override
   public Map<String, Pair<Boolean, String>> getSafeModeRuleStatusesForNode(String nodeId) throws IOException {
     GetSafeModeRuleStatusesRequestProto request = GetSafeModeRuleStatusesRequestProto.getDefaultInstance();
-
-    try {
-      StorageContainerLocationProtocolPB proxy = fpp.getProxyForNode(nodeId);
-      ScmContainerLocationRequest wrapper = ScmContainerLocationRequest.newBuilder()
-          .setCmdType(Type.GetSafeModeRuleStatuses)
-          .setVersion(ClientVersion.CURRENT_VERSION)
-          .setTraceID(TracingUtil.exportCurrentSpan())
-          .setGetSafeModeRuleStatusesRequest(request)
-          .build();
-      ScmContainerLocationResponse response = proxy.submitRequest(NULL_RPC_CONTROLLER, wrapper);
-
-      Map<String, Pair<Boolean, String>> ruleStatuses = new HashMap<>();
-      for (SafeModeRuleStatusProto statusProto :
-          response.getGetSafeModeRuleStatusesResponse().getSafeModeRuleStatusesProtoList()) {
-        ruleStatuses.put(statusProto.getRuleName(), Pair.of(statusProto.getValidate(), statusProto.getStatusText()));
-      }
-      return ruleStatuses;
-    } catch (Exception e) {
-      throw new IOException("Failed to get safe mode rule statuses from SCM node " + nodeId, e);
-    }
+    GetSafeModeRuleStatusesResponseProto response =
+        submitRequestToNode(nodeId, Type.GetSafeModeRuleStatuses,
+            builder -> builder.setGetSafeModeRuleStatusesRequest(request))
+            .getGetSafeModeRuleStatusesResponse();
+    return buildSafeModeRuleStatusesMap(response);
   }
 
   @Override

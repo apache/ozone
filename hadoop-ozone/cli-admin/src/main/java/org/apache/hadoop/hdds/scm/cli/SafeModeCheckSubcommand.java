@@ -135,7 +135,7 @@ public class SafeModeCheckSubcommand extends ScmSubcommand {
         }
       }
     } catch (Exception e) {
-      System.out.printf("%s [%s]: ERROR: %s%n",
+      System.out.printf("%s [%s]: ERROR: Failed to get safe mode status - %s%n",
           node.getScmClientAddress(), nodeId, e.getMessage());
     }
   }

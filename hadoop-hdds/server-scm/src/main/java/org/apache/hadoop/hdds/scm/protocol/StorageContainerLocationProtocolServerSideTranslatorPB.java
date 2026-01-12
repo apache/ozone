@@ -211,7 +211,9 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   @Override
   public ScmContainerLocationResponse submitRequest(RpcController controller,
       ScmContainerLocationRequest request) throws ServiceException {
-    // not leader or not belong to admin command.
+    // Trigger not leader exception unless:
+    // This is the leader node, or this is an admin command, 
+    // or this is a follower-readable command.
     if (!scm.checkLeader()
         && !ADMIN_COMMAND_TYPE.contains(request.getCmdType())
         && !FOLLOWER_READABLE_COMMAND_TYPE.contains(request.getCmdType())) {
