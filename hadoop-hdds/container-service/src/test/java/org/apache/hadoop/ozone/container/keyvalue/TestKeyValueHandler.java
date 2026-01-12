@@ -1009,6 +1009,7 @@ public class TestKeyValueHandler {
   @Test
   public void testReadBlockMetrics() throws Exception {
     Path testDir = Files.createTempDirectory("testReadBlockMetrics");
+    RandomAccessFileChannel blockFile = null;
     try {
       conf.set(OZONE_SCM_CONTAINER_LAYOUT_KEY, ContainerLayoutVersion.FILE_PER_BLOCK.name());
       HandlerWithVolumeSet handlerWithVolume = createKeyValueHandlerWithVolumeSet(testDir);
@@ -1067,7 +1068,7 @@ public class TestKeyValueHandler {
             }
           };
 
-      RandomAccessFileChannel blockFile = new RandomAccessFileChannel();
+      blockFile = new RandomAccessFileChannel();
       ContainerCommandResponseProto response = kvHandler.readBlock(
           readBlockRequest, container, blockFile, streamObserver);
       
@@ -1078,6 +1079,9 @@ public class TestKeyValueHandler {
           ContainerMetrics.STORAGE_CONTAINER_METRICS);
       assertCounter("bytesReadBlock", 1024L, containerMetrics);
     } finally {
+      if (blockFile != null) {
+        blockFile.close();
+      }
       FileUtils.deleteDirectory(testDir.toFile());
       ContainerMetrics.remove();
     }
