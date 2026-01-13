@@ -136,6 +136,7 @@ public class SCMSafeModeManager implements SafeModeManager {
   private void emitSafeModeStatus() {
     final SafeModeStatus safeModeStatus = status.get();
     scmContext.updateSafeModeStatus(safeModeStatus);
+    logSafeModeStatus();
 
     // notify SCMServiceManager
     if (!safeModeStatus.isInSafeMode()) {
@@ -165,14 +166,12 @@ public class SCMSafeModeManager implements SafeModeManager {
     // and notify listeners.
     if (validatedPreCheckRules.size() == preCheckRules.size()
         && status.compareAndSet(SafeModeStatus.INITIAL, SafeModeStatus.PRE_CHECKS_PASSED)) {
-      logSafeModeStatus();
       LOG.info("All SCM safe mode pre check rules have passed");
       emitSafeModeStatus();
     }
 
     if (validatedRules.size() == exitRules.size()
         && status.compareAndSet(SafeModeStatus.PRE_CHECKS_PASSED, SafeModeStatus.OUT_OF_SAFE_MODE)) {
-      logSafeModeStatus();
       // All rules are satisfied, we can exit safe mode.
       LOG.info("ScmSafeModeManager, all rules are successfully validated");
       LOG.info("SCM exiting safe mode.");
@@ -183,7 +182,6 @@ public class SCMSafeModeManager implements SafeModeManager {
   public void forceExitSafeMode() {
     LOG.info("SCM force-exiting safe mode.");
     status.set(SafeModeStatus.OUT_OF_SAFE_MODE);
-    logSafeModeStatus();
     emitSafeModeStatus();
   }
 
@@ -271,7 +269,7 @@ public class SCMSafeModeManager implements SafeModeManager {
       } catch (Throwable t) {
         LOG.warn("Safe mode periodic logger encountered an error", t);
       }
-    }, 0L, safeModeLogIntervalMs, TimeUnit.MILLISECONDS);
+    }, safeModeLogIntervalMs, safeModeLogIntervalMs, TimeUnit.MILLISECONDS);
     LOG.info("Started periodic Safe Mode logging with interval {} ms", safeModeLogIntervalMs);
   }
 
