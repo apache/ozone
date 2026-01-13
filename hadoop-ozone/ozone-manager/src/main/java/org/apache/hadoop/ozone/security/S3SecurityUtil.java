@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.security;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_TOKEN;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.REVOKED_TOKEN;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
@@ -181,13 +180,9 @@ public final class S3SecurityUtil {
    */
   private static boolean isOriginalAccessKeyIdRevoked(STSTokenIdentifier stsTokenIdentifier, OzoneManager ozoneManager)
       throws OMException {
+    // We already know originalAccessKeyId is not null from STSSecurityUtil.ensureEssentialFieldsArePresentInToken()
+    // method called from STSSecurityUtil.constructValidateAndDecryptSTSToken() method above
     final String originalAccessKeyId = stsTokenIdentifier.getOriginalAccessKeyId();
-    if (originalAccessKeyId == null) {
-      // This should not happen for valid STS tokens
-      final String msg = "Could not retrieve originalAccessKeyId for token: " + stsTokenIdentifier.getTempAccessKeyId();
-      LOG.warn(msg);
-      throw new OMException(msg, INVALID_REQUEST);
-    }
     try {
       // If the secret for the original principal is missing, it means it was revoked
       return !ozoneManager.getS3SecretManager().hasS3Secret(originalAccessKeyId);
