@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getECContainer;
+import static org.apache.ratis.util.Preconditions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -347,7 +348,7 @@ public class TestContainerStateManager {
 
     DeleteContainerCommand deleteCommand =
         (DeleteContainerCommand) commandCaptor.getValue().getCommand();
-    assertEquals(true, deleteCommand.isForce());
+    assertTrue(deleteCommand.isForce());
   }
 
   /**
