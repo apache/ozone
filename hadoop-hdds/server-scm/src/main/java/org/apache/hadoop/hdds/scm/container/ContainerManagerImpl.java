@@ -76,8 +76,6 @@ public class ContainerManagerImpl implements ContainerManager {
   // Metrics related to operations should be moved to ProtocolServer
   private final SCMContainerManagerMetrics scmContainerManagerMetrics;
 
-  private final int numContainerPerVolume;
-
   @SuppressWarnings("java:S2245") // no need for secure random
   private final Random random = new Random();
 
@@ -107,10 +105,6 @@ public class ContainerManagerImpl implements ContainerManager {
         .setSCMDBTransactionBuffer(scmHaManager.getDBTransactionBuffer())
         .setContainerReplicaPendingOps(containerReplicaPendingOps)
         .build();
-
-    this.numContainerPerVolume = conf
-        .getInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
-            ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
 
     maxContainerSize = (long) conf.getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
@@ -281,7 +275,11 @@ public class ContainerManagerImpl implements ContainerManager {
     lock.lock();
     try {
       if (containerExist(cid)) {
-        containerStateManager.updateContainerState(protoId, event);
+        final ContainerInfo info = containerStateManager.getContainer(cid);
+        if (info != null) {
+          // Delegate to @Replicate method with current sequenceId
+          containerStateManager.updateContainerStateWithSequenceId(protoId, event, info.getSequenceId());
+        }
       } else {
         throw new ContainerNotFoundException(cid);
       }
@@ -351,7 +349,7 @@ public class ContainerManagerImpl implements ContainerManager {
     try {
       synchronized (pipeline.getId()) {
         containerIDs = getContainersForOwner(pipeline, owner);
-        if (containerIDs.size() < getOpenContainerCountPerPipeline(pipeline)) {
+        if (containerIDs.size() < pipelineManager.openContainerLimit(pipeline.getNodes())) {
           if (pipelineManager.hasEnoughSpace(pipeline, maxContainerSize)) {
             allocateContainer(pipeline, owner);
             containerIDs = getContainersForOwner(pipeline, owner);
@@ -377,14 +375,6 @@ public class ContainerManagerImpl implements ContainerManager {
       LOG.warn("Container allocation failed on pipeline={}", pipeline, e);
       return null;
     }
-  }
-
-  private int getOpenContainerCountPerPipeline(Pipeline pipeline) {
-    int minContainerCountPerDn = numContainerPerVolume *
-        pipelineManager.minHealthyVolumeNum(pipeline);
-    int minPipelineCountPerDn = pipelineManager.minPipelineLimit(pipeline);
-    return (int) Math.ceil(
-        ((double) minContainerCountPerDn / minPipelineCountPerDn));
   }
 
   /**

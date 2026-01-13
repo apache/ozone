@@ -100,7 +100,7 @@ public class ReconUtils {
   /**
    * Get the current rebuild state of NSSummary tree.
    * Delegates to NSSummaryTask's unified control mechanism.
-   * 
+   *
    * @return current RebuildState from NSSummaryTask
    */
   public static org.apache.hadoop.ozone.recon.tasks.NSSummaryTask.RebuildState getNSSummaryRebuildState() {

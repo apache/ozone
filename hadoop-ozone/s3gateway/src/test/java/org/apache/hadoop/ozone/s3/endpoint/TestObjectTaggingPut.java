@@ -65,7 +65,7 @@ public class TestObjectTaggingPut {
     clientStub.getObjectStore().createS3Bucket(BUCKET_NAME);
 
     HttpHeaders headers = mock(HttpHeaders.class);
-    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("UNSIGNED-PAYLOAD");
 
     // Create PutObject and setClient to OzoneClientStub
     objectEndpoint = EndpointBuilder.newObjectEndpointBuilder()

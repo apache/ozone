@@ -117,7 +117,7 @@ public class VolumeUsage {
    * Calculate available space use method B.
    * |----used----|   (avail)   |++++++++reserved++++++++|
    *              |     fsAvail      |-------other-------|
-   *                          -&gt;|~~~~|&lt;-
+   *                          ->|~~~~|<-
    *                      remainingReserved
    * }
    * </pre>
@@ -175,9 +175,8 @@ public class VolumeUsage {
     return reservedInBytes;
   }
 
-  private static long getUsableSpace(
-      long available, long committed, long minFreeSpace) {
-    return available - committed - minFreeSpace;
+  public static long getUsableSpace(long available, long committed, long spared) {
+    return available - committed - spared;
   }
 
   public static long getUsableSpace(StorageReportProto report) {

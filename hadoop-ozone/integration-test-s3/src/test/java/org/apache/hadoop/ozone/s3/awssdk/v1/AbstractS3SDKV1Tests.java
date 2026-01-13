@@ -1350,6 +1350,41 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
     }
 
     @Test
+    public void testPresignedUrlPutSingleChunkWithWrongSha256() throws Exception {
+      final String keyName = getKeyName();
+
+      // Test PutObjectRequest presigned URL
+      GeneratePresignedUrlRequest generatePresignedUrlRequest =
+          new GeneratePresignedUrlRequest(BUCKET_NAME, keyName).withMethod(HttpMethod.PUT).withExpiration(expiration);
+      URL presignedUrl = s3Client.generatePresignedUrl(generatePresignedUrlRequest);
+
+      Map<String, List<String>> headers = new HashMap<>();
+      List<String> sha256Value = new ArrayList<>();
+      sha256Value.add("wrong-sha256-value");
+      headers.put("x-amz-content-sha256", sha256Value);
+
+      HttpURLConnection connection = null;
+      try {
+        connection = S3SDKTestUtils.openHttpURLConnection(presignedUrl, "PUT",
+            headers, CONTENT.getBytes(StandardCharsets.UTF_8));
+        int responseCode = connection.getResponseCode();
+        assertEquals(400, responseCode, "PutObject presigned URL should return 400 because of wrong SHA256");
+      } finally {
+        if (connection != null) {
+          connection.disconnect();
+        }
+      }
+
+      // Verify the object was not uploaded
+      AmazonServiceException ase = assertThrows(AmazonServiceException.class,
+          () -> s3Client.getObject(BUCKET_NAME, keyName));
+
+      assertEquals(ErrorType.Client, ase.getErrorType());
+      assertEquals(404, ase.getStatusCode());
+      assertEquals("NoSuchKey", ase.getErrorCode());
+    }
+
+    @Test
     public void testPresignedUrlMultipartUpload(@TempDir Path tempDir) throws Exception {
       final String keyName = getKeyName();
       final Map<String, String> userMetadata = new HashMap<>();
