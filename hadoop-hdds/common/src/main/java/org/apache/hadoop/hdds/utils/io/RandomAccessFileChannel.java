@@ -87,6 +87,7 @@ public class RandomAccessFileChannel implements Closeable {
    * In case of exception, this method catches the exception, logs a warning message,
    * and then continue closing the remaining resources.
    */
+  @Override
   public synchronized void close() {
     if (blockFile == null) {
       return;
