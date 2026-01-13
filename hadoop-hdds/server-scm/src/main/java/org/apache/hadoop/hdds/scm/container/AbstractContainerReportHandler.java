@@ -313,6 +313,11 @@ abstract class AbstractContainerReportHandler {
         deleteReplica(containerId, datanode, publisher, "DELETED", false, detailsForLogging);
         return false;
       }
+      if (replica.getState() == State.CLOSED && replica.getBlockCommitSequenceId() <= container.getSequenceId()
+          && container.getReplicationType().equals(HddsProtos.ReplicationType.RATIS)) {
+        deleteReplica(containerId, datanode, publisher, "DELETED", true, detailsForLogging);
+        return false;
+      }
       // HDDS-12421: fall-through to case DELETING
     case DELETING:
       // HDDS-11136: If a DELETING container has a non-empty CLOSED replica, transition the container to CLOSED
