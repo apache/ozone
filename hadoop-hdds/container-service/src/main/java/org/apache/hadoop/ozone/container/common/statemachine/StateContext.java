@@ -911,6 +911,17 @@ public class StateContext {
     }
   }
 
+  public void removeEndpoint(InetSocketAddress endpoint) {
+    this.endpoints.remove(endpoint);
+    this.containerActions.remove(endpoint);
+    this.pipelineActions.remove(endpoint);
+    this.incrementalReportsQueue.remove(endpoint);
+    this.isFullReportReadyToBeSent.remove(endpoint);
+    if (getQueueMetrics() != null) {
+      getQueueMetrics().removeEndpoint(endpoint);
+    }
+  }
+
   @VisibleForTesting
   public Message getContainerReports() {
     return containerReports.get();

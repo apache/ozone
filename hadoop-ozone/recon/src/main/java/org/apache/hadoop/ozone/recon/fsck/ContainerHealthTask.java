@@ -385,7 +385,7 @@ public class ContainerHealthTask extends ReconScmTask {
           containerReplicas, placementPolicy,
           reconContainerMetadataManager, conf);
 
-      if ((h.isHealthilyReplicated() && !h.isDataChecksumMismatched()) || h.isDeleted()) {
+      if ((h.isHealthilyReplicated() && !h.areChecksumsMismatched()) || h.isDeleted()) {
         return;
       }
       // For containers deleted in SCM, we sync the container state here.
@@ -563,7 +563,7 @@ public class ContainerHealthTask extends ReconScmTask {
         Map<UnHealthyContainerStates, Map<String, Long>>
             unhealthyContainerStateStatsMap) {
       List<UnhealthyContainers> records = new ArrayList<>();
-      if ((container.isHealthilyReplicated() && !container.isDataChecksumMismatched()) || container.isDeleted()) {
+      if ((container.isHealthilyReplicated() && !container.areChecksumsMismatched()) || container.isDeleted()) {
         return records;
       }
 
@@ -610,7 +610,7 @@ public class ContainerHealthTask extends ReconScmTask {
         populateContainerStats(container, UnHealthyContainerStates.OVER_REPLICATED, unhealthyContainerStateStatsMap);
       }
 
-      if (container.isDataChecksumMismatched()
+      if (container.areChecksumsMismatched()
               && !recordForStateExists.contains(
               UnHealthyContainerStates.REPLICA_MISMATCH.toString())) {
         records.add(recordForState(
@@ -686,7 +686,7 @@ public class ContainerHealthTask extends ReconScmTask {
 
     private static boolean keepReplicaMismatchRecord(
             ContainerHealthStatus container, UnhealthyContainersRecord rec) {
-      if (container.isDataChecksumMismatched()) {
+      if (container.areChecksumsMismatched()) {
         updateExpectedReplicaCount(rec, container.getReplicationFactor());
         updateActualReplicaCount(rec, container.getReplicaCount());
         updateReplicaDelta(rec, container.replicaDelta());

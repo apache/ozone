@@ -556,7 +556,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
         createDbStore(any());
     Map volumeMap = new HashMap<String, StorageVolume>();
     volumeMap.put(dataVolume.getStorageID(), volume);
-    dsm.getContainer().getVolumeSet().setVolumeMap(volumeMap);
+    dsm.getContainer().getVolumeSet().setVolumeMapForTesting(volumeMap);
 
     // Finalize will fail because of DB creation failure
     try {

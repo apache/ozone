@@ -30,16 +30,13 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -54,7 +51,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.slf4j.Logger;
@@ -744,22 +740,10 @@ public final class OMFileRequest {
   public static OmKeyInfo getOmKeyInfo(String volumeName, String bucketName,
       OmDirectoryInfo dirInfo, String keyName) {
 
-    return new OmKeyInfo.Builder()
-        .setParentObjectID(dirInfo.getParentObjectID())
-        .setKeyName(keyName)
-        .setAcls(dirInfo.getAcls())
-        .addAllMetadata(dirInfo.getMetadata())
+    return dirInfo.toKeyInfoBuilder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setCreationTime(dirInfo.getCreationTime())
-        .setModificationTime(dirInfo.getModificationTime())
-        .setObjectID(dirInfo.getObjectID())
-        .setUpdateID(dirInfo.getUpdateID())
-        .setReplicationConfig(RatisReplicationConfig
-            .getInstance(HddsProtos.ReplicationFactor.ONE))
-        .setOmKeyLocationInfos(Collections.singletonList(
-            new OmKeyLocationInfoGroup(0, new ArrayList<>())))
-        .setOwnerName(dirInfo.getOwner())
+        .setKeyName(keyName)
         .build();
   }
 
@@ -786,16 +770,7 @@ public final class OMFileRequest {
    * @return omDirectoryInfo object
    */
   public static OmDirectoryInfo getDirectoryInfo(OmKeyInfo keyInfo) {
-    return new OmDirectoryInfo.Builder()
-        .setParentObjectID(keyInfo.getParentObjectID())
-        .setAcls(keyInfo.getAcls())
-        .addAllMetadata(keyInfo.getMetadata())
-        .setCreationTime(keyInfo.getCreationTime())
-        .setModificationTime(keyInfo.getModificationTime())
-        .setObjectID(keyInfo.getObjectID())
-        .setUpdateID(keyInfo.getUpdateID())
-        .setName(OzoneFSUtils.getFileName(keyInfo.getKeyName()))
-        .build();
+    return keyInfo.toDirectoryInfoBuilder().build();
   }
 
   /**

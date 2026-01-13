@@ -21,6 +21,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.commons.lang3.StringUtils.isNotEmpty;
 import static org.apache.commons.lang3.StringUtils.leftPad;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
+import static org.apache.hadoop.hdds.utils.db.IteratorType.KEY_AND_VALUE;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
@@ -100,13 +101,14 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CompactionLogEntryProto;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileIterator;
+import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileIterator;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
@@ -2521,12 +2523,12 @@ public abstract class TestOmSnapshot {
                 java.nio.file.Path file = sstBackUpDir.resolve(f.getFileName() + ".sst");
                 if (COLUMN_FAMILIES_TO_TRACK_IN_DAG.contains(f.getColumnFamily()) && java.nio.file.Files.exists(file)) {
                   assertTrue(f.isPruned());
-                  try (ManagedRawSSTFileReader<byte[]> sstFileReader = new ManagedRawSSTFileReader<>(
+                  try (ManagedRawSSTFileReader sstFileReader = new ManagedRawSSTFileReader(
                           managedOptions, file.toFile().getAbsolutePath(), 2 * 1024 * 1024);
-                       ManagedRawSSTFileIterator<byte[]> itr = sstFileReader.newIterator(
-                           keyValue -> keyValue.getValue(), null, null)) {
+                       ManagedRawSSTFileIterator<CodecBuffer> itr = sstFileReader.newIterator(
+                           ManagedRawSSTFileIterator.KeyValue::getValue, null, null, KEY_AND_VALUE)) {
                     while (itr.hasNext()) {
-                      assertEquals(0, itr.next().length);
+                      assertEquals(0, itr.next().readableBytes());
                     }
                   }
                 } else {

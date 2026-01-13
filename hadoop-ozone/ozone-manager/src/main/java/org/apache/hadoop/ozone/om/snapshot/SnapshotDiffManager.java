@@ -101,12 +101,13 @@ import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.NativeLibraryNotLoadedException;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
+import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.SstFileSetReader;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffType;
@@ -135,7 +136,6 @@ import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.SubStatus;
 import org.apache.hadoop.ozone.util.ClosableIterator;
 import org.apache.logging.log4j.util.Strings;
 import org.apache.ozone.rocksdb.util.SstFileInfo;
-import org.apache.ozone.rocksdb.util.SstFileSetReader;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.rocksdb.ColumnFamilyDescriptor;
@@ -1123,16 +1123,12 @@ public class SnapshotDiffManager implements AutoCloseable {
           throw new RuntimeException(e);
         }
       }
-    } catch (RocksDBException rocksDBException) {
-      // TODO: [SNAPSHOT] Gracefully handle exception
-      //  e.g. when input files do not exist
-      throw new RuntimeException(rocksDBException);
     }
   }
 
   private void validateEstimatedKeyChangesAreInLimits(
       SstFileSetReader sstFileReader
-  ) throws RocksDBException, IOException {
+  ) throws IOException {
     if (sstFileReader.getEstimatedTotalKeys() >
         maxAllowedKeyChangesForASnapDiff) {
       // TODO: [SNAPSHOT] HDDS-8202: Change it to custom snapshot exception.

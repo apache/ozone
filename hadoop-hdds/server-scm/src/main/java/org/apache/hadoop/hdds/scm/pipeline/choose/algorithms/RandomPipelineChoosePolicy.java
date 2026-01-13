@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.pipeline.choose.algorithms;
 
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PipelineRequestInformation;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -46,6 +47,9 @@ public class RandomPipelineChoosePolicy implements PipelineChoosePolicy {
   @Override
   public int choosePipelineIndex(List<Pipeline> pipelineList,
       PipelineRequestInformation pri) {
-    return (int) (Math.random() * pipelineList.size());
+    if (pipelineList.isEmpty()) {
+      return -1;
+    }
+    return ThreadLocalRandom.current().nextInt(pipelineList.size());
   }
 }

@@ -235,7 +235,7 @@ public class TestVolumeSet {
 
     // Verify that volume usage can be queried during shutdown.
     for (StorageVolume volume : volumesList) {
-      assertThat(volume.getVolumeUsage()).isPresent();
+      assertThat(volume.getVolumeUsage()).isNotNull();
       volume.getCurrentUsage();
     }
   }

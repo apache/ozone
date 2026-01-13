@@ -26,6 +26,7 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getDummyCommandRequestProto;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
@@ -37,6 +38,7 @@ import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.UUID;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -45,6 +47,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
 import org.junit.jupiter.api.BeforeEach;
@@ -125,13 +128,13 @@ public class TestContainerUtils {
       // Read should return an empty value if file doesn't exist
       File nonExistFile = new File(tempDir, "non_exist.id");
       assertThrows(IOException.class,
-          () -> ContainerUtils.readDatanodeDetailsFrom(nonExistFile));
+          () -> ContainerUtils.readDatanodeDetailsFrom(nonExistFile, conf));
 
       // Read should fail if the file is malformed
       File malformedFile = new File(tempDir, "malformed.id");
       createMalformedIDFile(malformedFile);
       assertThrows(IOException.class,
-          () -> ContainerUtils.readDatanodeDetailsFrom(malformedFile));
+          () -> ContainerUtils.readDatanodeDetailsFrom(malformedFile, conf));
 
       // Test upgrade scenario - protobuf file instead of yaml
       File protoFile = new File(tempDir, "valid-proto.id");
@@ -139,11 +142,48 @@ public class TestContainerUtils {
         HddsProtos.DatanodeDetailsProto proto = id1.getProtoBufMessage();
         proto.writeTo(out);
       }
-      assertDetailsEquals(id1, ContainerUtils.readDatanodeDetailsFrom(protoFile));
+      assertDetailsEquals(id1, ContainerUtils.readDatanodeDetailsFrom(protoFile, conf));
 
       id1.setInitialVersion(1);
       assertWriteRead(tempDir, id1);
     }
+  }
+
+  @Test
+  public void testDatanodeIdRecovery(@TempDir File tempDir) throws IOException {
+    // 1. Setup storage directory and VERSION file
+    String datanodeUuid = UUID.randomUUID().toString();
+    File storageDir = new File(tempDir, "datanode-storage");
+    assertTrue(storageDir.mkdirs());
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, storageDir.getAbsolutePath());
+
+    File hddsSubDir = new File(storageDir, "hdds");
+    assertTrue(hddsSubDir.mkdirs());
+    File versionFile = new File(hddsSubDir, "VERSION");
+    DatanodeVersionFile dnVersionFile = new DatanodeVersionFile(
+        "storage-id", "cluster-id", datanodeUuid, System.currentTimeMillis(), 0);
+    dnVersionFile.createVersionFile(versionFile);
+
+    // 2. Simulate a corrupted/empty datanode.id file
+    File datanodeIdFile = new File(tempDir, "datanode.id");
+    assertTrue(datanodeIdFile.createNewFile());
+
+    assertEquals(0, datanodeIdFile.length(), "Datanode ID file should be empty initially");
+
+    // 3. Call readDatanodeDetailsFrom and verify recovery
+    DatanodeDetails recoveredDetails =
+        ContainerUtils.readDatanodeDetailsFrom(datanodeIdFile, conf);
+
+    // 4. Assertions
+    // Recovered UUID matches the one in the VERSION file
+    assertEquals(datanodeUuid, recoveredDetails.getUuidString());
+
+    // datanode.id file is recreated and is not empty
+    assertTrue(datanodeIdFile.length() > 0, "Datanode ID file should have been recreated with content");
+
+    // The recreated file can be read normally and contains the correct UUID
+    DatanodeDetails finalDetails = ContainerUtils.readDatanodeDetailsFrom(datanodeIdFile, conf);
+    assertEquals(datanodeUuid, finalDetails.getUuidString());
   }
 
   private void assertWriteRead(@TempDir File tempDir,
@@ -152,7 +192,7 @@ public class TestContainerUtils {
     File file = new File(tempDir, "valid-values.id");
     ContainerUtils.writeDatanodeDetailsTo(details, file, conf);
 
-    DatanodeDetails read = ContainerUtils.readDatanodeDetailsFrom(file);
+    DatanodeDetails read = ContainerUtils.readDatanodeDetailsFrom(file, conf);
 
     assertDetailsEquals(details, read);
     assertEquals(details.getCurrentVersion(), read.getCurrentVersion());
@@ -163,7 +203,7 @@ public class TestContainerUtils {
     // Write a single ID to the file and read it out
     File file = new File(tempDir, "valid-values.id");
     ContainerUtils.writeDatanodeDetailsTo(details, file, conf);
-    DatanodeDetails read = ContainerUtils.readDatanodeDetailsFrom(file);
+    DatanodeDetails read = ContainerUtils.readDatanodeDetailsFrom(file, conf);
     assertEquals(details.getIpAddress(), read.getIpAddress());
     read.validateDatanodeIpAddress();
     assertEquals("127.0.0.1", read.getIpAddress());

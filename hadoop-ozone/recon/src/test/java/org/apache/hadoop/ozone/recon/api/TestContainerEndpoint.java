@@ -64,6 +64,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.scm.container.ContainerChecksums;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerStateManager;
@@ -508,8 +509,7 @@ public class TestContainerEndpoint {
     // Set up test data for FSO keys
     setUpFSOData();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
-        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
-            reconOMMetadataManager, 10);
+        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager, reconOMMetadataManager, 10, 5, 20, 2000);
     nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
     // Reprocess the container key mapper to ensure the latest mapping is used
     reprocessContainerKeyMapper();
@@ -596,8 +596,7 @@ public class TestContainerEndpoint {
     // Reprocess the container key mapper to ensure the latest mapping is used
     reprocessContainerKeyMapper();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
-        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
-            reconOMMetadataManager, 10);
+        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager, reconOMMetadataManager, 10, 5, 20, 2000);
     nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
     response = containerEndpoint.getKeysForContainer(20L, -1, "/0/1/2/file7");
 
@@ -1074,12 +1073,12 @@ public class TestContainerEndpoint {
     final UUID u2 = newDatanode("host2", "127.0.0.2");
     final UUID u3 = newDatanode("host3", "127.0.0.3");
     final UUID u4 = newDatanode("host4", "127.0.0.4");
-    reconContainerManager.upsertContainerHistory(1L, u1, 1L, 1L, "OPEN", 1234L);
-    reconContainerManager.upsertContainerHistory(1L, u2, 2L, 1L, "OPEN", 1234L);
-    reconContainerManager.upsertContainerHistory(1L, u3, 3L, 1L, "OPEN", 1234L);
-    reconContainerManager.upsertContainerHistory(1L, u4, 4L, 1L, "OPEN", 1234L);
+    reconContainerManager.upsertContainerHistory(1L, u1, 1L, 1L, "OPEN", ContainerChecksums.of(1234L, 0L));
+    reconContainerManager.upsertContainerHistory(1L, u2, 2L, 1L, "OPEN", ContainerChecksums.of(1234L, 0L));
+    reconContainerManager.upsertContainerHistory(1L, u3, 3L, 1L, "OPEN", ContainerChecksums.of(1234L, 0L));
+    reconContainerManager.upsertContainerHistory(1L, u4, 4L, 1L, "OPEN", ContainerChecksums.of(1234L, 0L));
 
-    reconContainerManager.upsertContainerHistory(1L, u1, 5L, 1L, "OPEN", 1234L);
+    reconContainerManager.upsertContainerHistory(1L, u1, 5L, 1L, "OPEN", ContainerChecksums.of(1234L, 0L));
 
     Response response = containerEndpoint.getReplicaHistoryForContainer(1L);
     List<ContainerHistory> histories =
@@ -1189,13 +1188,13 @@ public class TestContainerEndpoint {
     long differentChecksum = dataChecksumMismatch ? 2345L : 1234L;
 
     reconContainerManager.upsertContainerHistory(cID, uuid1, 1L, 1L,
-        "UNHEALTHY", differentChecksum);
+        "UNHEALTHY", ContainerChecksums.of(differentChecksum, 0L));
     reconContainerManager.upsertContainerHistory(cID, uuid2, 2L, 1L,
-        "UNHEALTHY", differentChecksum);
+        "UNHEALTHY", ContainerChecksums.of(differentChecksum, 0L));
     reconContainerManager.upsertContainerHistory(cID, uuid3, 3L, 1L,
-        "UNHEALTHY", 1234L);
+        "UNHEALTHY", ContainerChecksums.of(1234L, 0L));
     reconContainerManager.upsertContainerHistory(cID, uuid4, 4L, 1L,
-        "UNHEALTHY", 1234L);
+        "UNHEALTHY", ContainerChecksums.of(1234L, 0L));
   }
 
   protected ContainerWithPipeline getTestContainer(
@@ -1468,7 +1467,7 @@ public class TestContainerEndpoint {
             .stream().map(entry -> entry.getKey()).collect(
                 Collectors.toList());
     deletedContainerKeyList.forEach((ContainerKeyPrefix key) -> {
-      try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
+      try (RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation()) {
         reconContainerMetadataManager
             .batchDeleteContainerMapping(rdbBatchOperation, key);
         reconContainerMetadataManager.commitBatchOperation(rdbBatchOperation);
@@ -1505,7 +1504,7 @@ public class TestContainerEndpoint {
         reconContainerMetadataManager.getKeyPrefixesForContainer(2).entrySet()
             .stream().map(entry -> entry.getKey()).collect(Collectors.toList());
     deletedContainerKeyList.forEach((ContainerKeyPrefix key) -> {
-      try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
+      try (RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation()) {
         reconContainerMetadataManager.batchDeleteContainerMapping(
             rdbBatchOperation, key);
         reconContainerMetadataManager.commitBatchOperation(rdbBatchOperation);
@@ -1854,7 +1853,7 @@ public class TestContainerEndpoint {
     setUpDuplicateFSOFileKeys();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
         new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
-            reconOMMetadataManager, 10);
+            reconOMMetadataManager, 10, 5, 20, 2000);
     nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
     // Reprocess the container key mappings so that the new keys are loaded.
     reprocessContainerKeyMapper();

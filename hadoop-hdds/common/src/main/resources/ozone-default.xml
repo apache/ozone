@@ -209,6 +209,15 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.disk.balancer.enabled</name>
+    <value>false</value>
+    <tag>OZONE, DATANODE, DISKBALANCER</tag>
+    <description>If this property is set to true, then the Disk Balancer
+      feature is enabled on Datanodes, and users can use
+      this service. By default, this is disabled.
+    </description>
+  </property>
+  <property>
     <name>hdds.datanode.volume.choosing.policy</name>
     <value>org.apache.hadoop.ozone.container.common.volume.CapacityVolumeChoosingPolicy</value>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
@@ -370,7 +379,6 @@
       datanode periodically send pipeline report to SCM. Unit could be
       defined with postfix (ns,ms,s,m,h,d)</description>
   </property>
-
 
   <property>
     <name>hdds.prometheus.endpoint.enabled</name>
@@ -772,6 +780,16 @@
     <tag>OZONE, SCM</tag>
     <description>
       The port number of the Ozone SCM block client service.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.block.deletion.per.dn.distribution.factor</name>
+    <value>8</value>
+    <tag>OZONE, SCM</tag>
+    <description>
+      Factor with which number of delete blocks sent to each datanode in every interval.
+      If total number of DNs are 100 and hdds.scm.block.deletion.per-interval.max is 500000
+      Then maximum 500000/(100/8) = 40000 blocks will be sent to each DN in every interval.
     </description>
   </property>
   <property>
@@ -2974,7 +2992,14 @@
       Comma separated list of users and groups allowed to access reconfigure protocol.
     </description>
   </property>
-
+  <property>
+    <name>hdds.security.client.datanode.disk.balancer.protocol.acl</name>
+    <value>*</value>
+    <tag>SECURITY</tag>
+    <description>
+      Comma separated list of users and groups allowed to access disk balancer protocol.
+    </description>
+  </property>
   <property>
     <name>hdds.datanode.http.auth.kerberos.principal</name>
     <value>HTTP/_HOST@REALM</value>
@@ -3091,9 +3116,9 @@
       Expert only. Ozone RpcClient attempts talking to each OzoneManager
       ipc.client.connect.max.retries (default = 10) number of times before
       failing over to another OzoneManager, if available. This parameter
-      represents the number of times the client will failover before giving
-      up. This value is kept high so that client does not give up trying to
-      connect to OMs easily.
+      represents the number of times per request the client will failover
+      before giving up. This value is kept high so that client does not
+      give up trying to connect to OMs easily.
     </description>
   </property>
   <property>
@@ -3502,6 +3527,24 @@
       during task reinitialization. When tasks are being reprocessed on staging DB,
       this buffer holds incoming delta updates to prevent blocking the OM sync process.
       If the buffer overflows, task reinitialization will be triggered.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.dn.metrics.collection.minimum.api.delay</name>
+    <value>30s</value>
+    <tag>OZONE, RECON, DN</tag>
+    <description>
+      Minimum delay in API to start a new task for Jmx collection.
+      It behaves like a rate limiter to avoid unnecessary task creation.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.dn.metrics.collection.timeout</name>
+    <value>10m</value>
+    <tag>OZONE, RECON, DN</tag>
+    <description>
+      Maximum time taken for the api to complete.
+      If it exceeds pending tasks will be cancelled.
     </description>
   </property>
   <property>
@@ -4318,7 +4361,7 @@
       recon rocks DB containerKeyTable
     </description>
   </property>
-
+    
   <property>
     <name>ozone.recon.filesizecount.flush.db.max.threshold</name>
     <value>200000</value>
