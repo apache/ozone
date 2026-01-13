@@ -44,15 +44,21 @@ public class VolumeInfoMetrics implements MetricsSource {
       VolumeInfoMetrics.class.getSimpleName();
 
   private static final MetricsInfo CAPACITY =
-      Interns.info("Capacity", "Capacity");
+      Interns.info("OzoneCapacity", "Ozone usable capacity (after reserved space adjustment)");
   private static final MetricsInfo AVAILABLE =
-      Interns.info("Available", "Available Space");
+      Interns.info("OzoneAvailable", "Ozone available space (after reserved space adjustment)");
   private static final MetricsInfo USED =
-      Interns.info("Used", "Used Space");
+      Interns.info("OzoneUsed", "Ozone used space");
   private static final MetricsInfo RESERVED =
       Interns.info("Reserved", "Reserved Space");
   private static final MetricsInfo TOTAL_CAPACITY =
-      Interns.info("TotalCapacity", "Total Capacity");
+      Interns.info("TotalCapacity", "Ozone capacity + reserved space");
+  private static final MetricsInfo FS_CAPACITY =
+      Interns.info("FilesystemCapacity", "Filesystem capacity as reported by the local filesystem");
+  private static final MetricsInfo FS_AVAILABLE =
+      Interns.info("FilesystemAvailable", "Filesystem available space as reported by the local filesystem");
+  private static final MetricsInfo FS_USED =
+      Interns.info("FilesystemUsed", "Filesystem used space (FilesystemCapacity - FilesystemAvailable)");
 
   private final MetricsRegistry registry;
   private final String metricsSourceName;
@@ -187,12 +193,18 @@ public class VolumeInfoMetrics implements MetricsSource {
     if (volumeUsage != null) {
       SpaceUsageSource usage = volumeUsage.getCurrentUsage();
       long reserved = volumeUsage.getReservedInBytes();
+      long fsCapacity = volumeUsage.getFsCapacity();
+      long fsAvailable = volumeUsage.getFsAvailable();
+      long fsUsed = fsCapacity - fsAvailable;
       builder
           .addGauge(CAPACITY, usage.getCapacity())
           .addGauge(AVAILABLE, usage.getAvailable())
           .addGauge(USED, usage.getUsedSpace())
           .addGauge(RESERVED, reserved)
-          .addGauge(TOTAL_CAPACITY, usage.getCapacity() + reserved);
+          .addGauge(TOTAL_CAPACITY, usage.getCapacity() + reserved)
+          .addGauge(FS_CAPACITY, fsCapacity)
+          .addGauge(FS_AVAILABLE, fsAvailable)
+          .addGauge(FS_USED, fsUsed);
     }
   }
 }

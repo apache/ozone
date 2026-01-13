@@ -33,6 +33,9 @@ public class DatanodeUsageInfo {
   private int containerCount;
   private int pipelineCount;
   private long reserved;
+  private boolean fsUsagePresent;
+  private long fsCapacity;
+  private long fsAvailable;
 
   /**
    * Constructs a DatanodeUsageInfo with DatanodeDetails and SCMNodeStat.
@@ -167,6 +170,12 @@ public class DatanodeUsageInfo {
     this.reserved = reserved; 
   }
 
+  public void setFilesystemUsage(long fsCapacity, long fsAvailable) {
+    this.fsUsagePresent = true;
+    this.fsCapacity = fsCapacity;
+    this.fsAvailable = fsAvailable;
+  }
+
   /**
    * Gets Comparator that compares two DatanodeUsageInfo on the basis of
    * their utilization values. Utilization is (capacity - remaining) divided
@@ -234,6 +243,10 @@ public class DatanodeUsageInfo {
     builder.setContainerCount(containerCount);
     builder.setPipelineCount(pipelineCount);
     builder.setReserved(reserved);
+    if (fsUsagePresent) {
+      builder.setFsCapacity(fsCapacity);
+      builder.setFsAvailable(fsAvailable);
+    }
     return builder;
   }
 }

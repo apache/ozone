@@ -112,6 +112,20 @@ public class VolumeUsage {
   }
 
   /**
+   * @return raw filesystem capacity (cached) for the configured volume path.
+   */
+  public long getFsCapacity() {
+    return source.getCapacity();
+  }
+
+  /**
+   * @return raw filesystem available space (cached) for the configured volume path.
+   */
+  public long getFsAvailable() {
+    return source.getAvailable();
+  }
+
+  /**
    * <pre>
    * {@code
    * Calculate available space use method B.

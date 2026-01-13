@@ -42,9 +42,14 @@ import picocli.CommandLine.Command;
  */
 @Command(
     name = "usageinfo",
-    description = "List usage information " +
-        "(such as Capacity, SCMUsed, Remaining) of a datanode by IP address " +
-        "or Host name or UUID",
+    description = "List usage information of a datanode by IP address, hostname or UUID.\n\n" +
+        "Legend (bytes):\n" +
+        "  Filesystem Capacity/Used/Available: raw filesystem stats for the Datanode, aggregated across volumes.\n" +
+        "  Ozone Capacity/Used/Available: Ozone-usable stats after reserved-space adjustment, aggregated across " +
+        "  volumes (see hdds.datanode.dir.du.reserved / hdds.datanode.dir.du.reserved.percent).\n" +
+        "  Reserved: hdds.datanode.dir.du.reserved: configured reserved space for non-Ozone usage.\n" +
+        "  Committed: space pre-allocated for containers.\n" +
+        "  Free Space To Spare: minimum free space to keep before closing containers.\n",
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class)
 public class UsageInfoSubcommand extends ScmSubcommand {
@@ -111,46 +116,51 @@ public class UsageInfoSubcommand extends ScmSubcommand {
    * @param info Information such as Capacity, SCMUsed etc.
    */
   private void printInfo(DatanodeUsage info) {
-    System.out.printf("%-13s: %s %n", "UUID",
+    System.out.printf("%-24s: %s %n", "UUID",
         info.getDatanodeDetails().getUuid());
-    System.out.printf("%-13s: %s %n", "IP Address",
+    System.out.printf("%-24s: %s %n", "IP Address",
         info.getDatanodeDetails().getIpAddress());
-    System.out.printf("%-13s: %s %n", "Hostname",
+    System.out.printf("%-24s: %s %n", "Hostname",
         info.getDatanodeDetails().getHostName());
-    // print capacity in a readable format
-    System.out.printf("%-13s: %s (%s) %n", "Capacity", info.getCapacity()
-        + " B", StringUtils.byteDesc(info.getCapacity()));
 
-    // print total used space and its percentage in a readable format
-    System.out.printf("%-13s: %s (%s) %n", "Total Used", info.getTotalUsed()
-        + " B", StringUtils.byteDesc(info.getTotalUsed()));
-    System.out.printf("%-13s: %s %n", "Total Used %",
-        PERCENT_FORMAT.format(info.getTotalUsedRatio()));
+    if (info.hasFilesystemUsage()) {
+      System.out.printf("%-24s: %s (%s) %n", "Filesystem Capacity",
+          info.getFilesystemCapacity() + " B", StringUtils.byteDesc(info.getFilesystemCapacity()));
+      System.out.printf("%-24s: %s (%s) %n", "Filesystem Used",
+          info.getFilesystemUsed() + " B", StringUtils.byteDesc(info.getFilesystemUsed()));
+      System.out.printf("%-24s: %s (Filesystem Used/Filesystem Capacity) %n", "Filesystem Used %",
+          PERCENT_FORMAT.format(info.getFilesystemUsedRatio()));
+      System.out.printf("%-24s: %s (%s) %n", "Filesystem Available",
+          info.getFilesystemAvailable() + " B", StringUtils.byteDesc(info.getFilesystemAvailable()));
+      System.out.printf("%-24s: %s (Filesystem Available/Filesystem Capacity) %n", "Filesystem Available %",
+          PERCENT_FORMAT.format(info.getFilesystemAvailableRatio()));
+    }
 
-    // print space used by ozone and its percentage in a readable format
-    System.out.printf("%-13s: %s (%s) %n", "Ozone Used", info.getOzoneUsed()
-        + " B", StringUtils.byteDesc(info.getOzoneUsed()));
-    System.out.printf("%-13s: %s %n", "Ozone Used %",
-        PERCENT_FORMAT.format(info.getUsedRatio()));
+    System.out.printf("%-24s: %s (%s) %n", "Ozone Capacity",
+        info.getOzoneCapacity() + " B", StringUtils.byteDesc(info.getOzoneCapacity()));
+    System.out.printf("%-24s: %s (%s) %n", "Ozone Used",
+        info.getOzoneUsed() + " B", StringUtils.byteDesc(info.getOzoneUsed()));
+    System.out.printf("%-24s: %s (Ozone Used/Ozone Capacity) %n", "Ozone Used %",
+        PERCENT_FORMAT.format(info.getOzoneUsedRatio()));
+    System.out.printf("%-24s: %s (%s) %n", "Ozone Available",
+        info.getOzoneAvailable() + " B", StringUtils.byteDesc(info.getOzoneAvailable()));
+    System.out.printf("%-24s: %s (Ozone Available/Ozone capacity) %n", "Ozone Available %",
+        PERCENT_FORMAT.format(info.getOzoneAvailableRatio()));
 
-    // print total remaining space and its percentage in a readable format
-    System.out.printf("%-13s: %s (%s) %n", "Remaining", info.getRemaining()
-        + " B", StringUtils.byteDesc(info.getRemaining()));
-    System.out.printf("%-13s: %s %n", "Remaining %",
-        PERCENT_FORMAT.format(info.getRemainingRatio()));
-    System.out.printf("%-13s: %d %n", "Pipeline(s)",
+
+    System.out.printf("%-24s: %d %n", "Pipeline(s)",
             info.getPipelineCount());
-    System.out.printf("%-13s: %d %n", "Container(s)",
+    System.out.printf("%-24s: %d %n", "Container(s)",
             info.getContainerCount());
     System.out.printf("%-24s: %s (%s) %n", "Container Pre-allocated",
         info.getCommitted() + " B", StringUtils.byteDesc(info.getCommitted()));
     System.out.printf("%-24s: %s (%s) %n", "Remaining Allocatable",
-        (info.getRemaining() - info.getCommitted()) + " B",
-        StringUtils.byteDesc((info.getRemaining() - info.getCommitted())));
+        (info.getOzoneAvailable() - info.getCommitted()) + " B",
+        StringUtils.byteDesc((info.getOzoneAvailable() - info.getCommitted())));
     System.out.printf("%-24s: %s (%s) %n", "Free Space To Spare",
         info.getFreeSpaceToSpare() + " B",
         StringUtils.byteDesc(info.getFreeSpaceToSpare()));
-    System.out.printf("%-13s: %s (%s) %n", "Reserved",
+    System.out.printf("%-24s: %s (%s) %n", "Reserved",
         info.getReserved() + " B", 
         StringUtils.byteDesc(info.getReserved()));
     System.out.println();
@@ -175,9 +185,13 @@ public class UsageInfoSubcommand extends ScmSubcommand {
   private static class DatanodeUsage {
 
     private DatanodeDetails datanodeDetails = null;
-    private long capacity = 0;
-    private long used = 0;
-    private long remaining = 0;
+    private boolean filesystemUsagePresent = false;
+    private long filesystemCapacity = 0;
+    private long filesystemAvailable = 0;
+    private long filesystemUsed = 0;
+    private long ozoneCapacity = 0;
+    private long ozoneUsed = 0;
+    private long ozoneAvailable = 0;
     private long committed = 0;
     private long freeSpaceToSpare = 0;
     private long containerCount = 0;
@@ -188,14 +202,21 @@ public class UsageInfoSubcommand extends ScmSubcommand {
       if (proto.hasNode()) {
         datanodeDetails = DatanodeDetails.getFromProtoBuf(proto.getNode());
       }
+      if (proto.hasFsCapacity() && proto.hasFsAvailable()) {
+        filesystemUsagePresent = true;
+        filesystemCapacity = proto.getFsCapacity();
+        filesystemAvailable = proto.getFsAvailable();
+        filesystemUsed = filesystemCapacity - filesystemAvailable;
+      }
+
       if (proto.hasCapacity()) {
-        capacity = proto.getCapacity();
+        ozoneCapacity = proto.getCapacity();
       }
       if (proto.hasUsed()) {
-        used = proto.getUsed();
+        ozoneUsed = proto.getUsed();
       }
       if (proto.hasRemaining()) {
-        remaining = proto.getRemaining();
+        ozoneAvailable = proto.getRemaining();
       }
       if (proto.hasCommitted()) {
         committed = proto.getCommitted();
@@ -218,20 +239,32 @@ public class UsageInfoSubcommand extends ScmSubcommand {
       return datanodeDetails;
     }
 
-    public long getCapacity() {
-      return capacity;
+    public boolean hasFilesystemUsage() {
+      return filesystemUsagePresent;
     }
 
-    public long getTotalUsed() {
-      return capacity - remaining;
+    public long getFilesystemCapacity() {
+      return filesystemCapacity;
+    }
+
+    public long getFilesystemUsed() {
+      return filesystemUsed;
+    }
+
+    public long getFilesystemAvailable() {
+      return filesystemAvailable;
+    }
+
+    public long getOzoneCapacity() {
+      return ozoneCapacity;
     }
 
     public long getOzoneUsed() {
-      return used;
+      return ozoneUsed;
     }
 
-    public long getRemaining() {
-      return remaining;
+    public long getOzoneAvailable() {
+      return ozoneAvailable;
     }
 
     public long getCommitted() {
@@ -247,33 +280,46 @@ public class UsageInfoSubcommand extends ScmSubcommand {
     }
 
     @JsonSerialize(using = DecimalJsonSerializer.class)
-    public double getTotalUsedPercent() {
-      return getTotalUsedRatio() * 100;
+    public double getFilesystemUsedPercent() {
+      return getFilesystemUsedRatio() * 100;
+    }
+
+    @JsonSerialize(using = DecimalJsonSerializer.class)
+    public double getFilesystemAvailablePercent() {
+      return getFilesystemAvailableRatio() * 100;
     }
 
     @JsonSerialize(using = DecimalJsonSerializer.class)
     public double getOzoneUsedPercent() {
-      return getUsedRatio() * 100;
+      return getOzoneUsedRatio() * 100;
     }
 
     @JsonSerialize(using = DecimalJsonSerializer.class)
-    public double getRemainingPercent() {
-      return getRemainingRatio() * 100;
+    public double getOzoneAvailablePercent() {
+      return getOzoneAvailableRatio() * 100;
     }
 
     @JsonIgnore
-    public double getTotalUsedRatio() {
-      return 1 - getRemainingRatio();
+    public double getFilesystemUsedRatio() {
+      if (!filesystemUsagePresent || filesystemCapacity == 0) {
+        return 0;
+      }
+      return filesystemUsed / (double) filesystemCapacity;
     }
 
     @JsonIgnore
-    public double getUsedRatio() {
-      return used / (double) capacity;
+    public double getFilesystemAvailableRatio() {
+      return filesystemAvailable / (double) filesystemCapacity;
     }
 
     @JsonIgnore
-    public double getRemainingRatio() {
-      return remaining / (double) capacity;
+    public double getOzoneUsedRatio() {
+      return ozoneUsed / (double) ozoneCapacity;
+    }
+
+    @JsonIgnore
+    public double getOzoneAvailableRatio() {
+      return ozoneAvailable / (double) ozoneCapacity;
     }
 
     public long getPipelineCount() {

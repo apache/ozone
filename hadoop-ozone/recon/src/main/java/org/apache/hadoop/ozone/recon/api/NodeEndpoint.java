@@ -56,6 +56,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.SCMNodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
@@ -174,14 +175,20 @@ public class NodeEndpoint {
   private DatanodeStorageReport getStorageReport(DatanodeDetails datanode) {
     SCMNodeStat nodeStat =
         nodeManager.getNodeStat(datanode).get();
-    DatanodeStorageReport storageReport = DatanodeStorageReport.newBuilder()
+    SCMNodeManager.FsUsageTotals fsUsage = nodeManager.getTotalFilesystemUsage(datanode);
+    DatanodeStorageReport.Builder builder = DatanodeStorageReport.newBuilder()
         .setCapacity(nodeStat.getCapacity().get())
         .setUsed(nodeStat.getScmUsed().get())
         .setRemaining(nodeStat.getRemaining().get())
         .setCommitted(nodeStat.getCommitted().get())
-        .setMinimumFreeSpace(nodeStat.getFreeSpaceToSpare().get())
-        .build();
-    return storageReport;
+        .setMinimumFreeSpace(nodeStat.getFreeSpaceToSpare().get());
+
+    if (fsUsage != null) {
+      builder.setFilesystemCapacity(fsUsage.getCapacity())
+          .setFilesystemAvailable(fsUsage.getAvailable())
+          .setFilesystemUsed(fsUsage.getUsed());
+    }
+    return builder.build();
   }
 
   /**

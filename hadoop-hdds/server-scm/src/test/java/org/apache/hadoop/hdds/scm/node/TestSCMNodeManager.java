@@ -1908,7 +1908,11 @@ public class TestSCMNodeManager {
       String storagePath = testDir.getAbsolutePath() + "/" + dnId;
       StorageReportProto report = HddsTestUtils
           .createStorageReport(dnId, storagePath, capacity, used,
-              remaining, null);
+              remaining, null)
+          .toBuilder()
+          .setFsCapacity(3000L)
+          .setFsAvailable(2400L)
+          .build();
 
       nodeManager.register(datanodeDetails, HddsTestUtils.createNodeReport(
           Arrays.asList(report), emptyList()),
@@ -1947,8 +1951,11 @@ public class TestSCMNodeManager {
     assertEquals(1900, stats.get("MaintenanceDiskRemaining").longValue());
 
     // All nodes
-    assertEquals(12000, stats.get("TotalCapacity").longValue());
-    assertEquals(600, stats.get("TotalUsed").longValue());
+    assertEquals(12000, stats.get("TotalOzoneCapacity").longValue());
+    assertEquals(600, stats.get("TotalOzoneUsed").longValue());
+    assertEquals(18000, stats.get("TotalFilesystemCapacity").longValue());
+    assertEquals(14400, stats.get("TotalFilesystemAvailable").longValue());
+    assertEquals(3600, stats.get("TotalFilesystemUsed").longValue());
   }
 
   /**

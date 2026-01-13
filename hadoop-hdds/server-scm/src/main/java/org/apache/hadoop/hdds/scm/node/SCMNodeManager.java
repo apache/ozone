@@ -1036,6 +1036,10 @@ public class SCMNodeManager implements NodeManager {
       usageInfo.setContainerCount(getContainerCount(dn));
       usageInfo.setPipelineCount(getPipeLineCount(dn));
       usageInfo.setReserved(getTotalReserved(dn));
+      FsUsageTotals fs = getTotalFilesystemUsage(dn);
+      if (fs != null) {
+        usageInfo.setFilesystemUsage(fs.capacity, fs.available);
+      }
     } catch (NodeNotFoundException ex) {
       LOG.error("Unknown datanode {}.", dn, ex);
     }
@@ -1131,8 +1135,20 @@ public class SCMNodeManager implements NodeManager {
         nodeInfo.put(s.label + stat.name(), 0L);
       }
     }
-    nodeInfo.put("TotalCapacity", 0L);
-    nodeInfo.put("TotalUsed", 0L);
+    nodeInfo.put("TotalOzoneCapacity", 0L);
+    nodeInfo.put("TotalOzoneUsed", 0L);
+    // Raw filesystem totals across non-dead nodes. -1 means old (older version) DN did not send fs stats.
+    nodeInfo.put("TotalFilesystemCapacity", -1L);
+    nodeInfo.put("TotalFilesystemUsed", -1L);
+    nodeInfo.put("TotalFilesystemAvailable", -1L);
+
+    long totalFsCapacity = 0L;
+    long totalFsAvailable = 0L;
+    /*
+    If any storage report in any DN has fs stats available, then include these in the metrics. This logic needs to
+    change in the case of rolling DN upgrades, where one DN might be old while another is new.
+     */
+    boolean fsPresent = false;
 
     for (DatanodeInfo node : nodeStateManager.getAllNodes()) {
       String keyPrefix = "";
@@ -1165,9 +1181,23 @@ public class SCMNodeManager implements NodeManager {
           nodeInfo.compute(keyPrefix + UsageMetrics.SSDUsed.name(),
               (k, v) -> v + reportProto.getScmUsed());
         }
-        nodeInfo.compute("TotalCapacity", (k, v) -> v + reportProto.getCapacity());
-        nodeInfo.compute("TotalUsed", (k, v) -> v + reportProto.getScmUsed());
+        nodeInfo.compute("TotalOzoneCapacity", (k, v) -> v + reportProto.getCapacity());
+        nodeInfo.compute("TotalOzoneUsed", (k, v) -> v + reportProto.getScmUsed());
+
+        if (reportProto.hasFailed() && reportProto.getFailed()) {
+          continue;
+        }
+        if (reportProto.hasFsCapacity() && reportProto.hasFsAvailable()) {
+          fsPresent = true;
+          totalFsCapacity += reportProto.getFsCapacity();
+          totalFsAvailable += reportProto.getFsAvailable();
+        }
       }
+    }
+    if (fsPresent) {
+      nodeInfo.put("TotalFilesystemCapacity", totalFsCapacity);
+      nodeInfo.put("TotalFilesystemUsed", totalFsCapacity - totalFsAvailable);
+      nodeInfo.put("TotalFilesystemAvailable", totalFsAvailable);
     }
     return nodeInfo;
   }
@@ -1735,6 +1765,62 @@ public class SCMNodeManager implements NodeManager {
       }
     }
     return reserved;
+  }
+
+  /**
+   * Compute aggregated raw filesystem capacity/available/used for a datanode
+   * from the storage reports.
+   */
+  public FsUsageTotals getTotalFilesystemUsage(DatanodeDetails datanodeDetails) {
+    final DatanodeInfo datanodeInfo;
+    try {
+      datanodeInfo = nodeStateManager.getNode(datanodeDetails);
+    } catch (NodeNotFoundException exception) {
+      LOG.error("Node not found when calculating fs usage for {}.", datanodeDetails, exception);
+      return null;
+    }
+
+    long capacity = 0L;
+    long available = 0L;
+    boolean hasFsReport = false;
+    for (StorageReportProto r : datanodeInfo.getStorageReports()) {
+      if (r.hasFailed() && r.getFailed()) {
+        continue;
+      }
+      if (r.hasFsCapacity() && r.hasFsAvailable()) {
+        hasFsReport = true;
+        capacity += r.getFsCapacity();
+        available += r.getFsAvailable();
+      }
+    }
+    if (!hasFsReport) {
+      LOG.warn("Datanode {} does not have filesystem storage stats in its storage reports.", datanodeDetails);
+    }
+    return hasFsReport ? new FsUsageTotals(capacity, available, capacity - available) : null;
+  }
+
+  public static final class FsUsageTotals {
+    private final long capacity;
+    private final long available;
+    private final long used;
+
+    private FsUsageTotals(long capacity, long available, long used) {
+      this.capacity = capacity;
+      this.available = available;
+      this.used = used;
+    }
+
+    public long getCapacity() {
+      return capacity;
+    }
+
+    public long getAvailable() {
+      return available;
+    }
+
+    public long getUsed() {
+      return used;
+    }
   }
 
   @Override
