@@ -20,7 +20,7 @@ package org.apache.hadoop.hdds.scm.pipeline;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -81,7 +81,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
         ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT);
   }
 
-  public static int currentRatisThreePipelineCount(
+  static int currentRatisThreePipelineCount(
       NodeManager nodeManager,
       PipelineStateManager stateManager,
       DatanodeDetails datanodeDetails) {
@@ -98,6 +98,18 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
         })
         .filter(PipelinePlacementPolicy::isNonClosedRatisThreePipeline)
         .count();
+  }
+
+  /** Filter the given datanodes within its pipeline limit. */
+  List<DatanodeDetails> filterPipelineLimit(Iterable<DatanodeDetails> datanodes) {
+    final SortedList<DatanodeDetails> sorted = new SortedList<>(DatanodeDetails.class);
+    for (DatanodeDetails d : datanodes) {
+      final int count = currentRatisThreePipelineCount(nodeManager, stateManager, d);
+      if (count < nodeManager.pipelineLimit(d)) {
+        sorted.add(d, count);
+      }
+    }
+    return sorted;
   }
 
   private static boolean isNonClosedRatisThreePipeline(Pipeline p) {
@@ -169,16 +181,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     // filter nodes that meet the size and pipeline engagement criteria.
     // Pipeline placement doesn't take node space left into account.
     // Sort the DNs by pipeline load.
-    // TODO check if sorting could cause performance issue: HDDS-3466.
-    List<DatanodeDetails> healthyList = healthyNodes.stream()
-        .map(d ->
-            new DnWithPipelines(d, currentRatisThreePipelineCount(nodeManager,
-                stateManager, d)))
-        .filter(d ->
-            (d.getPipelines() < nodeManager.pipelineLimit(d.getDn())))
-        .sorted(Comparator.comparingInt(DnWithPipelines::getPipelines))
-        .map(d -> d.getDn())
-        .collect(Collectors.toList());
+    final List<DatanodeDetails> healthyList = filterPipelineLimit(healthyNodes);
 
     if (healthyList.size() < nodesRequired) {
       if (LOG.isDebugEnabled()) {
@@ -217,12 +220,13 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
    * @return True if there are multiple racks, false otherwise
    */
   private boolean multipleRacksAvailable(List<DatanodeDetails> dns) {
-    if (dns.size() <= 1) {
+    final Iterator<DatanodeDetails> i = dns.iterator();
+    if (!i.hasNext()) {
       return false;
     }
-    String initialRack = dns.get(0).getNetworkLocation();
-    for (DatanodeDetails dn : dns) {
-      if (!dn.getNetworkLocation().equals(initialRack)) {
+    final String initialRack = i.next().getNetworkLocation();
+    while (i.hasNext()) {
+      if (!i.next().getNetworkLocation().equals(initialRack)) {
         return true;
       }
     }
@@ -574,27 +578,4 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
   protected int getRequiredRackCount(int numReplicas, int excludedRackCount) {
     return REQUIRED_RACKS;
   }
-
-  /**
-   * static inner utility class for datanodes with pipeline, used for
-   * pipeline engagement checking.
-   */
-  public static class DnWithPipelines {
-    private DatanodeDetails dn;
-    private int pipelines;
-
-    DnWithPipelines(DatanodeDetails dn, int pipelines) {
-      this.dn = dn;
-      this.pipelines = pipelines;
-    }
-
-    public int getPipelines() {
-      return pipelines;
-    }
-
-    public DatanodeDetails getDn() {
-      return dn;
-    }
-  }
-
 }
