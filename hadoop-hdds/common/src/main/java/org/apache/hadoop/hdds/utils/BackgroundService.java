@@ -24,6 +24,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
@@ -40,8 +41,7 @@ public abstract class BackgroundService {
   protected static final Logger LOG =
       LoggerFactory.getLogger(BackgroundService.class);
 
-  // Executor to launch child tasks
-  private ScheduledThreadPoolExecutor exec;
+  private ThreadPoolExecutor exec;
   // Scheduler for PeriodicalTask
   private ScheduledThreadPoolExecutor scheduler;
   private ThreadGroup threadGroup;
@@ -88,10 +88,16 @@ public abstract class BackgroundService {
       throw new IllegalArgumentException("Pool size must be positive.");
     }
 
-    // In ScheduledThreadPoolExecutor, maximumPoolSize is Integer.MAX_VALUE
-    // the corePoolSize will always less maximumPoolSize.
-    // So we can directly set the corePoolSize
-    exec.setCorePoolSize(size);
+    // In ThreadPoolExecutor, maximumPoolSize must always be >= corePoolSize.
+    // Update in the correct order based on whether we are increasing or decreasing.
+    final int currentCorePoolSize = exec.getCorePoolSize();
+    if (size > currentCorePoolSize) {
+      exec.setMaximumPoolSize(size);
+      exec.setCorePoolSize(size);
+    } else if (size < currentCorePoolSize) {
+      exec.setCorePoolSize(size);
+      exec.setMaximumPoolSize(size);
+    }
   }
 
   public synchronized void setServiceTimeoutInNanos(long newTimeout) {
@@ -115,7 +121,8 @@ public abstract class BackgroundService {
 
   // start service
   public synchronized void start() {
-    if (exec == null || exec.isShutdown() || exec.isTerminated()) {
+    if (exec == null || exec.isShutdown() || exec.isTerminated()
+        || scheduler == null || scheduler.isShutdown() || scheduler.isTerminated()) {
       initExecutorAndThreadGroup();
     }
     LOG.info("Starting service {} with interval {} {}", serviceName,
@@ -221,7 +228,7 @@ public abstract class BackgroundService {
         .setDaemon(true)
         .setNameFormat(threadNamePrefix + serviceName + "#%d")
         .build();
-    exec = (ScheduledThreadPoolExecutor) Executors.newScheduledThreadPool(threadPoolSize, threadFactory);
+    exec = (ThreadPoolExecutor) Executors.newFixedThreadPool(threadPoolSize, threadFactory);
     // Single-thread scheduler for PeriodicalTask
     ThreadFactory schedulerThreadFactory = new ThreadFactoryBuilder()
         .setThreadFactory(r -> new Thread(threadGroup, r))
