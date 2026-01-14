@@ -27,6 +27,7 @@ import java.util.UUID;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -149,6 +150,40 @@ public class TestOMKeyRenameResponse extends TestOMKeyResponse {
       assertFalse(omMetadataManager.getDirectoryTable()
           .isExist(getDBKeyName(toKeyParent)));
     }
+  }
+
+  @Test
+  public void testGetCompletedRequestInfo() throws Exception {
+    long txIndex = 100L;
+
+    OMResponse omResponse =
+        OMResponse.newBuilder().setRenameKeyResponse(
+            OzoneManagerProtocolProtos.RenameKeyResponse.getDefaultInstance())
+            .setStatus(OzoneManagerProtocolProtos.Status.OK)
+            .setCmdType(OzoneManagerProtocolProtos.Type.RenameKey)
+            .build();
+
+    String toKeyName = UUID.randomUUID().toString();
+    OmKeyInfo toKeyInfo = getOmKeyInfo(toKeyName);
+    OmKeyInfo fromKeyInfo = getOmKeyInfo(toKeyInfo, keyName);
+    String dbFromKey = addKeyToTable(fromKeyInfo);
+    String dbToKey = getDBKeyName(toKeyInfo);
+
+    OMKeyRenameResponse omKeyRenameResponse =
+        getOMKeyRenameResponse(omResponse, fromKeyInfo, toKeyInfo);
+
+    OmCompletedRequestInfo info = omKeyRenameResponse.getCompletedRequestInfo(txIndex);
+
+    assertEquals(txIndex, info.getTrxLogIndex());
+    assertEquals(OzoneManagerProtocolProtos.Type.RenameKey, info.getCmdType());
+    assertEquals(fromKeyInfo.getVolumeName(), info.getVolumeName());
+    assertEquals(fromKeyInfo.getBucketName(), info.getBucketName());
+    assertEquals(fromKeyInfo.getKeyName(), info.getKeyName());
+
+    assertEquals(OmCompletedRequestInfo.OperationArgs.RenameKeyArgs.class,
+             info.getOpArgs().getClass());
+    assertEquals(new OmCompletedRequestInfo.OperationArgs.RenameKeyArgs(toKeyInfo.getKeyName()),
+                 info.getOpArgs());
   }
 
   protected OmKeyInfo getOmKeyInfo(String keyName) {

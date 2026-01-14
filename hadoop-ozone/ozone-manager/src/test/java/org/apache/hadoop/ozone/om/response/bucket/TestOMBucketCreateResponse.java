@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.response.bucket;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 import java.util.UUID;
@@ -28,6 +29,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.apache.hadoop.ozone.om.response.TestOMResponseUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateBucketResponse;
@@ -94,5 +96,31 @@ public class TestOMBucketCreateResponse {
     assertEquals(omMetadataManager.getBucketKey(volumeName,
         bucketName), keyValue.getKey());
     assertEquals(omBucketInfo, keyValue.getValue());
+  }
+
+  @Test
+  void testGetCompletedRequestInfo() {
+    long txIndex = 100L;
+
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    OmBucketInfo omBucketInfo = TestOMResponseUtils.createBucket(
+        volumeName, bucketName);
+
+    OMBucketCreateResponse omBucketCreateResponse =
+        new OMBucketCreateResponse(OMResponse.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.CreateBucket)
+            .setStatus(OzoneManagerProtocolProtos.Status.OK)
+            .setCreateBucketResponse(
+                CreateBucketResponse.newBuilder().build()).build(),
+            omBucketInfo);
+
+    OmCompletedRequestInfo info = omBucketCreateResponse.getCompletedRequestInfo(txIndex);
+
+    assertEquals(txIndex, info.getTrxLogIndex());
+    assertEquals(OzoneManagerProtocolProtos.Type.CreateBucket, info.getCmdType());
+    assertEquals(volumeName, info.getVolumeName());
+    assertEquals(bucketName, info.getBucketName());
+    assertTrue(info.getOpArgs() instanceof OmCompletedRequestInfo.OperationArgs.NoArgs);
   }
 }

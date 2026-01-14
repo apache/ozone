@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.response.file;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -34,6 +35,7 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -114,6 +116,40 @@ public class TestOMDirectoryCreateResponse {
     assertEquals(omMetadataManager.getBucketKey(volumeName,
         bucketName), keyValue.getKey());
     assertEquals(usedNamespace, keyValue.getValue().getUsedNamespace());
+  }
+
+  @Test
+  void testGetCompletedRequestInfo() {
+    long txIndex = 100L;
+
+    String volumeName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
+        bucketName, OzoneFSUtils.addTrailingSlashIfNeeded(keyName),
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE)).build();
+
+    OmBucketInfo omBucketInfo = TestOMResponseUtils.createBucket(
+        volumeName, bucketName);
+
+    OMResponse omResponse = OMResponse.newBuilder().setCreateDirectoryResponse(
+        OzoneManagerProtocolProtos.CreateDirectoryResponse.getDefaultInstance())
+            .setStatus(OzoneManagerProtocolProtos.Status.OK)
+            .setCmdType(OzoneManagerProtocolProtos.Type.CreateDirectory)
+            .build();
+
+    OMDirectoryCreateResponse omDirectoryCreateResponse =
+        new OMDirectoryCreateResponse(omResponse, omKeyInfo,
+            new ArrayList<>(), Result.SUCCESS, getBucketLayout(), omBucketInfo);
+
+    OmCompletedRequestInfo info = omDirectoryCreateResponse.getCompletedRequestInfo(txIndex);
+
+    assertEquals(txIndex, info.getTrxLogIndex());
+    assertEquals(OzoneManagerProtocolProtos.Type.CreateDirectory, info.getCmdType());
+    assertEquals(volumeName, info.getVolumeName());
+    assertEquals(bucketName, info.getBucketName());
+    assertTrue(info.getOpArgs() instanceof OmCompletedRequestInfo.OperationArgs.NoArgs);
   }
 
   public BucketLayout getBucketLayout() {
