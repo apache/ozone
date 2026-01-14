@@ -76,6 +76,7 @@ public class TestOzoneFsUtils {
     assertEquals("a/b/c", OzoneFSUtils.isValidKeyPath("a/b/c", true));
     assertEquals("a/b/c", OzoneFSUtils.isValidKeyPath("a/b/c", false));
     assertEquals("file", OzoneFSUtils.isValidKeyPath("file", true));
+    assertEquals("file.txt", OzoneFSUtils.isValidKeyPath("file.txt", true));
     assertEquals("dir/subdir/file", OzoneFSUtils.isValidKeyPath("dir/subdir/file", true));
 
     // Empty path - throwOnEmpty=true should throw exception
@@ -94,6 +95,7 @@ public class TestOzoneFsUtils {
 
     // Invalid paths - contains "."
     assertThrows(OMException.class, () -> OzoneFSUtils.isValidKeyPath("a/./b", true));
+    assertThrows(OMException.class, () -> OzoneFSUtils.isValidKeyPath("./file", true));
 
     // Invalid paths - contains ":"
     assertThrows(OMException.class, () -> OzoneFSUtils.isValidKeyPath("a:b", true));

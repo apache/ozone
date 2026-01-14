@@ -161,7 +161,7 @@ public final class OzoneFSUtils {
   public static String isValidKeyPath(String path, boolean throwOnEmpty) throws OMException {
     if (path.isEmpty()) {
       if (throwOnEmpty) {
-        throw new OMException("Invalid KeyPath, empty keyName" + path,
+        throw new OMException("Invalid KeyPath, empty keyName",
             INVALID_KEY_NAME);
       }
       return path;
