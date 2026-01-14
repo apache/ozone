@@ -32,21 +32,21 @@ In Apache Ozone, snapshots currently take a checkpoint of the Active Object Stor
 
 # Solution Proposal
 
-The primary inefficiency in the current snapshotting mechanism stems from constant RocksDB compactions in AOS, which can cause a key, file, or directory entry to appear in multiple SST files. Ideally, each unique key, file, or directory entry should reside in only one SST file, eliminating redundant storage and mitigating the multiplier effect caused by snapshots. If implemented correctly, the total RocksDB size would be proportional to the total number of unique keys in the system rather than the number of snapshots.
+The primary inefficiency in the current snapshot mechanism stems from constant RocksDB compactions in AOS, which can cause a key, file, or directory entry to appear in multiple SST files. Ideally, each unique key, file, or directory entry should reside in only one SST file, eliminating redundant storage and mitigating the multiplier effect caused by snapshots. If implemented correctly, the total RocksDB size would be proportional to the total number of unique keys in the system rather than the number of snapshots.
 
 ## Snapshot Defragmentation
 
-Currently, automatic RocksDB compactions are disabled for snapshot RocksDB to preserve snapshot diff performance, preventing any form of compaction. However, snapshots can be defragmented in the way that the next active snapshot in the chain is a checkpoint of its previous active snapshot plus a diff stored in separate SST files (one SST for each column family changed). The proposed approach involves rewriting snapshots iteratively from the beginning of the snapshot chain and restructuring them in a separate directory.
+Currently, snapshot RocksDBs has automatic RocksDB compaction disabled intentionally to preserve snapshot diff performance, preventing any form of compaction. However, snapshots can be defragmented in the way that the next active snapshot in the chain is a checkpoint of its previous active snapshot plus a diff stored in separate SST files (one SST for each column family changed). The proposed approach involves rewriting snapshots iteratively from the beginning of the snapshot chain and restructuring them in a separate directory.
 
-Note: Snapshot Defragmentation was previously called Snapshot Compaction earlier during the design phase. It is not RocksDB compaction. Thus the rename to avoid such confusion. We are also not going to enable RocksDB auto compaction on snapshot RocksDB.
+Note: Snapshot Defragmentation was previously called Snapshot Compaction earlier during the design phase. It is not RocksDB compaction. Thus the rename to avoid such confusion. We are also not going to enable RocksDB auto compaction on snapshot RocksDBs.
 
 1. ### Introducing last defragmentation time
 
-   A new boolean flag (`needsDefrag`), timestamp (`lastDefragTime`), int `version` will be added to snapshot metadata. If absent, `needsDefrag` will default to `true`.
-   `needsDefrag` tells the system whether a snapshot is pending defrag (`true`) or if it is already defragged and up to date (`false`). This helps manage and automate the defrag workflow, ensuring snapshots are efficiently stored and maintained.
-   A new list of Map\<String, List\<Longs\>\> (`notDefraggedSstFileList`) also needs to be added to snapshot meta as part of snapshot create operation; this would be storing the original list of sst files in the not defragged copy of the snapshot corresponding to keyTable/fileTable/DirectoryTable. This should be done as part of the snapshot create operation.
+   A new boolean flag (`needsDefrag`), timestamp (`lastDefragTime`), int `version` would be added to snapshot metadata.
+   `needsDefrag` tells the system whether a snapshot is pending defrag (`true`) or if it is already defragged and up to date (`false`). This helps manage and automate the defrag workflow, ensuring snapshots are efficiently stored and maintained. `needsDefrag` defaults to `false` during initialization and when absent.
+   A new list of Map\<String, List\<Longs\>\> (`notDefraggedSstFileList`) also would be added to snapshot meta as part of snapshot create operation; this would be storing the original list of SST files in the not defragged copy of the snapshot corresponding to keyTable/fileTable/DirectoryTable. This should be done as part of the snapshot create operation.
    Since this is not going to be consistent across all OMs this would have to be written to a local yaml file inside the snapshot directory and this can be maintained in the SnapshotChainManager in memory on startup. So all updates should not go through Ratis.  
-   An additional Map\<Integer, Map\<String, List\<Long\>\>\> (`defraggedSstFileList`) also needs to be added to snapshotMeta. This will be maintaining a list of sstFiles of different versions of defragged snapshots. The key here would be the version number of snapshots.
+   An additional Map\<Integer, Map\<String, List\<Long\>\>\> (`defraggedSstFileList`) also would be added to snapshotMeta. This will be maintaining a list of sstFiles of different versions of defragged snapshots. The key here would be the version number of snapshot DBs.
 
 2. ### Snapshot Cache Lock for Read Prevention
 
@@ -63,10 +63,10 @@ Note: Snapshot Defragmentation was previously called Snapshot Compaction earlier
 
 To compute a snapshot diff:
 
-* If both snapshots are defragged, their defragged versions will be used. The diff b/w two defragged snapshot should be present in one sst file.  
-* If the target snapshot is not defragged & the source snapshot is defragged (other way is not possible as we always defrag snapshots in order) and if the DAG has all the sst files corresponding to the not defragged snapshot version of the defragged snapshot which would be captured as part of the snapshot metadata, then an efficient diff can be performed with the information present in the DAG. Use `notDefraggedSstFileList` from each of the snapshot’s meta  
-* Otherwise, a full diff will be computed between the defragged source and the defragged target snapshot. Delta sst files would be computed corresponding to the latest version number of the target snapshot(version number of target snapshot would always be greater)  
-* Changes in the full diff logic is required to check inode ids of sst files and remove the common sst files b/w source and target snapshots. 
+* If both snapshots are defragged, their defragged versions will be used. The diff between two defragged snapshot should be present in one SST file.
+* If the target snapshot is not defragged & the source snapshot is defragged (other way is not possible as we always defrag snapshots in order) and if the DAG has all the sst files corresponding to the not defragged snapshot version of the defragged snapshot which would be captured as part of the snapshot metadata, then an efficient diff can be performed with the information present in the DAG. Use `notDefraggedSstFileList` from each of the snapshot's meta  
+* Otherwise, a full diff will be computed between the defragged source and the defragged target snapshot. Delta SST files would be computed corresponding to the latest version number of the target snapshot(version number of target snapshot would always be greater)
+* Changes in the full diff logic is required to check inode ids of sst files and remove the common sst files b/w source and target snapshots.
 
 
 5. ### Snapshot Defragmentation Workflow
