@@ -23,16 +23,19 @@ import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
+import org.apache.hadoop.ozone.om.response.HasCompletedRequestInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 
 /**
  * Response for DeleteVolume request.
  */
 @CleanupTableInfo(cleanupTables = {VOLUME_TABLE})
-public class OMVolumeDeleteResponse extends OMClientResponse {
+public class OMVolumeDeleteResponse extends OMClientResponse implements HasCompletedRequestInfo {
   private String volume;
   private String owner;
   private PersistedUserVolumeInfo updatedVolumeList;
@@ -71,5 +74,15 @@ public class OMVolumeDeleteResponse extends OMClientResponse {
     omMetadataManager.getVolumeTable().deleteWithBatch(batchOperation,
         omMetadataManager.getVolumeKey(volume));
   }
-}
 
+  @Override
+  public OmCompletedRequestInfo getCompletedRequestInfo(long trxnLogIndex) {
+    return OmCompletedRequestInfo.newBuilder()
+        .setTrxLogIndex(trxnLogIndex)
+        .setCmdType(Type.DeleteVolume)
+        .setCreationTime(System.currentTimeMillis())
+        .setVolumeName(volume)
+        .setOpArgs(new OmCompletedRequestInfo.OperationArgs.NoArgs())
+        .build();
+  }
+}
