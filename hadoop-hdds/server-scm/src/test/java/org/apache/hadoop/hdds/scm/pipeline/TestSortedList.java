@@ -17,13 +17,16 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 import org.junit.jupiter.api.Test;
@@ -37,10 +40,11 @@ public class TestSortedList {
 
   static class Element implements Comparable<Element> {
     private final int weight;
-    private final String value = "e" + ++id;
+    private final String value;
 
     Element(int weight) {
       this.weight = weight;
+      this.value = String.format("e%04d(%02d)", ++id, weight);
     }
 
     int getWeight() {
@@ -80,7 +84,7 @@ public class TestSortedList {
 
     @Override
     public String toString() {
-      return value + "(" + weight + ")";
+      return value;
     }
   }
 
@@ -143,17 +147,20 @@ public class TestSortedList {
     assertOrdering(right, left);
   }
 
-  static void assertOrdering(List<Element> ordering, List<Element> contains) {
-    final int size = contains.size();
+  static void assertOrdering(List<Element> ordering, List<Element> containing) {
+    final int size = containing.size();
     assertEquals(size, ordering.size());
 
     int min = -1;
     int count = 0;
+    final Iterator<Element> actual = containing.iterator();
     for (Element e : ordering) {
-      count++;
-      assertTrue(e.weight >= min);
+      assertThat(e.weight).isGreaterThanOrEqualTo(min);
       min = e.weight;
-      assertTrue(contains.contains(e));
+      assertThat(containing).contains(e);
+      assertTrue(actual.hasNext());
+      assertSame(e, actual.next(), "[" + count + "]");
+      count++;
     }
     assertEquals(size, count, () -> ordering.getClass().getSimpleName() + " " + ordering);
   }

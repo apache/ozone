@@ -31,14 +31,14 @@ import java.util.function.BiFunction;
 import java.util.function.Predicate;
 
 /**
- * A sorted list using bucket-sort.
+ * A sorted list using bucket-sort with bucket size == 1.
  * The elements are sorted by their weights
  * while different elements may have the same weight.
  * <p>
  * The number of buckets is assumed to be much smaller than the number of elements.
  * For examples, a cluster may have 5,000 datanodes (elements)
- * but the number of pipelines (buckets) is always less than 100.
- * Therefore, this class (n log b) is more efficient than the usual sorting (n log n),
+ * but the number of pipelines (buckets) is mostly less than 100.
+ * Therefore, this class O(n log b) is more efficient than the usual sorting O(n log n),
  * where n is the number of elements and b is the number of buckets.
  * <p>
  * Note that some unused methods in {@link List} are unsupported.
@@ -73,7 +73,7 @@ final class SortedList<E> implements List<E> {
     return true;
   }
 
-  private E getOrRmove(String name, int index, BiFunction<List<E>, Integer, E> method) {
+  private E getOrRemove(String name, int index, BiFunction<List<E>, Integer, E> method) {
     if (index < 0) {
       throw new IndexOutOfBoundsException("index = " + index + " < 0");
     }
@@ -99,12 +99,12 @@ final class SortedList<E> implements List<E> {
 
   @Override
   public E get(int index) {
-    return getOrRmove("get", index, List::get);
+    return getOrRemove("get", index, List::get);
   }
 
   @Override
   public E remove(int index) {
-    final E removed = getOrRmove("remove", index, (list, i) -> list.remove((int)i));
+    final E removed = getOrRemove("remove", index, (list, i) -> list.remove((int)i));
     numElements--;
     return removed;
   }
