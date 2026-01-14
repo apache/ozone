@@ -641,7 +641,7 @@ public class PipelineManagerImpl implements PipelineManager {
       if (!(node instanceof DatanodeInfo)) {
         node = nodeManager.getDatanodeInfo(node);
       }
-      if (!SCMCommonPlacementPolicy.hasEnoughSpace(node, 0, containerSize, null)) {
+      if (!SCMCommonPlacementPolicy.hasEnoughSpace(node, 0, containerSize)) {
         return false;
       }
     }
@@ -671,13 +671,8 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   @Override
-  public int minHealthyVolumeNum(Pipeline pipeline) {
-    return nodeManager.minHealthyVolumeNum(pipeline.getNodes());
-  }
-
-  @Override
-  public int minPipelineLimit(Pipeline pipeline) {
-    return nodeManager.minPipelineLimit(pipeline.getNodes());
+  public int openContainerLimit(List<DatanodeDetails> datanodes) {
+    return nodeManager.openContainerLimit(datanodes);
   }
 
   /**
@@ -842,8 +837,6 @@ public class PipelineManagerImpl implements PipelineManager {
 
     SCMPipelineMetrics.unRegister();
 
-    // shutdown pipeline provider.
-    pipelineFactory.shutdown();
     try {
       stateManager.close();
     } catch (Exception ex) {

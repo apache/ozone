@@ -57,11 +57,10 @@ public class RatisPipelineProvider
   private static final Logger LOG =
       LoggerFactory.getLogger(RatisPipelineProvider.class);
 
-  private final ConfigurationSource conf;
   private final EventPublisher eventPublisher;
   private final PlacementPolicy placementPolicy;
-  private int pipelineNumberLimit;
-  private int maxPipelinePerDatanode;
+  private final int pipelineNumberLimit;
+  private final int datanodePipelineLimit;
   private final LeaderChoosePolicy leaderChoosePolicy;
   private final SCMContext scmContext;
   private final long containerSizeBytes;
@@ -74,7 +73,6 @@ public class RatisPipelineProvider
                                EventPublisher eventPublisher,
                                SCMContext scmContext) {
     super(nodeManager, stateManager);
-    this.conf = conf;
     this.eventPublisher = eventPublisher;
     this.scmContext = scmContext;
     this.placementPolicy = PipelinePlacementPolicyFactory
@@ -82,14 +80,14 @@ public class RatisPipelineProvider
     this.pipelineNumberLimit = conf.getInt(
         ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT,
         ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT_DEFAULT);
-    String dnLimit = conf.get(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT);
-    this.maxPipelinePerDatanode = dnLimit == null ? 0 :
-        Integer.parseInt(dnLimit);
-    this.containerSizeBytes = (long) this.conf.getStorageSize(
+    this.datanodePipelineLimit = conf.getInt(
+        ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT,
+        ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT);
+    this.containerSizeBytes = (long) conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
         StorageUnit.BYTES);
-    this.minRatisVolumeSizeBytes = (long) this.conf.getStorageSize(
+    this.minRatisVolumeSizeBytes = (long) conf.getStorageSize(
         ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN,
         ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN_DEFAULT,
         StorageUnit.BYTES);
@@ -112,10 +110,10 @@ public class RatisPipelineProvider
     int closedPipelines = pipelineStateManager.getPipelines(replicationConfig, PipelineState.CLOSED).size();
     int openPipelines = totalActivePipelines - closedPipelines;
     // Check per-datanode pipeline limit
-    if (maxPipelinePerDatanode > 0) {
+    if (datanodePipelineLimit > 0) {
       int healthyNodeCount = getNodeManager()
           .getNodeCount(NodeStatus.inServiceHealthy());
-      int allowedOpenPipelines = (maxPipelinePerDatanode * healthyNodeCount)
+      int allowedOpenPipelines = (datanodePipelineLimit * healthyNodeCount)
           / replicationConfig.getRequiredNodes();
       return openPipelines >= allowedOpenPipelines;
     }
@@ -147,8 +145,8 @@ public class RatisPipelineProvider
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
       throws IOException {
     if (exceedPipelineNumberLimit(replicationConfig)) {
-      String limitInfo = (maxPipelinePerDatanode > 0)
-          ? String.format("per datanode: %d", maxPipelinePerDatanode)
+      String limitInfo = (datanodePipelineLimit > 0)
+          ? String.format("per datanode: %d", datanodePipelineLimit)
           : String.format(": %d", pipelineNumberLimit);
 
       throw new SCMException(
@@ -158,14 +156,12 @@ public class RatisPipelineProvider
       );
     }
 
-    List<DatanodeDetails> dns;
-
+    final List<DatanodeDetails> dns;
     final ReplicationFactor factor =
         replicationConfig.getReplicationFactor();
     switch (factor) {
     case ONE:
-      dns = pickNodesNotUsed(replicationConfig, minRatisVolumeSizeBytes,
-          containerSizeBytes, conf);
+      dns = pickNodesNotUsed(replicationConfig, minRatisVolumeSizeBytes, containerSizeBytes);
       break;
     case THREE:
       List<DatanodeDetails> excludeDueToEngagement = filterPipelineEngagement();
@@ -249,10 +245,6 @@ public class RatisPipelineProvider
         .map(d -> d.getDn())
         .collect(Collectors.toList());
     return excluded;
-  }
-
-  @Override
-  public void shutdown() {
   }
 
   /**

@@ -54,7 +54,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       LoggerFactory.getLogger(PipelinePlacementPolicy.class);
   private final NodeManager nodeManager;
   private final PipelineStateManager stateManager;
-  private final int heavyNodeCriteria;
+  private final int datanodePipelineLimit;
   private static final int REQUIRED_RACKS = 2;
 
   public static final String MULTIPLE_RACK_PIPELINE_MSG =
@@ -76,8 +76,9 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     super(nodeManager, conf);
     this.nodeManager = nodeManager;
     this.stateManager = stateManager;
-    String dnLimit = conf.get(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT);
-    this.heavyNodeCriteria = dnLimit == null ? 0 : Integer.parseInt(dnLimit);
+    this.datanodePipelineLimit = conf.getInt(
+        ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT,
+        ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT);
   }
 
   public static int currentRatisThreePipelineCount(
@@ -182,7 +183,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     if (healthyList.size() < nodesRequired) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Unable to find enough nodes that meet the criteria that" +
-            " cannot engage in more than" + heavyNodeCriteria +
+            " cannot engage in more than" + datanodePipelineLimit +
             " pipelines. Nodes required: " + nodesRequired + " Excluded: " +
             excludedNodesSize + " Found:" +
             healthyList.size() + " healthy nodes count in NodeManager: " +
@@ -191,7 +192,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       msg = String.format("Pipeline creation failed because nodes are engaged" +
               " in other pipelines and every node can only be engaged in" +
               " max %d pipelines. Required %d. Found %d. Excluded: %d.",
-          heavyNodeCriteria, nodesRequired, healthyList.size(),
+          datanodePipelineLimit, nodesRequired, healthyList.size(),
           excludedNodesSize);
       throw new SCMException(msg,
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);

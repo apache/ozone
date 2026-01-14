@@ -131,6 +131,7 @@ import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolCli
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.io.retry.FailoverProxyProvider.ProxyInfo;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -327,13 +328,13 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider =
         OmFailoverProxyUtil.getFailoverProxyProvider(store.getClientProxy());
 
-    List<OMProxyInfo> omProxies = omFailoverProxyProvider.getOMProxyInfos();
+    List<ProxyInfo> omProxies = omFailoverProxyProvider.getOMProxies();
 
     // For a non-HA OM service, there should be only one OM proxy.
     assertEquals(1, omProxies.size());
     // The address in OMProxyInfo object, which client will connect to,
     // should match the OM's RPC address.
-    assertEquals(omProxies.get(0).getAddress(),
+    assertEquals(((OMProxyInfo) omProxies.get(0)).getAddress(),
         ozoneManager.getOmRpcServerAddr());
   }
 
