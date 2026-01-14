@@ -24,6 +24,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTER
 import static org.apache.hadoop.ozone.container.TestHelper.waitForContainerClose;
 import static org.apache.hadoop.ozone.container.TestHelper.waitForContainerStateInSCM;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.Assert.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -103,7 +104,7 @@ public class TestContainerReportHandlingWithHA {
 
         // move the container to DELETING
         ContainerManager containerManager = cluster.getScmLeader().getContainerManager();
-        assertTrue(containerManager.getContainerReplicas(containerID).size() > 0);
+        assertFalse(containerManager.getContainerReplicas(containerID).isEmpty());
         containerManager.updateContainerState(containerID, HddsProtos.LifeCycleEvent.DELETE);
         assertEquals(HddsProtos.LifeCycleState.DELETING, containerManager.getContainer(containerID).getState());
 
@@ -129,7 +130,7 @@ public class TestContainerReportHandlingWithHA {
           // wait for all replica gets deleted
           GenericTestUtils.waitFor(() -> {
             try {
-              return containerManager.getContainerReplicas(containerID).size() == 0;
+              return containerManager.getContainerReplicas(containerID).isEmpty();
             } catch (ContainerNotFoundException e) {
               throw new RuntimeException(e);
             }
