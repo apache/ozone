@@ -129,7 +129,7 @@ public class TestContainerReportHandlingWithHA {
           // wait for all replica gets deleted
           GenericTestUtils.waitFor(() -> {
             try {
-              return containerManager.getContainerReplicas(containerID).isEmpty();
+              return containerManager.getContainerReplicas(containerID).size() == 0;
             } catch (ContainerNotFoundException e) {
               throw new RuntimeException(e);
             }
