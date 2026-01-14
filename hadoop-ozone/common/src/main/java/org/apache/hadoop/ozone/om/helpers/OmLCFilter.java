@@ -62,12 +62,17 @@ public final class OmLCFilter {
 
   /**
    * Validates the OmLCFilter.
-   * Ensures that only one of prefix, tag, or andOperator is set.
-   * You can specify an empty filter, in which case the rule applies to all objects in the bucket.
-   * Prefix can be "", in which case the rule applies to all objects in the bucket.
    * Ref: <a href="https://docs.aws.amazon.com/AmazonS3/latest/userguide/intro-lifecycle-filters.html#filter-examples">...</a>
-   * If the validation fails, an OMException is thrown.
+   * - Only one of prefix, tag, or andOperator is set.
+   * - You can specify an empty filter, in which case the rule applies to all objects in the bucket.
+   * - Prefix can be "", in which case the rule applies to all objects in the bucket.
+   * - Prefix length must be a length between 0 and 1024.
+   * - Tag's key must be a length between 1 and 128.
+   * - Tag's value must be a length between 0 and 256.
+   * - For FSO bucket, the prefix must be normalized and valid path.
+   * - Prefix cannot be the Trash directory or any of its subdirectories.
    *
+   * @param layout The bucket layout for validation
    * @throws OMException if the filter is invalid.
    */
   public void valid(BucketLayout layout) throws OMException {
