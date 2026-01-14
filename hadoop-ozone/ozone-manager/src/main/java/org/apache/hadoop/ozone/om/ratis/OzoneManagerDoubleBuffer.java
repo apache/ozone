@@ -44,6 +44,7 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
+import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -106,10 +107,13 @@ public final class OzoneManagerDoubleBuffer {
   private static class Entry {
     private final TermIndex termIndex;
     private final OMClientResponse response;
+    // strawman approach: see comments in addToBatch()
+    private final OmCompletedRequestInfo completedRequestInfo;
 
-    Entry(TermIndex termIndex, OMClientResponse response) {
+    Entry(TermIndex termIndex, OMClientResponse response, OmCompletedRequestInfo completedRequestInfo) {
       this.termIndex = termIndex;
       this.response = response;
+      this.completedRequestInfo = completedRequestInfo;
     }
 
     TermIndex getTermIndex() {
@@ -118,6 +122,10 @@ public final class OzoneManagerDoubleBuffer {
 
     OMClientResponse getResponse() {
       return response;
+    }
+
+    OmCompletedRequestInfo getCompletedRequestInfo() {
+      return completedRequestInfo;
     }
   }
 
@@ -404,11 +412,29 @@ public final class OzoneManagerDoubleBuffer {
     for (Entry entry: buffer) {
       OMClientResponse response = entry.getResponse();
       OMResponse omResponse = response.getOMResponse();
+      OmCompletedRequestInfo completedRequestInfo = entry.getCompletedRequestInfo();
       lastTraceId = omResponse.getTraceID();
 
       try {
         addToBatchWithTrace(omResponse,
             () -> response.checkAndUpdateDB(omMetadataManager, batchOperation));
+
+        // This is a strawman approach and requires some discussion
+        // with the community on approach.
+        //
+        // TODO: would it be better to have each type of request we want
+        // to capture populate a row in the ledger in the addToBatch
+        // callback of the response (triggered above) e.g.
+        // OMKeyCommitResponse::addToBatch could generate the suitable
+        // OmCompletedRequestInfo row and populate (Q: if we went with
+        // that approach then would it have access to all the necessary
+        // request parameters? e.g. termIndex.getIndex(), cmdType and
+        // all captured request parameters
+        if (completedRequestInfo != null) {
+          omMetadataManager.getCompletedRequestInfoTable().putWithBatch(
+              batchOperation, completedRequestInfo.getTrxLogIndex(), completedRequestInfo);
+        }
+
       } catch (IOException ex) {
         // During Adding to RocksDB batch entry got an exception.
         // We should terminate the OM.
@@ -554,8 +580,9 @@ public final class OzoneManagerDoubleBuffer {
   /**
    * Add OmResponseBufferEntry to buffer.
    */
-  public synchronized void add(OMClientResponse response, TermIndex termIndex) {
-    currentBuffer.add(new Entry(termIndex, response));
+  public synchronized void add(OMClientResponse response, TermIndex termIndex,
+                               OmCompletedRequestInfo completedRequestInfo) {
+    currentBuffer.add(new Entry(termIndex, response, completedRequestInfo));
     notify();
   }
 

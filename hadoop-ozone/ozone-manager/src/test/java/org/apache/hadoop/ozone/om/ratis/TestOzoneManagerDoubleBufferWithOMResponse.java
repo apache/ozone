@@ -312,7 +312,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     final TermIndex termIndex = TermIndex.valueOf(term, transactionID);
     final ExecutionContext context = ExecutionContext.of(termIndex.getIndex(), termIndex);
     OMClientResponse omClientResponse = omBucketDeleteRequest.validateAndUpdateCache(ozoneManager, context);
-    doubleBuffer.add(omClientResponse, termIndex);
+    doubleBuffer.add(omClientResponse, termIndex, null);
     return omClientResponse;
   }
 
@@ -456,7 +456,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     final TermIndex termIndex = TransactionInfo.getTermIndex(transactionId);
     final ExecutionContext context = ExecutionContext.of(termIndex.getIndex(), termIndex);
     OMClientResponse omClientResponse = omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, context);
-    doubleBuffer.add(omClientResponse, termIndex);
+    doubleBuffer.add(omClientResponse, termIndex, null);
     return omClientResponse;
   }
 
@@ -483,7 +483,7 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     final TermIndex termIndex = TermIndex.valueOf(term, transactionID);
     final ExecutionContext context = ExecutionContext.of(termIndex.getIndex(), termIndex);
     OMClientResponse omClientResponse = omBucketCreateRequest.validateAndUpdateCache(ozoneManager, context);
-    doubleBuffer.add(omClientResponse, termIndex);
+    doubleBuffer.add(omClientResponse, termIndex, null);
     return (OMBucketCreateResponse) omClientResponse;
   }
 }

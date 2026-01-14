@@ -98,7 +98,7 @@ public class TestOzoneManagerDoubleBufferWithDummyResponse {
 
     for (int i = 0; i < bucketCount; i++) {
       doubleBuffer.add(createDummyBucketResponse(volumeName),
-          TermIndex.valueOf(term, trxId.incrementAndGet()));
+          TermIndex.valueOf(term, trxId.incrementAndGet()), null);
     }
     waitFor(() -> metrics.getTotalNumOfFlushedTransactions() == bucketCount,
         100, 60000);

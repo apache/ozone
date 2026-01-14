@@ -103,7 +103,7 @@ public class OMPrepareRequest extends OMClientRequest {
       // the snapshot index in the prepared state.
       OzoneManagerDoubleBuffer doubleBuffer =
           ozoneManager.getOmRatisServer().getOmStateMachine().getOzoneManagerDoubleBuffer();
-      doubleBuffer.add(response, context.getTermIndex());
+      doubleBuffer.add(response, context.getTermIndex(), null);
 
       OzoneManagerRatisServer omRatisServer = ozoneManager.getOmRatisServer();
       final RaftServer.Division division = omRatisServer.getServerDivision();
