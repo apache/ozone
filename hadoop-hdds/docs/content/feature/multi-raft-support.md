@@ -105,6 +105,22 @@ Ratis handles concurrent logs per node.
   The Ratis pipelines will be distributed accordingly.
   - Be cautious with very high pipeline counts due to memory/CPU overhead.
 
+## Advanced Ratis Configuration
+
+Any Ratis configuration properties can be set using a corresponding prefix.
+The following table shows the prefixes in each Ozone component.
+
+| Ozone Components                | Configuration Prefixes  |
+|---------------------------------|-------------------------|
+| Ozone Manager (OM)              | `ozone.om.ha`           |
+| Storage Container Manager (SCM) | `ozone.scm.ha`          |
+| Recon                           | `ozone.recon.scmconfig` |
+| Datanode                        | `hdds.ratis`            |
+| Ozone Client                    | `hdds.ratis`            |
+
+See also [Apache Ratis configuration
+documentation](https://github.com/apache/ratis/blob/ratis-3.2.1/ratis-docs/src/site/markdown/configurations.md).
+
 ## Limitations
 - Global configuration: cannot set per-node limits
 - Requires restart after changing storage dirs
