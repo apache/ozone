@@ -28,9 +28,12 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
+import org.apache.hadoop.ozone.om.response.HasCompletedRequestInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,7 +41,7 @@ import org.slf4j.LoggerFactory;
  * Response for CreateKey request.
  */
 @CleanupTableInfo(cleanupTables = {OPEN_KEY_TABLE, KEY_TABLE, BUCKET_TABLE})
-public class OMKeyCreateResponse extends OmKeyResponse {
+public class OMKeyCreateResponse extends OmKeyResponse implements HasCompletedRequestInfo {
 
   protected static final Logger LOG =
       LoggerFactory.getLogger(OMKeyCreateResponse.class);
@@ -113,6 +116,19 @@ public class OMKeyCreateResponse extends OmKeyResponse {
 
   protected OmBucketInfo getOmBucketInfo() {
     return omBucketInfo;
+  }
+
+  @Override
+  public OmCompletedRequestInfo getCompletedRequestInfo(long trxnLogIndex) {
+    return OmCompletedRequestInfo.newBuilder()
+        .setTrxLogIndex(trxnLogIndex)
+        .setCmdType(Type.CreateKey)
+        .setCreationTime(System.currentTimeMillis())
+        .setVolumeName(omKeyInfo.getVolumeName())
+        .setBucketName(omKeyInfo.getBucketName())
+        .setKeyName(omKeyInfo.getKeyName())
+        .setOpArgs(new OmCompletedRequestInfo.OperationArgs.NoArgs())
+        .build();
   }
 }
 
