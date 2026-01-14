@@ -118,6 +118,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
 
     CreateKeyRequest.Builder newCreateKeyRequest = null;
     KeyArgs.Builder newKeyArgs = null;
+    UserInfo userInfo = getUserInfo();
     if (!keyArgs.getIsMultipartKey()) {
 
       long scmBlockSize = ozoneManager.getScmBlockSize();
@@ -144,7 +145,6 @@ public class OMKeyCreateRequest extends OMKeyRequest {
       //  bucket/key/volume or not and also with out any authorization checks.
       //  As for a client for the first time this can be executed on any OM,
       //  till leader is identified.
-      UserInfo userInfo = getUserInfo();
 
       List<OmKeyLocationInfo> omKeyLocationInfoList;
       final long effectiveDataSize;
@@ -197,7 +197,7 @@ public class OMKeyCreateRequest extends OMKeyRequest {
             .setClientID(UniqueId.next());
 
     return getOmRequest().toBuilder()
-        .setCreateKeyRequest(newCreateKeyRequest).setUserInfo(getUserInfo())
+        .setCreateKeyRequest(newCreateKeyRequest).setUserInfo(userInfo)
         .build();
   }
 

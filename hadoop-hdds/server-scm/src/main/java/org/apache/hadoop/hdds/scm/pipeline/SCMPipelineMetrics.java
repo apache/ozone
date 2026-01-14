@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
-import com.google.common.annotations.VisibleForTesting;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -194,7 +193,6 @@ public final class SCMPipelineMetrics implements MetricsSource {
   /**
    * Return number of blocks allocated across all pipelines.
    */
-  @VisibleForTesting
   public long getTotalNumBlocksAllocated() {
     return numBlocksAllocated.values().stream().mapToLong(MutableCounterLong::value).sum();
   }
