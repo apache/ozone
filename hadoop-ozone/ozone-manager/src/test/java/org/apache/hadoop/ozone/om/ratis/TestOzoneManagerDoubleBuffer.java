@@ -268,7 +268,7 @@ class TestOzoneManagerDoubleBuffer {
     doubleBuffer.stopDaemon();
 
     for (int i = 0; i < omClientResponses.size(); i++) {
-      doubleBuffer.add(omClientResponses.get(i), TransactionInfo.getTermIndex(i));
+      doubleBuffer.add(omClientResponses.get(i), TransactionInfo.getTermIndex(i), null);
     }
 
     // Flush the current buffer.
@@ -320,7 +320,7 @@ class TestOzoneManagerDoubleBuffer {
 
     // Init double buffer.
     for (OMClientResponse omClientResponse : omClientResponses) {
-      doubleBuffer.add(omClientResponse, TransactionInfo.getTermIndex(transactionIndex++));
+      doubleBuffer.add(omClientResponse, TransactionInfo.getTermIndex(transactionIndex++), null);
     }
     assertEquals(initialSize,
         doubleBuffer.getCurrentBufferSize());
@@ -412,7 +412,7 @@ class TestOzoneManagerDoubleBuffer {
     // Run validateAndUpdateCache
     OMClientResponse omClientResponse =
         s3GetSecretRequest.validateAndUpdateCache(ozoneManager, txLogIndex);
-    doubleBuffer.add(omClientResponse, TransactionInfo.getTermIndex(txLogIndex));
+    doubleBuffer.add(omClientResponse, TransactionInfo.getTermIndex(txLogIndex), null);
   }
 
   private OzoneManagerProtocolProtos.OMRequest s3GetSecretRequest(

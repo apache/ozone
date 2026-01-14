@@ -75,6 +75,7 @@ import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadList;
@@ -91,6 +92,7 @@ import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.helpers.TenantStateList;
 import org.apache.hadoop.ozone.om.helpers.TenantUserInfoValue;
 import org.apache.hadoop.ozone.om.helpers.TenantUserList;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerCompletedRequestInfoProvider;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -166,6 +168,7 @@ import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.ozone.util.PayloadUtils;
 import org.apache.hadoop.ozone.util.ProtobufUtils;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -177,10 +180,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   static final Logger LOG =
       LoggerFactory.getLogger(OzoneManagerRequestHandler.class);
   private final OzoneManager impl;
+  private final OzoneManagerCompletedRequestInfoProvider completedRequestInfoProvider;
   private FaultInjector injector;
 
   public OzoneManagerRequestHandler(OzoneManager om) {
     this.impl = om;
+    this.completedRequestInfoProvider = new OzoneManagerCompletedRequestInfoProvider();
   }
 
   //TODO simplify it to make it shorter
@@ -424,6 +429,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
           th);
       throw th;
     }
+  }
+
+  @Override
+  public OmCompletedRequestInfo handleSuccessfulWriteRequestImpl(TermIndex termIndex, OMRequest omRequest)
+          throws IOException {
+    return completedRequestInfoProvider.get(termIndex.getIndex(), omRequest);
   }
 
   @VisibleForTesting

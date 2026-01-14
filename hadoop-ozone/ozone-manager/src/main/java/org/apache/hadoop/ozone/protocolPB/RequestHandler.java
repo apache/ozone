@@ -20,11 +20,13 @@ package org.apache.hadoop.ozone.protocolPB;
 import java.io.IOException;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
+import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.ratis.server.protocol.TermIndex;
 
 /**
  * Handler to handleRequest the OmRequests.
@@ -61,7 +63,11 @@ public interface RequestHandler {
       OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer) throws IOException {
     final OMClientResponse response = handleWriteRequestImpl(omRequest, context);
     if (omRequest.getCmdType() != Type.Prepare) {
-      ozoneManagerDoubleBuffer.add(response, context.getTermIndex());
+
+      final OmCompletedRequestInfo omCompletedRequestInfo = handleSuccessfulWriteRequestImpl(
+          context.getTermIndex(), omRequest);
+
+      ozoneManagerDoubleBuffer.add(response, context.getTermIndex(), omCompletedRequestInfo);
     }
     return response;
   }
@@ -74,4 +80,6 @@ public interface RequestHandler {
    * @return OMClientResponse
    */
   OMClientResponse handleWriteRequestImpl(OMRequest omRequest, ExecutionContext context) throws IOException;
+
+  OmCompletedRequestInfo handleSuccessfulWriteRequestImpl(TermIndex index, OMRequest omRequest) throws IOException;
 }
