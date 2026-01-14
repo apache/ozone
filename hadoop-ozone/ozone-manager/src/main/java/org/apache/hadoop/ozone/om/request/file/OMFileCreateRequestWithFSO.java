@@ -216,7 +216,8 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
           .setCmdType(Type.CreateFile);
       omClientResponse = new OMFileCreateResponseWithFSO(omResponse.build(),
               omFileInfo, missingParentInfos, clientID,
-              omBucketInfo.copyObject(), volumeId);
+              omBucketInfo.copyObject(), volumeId,
+              isRecursive, isOverWrite);
 
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {

@@ -29,11 +29,17 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 
 /**
  * Tests OMKeyCreateResponseWithFSO.
  */
 public class TestOMKeyCreateResponseWithFSO extends TestOMKeyCreateResponse {
+
+  @Override
+  public Type getCmdType() {
+    return Type.CreateKey;
+  }
 
   @Nonnull
   @Override

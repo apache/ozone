@@ -518,7 +518,7 @@ public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse 
     OMKeyRenameResponseWithFSO omKeyRenameResponse =
         new OMKeyRenameResponseWithFSO(omResponse, getDBKeyName(fromKeyInfo),
             getDBKeyName(toKeyInfo), fromKeyParent, null, toKeyInfo,
-            null, true, BucketLayout.FILE_SYSTEM_OPTIMIZED);
+            null, true, BucketLayout.FILE_SYSTEM_OPTIMIZED, fromKey, toKey);
     omKeyRenameResponse.addToDBBatch(getOmMetadataManager(), getBatchOperation());
     getOmMetadataManager().getStore().commitBatchOperation(getBatchOperation());
   }

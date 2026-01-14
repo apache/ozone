@@ -17,12 +17,14 @@
 
 package org.apache.hadoop.ozone.om.response.key;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyResponse;
@@ -36,6 +38,14 @@ public class TestOMKeyCreateResponse extends TestOMKeyResponse {
 
   protected long getVolumeId() throws IOException {
     return omMetadataManager.getVolumeId(volumeName);
+  }
+
+  protected OzoneManagerProtocolProtos.Type getCmdType() {
+    return OzoneManagerProtocolProtos.Type.CreateKey;
+  }
+
+  protected OmCompletedRequestInfo.OperationArgs getCompletedRequestInfoArgs() {
+    return new OmCompletedRequestInfo.OperationArgs.NoArgs();
   }
 
   @Test
@@ -91,6 +101,30 @@ public class TestOMKeyCreateResponse extends TestOMKeyResponse {
     // As omResponse is error it is a no-op.
     assertFalse(omMetadataManager.getOpenKeyTable(getBucketLayout()).isExist(openKey));
 
+  }
+
+  @Test
+  public void testGetCompletedRequestInfo() throws IOException {
+    long txIndex = 100L;
+    OmKeyInfo omKeyInfo = getOmKeyInfo();
+
+    OMResponse omResponse = OMResponse.newBuilder().setCreateKeyResponse(
+                CreateKeyResponse.getDefaultInstance())
+            .setStatus(OzoneManagerProtocolProtos.Status.OK)
+            .setCmdType(getCmdType())
+            .build();
+
+    OMKeyCreateResponse omKeyCreateResponse =
+            getOmKeyCreateResponse(omKeyInfo, omBucketInfo,
+                    omResponse);
+
+    OmCompletedRequestInfo info = omKeyCreateResponse.getCompletedRequestInfo(txIndex);
+
+    assertEquals(txIndex, info.getTrxLogIndex());
+    assertEquals(getCmdType(), info.getCmdType());
+    assertEquals(omKeyInfo.getVolumeName(), info.getVolumeName());
+    assertEquals(omKeyInfo.getBucketName(), info.getBucketName());
+    assertEquals(getCompletedRequestInfoArgs(), info.getOpArgs());
   }
 
   @Nonnull
