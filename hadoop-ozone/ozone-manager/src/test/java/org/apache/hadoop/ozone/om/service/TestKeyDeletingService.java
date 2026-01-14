@@ -1380,32 +1380,6 @@ class TestKeyDeletingService extends OzoneTestBase {
     return keyArg;
   }
 
-  private OmKeyArgs createAndCommitEmptyKey(String volumeName,
-                                            String bucketName, String keyName,
-                                            OzoneManagerProtocol customWriteClient) throws IOException {
-
-    // 1. Build the basic KeyArgs with 0 data size
-    OmKeyArgs keyArg = new OmKeyArgs.Builder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .setKeyName(keyName)
-        .setAcls(Collections.emptyList())
-        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
-        .setDataSize(0L) // Explicitly set to 0
-        .setLocationInfoList(new ArrayList<>())
-        .setOwnerName("user" + RandomStringUtils.secure().nextNumeric(5))
-        .build();
-
-    // 2. Open the Key session
-    OpenKeySession session = customWriteClient.openKey(keyArg);
-
-    // 3. Commit the key immediately using the session ID
-    // Since it's empty, we don't need to call allocateBlock or update location lists
-    customWriteClient.commitKey(keyArg, session.getId());
-
-    return keyArg;
-  }
-
   private long getDeletedKeyCount() {
     final long count = keyDeletingService.getDeletedKeyCount().get();
     LOG.debug("KeyDeletingService deleted keys: {}", count);
