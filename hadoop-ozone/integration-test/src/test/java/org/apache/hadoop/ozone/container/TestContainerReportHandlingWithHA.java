@@ -37,11 +37,12 @@ import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -53,6 +54,7 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
@@ -69,7 +71,8 @@ public class TestContainerReportHandlingWithHA {
    * To do this, the test first creates a key and closes its corresponding container. Then it moves that container to
    * DELETING (or DELETED) state using ContainerManager. Then it restarts a Datanode hosting that container,
    * making it send a full container report.
-   * Finally, the test waits for the container to move from DELETING (or DELETED) to CLOSED in all SCMs.
+   * the test waits for the container to move from DELETING to CLOSED in all SCMs.
+   * the test waits for the replica to move from CLOSED to DELETED in SCM for DELETED container.
    */
   @ParameterizedTest
   @EnumSource(value = HddsProtos.LifeCycleState.class,
@@ -100,6 +103,7 @@ public class TestContainerReportHandlingWithHA {
 
         // move the container to DELETING
         ContainerManager containerManager = cluster.getScmLeader().getContainerManager();
+        assertTrue(containerManager.getContainerReplicas(containerID).size() > 0);
         containerManager.updateContainerState(containerID, HddsProtos.LifeCycleEvent.DELETE);
         assertEquals(HddsProtos.LifeCycleState.DELETING, containerManager.getContainer(containerID).getState());
 
@@ -109,13 +113,30 @@ public class TestContainerReportHandlingWithHA {
           assertEquals(HddsProtos.LifeCycleState.DELETED, containerManager.getContainer(containerID).getState());
         }
 
-        // restart a DN and wait for the container to get CLOSED in all SCMs
-        HddsDatanodeService dn = cluster.getHddsDatanode(keyLocation.getPipeline().getFirstNode());
-        cluster.restartHddsDatanode(dn.getDatanodeDetails(), false);
+        // restart all the DNs
+        List<DatanodeDetails> dnlist = keyLocation.getPipeline().getNodes();
+        for (DatanodeDetails dn: dnlist) {
+          cluster.restartHddsDatanode(dn, false);
+        }
 
-        waitForContainerStateInAllSCMs(cluster, containerID, HddsProtos.LifeCycleState.CLOSED);
+        if (desiredState == HddsProtos.LifeCycleState.DELETING) {
+          // wait for the container to get CLOSED in all SCMs
+          waitForContainerStateInAllSCMs(cluster, containerID, HddsProtos.LifeCycleState.CLOSED);
+          assertEquals(HddsProtos.LifeCycleState.CLOSED, containerManager.getContainer(containerID).getState());
+        } else {
+          // Since replica state is CLOSED and container is DELETED in SCM also bcsid of replica and container is same
+          // SCM will trigger delete replica
+          // wait for all replica gets deleted
+          GenericTestUtils.waitFor(() -> {
+            try {
+              return containerManager.getContainerReplicas(containerID).isEmpty();
+            } catch (ContainerNotFoundException e) {
+              throw new RuntimeException(e);
+            }
+          }, 100, 120000);
+          assertEquals(HddsProtos.LifeCycleState.DELETED, containerManager.getContainer(containerID).getState());
 
-        assertEquals(HddsProtos.LifeCycleState.CLOSED, containerManager.getContainer(containerID).getState());
+        }
       }
     } finally {
       if (clusterPath != null) {
