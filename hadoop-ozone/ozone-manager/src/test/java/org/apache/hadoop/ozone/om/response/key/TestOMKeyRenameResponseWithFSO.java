@@ -73,7 +73,8 @@ public class TestOMKeyRenameResponseWithFSO extends TestOMKeyRenameResponse {
     createParent();
     return new OMKeyRenameResponseWithFSO(response, getDBKeyName(fromKeyInfo),
         getDBKeyName(toKeyInfo), fromKeyParent, toKeyParent, toKeyInfo,
-        bucketInfo, false, getBucketLayout());
+        bucketInfo, false, getBucketLayout(),
+        fromKeyInfo.getKeyName(), toKeyInfo.getKeyName());
   }
 
   protected void createParent() {

@@ -24,10 +24,12 @@ import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 
 /**
@@ -69,6 +71,11 @@ public class OMVolumeCreateResponse extends OMClientResponse {
         dbVolumeKey, omVolumeArgs);
     omMetadataManager.getUserTable().putWithBatch(batchOperation, dbUserKey,
         userVolumeInfo);
+
+    // Add to completed requests table.
+    omMetadataManager.getCompletedRequestInfoTable()
+        .putWithBatch(batchOperation, omVolumeArgs.getUpdateID(),
+            getCompletedRequestInfo(omVolumeArgs.getUpdateID()));
   }
 
   @VisibleForTesting
@@ -76,5 +83,13 @@ public class OMVolumeCreateResponse extends OMClientResponse {
     return omVolumeArgs;
   }
 
+  protected OmCompletedRequestInfo getCompletedRequestInfo(long trxnLogIndex) {
+    return OmCompletedRequestInfo.newBuilder()
+        .setTrxLogIndex(trxnLogIndex)
+        .setCmdType(Type.CreateVolume)
+        .setCreationTime(System.currentTimeMillis())
+        .setVolumeName(omVolumeArgs.getVolume())
+        .setOpArgs(new OmCompletedRequestInfo.OperationArgs.NoArgs())
+        .build();
+  }
 }
-

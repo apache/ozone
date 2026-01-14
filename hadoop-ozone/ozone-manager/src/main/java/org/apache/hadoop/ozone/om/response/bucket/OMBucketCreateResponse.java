@@ -26,10 +26,12 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 
 /**
  * Response for CreateBucket request.
@@ -80,6 +82,11 @@ public final class OMBucketCreateResponse extends OMClientResponse {
               omMetadataManager.getVolumeKey(omVolumeArgs.getVolume()),
               omVolumeArgs);
     }
+
+    // Add to completed requests table.
+    omMetadataManager.getCompletedRequestInfoTable()
+        .putWithBatch(batchOperation, omBucketInfo.getUpdateID(),
+            getCompletedRequestInfo(omBucketInfo.getUpdateID()));
   }
 
   @Nullable
@@ -87,5 +94,15 @@ public final class OMBucketCreateResponse extends OMClientResponse {
     return omBucketInfo;
   }
 
+  protected OmCompletedRequestInfo getCompletedRequestInfo(long trxnLogIndex) {
+    return OmCompletedRequestInfo.newBuilder()
+        .setTrxLogIndex(trxnLogIndex)
+        .setCmdType(Type.CreateBucket)
+        .setCreationTime(System.currentTimeMillis())
+        .setVolumeName(omBucketInfo.getVolumeName())
+        .setBucketName(omBucketInfo.getBucketName())
+        .setOpArgs(new OmCompletedRequestInfo.OperationArgs.NoArgs())
+        .build();
+  }
 }
 

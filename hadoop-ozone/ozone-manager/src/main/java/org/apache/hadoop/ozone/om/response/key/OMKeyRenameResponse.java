@@ -25,10 +25,12 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 
 /**
  * Response for RenameKey request.
@@ -94,6 +96,11 @@ public class OMKeyRenameResponse extends OmKeyResponse {
       omMetadataManager.getSnapshotRenamedTable().putWithBatch(
           batchOperation, renameDbKey, fromDbKey);
     }
+
+    // Add to completed requests table.
+    omMetadataManager.getCompletedRequestInfoTable()
+        .putWithBatch(batchOperation, renameKeyInfo.getUpdateID(),
+            getCompletedRequestInfo(renameKeyInfo.getUpdateID()));
   }
 
   public OmKeyInfo getRenameKeyInfo() {
@@ -106,5 +113,27 @@ public class OMKeyRenameResponse extends OmKeyResponse {
 
   public String getToKeyName() {
     return toKeyName;
+  }
+
+  protected String getFromKeyNameInRequest() {
+    return fromKeyName;
+  }
+
+  protected String getToKeyNameInRequest() {
+    return toKeyName;
+  }
+
+  protected OmCompletedRequestInfo getCompletedRequestInfo(long trxnLogIndex) {
+    String fromKeyNameInRequest = getFromKeyNameInRequest();
+    String toKeyNameInRequest = getToKeyNameInRequest();
+    return OmCompletedRequestInfo.newBuilder()
+        .setTrxLogIndex(trxnLogIndex)
+        .setCmdType(Type.RenameKey)
+        .setCreationTime(System.currentTimeMillis())
+        .setVolumeName(renameKeyInfo.getVolumeName())
+        .setBucketName(renameKeyInfo.getBucketName())
+        .setKeyName(fromKeyNameInRequest)
+        .setOpArgs(new OmCompletedRequestInfo.OperationArgs.RenameKeyArgs(toKeyNameInRequest))
+        .build();
   }
 }

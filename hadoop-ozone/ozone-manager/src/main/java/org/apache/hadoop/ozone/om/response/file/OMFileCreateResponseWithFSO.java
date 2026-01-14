@@ -42,6 +42,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
     BUCKET_TABLE})
 public class OMFileCreateResponseWithFSO extends OMFileCreateResponse {
 
+  private static final boolean DEFAULT_IS_RECURSIVE = false;
+  private static final boolean DEFAULT_IS_OVERWRITE = false;
+
   private List<OmDirectoryInfo> parentDirInfos;
   private long volumeId;
 
@@ -49,8 +52,19 @@ public class OMFileCreateResponseWithFSO extends OMFileCreateResponse {
       @Nonnull OmKeyInfo omKeyInfo,
       @Nonnull List<OmDirectoryInfo> parentDirInfos, long openKeySessionID,
       @Nonnull OmBucketInfo omBucketInfo, @Nonnull long volumeId) {
+    this(omResponse, omKeyInfo, parentDirInfos, openKeySessionID,
+         omBucketInfo, volumeId, DEFAULT_IS_RECURSIVE,
+         DEFAULT_IS_OVERWRITE);
+  }
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public OMFileCreateResponseWithFSO(@Nonnull OMResponse omResponse,
+      @Nonnull OmKeyInfo omKeyInfo,
+      @Nonnull List<OmDirectoryInfo> parentDirInfos, long openKeySessionID,
+      @Nonnull OmBucketInfo omBucketInfo, @Nonnull long volumeId,
+      boolean isRecursive, boolean isOverWrite) {
     super(omResponse, omKeyInfo, new ArrayList<>(), openKeySessionID,
-        omBucketInfo);
+        omBucketInfo, isRecursive, isOverWrite);
     this.parentDirInfos = parentDirInfos;
     this.volumeId = volumeId;
   }
@@ -95,6 +109,11 @@ public class OMFileCreateResponseWithFSO extends OMFileCreateResponse {
 
     OMFileRequest.addToOpenFileTable(omMetadataMgr, batchOp, getOmKeyInfo(),
         getOpenKeySessionID(), volumeId, getOmBucketInfo().getObjectID());
+
+    // Add to completed requests table.
+    omMetadataMgr.getCompletedRequestInfoTable()
+        .putWithBatch(batchOp, getOmKeyInfo().getUpdateID(),
+            getCompletedRequestInfo(getOmKeyInfo().getUpdateID()));
   }
 
   @Override

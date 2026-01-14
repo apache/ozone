@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -128,6 +129,34 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
     assertThat(rangeKVs.size()).isGreaterThan(0);
     assertEquals(1, rangeKVs.get(0).getValue().getOmKeyInfoList().size());
 
+  }
+
+  @Test
+  public void testGetCompletedRequestInfo() throws IOException {
+    long txIndex = 100L;
+
+    OmKeyInfo omKeyInfo = getOmKeyInfo();
+
+    OzoneManagerProtocolProtos.OMResponse omResponse =
+        OzoneManagerProtocolProtos.OMResponse.newBuilder().setCommitKeyResponse(
+            OzoneManagerProtocolProtos.CommitKeyResponse.getDefaultInstance())
+            .setStatus(OzoneManagerProtocolProtos.Status.OK)
+            .setCmdType(OzoneManagerProtocolProtos.Type.CommitKey)
+            .build();
+
+    String openKey = getOpenKeyName();
+    String ozoneKey = getOzoneKey();
+
+    OMKeyCommitResponse omKeyCommitResponse = getOmKeyCommitResponse(
+            omKeyInfo, omResponse, openKey, ozoneKey, keysToDelete, false, null);
+
+    OmCompletedRequestInfo info = omKeyCommitResponse.getCompletedRequestInfo(txIndex);
+
+    assertEquals(txIndex, info.getTrxLogIndex());
+    assertEquals(OzoneManagerProtocolProtos.Type.CommitKey, info.getCmdType());
+    assertEquals(omKeyInfo.getVolumeName(), info.getVolumeName());
+    assertEquals(omKeyInfo.getBucketName(), info.getBucketName());
+    assertTrue(info.getOpArgs() instanceof OmCompletedRequestInfo.OperationArgs.NoArgs);
   }
 
   @Nonnull

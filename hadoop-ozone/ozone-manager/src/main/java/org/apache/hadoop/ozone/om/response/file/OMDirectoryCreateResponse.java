@@ -26,11 +26,13 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMDirectoryCreateRequest.Result;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.key.OmKeyResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,10 +94,28 @@ public class OMDirectoryCreateResponse extends OmKeyResponse {
           bucketInfo.getVolumeName(), bucketInfo.getBucketName());
       omMetadataManager.getBucketTable().putWithBatch(batchOperation,
           bucketKey, bucketInfo);
+
+      // Add to completed requests table.
+      omMetadataManager.getCompletedRequestInfoTable()
+          .putWithBatch(batchOperation, dirKeyInfo.getUpdateID(),
+              getCompletedRequestInfo(dirKeyInfo.getUpdateID()));
+
     } else if (Result.DIRECTORY_ALREADY_EXISTS == result) {
       // When directory already exists, we don't add it to cache. And it is
       // not an error, in this case dirKeyInfo will be null.
       LOG.debug("Directory already exists. addToDBBatch is a no-op");
     }
+  }
+
+  protected OmCompletedRequestInfo getCompletedRequestInfo(long trxnLogIndex) {
+    return OmCompletedRequestInfo.newBuilder()
+        .setTrxLogIndex(trxnLogIndex)
+        .setCmdType(Type.CreateDirectory)
+        .setCreationTime(System.currentTimeMillis())
+        .setVolumeName(dirKeyInfo.getVolumeName())
+        .setBucketName(dirKeyInfo.getBucketName())
+        .setKeyName(dirKeyInfo.getKeyName())
+        .setOpArgs(new OmCompletedRequestInfo.OperationArgs.NoArgs())
+        .build();
   }
 }

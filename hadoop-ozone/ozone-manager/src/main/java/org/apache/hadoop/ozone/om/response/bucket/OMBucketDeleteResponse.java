@@ -24,10 +24,12 @@ import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 
 /**
  * Response for DeleteBucket request.
@@ -38,13 +40,15 @@ public final class OMBucketDeleteResponse extends OMClientResponse {
   private String volumeName;
   private String bucketName;
   private final OmVolumeArgs omVolumeArgs;
+  private final long updateID;
 
   public OMBucketDeleteResponse(@Nonnull OMResponse omResponse,
-      String volumeName, String bucketName, OmVolumeArgs volumeArgs) {
+      String volumeName, String bucketName, OmVolumeArgs volumeArgs, long updateID) {
     super(omResponse);
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.omVolumeArgs = volumeArgs;
+    this.updateID = updateID;
   }
 
   public OMBucketDeleteResponse(@Nonnull OMResponse omResponse,
@@ -53,6 +57,7 @@ public final class OMBucketDeleteResponse extends OMClientResponse {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.omVolumeArgs = null;
+    this.updateID = 0;
   }
 
   /**
@@ -63,6 +68,7 @@ public final class OMBucketDeleteResponse extends OMClientResponse {
     super(omResponse);
     checkStatusNotOK();
     this.omVolumeArgs = null;
+    this.updateID = 0;
   }
 
   @Override
@@ -79,6 +85,12 @@ public final class OMBucketDeleteResponse extends OMClientResponse {
               omMetadataManager.getVolumeKey(omVolumeArgs.getVolume()),
               omVolumeArgs);
     }
+
+    // Add to completed requests table.
+    if (omVolumeArgs != null) {
+      omMetadataManager.getCompletedRequestInfoTable()
+          .putWithBatch(batchOperation, updateID, getCompletedRequestInfo(updateID));
+    }
   }
 
   public String getVolumeName() {
@@ -89,5 +101,14 @@ public final class OMBucketDeleteResponse extends OMClientResponse {
     return bucketName;
   }
 
+  protected OmCompletedRequestInfo getCompletedRequestInfo(long trxnLogIndex) {
+    return OmCompletedRequestInfo.newBuilder()
+        .setTrxLogIndex(trxnLogIndex)
+        .setCmdType(Type.DeleteBucket)
+        .setCreationTime(System.currentTimeMillis())
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setOpArgs(new OmCompletedRequestInfo.OperationArgs.NoArgs())
+        .build();
+  }
 }
-
