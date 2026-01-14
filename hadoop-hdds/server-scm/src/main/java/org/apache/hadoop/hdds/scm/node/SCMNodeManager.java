@@ -238,9 +238,7 @@ public class SCMNodeManager implements NodeManager {
    */
   @Override
   public List<DatanodeDetails> getNodes(NodeStatus nodeStatus) {
-    return nodeStateManager.getNodes(nodeStatus)
-        .stream()
-        .map(node -> (DatanodeDetails)node).collect(Collectors.toList());
+    return nodeStateManager.getNodes(nodeStatus);
   }
 
   /**
