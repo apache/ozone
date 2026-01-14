@@ -148,23 +148,22 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Send {} key(s) to SCM (filtered {} empty files): {}",
+      LOG.debug("Send {} key(s) to SCM (filtered {} empty keys): {}",
           nonEmptyKeyBlocksList.size(), keyBlocksList.size() - nonEmptyKeyBlocksList.size(), nonEmptyKeyBlocksList);
     } else if (LOG.isInfoEnabled()) {
       int logSize = 10;
       if (nonEmptyKeyBlocksList.size() < logSize) {
         logSize = nonEmptyKeyBlocksList.size();
       }
-      LOG.info("Send {} key(s) to SCM (filtered {} empty files), first {} keys: {}",
-          nonEmptyKeyBlocksList.size(), keyBlocksList.size() - nonEmptyKeyBlocksList.size(), logSize,
-          nonEmptyKeyBlocksList.entrySet().stream().limit(logSize)
+      LOG.info("Send {} key(s) to SCM, first {} keys: {}",
+          keyBlocksList.size(), logSize, keyBlocksList.entrySet().stream().limit(logSize)
               .map(Map.Entry::getValue).collect(Collectors.toSet()));
     }
     List<DeleteBlockGroupResult> blockDeletionResults;
     if (nonEmptyKeyBlocksList.isEmpty()) {
       // Skip SCM call if all files are empty
       blockDeletionResults = new ArrayList<>();
-      LOG.info("Skipping SCM call as all {} files are empty", keyBlocksList.size());
+      LOG.info("Skipping SCM call as all {} keys are empty", keyBlocksList.size());
     } else {
       blockDeletionResults =
           scmClient.deleteKeyBlocks(nonEmptyKeyBlocksList.values().stream()
@@ -182,10 +181,9 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           emptyKey.getBlockGroup().getGroupID(), new ArrayList<>());
       blockDeletionResults.add(emptyFileResult);
     }
-    
-    LOG.info("{} BlockGroup deletion are acked by SCM in {} ms ({} non-empty, {} empty)",
-        keyBlocksList.size(), Time.monotonicNow() - startTime, 
-        nonEmptyKeyBlocksList.size(), emptyKeyBlocksList.size());
+
+    LOG.info("{} BlockGroup deletion are acked by SCM in {} ms",
+        keyBlocksList.size(), Time.monotonicNow() - startTime);
     if (blockDeletionResults != null) {
       long purgeStartTime = Time.monotonicNow();
       purgeResult = submitPurgeKeysRequest(blockDeletionResults, keyBlocksList, keysToModify, renameEntries,

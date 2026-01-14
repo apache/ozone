@@ -39,6 +39,7 @@ import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -244,6 +245,32 @@ class TestKeyDeletingService extends OzoneTestBase {
           keyManager, om.getMetadataManager().getLock())) {
         assertThat(keyManager.getPendingDeletionKeys(filter, Integer.MAX_VALUE).getPurgedKeys()).isEmpty();
       }
+    }
+
+    /**
+     * Test that verifies zero-sized keys (keys with no blocks) are not sent to SCM.
+     * The KeyDeletingService should filter out empty keys before calling SCM.
+     */
+    @Test
+    void checkIfDeleteServiceIsDeletingZeroSizedKeys()
+        throws IOException, TimeoutException, InterruptedException {
+      // Spy on the SCM client to verify it's not called for empty keys
+      ScmBlockLocationTestingClient scmClientSpy = Mockito.spy(scmBlockTestingClient);
+      // Create a KeyDeletingService with the spied client
+      KeyDeletingService testService = new KeyDeletingService(
+          om, scmClientSpy, 100, 10000, conf, 10, false);
+      // Create a BlockGroup with empty deleted blocks list (zero-sized key)
+      BlockGroup blockGroup = BlockGroup.newBuilder().setKeyName("key1/1")
+          .addAllDeletedBlocks(new ArrayList<>()).build();
+      Map<String, PurgedKey> blockGroups = Collections.singletonMap(
+          blockGroup.getGroupID(), 
+          new PurgedKey("vol", "buck", 1, blockGroup, "key1", 0, true));
+      // Process the key deletion
+      testService.processKeyDeletes(blockGroups, new HashMap<>(), new ArrayList<>(), null, null);
+      // Verify that SCM's deleteKeyBlocks was never called (empty keys are filtered out)
+      verify(scmClientSpy, never()).deleteKeyBlocks(any());
+      // Cleanup
+      testService.shutdown();
     }
 
     @Test
@@ -1350,6 +1377,32 @@ class TestKeyDeletingService extends OzoneTestBase {
     }
     keyArg.setDataSize(size);
     customWriteClient.commitKey(keyArg, session.getId());
+    return keyArg;
+  }
+
+  private OmKeyArgs createAndCommitEmptyKey(String volumeName,
+                                            String bucketName, String keyName,
+                                            OzoneManagerProtocol customWriteClient) throws IOException {
+
+    // 1. Build the basic KeyArgs with 0 data size
+    OmKeyArgs keyArg = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setAcls(Collections.emptyList())
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
+        .setDataSize(0L) // Explicitly set to 0
+        .setLocationInfoList(new ArrayList<>())
+        .setOwnerName("user" + RandomStringUtils.secure().nextNumeric(5))
+        .build();
+
+    // 2. Open the Key session
+    OpenKeySession session = customWriteClient.openKey(keyArg);
+
+    // 3. Commit the key immediately using the session ID
+    // Since it's empty, we don't need to call allocateBlock or update location lists
+    customWriteClient.commitKey(keyArg, session.getId());
+
     return keyArg;
   }
 
