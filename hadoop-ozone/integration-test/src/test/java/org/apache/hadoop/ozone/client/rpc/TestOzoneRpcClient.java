@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED;
+
 import java.io.IOException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -36,6 +38,7 @@ class TestOzoneRpcClient extends OzoneRpcClientTests {
     conf.setBoolean(OzoneConfigKeys.OZONE_ACL_ENABLED, true);
     conf.set(OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS,
         OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS_NATIVE);
+    conf.setBoolean(OZONE_KEY_LIFECYCLE_SERVICE_ENABLED, true);
     startCluster(conf);
   }
 

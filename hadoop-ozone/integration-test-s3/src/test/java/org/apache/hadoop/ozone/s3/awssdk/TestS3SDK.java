@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.s3.awssdk;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 
 class TestS3SDK extends OzoneS3SDKTests {
   @Override
@@ -27,6 +28,7 @@ class TestS3SDK extends OzoneS3SDKTests {
     OzoneConfiguration conf = super.createOzoneConfig();
     conf.setBoolean(OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_ENABLED, false);
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 1);
+    conf.setBoolean(OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED, true);
     return conf;
   }
 }

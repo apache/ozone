@@ -138,8 +138,7 @@ public class KeyLifecycleService extends BackgroundService {
         OZONE_KEY_LIFECYCLE_SERVICE_DELETE_CACHED_DIRECTORY_MAX_COUNT_DEFAULT);
     this.suspended = new AtomicBoolean(false);
     this.metrics = KeyLifecycleServiceMetrics.create();
-    this.isServiceEnabled = new AtomicBoolean(conf.getBoolean(OZONE_KEY_LIFECYCLE_SERVICE_ENABLED,
-        OZONE_KEY_LIFECYCLE_SERVICE_ENABLED_DEFAULT));
+    this.isServiceEnabled = new AtomicBoolean(ozoneManager.isLifecycleEnabled());
     this.moveToTrashEnabled = new AtomicBoolean(conf.getBoolean(OZONE_KEY_LIFECYCLE_SERVICE_MOVE_TO_TRASH_ENABLED,
         OZONE_KEY_LIFECYCLE_SERVICE_MOVE_TO_TRASH_ENABLED_DEFAULT));
     this.inFlight = new ConcurrentHashMap();

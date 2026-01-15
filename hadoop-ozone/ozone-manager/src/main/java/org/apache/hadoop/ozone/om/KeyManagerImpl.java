@@ -364,7 +364,7 @@ public class KeyManagerImpl implements KeyManager {
       multipartUploadCleanupService.start();
     }
 
-    if (keyLifecycleService == null) {
+    if (keyLifecycleService == null && ozoneManager.isLifecycleEnabled()) {
       long lifecycleServiceInterval = configuration.getTimeDuration(OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL,
           OZONE_KEY_LIFECYCLE_SERVICE_INTERVAL_DEFAULT, TimeUnit.MILLISECONDS);
       long lifecycleServiceTimeout = configuration.getTimeDuration(OZONE_KEY_LIFECYCLE_SERVICE_TIMEOUT,
