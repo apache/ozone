@@ -114,7 +114,6 @@ The following table shows the prefixes in each Ozone component.
 |---------------------------------|-------------------------|
 | Ozone Manager (OM)              | `ozone.om.ha`           |
 | Storage Container Manager (SCM) | `ozone.scm.ha`          |
-| Recon                           | `ozone.recon.scmconfig` |
 | Datanode                        | `hdds.ratis`            |
 | Ozone Client                    | `hdds.ratis`            |
 
