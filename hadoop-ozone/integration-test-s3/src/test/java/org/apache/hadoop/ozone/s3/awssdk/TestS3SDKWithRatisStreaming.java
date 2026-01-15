@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.s3.awssdk;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 
 class TestS3SDKWithRatisStreaming extends OzoneS3SDKTests {
   @Override
@@ -30,6 +31,7 @@ class TestS3SDKWithRatisStreaming extends OzoneS3SDKTests {
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_DATASTREAM_ENABLED, true);
     // Ensure that all writes use datastream
     conf.set(OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD, "0MB");
+    conf.setBoolean(OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED, true);
     return conf;
   }
 }
