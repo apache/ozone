@@ -73,7 +73,7 @@ final class UpgradeUtils {
     File idFile = new File(idFilePath);
     Preconditions.checkState(idFile.exists(),
         "Datanode id file: " + idFilePath + " not exists");
-    return ContainerUtils.readDatanodeDetailsFrom(idFile);
+    return ContainerUtils.readDatanodeDetailsFrom(idFile, conf);
   }
 
   public static File getVolumeUpgradeCompleteFile(HddsVolume volume) {

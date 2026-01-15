@@ -25,14 +25,14 @@ import java.util.Map;
 /**
  * In memory, mutable configuration source for testing.
  */
-public class InMemoryConfiguration implements MutableConfigurationSource {
+public class InMemoryConfigurationForTesting implements MutableConfigurationSource {
 
   private Map<String, String> configs = new HashMap<>();
 
-  public InMemoryConfiguration() {
+  public InMemoryConfigurationForTesting() {
   }
 
-  public InMemoryConfiguration(String key, String value) {
+  public InMemoryConfigurationForTesting(String key, String value) {
     set(key, value);
   }
 

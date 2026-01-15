@@ -561,3 +561,27 @@ message InnerNode {
     optional uint32 numOfLeaves = 2;
     repeated ChildrenMap childrenMap = 3;
 }
+
+message DiskBalancerConfigurationProto {
+    optional double threshold = 1;
+    optional uint64 diskBandwidthInMB = 2;
+    optional int32 parallelThread = 3;
+    optional bool stopAfterDiskEven = 4;
+}
+
+enum DiskBalancerRunningStatus {
+    RUNNING = 1;
+    STOPPED = 2;
+    PAUSED = 3;
+}
+
+message DatanodeDiskBalancerInfoProto {
+    required DatanodeDetailsProto node = 1;
+    required double currentVolumeDensitySum = 2;
+    optional DiskBalancerRunningStatus runningStatus = 3;
+    optional DiskBalancerConfigurationProto diskBalancerConf = 4;
+    optional uint64 successMoveCount = 5;
+    optional uint64 failureMoveCount = 6;
+    optional uint64 bytesToMove = 7;
+    optional uint64 bytesMoved = 8;
+}

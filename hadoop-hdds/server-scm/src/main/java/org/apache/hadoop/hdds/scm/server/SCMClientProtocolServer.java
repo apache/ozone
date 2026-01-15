@@ -34,7 +34,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
-import com.google.protobuf.ProtocolMessageEnum;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -140,7 +139,7 @@ public class SCMClientProtocolServer implements
   private final InetSocketAddress clientRpcAddress;
   private final StorageContainerManager scm;
   private final OzoneConfiguration config;
-  private final ProtocolMessageMetrics<ProtocolMessageEnum> protocolMetrics;
+  private final ProtocolMessageMetrics<StorageContainerLocationProtocolProtos.Type> protocolMetrics;
 
   public SCMClientProtocolServer(OzoneConfiguration conf,
       StorageContainerManager scm,
@@ -158,7 +157,7 @@ public class SCMClientProtocolServer implements
     protocolMetrics = ProtocolMessageMetrics
         .create("ScmContainerLocationProtocol",
             "SCM ContainerLocation protocol metrics",
-            StorageContainerLocationProtocolProtos.Type.values());
+            StorageContainerLocationProtocolProtos.Type.class);
 
     // SCM Container Service RPC
     BlockingService storageProtoPbService =
