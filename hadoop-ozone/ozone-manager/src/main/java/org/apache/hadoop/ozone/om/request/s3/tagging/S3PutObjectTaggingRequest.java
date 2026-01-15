@@ -17,12 +17,14 @@
 
 package org.apache.hadoop.ozone.om.request.s3.tagging;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
 import java.io.IOException;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Pattern;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -55,6 +57,59 @@ public class S3PutObjectTaggingRequest extends OMKeyRequest {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(S3PutObjectTaggingRequest.class);
+
+  // NOTE: These limits must be kept in sync with
+  // org.apache.hadoop.ozone.s3.util.S3Consts (S3 Gateway side),
+  // but OM cannot depend on s3gateway, so we define them here as well.
+  private static final int TAG_NUM_LIMIT = 10;
+  private static final int TAG_KEY_LENGTH_LIMIT = 128;
+  private static final int TAG_VALUE_LENGTH_LIMIT = 256;
+  private static final String AWS_TAG_PREFIX = "aws:";
+  private static final Pattern TAG_REGEX_PATTERN =
+      Pattern.compile("^([\\p{L}\\p{Z}\\p{N}_.:/=+\\-]*)$");
+
+  private static void validateTags(Map<String, String> tags) throws OMException {
+    if (tags == null || tags.isEmpty()) {
+      return;
+    }
+
+    if (tags.size() > TAG_NUM_LIMIT) {
+      throw new OMException("The number of tags " + tags.size()
+          + " exceeded the maximum number of tags of " + TAG_NUM_LIMIT,
+          INVALID_REQUEST);
+    }
+
+    for (Map.Entry<String, String> entry : tags.entrySet()) {
+      String tagKey = entry.getKey();
+      String tagValue = entry.getValue() == null ? "" : entry.getValue();
+
+      if (tagKey.length() > TAG_KEY_LENGTH_LIMIT) {
+        throw new OMException(
+            "The tag key exceeds the maximum length of " + TAG_KEY_LENGTH_LIMIT,
+            INVALID_REQUEST);
+      }
+
+      if (tagValue.length() > TAG_VALUE_LENGTH_LIMIT) {
+        throw new OMException(
+            "The tag value exceeds the maximum length of " + TAG_VALUE_LENGTH_LIMIT,
+            INVALID_REQUEST);
+      }
+
+      if (!TAG_REGEX_PATTERN.matcher(tagKey).matches()) {
+        throw new OMException("Invalid tag key: " + tagKey, INVALID_REQUEST);
+      }
+
+      if (!TAG_REGEX_PATTERN.matcher(tagValue).matches()) {
+        throw new OMException("Invalid tag value: " + tagValue, INVALID_REQUEST);
+      }
+
+      if (tagKey.startsWith(AWS_TAG_PREFIX)) {
+        throw new OMException(
+            "Tag key must not start with reserved prefix " + AWS_TAG_PREFIX,
+            INVALID_REQUEST);
+      }
+    }
+  }
 
   public S3PutObjectTaggingRequest(OMRequest omRequest, BucketLayout bucketLayout) {
     super(omRequest, bucketLayout);
@@ -127,8 +182,12 @@ public class S3PutObjectTaggingRequest extends OMKeyRequest {
         throw new OMException("Key not found", KEY_NOT_FOUND);
       }
 
+      Map<String, String> tags =
+          KeyValueUtil.getFromProtobuf(keyArgs.getTagsList());
+      validateTags(tags);
+
       omKeyInfo = omKeyInfo.toBuilder()
-          .setTags(KeyValueUtil.getFromProtobuf(keyArgs.getTagsList()))
+          .setTags(tags)
           .setUpdateID(trxnLogIndex)
           .build();
 
