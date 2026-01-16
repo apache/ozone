@@ -31,6 +31,7 @@ import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
+import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFollowerReadFailoverProxyProvider;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -45,7 +46,8 @@ public class Hadoop3OmTransport implements OmTransport {
    */
   private static final RpcController NULL_RPC_CONTROLLER = null;
 
-  private final HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider;
+  private final HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> omFailoverProxyProvider;
+  private HadoopRpcOMFollowerReadFailoverProxyProvider<OzoneManagerProtocolPB> followerReadFailoverProxyProvider;
 
   private final OzoneManagerProtocolPB rpcProxy;
 
@@ -56,14 +58,34 @@ public class Hadoop3OmTransport implements OmTransport {
         OzoneManagerProtocolPB.class,
         ProtobufRpcEngine.class);
 
-    this.omFailoverProxyProvider = new HadoopRpcOMFailoverProxyProvider(
+    this.omFailoverProxyProvider = new HadoopRpcOMFailoverProxyProvider<>(
             conf, ugi, omServiceId, OzoneManagerProtocolPB.class);
+
+    boolean followerReadEnabled = conf.getBoolean(
+        OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY,
+        OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_DEFAULT
+    );
 
     int maxFailovers = conf.getInt(
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY,
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT);
 
-    this.rpcProxy = createRetryProxy(omFailoverProxyProvider, maxFailovers);
+    // TODO: In the future, we might support more FollowerReadProxyProvider strategies depending on factors
+    //  like latency, applied index, etc.
+    //  So instead of enabling using follower read configuration, we can simply let user to configure the
+    //  failover proxy provider instead (similar to dfs.client.failover.proxy.provider.<nameservice>)
+    if (followerReadEnabled) {
+      this.followerReadFailoverProxyProvider = new HadoopRpcOMFollowerReadFailoverProxyProvider<>(
+          omServiceId, OzoneManagerProtocolPB.class, omFailoverProxyProvider
+      );
+      this.rpcProxy = createRetryProxy(followerReadFailoverProxyProvider, maxFailovers);
+    } else {
+      // TODO: It should be possible to simply instantiate HadoopRpcOMFollowerReadFailoverProxyProvider
+      //  even if the follower read is not enabled. We can try this to ensure that the tests still pass which
+      //  suggests that the HadoopRpcOMFollowerReadFailoverProxyProvider is a indeed a superset of
+      //  HadoopRpcOMFollowerReadFailoverProxyProvider
+      this.rpcProxy = createRetryProxy(omFailoverProxyProvider, maxFailovers);
+    }
   }
 
   @Override
@@ -103,13 +125,24 @@ public class Hadoop3OmTransport implements OmTransport {
    * is not the leader OM.
    */
   private OzoneManagerProtocolPB createRetryProxy(
-      HadoopRpcOMFailoverProxyProvider failoverProxyProvider,
+      HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> failoverProxyProvider,
       int maxFailovers) {
-
-    OzoneManagerProtocolPB proxy = (OzoneManagerProtocolPB) RetryProxy.create(
+    return (OzoneManagerProtocolPB) RetryProxy.create(
         OzoneManagerProtocolPB.class, failoverProxyProvider,
         failoverProxyProvider.getRetryPolicy(maxFailovers));
-    return proxy;
+  }
+
+  /**
+   * Creates a {@link RetryProxy} encapsulating the
+   * {@link HadoopRpcOMFollowerReadFailoverProxyProvider}.
+   */
+  private OzoneManagerProtocolPB createRetryProxy(
+      HadoopRpcOMFollowerReadFailoverProxyProvider<OzoneManagerProtocolPB> failoverProxyProvider,
+      int maxFailovers) {
+    return (OzoneManagerProtocolPB) RetryProxy.create(
+        OzoneManagerProtocolPB.class, failoverProxyProvider,
+        failoverProxyProvider.getRetryPolicy(maxFailovers)
+    );
   }
 
   @VisibleForTesting
@@ -117,8 +150,17 @@ public class Hadoop3OmTransport implements OmTransport {
     return omFailoverProxyProvider;
   }
 
+  @VisibleForTesting
+  public HadoopRpcOMFollowerReadFailoverProxyProvider getOmFollowerReadFailoverProxyProvider() {
+    return followerReadFailoverProxyProvider;
+  }
+
   @Override
   public void close() throws IOException {
-    omFailoverProxyProvider.close();
+    if (followerReadFailoverProxyProvider != null) {
+      followerReadFailoverProxyProvider.close();
+    } else {
+      omFailoverProxyProvider.close();
+    }
   }
 }

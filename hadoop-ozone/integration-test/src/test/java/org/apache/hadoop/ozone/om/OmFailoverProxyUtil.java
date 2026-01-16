@@ -18,8 +18,8 @@
 package org.apache.hadoop.ozone.om;
 
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
-import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
+import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFollowerReadFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.protocolPB.Hadoop3OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 
@@ -39,10 +39,21 @@ public final class OmFailoverProxyUtil {
 
     OzoneManagerProtocolClientSideTranslatorPB ozoneManagerClient =
         (OzoneManagerProtocolClientSideTranslatorPB)
-            ((RpcClient) clientProtocol).getOzoneManagerClient();
+            clientProtocol.getOzoneManagerClient();
     
     Hadoop3OmTransport transport =
         (Hadoop3OmTransport) ozoneManagerClient.getTransport();
     return transport.getOmFailoverProxyProvider();
+  }
+
+  public static HadoopRpcOMFollowerReadFailoverProxyProvider getFollowerReadFailoverProxyProvider(
+      ClientProtocol clientProtocol) {
+    OzoneManagerProtocolClientSideTranslatorPB ozoneManagerClient =
+        (OzoneManagerProtocolClientSideTranslatorPB)
+            clientProtocol.getOzoneManagerClient();
+
+    Hadoop3OmTransport transport =
+        (Hadoop3OmTransport) ozoneManagerClient.getTransport();
+    return transport.getOmFollowerReadFailoverProxyProvider();
   }
 }
