@@ -25,6 +25,10 @@
   <name>Apache Ozone Recon Integration Tests</name>
   <description>Apache Ozone Integration Tests with Recon</description>
 
+  <properties>
+    <maven.compiler.release>${ozone.server.java.version}</maven.compiler.release>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>

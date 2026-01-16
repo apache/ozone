@@ -23,6 +23,7 @@
   <name>Apache Ozone Recon</name>
   <properties>
     <classpath.skip>false</classpath.skip>
+    <maven.compiler.release>${ozone.server.java.version}</maven.compiler.release>
     <pnpm.version>8.15.7</pnpm.version>
   </properties>
   <dependencies>

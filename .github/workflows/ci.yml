@@ -134,7 +134,7 @@ jobs:
     if: needs.build-info.outputs.needs-compile == 'true'
     strategy:
       matrix:
-        java: [ 8, 11, 17 ]
+        java: [ 17 ]
         include:
           - os: ubuntu-24.04
           - java: 21

@@ -175,6 +175,7 @@
     <opentelemetry.version>1.58.0</opentelemetry.version>
     <os-maven-plugin.version>1.7.1</os-maven-plugin.version>
     <ozone.release>Katmai</ozone.release>
+    <ozone.server.java.version>17</ozone.server.java.version>
     <ozone.shaded.native.prefix>org_apache_ozone_shaded</ozone.shaded.native.prefix>
     <ozone.shaded.prefix>org.apache.ozone.shaded</ozone.shaded.prefix>
     <ozone.version>2.2.0-SNAPSHOT</ozone.version>

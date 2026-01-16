@@ -24,6 +24,11 @@
   <packaging>jar</packaging>
   <name>Apache Ozone Storage Interface</name>
   <description>Apache Ozone Storage Interface</description>
+
+  <properties>
+    <maven.compiler.release>${ozone.server.java.version}</maven.compiler.release>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>com.github.stephenc.jcip</groupId>
