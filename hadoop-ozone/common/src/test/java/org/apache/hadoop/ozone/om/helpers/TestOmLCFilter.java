@@ -30,7 +30,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.util.Collections;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleFilter;
 import org.junit.jupiter.api.Test;
@@ -88,6 +90,32 @@ class TestOmLCFilter {
     assertOMException(() -> lcFilter4.build().valid(BucketLayout.DEFAULT), INVALID_REQUEST,
         "Only one of 'Prefix', 'Tag', or 'AndOperator' should be specified");
 
+  }
+
+  @Test
+  public void testFilterValidation() {
+    // 1. Prefix is Trash path
+    OmLCFilter.Builder trashPrefixFilter = getOmLCFilterBuilder(FileSystem.TRASH_PREFIX, null, null);
+    assertOMException(() -> trashPrefixFilter.build().valid(BucketLayout.DEFAULT), INVALID_REQUEST,
+        "Lifecycle rule prefix cannot be trash root");
+
+    // 2. Prefix too long
+    String longPrefix = RandomStringUtils.randomAlphanumeric(1025);
+    OmLCFilter.Builder longPrefixFilter = getOmLCFilterBuilder(longPrefix, null, null);
+    assertOMException(() -> longPrefixFilter.build().valid(BucketLayout.DEFAULT), INVALID_REQUEST,
+        "The maximum size of a prefix is 1024");
+
+    // 3. Tag key too long
+    String longKey = RandomStringUtils.randomAlphanumeric(129);
+    OmLCFilter.Builder longKeyFilter = getOmLCFilterBuilder(null, Pair.of(longKey, "value"), null);
+    assertOMException(() -> longKeyFilter.build().valid(BucketLayout.DEFAULT), INVALID_REQUEST,
+        "A Tag's Key must be a length between 1 and 128");
+
+    // 4. Tag value too long
+    String longValue = RandomStringUtils.randomAlphanumeric(257);
+    OmLCFilter.Builder longValueFilter = getOmLCFilterBuilder(null, Pair.of("key", longValue), null);
+    assertOMException(() -> longValueFilter.build().valid(BucketLayout.DEFAULT), INVALID_REQUEST,
+        "A Tag's Value must be a length between 0 and 256");
   }
 
   @Test
