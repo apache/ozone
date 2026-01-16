@@ -20,13 +20,16 @@ package org.apache.hadoop.ozone.recon.tasks;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -35,6 +38,7 @@ import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
+import org.apache.hadoop.ozone.recon.tasks.util.ParallelTableIteratorOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,66 +54,132 @@ public class NSSummaryTaskWithOBS extends NSSummaryTaskDbEventHandler {
 
   private final long nsSummaryFlushToDBMaxThreshold;
 
+  private final int maxIterators;
+  private final int maxWorkers;
+  private final int maxKeysInMemory;
+
   public NSSummaryTaskWithOBS(
       ReconNamespaceSummaryManager reconNamespaceSummaryManager,
       ReconOMMetadataManager reconOMMetadataManager,
-      long nsSummaryFlushToDBMaxThreshold) {
+      long nsSummaryFlushToDBMaxThreshold,
+      int maxIterators,
+      int maxWorkers,
+      int maxKeysInMemory) {
     super(reconNamespaceSummaryManager,
         reconOMMetadataManager);
     this.nsSummaryFlushToDBMaxThreshold = nsSummaryFlushToDBMaxThreshold;
+    this.maxIterators = maxIterators;
+    this.maxWorkers = maxWorkers;
+    this.maxKeysInMemory = maxKeysInMemory;
   }
 
   public boolean reprocessWithOBS(OMMetadataManager omMetadataManager) {
-    Map<Long, NSSummary> nsSummaryMap = new HashMap<>();
+    // Create async flusher with queue capacity based on worker count
+    int queueCapacity = maxWorkers * 2;
 
-    try {
-      Table<String, OmKeyInfo> keyTable =
-          omMetadataManager.getKeyTable(BUCKET_LAYOUT);
+    try (NSSummaryAsyncFlusher asyncFlusher =
+             NSSummaryAsyncFlusher.create(getReconNamespaceSummaryManager(),
+                 "NSSummaryTaskWithOBS", queueCapacity)) {
 
-      try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-               keyTableIter = keyTable.iterator()) {
+      if (!processKeyTableInParallel(omMetadataManager, asyncFlusher)) {
+        return false;
+      }
 
-        while (keyTableIter.hasNext()) {
-          Table.KeyValue<String, OmKeyInfo> kv = keyTableIter.next();
-          OmKeyInfo keyInfo = kv.getValue();
+    } catch (Exception ex) {
+      LOG.error("Unable to reprocess Namespace Summary data in Recon DB.", ex);
+      return false;
+    }
 
-          // KeyTable entries belong to both Legacy and OBS buckets.
-          // Check bucket layout and if it's anything other than OBS,
-          // continue to the next iteration.
-          String volumeName = keyInfo.getVolumeName();
-          String bucketName = keyInfo.getBucketName();
-          String bucketDBKey = omMetadataManager
-              .getBucketKey(volumeName, bucketName);
-          // Get bucket info from bucket table
-          OmBucketInfo omBucketInfo = omMetadataManager
-              .getBucketTable().getSkipCache(bucketDBKey);
+    LOG.info("Completed a reprocess run of NSSummaryTaskWithOBS");
+    return true;
+  }
 
-          if (omBucketInfo.getBucketLayout() != BUCKET_LAYOUT) {
-            continue;
-          }
+  private boolean processKeyTableInParallel(OMMetadataManager omMetadataManager,
+                                            NSSummaryAsyncFlusher asyncFlusher) {
+    Table<String, OmKeyInfo> keyTable =
+        omMetadataManager.getKeyTable(BUCKET_LAYOUT);
 
-          long parentObjectID = getKeyParentID(keyInfo);
+    // Per-worker maps for lockless updates
+    Map<Long, Map<Long, NSSummary>> allWorkerMaps = new ConcurrentHashMap<>();
 
-          handlePutKeyEvent(keyInfo, nsSummaryMap, parentObjectID);
-          if (nsSummaryMap.size() >= nsSummaryFlushToDBMaxThreshold) {
-            if (!flushAndCommitNSToDB(nsSummaryMap)) {
-              return false;
-            }
+    // Divide threshold by worker count
+    final long perWorkerThreshold = Math.max(1, nsSummaryFlushToDBMaxThreshold / maxWorkers);
+
+    Function<Table.KeyValue<String, OmKeyInfo>, Void> kvOperation = kv -> {
+      // Get this worker's private map
+      long threadId = Thread.currentThread().getId();
+      Map<Long, NSSummary> workerMap = allWorkerMaps.computeIfAbsent(threadId, k -> new HashMap<>());
+
+      try {
+        OmKeyInfo keyInfo = kv.getValue();
+
+        // KeyTable entries belong to both Legacy and OBS buckets.
+        // Check bucket layout and if it's anything other than OBS,
+        // continue to the next iteration.
+        String volumeName = keyInfo.getVolumeName();
+        String bucketName = keyInfo.getBucketName();
+        String bucketDBKey = omMetadataManager
+            .getBucketKey(volumeName, bucketName);
+        // Get bucket info from bucket table
+        OmBucketInfo omBucketInfo = omMetadataManager
+            .getBucketTable().getSkipCache(bucketDBKey);
+
+        if (omBucketInfo != null && omBucketInfo.getBucketLayout() == BUCKET_LAYOUT) {
+          // Check if async flusher has failed - stop immediately if so
+          asyncFlusher.checkForFailures();
+          
+          // Look up parent ID for OBS keys (not populated in keyInfo from DB)
+          long parentObjectId = getKeyParentID(keyInfo);
+          
+          // Use reprocess-specific method (no DB reads)
+          handlePutKeyEventReprocess(keyInfo, workerMap, parentObjectId);
+
+          // Submit to async queue when threshold reached
+          if (workerMap.size() >= perWorkerThreshold) {
+            asyncFlusher.submitForFlush(workerMap);
+            // Get fresh map for this worker
+            allWorkerMaps.put(threadId, new HashMap<>());
           }
         }
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new RuntimeException(e);
       }
-    } catch (IOException ioEx) {
-      LOG.error("Unable to reprocess Namespace Summary data in Recon DB. ",
-          ioEx);
-      nsSummaryMap.clear();
+      return null;
+    };
+
+    LOG.debug("Starting keyTable parallel iteration");
+    long keyStartTime = System.currentTimeMillis();
+    
+    try (ParallelTableIteratorOperation<String, OmKeyInfo> parallelIter =
+             new ParallelTableIteratorOperation<>(omMetadataManager, keyTable, StringCodec.get(),
+                 maxIterators, maxWorkers, maxKeysInMemory, nsSummaryFlushToDBMaxThreshold)) {
+      parallelIter.performTaskOnTableVals("NSSummaryTaskWithOBS-keyTable", null, null, kvOperation);
+    } catch (Exception ex) {
+      LOG.error("Unable to process keyTable in parallel", ex);
       return false;
+    }
+    
+    long keyEndTime = System.currentTimeMillis();
+    LOG.debug("Completed keyTable parallel iteration in {} ms", (keyEndTime - keyStartTime));
+
+    // Submit any remaining worker maps
+    for (Map<Long, NSSummary> remainingMap : allWorkerMaps.values()) {
+      if (!remainingMap.isEmpty()) {
+        try {
+          asyncFlusher.submitForFlush(remainingMap);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          return false;
+        } catch (IOException e) {
+          LOG.error("Failed to submit remaining map for flush", e);
+          return false;
+        }
+      }
     }
 
-    // flush and commit left out entries at end
-    if (!flushAndCommitNSToDB(nsSummaryMap)) {
-      return false;
-    }
-    LOG.debug("Completed a reprocess run of NSSummaryTaskWithOBS");
     return true;
   }
 

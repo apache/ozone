@@ -129,7 +129,7 @@ public class TestNodeStateMap {
     }
     final NodeStatus requestedState = NodeStatus.valueOf(
         NodeOperationalState.IN_SERVICE, NodeState.STALE, opExpiryEpochSeconds);
-    List<DatanodeInfo> nodes = map.getDatanodeInfos(requestedState);
+    final List<DatanodeDetails> nodes = map.getDatanodeDetails(requestedState);
     assertEquals(1, nodes.size());
     assertEquals(1, map.getNodeCount(requestedState));
 
