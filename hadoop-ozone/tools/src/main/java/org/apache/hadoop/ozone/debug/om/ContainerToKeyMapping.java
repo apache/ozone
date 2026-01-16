@@ -57,7 +57,7 @@ import picocli.CommandLine;
 
 /**
  * Tool to map full key paths that use the specified containers.
- * Note: Currently only processes FSO layout buckets.
+ * Supports both FSO (File System Optimized) and OBS (Object Store) bucket layouts.
  */
 @CommandLine.Command(
     name = "container-key-mapping",
