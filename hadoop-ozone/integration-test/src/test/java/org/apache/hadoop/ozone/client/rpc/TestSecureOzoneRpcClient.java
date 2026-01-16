@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_ROOT;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.TestDataUtil.cleanupDeletedTable;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_LIFECYCLE_SERVICE_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.FILE_SYSTEM_OPTIMIZED;
 import static org.apache.ozone.test.GenericTestUtils.getTestStartTime;
@@ -125,6 +126,8 @@ class TestSecureOzoneRpcClient extends OzoneRpcClientTests {
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
     conf.set(CommonConfigurationKeysPublic.HADOOP_SECURITY_KEY_PROVIDER_PATH,
         keyProviderUri);
+    conf.setBoolean(OZONE_KEY_LIFECYCLE_SERVICE_ENABLED, true);
+
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
         .setCertificateClient(certificateClientTest)
         .setSecretKeyClient(new SecretKeyTestClient());
