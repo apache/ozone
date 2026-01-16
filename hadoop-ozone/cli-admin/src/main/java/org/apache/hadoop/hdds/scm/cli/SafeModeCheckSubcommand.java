@@ -205,6 +205,9 @@ public class SafeModeCheckSubcommand extends ScmSubcommand {
           target.getAddress().equals(nodeAddr.getAddress());
     } catch (Exception e) {
       // If address resolution fails, no match
+      if (isVerbose()) {
+        System.err.println("Warning: Failed to resolve address: " + e.getMessage());
+      }
       return false;
     }
   }
