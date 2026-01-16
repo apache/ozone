@@ -47,43 +47,90 @@ public class SafeModeCheckSubcommand extends ScmSubcommand {
           "When multiple SCM service IDs are configured, --service-id must be specified.")
   private boolean allNodes;
 
+  private String serviceId;
+  private List<SCMNodeInfo> nodes;
+
   @Override
   public void execute(ScmClient scmClient) throws IOException {
-    final OzoneConfiguration conf = getOzoneConf();
-    String serviceId = HddsUtils.getScmServiceId(conf);
+    OzoneConfiguration conf = getOzoneConf();
+    serviceId = HddsUtils.getScmServiceId(conf);
+    String scmAddress = getScmOption().getScm();
+    if (serviceId != null) {
+      nodes = SCMNodeInfo.buildNodeInfo(conf);
+    }
     
     if (allNodes) {
       executeForAllNodes(scmClient);
-    } else if (StringUtils.isNotEmpty(getScmOption().getScm()) && serviceId != null) {
-      executeForSpecificNodeInHA(scmClient, serviceId);
+    } else if (StringUtils.isNotEmpty(scmAddress)) {
+      executeForSpecificNode(scmClient, scmAddress);
     } else {
       executeForSingleNode(scmClient);
     }
   }
 
   private void executeForSingleNode(ScmClient scmClient) throws IOException {
-    boolean execReturn = scmClient.inSafeMode();
+    boolean inSafeMode;
+    Map<String, Pair<Boolean, String>> rules = null;
+    String leaderNodeId;
 
-    // Output data list
-    if (execReturn) {
+    // If SCM HA mode, query the leader node.
+    if (serviceId != null) {
+      leaderNodeId = findLeaderNodeId(scmClient);
+      inSafeMode = scmClient.inSafeModeForNode(leaderNodeId);
+      if (isVerbose()) {
+        rules = scmClient.getSafeModeRuleStatusesForNode(leaderNodeId);
+      }
+    } else {
+      // Non-HA mode
+      inSafeMode = scmClient.inSafeMode();
+      if (isVerbose()) {
+        rules = scmClient.getSafeModeRuleStatuses();
+      }
+    }
+    
+    if (inSafeMode) {
       System.out.println("SCM is in safe mode.");
     } else {
       System.out.println("SCM is out of safe mode.");
     }
-    if (isVerbose()) {
-      printSafeModeRules(scmClient.getSafeModeRuleStatuses());
+    if (isVerbose() && rules != null) {
+      printSafeModeRules(rules);
     }
   }
 
-  private void executeForSpecificNodeInHA(ScmClient scmClient, String serviceId) throws IOException {
-    String scmAddress = getScmOption().getScm();
+  /**
+   * Find the leader node ID from SCM roles.
+   * @param scmClient the SCM client
+   * @return the leader node ID, or null if not found
+   */
+  private String findLeaderNodeId(ScmClient scmClient) throws IOException {
+    try {
+      List<String> roles = scmClient.getScmRoles();
+      for (String role : roles) {
+        String[] parts = role.split(":");
+        if (parts.length >= 3 && "LEADER".equalsIgnoreCase(parts[2])) {
+          String leaderHostname = parts[0];
+          for (SCMNodeInfo node : nodes) {
+            String nodeHostname = node.getScmClientAddress().split(":")[0];
+            if (nodeHostname.equalsIgnoreCase(leaderHostname)) {
+              return node.getNodeId();
+            }
+          }
+        }
+      }
+      return null;
+    } catch (IOException e) {
+      throw new IOException("Could not determine leader node for service: " + serviceId, e);
+    }
+  }
+
+  private void executeForSpecificNode(ScmClient scmClient, String scmAddress) throws IOException {
+    if (serviceId == null) {
+      executeForSingleNode(scmClient);
+      return;
+    }
 
     System.out.println("Service ID: " + serviceId);
-
-    final OzoneConfiguration conf = getOzoneConf();
-
-    List<SCMNodeInfo> nodes = SCMNodeInfo.buildNodeInfo(conf);
-    
     // Find the node matching the --scm address
     List<SCMNodeInfo> matchedNodes = nodes.stream()
         .filter(node -> matchesAddress(node, scmAddress))
@@ -101,16 +148,12 @@ public class SafeModeCheckSubcommand extends ScmSubcommand {
   }
 
   private void executeForAllNodes(ScmClient scmClient) throws IOException {
-    final OzoneConfiguration conf = getOzoneConf();
-    String serviceId = HddsUtils.getScmServiceId(conf);
-
     if (serviceId == null) {
       executeForSingleNode(scmClient);
       return;
     }
 
     System.out.println("Service ID: " + serviceId);
-    List<SCMNodeInfo> nodes = SCMNodeInfo.buildNodeInfo(conf);
 
     for (SCMNodeInfo node : nodes) {
       queryNode(scmClient, node);
