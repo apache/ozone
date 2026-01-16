@@ -188,6 +188,67 @@ Set ACL                               | not implemented in Ozone FileSystem API
 Get ACL Status                        | not implemented in Ozone FileSystem API
 Check access                          | not implemented in Ozone FileSystem API
 
+## Proxy User Configuration
+
+HttpFS supports proxy user (user impersonation) functionality, which allows a user to perform operations on behalf of another user. This is useful when HttpFS is used as a gateway and you want to allow certain users to impersonate other users.
+
+To configure proxy users, you need to add the following properties to `httpfs-site.xml`.
+
+### Configuration Properties
+
+For each user that should be allowed to perform impersonation, you need to configure two properties:
+
+1. **`httpfs.proxyuser.#USER#.hosts`**: List of hosts from which the user is allowed to perform impersonation operations.
+2. **`httpfs.proxyuser.#USER#.groups`**: List of groups whose users can be impersonated by the specified user.
+
+Replace `#USER#` with the actual username of the user who should be allowed to perform impersonation.
+
+### Example Configuration
+
+```xml
+<property>
+  <name>httpfs.proxyuser.knoxuser.hosts</name>
+  <value>*</value>
+  <description>
+    List of hosts the 'knoxuser' user is allowed to perform 'doAs'
+    operations.
+    
+    The value can be the '*' wildcard or a comma-separated list of hostnames.
+    
+    For multiple users, copy this property and replace the user name
+    in the property name.
+  </description>
+</property>
+
+<property>
+  <name>httpfs.proxyuser.knoxuser.groups</name>
+  <value>*</value>
+  <description>
+    List of groups the 'knoxuser' user is allowed to impersonate users
+    from to perform 'doAs' operations.
+    
+    The value can be the '*' wildcard or a comma-separated list of group names.
+    
+    For multiple users, copy this property and replace the user name
+    in the property name.
+  </description>
+</property>
+```
+
+In this example, the user `knoxuser` is allowed to impersonate any user from any host. For production environments, it's recommended to restrict these values to specific hosts and groups instead of using the wildcard `*`.
+
+### Troubleshooting
+
+If you encounter an error like:
+```
+User: user/host@REALM is not allowed to impersonate user01
+```
+
+This indicates that the proxy user configuration is missing or incorrect. Ensure that:
+1. The `httpfs.proxyuser.#USER#.hosts` property is set with appropriate host values
+2. The `httpfs.proxyuser.#USER#.groups` property is set with appropriate group values
+3. The HttpFS service has been restarted after configuration changes
+
 ## Hadoop user and developer documentation about HttpFS
 
 * [HttpFS Server Setup](https://hadoop.apache.org/docs/stable/hadoop-hdfs-httpfs/ServerSetup.html)

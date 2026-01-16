@@ -208,7 +208,7 @@ public class OmTableInsightTask implements ReconOmTask {
     try (ParallelTableIteratorOperation<String, byte[]> parallelIter = new ParallelTableIteratorOperation<>(
         omMetadataManager, table, StringCodec.get(),
         maxIterators, workerCount, maxKeysInMemory, loggingThreshold)) {
-      
+
       parallelIter.performTaskOnTableVals(getTaskName(), null, null, kv -> {
         if (kv != null) {
           count.incrementAndGet();
@@ -352,7 +352,7 @@ public class OmTableInsightTask implements ReconOmTask {
    * @param dataMap Map containing the updated count and size information.
    */
   private void writeDataToDB(Map<String, Long> dataMap) {
-    try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
+    try (RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation()) {
       for (Entry<String, Long> entry : dataMap.entrySet()) {
         String key = entry.getKey();
         Long value = entry.getValue();

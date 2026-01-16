@@ -113,7 +113,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.BlockingService;
-import com.google.protobuf.ProtocolMessageEnum;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
@@ -184,7 +183,6 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
-import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
@@ -415,7 +413,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final OMMetrics metrics;
   private final OmSnapshotInternalMetrics omSnapshotIntMetrics;
   private OMHAMetrics omhaMetrics;
-  private final ProtocolMessageMetrics<ProtocolMessageEnum>
+  private final ProtocolMessageMetrics<OzoneManagerProtocolProtos.Type>
       omClientProtocolMetrics;
   private final DeletingServiceMetrics omDeletionMetrics;
   private OzoneManagerHttpServer httpServer;
@@ -703,7 +701,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     omClientProtocolMetrics = ProtocolMessageMetrics
         .create("OmClientProtocol", "Ozone Manager RPC endpoint",
-            OzoneManagerProtocolProtos.Type.values());
+            OzoneManagerProtocolProtos.Type.class);
 
     // Start Om Rpc Server.
     omRpcServer = getRpcServer(configuration);
@@ -1607,10 +1605,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     OmUtils.createOMDir(omRatisDirectory);
 
-    String scmStorageDir = SCMHAUtils.getRatisStorageDir(conf);
-    if (!Strings.isNullOrEmpty(omRatisDirectory) && !Strings
-        .isNullOrEmpty(scmStorageDir) && omRatisDirectory
-        .equals(scmStorageDir)) {
+    String omRatisConfigured = conf.get(OMConfigKeys.OZONE_OM_RATIS_STORAGE_DIR);
+    String scmRatisConfigured = conf.get(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR);
+
+    // Only check co-location if BOTH are explicitly configured
+    if (!Strings.isNullOrEmpty(omRatisConfigured) &&
+        !Strings.isNullOrEmpty(scmRatisConfigured) &&
+        omRatisConfigured.equals(scmRatisConfigured)) {
       throw new IOException(
           "Path of " + OMConfigKeys.OZONE_OM_RATIS_STORAGE_DIR + " and "
               + ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR

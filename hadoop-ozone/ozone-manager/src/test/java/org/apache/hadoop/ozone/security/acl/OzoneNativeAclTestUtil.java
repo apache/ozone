@@ -76,9 +76,10 @@ final class OzoneNativeAclTestUtil {
   ) throws IOException {
     final String objKey = metadataManager.getOzoneKey(volume, bucket, key);
     final Table<String, OmKeyInfo> keyTable = metadataManager.getKeyTable(bucketLayout);
-    final OmKeyInfo omKeyInfo = keyTable.get(objKey);
-
-    omKeyInfo.addAcl(ozoneAcl);
+    final OmKeyInfo omKeyInfo = keyTable.get(objKey)
+        .toBuilder()
+        .addAcl(ozoneAcl)
+        .build();
 
     keyTable.addCacheEntry(
         new CacheKey<>(objKey),
@@ -127,9 +128,10 @@ final class OzoneNativeAclTestUtil {
       List<OzoneAcl> ozoneAcls) throws IOException {
     final String objKey = metadataManager.getOzoneKey(volume, bucket, key);
     final Table<String, OmKeyInfo> keyTable = metadataManager.getKeyTable(bucketLayout);
-    final OmKeyInfo omKeyInfo = keyTable.get(objKey);
-
-    omKeyInfo.setAcls(ozoneAcls);
+    final OmKeyInfo omKeyInfo = keyTable.get(objKey)
+        .toBuilder()
+        .setAcls(ozoneAcls)
+        .build();
 
     keyTable.addCacheEntry(
         new CacheKey<>(objKey),

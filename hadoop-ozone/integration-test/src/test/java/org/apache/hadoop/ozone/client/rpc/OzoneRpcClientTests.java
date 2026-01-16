@@ -38,6 +38,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.apache.hadoop.ozone.OzoneConsts.MD5_HASH;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.client.OzoneClientTestUtils.assertKeyContent;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR;
@@ -130,6 +131,7 @@ import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolCli
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.io.retry.FailoverProxyProvider.ProxyInfo;
 import org.apache.hadoop.ozone.ClientConfigForTesting;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
@@ -326,13 +328,13 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider =
         OmFailoverProxyUtil.getFailoverProxyProvider(store.getClientProxy());
 
-    List<OMProxyInfo> omProxies = omFailoverProxyProvider.getOMProxyInfos();
+    List<ProxyInfo> omProxies = omFailoverProxyProvider.getOMProxies();
 
     // For a non-HA OM service, there should be only one OM proxy.
     assertEquals(1, omProxies.size());
     // The address in OMProxyInfo object, which client will connect to,
     // should match the OM's RPC address.
-    assertEquals(omProxies.get(0).getAddress(),
+    assertEquals(((OMProxyInfo) omProxies.get(0)).getAddress(),
         ozoneManager.getOmRpcServerAddr());
   }
 
@@ -1403,20 +1405,6 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
         keyDetails.getMetadata())) {
       out.write(newContent);
     }
-  }
-
-  private static OzoneKeyDetails assertKeyContent(
-      OzoneBucket bucket, String keyName, byte[] expectedContent
-  ) throws IOException {
-    OzoneKeyDetails updatedKeyDetails = bucket.getKey(keyName);
-
-    try (OzoneInputStream is = bucket.readKey(keyName)) {
-      byte[] fileContent = new byte[expectedContent.length];
-      IOUtils.readFully(is, fileContent);
-      assertArrayEquals(expectedContent, fileContent);
-    }
-
-    return updatedKeyDetails;
   }
 
   private OzoneBucket createBucket(BucketLayout layout) throws IOException {
@@ -5282,5 +5270,57 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
     assertEquals(tags.size(), tagsRetrieved.size());
     assertThat(tagsRetrieved).containsAllEntriesOf(tags);
+  }
+
+  @Test
+  public void testCreateEmptyKeySkipBlockAllocation()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    getStore().createVolume(volumeName);
+    OzoneVolume volume = getStore().getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    long initialAllocatedBlocks =
+        getCluster().getStorageContainerManager().getPipelineManager()
+            .getMetrics().getTotalNumBlocksAllocated();
+    // Don't write anything - this is an empty file
+    OzoneOutputStream out = bucket.createKey(keyName, 0);
+    out.close();
+
+    // createKey should skip block allocation if data size is 0
+    long currentAllocatedBlocks =
+        getCluster().getStorageContainerManager().getPipelineManager().getMetrics().getTotalNumBlocksAllocated();
+    assertEquals(initialAllocatedBlocks, currentAllocatedBlocks);
+  }
+
+  @Test
+  public void testCreateEmptyFileNotSkipBlockAllocation()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    getStore().createVolume(volumeName);
+    OzoneVolume volume = getStore().getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    long initialAllocatedBlocks =
+        getCluster().getStorageContainerManager().getPipelineManager().getMetrics().getTotalNumBlocksAllocated();
+    // Don't write anything - this is an empty file
+    OzoneOutputStream out = bucket.createFile(keyName, 0,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+        false,
+        false);
+    out.close();
+
+    // OM should call allocateBlock in OMFileCreateRequest regardless of data size
+    long currentAllocatedBlocks =
+        getCluster().getStorageContainerManager().getPipelineManager().getMetrics().getTotalNumBlocksAllocated();
+    assertEquals(initialAllocatedBlocks + 1, currentAllocatedBlocks);
   }
 }

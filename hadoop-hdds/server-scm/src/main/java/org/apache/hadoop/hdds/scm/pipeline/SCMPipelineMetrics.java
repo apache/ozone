@@ -186,4 +186,11 @@ public final class SCMPipelineMetrics implements MetricsSource {
   public void updatePipelineCreationLatencyNs(long startNanos) {
     pipelineCreationLatencyNs.add(Time.monotonicNowNanos() - startNanos);
   }
+
+  /**
+   * Return number of blocks allocated across all pipelines.
+   */
+  public long getTotalNumBlocksAllocated() {
+    return numBlocksAllocated.values().stream().mapToLong(MutableCounterLong::value).sum();
+  }
 }

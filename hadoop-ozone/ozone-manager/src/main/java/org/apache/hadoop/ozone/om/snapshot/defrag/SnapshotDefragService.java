@@ -57,16 +57,17 @@ import org.apache.hadoop.hdds.utils.db.CodecBufferCodec;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.RDBSstFileWriter;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
+import org.apache.hadoop.hdds.utils.db.SstFileSetReader;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
@@ -88,10 +89,8 @@ import org.apache.hadoop.ozone.util.ClosableIterator;
 import org.apache.hadoop.util.Time;
 import org.apache.logging.log4j.util.Strings;
 import org.apache.ozone.rocksdb.util.SstFileInfo;
-import org.apache.ozone.rocksdb.util.SstFileSetReader;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
-import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -354,8 +353,6 @@ public class SnapshotDefragService extends BackgroundService
           deltaEntriesCount++;
         }
       }
-    } catch (RocksDBException e) {
-      throw new RocksDatabaseException("Error while reading sst files.", e);
     }
     // If there are no delta entries then delete the delta file. No need to ingest the file as a diff.
     return Pair.of(fileToBeIngested, deltaEntriesCount != 0);

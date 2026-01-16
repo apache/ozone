@@ -237,6 +237,7 @@ public class StorageDistributionEndpoint {
       long remaining = nodeStat.getRemaining() != null ? nodeStat.getRemaining().get() : 0L;
       long committed = nodeStat.getCommitted() != null ? nodeStat.getCommitted().get() : 0L;
       long minFreeSpace  = nodeStat.getFreeSpaceToSpare() != null ? nodeStat.getFreeSpaceToSpare().get() : 0L;
+      long reservedSpace = nodeStat.getReserved() != null ? nodeStat.getReserved().get() : 0L;
 
       return DatanodeStorageReport.newBuilder()
           .setCapacity(capacity)
@@ -244,6 +245,7 @@ public class StorageDistributionEndpoint {
           .setRemaining(remaining)
           .setCommitted(committed)
           .setMinimumFreeSpace(minFreeSpace)
+          .setReserved(reservedSpace)
           .setDatanodeUuid(datanode.getUuidString())
           .setHostName(datanode.getHostName())
           .build();

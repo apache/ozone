@@ -122,6 +122,12 @@
       <artifactId>ozone-filesystem</artifactId>
       <scope>runtime</scope>
     </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-config</artifactId>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
   <build>
     <plugins>
@@ -173,8 +179,6 @@
                   <bannedImports>
                     <bannedImport>org.apache.hadoop.hdds.conf.Config</bannedImport>
                     <bannedImport>org.apache.hadoop.hdds.conf.ConfigGroup</bannedImport>
-                    <bannedImport>org.apache.hadoop.hdds.scm.metadata.Replicate</bannedImport>
-                    <bannedImport>org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator</bannedImport>
                   </bannedImports>
                 </restrictImports>
               </rules>
