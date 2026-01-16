@@ -107,15 +107,15 @@ Ratis handles concurrent logs per node.
 
 ## Advanced Ratis Configuration
 
-Any Ratis configuration properties can be set using a corresponding prefix.
+Any Ratis configuration properties can be set by prepending a corresponding prefix.
 The following table shows the prefixes in each Ozone component.
 
-| Ozone Components                | Configuration Prefixes  |
-|---------------------------------|-------------------------|
-| Ozone Manager (OM)              | `ozone.om.ha`           |
-| Storage Container Manager (SCM) | `ozone.scm.ha`          |
-| Datanode                        | `hdds.ratis`            |
-| Ozone Client                    | `hdds.ratis`            |
+| Ozone Components                | Configuration Prefixes | Examples: To set `raft.server.write.byte-limit` |
+|---------------------------------|------------------------|-------------------------------------------------|
+| Ozone Manager (OM)              | `ozone.om.ha.`         | Use `ozone.om.ha.raft.server.write.byte-limit`  |
+| Storage Container Manager (SCM) | `ozone.scm.ha.`        | Use `ozone.scm.ha.raft.server.write.byte-limit` |
+| Datanode                        | `hdds.ratis.`          | Use `hdds.ratis.raft.server.write.byte-limit`   |
+| Ozone Client                    | `hdds.ratis.`          | Use `hdds.ratis.raft.server.write.byte-limit`   |
 
 See also [Apache Ratis configuration
 documentation](https://github.com/apache/ratis/blob/ratis-3.2.1/ratis-docs/src/site/markdown/configurations.md).
