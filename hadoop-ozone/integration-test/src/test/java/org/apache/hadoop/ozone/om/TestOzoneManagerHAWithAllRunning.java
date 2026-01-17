@@ -54,6 +54,7 @@ import javax.management.ObjectName;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.io.retry.FailoverProxyProvider.ProxyInfo;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -1179,46 +1180,51 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
         .setOwner(userName)
         .setAdmin(adminName)
         .build();
+    OzoneClient ozoneClient = null;
+    try {
+      ozoneClient = OzoneClientFactory.getRpcClient(clientConf);
 
-    OzoneClient ozoneClient = OzoneClientFactory.getRpcClient(clientConf);
+      HadoopRpcOMFailoverProxyProvider leaderFailoverProxyProvider =
+          OmFailoverProxyUtil
+              .getFailoverProxyProvider(ozoneClient.getProxy());
+      HadoopRpcOMFollowerReadFailoverProxyProvider followerReadFailoverProxyProvider =
+          OmFailoverProxyUtil.getFollowerReadFailoverProxyProvider(
+              ozoneClient.getProxy()
+          );
+      assertNotNull(followerReadFailoverProxyProvider);
+      assertTrue(followerReadFailoverProxyProvider.isFollowerReadEnabled());
 
-    HadoopRpcOMFailoverProxyProvider leaderFailoverProxyProvider =
-        OmFailoverProxyUtil
-            .getFailoverProxyProvider(ozoneClient.getProxy());
-    HadoopRpcOMFollowerReadFailoverProxyProvider followerReadFailoverProxyProvider =
-        OmFailoverProxyUtil.getFollowerReadFailoverProxyProvider(
-            ozoneClient.getProxy()
-        );
-    assertNotNull(followerReadFailoverProxyProvider);
-    assertTrue(followerReadFailoverProxyProvider.isFollowerReadEnabled());
+      ObjectStore objectStore = ozoneClient.getObjectStore();
 
-    ObjectStore objectStore = ozoneClient.getObjectStore();
+      // Trigger write so that the leader failover proxy provider points to the leader
+      objectStore.createVolume(volumeName, createVolumeArgs);
 
-    // Trigger write so that the leader failover proxy provider points to the leader
-    objectStore.createVolume(volumeName, createVolumeArgs);
+      // Get the leader OM node ID
+      String leaderOMNodeId = leaderFailoverProxyProvider.getCurrentProxyOMNodeId();
 
-    // Get the leader OM node ID
-    String leaderOMNodeId = leaderFailoverProxyProvider.getCurrentProxyOMNodeId();
-
-    // Pick a follower and tigger read so that read failover proxy provider fall back to the leader-only read
-    // on encountering OMNotLeaderException
-    String followerOMNodeId = null;
-    for (OzoneManager om : getCluster().getOzoneManagersList()) {
-      if (!om.getOMNodeId().equals(leaderOMNodeId)) {
-        followerOMNodeId = om.getOMNodeId();
-        break;
+      // Pick a follower and tigger read so that read failover proxy provider fall back to the leader-only read
+      // on encountering OMNotLeaderException
+      String followerOMNodeId = null;
+      for (OzoneManager om : getCluster().getOzoneManagersList()) {
+        if (!om.getOMNodeId().equals(leaderOMNodeId)) {
+          followerOMNodeId = om.getOMNodeId();
+          break;
+        }
       }
-    }
-    assertNotNull(followerOMNodeId);
-    followerReadFailoverProxyProvider.changeInitialProxyForTest(followerOMNodeId);
-    objectStore.getVolume(volumeName);
+      assertNotNull(followerOMNodeId);
+      followerReadFailoverProxyProvider.changeInitialProxyForTest(followerOMNodeId);
+      objectStore.getVolume(volumeName);
 
-    // Client follower read is disabled since it detected that the cluster does not
-    // support follower read
-    assertFalse(followerReadFailoverProxyProvider.isFollowerReadEnabled());
-    OMProxyInfo<OzoneManagerProtocolPB> lastProxy =
-        (OMProxyInfo<OzoneManagerProtocolPB>) followerReadFailoverProxyProvider.getLastProxy();
-    // The last read will be done on the leader
-    assertEquals(leaderFailoverProxyProvider.getCurrentProxyOMNodeId(), lastProxy.getNodeId());
+      // Client follower read is disabled since it detected that the cluster does not
+      // support follower read
+      assertFalse(followerReadFailoverProxyProvider.isFollowerReadEnabled());
+      OMProxyInfo<OzoneManagerProtocolPB> lastProxy =
+          (OMProxyInfo<OzoneManagerProtocolPB>) followerReadFailoverProxyProvider.getLastProxy();
+      // The last read will be done on the leader
+      assertEquals(leaderFailoverProxyProvider.getCurrentProxyOMNodeId(), lastProxy.getNodeId());
+    } finally {
+      IOUtils.closeQuietly(ozoneClient);
+    }
+
   }
 }

@@ -41,6 +41,7 @@ import java.util.List;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.io.retry.FailoverProxyProvider.ProxyInfo;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneTestUtils;
@@ -237,42 +238,47 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends TestOzoneManag
     // Setup another client
     OzoneConfiguration clientConf = OzoneConfiguration.of(getConf());
     clientConf.setBoolean(OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, true);
-    OzoneClient anotherClient = OzoneClientFactory.getRpcClient(getOmServiceId(), clientConf);
-    ObjectStore anotherObjectStore = anotherClient.getObjectStore();
+    OzoneClient anotherClient = null;
+    try {
+      anotherClient = OzoneClientFactory.getRpcClient(getOmServiceId(), clientConf);
+      ObjectStore anotherObjectStore = anotherClient.getObjectStore();
 
-    // Ensure that the proxy provider of the two clients are not shared
-    assertNotSame(
-        OmFailoverProxyUtil.getFailoverProxyProvider(getObjectStore().getClientProxy()),
-        OmFailoverProxyUtil.getFailoverProxyProvider(anotherObjectStore.getClientProxy()));
-    HadoopRpcOMFollowerReadFailoverProxyProvider otherClientFollowerReadProxyProvider =
-        OmFailoverProxyUtil.getFollowerReadFailoverProxyProvider(anotherObjectStore.getClientProxy());
-    assertNotSame(
-        OmFailoverProxyUtil.getFollowerReadFailoverProxyProvider(getObjectStore().getClientProxy()),
-        otherClientFollowerReadProxyProvider);
-    String initialProxyOmNodeId = otherClientFollowerReadProxyProvider.getCurrentProxy().getNodeId();
+      // Ensure that the proxy provider of the two clients are not shared
+      assertNotSame(
+          OmFailoverProxyUtil.getFailoverProxyProvider(getObjectStore().getClientProxy()),
+          OmFailoverProxyUtil.getFailoverProxyProvider(anotherObjectStore.getClientProxy()));
+      HadoopRpcOMFollowerReadFailoverProxyProvider otherClientFollowerReadProxyProvider =
+          OmFailoverProxyUtil.getFollowerReadFailoverProxyProvider(anotherObjectStore.getClientProxy());
+      assertNotSame(
+          OmFailoverProxyUtil.getFollowerReadFailoverProxyProvider(getObjectStore().getClientProxy()),
+          otherClientFollowerReadProxyProvider);
+      String initialProxyOmNodeId = otherClientFollowerReadProxyProvider.getCurrentProxy().getNodeId();
 
-    // Setup the bucket and create a key with the default client
-    OzoneBucket ozoneBucket = setupBucket();
-    String key = createKey(ozoneBucket);
+      // Setup the bucket and create a key with the default client
+      OzoneBucket ozoneBucket = setupBucket();
+      String key = createKey(ozoneBucket);
 
-    // Immediately read using another client, this might or might
-    // not be sent to the leader. Regardless, the other client should be
-    // able to see the read immediately.
-    OzoneKey keyReadFromAnotherClient = anotherObjectStore.getClientProxy().headObject(
-        ozoneBucket.getVolumeName(), ozoneBucket.getName(), key);
-    assertEquals(key, keyReadFromAnotherClient.getName());
+      // Immediately read using another client, this might or might
+      // not be sent to the leader. Regardless, the other client should be
+      // able to see the read immediately.
+      OzoneKey keyReadFromAnotherClient = anotherObjectStore.getClientProxy().headObject(
+          ozoneBucket.getVolumeName(), ozoneBucket.getName(), key);
+      assertEquals(key, keyReadFromAnotherClient.getName());
 
-    // Create a more keys
-    for (int i = 0; i < 100; i++) {
-      createKey(ozoneBucket);
+      // Create a more keys
+      for (int i = 0; i < 100; i++) {
+        createKey(ozoneBucket);
+      }
+
+      List<OzoneKey> ozoneKeys = anotherObjectStore.getClientProxy().listKeys(
+          ozoneBucket.getVolumeName(), ozoneBucket.getName(),
+          null, null, 1000);
+      assertEquals(101, ozoneKeys.size());
+      // Since the OM node is normal, it should not failover
+      assertEquals(initialProxyOmNodeId, otherClientFollowerReadProxyProvider.getCurrentProxy().getNodeId());
+    } finally {
+      IOUtils.closeQuietly(anotherClient);
     }
-
-    List<OzoneKey> ozoneKeys = anotherObjectStore.getClientProxy().listKeys(
-        ozoneBucket.getVolumeName(), ozoneBucket.getName(),
-        null, null, 1000);
-    assertEquals(101, ozoneKeys.size());
-    // Since the OM node is normal, it should not failover
-    assertEquals(initialProxyOmNodeId, otherClientFollowerReadProxyProvider.getCurrentProxy().getNodeId());
   }
 
   @Test
