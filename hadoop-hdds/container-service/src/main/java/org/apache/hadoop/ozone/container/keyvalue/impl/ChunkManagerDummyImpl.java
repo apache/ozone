@@ -17,11 +17,17 @@
 
 package org.apache.hadoop.ozone.container.keyvalue.impl;
 
-import static org.apache.hadoop.ozone.container.keyvalue.helpers.ChunkUtils.limitReadSize;
-
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.Objects;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -39,6 +45,49 @@ import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
  * Chunks are not written to disk, Reads are returned with zero-filled buffers
  */
 public class ChunkManagerDummyImpl implements ChunkManager {
+
+  private static final int DEFAULT_MAP_SIZE = 1 * 1024 * 1024; // 1MB
+
+  private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+  private volatile MappedByteBuffer mapped;
+  private volatile int mappedSize;
+  private volatile Path backingFile;
+
+  private void ensureMapped(int minSize)
+      throws StorageContainerException {
+    if (mapped != null && mappedSize >= minSize) {
+      return;
+    }
+
+    lock.writeLock().lock();
+    try {
+      if (mapped != null && mappedSize >= minSize) {
+        return;
+      }
+
+      int newSize = Math.max(DEFAULT_MAP_SIZE, minSize);
+      if (backingFile == null) {
+        backingFile = Files.createTempFile("ozone-dummy-chunk-", ".bin");
+        backingFile.toFile().deleteOnExit();
+      }
+
+      try (FileChannel ch = FileChannel.open(backingFile,
+          StandardOpenOption.READ, StandardOpenOption.WRITE)) {
+        if (ch.size() < newSize) {
+          ch.truncate(newSize);
+        }
+        mapped = ch.map(FileChannel.MapMode.READ_ONLY, 0, newSize);
+        mappedSize = newSize;
+      }
+    } catch (IOException e) {
+      throw new StorageContainerException(
+          "Failed to create mapped buffer for dummy chunk reads",
+          e,
+          ContainerProtos.Result.IO_EXCEPTION);
+    } finally {
+      lock.writeLock().unlock();
+    }
+  }
 
   @Override
   public void writeChunk(Container container, BlockID blockID, ChunkInfo info,
@@ -72,9 +121,26 @@ public class ChunkManagerDummyImpl implements ChunkManager {
       ChunkInfo info, DispatcherContext dispatcherContext)
       throws StorageContainerException {
 
-    limitReadSize(info.getLen());
-    // stats are handled in ChunkManagerImpl
-    return ChunkBuffer.wrap(ByteBuffer.allocate((int) info.getLen()));
+    long lenL = info.getLen();
+    if (lenL > Integer.MAX_VALUE) {
+      throw new StorageContainerException(
+          "Chunk length too large: " + lenL, null);
+    }
+    int len = (int) lenL;
+
+    ensureMapped(len);
+
+    lock.readLock().lock();
+    try {
+      ByteBuffer dup = mapped.duplicate();
+      dup.position(0);
+      dup.limit(len);
+      ByteBuffer slice = dup.slice();
+
+      return ChunkBuffer.wrap(slice);
+    } finally {
+      lock.readLock().unlock();
+    }
   }
 
   @Override
