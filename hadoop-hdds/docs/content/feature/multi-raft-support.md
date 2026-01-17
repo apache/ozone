@@ -71,28 +71,27 @@ Ratis handles concurrent logs per node.
 
 ### Calculating Ratis Pipeline Limits
 
-The target number of open, FACTOR_THREE Ratis pipelines is controlled by three properties that define the maximum
-number of pipelines in the cluster at a cluster-wide level, datanode level, and metadata disk level, respectively.
-SCM will create pipelines until the most restrictive limit is met.
+ReplicationFactor.THREE is controlled by three configuration properties that limit the
+number of pipelines in the cluster at a cluster-wide level and a datanode level, respectively.
+The number of pipelines created by SCM is restricted by these limits.
 
 1.  **Cluster-wide Limit (`ozone.scm.ratis.pipeline.limit`)**
-    *   **Description**: An absolute, global limit for the total number of open, FACTOR_THREE Ratis pipelines
+    *   **Description**: An absolute, global limit for the total number of open Ratis pipelines
         across the entire cluster. This acts as a final cap on the total number of pipelines.
-    *   **Default Value**: `0` (which means no global limit is enforced by default).
+    *   **Default Value**: `0` (which means no global limit by default).
 
 2.  **Datanode-level Fixed Limit (`ozone.scm.datanode.pipeline.limit`)**
     *   **Description**: When set to a positive number, this property defines a fixed maximum number of pipelines for
-        every datanode. This is one of two ways to calculate a cluster-wide target.
+        every datanode.
     *   **Default Value**: `2`
-    *   **Calculation**: If this is set, the target is `(<this value> * <number of healthy datanodes>) / 3`.
+    *   **Cluster-wide Limit Calculation**: If this property is set,
+        the number of pipelines in the cluster is in addition limited by
+        `(<this value> * <number of healthy datanodes>) / 3`.
 
 3.  **Datanode-level Dynamic Limit (`ozone.scm.pipeline.per.metadata.disk`)**
-    *   **Description**: This property is used only when `ozone.scm.datanode.pipeline.limit` is explicitly set to `0`.
+    *   **Description**: This property takes effect when `ozone.scm.datanode.pipeline.limit` is not set to a positive number.
         It calculates a dynamic limit for each datanode based on its available metadata disks.
     *   **Default Value**: `2`
-    *   **Calculation**: The limit for each datanode is
-        `(<this value> * <number of metadata disks on that datanode>)`.
-        The total cluster-wide target is the sum of all individual datanode limits, divided by 3.
 
 #### How Limits are Applied
 
