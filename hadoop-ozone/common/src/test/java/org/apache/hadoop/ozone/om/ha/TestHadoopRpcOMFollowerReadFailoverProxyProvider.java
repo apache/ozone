@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -269,8 +270,10 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
     doRead();
     long elapsed = Time.monotonicNow() - start;
     assertHandledBy(0);
-    assertTrue(elapsed > SLOW_RESPONSE_SLEEP_TIME,
-        "Read operation finished earlier than expected");
+    assertThat(elapsed)
+        .withFailMessage(() -> "Read operation finished earlier than expected")
+        .isGreaterThanOrEqualTo(SLOW_RESPONSE_SLEEP_TIME);
+
   }
 
   @Test
