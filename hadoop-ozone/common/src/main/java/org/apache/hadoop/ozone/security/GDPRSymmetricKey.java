@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.security;
 import com.google.common.base.Preconditions;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.util.Objects;
 import java.util.function.BiConsumer;
 import javax.crypto.Cipher;
 import javax.crypto.NoSuchPaddingException;
@@ -76,12 +77,12 @@ public class GDPRSymmetricKey {
    */
   public GDPRSymmetricKey(String secret, String algorithm)
       throws NoSuchPaddingException, NoSuchAlgorithmException {
-    Preconditions.checkNotNull(secret, "Secret cannot be null");
+    Objects.requireNonNull(secret, "Secret cannot be null");
     //TODO: When we add feature to allow users to customize the secret length,
     // we need to update this length check Precondition
     Preconditions.checkArgument(secret.length() == 16,
         "Secret must be exactly 16 characters");
-    Preconditions.checkNotNull(algorithm, "Algorithm cannot be null");
+    Objects.requireNonNull(algorithm, "Algorithm cannot be null");
     this.secret = secret;
     this.algorithm = algorithm;
     this.secretKey = new SecretKeySpec(

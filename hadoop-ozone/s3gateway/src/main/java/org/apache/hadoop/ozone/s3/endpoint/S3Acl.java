@@ -41,8 +41,8 @@ public final class S3Acl {
   // ACL put related headers
   public static final String GRANT_READ = "x-amz-grant-read";
   public static final String GRANT_WRITE = "x-amz-grant-write";
-  public static final String GRANT_READ_CAP = "x-amz-grant-read-acp";
-  public static final String GRANT_WRITE_CAP = "x-amz-grant-write-acp";
+  public static final String GRANT_READ_ACP = "x-amz-grant-read-acp";
+  public static final String GRANT_WRITE_ACP = "x-amz-grant-write-acp";
   public static final String GRANT_FULL_CONTROL = "x-amz-grant-full-control";
 
   // Not supported headers at current stage, may support it in future

@@ -25,6 +25,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -130,7 +131,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   private final DataStreamOutput out;
   private CompletableFuture<DataStreamReply> dataStreamCloseReply;
   private List<CompletableFuture<DataStreamReply>> futures = new ArrayList<>();
-  private static final long SYNC_SIZE = 0; // TODO: disk sync is disabled for now
+  private final long syncSize;
   private long syncPosition = 0;
   private StreamBuffer currentBuffer;
   private XceiverClientMetrics metrics;
@@ -156,6 +157,7 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     this.xceiverClientFactory = xceiverClientManager;
     this.config = config;
     this.isDatastreamPipelineMode = config.isDatastreamPipelineMode();
+    this.syncSize = config.getDataStreamSyncSize();
     this.blockID = new AtomicReference<>(blockID);
     KeyValue keyValue =
         KeyValue.newBuilder().setKey("TYPE").setValue("KEY").build();
@@ -215,11 +217,11 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
         ContainerCommandRequestMessage.toMessage(builder.build(), null);
 
     if (isDatastreamPipelineMode) {
-      return Preconditions.checkNotNull(xceiverClient.getDataStreamApi())
+      return Objects.requireNonNull(xceiverClient.getDataStreamApi(), "xceiverClient.getDataStreamApi() == null")
           .stream(message.getContent().asReadOnlyByteBuffer(),
               RatisHelper.getRoutingTable(pipeline));
     } else {
-      return Preconditions.checkNotNull(xceiverClient.getDataStreamApi())
+      return Objects.requireNonNull(xceiverClient.getDataStreamApi(), "xceiverClient.getDataStreamApi() == null")
           .stream(message.getContent().asReadOnlyByteBuffer());
     }
   }
@@ -398,10 +400,10 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
     long flushPos = totalDataFlushedLength;
     final List<StreamBuffer> byteBufferList;
     if (!force) {
-      Preconditions.checkNotNull(bufferList);
+      Objects.requireNonNull(bufferList, "bufferList == null");
       byteBufferList = buffersForPutBlock;
       buffersForPutBlock = null;
-      Preconditions.checkNotNull(byteBufferList);
+      Objects.requireNonNull(byteBufferList, "byteBufferList == null");
     } else {
       byteBufferList = null;
     }
@@ -646,9 +648,8 @@ public class BlockDataStreamOutput implements ByteBufferStreamOutput {
   }
 
   private boolean needSync(long position) {
-    if (SYNC_SIZE > 0) {
-      // TODO: or position >= fileLength
-      if (position - syncPosition >= SYNC_SIZE) {
+    if (syncSize > 0) {
+      if (position - syncPosition >= syncSize) {
         syncPosition = position;
         return true;
       }

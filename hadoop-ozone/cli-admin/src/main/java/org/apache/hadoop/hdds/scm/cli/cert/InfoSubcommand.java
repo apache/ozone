@@ -17,10 +17,10 @@
 
 package org.apache.hadoop.hdds.scm.cli.cert;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.Objects;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
@@ -45,7 +45,7 @@ class InfoSubcommand extends ScmCertSubcommand {
   public void execute(SCMSecurityProtocol client) throws IOException {
     final String certPemStr =
         client.getCertificate(serialId);
-    Preconditions.checkNotNull(certPemStr,
+    Objects.requireNonNull(certPemStr,
         "Certificate can't be found");
 
     // Print container report info.

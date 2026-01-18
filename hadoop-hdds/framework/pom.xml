@@ -309,6 +309,12 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-managed-rocksdb</artifactId>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-test-utils</artifactId>
       <type>test-jar</type>
       <scope>test</scope>
@@ -378,7 +384,6 @@
                 <restrictImports>
                   <reason>Only selected annotation processors are enabled, see configuration of maven-compiler-plugin.</reason>
                   <bannedImports>
-                    <bannedImport>org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator</bannedImport>
                     <bannedImport>org.kohsuke.MetaInfServices</bannedImport>
                   </bannedImports>
                 </restrictImports>

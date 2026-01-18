@@ -287,7 +287,7 @@ public class TestHddsConfServlet {
   @ConfigGroup(prefix = "ozone.test")
   public static class OzoneTestConfig {
     @Config(
-        key = "test.key",
+        key = "ozone.test.test.key",
         defaultValue = "value1",
         type = ConfigType.STRING,
         description = "Test get config by tag",

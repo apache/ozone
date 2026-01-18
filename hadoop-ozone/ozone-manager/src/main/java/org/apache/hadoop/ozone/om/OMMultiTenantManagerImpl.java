@@ -364,7 +364,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       tenantCacheLock.readLock().lock();
       try {
         final CachedTenantState cachedTenantState = tenantCache.get(tenantId);
-        Preconditions.checkNotNull(cachedTenantState,
+        Objects.requireNonNull(cachedTenantState,
             "Cache entry for tenant '" + tenantId + "' does not exist");
 
         final String tenantUserRoleName =
@@ -609,7 +609,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
       tenantCacheLock.writeLock().lock();
       try {
         final CachedTenantState cachedTenantState = tenantCache.get(tenantId);
-        Preconditions.checkNotNull(cachedTenantState,
+        Objects.requireNonNull(cachedTenantState,
             "Cache entry for tenant '" + tenantId + "' does not exist");
 
         LOG.info("Adding to cache: user '{}' accessId '{}' in tenant '{}'",
@@ -879,7 +879,7 @@ public class OMMultiTenantManagerImpl implements OMMultiTenantManager {
         // If the TenantState doesn't exist, it means the accessId entry is
         //  orphaned or incorrect, likely metadata inconsistency
         CachedTenantState cachedTenantState = tenantCache.get(tenantId);
-        Preconditions.checkNotNull(cachedTenantState,
+        Objects.requireNonNull(cachedTenantState,
             "OmDBTenantState should have existed for " + tenantId);
 
         cachedTenantState.getAccessIdInfoMap().put(accessId,

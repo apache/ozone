@@ -54,7 +54,7 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
         omMetadataManager, getBucketLayout());
     fromKeyName = new Path("fromKey").toString();
     toKeyName = new Path("toKey").toString();
-    fromKeyInfo = getOmKeyInfo(fromKeyName);
+    fromKeyInfo = getOmKeyInfo(fromKeyName).build();
     dbToKey = omMetadataManager.getOzoneKey(volumeName, bucketName, toKeyName);
   }
 
@@ -207,9 +207,9 @@ public class TestOMKeyRenameRequest extends TestOMKeyRequest {
         .setCmdType(OzoneManagerProtocolProtos.Type.RenameKey).build();
   }
 
-  protected OmKeyInfo getOmKeyInfo(String keyName) {
+  protected OmKeyInfo.Builder getOmKeyInfo(String keyName) {
     return OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
-        replicationConfig).build();
+        replicationConfig);
   }
 
   protected String addKeyToTable(OmKeyInfo keyInfo) throws Exception {

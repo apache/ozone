@@ -339,7 +339,6 @@ message SCMCommandProto {
   optional ReconstructECContainersCommandProto reconstructECContainersCommandProto = 12;
   optional ReconcileContainerCommandProto reconcileContainerCommandProto = 13;
 
-
   // If running upon Ratis, holds term of underlying RaftServer iff current
   // SCM is a leader. If running without Ratis, holds SCMContext.INVALID_TERM.
   optional int64 term = 15;

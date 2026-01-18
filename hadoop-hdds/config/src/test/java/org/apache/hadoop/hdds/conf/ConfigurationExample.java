@@ -26,49 +26,49 @@ import java.util.concurrent.TimeUnit;
 @ConfigGroup(prefix = "ozone.test.config")
 public class ConfigurationExample extends ConfigurationExampleParent {
 
-  @Config(key = "address", defaultValue = "localhost", description = "Client "
+  @Config(key = "ozone.test.config.address", defaultValue = "localhost", description = "Client "
       + "address (To test string injection).", tags = ConfigTag.MANAGEMENT)
   private String clientAddress;
 
-  @Config(key = "bind.host", defaultValue = "0.0.0.0", description = "Bind "
+  @Config(key = "ozone.test.config.bind.host", defaultValue = "0.0.0.0", description = "Bind "
       + "host(To test string injection).", tags = ConfigTag.MANAGEMENT)
   private String bindHost;
 
-  @Config(key = "compression.enabled", defaultValue = "true", description =
+  @Config(key = "ozone.test.config.compression.enabled", defaultValue = "true", description =
       "Compression enabled. (Just to test boolean flag)", tags =
       ConfigTag.MANAGEMENT)
   private boolean compressionEnabled;
 
-  @Config(key = "port", defaultValue = "1234", description = "Port number "
+  @Config(key = "ozone.test.config.port", defaultValue = "1234", description = "Port number "
       + "config (To test in injection)", tags = ConfigTag.MANAGEMENT)
   private int port = 1234;
 
-  @Config(key = "wait", type = ConfigType.TIME, timeUnit =
+  @Config(key = "ozone.test.config.wait", type = ConfigType.TIME, timeUnit =
       TimeUnit.SECONDS, defaultValue = "30m", description = "Wait time (To "
       + "test TIME config type)", tags = ConfigTag.MANAGEMENT)
   private long waitTime = 1;
 
-  @Config(key = "time.duration", type = ConfigType.TIME, timeUnit =
+  @Config(key = "ozone.test.config.time.duration", type = ConfigType.TIME, timeUnit =
       TimeUnit.MINUTES, defaultValue = "1h", description = "N/A",
       tags = ConfigTag.MANAGEMENT)
   private Duration duration = Duration.ofSeconds(5);
 
-  @Config(key = "size.small", type = ConfigType.SIZE, defaultValue = "42MB",
+  @Config(key = "ozone.test.config.size.small", type = ConfigType.SIZE, defaultValue = "42MB",
       tags = {},
       description = "Testing SIZE with int field")
   private int smallSize;
 
-  @Config(key = "size.large", type = ConfigType.SIZE,
+  @Config(key = "ozone.test.config.size.large", type = ConfigType.SIZE,
       defaultValue = "5GB", tags = {},
       description = "Testing SIZE with long field")
   private long largeSize;
 
-  @Config(key = "threshold", type = ConfigType.DOUBLE, defaultValue = "10",
+  @Config(key = "ozone.test.config.threshold", type = ConfigType.DOUBLE, defaultValue = "10",
       description = "Threshold (To test DOUBLE config type)",
       tags = ConfigTag.MANAGEMENT)
   private double threshold = 10;
 
-  @Config(key = "dynamic", reconfigurable = true, defaultValue = "original",
+  @Config(key = "ozone.test.config.dynamic", reconfigurable = true, defaultValue = "original",
       description = "Test dynamic property", tags = {})
   private String dynamic;
 

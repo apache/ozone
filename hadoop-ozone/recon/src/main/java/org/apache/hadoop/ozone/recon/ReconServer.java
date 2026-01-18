@@ -34,7 +34,6 @@ import java.net.InetSocketAddress;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.sql.DataSource;
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
@@ -160,6 +159,11 @@ public class ReconServer extends GenericCli implements Callable<Void> {
       LOG.info("Initializing support of Recon Features...");
       FeatureProvider.initFeatureSupport(configuration);
 
+      LOG.debug("Now starting all services of Recon...");
+      // Start all services
+      start();
+      isStarted = true;
+
       LOG.info("Finalizing Layout Features.");
       // Handle Recon Schema Versioning
       ReconSchemaVersionTableManager versionTableManager =
@@ -173,10 +177,12 @@ public class ReconServer extends GenericCli implements Callable<Void> {
 
       LOG.info("Recon schema versioning completed.");
 
-      LOG.debug("Now starting all services of Recon...");
-      // Start all services
-      start();
-      isStarted = true;
+      // Register ReconTaskStatusMetrics after schema upgrade completes
+      // This ensures the RECON_TASK_STATUS table has all required columns
+      if (reconTaskStatusMetrics != null) {
+        reconTaskStatusMetrics.register();
+        LOG.debug("ReconTaskStatusMetrics registered after schema upgrade");
+      }
 
       LOG.info("Recon server initialized successfully!");
     } catch (Exception e) {
@@ -274,9 +280,6 @@ public class ReconServer extends GenericCli implements Callable<Void> {
       isStarted = true;
       // Initialize metrics for Recon
       HddsServerUtil.initializeMetrics(configuration, "Recon");
-      if (reconTaskStatusMetrics != null) {
-        reconTaskStatusMetrics.register();
-      }
       if (httpServer != null) {
         httpServer.start();
       }
@@ -377,7 +380,7 @@ public class ReconServer extends GenericCli implements Callable<Void> {
           reconConfig.getKerberosPrincipal(),
           reconConfig.getKerberosKeytab());
       UserGroupInformation.setConfiguration(conf);
-      InetSocketAddress socAddr = HddsUtils.getReconAddresses(conf);
+      InetSocketAddress socAddr = HddsServerUtil.getReconAddressForDatanodes(conf);
       SecurityUtil.login(conf,
           OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY,
           OZONE_RECON_KERBEROS_PRINCIPAL_KEY,

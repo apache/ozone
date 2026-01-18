@@ -611,7 +611,7 @@ public final class OMRequestTestUtils {
   public static OmDirectoryInfo createOmDirectoryInfo(String keyName,
       long objectID,
       long parentObjID) {
-    return new OmDirectoryInfo.Builder()
+    return OmDirectoryInfo.newBuilder()
         .setName(keyName)
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())

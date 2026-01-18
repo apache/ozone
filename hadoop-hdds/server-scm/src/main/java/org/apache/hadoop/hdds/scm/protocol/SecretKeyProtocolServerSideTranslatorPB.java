@@ -17,12 +17,12 @@
 
 package org.apache.hadoop.hdds.scm.protocol;
 
-import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMGetCheckAndRotateResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMGetCurrentSecretKeyResponse;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos.SCMGetSecretKeyRequest;
@@ -58,7 +58,7 @@ public class SecretKeyProtocolServerSideTranslatorPB
   private static final String ROLE_TYPE = "SCM";
 
   private OzoneProtocolMessageDispatcher<SCMSecretKeyRequest,
-      SCMSecretKeyResponse, ProtocolMessageEnum> dispatcher;
+      SCMSecretKeyResponse, SCMSecretKeyProtocolProtos.Type> dispatcher;
 
   public SecretKeyProtocolServerSideTranslatorPB(SecretKeyProtocolScm impl,
       StorageContainerManager storageContainerManager,
