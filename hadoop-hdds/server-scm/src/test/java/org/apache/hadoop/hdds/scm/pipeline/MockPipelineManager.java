@@ -341,4 +341,9 @@ public class MockPipelineManager implements PipelineManager {
     // For tests that do not care about this limit, return a large value.
     return Integer.MAX_VALUE;
   }
+
+  @Override
+  public SCMPipelineMetrics getMetrics() {
+    return null;
+  }
 }

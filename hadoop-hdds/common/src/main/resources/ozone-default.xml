@@ -1750,6 +1750,16 @@
   </property>
 
   <property>
+    <name>hdds.scm.safemode.log.interval</name>
+    <value>1m</value>
+    <tag>HDDS,SCM,OPERATION</tag>
+    <description>
+      Interval at which SCM logs safemode status while SCM is in safemode.
+      Default is 1 minute.
+    </description>
+  </property>
+
+  <property>
     <name>hdds.container.action.max.limit</name>
     <value>20</value>
     <tag>DATANODE</tag>
