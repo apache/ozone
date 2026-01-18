@@ -24,7 +24,6 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.B
 import java.io.IOException;
 import java.util.Map;
 import java.util.Objects;
-import java.util.regex.Pattern;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -65,8 +64,6 @@ public class S3PutObjectTaggingRequest extends OMKeyRequest {
   private static final int TAG_KEY_LENGTH_LIMIT = 128;
   private static final int TAG_VALUE_LENGTH_LIMIT = 256;
   private static final String AWS_TAG_PREFIX = "aws:";
-  private static final Pattern TAG_REGEX_PATTERN =
-      Pattern.compile("^([\\p{L}\\p{Z}\\p{N}_.:/=+\\-]*)$");
 
   private static void validateTags(Map<String, String> tags) throws OMException {
     if (tags == null || tags.isEmpty()) {
@@ -93,14 +90,6 @@ public class S3PutObjectTaggingRequest extends OMKeyRequest {
         throw new OMException(
             "The tag value exceeds the maximum length of " + TAG_VALUE_LENGTH_LIMIT,
             INVALID_REQUEST);
-      }
-
-      if (!TAG_REGEX_PATTERN.matcher(tagKey).matches()) {
-        throw new OMException("Invalid tag key: " + tagKey, INVALID_REQUEST);
-      }
-
-      if (!TAG_REGEX_PATTERN.matcher(tagValue).matches()) {
-        throw new OMException("Invalid tag value: " + tagValue, INVALID_REQUEST);
       }
 
       if (tagKey.startsWith(AWS_TAG_PREFIX)) {
