@@ -447,24 +447,6 @@ public class ReconServer extends GenericCli implements Callable<Void> {
   }
 
   /**
-   * Get the collection of Recon admin usernames.
-   *
-   * @return Collection of admin usernames
-   */
-  public Collection<String> getReconAdminUsernames() {
-    return reconAdmins.getAdminUsernames();
-  }
-
-  /**
-   * Get the collection of Recon admin groups.
-   *
-   * @return Collection of admin groups
-   */
-  public Collection<String> getReconAdminGroups() {
-    return reconAdmins.getAdminGroups();
-  }
-
-  /**
    * Check if a user is a Recon administrator.
    *
    * @param user UserGroupInformation
