@@ -111,7 +111,7 @@ public class TestContainerToKeyMapping {
 
     // Check FSO key
     assertThat(output).contains("\"" + CONTAINER_ID_1 + "\"");
-    assertThat(output).contains("vol1/fso-bucket/dir1/file1");
+    assertThat(output).contains("/vol1/fso-bucket/dir1/file1");
 
     // Check OBS key
     assertThat(output).contains("\"" + CONTAINER_ID_2 + "\"");
@@ -128,7 +128,7 @@ public class TestContainerToKeyMapping {
     // Check FSO key - should show only filename
     assertThat(output).contains("\"" + CONTAINER_ID_1 + "\"");
     assertThat(output).contains("file1");
-    assertThat(output).doesNotContain("vol1/fso-bucket/dir1/file1");
+    assertThat(output).doesNotContain("/vol1/fso-bucket/dir1/file1");
 
     // Check OBS key - should also show only key name
     assertThat(output).contains("\"" + CONTAINER_ID_2 + "\"");
@@ -145,7 +145,7 @@ public class TestContainerToKeyMapping {
     
     String output = outWriter.toString();
     assertThat(output).contains("\"" + nonExistentContainerId + "\"");
-    assertThat(output).contains("\"numOfKeys\" : 0");
+    assertThat(output).contains("\"totalKeys\" : 0");
   }
 
   @Test
@@ -156,7 +156,7 @@ public class TestContainerToKeyMapping {
     String output = outWriter.toString();
 
     assertThat(output).contains("\"" + CONTAINER_ID_3 + "\"");
-    assertThat(output).contains("\"numOfKeys\" : 0");
+    assertThat(output).contains("\"totalKeys\" : 1");
     assertThat(output).contains("\"unreferencedKeys\" : 1");
   }
 

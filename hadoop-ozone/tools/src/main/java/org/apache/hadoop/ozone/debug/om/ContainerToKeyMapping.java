@@ -127,8 +127,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
       fileTable = OMDBDefinition.FILE_TABLE_DEF.getTable(omDbStore, CacheType.NO_CACHE);
       keyTable = OMDBDefinition.KEY_TABLE_DEF.getTable(omDbStore, CacheType.NO_CACHE);
 
-      openDirTreeDB(dbPath);
-      retrieve(writer, containerIDs);
+      retrieve(dbPath, writer, containerIDs);
     } catch (Exception e) {
       err().println("Failed to open RocksDB: " + e);
       throw e;
@@ -167,14 +166,17 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
     }
   }
 
-  private void retrieve(PrintWriter writer, Set<Long> containerIds) {
-    // Build dir tree for FSO keys
+  private void retrieve(String dbPath, PrintWriter writer, Set<Long> containerIds) {
     Map<Long, Pair<Long, String>> bucketVolMap = new HashMap<>();
-    try {
-      prepareDirIdTree(bucketVolMap);
-    } catch (Exception e) {
-      err().println("Exception occurred reading directory Table, " + e);
-      return;
+    // Build dir tree for FSO keys only if we need full paths
+    if (!onlyFileNames) {
+      try {
+        openDirTreeDB(dbPath);
+        prepareDirIdTree(bucketVolMap);
+      } catch (Exception e) {
+        err().println("Exception occurred reading directory Table, " + e);
+        return;
+      }
     }
 
     // Map to collect keys per container
@@ -208,17 +210,13 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
         Set<Long> keyContainers = getKeyContainers(keyInfo, containerIds);
 
         if (!keyContainers.isEmpty()) {
-          if (!onlyFileNames) {
-            // Reconstruct full path
-            String fullPath = reconstructFullPath(keyInfo, bucketVolMap, unreferencedCountMap, keyContainers);
-            if (fullPath != null) {
-              for (Long containerId : keyContainers) {
-                containerToKeysMap.get(containerId).add(fullPath);
-              }
-            }
-          } else {
+          // For FSO keys, reconstruct the full path
+          // Or extract just the key name if onlyFileNames is true
+          String keyPath = onlyFileNames ? keyInfo.getKeyName() :
+              reconstructFullPath(keyInfo, bucketVolMap, unreferencedCountMap, keyContainers);
+          if (keyPath != null) {
             for (Long containerId : keyContainers) {
-              containerToKeysMap.get(containerId).add(keyInfo.getKeyName());
+              containerToKeysMap.get(containerId).add(keyPath);
             }
           }
         }
@@ -311,7 +309,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
         sb.insert(0, nameParentPair.getValue() + OM_KEY_PREFIX);
         prvParent = nameParentPair.getKey();
         if (null == prvParent) {
-          return sb.toString();
+          return OM_KEY_PREFIX + sb;
         }
         continue;
       }
@@ -319,11 +317,11 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
       // Check dir tree
       Pair<Long, String> nameParentPair = getFromDirTree(prvParent);
       if (nameParentPair == null) {
-        // Parent not found - increment unreferenced count for all containers this key uses
+        // If parent is not found, mark the key as unreferenced and increment its count
         for (Long containerId : keyContainers) {
           unreferencedCountMap.put(containerId, unreferencedCountMap.get(containerId) + 1);
         }
-        break;
+        return "[unreferenced] " + keyInfo.getKeyName();
       }
       sb.insert(0, nameParentPair.getValue() + OM_KEY_PREFIX);
       prvParent = nameParentPair.getKey();
@@ -390,7 +388,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
         }
         
         containerNode.set("keys", keysArray);
-        containerNode.put("numOfKeys", entry.getValue().size());
+        containerNode.put("totalKeys", entry.getValue().size()); // includes unreferenced keys
         
         // Add unreferenced count if > 0
         long unreferencedCount = unreferencedCountMap.get(containerId);
