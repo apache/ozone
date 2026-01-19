@@ -442,15 +442,6 @@ public class TestContainerStateManager {
       final ContainerReplicaProto.State state,
       final String originNodeId,
       final long bcsId,
-      final boolean isEmpty) {
-    return getContainerReportsProto(containerId, state, originNodeId, bcsId, isEmpty, 0);
-  }
-
-  private static StorageContainerDatanodeProtocolProtos.ContainerReportsProto getContainerReportsProto(
-      final ContainerID containerId,
-      final ContainerReplicaProto.State state,
-      final String originNodeId,
-      final long bcsId,
       final boolean isEmpty,
       final int replicaIndex) {
     final StorageContainerDatanodeProtocolProtos.ContainerReportsProto.Builder crBuilder =
