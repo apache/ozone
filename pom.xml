@@ -325,6 +325,13 @@
         <scope>import</scope>
       </dependency>
       <dependency>
+        <groupId>org.springframework</groupId>
+        <artifactId>spring-framework-bom</artifactId>
+        <version>${spring.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
         <groupId>software.amazon.awssdk</groupId>
         <artifactId>bom</artifactId>
         <version>${aws-java-sdk2.version}</version>
@@ -1523,20 +1530,11 @@
         <version>${spring.version}</version>
         <exclusions>
           <exclusion>
+            <!-- avoid conflict with Commons Logging -->
             <groupId>org.springframework</groupId>
             <artifactId>spring-jcl</artifactId>
           </exclusion>
         </exclusions>
-      </dependency>
-      <dependency>
-        <groupId>org.springframework</groupId>
-        <artifactId>spring-jdbc</artifactId>
-        <version>${spring.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.springframework</groupId>
-        <artifactId>spring-tx</artifactId>
-        <version>${spring.version}</version>
       </dependency>
       <dependency>
         <groupId>org.vafer</groupId>
