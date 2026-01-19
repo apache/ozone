@@ -558,6 +558,12 @@ public final class OzoneConsts {
       "compactionLogTable";
 
   /**
+   * DB flush log table name. Referenced in RDBStore.
+   */
+  public static final String FLUSH_LOG_TABLE =
+      "flushLogTable";
+
+  /**
    * S3G multipart upload request's ETag header key.
    */
   public static final String ETAG = "ETag";

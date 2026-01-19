@@ -52,7 +52,7 @@ import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DO
 import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.IN_PROGRESS;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.isDone;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.isStarting;
-import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK_IN_DAG;
+import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK;
 import static org.apache.ozone.test.LambdaTestUtils.await;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -157,7 +157,7 @@ import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
-import org.apache.ozone.rocksdiff.CompactionNode;
+import org.apache.ozone.rocksdiff.FlushNode;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Slow;
@@ -2177,7 +2177,8 @@ public abstract class TestOmSnapshot {
     RDBStore activeDbStore = getRdbStore();
     // RocksDBCheckpointDiffer should be not null for active DB store.
     assertNotNull(activeDbStore.getRocksDBCheckpointDiffer());
-    assertEquals(2,  activeDbStore.getDbOptions().listeners().size());
+    // 1 listener for flush-based tracking (FlushCompletedListener)
+    assertEquals(1,  activeDbStore.getDbOptions().listeners().size());
 
     try (UncheckedAutoCloseableSupplier<IOmMetadataReader> omSnapshot = cluster.getOzoneManager()
         .getOmSnapshotManager()
@@ -2464,12 +2465,12 @@ public abstract class TestOmSnapshot {
 
     createSnapshot(volume1, bucket3, "bucket3-snap3");
 
-    List<CompactionNode> filteredNodes = ozoneManager.getMetadataManager()
+    List<FlushNode> filteredNodes = ozoneManager.getMetadataManager()
         .getStore()
         .getRocksDBCheckpointDiffer()
-        .getCompactionNodeMap().values().stream()
+        .getFlushLinkedList().getFlushNodeMap().values().stream()
         .filter(node ->
-            !COLUMN_FAMILIES_TO_TRACK_IN_DAG.contains(node.getColumnFamily()))
+            !COLUMN_FAMILIES_TO_TRACK.contains(node.getColumnFamily()))
         .collect(Collectors.toList());
 
     assertEquals(0, filteredNodes.size());
@@ -2521,7 +2522,7 @@ public abstract class TestOmSnapshot {
           compactionLogEntry.getInputFileInfoList().forEach(
               f -> {
                 java.nio.file.Path file = sstBackUpDir.resolve(f.getFileName() + ".sst");
-                if (COLUMN_FAMILIES_TO_TRACK_IN_DAG.contains(f.getColumnFamily()) && java.nio.file.Files.exists(file)) {
+                if (COLUMN_FAMILIES_TO_TRACK.contains(f.getColumnFamily()) && java.nio.file.Files.exists(file)) {
                   assertTrue(f.isPruned());
                   try (ManagedRawSSTFileReader sstFileReader = new ManagedRawSSTFileReader(
                           managedOptions, file.toFile().getAbsolutePath(), 2 * 1024 * 1024);

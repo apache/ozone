@@ -60,6 +60,7 @@ import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
+import org.apache.ozone.compaction.log.FlushLogEntry;
 
 /**
  * OM metadata manager interface.
@@ -485,6 +486,8 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
   Table<String, String> getSnapshotRenamedTable();
 
   Table<String, CompactionLogEntry> getCompactionLogTable();
+
+  Table<String, FlushLogEntry> getFlushLogTable();
 
   /**
    * Gets the OM Meta table.
