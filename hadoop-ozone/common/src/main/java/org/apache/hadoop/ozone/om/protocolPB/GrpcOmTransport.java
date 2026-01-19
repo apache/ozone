@@ -299,13 +299,42 @@ public class GrpcOmTransport implements OmTransport {
     for (Map.Entry<String, ManagedChannel> entry : channels.entrySet()) {
       ManagedChannel channel = entry.getValue();
       channel.shutdown();
+    }
+
+    final long maxWaitMillis = TimeUnit.SECONDS.toMillis(5);
+    long startDeadline = System.currentTimeMillis();
+    long elapsed = 0;
+    boolean allTerminated = false;
+
+    while (elapsed < maxWaitMillis) {
+      allTerminated = true;
+      for (Map.Entry<String, ManagedChannel> entry : channels.entrySet()) {
+        ManagedChannel channel = entry.getValue();
+        if (!channel.isTerminated()) {
+          allTerminated = false;
+          break;
+        }
+      }
+      if (allTerminated) {
+        break;
+      }
       try {
-        channel.awaitTermination(5, TimeUnit.SECONDS);
-      } catch (Exception e) {
-        LOG.error("failed to shutdown OzoneManagerServiceGrpc channel {} : {}",
-            entry.getKey(), e);
+        Thread.sleep(100);
+      } catch (InterruptedException e) {
+        LOG.error("Interrupted while waiting for channels to terminate", e);
+        Thread.currentThread().interrupt();
+        break;
+      }
+      elapsed = System.currentTimeMillis() - startDeadline;
+    }
+
+    for (Map.Entry<String, ManagedChannel> entry : channels.entrySet()) {
+      ManagedChannel channel = entry.getValue();
+      if (!channel.isTerminated()) {
+        LOG.warn("Channel {} did not terminate within timeout.", entry.getKey());
       }
     }
+
     LOG.info("{}: stopped", CLIENT_NAME);
   }
 
