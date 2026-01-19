@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit;
  * Example configuration to test the configuration injection.
  */
 @ConfigGroup(prefix = "ozone.test.config")
-public class ConfigurationExample extends ConfigurationExampleParent {
+public class ConfigurationExample extends ReconfigurableConfig {
 
   @Config(key = "ozone.test.config.address", defaultValue = "localhost", description = "Client "
       + "address (To test string injection).", tags = ConfigTag.MANAGEMENT)
