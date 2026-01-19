@@ -1145,10 +1145,11 @@ public class SCMNodeManager implements NodeManager {
     long totalFsCapacity = 0L;
     long totalFsAvailable = 0L;
     /*
-    If any storage report in any DN has fs stats available, then include these in the metrics. This logic needs to
-    change in the case of rolling DN upgrades, where one DN might be old while another is new.
+    If any storage report is missing fs stats, this is a rolling upgrade scenario in which some older dn versions
+    aren't reporting fs stats. Better to not report aggregated fs stats at all in this case?
      */
     boolean fsPresent = false;
+    boolean fsMissing = false;
 
     for (DatanodeInfo node : nodeStateManager.getAllNodes()) {
       String keyPrefix = "";
@@ -1191,10 +1192,13 @@ public class SCMNodeManager implements NodeManager {
           fsPresent = true;
           totalFsCapacity += reportProto.getFsCapacity();
           totalFsAvailable += reportProto.getFsAvailable();
+        } else {
+          fsMissing = true;
         }
       }
     }
-    if (fsPresent) {
+    if (fsPresent && !fsMissing) {
+      // don't report aggregated fs stats if some storage reports did not have them
       nodeInfo.put("TotalFilesystemCapacity", totalFsCapacity);
       nodeInfo.put("TotalFilesystemUsed", totalFsCapacity - totalFsAvailable);
       nodeInfo.put("TotalFilesystemAvailable", totalFsAvailable);
@@ -1794,7 +1798,7 @@ public class SCMNodeManager implements NodeManager {
       }
     }
     if (!hasFsReport) {
-      LOG.warn("Datanode {} does not have filesystem storage stats in its storage reports.", datanodeDetails);
+      LOG.debug("Datanode {} does not have filesystem storage stats in its storage reports.", datanodeDetails);
     }
     return hasFsReport ? new FsUsageTotals(capacity, available, capacity - available) : null;
   }

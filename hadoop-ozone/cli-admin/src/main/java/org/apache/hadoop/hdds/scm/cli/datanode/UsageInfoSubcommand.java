@@ -309,6 +309,9 @@ public class UsageInfoSubcommand extends ScmSubcommand {
 
     @JsonIgnore
     public double getFilesystemAvailableRatio() {
+      if (!filesystemUsagePresent || filesystemCapacity == 0) {
+        return 0;
+      }
       return filesystemAvailable / (double) filesystemCapacity;
     }
 
