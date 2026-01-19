@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.container;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getECContainer;
-import static org.apache.ratis.util.Preconditions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -269,47 +268,18 @@ public class TestContainerStateManager {
   @Test
   public void testDeletedContainerWithStaleClosedReplicaRatis()
       throws IOException {
-    final ContainerReportHandler reportHandler =
-        new ContainerReportHandler(nodeManager, containerManager, scmContext, null);
-
-    final DatanodeDetails datanode = nodeManager.getNodes(
-        NodeStatus.inServiceHealthy()).iterator().next();
-
-    // Create a DELETED RATIS container with sequenceId = 10000L
     final ContainerInfo container = getContainer(HddsProtos.LifeCycleState.DELETED);
     containerStateManager.addContainer(container.getProtobuf());
-
-    // Verify it's RATIS type
     assertEquals(HddsProtos.ReplicationType.RATIS, container.getReplicationType());
-
-    // Report a CLOSED replica with BCSID = 10000L (equal to container's seqId)
-    final StorageContainerDatanodeProtocolProtos.ContainerReportsProto containerReport = getContainerReportsProto(
-        container.containerID(),
-        ContainerReplicaProto.State.CLOSED,
-        datanode.getUuidString(),
-        10000L,  // BCSID matches container sequenceId
-        false);  // not empty
-
-    final SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode reportFromDatanode =
-        new SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode(datanode, containerReport);
-    reportHandler.onMessage(reportFromDatanode, publisher);
-
-    ArgumentCaptor<CommandForDatanode<?>> commandCaptor =
-        ArgumentCaptor.forClass(CommandForDatanode.class);
-    verify(publisher, times(1))
-        .fireEvent(eq(SCMEvents.DATANODE_COMMAND), commandCaptor.capture());
-
-    // Verify it's a DeleteContainerCommand with force=true
-    CommandForDatanode<?> capturedCommand = commandCaptor.getValue();
-    assertEquals(DeleteContainerCommand.class, capturedCommand.getCommand().getClass());
-    DeleteContainerCommand deleteCommand = (DeleteContainerCommand) capturedCommand.getCommand();
-    assertEquals(true, deleteCommand.isForce(),
+    final DatanodeDetails datanode = nodeManager.getNodes(
+        NodeStatus.inServiceHealthy()).iterator().next();
+    // Report CLOSED replica with BCSID = 10000L (equal to container's seqId)
+    DeleteContainerCommand deleteCmd = sendReportAndCaptureDeleteCommand(
+        container, datanode, 10000L, false, 0, true);
+    // Verify force delete
+    verifyForceDeleteCommand(deleteCmd, container.containerID(), true,
         "Delete command should have force=true for stale RATIS replica");
-    assertEquals(container.getContainerID(), deleteCommand.getContainerID());
-
-    // Container should remain in DELETED state
-    assertEquals(HddsProtos.LifeCycleState.DELETED,
-        containerManager.getContainer(container.containerID()).getState());
+    verifyContainerState(container.containerID(), HddsProtos.LifeCycleState.DELETED);
   }
 
   /**
@@ -319,36 +289,15 @@ public class TestContainerStateManager {
   @Test
   public void testDeletedContainerWithLowerBcsidStaleReplicaRatis()
       throws IOException {
-    final ContainerReportHandler reportHandler =
-        new ContainerReportHandler(nodeManager, containerManager, scmContext, null);
-
-    final DatanodeDetails datanode = nodeManager.getNodes(
-        NodeStatus.inServiceHealthy()).iterator().next();
-
     final ContainerInfo container = getContainer(HddsProtos.LifeCycleState.DELETED);
     containerStateManager.addContainer(container.getProtobuf());
-
-    // Report a CLOSED replica with BCSID = 9000L (lower than container's 10000L)
-    final StorageContainerDatanodeProtocolProtos.ContainerReportsProto containerReport = getContainerReportsProto(
-        container.containerID(),
-        ContainerReplicaProto.State.CLOSED,
-        datanode.getUuidString(),
-        9000L,   // BCSID < container sequenceId
-        false);
-
-    final SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode reportFromDatanode =
-        new SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode(datanode, containerReport);
-    reportHandler.onMessage(reportFromDatanode, publisher);
-
-    // Should send force delete command
-    ArgumentCaptor<CommandForDatanode<?>> commandCaptor =
-        ArgumentCaptor.forClass(CommandForDatanode.class);
-    verify(publisher, times(1))
-        .fireEvent(eq(SCMEvents.DATANODE_COMMAND), commandCaptor.capture());
-
-    DeleteContainerCommand deleteCommand =
-        (DeleteContainerCommand) commandCaptor.getValue().getCommand();
-    assertTrue(deleteCommand.isForce());
+    final DatanodeDetails datanode = nodeManager.getNodes(
+        NodeStatus.inServiceHealthy()).iterator().next();
+    // Report CLOSED replica with BCSID = 9000L (lower than container's 10000L)
+    DeleteContainerCommand deleteCmd = sendReportAndCaptureDeleteCommand(
+        container, datanode, 9000L, false, 0, true);
+    verifyForceDeleteCommand(deleteCmd, container.containerID(), true,
+        "Delete command should have force=true for stale RATIS replica with lower BCSID");
   }
 
   /**
@@ -359,12 +308,8 @@ public class TestContainerStateManager {
   @Test
   public void testDeletedECContainerWithStaleClosedReplicaShouldNotForceDelete()
       throws IOException {
-    final ContainerReportHandler reportHandler =
-        new ContainerReportHandler(nodeManager, containerManager, scmContext, null);
-
     final DatanodeDetails datanode = randomDatanodeDetails();
     nodeManager.register(datanode, null, null);
-
     // Create a DELETED EC container
     ECReplicationConfig repConfig = new ECReplicationConfig(3, 2);
     final ContainerInfo ecContainer = getECContainer(
@@ -372,31 +317,57 @@ public class TestContainerStateManager {
         PipelineID.randomId(),
         repConfig);
     containerStateManager.addContainer(ecContainer.getProtobuf());
-
-    // Verify it's EC type
     assertEquals(HddsProtos.ReplicationType.EC, ecContainer.getReplicationType());
+    // Report CLOSED replica with BCSID = container's seqId
+    sendReportAndCaptureDeleteCommand(ecContainer, datanode,
+        ecContainer.getSequenceId(), false, 1, false);
+    // Container should transition to CLOSED
+    verifyContainerState(ecContainer.containerID(), HddsProtos.LifeCycleState.CLOSED);
+  }
 
-    // Report a CLOSED replica with BCSID = container's seqId
-    final StorageContainerDatanodeProtocolProtos.ContainerReportsProto containerReport = getContainerReportsProto(
-        ecContainer.containerID(),
-        ContainerReplicaProto.State.CLOSED,
-        datanode.getUuidString(),
-        ecContainer.getSequenceId(), // BCSID matches
-        false,   // not empty
-        1);      // replica index 1
-
+  private DeleteContainerCommand sendReportAndCaptureDeleteCommand(
+      ContainerInfo container, DatanodeDetails datanode,
+      long bcsId, boolean isEmpty, int replicaIndex, boolean reqCommandSend) {
+    final ContainerReportHandler reportHandler =
+        new ContainerReportHandler(nodeManager, containerManager, scmContext, null);
+    final StorageContainerDatanodeProtocolProtos.ContainerReportsProto containerReport =
+        getContainerReportsProto(container.containerID(),
+            ContainerReplicaProto.State.CLOSED,
+            datanode.getUuidString(),
+            bcsId,
+            isEmpty,
+            replicaIndex);
     final SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode reportFromDatanode =
         new SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode(datanode, containerReport);
     reportHandler.onMessage(reportFromDatanode, publisher);
+    // Capture the delete command
+    ArgumentCaptor<CommandForDatanode<?>> commandCaptor =
+        ArgumentCaptor.forClass(CommandForDatanode.class);
+    if (reqCommandSend) {
+      verify(publisher, times(1))
+          .fireEvent(eq(SCMEvents.DATANODE_COMMAND), commandCaptor.capture());
+      CommandForDatanode<?> capturedCommand = commandCaptor.getValue();
+      assertEquals(DeleteContainerCommand.class, capturedCommand.getCommand().getClass());
+      return (DeleteContainerCommand) capturedCommand.getCommand();
+    } else {
+      verify(publisher, times(0))
+          .fireEvent(eq(SCMEvents.DATANODE_COMMAND), commandCaptor.capture());
+      return null;
+    }
+  }
 
-    // Should NOT send any delete command
-    // Instead should transition to CLOSED
-    verify(publisher, times(0))
-        .fireEvent(eq(SCMEvents.DATANODE_COMMAND), any(CommandForDatanode.class));
+  private void verifyForceDeleteCommand(DeleteContainerCommand deleteCmd,
+      ContainerID expectedContainerId, boolean expectedForce, String message) {
+    assertEquals(expectedForce, deleteCmd.isForce(), message);
+    assertEquals(expectedContainerId.getId(), deleteCmd.getContainerID());
+  }
 
-    // Container should transition to CLOSED
-    assertEquals(HddsProtos.LifeCycleState.CLOSED,
-        containerManager.getContainer(ecContainer.containerID()).getState());
+  /**
+   * Verifies the container is in the expected state.
+   */
+  private void verifyContainerState(ContainerID containerId,
+      HddsProtos.LifeCycleState expectedState) throws IOException {
+    assertEquals(expectedState, containerManager.getContainer(containerId).getState());
   }
 
   @Test
