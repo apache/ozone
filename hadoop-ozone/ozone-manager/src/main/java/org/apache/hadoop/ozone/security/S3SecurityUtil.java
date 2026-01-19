@@ -23,6 +23,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.REVO
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
 
 import com.google.protobuf.ServiceException;
+import java.io.IOException;
 import java.time.Clock;
 import java.time.ZoneOffset;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -76,6 +77,13 @@ public final class S3SecurityUtil {
           if (isRevokedStsToken(token, ozoneManager)) {
             LOG.info("Session token has been revoked: {}, {}", stsTokenIdentifier.getTempAccessKeyId(), token);
             throw new OMException("STS token has been revoked", REVOKED_TOKEN);
+          }
+
+          // Ensure the principal that created the STS token (originalAccessKeyId) has not been revoked
+          if (isOriginalAccessKeyIdRevoked(stsTokenIdentifier, ozoneManager)) {
+            LOG.info("OriginalAccessKeyId for session token has been revoked: {}, {}",
+                stsTokenIdentifier.getOriginalAccessKeyId(), stsTokenIdentifier.getTempAccessKeyId());
+            throw new OMException("STS token no longer valid: OriginalAccessKeyId principal revoked", REVOKED_TOKEN);
           }
 
           // HMAC signature and expiration were validated above.  Now validate AWS signature.
@@ -162,6 +170,24 @@ public final class S3SecurityUtil {
       return revokedStsTokenTable.getIfExist(sessionToken) != null;
     } catch (Exception e) {
       final String msg = "Could not determine STS revocation because of Exception: " + e.getMessage();
+      LOG.warn(msg, e);
+      throw new OMException(msg, e, INTERNAL_ERROR);
+    }
+  }
+
+  /**
+   * Returns true if the originalAccessKeyId of the STS token has been revoked.
+   */
+  private static boolean isOriginalAccessKeyIdRevoked(STSTokenIdentifier stsTokenIdentifier, OzoneManager ozoneManager)
+      throws OMException {
+    // We already know originalAccessKeyId is not null from STSSecurityUtil.ensureEssentialFieldsArePresentInToken()
+    // method called from STSSecurityUtil.constructValidateAndDecryptSTSToken() method above
+    final String originalAccessKeyId = stsTokenIdentifier.getOriginalAccessKeyId();
+    try {
+      // If the secret for the original principal is missing, it means it was revoked
+      return !ozoneManager.getS3SecretManager().hasS3Secret(originalAccessKeyId);
+    } catch (IOException e) {
+      final String msg = "Could not determine if original principal is revoked: " + e.getMessage();
       LOG.warn(msg, e);
       throw new OMException(msg, e, INTERNAL_ERROR);
     }
