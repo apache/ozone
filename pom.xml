@@ -32,7 +32,7 @@
     <annotation-api.version>1.3.2</annotation-api.version>
     <aopalliance.version>1.0</aopalliance.version>
     <apache-rat-plugin.version>0.16.1</apache-rat-plugin.version>
-    <asm.version>9.7.1</asm.version>
+    <asm.version>9.9.1</asm.version>
     <aspectj-plugin.version>1.14.1</aspectj-plugin.version>
     <aspectj.java11.version>1.9.20</aspectj.java11.version>
     <aspectj.java21.version>1.9.24</aspectj.java21.version>
