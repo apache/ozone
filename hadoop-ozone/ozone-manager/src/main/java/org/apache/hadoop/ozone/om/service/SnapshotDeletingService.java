@@ -77,7 +77,6 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
   // from the same table and can send deletion requests for same snapshot
   // multiple times.
   private static final int SNAPSHOT_DELETING_CORE_POOL_SIZE = 1;
-  private static final int MIN_ERR_LIMIT_PER_TASK = 1000;
   private final ClientId clientId = ClientId.randomId();
 
   private final OzoneManager ozoneManager;
