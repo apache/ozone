@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -271,6 +272,11 @@ public class DataNodeMetricsService {
   private void updateFinalState(CollectionContext context) {
     // Update shared state atomically
     synchronized (this) {
+      // Sort by pendingBlockSize in descending order so highest values appear first
+      context.results.sort(
+          Comparator.comparingLong(DatanodePendingDeletionMetrics::getPendingBlockSize)
+              .reversed()
+      );
       pendingDeletionList = context.results;
       totalPendingDeletion = context.totalPending;
       totalNodesQueried = context.totalQueried;

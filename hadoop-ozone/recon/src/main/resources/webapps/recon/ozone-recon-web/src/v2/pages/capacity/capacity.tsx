@@ -38,7 +38,6 @@ import { useApiData } from '@/v2/hooks/useAPIData.hook';
 import * as CONSTANTS from '@/v2/constants/capacity.constants';
 import { UtilizationResponse, SCMPendingDeletion, OMPendingDeletion, DNPendingDeletion, DataNodeUsage } from '@/v2/types/capacity.types';
 import { useAutoReload } from '@/v2/hooks/useAutoReload.hook';
-import { AUTO_RELOAD_INTERVAL_DEFAULT } from '@/constants/autoReload.constants';
 
 type CapacityState = {
   isDNPending: boolean;
@@ -109,7 +108,6 @@ const Capacity: React.FC<object> = () => {
   }
 
   const autoReload = useAutoReload(loadDNData);
-  const lastIntervalRef = React.useRef<number>(AUTO_RELOAD_INTERVAL_DEFAULT);
 
   const selectedDNDetails: DataNodeUsage & { pendingBlockSize: number } = React.useMemo(() => {
     const selected = storageDistribution.data.dataNodeUsage.find(datanode => datanode.hostName === selectedDatanode)
@@ -133,21 +131,18 @@ const Capacity: React.FC<object> = () => {
     }
   }, [selectedDatanode, storageDistribution.data.dataNodeUsage, dnPendingDeletes.data.pendingDeletionPerDataNode]);
 
-  // Dynamically adjust polling interval based on DN pending status
+  // Poll every 5s until status is FINISHED, then stop
   React.useEffect(() => {
-    const pending = dnPendingDeletes.loading || dnPendingDeletes.data.status !== "FINISHED";
-    const targetInterval = pending ? PENDING_POLL_INTERVAL : AUTO_RELOAD_INTERVAL_DEFAULT;
-
-    if (!autoReload.isPolling) {
-      lastIntervalRef.current = targetInterval;
-      return;
+    if (dnPendingDeletes.data.status !== "FINISHED") {
+      if (!autoReload.isPolling) {
+        autoReload.startPolling(PENDING_POLL_INTERVAL);
+      }
+    } else {
+      if (autoReload.isPolling) {
+        autoReload.stopPolling();
+      }
     }
-
-    if (lastIntervalRef.current !== targetInterval) {
-      lastIntervalRef.current = targetInterval;
-      autoReload.startPolling(targetInterval);
-    }
-  }, [dnPendingDeletes.loading, dnPendingDeletes.data.status, autoReload.isPolling, autoReload.startPolling]);
+  }, [dnPendingDeletes.data.status, autoReload.isPolling, autoReload.startPolling, autoReload.stopPolling]);
 
   const dnReportStatus = (
     (dnPendingDeletes.data.totalNodeQueriesFailed ?? 0) > 0
@@ -325,7 +320,12 @@ const Capacity: React.FC<object> = () => {
             showDropdown={true}
             handleSelect={setSelectedDatanode}
             dropdownItems={storageDistribution.data.dataNodeUsage.map(datanode => ({
-              label: datanode.hostName,
+              label: (
+                <>
+                  <span>{datanode.hostName}</span>
+                  <span className="dn-select-option-uuid">{datanode.datanodeUuid}</span>
+                </>
+              ),
               value: datanode.hostName
             }))}
             disabledOpts={

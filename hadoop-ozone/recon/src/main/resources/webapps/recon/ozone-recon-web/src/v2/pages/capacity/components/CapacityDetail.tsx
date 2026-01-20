@@ -113,49 +113,53 @@ const CapacityDetail: React.FC<CapacityDetailProps> = (
   })) ?? [];
 
   return (
-    <Card title={title} size='small' headStyle={cardHeadStyle} loading={loading} extra={extra}>
-      { showDropdown && options.length > 0 &&
-        <div className='node-select-container'>
-          <strong>Node Selector:</strong>
-          <Select
-            showSearch
-            defaultValue={options?.[0]?.value}
-            options={options}
-            onChange={handleSelect}
-            style={{ marginBottom: '16px' }}
-          />
-        </div>
-      }
-      <div className='cluster-card-data-container vertical-layout'>
-        {dataDetails.map((data, idx) => {
-          const size = filesize(data.size, { round: 1 }).split(' ');
-          return (
-            <div key={`data-detail-${data.title}-${idx}`} className='data-detail-item'>
-              <Statistic
-                title={data.title}
-                value={size[0]}
-                suffix={size[1]}
-                valueStyle={statisticValueStyle}
-                className='data-detail-statistic'
-                loading={data.loading}
-              />
-              {!data.loading && <Row className='data-detail-breakdown-container'>
-                {data.breakdown.map((item, idx) => (
-                  <div key={`data-defailt-breakdown-${item.label}-${idx}`} className='data-detail-breakdown-item'>
-                    <GraphLegendIcon color={item.color} height={12} />
-                    <span className="data-detail-breakdown-label">{item.label}</span>
-                    <span className="data-detail-breakdown-value">{filesize(item.value, {round: 1})}</span>
+    <Card title={title} size='small' headStyle={cardHeadStyle} extra={extra}>
+      <Spin spinning={loading}>
+          <>
+            { showDropdown && options.length > 0 &&
+              <div className='node-select-container'>
+                <strong>Node Selector:</strong>
+                <Select
+                  showSearch
+                  defaultValue={options?.[0]?.value}
+                  options={options}
+                  onChange={handleSelect}
+                  style={{ marginBottom: '16px' }}
+                />
+              </div>
+            }
+            <div className='cluster-card-data-container vertical-layout'>
+              {dataDetails.map((data, idx) => {
+                const size = filesize(data.size, { round: 1 }).split(' ');
+                return (
+                  <div key={`data-detail-${data.title}-${idx}`} className='data-detail-item'>
+                    <Statistic
+                      title={data.title}
+                      value={size[0]}
+                      suffix={size[1]}
+                      valueStyle={statisticValueStyle}
+                      className='data-detail-statistic'
+                      loading={data.loading}
+                    />
+                    {!data.loading && <Row className='data-detail-breakdown-container'>
+                      {data.breakdown.map((item, idx) => (
+                        <div key={`data-defailt-breakdown-${item.label}-${idx}`} className='data-detail-breakdown-item'>
+                          <GraphLegendIcon color={item.color} height={12} />
+                          <span className="data-detail-breakdown-label">{item.label}</span>
+                          <span className="data-detail-breakdown-value">{filesize(item.value, {round: 1})}</span>
+                        </div>
+                      ))}
+                      <EChart
+                        option={getEchartOptions(data.title, data)}
+                        style={{ height: '40px', width: '100%', margin: '10px 0px' }} />
+                      {idx < dataDetails.length - 1 && <Divider />}
+                    </Row>}
                   </div>
-                ))}
-                <EChart
-                  option={getEchartOptions(data.title, data)}
-                  style={{ height: '40px', width: '100%', margin: '10px 0px' }} />
-                {idx < dataDetails.length - 1 && <Divider />}
-              </Row>}
+                )
+              })}
             </div>
-          )
-        })}
-      </div>
+          </>
+        </Spin>
     </Card>
   );
 }

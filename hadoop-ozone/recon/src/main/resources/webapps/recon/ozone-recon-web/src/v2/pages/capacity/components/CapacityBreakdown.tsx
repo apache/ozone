@@ -19,6 +19,7 @@
 import { GraphLegendIcon } from '@/utils/themeIcons';
 import StackedProgress from '@/v2/pages/capacity/components/StackedProgress';
 import { cardHeadStyle, statisticValueStyle } from '@/v2/pages/capacity/constants/styles.constants';
+import { Segment } from '@/v2/types/capacity.types';
 import { Card, Statistic } from 'antd';
 import filesize from 'filesize';
 import React from 'react';
@@ -51,7 +52,7 @@ const CapacityBreakdown: React.FC<ClusterCardProps> = ({ title, items, loading }
       <div className='cluster-card-data-container'>
         {items.map((item, idx) => {
           // Split the size into the value and the unit
-          const size = filesize(item.value, { round: 1 }).split(' ');
+          const size = filesize((item.value > 0 ? item.value : 0), { round: 1 }).split(' ');
           return (
             <Statistic
               key={`cluster-statistic-${item.title}-${idx}`}
