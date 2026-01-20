@@ -170,7 +170,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
               .map(PurgedKey::getBlockGroup).collect(Collectors.toList()));
     }
 
-    if (keyBlocksList.size() != blockDeletionResults.size()) {
+    if (keyBlocksList.size() != nonEmptyKeyBlocksList.size()) {
       // Add successful results for empty files (no need to send to SCM)
       Map<String, PurgedKey> emptyKeyBlocksList = keyBlocksList.entrySet().stream()
           .filter(entry -> !nonEmptyKeyBlocksList.containsKey(entry.getKey()))
