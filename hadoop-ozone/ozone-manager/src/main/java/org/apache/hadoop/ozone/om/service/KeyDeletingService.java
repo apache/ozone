@@ -169,17 +169,19 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
           scmClient.deleteKeyBlocks(nonEmptyKeyBlocksList.values().stream()
               .map(PurgedKey::getBlockGroup).collect(Collectors.toList()));
     }
-    
-    // Add successful results for empty files (no need to send to SCM)
-    Map<String, PurgedKey> emptyKeyBlocksList = keyBlocksList.entrySet().stream()
-        .filter(entry -> !nonEmptyKeyBlocksList.containsKey(entry.getKey()))
-        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-    
-    for (PurgedKey emptyKey : emptyKeyBlocksList.values()) {
-      // Create a successful result for empty files
-      DeleteBlockGroupResult emptyFileResult = new DeleteBlockGroupResult(
-          emptyKey.getBlockGroup().getGroupID(), new ArrayList<>());
-      blockDeletionResults.add(emptyFileResult);
+
+    if (keyBlocksList.size() != blockDeletionResults.size()) {
+      // Add successful results for empty files (no need to send to SCM)
+      Map<String, PurgedKey> emptyKeyBlocksList = keyBlocksList.entrySet().stream()
+          .filter(entry -> !nonEmptyKeyBlocksList.containsKey(entry.getKey()))
+          .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+      for (PurgedKey emptyKey : emptyKeyBlocksList.values()) {
+        // Create a successful result for empty files
+        DeleteBlockGroupResult emptyFileResult = new DeleteBlockGroupResult(
+            emptyKey.getBlockGroup().getGroupID(), new ArrayList<>());
+        blockDeletionResults.add(emptyFileResult);
+      }
     }
 
     LOG.info("{} BlockGroup deletion are acked by SCM in {} ms",

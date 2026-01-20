@@ -40,6 +40,7 @@ import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -269,6 +270,34 @@ class TestKeyDeletingService extends OzoneTestBase {
       testService.processKeyDeletes(blockGroups, new HashMap<>(), new ArrayList<>(), null, null);
       // Verify that SCM's deleteKeyBlocks was never called (empty keys are filtered out)
       verify(scmClientSpy, never()).deleteKeyBlocks(any());
+      // Cleanup
+      testService.shutdown();
+    }
+
+    @Test
+    void checkIfDeleteServiceIsDeletingMixedSizedKeys()
+        throws IOException, TimeoutException, InterruptedException {
+      // Spy on the SCM client to verify it's not called for empty keys
+      ScmBlockLocationTestingClient scmClientSpy = Mockito.spy(scmBlockTestingClient);
+      // Create a KeyDeletingService with the spied client
+      KeyDeletingService testService = new KeyDeletingService(
+          om, scmClientSpy, 100, 10000, conf, 10, false);
+      // Create a BlockGroup with empty deleted blocks list (zero-sized key)
+      BlockGroup blockGroup1 = BlockGroup.newBuilder().setKeyName("key1/1")
+          .addAllDeletedBlocks(new ArrayList<>()).build();
+      //Create a BlockGroup with non-empty deleted blocks
+      List<DeletedBlock> deletedBlocks = Collections.singletonList(new DeletedBlock(new BlockID(1, 1), 1, 3));
+      BlockGroup blockGroup2 = BlockGroup.newBuilder().setKeyName("key2/2")
+          .addAllDeletedBlocks(deletedBlocks).build();
+      Map<String, PurgedKey> blockGroups = new HashMap<>();
+
+      blockGroups.put(blockGroup1.getGroupID(), new PurgedKey("vol", "buck", 1, blockGroup1, "key1", 0, true));
+      blockGroups.put(blockGroup2.getGroupID(), new PurgedKey("vol", "buck", 1, blockGroup2, "key2", 0, true));
+
+      // Process the key deletion
+      testService.processKeyDeletes(blockGroups, new HashMap<>(), new ArrayList<>(), null, null);
+      // Verify that SCM's deleteKeyBlocks was never called (empty keys are filtered out)
+      verify(scmClientSpy, times(1)).deleteKeyBlocks(any());
       // Cleanup
       testService.shutdown();
     }
