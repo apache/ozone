@@ -170,10 +170,10 @@ public class DatanodeUsageInfo {
     this.reserved = reserved; 
   }
 
-  public void setFilesystemUsage(long fsCapacity, long fsAvailable) {
+  public void setFilesystemUsage(long capacity, long available) {
     this.fsUsagePresent = true;
-    this.fsCapacity = fsCapacity;
-    this.fsAvailable = fsAvailable;
+    this.fsCapacity = capacity;
+    this.fsAvailable = available;
   }
 
   /**

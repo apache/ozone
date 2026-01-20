@@ -1803,6 +1803,9 @@ public class SCMNodeManager implements NodeManager {
     return hasFsReport ? new FsUsageTotals(capacity, available, capacity - available) : null;
   }
 
+  /**
+   * Simple class for grouping disk space related values.
+   */
   public static final class FsUsageTotals {
     private final long capacity;
     private final long available;
