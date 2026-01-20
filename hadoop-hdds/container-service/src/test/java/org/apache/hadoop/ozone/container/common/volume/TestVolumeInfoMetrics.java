@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.common.volume;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -47,7 +48,7 @@ class TestVolumeInfoMetrics {
     when(volume.getVolumeUsage()).thenReturn(volumeUsage);
 
     // Ozone-usable usage and reserved
-    when(volumeUsage.getCurrentUsage()).thenReturn(new SpaceUsageSource.Fixed(
+    when(volumeUsage.getCurrentUsage(any())).thenReturn(new SpaceUsageSource.Fixed(
         1000L,
         900L,
         100L
@@ -55,8 +56,7 @@ class TestVolumeInfoMetrics {
     when(volumeUsage.getReservedInBytes()).thenReturn(50L);
 
     // Raw filesystem stats
-    when(volumeUsage.getFsCapacity()).thenReturn(2000L);
-    when(volumeUsage.getFsAvailable()).thenReturn(1500L);
+    when(volumeUsage.realUsage()).thenReturn(new SpaceUsageSource.Fixed(2000L, 1500L, 500L));
 
     VolumeInfoMetrics metrics = new VolumeInfoMetrics("test-vol-1", volume);
     try {

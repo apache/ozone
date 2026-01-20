@@ -191,20 +191,18 @@ public class VolumeInfoMetrics implements MetricsSource {
     registry.snapshot(builder, all);
     VolumeUsage volumeUsage = volume.getVolumeUsage();
     if (volumeUsage != null) {
-      SpaceUsageSource usage = volumeUsage.getCurrentUsage();
+      SpaceUsageSource.Fixed fsUsage = volumeUsage.realUsage();
+      SpaceUsageSource usage = volumeUsage.getCurrentUsage(fsUsage);
       long reserved = volumeUsage.getReservedInBytes();
-      long fsCapacity = volumeUsage.getFsCapacity();
-      long fsAvailable = volumeUsage.getFsAvailable();
-      long fsUsed = fsCapacity - fsAvailable;
       builder
           .addGauge(CAPACITY, usage.getCapacity())
           .addGauge(AVAILABLE, usage.getAvailable())
           .addGauge(USED, usage.getUsedSpace())
           .addGauge(RESERVED, reserved)
           .addGauge(TOTAL_CAPACITY, usage.getCapacity() + reserved)
-          .addGauge(FS_CAPACITY, fsCapacity)
-          .addGauge(FS_AVAILABLE, fsAvailable)
-          .addGauge(FS_USED, fsUsed);
+          .addGauge(FS_CAPACITY, fsUsage.getCapacity())
+          .addGauge(FS_AVAILABLE, fsUsage.getAvailable())
+          .addGauge(FS_USED, fsUsage.getUsedSpace());
     }
   }
 }
