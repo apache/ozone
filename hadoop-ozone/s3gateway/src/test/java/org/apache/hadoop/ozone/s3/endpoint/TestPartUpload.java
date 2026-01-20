@@ -164,7 +164,7 @@ public class TestPartUpload {
     try (MockedStatic<IOUtils> ioutils = mockStatic(IOUtils.class);
         MockedStatic<ObjectEndpointStreaming> streaming = mockStatic(ObjectEndpointStreaming.class)) {
       // Add the mocked methods only during part upload
-      when(rest.getMessageDigestInstance()).thenReturn(messageDigest);
+      when(rest.getMD5DigestInstance()).thenReturn(messageDigest);
       when(rest.getSha256DigestInstance()).thenReturn(sha256Digest);
       if (enableDataStream) {
         streaming.when(() -> ObjectEndpointStreaming.createMultipartKey(any(), any(), anyLong(), anyInt(), any(),

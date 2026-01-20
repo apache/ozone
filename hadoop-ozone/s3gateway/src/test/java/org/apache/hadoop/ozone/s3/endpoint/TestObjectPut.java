@@ -253,7 +253,7 @@ class TestObjectPut {
       mocked.when(() -> IOUtils.copyLarge(any(InputStream.class), any(OutputStream.class), anyLong(),
               anyLong(), any(byte[].class)))
           .thenThrow(IOException.class);
-      when(objectEndpoint.getMessageDigestInstance()).thenReturn(messageDigest);
+      when(objectEndpoint.getMD5DigestInstance()).thenReturn(messageDigest);
 
       assertThrows(IOException.class, () -> putObject(CONTENT).close());
 
@@ -371,7 +371,7 @@ class TestObjectPut {
     MessageDigest messageDigest = mock(MessageDigest.class);
     try (MockedStatic<IOUtils> mocked = mockStatic(IOUtils.class)) {
       // Add the mocked methods only during the copy request
-      when(objectEndpoint.getMessageDigestInstance()).thenReturn(messageDigest);
+      when(objectEndpoint.getMD5DigestInstance()).thenReturn(messageDigest);
       mocked.when(() -> IOUtils.copyLarge(any(InputStream.class), any(OutputStream.class), anyLong(),
               anyLong(), any(byte[].class)))
           .thenThrow(IOException.class);

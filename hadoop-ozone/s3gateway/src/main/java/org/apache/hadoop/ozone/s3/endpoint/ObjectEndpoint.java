@@ -247,13 +247,13 @@ public class ObjectEndpoint extends EndpointBase {
       Map<String, String> tags = getTaggingFromHeaders(getHeaders());
 
       long putLength;
-      final String eTag;
+      final String md5Hash;
       if (isDatastreamEnabled() && !enableEC && length > getDatastreamMinLength()) {
         perf.appendStreamMode();
         Pair<String, Long> keyWriteResult = ObjectEndpointStreaming
             .put(bucket, keyPath, length, replicationConfig, getChunkSize(),
                 customMetadata, tags, multiDigestInputStream, getHeaders(), signatureInfo.isSignPayload(), perf);
-        eTag = keyWriteResult.getKey();
+        md5Hash = keyWriteResult.getKey();
         putLength = keyWriteResult.getValue();
       } else {
         final String amzContentSha256Header =
@@ -266,17 +266,17 @@ public class ObjectEndpoint extends EndpointBase {
           perf.appendMetaLatencyNanos(metadataLatencyNs);
           putLength = IOUtils.copyLarge(multiDigestInputStream, output, 0, length,
               new byte[getIOBufferSize(length)]);
-          eTag = DatatypeConverter.printHexBinary(
+          md5Hash = DatatypeConverter.printHexBinary(
                   multiDigestInputStream.getMessageDigest(OzoneConsts.MD5_HASH).digest())
               .toLowerCase();
-          output.getMetadata().put(OzoneConsts.ETAG, eTag);
+          output.getMetadata().put(OzoneConsts.ETAG, md5Hash);
 
           List<CheckedRunnable<IOException>> preCommits = new ArrayList<>();
 
           String clientContentMD5 = getHeaders().getHeaderString(S3Consts.CHECKSUM_HEADER);
           if (clientContentMD5 != null) {
             CheckedRunnable<IOException> checkContentMD5Hook = () -> {
-              S3Utils.validateContentMD5(clientContentMD5, eTag, keyPath);
+              S3Utils.validateContentMD5(clientContentMD5, md5Hash, keyPath);
             };
             preCommits.add(checkContentMD5Hook);
           }
@@ -299,7 +299,7 @@ public class ObjectEndpoint extends EndpointBase {
       getMetrics().incPutKeySuccessLength(putLength);
       perf.appendSizeBytes(putLength);
       return Response.ok()
-          .header(HttpHeaders.ETAG, wrapInQuotes(eTag))
+          .header(HttpHeaders.ETAG, wrapInQuotes(md5Hash))
           .status(HttpStatus.SC_OK)
           .build();
     } catch (OMException ex) {
@@ -472,10 +472,10 @@ public class ObjectEndpoint extends EndpointBase {
       responseBuilder
           .header(ACCEPT_RANGE_HEADER, RANGE_HEADER_SUPPORTED_UNIT);
 
-      String eTag = keyDetails.getMetadata().get(OzoneConsts.ETAG);
-      if (eTag != null) {
-        responseBuilder.header(HttpHeaders.ETAG, wrapInQuotes(eTag));
-        String partsCount = extractPartsCount(eTag);
+      String md5Hash = keyDetails.getMetadata().get(OzoneConsts.ETAG);
+      if (md5Hash != null) {
+        responseBuilder.header(HttpHeaders.ETAG, wrapInQuotes(md5Hash));
+        String partsCount = extractPartsCount(md5Hash);
         if (partsCount != null) {
           responseBuilder.header(MP_PARTS_COUNT, partsCount);
         }
@@ -997,15 +997,15 @@ public class ObjectEndpoint extends EndpointBase {
           putLength = IOUtils.copyLarge(multiDigestInputStream, ozoneOutputStream, 0, length,
               new byte[getIOBufferSize(length)]);
           byte[] digest = multiDigestInputStream.getMessageDigest(OzoneConsts.MD5_HASH).digest();
-          String eTag = DatatypeConverter.printHexBinary(digest).toLowerCase();
+          String md5Hash = DatatypeConverter.printHexBinary(digest).toLowerCase();
           String clientContentMD5 = getHeaders().getHeaderString(S3Consts.CHECKSUM_HEADER);
           if (clientContentMD5 != null) {
             CheckedRunnable<IOException> checkContentMD5Hook = () -> {
-              S3Utils.validateContentMD5(clientContentMD5, eTag, key);
+              S3Utils.validateContentMD5(clientContentMD5, md5Hash, key);
             };
             ozoneOutputStream.getKeyOutputStream().setPreCommits(Collections.singletonList(checkContentMD5Hook));
           }
-          ozoneOutputStream.getMetadata().put(OzoneConsts.ETAG, eTag);
+          ozoneOutputStream.getMetadata().put(OzoneConsts.ETAG, md5Hash);
           outputStream = ozoneOutputStream;
         }
         getMetrics().incPutKeySuccessLength(putLength);
@@ -1148,8 +1148,8 @@ public class ObjectEndpoint extends EndpointBase {
             getMetrics().updateCopyKeyMetadataStats(startNanos);
         perf.appendMetaLatencyNanos(metadataLatencyNs);
         copyLength = IOUtils.copyLarge(src, dest, 0, srcKeyLen, new byte[getIOBufferSize(srcKeyLen)]);
-        String eTag = DatatypeConverter.printHexBinary(src.getMessageDigest().digest()).toLowerCase();
-        dest.getMetadata().put(OzoneConsts.ETAG, eTag);
+        String md5Hash = DatatypeConverter.printHexBinary(src.getMessageDigest().digest()).toLowerCase();
+        dest.getMetadata().put(OzoneConsts.ETAG, md5Hash);
       }
     }
     getMetrics().incCopyObjectSuccessLength(copyLength);
@@ -1243,7 +1243,7 @@ public class ObjectEndpoint extends EndpointBase {
       try (OzoneInputStream src = getClientProtocol().getKey(volume.getName(),
           sourceBucket, sourceKey)) {
         getMetrics().updateCopyKeyMetadataStats(startNanos);
-        sourceDigestInputStream = new DigestInputStream(src, getMessageDigestInstance());
+        sourceDigestInputStream = new DigestInputStream(src, getMD5DigestInstance());
         copy(volume, sourceDigestInputStream, sourceKeyLen, destkey, destBucket, replicationConfig,
                 customMetadata, perf, startNanos, tags);
       }

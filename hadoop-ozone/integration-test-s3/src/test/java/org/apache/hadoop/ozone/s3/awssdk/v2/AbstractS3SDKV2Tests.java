@@ -236,6 +236,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     assertEquals("\"37b51d194a7513e45b56f6524f2d51f2\"", getObjectResponse.eTag());
   }
 
+  @Test
   public void testPutObjectEmpty() throws Exception {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();

@@ -118,21 +118,21 @@ final class ObjectEndpointStreaming {
     long startNanos = Time.monotonicNowNanos();
     final String amzContentSha256Header = validateSignatureHeader(headers, keyPath, isSignedPayload);
     long writeLen;
-    String eTag;
+    String md5Hash;
     try (OzoneDataStreamOutput streamOutput = bucket.createStreamKey(keyPath,
         length, replicationConfig, keyMetadata, tags)) {
       long metadataLatencyNs = METRICS.updatePutKeyMetadataStats(startNanos);
       writeLen = writeToStreamOutput(streamOutput, body, bufferSize, length);
-      eTag = DatatypeConverter.printHexBinary(body.getMessageDigest(OzoneConsts.MD5_HASH).digest())
+      md5Hash = DatatypeConverter.printHexBinary(body.getMessageDigest(OzoneConsts.MD5_HASH).digest())
           .toLowerCase();
       perf.appendMetaLatencyNanos(metadataLatencyNs);
-      ((KeyMetadataAware)streamOutput).getMetadata().put(OzoneConsts.ETAG, eTag);
+      ((KeyMetadataAware)streamOutput).getMetadata().put(OzoneConsts.ETAG, md5Hash);
 
       List<CheckedRunnable<IOException>> preCommits = new ArrayList<>();
       String clientContentMD5 = headers.getHeaderString(S3Consts.CHECKSUM_HEADER);
       if (clientContentMD5 != null) {
         CheckedRunnable<IOException> checkContentMD5Hook = () -> {
-          S3Utils.validateContentMD5(clientContentMD5, eTag, keyPath);
+          S3Utils.validateContentMD5(clientContentMD5, md5Hash, keyPath);
         };
         preCommits.add(checkContentMD5Hook);
       }
@@ -152,7 +152,7 @@ final class ObjectEndpointStreaming {
 
       streamOutput.getKeyDataStreamOutput().setPreCommits(preCommits);
     }
-    return Pair.of(eTag, writeLen);
+    return Pair.of(md5Hash, writeLen);
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
