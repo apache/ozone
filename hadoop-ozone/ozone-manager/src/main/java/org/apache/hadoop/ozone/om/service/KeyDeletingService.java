@@ -156,7 +156,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         logSize = nonEmptyKeyBlocksList.size();
       }
       LOG.info("Send {} key(s) to SCM, first {} keys: {}",
-          keyBlocksList.size(), logSize, keyBlocksList.entrySet().stream().limit(logSize)
+          nonEmptyKeyBlocksList.size(), logSize, nonEmptyKeyBlocksList.entrySet().stream().limit(logSize)
               .map(Map.Entry::getValue).collect(Collectors.toSet()));
     }
     List<DeleteBlockGroupResult> blockDeletionResults;
