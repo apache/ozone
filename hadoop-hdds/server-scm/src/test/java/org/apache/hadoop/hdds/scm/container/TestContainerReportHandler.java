@@ -205,7 +205,8 @@ public class TestContainerReportHandler {
           }
           if (replicationType == HddsProtos.ReplicationType.RATIS &&
               replicaState.equals(ContainerReplicaProto.State.CLOSED) &&
-              containerState.equals(HddsProtos.LifeCycleState.DELETED)) {
+              (containerState.equals(HddsProtos.LifeCycleState.DELETED) ||
+              containerState.equals(HddsProtos.LifeCycleState.DELETING))) {
             continue;
           }
           for (ContainerReplicaProto.State invalidState : invalidReplicaStates) {

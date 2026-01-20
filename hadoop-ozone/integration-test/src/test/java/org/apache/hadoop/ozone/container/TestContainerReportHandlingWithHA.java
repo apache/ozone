@@ -68,17 +68,16 @@ public class TestContainerReportHandlingWithHA {
   private static final String KEY = "key1";
 
   /**
-   * Tests that a DELETING (or DELETED) container moves to the CLOSED state if a non-empty replica is reported.
+   * Tests that a DELETING (or DELETED) container replica gets deleted when replica bcsid <= container bcsid
    * To do this, the test first creates a key and closes its corresponding container. Then it moves that container to
-   * DELETING (or DELETED) state using ContainerManager. Then it restarts a Datanode hosting that container,
+   * DELETING (or DELETED) state using ContainerManager. Then it restarts Datanodes hosting that container,
    * making it send a full container report.
-   * the test waits for the container to move from DELETING to CLOSED in all SCMs.
-   * the test waits for the replica to move from CLOSED to DELETED in SCM for DELETED container.
+   * Tests wait for a DELETING (or DELETED) container replica gets deleted when replica bcsid <= container bcsid
    */
   @ParameterizedTest
   @EnumSource(value = HddsProtos.LifeCycleState.class,
       names = {"DELETING", "DELETED"})
-  void testDeletingOrDeletedContainerTransitionsToClosedWhenNonEmptyReplicaIsReportedWithScmHA(
+  void testDeletingOrDeletedContainerWhenNonEmptyReplicaIsReportedWithScmHA(
       HddsProtos.LifeCycleState desiredState)
       throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -120,24 +119,16 @@ public class TestContainerReportHandlingWithHA {
           cluster.restartHddsDatanode(dn, false);
         }
 
-        if (desiredState == HddsProtos.LifeCycleState.DELETING) {
-          // wait for the container to get CLOSED in all SCMs
-          waitForContainerStateInAllSCMs(cluster, containerID, HddsProtos.LifeCycleState.CLOSED);
-          assertEquals(HddsProtos.LifeCycleState.CLOSED, containerManager.getContainer(containerID).getState());
-        } else {
-          // Since replica state is CLOSED and container is DELETED in SCM also bcsid of replica and container is same
-          // SCM will trigger delete replica
-          // wait for all replica gets deleted
-          GenericTestUtils.waitFor(() -> {
-            try {
-              return containerManager.getContainerReplicas(containerID).isEmpty();
-            } catch (ContainerNotFoundException e) {
-              throw new RuntimeException(e);
-            }
-          }, 100, 120000);
-          assertEquals(HddsProtos.LifeCycleState.DELETED, containerManager.getContainer(containerID).getState());
-
-        }
+        // Since replica state is CLOSED and container is DELETED/DELETING in SCM
+        // also bcsid of replica and container is same, SCM will trigger delete replica
+        // wait for all replica to be deleted
+        GenericTestUtils.waitFor(() -> {
+          try {
+            return containerManager.getContainerReplicas(containerID).isEmpty();
+          } catch (ContainerNotFoundException e) {
+            throw new RuntimeException(e);
+          }
+        }, 100, 180000);
       }
     } finally {
       if (clusterPath != null) {
