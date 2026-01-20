@@ -203,6 +203,7 @@ jobs:
     needs:
       - build-info
       - build
+    if: needs.build-info.outputs.needs-compile == 'true'
     uses: ./.github/workflows/check.yml
     secrets: inherit
     with:
