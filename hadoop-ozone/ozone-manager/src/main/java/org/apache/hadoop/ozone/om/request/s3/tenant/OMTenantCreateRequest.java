@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
@@ -114,7 +115,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
 
     final OMRequest omRequest = super.preExecute(ozoneManager);
     final CreateTenantRequest request = omRequest.getCreateTenantRequest();
-    Preconditions.checkNotNull(request);
+    Objects.requireNonNull(request, "request == null");
     final String tenantId = request.getTenantId();
 
     // Check tenantId validity
@@ -140,6 +141,22 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
 
     final String dbVolumeKey = ozoneManager.getMetadataManager()
         .getVolumeKey(volumeName);
+
+    // ACL check during preExecute (align with other create requests)
+    if (ozoneManager.getAclsEnabled()) {
+      try {
+        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
+            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE,
+            volumeName, null, null);
+      } catch (IOException ex) {
+        // Ensure audit log captures preExecute failures
+        markForAudit(ozoneManager.getAuditLogger(),
+            buildAuditMessage(OMAction.CREATE_TENANT,
+                buildVolumeAuditMap(volumeName), ex,
+                omRequest.getUserInfo()));
+        throw ex;
+      }
+    }
 
     // Backwards compatibility with older Ozone clients that don't have this
     // field. Defaults to false.
@@ -218,7 +235,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     OMClientResponse omClientResponse = null;
     final OMResponse.Builder omResponse =
         OmResponseUtil.getOMResponseBuilder(getOmRequest());
-    OmVolumeArgs omVolumeArgs = null;
+    OmVolumeArgs omVolumeArgs;
     boolean acquiredVolumeLock = false;
     boolean acquiredUserLock = false;
     final String owner = getOmRequest().getUserInfo().getUserName();
@@ -235,7 +252,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     final VolumeInfo volumeInfo =
         getOmRequest().getCreateVolumeRequest().getVolumeInfo();
     final String volumeName = volumeInfo.getVolume();
-    Preconditions.checkNotNull(volumeName);
+    Objects.requireNonNull(volumeName, "volumeName == null");
     Preconditions.checkState(request.getVolumeName().equals(volumeName),
         "CreateTenantRequest's volumeName value should match VolumeInfo's");
     final String dbVolumeKey = omMetadataManager.getVolumeKey(volumeName);
@@ -243,13 +260,6 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     Exception exception = null;
 
     try {
-      // Check ACL: requires volume CREATE permission.
-      if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE,
-            tenantId, null, null);
-      }
-
       mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volumeName));
       acquiredVolumeLock = getOmLockDetails().isLockAcquired();
@@ -272,16 +282,17 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
           USER_LOCK, owner));
       acquiredUserLock = getOmLockDetails().isLockAcquired();
 
+      OmVolumeArgs.Builder volumeBuilder;
       PersistedUserVolumeInfo volumeList = null;
       if (!skipVolumeCreation) {
         // Create volume. TODO: dedup OMVolumeCreateRequest
-        omVolumeArgs = OmVolumeArgs.builderFromProtobuf(volumeInfo)
+        volumeBuilder = OmVolumeArgs.builderFromProtobuf(volumeInfo)
             .setQuotaInBytes(OzoneConsts.QUOTA_RESET)
             .setQuotaInNamespace(OzoneConsts.QUOTA_RESET)
             .setObjectID(ozoneManager.getObjectIdFromTxId(transactionLogIndex))
             .setUpdateID(transactionLogIndex)
-            .incRefCount()
-            .build();
+            .incRefCount();
+        omVolumeArgs = volumeBuilder.build();
 
         // Remove this check when vol ref count is also used by other features
         Preconditions.checkState(omVolumeArgs.getRefCount() == 1L,
@@ -297,10 +308,10 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       } else {
         LOG.info("Skipped volume '{}' creation. "
             + "Will only increment volume refCount", volumeName);
-        omVolumeArgs = getVolumeInfo(omMetadataManager, volumeName)
+        volumeBuilder = getVolumeInfo(omMetadataManager, volumeName)
             .toBuilder()
-            .incRefCount()
-            .build();
+            .incRefCount();
+        omVolumeArgs = volumeBuilder.build();
 
         // Remove this check when vol ref count is also used by other features
         Preconditions.checkState(omVolumeArgs.getRefCount() == 1L,
@@ -312,7 +323,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
       }
 
       // Audit
-      auditMap = omVolumeArgs.toAuditMap();
+      auditMap = volumeBuilder.toAuditMap();
 
       // Check tenant existence in tenantStateTable
       if (omMetadataManager.getTenantStateTable().isExist(tenantId)) {

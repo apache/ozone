@@ -21,6 +21,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.Path;
 import java.time.Clock;
 import java.util.Collection;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -29,8 +30,8 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
-import org.apache.hadoop.hdds.scm.container.common.helpers.RandomAccessBlockFile;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
 import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
@@ -266,9 +267,21 @@ public abstract class Handler {
     this.clusterId = clusterID;
   }
 
+  /**
+   * Copy container to the destination path.
+   */
+  public abstract void copyContainer(
+      Container container, Path destination)
+      throws IOException;
+
+  /**
+   * Imports container from a container which is under the temp directory.
+   */
+  public abstract Container importContainer(ContainerData targetTempContainerData) throws IOException;
+
   public abstract ContainerCommandResponseProto readBlock(
       ContainerCommandRequestProto msg, Container container,
-      RandomAccessBlockFile blockFile,
+      RandomAccessFileChannel blockFile,
       StreamObserver<ContainerCommandResponseProto> streamObserver);
 
 }

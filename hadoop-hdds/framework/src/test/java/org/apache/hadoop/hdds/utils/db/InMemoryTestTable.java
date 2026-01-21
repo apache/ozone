@@ -91,17 +91,12 @@ public class InMemoryTestTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
-  public void deleteRangeWithBatch(BatchOperation batch, KEY beginKey, KEY endKey) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public void deleteRange(KEY beginKey, KEY endKey) {
-    throw new UnsupportedOperationException();
+    map.subMap(beginKey, endKey).clear();
   }
 
   @Override
-  public KeyValueIterator<KEY, VALUE> iterator(KEY prefix, KeyValueIterator.Type type) {
+  public KeyValueIterator<KEY, VALUE> iterator(KEY prefix, IteratorType type) {
     throw new UnsupportedOperationException();
   }
 
@@ -136,7 +131,7 @@ public class InMemoryTestTable<KEY, VALUE> implements Table<KEY, VALUE> {
     throw new UnsupportedOperationException();
   }
 
-  NavigableMap<KEY, VALUE> getMap() {
+  public NavigableMap<KEY, VALUE> getMap() {
     return map;
   }
 }

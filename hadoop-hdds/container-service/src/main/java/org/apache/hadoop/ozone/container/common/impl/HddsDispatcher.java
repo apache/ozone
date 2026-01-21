@@ -29,6 +29,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
@@ -49,13 +50,13 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerAction;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerNotOpenException;
 import org.apache.hadoop.hdds.scm.container.common.helpers.InvalidContainerStateException;
-import org.apache.hadoop.hdds.scm.container.common.helpers.RandomAccessBlockFile;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.security.token.NoopTokenVerifier;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
+import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -77,7 +78,6 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError;
 import org.apache.hadoop.ozone.container.ozoneimpl.DataScanResult;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
-import org.apache.ratis.thirdparty.com.google.protobuf.ProtocolMessageEnum;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.slf4j.Logger;
@@ -109,9 +109,9 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   private final ContainerSet containerSet;
   private final StateContext context;
   private final float containerCloseThreshold;
-  private final ProtocolMessageMetrics<ProtocolMessageEnum> protocolMetrics;
+  private final ProtocolMessageMetrics<Type> protocolMetrics;
   private OzoneProtocolMessageDispatcher<ContainerCommandRequestProto,
-      ContainerCommandResponseProto, ProtocolMessageEnum> dispatcher;
+      ContainerCommandResponseProto, Type> dispatcher;
   private String clusterId;
   private ContainerMetrics metrics;
   private final TokenVerifier tokenVerifier;
@@ -141,7 +141,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         new ProtocolMessageMetrics<>(
             "HddsDispatcher",
             "HDDS dispatcher metrics",
-            Type.values());
+            Type.class);
 
     this.dispatcher =
         new OzoneProtocolMessageDispatcher<>("DatanodeClient",
@@ -203,7 +203,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   @SuppressWarnings("methodlength")
   private ContainerCommandResponseProto dispatchRequest(
       ContainerCommandRequestProto msg, DispatcherContext dispatcherContext) {
-    Preconditions.checkNotNull(msg);
+    Objects.requireNonNull(msg, "msg == null");
     if (LOG.isTraceEnabled()) {
       LOG.trace("Command {}, trace ID: {} ", msg.getCmdType(),
           msg.getTraceID());
@@ -267,7 +267,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       // snapshot.
       // just add it to the list, and remove it from missing container set
       // as it might have been added in the list during "init".
-      Preconditions.checkNotNull(container2BCSIDMap);
+      Objects.requireNonNull(container2BCSIDMap, "container2BCSIDMap == null");
       if (container != null && container2BCSIDMap.get(containerID) == null) {
         container2BCSIDMap.put(
             containerID, container.getBlockCommitSequenceId());
@@ -428,8 +428,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       }
       if (cmdType == Type.CreateContainer
           && result == Result.SUCCESS && dispatcherContext != null) {
-        Preconditions.checkNotNull(dispatcherContext.getContainer2BCSIDMap());
-        container2BCSIDMap.putIfAbsent(containerID, Long.valueOf(0));
+        Objects.requireNonNull(container2BCSIDMap, "container2BCSIDMap == null");
+        container2BCSIDMap.putIfAbsent(containerID, 0L);
       }
       if (result == Result.SUCCESS) {
         updateBCSID(container, dispatcherContext, cmdType);
@@ -467,12 +467,12 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       DispatcherContext dispatcherContext, Type cmdType) {
     if (dispatcherContext != null && (cmdType == Type.PutBlock
         || cmdType == Type.PutSmallFile)) {
-      Preconditions.checkNotNull(container);
+      Objects.requireNonNull(container, "container == null");
       long bcsID = container.getBlockCommitSequenceId();
       long containerId = container.getContainerData().getContainerID();
       Map<Long, Long> container2BCSIDMap;
       container2BCSIDMap = dispatcherContext.getContainer2BCSIDMap();
-      Preconditions.checkNotNull(container2BCSIDMap);
+      Objects.requireNonNull(container2BCSIDMap, "container2BCSIDMap == null");
       Preconditions.checkArgument(container2BCSIDMap.containsKey(containerId));
       // updates the latest BCSID on every putBlock or putSmallFile
       // transaction over Ratis.
@@ -655,7 +655,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
 
   @Override
   public void setClusterId(String clusterId) {
-    Preconditions.checkNotNull(clusterId, "clusterId cannot be null");
+    Objects.requireNonNull(clusterId, "clusterId == null");
     if (this.clusterId == null) {
       this.clusterId = clusterId;
       for (Map.Entry<ContainerType, Handler> handlerMap : handlers.entrySet()) {
@@ -820,7 +820,8 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   @Override
   public void streamDataReadOnly(ContainerCommandRequestProto msg,
       StreamObserver<ContainerCommandResponseProto> streamObserver,
-      RandomAccessBlockFile blockFile, DispatcherContext dispatcherContext) {
+      RandomAccessFileChannel blockFile, DispatcherContext dispatcherContext) {
+    Objects.requireNonNull(msg, "msg == null");
     Type cmdType = msg.getCmdType();
     String traceID = msg.getTraceID();
     Span span = TracingUtil.importAndCreateSpan(cmdType.toString(), traceID);
@@ -828,7 +829,6 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
     EventType eventType = getEventType(msg);
 
     try (UncheckedAutoCloseable ignored = protocolMetrics.measure(cmdType)) {
-      Preconditions.checkNotNull(msg);
       if (LOG.isTraceEnabled()) {
         LOG.trace("Command {}, trace ID: {}.", msg.getCmdType(), traceID);
       }

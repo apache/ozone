@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.recon.api.types;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Objects;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -25,16 +24,12 @@ import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
-import org.apache.hadoop.ozone.om.helpers.WithParentObjectId;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
 /**
  * Lightweight OmKeyInfo class.
  */
-@JsonIgnoreProperties({
-    "metadata", "objectID", "updateID", "parentObjectID", "objectInfo"
-})
-public final class ReconBasicOmKeyInfo extends WithParentObjectId {
+public final class ReconBasicOmKeyInfo {
 
   private final String volumeName;
   private final String bucketName;
@@ -59,7 +54,7 @@ public final class ReconBasicOmKeyInfo extends WithParentObjectId {
   private final ReplicationConfig replicationConfig;
 
   private final boolean isFile;
-  private long parentId;
+  private final long parentId;
 
   public static Codec<ReconBasicOmKeyInfo> getCodec() {
     return DelegatedCodec.decodeOnly(

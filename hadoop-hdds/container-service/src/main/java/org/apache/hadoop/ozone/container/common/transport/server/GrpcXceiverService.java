@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.XceiverClientProtocolServiceGrpc;
-import org.apache.hadoop.hdds.scm.container.common.helpers.RandomAccessBlockFile;
+import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.ratis.grpc.util.ZeroCopyMessageMarshaller;
@@ -98,7 +98,7 @@ public class GrpcXceiverService extends
       StreamObserver<ContainerCommandResponseProto> responseObserver) {
     return new StreamObserver<ContainerCommandRequestProto>() {
       private final AtomicBoolean isClosed = new AtomicBoolean(false);
-      private final RandomAccessBlockFile blockFile = new RandomAccessBlockFile();
+      private final RandomAccessFileChannel blockFile = new RandomAccessFileChannel();
 
       boolean close() {
         if (isClosed.compareAndSet(false, true)) {

@@ -36,6 +36,7 @@ OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data/metadata
 OZONE-SITE.XML_ozone.scm.names=scm
 OZONE-SITE.XML_ozone.scm.pipeline.creation.interval=30s
 OZONE-SITE.XML_ozone.scm.pipeline.owner.container.count=1
+OZONE-SITE.XML_ozone.scm.ec.pipeline.minimum=1
 OZONE-SITE.XML_ozone.datanode.pipeline.limit=1
 OZONE-SITE.XML_recon.om.snapshot.task.interval.delay=1m
 OZONE-SITE.XML_hdds.scmclient.max.retry.timeout=30s

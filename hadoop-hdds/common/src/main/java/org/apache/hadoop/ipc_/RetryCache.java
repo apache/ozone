@@ -19,6 +19,7 @@ package org.apache.hadoop.ipc_;
 
 
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -273,8 +274,7 @@ public class RetryCache {
       lock.unlock();
     }
     // Entry already exists in cache. Wait for completion and return its state
-    Preconditions.checkNotNull(mapEntry,
-        "Entry from the cache should not be null");
+    Objects.requireNonNull(mapEntry, "Entry from the cache should not be null");
     // Wait for in progress request to complete
     synchronized (mapEntry) {
       while (mapEntry.state == CacheEntry.INPROGRESS) {

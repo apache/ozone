@@ -33,6 +33,7 @@ import java.lang.reflect.Modifier;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -118,7 +119,7 @@ public abstract class GenericTestUtils {
    */
   public static void waitFor(BooleanSupplier check, int checkEveryMillis,
       int waitForMillis) throws TimeoutException, InterruptedException {
-    Preconditions.checkNotNull(check, ERROR_MISSING_ARGUMENT);
+    Objects.requireNonNull(check, ERROR_MISSING_ARGUMENT);
     Preconditions.checkArgument(waitForMillis >= checkEveryMillis,
         ERROR_INVALID_ARGUMENT);
 

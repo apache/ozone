@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.ha;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.protobuf.ServiceException;
 import java.io.Closeable;
 import java.io.IOException;
@@ -28,6 +27,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -50,6 +50,7 @@ import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
+import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,11 +70,25 @@ public abstract class OMFailoverProxyProviderBase<T> implements
   private final ConfigurationSource conf;
   private final Class<T> protocolClass;
 
-  // Map of OMNodeID to its proxy
-  private Map<String, ProxyInfo<T>> omProxies;
-  private List<String> omNodeIDList;
-  private Map<String, InetSocketAddress> omNodeAddressMap;
+  // omProxies: Map of OMNodeID to its proxy
+  // omNodesInOrder: List that specifies the ordering of OM nodes that
+  // is used to determine the next OM node proxy to retrieve
+  // from omProxies.
+  // Invariants:
+  // 1. size(omProxies) == size(omNodesInOrder)
+  // 2. set(omProxies.keySet) == set(omNodesInOrder)
+  private Map<String, OMProxyInfo<T>> omProxies;
+  private List<String> omNodesInOrder;
 
+  // These are used to identify the current and next OM node
+  // OMNodeId is used to retrieve proxy from omProxies
+  // ProxyIndex is used to find the node ID from omNodesInOrder
+  // Invariants:
+  // 1. omProxies[currentProxyOMNodeId] = omNodesInOrder[currentProxyIndex]
+  // 2. omProxies[nextProxyOMNodeId] = omNodesInOrder[nextProxyIndex]
+  // Note that these fields need to be modified atomically (e.g. using synchronized)
+  // Specifically (currentProxyOMNodeId, currentProxyNodeIndex) and (nextProxyOMNodeId, nextProxyIndex)
+  // should be atomically updated
   private String currentProxyOMNodeId;
   private int currentProxyIndex;
   private String nextProxyOMNodeId;
@@ -84,11 +99,11 @@ public abstract class OMFailoverProxyProviderBase<T> implements
   // before attempting to contact all the OMs again. For other exceptions
   // such as LeaderNotReadyException, the same OM is contacted again with a
   // linearly increasing wait time.
-  private Set<String> attemptedOMs = new HashSet<>();
+  private final Set<String> attemptedOMs = new HashSet<>();
   private String lastAttemptedOM;
   private int numAttemptsOnSameOM = 0;
   private final long waitBetweenRetries;
-  private Set<String> accessControlExceptionOMs = new HashSet<>();
+  private final Set<String> accessControlExceptionOMs = new HashSet<>();
   private boolean performFailoverDone;
 
   private final UserGroupInformation ugi;
@@ -106,19 +121,23 @@ public abstract class OMFailoverProxyProviderBase<T> implements
         OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY,
         OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT);
 
-    loadOMClientConfigs(conf, omServiceId);
-    Preconditions.checkNotNull(omProxies);
-    Preconditions.checkNotNull(omNodeIDList);
-    Preconditions.checkNotNull(omNodeAddressMap);
+    initOmProxiesFromConfigs(conf, omServiceId);
 
     nextProxyIndex = 0;
-    nextProxyOMNodeId = omNodeIDList.get(nextProxyIndex);
+    nextProxyOMNodeId = omNodesInOrder.get(nextProxyIndex);
     currentProxyIndex = 0;
     currentProxyOMNodeId = nextProxyOMNodeId;
   }
 
-  protected abstract void loadOMClientConfigs(ConfigurationSource config,
-                                              String omSvcId)
+  /**
+   * Initialize the OM proxies from the configuration and the OM service ID.
+   * The implementation initialize the OM proxies and ordered OM node ID list
+   * through {@link #initOmProxies(Map, List)}
+   * @param config configuration containing OM node information
+   * @param omSvcId OM service ID
+   * @throws IOException if any exception occurs while trying to initialize the proxy.
+   */
+  protected abstract void initOmProxiesFromConfigs(ConfigurationSource config, String omSvcId)
       throws IOException;
 
   /**
@@ -137,7 +156,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
     // Ensure we do not attempt retry on the same OM in case of exceptions
     RetryPolicy connectionRetryPolicy = RetryPolicies.failoverOnNetworkException(0);
 
-    return (T) RPC.getProtocolProxy(
+    return RPC.getProtocolProxy(
         getInterface(),
         RPC.getProtocolVersion(protocolClass),
         omAddress,
@@ -160,9 +179,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
         return false;
       } else {
         accessControlExceptionOMs.add(nextProxyOMNodeId);
-        if (accessControlExceptionOMs.containsAll(omNodeIDList)) {
-          return false;
-        }
+        return !accessControlExceptionOMs.containsAll(omNodesInOrder);
       }
     } else if (HddsUtils.shouldNotFailoverOnRpcException(unwrappedException)) {
       return false;
@@ -220,8 +237,8 @@ public abstract class OMFailoverProxyProviderBase<T> implements
                 notLeaderException.getSuggestedLeaderNodeId();
             if (suggestedLeaderAddress != null &&
                 suggestedNodeId != null &&
-                omNodeAddressMap.containsKey(suggestedNodeId) &&
-                omNodeAddressMap.get(suggestedNodeId).toString()
+                omProxies.containsKey(suggestedNodeId) &&
+                omProxies.get(suggestedNodeId).getRpcAddr().toString()
                     .equals(suggestedLeaderAddress)) {
               setNextOmProxy(suggestedNodeId);
               return getRetryAction(RetryDecision.FAILOVER_AND_RETRY,
@@ -259,7 +276,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
           return new RetryAction(fallbackAction, getWaitTime());
         } else {
           LOG.error("Failed to connect to OMs: {}. Attempted {} failovers.",
-              omNodeIDList, maxFailovers);
+              omNodesInOrder, maxFailovers);
           return RetryAction.FAIL;
         }
       }
@@ -318,7 +335,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
       int newProxyIndex = incrementNextProxyIndex();
       if (LOG.isDebugEnabled()) {
         LOG.debug("Incrementing OM proxy index to {}, nodeId: {}",
-            newProxyIndex, omNodeIDList.get(newProxyIndex));
+            newProxyIndex, omNodesInOrder.get(newProxyIndex));
       }
     }
   }
@@ -334,7 +351,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
     attemptedOMs.add(nextProxyOMNodeId);
 
     nextProxyIndex = (nextProxyIndex + 1) % omProxies.size();
-    nextProxyOMNodeId = omNodeIDList.get(nextProxyIndex);
+    nextProxyOMNodeId = omNodesInOrder.get(nextProxyIndex);
     return nextProxyIndex;
   }
 
@@ -348,7 +365,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
       if (omProxies.containsKey(newLeaderOMNodeId)) {
         lastAttemptedOM = nextProxyOMNodeId;
         nextProxyOMNodeId = newLeaderOMNodeId;
-        nextProxyIndex = omNodeIDList.indexOf(nextProxyOMNodeId);
+        nextProxyIndex = omNodesInOrder.indexOf(nextProxyOMNodeId);
         return true;
       }
     } else {
@@ -391,19 +408,20 @@ public abstract class OMFailoverProxyProviderBase<T> implements
     return waitBetweenRetries;
   }
 
-  public List<ProxyInfo> getOMProxies() {
-    return new ArrayList<ProxyInfo>(omProxies.values());
+  public List<OMProxyInfo<T>> getOMProxies() {
+    return new ArrayList<>(omProxies.values());
   }
 
-  public Map<String, ProxyInfo<T>> getOMProxyMap() {
+  public Map<String, OMProxyInfo<T>> getOMProxyMap() {
     return omProxies;
   }
 
   /**
-   * Check if exception is OMLeaderNotReadyException.
+   * Unwrap the exception and return the wrapped OMLeaderNotReadyException if any.
    *
-   * @param exception
-   * @return OMLeaderNotReadyException
+   * @param exception exception to unwrap.
+   * @return the unwrapped OMLeaderNotReadyException or null if the wrapped
+   *         exception is not OMLeaderNotReadyException.
    */
   public static OMLeaderNotReadyException getLeaderNotReadyException(
       Exception exception) {
@@ -419,9 +437,11 @@ public abstract class OMFailoverProxyProviderBase<T> implements
   }
 
   /**
-   * Check if exception is a OMNotLeaderException.
+   * Unwrap the exception and return the wrapped OMNotLeaderException if any.
    *
-   * @return OMNotLeaderException.
+   * @param exception exception to unwrap.
+   * @return the unwrapped OMNotLeaderException or null if the wrapped
+   *         exception is not OMNotLeaderException.
    */
   public static OMNotLeaderException getNotLeaderException(
       Exception exception) {
@@ -440,23 +460,24 @@ public abstract class OMFailoverProxyProviderBase<T> implements
     return conf;
   }
 
-  protected synchronized void setOmProxies(Map<String,
-      ProxyInfo<T>> omProxies) {
-    this.omProxies = omProxies;
+  /**
+   * Initialize the OM proxy map and the OM nodes ordering.
+   * @param omProxyMap OM Node ID to OMProxyInfo map
+   * @param omNodesInOrderList Ordered list of OM Node ID to define failover ordering.
+   */
+  protected synchronized void initOmProxies(Map<String, OMProxyInfo<T>> omProxyMap, List<String> omNodesInOrderList) {
+    Objects.requireNonNull(omProxyMap, "omProxyMap == null");
+    Objects.requireNonNull(omProxyMap, "omNodesInOrderList == null");
+    Preconditions.assertSame(omProxyMap.size(), omNodesInOrderList.size(),
+        "omProxyMap and omNodesInOrderList should have the same size");
+    Preconditions.assertEquals(omProxyMap.keySet(), new HashSet<>(omNodesInOrderList),
+        "the OM node IDs of omProxies keys should be the same as omNodesInOrder");
+    this.omProxies = omProxyMap;
+    this.omNodesInOrder = Collections.unmodifiableList(omNodesInOrderList);
   }
 
-  protected synchronized void setOmNodeIDList(List<String> omNodeIDList) {
-    Collections.shuffle(omNodeIDList);
-    this.omNodeIDList = Collections.unmodifiableList(omNodeIDList);
-  }
-
-  protected synchronized List<String> getOmNodeIDList() {
-    return omNodeIDList;
-  }
-
-  protected synchronized void setOmNodeAddressMap(
-      Map<String, InetSocketAddress> map) {
-    this.omNodeAddressMap = map;
+  protected synchronized List<String> getOmNodesInOrder() {
+    return omNodesInOrder;
   }
 
 }

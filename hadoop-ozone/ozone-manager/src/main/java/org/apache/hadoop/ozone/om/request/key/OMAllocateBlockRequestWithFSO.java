@@ -21,13 +21,13 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_UNDER_LEASE_RECOVERY;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
-import com.google.common.base.Preconditions;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -82,7 +82,7 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
 
     OzoneManagerProtocolProtos.KeyLocation blockLocation =
             allocateBlockRequest.getKeyLocation();
-    Preconditions.checkNotNull(blockLocation);
+    Objects.requireNonNull(blockLocation, "blockLocation == null");
 
     String volumeName = keyArgs.getVolumeName();
     String bucketName = keyArgs.getBucketName();

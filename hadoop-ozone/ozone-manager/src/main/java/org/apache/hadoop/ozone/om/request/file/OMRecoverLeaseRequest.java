@@ -28,13 +28,13 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.B
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.HBASE_SUPPORT;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.RecoverLease;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenSecretManager;
@@ -86,7 +86,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
     RecoverLeaseRequest recoverLeaseRequest = getOmRequest()
         .getRecoverLeaseRequest();
 
-    Preconditions.checkNotNull(recoverLeaseRequest);
+    Objects.requireNonNull(recoverLeaseRequest, "recoverLeaseRequest == null");
     volumeName = recoverLeaseRequest.getVolumeName();
     bucketName = recoverLeaseRequest.getBucketName();
     keyName = recoverLeaseRequest.getKeyName();
@@ -122,7 +122,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     RecoverLeaseRequest recoverLeaseRequest = getOmRequest()
         .getRecoverLeaseRequest();
-    Preconditions.checkNotNull(recoverLeaseRequest);
+    Objects.requireNonNull(recoverLeaseRequest, "recoverLeaseRequest == null");
 
     Map<String, String> auditMap = new LinkedHashMap<>();
     auditMap.put(OzoneConsts.VOLUME, volumeName);

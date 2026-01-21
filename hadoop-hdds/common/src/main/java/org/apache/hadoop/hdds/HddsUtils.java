@@ -25,14 +25,9 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_PORT_KE
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_DNS_INTERFACE_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_DNS_NAMESERVER_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HOST_NAME_KEY;
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_PORT_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
@@ -60,7 +55,6 @@ import java.util.OptionalInt;
 import java.util.TreeMap;
 import java.util.UUID;
 import javax.management.ObjectName;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.ConfigRedactor;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -275,81 +269,6 @@ public final class HddsUtils {
       }
     }
     return OptionalInt.empty();
-  }
-
-  /**
-   * Retrieve the socket addresses of all storage container managers.
-   *
-   * @return A collection of SCM addresses
-   * @throws IllegalArgumentException If the configuration is invalid
-   */
-  public static Collection<InetSocketAddress> getSCMAddressForDatanodes(
-      ConfigurationSource conf) {
-
-    // First check HA style config, if not defined fall back to OZONE_SCM_NAMES
-
-    if (getScmServiceId(conf) != null) {
-      List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(conf);
-      Collection<InetSocketAddress> scmAddressList =
-          new HashSet<>(scmNodeInfoList.size());
-      for (SCMNodeInfo scmNodeInfo : scmNodeInfoList) {
-        scmAddressList.add(
-            NetUtils.createSocketAddr(scmNodeInfo.getScmDatanodeAddress()));
-      }
-      return scmAddressList;
-    } else {
-      // fall back to OZONE_SCM_NAMES.
-      Collection<String> names =
-          conf.getTrimmedStringCollection(ScmConfigKeys.OZONE_SCM_NAMES);
-      if (names.isEmpty()) {
-        throw new IllegalArgumentException(ScmConfigKeys.OZONE_SCM_NAMES
-            + " need to be a set of valid DNS names or IP addresses."
-            + " Empty address list found.");
-      }
-
-      Collection<InetSocketAddress> addresses = new HashSet<>(names.size());
-      for (String address : names) {
-        Optional<String> hostname = getHostName(address);
-        if (!hostname.isPresent()) {
-          throw new IllegalArgumentException("Invalid hostname for SCM: "
-              + address);
-        }
-        int port = getHostPort(address)
-            .orElse(conf.getInt(OZONE_SCM_DATANODE_PORT_KEY,
-                OZONE_SCM_DATANODE_PORT_DEFAULT));
-        InetSocketAddress addr = NetUtils.createSocketAddr(hostname.get(),
-            port);
-        addresses.add(addr);
-      }
-
-      if (addresses.size() > 1) {
-        LOG.warn("When SCM HA is configured, configure {} appended with " +
-            "serviceId and nodeId. {} is deprecated.", OZONE_SCM_ADDRESS_KEY,
-            OZONE_SCM_NAMES);
-      }
-      return addresses;
-    }
-  }
-
-  /**
-   * Retrieve the socket addresses of recon.
-   *
-   * @return Recon address
-   * @throws IllegalArgumentException If the configuration is invalid
-   */
-  public static InetSocketAddress getReconAddresses(
-      ConfigurationSource conf) {
-    String name = conf.get(OZONE_RECON_ADDRESS_KEY);
-    if (StringUtils.isEmpty(name)) {
-      return null;
-    }
-    Optional<String> hostname = getHostName(name);
-    if (!hostname.isPresent()) {
-      throw new IllegalArgumentException("Invalid hostname for Recon: "
-          + name);
-    }
-    int port = getHostPort(name).orElse(OZONE_RECON_DATANODE_PORT_DEFAULT);
-    return NetUtils.createSocketAddr(hostname.get(), port);
   }
 
   /**
@@ -635,10 +554,8 @@ public final class HddsUtils {
    *     ancestor of {@code path}
    */
   public static void validatePath(Path path, Path ancestor) {
-    Preconditions.checkNotNull(path,
-        "Path should not be null");
-    Preconditions.checkNotNull(ancestor,
-        "Ancestor should not be null");
+    Objects.requireNonNull(path, "Path should not be null");
+    Objects.requireNonNull(ancestor, "Ancestor should not be null");
     Preconditions.checkArgument(
         path.normalize().startsWith(ancestor.normalize()),
         "Path %s should be a descendant of %s", path, ancestor);
@@ -852,8 +769,7 @@ public final class HddsUtils {
    * Transform a protobuf UUID to Java UUID.
    */
   public static UUID fromProtobuf(HddsProtos.UUID uuid) {
-    Objects.requireNonNull(uuid,
-        "HddsProtos.UUID can't be null to transform to java UUID.");
+    Objects.requireNonNull(uuid, "HddsProtos.UUID can't be null to transform to java UUID.");
     return new UUID(uuid.getMostSigBits(), uuid.getLeastSigBits());
   }
 
@@ -861,8 +777,7 @@ public final class HddsUtils {
    * Transform a Java UUID to protobuf UUID.
    */
   public static HddsProtos.UUID toProtobuf(UUID uuid) {
-    Objects.requireNonNull(uuid,
-        "UUID can't be null to transform to protobuf UUID.");
+    Objects.requireNonNull(uuid, "UUID can't be null to transform to protobuf UUID.");
     return HddsProtos.UUID.newBuilder()
         .setMostSigBits(uuid.getMostSignificantBits())
         .setLeastSigBits(uuid.getLeastSignificantBits())

@@ -52,6 +52,7 @@ import javax.management.MBeanServer;
 import javax.management.ObjectName;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.io.retry.FailoverProxyProvider.ProxyInfo;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneTestUtils;
@@ -292,8 +293,8 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
         OmFailoverProxyUtil.getFailoverProxyProvider(
             rpcClient.getObjectStore().getClientProxy());
 
-    List<OMProxyInfo> omProxies =
-        omFailoverProxyProvider.getOMProxyInfos();
+    List<ProxyInfo> omProxies =
+        omFailoverProxyProvider.getOMProxies();
 
     assertEquals(getNumOfOMs(), omProxies.size());
 
@@ -301,7 +302,8 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
       OzoneManager om = getCluster().getOzoneManager(i);
       InetSocketAddress omRpcServerAddr = om.getOmRpcServerAddr();
       boolean omClientProxyExists = false;
-      for (OMProxyInfo omProxyInfo : omProxies) {
+      for (ProxyInfo proxyInfo : omProxies) {
+        OMProxyInfo omProxyInfo = (OMProxyInfo) proxyInfo;
         if (omProxyInfo.getAddress().equals(omRpcServerAddr)) {
           omClientProxyExists = true;
           break;
@@ -368,7 +370,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
     // The OMFailoverProxyProvider will point to the current leader OM node.
     String leaderOMNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
     String leaderOMAddress = ((OMProxyInfo)
-        omFailoverProxyProvider.getOMProxyInfoMap().get(leaderOMNodeId))
+        omFailoverProxyProvider.getOMProxyMap().get(leaderOMNodeId))
         .getAddress().getAddress().toString();
     OzoneManager followerOM = null;
     for (OzoneManager om: getCluster().getOzoneManagersList()) {
@@ -743,8 +745,8 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
     OzoneBucket linkedBucket = linkBucket(srcBucket);
     OzoneObj linkObj = buildBucketObj(linkedBucket);
     OzoneObj srcObj = buildBucketObj(srcBucket);
-    // As by default create will add some default acls in RpcClient.
-    List<OzoneAcl> acls = getObjectStore().getAcl(linkObj);
+    // choose from src's ACLs to avoid trying to remove OzoneAcl#LINK_BUCKET_DEFAULT_ACL
+    List<OzoneAcl> acls = getObjectStore().getAcl(srcObj);
     assertFalse(acls.isEmpty());
     // Remove an existing acl.
     boolean removeAcl = getObjectStore().removeAcl(linkObj, acls.get(0));

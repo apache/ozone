@@ -283,7 +283,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private RootCARotationManager rootCARotationManager;
   private ContainerTokenSecretManager containerTokenMgr;
 
-  private final OzoneConfiguration configuration;
+  private OzoneConfiguration configuration;
   private SCMContainerMetrics scmContainerMetrics;
   private SCMContainerPlacementMetrics placementMetrics;
   private PlacementPolicy containerPlacementPolicy;
@@ -402,7 +402,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         new ReconfigurationHandler("SCM", conf, this::checkAdminAccess)
             .register(OZONE_ADMINISTRATORS, this::reconfOzoneAdmins)
             .register(OZONE_READONLY_ADMINISTRATORS,
-                this::reconfOzoneReadOnlyAdmins);
+                this::reconfOzoneReadOnlyAdmins)
+            .register(HddsConfigKeys.HDDS_SCM_SAFEMODE_LOG_INTERVAL,
+                this::reconfigureSafeModeLogInterval);
 
     reconfigurationHandler.setReconfigurationCompleteCallback(reconfigurationHandler.defaultLoggingCallback());
 
@@ -478,7 +480,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     StaleNodeHandler staleNodeHandler =
         new StaleNodeHandler(scmNodeManager, pipelineManager);
     DeadNodeHandler deadNodeHandler = new DeadNodeHandler(scmNodeManager,
-        pipelineManager, containerManager);
+        pipelineManager, containerManager, null);
     StartDatanodeAdminHandler datanodeStartAdminHandler =
         new StartDatanodeAdminHandler(scmNodeManager, pipelineManager);
     ReadOnlyHealthyToHealthyNodeHandler readOnlyHealthyToHealthyNodeHandler =
@@ -601,6 +603,11 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
   public OzoneConfiguration getConfiguration() {
     return configuration;
+  }
+
+  @VisibleForTesting
+  public void setConfiguration(OzoneConfiguration conf) {
+    this.configuration = conf;
   }
 
   /**
@@ -1173,9 +1180,9 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
             scmhaNodeDetails.getLocalNodeDetails().getNodeId());
     final ScmInfo scmInfo = HAUtils.getScmInfo(config);
     final String fetchedId = scmInfo.getClusterId();
-    Preconditions.checkNotNull(fetchedId);
+    Objects.requireNonNull(fetchedId, "fetchedId == null");
     if (state == StorageState.INITIALIZED) {
-      Preconditions.checkNotNull(scmStorageConfig.getScmId());
+      Objects.requireNonNull(scmStorageConfig.getScmId(), "scmId == null");
       if (!fetchedId.equals(persistedClusterId)) {
         LOG.error(
             "Could not bootstrap as SCM is already initialized with cluster "
@@ -1260,7 +1267,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       try {
         if (clusterId != null && !clusterId.isEmpty()) {
           // clusterId must be an UUID
-          Preconditions.checkNotNull(UUID.fromString(clusterId));
+          Objects.requireNonNull(UUID.fromString(clusterId), "clusterId UUID == null");
           scmStorageConfig.setClusterId(clusterId);
         }
 
@@ -1344,7 +1351,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       ConfigurationSource conf) throws IOException {
     List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(
         conf);
-    Preconditions.checkNotNull(scmNodeInfoList, "scmNodeInfoList is null");
+    Objects.requireNonNull(scmNodeInfoList, "scmNodeInfoList is null");
 
     InetSocketAddress scmAddress = null;
     if (HddsUtils.getScmServiceId(conf) != null) {
@@ -2202,6 +2209,19 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     return String.valueOf(newVal);
   }
 
+  private String reconfigureSafeModeLogInterval(String newLogInterval) {
+    getConfiguration().set(HddsConfigKeys.HDDS_SCM_SAFEMODE_LOG_INTERVAL, newLogInterval);
+    long newIntervalMs = getConfiguration().getTimeDuration(
+        HddsConfigKeys.HDDS_SCM_SAFEMODE_LOG_INTERVAL,
+        HddsConfigKeys.HDDS_SCM_SAFEMODE_LOG_INTERVAL_DEFAULT,
+        TimeUnit.MILLISECONDS);
+    
+    scmSafeModeManager.reconfigureLogInterval(newIntervalMs, TimeUnit.MILLISECONDS);
+
+    LOG.info("Reconfigured {} to {}", HddsConfigKeys.HDDS_SCM_SAFEMODE_LOG_INTERVAL, newLogInterval);
+    return newLogInterval;
+  }
+  
   /**
    * This will remove the given SCM node from HA Ring by removing it from
    * Ratis Ring.
@@ -2224,8 +2244,8 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     checkIfCertSignRequestAllowed(rootCARotationManager, false, configuration,
         "removePeerFromHARing");
 
-    Preconditions.checkNotNull(getScmHAManager().getRatisServer()
-        .getDivision().getGroup());
+    Objects.requireNonNull(getScmHAManager().getRatisServer()
+        .getDivision().getGroup(), "Group == null");
 
     // check valid scmid in ratis peers list
     if (getScmHAManager().getRatisServer().getDivision()
@@ -2243,6 +2263,20 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     return getScmHAManager().removeSCM(request);
 
+  }
+
+  /**
+   * Check if the input scmId exists in the peers list.
+   * @return true if the nodeId is self, or it exists in peer node list,
+   *         false otherwise.
+   */
+  @VisibleForTesting
+  public boolean doesPeerExist(String scmId) {
+    if (getScmId().equals(scmId)) {
+      return true;
+    }
+    return getScmHAManager().getRatisServer().getDivision()
+        .getGroup().getPeer(RaftPeerId.valueOf(scmId)) != null;
   }
 
   public void scmHAMetricsUpdate(String leaderId) {

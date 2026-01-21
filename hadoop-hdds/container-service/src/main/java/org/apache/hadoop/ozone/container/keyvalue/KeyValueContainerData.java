@@ -45,6 +45,7 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -326,7 +327,7 @@ public class KeyValueContainerData extends ContainerData {
     if (!finalizedBlockSet.isEmpty()) {
       // delete from db and clear memory
       // Should never fail.
-      Preconditions.checkNotNull(db, "DB cannot be null here");
+      Objects.requireNonNull(db, "db == null");
       try (BatchOperation batch = db.getStore().getBatchHandler().initBatchOperation()) {
         db.getStore().getFinalizeBlocksTable().deleteBatchWithPrefix(batch, containerPrefix());
         db.getStore().getBatchHandler().commitBatchOperation(batch);

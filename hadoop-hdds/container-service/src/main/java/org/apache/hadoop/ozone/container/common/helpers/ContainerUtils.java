@@ -27,7 +27,6 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getContainerCommandResponse;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerData.CHARSET_ENCODING;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -35,6 +34,9 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Collection;
+import java.util.Objects;
+import java.util.Properties;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -49,10 +51,12 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.slf4j.Logger;
@@ -105,13 +109,13 @@ public final class ContainerUtils {
    * @return Name of the container.
    */
   public static String getContainerNameFromFile(File containerFile) {
-    Preconditions.checkNotNull(containerFile);
+    Objects.requireNonNull(containerFile, "containerFile == null");
     return Paths.get(containerFile.getParent()).resolve(
         removeExtension(containerFile.getName())).toString();
   }
 
   public static long getContainerIDFromFile(File containerFile) {
-    Preconditions.checkNotNull(containerFile);
+    Objects.requireNonNull(containerFile, "containerFile == null");
     String containerID = getContainerNameFromFile(containerFile);
     return Long.parseLong(containerID);
   }
@@ -123,9 +127,8 @@ public final class ContainerUtils {
    */
   public static void verifyIsNewContainer(File containerFile) throws
       FileAlreadyExistsException {
+    Objects.requireNonNull(containerFile, "containerFile == null");
     Logger log = LoggerFactory.getLogger(ContainerSet.class);
-    Preconditions.checkNotNull(containerFile, "containerFile Should not be " +
-        "null");
     if (containerFile.getParentFile().exists()) {
       log.error("Container already exists on disk. File: {}", containerFile
           .toPath());
@@ -167,24 +170,67 @@ public final class ContainerUtils {
    * @return {@link DatanodeDetails}
    * @throws IOException If the id file is malformed or other I/O exceptions
    */
-  public static synchronized DatanodeDetails readDatanodeDetailsFrom(File path)
-      throws IOException {
+  public static synchronized DatanodeDetails readDatanodeDetailsFrom(
+      File path, ConfigurationSource conf) throws IOException {
     if (!path.exists()) {
       throw new IOException("Datanode ID file not found.");
     }
     try {
       return DatanodeIdYaml.readDatanodeIdFile(path);
     } catch (IOException e) {
-      LOG.warn("Error loading DatanodeDetails yaml from {}",
-          path.getAbsolutePath(), e);
-      // Try to load as protobuf before giving up
-      try (InputStream in = Files.newInputStream(path.toPath())) {
-        return DatanodeDetails.getFromProtoBuf(
-            HddsProtos.DatanodeDetailsProto.parseFrom(in));
-      } catch (IOException io) {
-        throw new IOException("Failed to parse DatanodeDetails from "
-            + path.getAbsolutePath(), io);
+      LOG.warn("Failed to read Datanode ID file as YAML. " +
+          "Attempting recovery.", e);
+      try {
+        return recoverDatanodeDetailsFromVersionFile(path, conf);
+      } catch (IOException recoveryEx) {
+        LOG.warn("Datanode ID recovery from VERSION file failed. " +
+            "Falling back to reading as Protobuf.", recoveryEx);
+        try {
+          return readDatanodeDetailsFromProto(path);
+        } catch (IOException io) {
+          throw new IOException("Failed to parse DatanodeDetails from "
+              + path.getAbsolutePath(), io);
+        }
       }
+    }
+  }
+
+  /**
+   * Recover DatanodeDetails from VERSION file.
+   */
+  private static DatanodeDetails recoverDatanodeDetailsFromVersionFile(
+      File path, ConfigurationSource conf) throws IOException {
+    LOG.info("Attempting to recover Datanode ID from VERSION file.");
+    String dnUuid = null;
+    Collection<String> dataNodeDirs =
+        HddsServerUtil.getDatanodeStorageDirs(conf);
+    for (String dataNodeDir : dataNodeDirs) {
+      File versionFile = new File(dataNodeDir, HddsVolume.HDDS_VOLUME_DIR + "/" + StorageVolumeUtil.VERSION_FILE);
+      if (versionFile.exists()) {
+        Properties props = DatanodeVersionFile.readFrom(versionFile);
+        dnUuid = props.getProperty(OzoneConsts.DATANODE_UUID);
+        if (dnUuid != null && !dnUuid.isEmpty()) {
+          break;
+        }
+      }
+    }
+    if (dnUuid == null) {
+      throw new IOException("Could not find a valid datanode UUID from " +
+          "any VERSION file in " + dataNodeDirs);
+    }
+    DatanodeDetails.Builder builder = DatanodeDetails.newBuilder();
+    builder.setUuid(UUID.fromString(dnUuid));
+    DatanodeDetails datanodeDetails = builder.build();
+    DatanodeIdYaml.createDatanodeIdFile(datanodeDetails, path, conf);
+    LOG.info("Successfully recovered and rewrote datanode ID file.");
+    return datanodeDetails;
+  }
+
+  private static DatanodeDetails readDatanodeDetailsFromProto(File path)
+      throws IOException {
+    try (InputStream in = Files.newInputStream(path.toPath())) {
+      return DatanodeDetails.getFromProtoBuf(
+          HddsProtos.DatanodeDetailsProto.parseFrom(in));
     }
   }
 
@@ -259,7 +305,7 @@ public final class ContainerUtils {
    */
   public static File getChunkDir(ContainerData containerData)
       throws StorageContainerException {
-    Preconditions.checkNotNull(containerData, "Container data can't be null");
+    Objects.requireNonNull(containerData, "containerData == null");
 
     String chunksPath = containerData.getChunksPath();
     if (chunksPath == null) {

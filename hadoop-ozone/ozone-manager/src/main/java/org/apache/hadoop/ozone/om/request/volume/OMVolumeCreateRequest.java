@@ -21,12 +21,11 @@ import static org.apache.hadoop.ozone.om.helpers.OzoneAclUtil.getDefaultAclList;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.USER_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
+import java.util.Objects;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.audit.OMAction;
@@ -110,7 +109,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
 
     CreateVolumeRequest createVolumeRequest =
         getOmRequest().getCreateVolumeRequest();
-    Preconditions.checkNotNull(createVolumeRequest);
+    Objects.requireNonNull(createVolumeRequest, "createVolumeRequest == null");
     VolumeInfo volumeInfo = createVolumeRequest.getVolumeInfo();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
@@ -135,12 +134,11 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
       // when you create a volume, we set both Object ID and update ID.
       // The Object ID will never change, but update
       // ID will be set to transactionID each time we update the object.
-      omVolumeArgs = OmVolumeArgs.builderFromProtobuf(volumeInfo)
+      OmVolumeArgs.Builder builder = OmVolumeArgs.builderFromProtobuf(volumeInfo)
           .setObjectID(ozoneManager.getObjectIdFromTxId(transactionLogIndex))
-          .setUpdateID(transactionLogIndex)
-          .build();
+          .setUpdateID(transactionLogIndex);
 
-      auditMap = omVolumeArgs.toAuditMap();
+      auditMap = builder.toAuditMap();
       // acquire lock.
       mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volume));
@@ -154,7 +152,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
 
       PersistedUserVolumeInfo volumeList = null;
       if (omMetadataManager.getVolumeTable().isExist(dbVolumeKey)) {
-        LOG.debug("volume:{} already exists", omVolumeArgs.getVolume());
+        LOG.debug("volume:{} already exists", volume);
         throw new OMException("Volume already exists",
             OMException.ResultCodes.VOLUME_ALREADY_EXISTS);
       } else {
@@ -164,15 +162,16 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
             ozoneManager.getMaxUserVolumeCount(), transactionLogIndex);
 
         // Add default ACL for volume
-        List<OzoneAcl> listOfAcls = getDefaultAclList(UserGroupInformation.createRemoteUser(owner),
+        List<OzoneAcl> defaultAclList = getDefaultAclList(UserGroupInformation.createRemoteUser(owner),
             ozoneManager.getConfig());
         // ACLs from VolumeArgs
-        if (omVolumeArgs.getAcls() != null && !ozoneManager.getConfig().ignoreClientACLs()) {
-          listOfAcls.addAll(omVolumeArgs.getAcls());
+        if (ozoneManager.getConfig().ignoreClientACLs()) {
+          builder.acls().set(defaultAclList);
+        } else {
+          builder.acls().addAll(defaultAclList);
         }
-        // Remove the duplicates
-        listOfAcls = listOfAcls.stream().distinct().collect(Collectors.toList());
-        omVolumeArgs.setAcls(listOfAcls);
+
+        omVolumeArgs = builder.build();
 
         createVolume(omMetadataManager, omVolumeArgs, volumeList, dbVolumeKey,
             dbUserKey, transactionLogIndex);
