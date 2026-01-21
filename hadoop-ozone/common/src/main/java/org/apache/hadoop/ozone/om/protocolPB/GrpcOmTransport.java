@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.net.InetAddress;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +42,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
@@ -296,26 +298,18 @@ public class GrpcOmTransport implements OmTransport {
   }
 
   public void shutdown() {
-    for (Map.Entry<String, ManagedChannel> entry : channels.entrySet()) {
-      ManagedChannel channel = entry.getValue();
+    for (ManagedChannel channel : channels.values()) {
       channel.shutdown();
     }
 
     final long maxWaitMillis = TimeUnit.SECONDS.toMillis(5);
-    long startDeadline = System.currentTimeMillis();
-    long elapsed = 0;
-    boolean allTerminated = false;
+    long deadline = System.currentTimeMillis() + maxWaitMillis;
+    List<Map.Entry<String, ManagedChannel>> nonTerminated =
+        new ArrayList<>(channels.entrySet());
 
-    while (elapsed < maxWaitMillis) {
-      allTerminated = true;
-      for (Map.Entry<String, ManagedChannel> entry : channels.entrySet()) {
-        ManagedChannel channel = entry.getValue();
-        if (!channel.isTerminated()) {
-          allTerminated = false;
-          break;
-        }
-      }
-      if (allTerminated) {
+    while (!nonTerminated.isEmpty() && System.currentTimeMillis() < deadline) {
+      nonTerminated.removeIf(e -> e.getValue().isTerminated());
+      if (nonTerminated.isEmpty()) {
         break;
       }
       try {
@@ -325,14 +319,13 @@ public class GrpcOmTransport implements OmTransport {
         Thread.currentThread().interrupt();
         break;
       }
-      elapsed = System.currentTimeMillis() - startDeadline;
     }
 
-    for (Map.Entry<String, ManagedChannel> entry : channels.entrySet()) {
-      ManagedChannel channel = entry.getValue();
-      if (!channel.isTerminated()) {
-        LOG.warn("Channel {} did not terminate within timeout.", entry.getKey());
-      }
+    if (!nonTerminated.isEmpty()) {
+      LOG.warn("Channels {} did not terminate within timeout.",
+          nonTerminated.stream()
+              .map(Map.Entry::getKey)
+              .collect(Collectors.toList()));
     }
 
     LOG.info("{}: stopped", CLIENT_NAME);
