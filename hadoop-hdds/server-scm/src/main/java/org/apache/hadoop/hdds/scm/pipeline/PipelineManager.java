@@ -222,4 +222,9 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
   boolean hasEnoughSpace(Pipeline pipeline, long containerSize);
 
   int openContainerLimit(List<DatanodeDetails> datanodes);
+
+  /**
+   * Get the pipeline metrics.
+   */
+  SCMPipelineMetrics getMetrics();
 }

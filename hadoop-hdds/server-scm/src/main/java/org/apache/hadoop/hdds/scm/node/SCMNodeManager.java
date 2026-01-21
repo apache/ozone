@@ -133,7 +133,7 @@ public class SCMNodeManager implements NodeManager {
   private final boolean useHostname;
   private final Map<String, Set<DatanodeID>> dnsToDnIdMap = new ConcurrentHashMap<>();
   private final int numPipelinesPerMetadataVolume;
-  private final int heavyNodeCriteria;
+  private final int datanodePipelineLimit;
   private final HDDSLayoutVersionManager scmLayoutVersionManager;
   private final EventPublisher scmNodeEventPublisher;
   private final SCMContext scmContext;
@@ -195,8 +195,9 @@ public class SCMNodeManager implements NodeManager {
     this.numPipelinesPerMetadataVolume =
         conf.getInt(ScmConfigKeys.OZONE_SCM_PIPELINE_PER_METADATA_VOLUME,
             ScmConfigKeys.OZONE_SCM_PIPELINE_PER_METADATA_VOLUME_DEFAULT);
-    String dnLimit = conf.get(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT);
-    this.heavyNodeCriteria = dnLimit == null ? 0 : Integer.parseInt(dnLimit);
+    this.datanodePipelineLimit = conf.getInt(
+        ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT,
+        ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT);
     this.numContainerPerVolume = conf.getInt(
         ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
         ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT_DEFAULT);
@@ -237,9 +238,7 @@ public class SCMNodeManager implements NodeManager {
    */
   @Override
   public List<DatanodeDetails> getNodes(NodeStatus nodeStatus) {
-    return nodeStateManager.getNodes(nodeStatus)
-        .stream()
-        .map(node -> (DatanodeDetails)node).collect(Collectors.toList());
+    return nodeStateManager.getNodes(nodeStatus);
   }
 
   /**
@@ -1602,8 +1601,8 @@ public class SCMNodeManager implements NodeManager {
   @Override
   public int pipelineLimit(DatanodeDetails dn) {
     try {
-      if (heavyNodeCriteria > 0) {
-        return heavyNodeCriteria;
+      if (datanodePipelineLimit > 0) {
+        return datanodePipelineLimit;
       } else if (nodeStateManager.getNode(dn).getHealthyVolumeCount() > 0) {
         return numPipelinesPerMetadataVolume *
             nodeStateManager.getNode(dn).getMetaDataVolumeCount();
