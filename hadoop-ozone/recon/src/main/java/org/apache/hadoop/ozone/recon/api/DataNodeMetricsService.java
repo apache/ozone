@@ -305,10 +305,10 @@ public class DataNodeMetricsService {
     if (currentStatus == MetricCollectionStatus.FINISHED) {
       DataNodeMetricsServiceResponse.Builder dnMetricsBuilder = DataNodeMetricsServiceResponse.newBuilder();
       dnMetricsBuilder
-        .setStatus(currentStatus)
-        .setTotalPendingDeletionSize(totalPendingDeletion)
-        .setTotalNodesQueried(totalNodesQueried)
-        .setTotalNodeQueryFailures(totalNodesFailed);
+          .setStatus(currentStatus)
+          .setTotalPendingDeletionSize(totalPendingDeletion)
+          .setTotalNodesQueried(totalNodesQueried)
+          .setTotalNodeQueryFailures(totalNodesFailed);
 
       if (limit < 0) {
         return dnMetricsBuilder.setPendingDeletion(pendingDeletionList).build();
