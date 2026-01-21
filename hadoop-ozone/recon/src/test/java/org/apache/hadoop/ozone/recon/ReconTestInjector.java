@@ -234,6 +234,31 @@ public class ReconTestInjector {
   }
 
   /**
+   * Closes all resources created by this injector.
+   * This should be called in test tearDown methods to ensure proper cleanup.
+   *
+   * @throws Exception if any resource fails to close
+   */
+  public void close() throws Exception {
+    // Close ReconDBProvider if it was created
+    if (withContainerDB && injector != null) {
+      try {
+        ReconDBProvider reconDBProvider =
+            injector.getInstance(ReconDBProvider.class);
+        if (reconDBProvider != null) {
+          reconDBProvider.close();
+        }
+      } catch (Exception e) {
+      }
+    }
+
+    // Close OzoneStorageContainerManager if it was created
+    if (reconScm != null) {
+      reconScm.stop();
+    }
+  }
+
+  /**
    * Builder for Recon Test Injector.
    */
   public static class Builder {

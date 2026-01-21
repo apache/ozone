@@ -86,7 +86,6 @@ import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
-import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTaskOBS;
 import org.apache.hadoop.ozone.recon.tasks.GlobalStatsValue;
@@ -110,8 +109,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   private ReconOMMetadataManager reconOMMetadataManager;
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private OMDBInsightEndpoint omdbInsightEndpoint;
-  private OzoneStorageContainerManager ozoneStorageContainerManager;
-  private ReconDBProvider reconDBProvider;
+  private ReconTestInjector reconTestInjector;
   private Pipeline pipeline;
   private Random random = new Random();
   private OzoneConfiguration ozoneConfiguration;
@@ -300,7 +298,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
         Files.createDirectory(temporaryFolder.resolve(
             "JunitOmMetadataTest")).toFile());
-    ReconTestInjector reconTestInjector =
+    reconTestInjector =
         new ReconTestInjector.Builder(temporaryFolder.toFile())
             .withReconSqlDb()
             .withReconOm(reconOMMetadataManager)
@@ -319,9 +317,8 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         reconTestInjector.getInstance(ReconContainerMetadataManager.class);
     omdbInsightEndpoint = reconTestInjector.getInstance(
         OMDBInsightEndpoint.class);
-    ozoneStorageContainerManager =
+    OzoneStorageContainerManager ozoneStorageContainerManager =
         reconTestInjector.getInstance(OzoneStorageContainerManager.class);
-    reconDBProvider = reconTestInjector.getInstance(ReconDBProvider.class);
     ReconPipelineManager reconPipelineManager = (ReconPipelineManager)
                                                     ozoneStorageContainerManager.getPipelineManager();
     pipeline = getRandomPipeline();
@@ -354,11 +351,8 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     if (reconOMMetadataManager != null) {
       reconOMMetadataManager.stop();
     }
-    if (ozoneStorageContainerManager != null) {
-      ozoneStorageContainerManager.stop();
-    }
-    if (reconDBProvider != null) {
-      reconDBProvider.close();
+    if (reconTestInjector != null) {
+      reconTestInjector.close();
     }
   }
 
