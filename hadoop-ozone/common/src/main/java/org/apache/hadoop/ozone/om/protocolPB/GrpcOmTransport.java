@@ -73,7 +73,7 @@ public class GrpcOmTransport implements OmTransport {
 
   private static final String CLIENT_NAME = "GrpcOmTransport";
   private static final int SHUTDOWN_WAIT_INTERVAL = 100;
-  private static final int SHUTDOWN_MAX_WAIT_MILLIS = 5;
+  private static final int SHUTDOWN_MAX_WAIT_SECONDS = 5;
   private final AtomicBoolean isRunning = new AtomicBoolean(false);
 
   // gRPC specific
@@ -304,13 +304,12 @@ public class GrpcOmTransport implements OmTransport {
       channel.shutdown();
     }
 
-    final long maxWaitMillis = TimeUnit.SECONDS.toMillis(SHUTDOWN_MAX_WAIT_MILLIS);
-    long deadline = System.currentTimeMillis() + maxWaitMillis;
-    List<Map.Entry<String, ManagedChannel>> nonTerminated =
-        new ArrayList<>(channels.entrySet());
+    final long maxWaitNanos = TimeUnit.SECONDS.toNanos(SHUTDOWN_MAX_WAIT_SECONDS);
+    long deadline = System.nanoTime() + maxWaitNanos;
+    List<ManagedChannel> nonTerminated = new ArrayList<>(channels.values());
 
-    while (!nonTerminated.isEmpty() && System.currentTimeMillis() < deadline) {
-      nonTerminated.removeIf(e -> e.getValue().isTerminated());
+    while (!nonTerminated.isEmpty() && System.nanoTime() < deadline) {
+      nonTerminated.removeIf(ManagedChannel::isTerminated);
       if (nonTerminated.isEmpty()) {
         break;
       }
@@ -324,10 +323,11 @@ public class GrpcOmTransport implements OmTransport {
     }
 
     if (!nonTerminated.isEmpty()) {
-      LOG.warn("Channels {} did not terminate within timeout.",
-          nonTerminated.stream()
-              .map(Map.Entry::getKey)
-              .collect(Collectors.toList()));
+      List<String> failedChannels = channels.entrySet().stream()
+          .filter(e -> !e.getValue().isTerminated())
+          .map(Map.Entry::getKey)
+          .collect(Collectors.toList());
+      LOG.warn("Channels {} did not terminate within timeout.", failedChannels);
     }
 
     LOG.info("{}: stopped", CLIENT_NAME);
