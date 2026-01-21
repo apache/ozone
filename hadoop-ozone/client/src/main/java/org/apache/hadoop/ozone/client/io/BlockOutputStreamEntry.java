@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.client.io;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.concurrent.ExecutorService;
@@ -58,6 +59,10 @@ public class BlockOutputStreamEntry extends OutputStream {
   private BlockOutputStream outputStream;
   private BlockID blockID;
   private final String key;
+  private final String volumeName;
+  private final String bucketName;
+  private final long objectID;
+  private final long parentObjectID;
   private final XceiverClientFactory xceiverClientManager;
   private final Pipeline pipeline;
   // total number of bytes that should be written to this stream
@@ -87,6 +92,10 @@ public class BlockOutputStreamEntry extends OutputStream {
     this.outputStream = null;
     this.blockID = b.blockID;
     this.key = b.key;
+    this.volumeName = b.volumeName;
+    this.bucketName = b.bucketName;
+    this.objectID = b.objectID;
+    this.parentObjectID = b.parentObjectID;
     this.xceiverClientManager = b.xceiverClientManager;
     this.pipeline = b.pipeline;
     this.token = b.token;
@@ -155,7 +164,7 @@ public class BlockOutputStreamEntry extends OutputStream {
   void createOutputStream() throws IOException {
     outputStream = new RatisBlockOutputStream(blockID, length, xceiverClientManager,
         pipeline, bufferPool, config, token, clientMetrics, streamBufferArgs,
-        executorServiceSupplier);
+        executorServiceSupplier, volumeName, bucketName, key, objectID, parentObjectID, Instant.now());
   }
 
   ContainerClientMetrics getClientMetrics() {
@@ -398,6 +407,26 @@ public class BlockOutputStreamEntry extends OutputStream {
     return this.bufferPool;
   }
 
+  protected String getVolumeName() {
+    return volumeName;
+  }
+
+  protected String getBucketName() {
+    return bucketName;
+  }
+
+  protected String getKey() {
+    return key;
+  }
+
+  protected long getObjectID() {
+    return objectID;
+  }
+
+  protected long getParentObjectID() {
+    return parentObjectID;
+  }
+
   /**
    * Builder class for ChunkGroupOutputStreamEntry.
    * */
@@ -405,6 +434,10 @@ public class BlockOutputStreamEntry extends OutputStream {
 
     private BlockID blockID;
     private String key;
+    private String volumeName;
+    private String bucketName;
+    private long objectID;
+    private long parentObjectID;
     private XceiverClientFactory xceiverClientManager;
     private Pipeline pipeline;
     private long length;
@@ -431,6 +464,26 @@ public class BlockOutputStreamEntry extends OutputStream {
 
     public Builder setKey(String keys) {
       this.key = keys;
+      return this;
+    }
+
+    public Builder setVolumeName(String volume) {
+      this.volumeName = volume;
+      return this;
+    }
+
+    public Builder setBucketName(String bucket) {
+      this.bucketName = bucket;
+      return this;
+    }
+
+    public Builder setObjectID(long objId) {
+      this.objectID = objId;
+      return this;
+    }
+
+    public Builder setParentObjectID(long parentObjId) {
+      this.parentObjectID = parentObjId;
       return this;
     }
 

@@ -17,6 +17,12 @@
 
 package org.apache.hadoop.ozone.container.ec.reconstruction;
 
+import static org.apache.hadoop.ozone.OzoneBlockMetadata.BUCKET_NAME;
+import static org.apache.hadoop.ozone.OzoneBlockMetadata.CREATION_TIME;
+import static org.apache.hadoop.ozone.OzoneBlockMetadata.KEY_NAME;
+import static org.apache.hadoop.ozone.OzoneBlockMetadata.OBJECT_ID;
+import static org.apache.hadoop.ozone.OzoneBlockMetadata.PARENT_OBJECT_ID;
+import static org.apache.hadoop.ozone.OzoneBlockMetadata.VOLUME_NAME;
 import static org.apache.hadoop.ozone.container.common.helpers.TokenHelper.encode;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -26,6 +32,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -223,16 +230,62 @@ public class ECReconstructionCoordinator implements Closeable {
 
   private ECBlockOutputStream getECBlockOutputStream(
       BlockLocationInfo blockLocationInfo, DatanodeDetails datanodeDetails,
-      ECReplicationConfig repConfig, int replicaIndex) throws IOException {
-    StreamBufferArgs streamBufferArgs =
-        StreamBufferArgs.getDefaultStreamBufferArgs(repConfig, ozoneClientConfig);
+      ECReplicationConfig repConfig, int replicaIndex, BlockData[] blockDataGroup) throws IOException {
+
+    // Extract metadata from first healthy block replica
+    String volumeName = "UNKNOWN";
+    String bucketName = "UNKNOWN";
+    String keyName = "EC_RECONSTRUCTION";
+    long objectID = -1L;
+    long parentObjectID = -1L;
+    Instant creationTime = null;
+
+    if (blockDataGroup != null) {
+      for (BlockData blockData : blockDataGroup) {
+        if (blockData != null && blockData.getMetadata() != null) {
+          Map<String, String> metadata = blockData.getMetadata();
+          volumeName = metadata.getOrDefault(VOLUME_NAME, "UNKNOWN");
+          bucketName = metadata.getOrDefault(BUCKET_NAME, "UNKNOWN");
+          keyName = metadata.getOrDefault(KEY_NAME, "EC_RECONSTRUCTION");
+          String objectIdStr = metadata.get(OBJECT_ID);
+          if (objectIdStr != null) {
+            try {
+              objectID = Long.parseLong(objectIdStr);
+            } catch (NumberFormatException e) {
+              // Keep default -1L
+            }
+          }
+          String parentObjectIdStr = metadata.get(PARENT_OBJECT_ID);
+          if (parentObjectIdStr != null) {
+            try {
+              parentObjectID = Long.parseLong(parentObjectIdStr);
+            } catch (NumberFormatException e) {
+              // Keep default -1L
+            }
+          }
+          String creationTimeStr = metadata.get(CREATION_TIME);
+          if (creationTimeStr != null) {
+            try {
+              creationTime = Instant.parse(creationTimeStr);
+            } catch (Exception e) {
+              // Keep null to use current time
+            }
+          }
+
+          break;
+        }
+      }
+    }
+
+    StreamBufferArgs streamBufferArgs = StreamBufferArgs.getDefaultStreamBufferArgs(repConfig, ozoneClientConfig);
     return new ECBlockOutputStream(
         blockLocationInfo.getBlockID(),
         containerOperationClient.getXceiverClientManager(),
         containerOperationClient.singleNodePipeline(datanodeDetails,
             repConfig, replicaIndex),
         BufferPool.empty(), ozoneClientConfig,
-        blockLocationInfo.getToken(), clientMetrics, streamBufferArgs, ecReconstructWriteExecutor);
+        blockLocationInfo.getToken(), clientMetrics, streamBufferArgs, ecReconstructWriteExecutor,
+        volumeName, bucketName, keyName, objectID, parentObjectID, creationTime);
   }
 
   @VisibleForTesting
@@ -278,7 +331,8 @@ public class ECReconstructionCoordinator implements Closeable {
         for (int i = 0; i < toReconstructIndexes.size(); i++) {
           int replicaIndex = toReconstructIndexes.get(i);
           DatanodeDetails datanodeDetails = targetMap.get(replicaIndex);
-          targetBlockStreams[i] = getECBlockOutputStream(blockLocationInfo, datanodeDetails, repConfig, replicaIndex);
+          targetBlockStreams[i] =
+              getECBlockOutputStream(blockLocationInfo, datanodeDetails, repConfig, replicaIndex, blockDataGroup);
           bufs[i] = byteBufferPool.getBuffer(false, repConfig.getEcChunkSize());
           bufs[i].clear();
         }
@@ -287,7 +341,8 @@ public class ECReconstructionCoordinator implements Closeable {
         for (int i = 0; i < notReconstructIndexes.size(); i++) {
           int replicaIndex = notReconstructIndexes.get(i);
           DatanodeDetails datanodeDetails = targetMap.get(replicaIndex);
-          emptyBlockStreams[i] = getECBlockOutputStream(blockLocationInfo, datanodeDetails, repConfig, replicaIndex);
+          emptyBlockStreams[i] =
+              getECBlockOutputStream(blockLocationInfo, datanodeDetails, repConfig, replicaIndex, blockDataGroup);
         }
 
         if (!toReconstructIndexes.isEmpty()) {

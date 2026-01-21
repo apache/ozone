@@ -24,6 +24,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -77,14 +78,15 @@ public class ECBlockOutputStreamEntry extends BlockOutputStreamEntry {
     if (!isInitialized()) {
       final ECBlockOutputStream[] streams =
           new ECBlockOutputStream[replicationConfig.getRequiredNodes()];
+      Instant timestamp = Instant.now();
       for (int i = currentStreamIdx; i < replicationConfig
           .getRequiredNodes(); i++) {
         List<DatanodeDetails> nodes = getPipeline().getNodes();
         streams[i] =
             new ECBlockOutputStream(getBlockID(), getXceiverClientManager(),
-                createSingleECBlockPipeline(getPipeline(), nodes.get(i), i + 1),
-                getBufferPool(), getConf(), getToken(), getClientMetrics(), getStreamBufferArgs(),
-                getExecutorServiceSupplier());
+                createSingleECBlockPipeline(getPipeline(), nodes.get(i), i + 1), getBufferPool(),
+                getConf(), getToken(), getClientMetrics(), getStreamBufferArgs(), getExecutorServiceSupplier(),
+                getVolumeName(), getBucketName(), getKey(), getObjectID(), getParentObjectID(), timestamp);
       }
       blockOutputStreams = streams;
     }

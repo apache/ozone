@@ -73,6 +73,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
   private int currentStreamIndex;
   private final OzoneManagerProtocol omClient;
   private final OmKeyArgs keyArgs;
+  private final long objectID;
   private final XceiverClientFactory xceiverClientFactory;
   /**
    * A {@link BufferPool} shared between all
@@ -89,12 +90,16 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
   // update blocks on OM
   private ContainerBlockID lastUpdatedBlockId = new ContainerBlockID(-1, -1);
 
+  private long parentObjectID;
+
   public BlockOutputStreamEntryPool(KeyOutputStream.Builder b) {
     this.config = b.getClientConfig();
     this.xceiverClientFactory = b.getXceiverManager();
     currentStreamIndex = 0;
     this.omClient = b.getOmClient();
     final OmKeyInfo info = b.getOpenHandler().getKeyInfo();
+    this.objectID = info.getObjectID();
+    this.parentObjectID = info.getParentObjectID();
     this.keyArgs = new OmKeyArgs.Builder().setVolumeName(info.getVolumeName())
         .setBucketName(info.getBucketName()).setKeyName(info.getKeyName())
         .setReplicationConfig(b.getReplicationConfig())
@@ -157,6 +162,10 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
         new BlockOutputStreamEntry.Builder()
             .setBlockID(subKeyInfo.getBlockID())
             .setKey(keyArgs.getKeyName())
+            .setVolumeName(keyArgs.getVolumeName())
+            .setBucketName(keyArgs.getBucketName())
+            .setObjectID(objectID)
+            .setParentObjectID(parentObjectID)
             .setXceiverClientManager(xceiverClientFactory)
             .setPipeline(subKeyInfo.getPipeline())
             .setConfig(config)
@@ -280,6 +289,22 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
 
   String getKeyName() {
     return keyArgs.getKeyName();
+  }
+
+  protected String getVolumeName() {
+    return keyArgs.getVolumeName();
+  }
+
+  protected String getBucketName() {
+    return keyArgs.getBucketName();
+  }
+
+  protected long getObjectID() {
+    return objectID;
+  }
+
+  protected long getParentObjectID() {
+    return parentObjectID;
   }
 
   synchronized long getKeyLength() {
