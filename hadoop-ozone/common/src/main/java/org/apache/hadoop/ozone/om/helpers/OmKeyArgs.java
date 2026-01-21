@@ -352,7 +352,7 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
 
     public Builder addAllMetadataGdpr(Map<String, String> metadatamap) {
       addAllMetadata(metadatamap);
-      if (Boolean.parseBoolean(metadatamap.get(OzoneConsts.GDPR_FLAG))) {
+      if (metadatamap != null && Boolean.parseBoolean(metadatamap.get(OzoneConsts.GDPR_FLAG))) {
         GDPRSymmetricKey.newDefaultInstance().acceptKeyDetails(this::addMetadata);
       }
       return this;
