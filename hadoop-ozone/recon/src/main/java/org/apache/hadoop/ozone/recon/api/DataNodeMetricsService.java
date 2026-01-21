@@ -300,16 +300,23 @@ public class DataNodeMetricsService {
     totalNodesFailed = 0;
   }
 
-  public DataNodeMetricsServiceResponse getCollectedMetrics() {
+  public DataNodeMetricsServiceResponse getCollectedMetrics(int limit) {
     startTask();
     if (currentStatus == MetricCollectionStatus.FINISHED) {
-      return DataNodeMetricsServiceResponse.newBuilder()
-          .setStatus(currentStatus)
-          .setPendingDeletion(pendingDeletionList)
-          .setTotalPendingDeletionSize(totalPendingDeletion)
-          .setTotalNodesQueried(totalNodesQueried)
-          .setTotalNodeQueryFailures(totalNodesFailed)
-          .build();
+      DataNodeMetricsServiceResponse.Builder dnMetricsBuilder = DataNodeMetricsServiceResponse.newBuilder();
+      dnMetricsBuilder
+        .setStatus(currentStatus)
+        .setTotalPendingDeletionSize(totalPendingDeletion)
+        .setTotalNodesQueried(totalNodesQueried)
+        .setTotalNodeQueryFailures(totalNodesFailed);
+
+      if (limit < 0) {
+        return dnMetricsBuilder.setPendingDeletion(pendingDeletionList).build();
+      } else {
+        return dnMetricsBuilder.setPendingDeletion(
+            pendingDeletionList.subList(0, Math.min(limit, pendingDeletionList.size())
+        )).build();
+      }
     }
     return DataNodeMetricsServiceResponse.newBuilder()
         .setStatus(currentStatus)

@@ -46,6 +46,7 @@ type CapacityState = {
 
 const Capacity: React.FC<object> = () => {
   const PENDING_POLL_INTERVAL = 5 * 1000;
+  const DN_CSV_DOWNLOAD_URL = '/api/v1/pendingDeletion/download';
 
   const [state, setState] = React.useState<CapacityState>({
     isDNPending: true,
@@ -80,7 +81,7 @@ const Capacity: React.FC<object> = () => {
   );
 
   const dnPendingDeletes = useApiData<DNPendingDeletion>(
-    '/api/v1/pendingDeletion?component=dn',
+    '/api/v1/pendingDeletion?component=dn&limit=15',
     CONSTANTS.DEFAULT_DN_PENDING_DELETION,
     {
       retryAttempts: 2,
@@ -107,7 +108,7 @@ const Capacity: React.FC<object> = () => {
     })
   }
 
-  const autoReload = useAutoReload(loadDNData);
+  const autoReload = useAutoReload(loadDNData, PENDING_POLL_INTERVAL);
 
   const selectedDNDetails: DataNodeUsage & { pendingBlockSize: number } = React.useMemo(() => {
     const selected = storageDistribution.data.dataNodeUsage.find(datanode => datanode.hostName === selectedDatanode)
@@ -131,18 +132,45 @@ const Capacity: React.FC<object> = () => {
     }
   }, [selectedDatanode, storageDistribution.data.dataNodeUsage, dnPendingDeletes.data.pendingDeletionPerDataNode]);
 
+  const downloadCsv = async (url: string) => {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        showDataFetchError(`CSV download failed: ${response.statusText}`);
+        return;
+      }
+      const blob = await response.blob();
+      const contentDisposition = response.headers.get('content-disposition');
+      const filenameMatch = contentDisposition?.match(/filename="([^"]+)"/);
+      const filename = filenameMatch?.[1] ?? 'pending_deletion_stats.csv';
+      const link = document.createElement('a');
+      link.href = window.URL.createObjectURL(blob);
+      link.download = filename;
+      link.click();
+      window.URL.revokeObjectURL(link.href);
+    } catch (error) {
+      showDataFetchError((error as Error).toString());
+    }
+  };
+
   // Poll every 5s until status is FINISHED, then stop
   React.useEffect(() => {
     if (dnPendingDeletes.data.status !== "FINISHED") {
       if (!autoReload.isPolling) {
         autoReload.startPolling(PENDING_POLL_INTERVAL);
       }
-    } else {
-      if (autoReload.isPolling) {
-        autoReload.stopPolling();
-      }
+      return;
     }
-  }, [dnPendingDeletes.data.status, autoReload.isPolling, autoReload.startPolling, autoReload.stopPolling]);
+
+    if (autoReload.isPolling) {
+      autoReload.stopPolling();
+    }
+  }, [
+    dnPendingDeletes.data.status,
+    autoReload.isPolling,
+    autoReload.startPolling,
+    autoReload.stopPolling
+  ]);
 
   const dnReportStatus = (
     (dnPendingDeletes.data.totalNodeQueriesFailed ?? 0) > 0
@@ -318,6 +346,8 @@ const Capacity: React.FC<object> = () => {
             title={dnReportStatus}
             loading={dnPendingDeletes.loading || dnPendingDeletes.data.status !== "FINISHED"}
             showDropdown={true}
+            downloadUrl={DN_CSV_DOWNLOAD_URL}
+            onDownloadClick={() => downloadCsv(DN_CSV_DOWNLOAD_URL)}
             handleSelect={setSelectedDatanode}
             dropdownItems={storageDistribution.data.dataNodeUsage.map(datanode => ({
               label: (

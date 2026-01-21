@@ -20,6 +20,7 @@ import { EChart } from '@/components/eChart/eChart';
 import { GraphLegendIcon } from '@/utils/themeIcons';
 import { cardHeadStyle, statisticValueStyle } from '@/v2/pages/capacity/constants/styles.constants';
 import { Segment } from '@/v2/types/capacity.types';
+import { DownloadOutlined } from '@ant-design/icons';
 import { Card, Divider, Row, Select, Spin, Statistic } from 'antd';
 import filesize from 'filesize';
 import React from 'react';
@@ -35,10 +36,12 @@ type CapacityDetailProps = {
   title: string | React.ReactNode;
   showDropdown: boolean;
   dataDetails: DataDetailItem[];
+  downloadUrl?: string;
   dropdownItems?: {
     label: React.ReactNode | string;
     value: string;
   }[];
+  onDownloadClick?: () => void;
   disabledOpts?: string[];
   optsClass?: string;
   handleSelect?: React.Dispatch<React.SetStateAction<string>>
@@ -95,7 +98,9 @@ const CapacityDetail: React.FC<CapacityDetailProps> = (
   {
     title,
     showDropdown,
+    downloadUrl,
     dropdownItems,
+    onDownloadClick,
     disabledOpts,
     optsClass,
     dataDetails,
@@ -112,8 +117,25 @@ const CapacityDetail: React.FC<CapacityDetailProps> = (
     ...(optsClass && { className: optsClass }),
   })) ?? [];
 
+  const cardExtra = extra ?? (downloadUrl
+    ? (
+      <a
+        href={downloadUrl}
+        onClick={(event) => {
+          if (onDownloadClick) {
+            event.preventDefault();
+            onDownloadClick();
+          }
+        }}
+        rel='noopener noreferrer'
+      >
+        Download Insights <DownloadOutlined />
+      </a>
+    )
+    : undefined);
+
   return (
-    <Card title={title} size='small' headStyle={cardHeadStyle} extra={extra}>
+    <Card title={title} size='small' headStyle={cardHeadStyle} extra={cardExtra}>
       <Spin spinning={loading}>
           <>
             { showDropdown && options.length > 0 &&

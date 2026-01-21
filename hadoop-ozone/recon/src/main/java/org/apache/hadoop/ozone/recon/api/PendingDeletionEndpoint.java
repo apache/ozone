@@ -17,16 +17,23 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
+import java.io.BufferedWriter;
+import java.io.OutputStreamWriter;
 import java.util.Map;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.StreamingOutput;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVPrinter;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsServiceResponse;
+import org.apache.hadoop.ozone.recon.api.types.DatanodePendingDeletionMetrics;
 import org.apache.hadoop.ozone.recon.api.types.ScmPendingDeletion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,7 +63,12 @@ public class PendingDeletionEndpoint {
   }
 
   @GET
-  public Response getPendingDeletionByComponent(@QueryParam("component") String component) {
+  public Response getPendingDeletionByComponent(
+      @QueryParam("component")
+      String component,
+      @QueryParam("limit")
+      int limit
+  ) {
     if (component == null || component.isEmpty()) {
       return Response.status(Response.Status.BAD_REQUEST)
           .entity("component query parameter is required").build();
@@ -64,7 +76,7 @@ public class PendingDeletionEndpoint {
     final String normalizedComponent = component.trim().toLowerCase();
     switch (normalizedComponent) {
     case "dn":
-      return handleDataNodeMetrics();
+      return handleDataNodeMetrics(limit);
     case "scm":
       return handleScmPendingDeletion();
     case "om":
@@ -75,8 +87,57 @@ public class PendingDeletionEndpoint {
     }
   }
 
-  private Response handleDataNodeMetrics() {
-    DataNodeMetricsServiceResponse response = dataNodeMetricsService.getCollectedMetrics();
+  @GET
+  @Path("/download")
+  public Response downloadPendingDeleteData() {
+    DataNodeMetricsServiceResponse dnMetricsResponse = dataNodeMetricsService.getCollectedMetrics(-1);
+
+    if (dnMetricsResponse.getStatus() != DataNodeMetricsService.MetricCollectionStatus.FINISHED) {
+      return Response.status(Response.Status.ACCEPTED)
+          .entity(dnMetricsResponse)
+          .type("application/json")
+          .build();
+    }
+
+    if (null == dnMetricsResponse.getPendingDeletionPerDataNode()) {
+      return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+          .entity("Metrics data is missing despite FINISHED status.")
+          .type("text/plain")
+          .build();
+    }
+
+    StreamingOutput stream = output -> {
+      CSVFormat format = CSVFormat.DEFAULT.builder()
+          .setHeader("HostName", "Datanode UUID", "Pending Block Size (bytes)").build();
+      try (CSVPrinter csvPrinter = new CSVPrinter(
+          new BufferedWriter(new OutputStreamWriter(output)), format)) {
+        for (DatanodePendingDeletionMetrics metric : dnMetricsResponse.getPendingDeletionPerDataNode()) {
+          csvPrinter.printRecord(
+              metric.getHostName(),
+              metric.getDatanodeUuid(),
+              metric.getPendingBlockSize()
+          );
+        }
+        csvPrinter.flush();
+      } catch (Exception e) {
+        LOG.error("Failed to stream CSV", e);
+        throw new WebApplicationException("Failed to generate CSV", e);
+      }
+    };
+
+    return Response.status(Response.Status.ACCEPTED)
+        .entity(stream)
+        .type("text/csv")
+        .header("Content-Disposition", "attachment; filename=\"pending_deletion_stats.csv\"")
+        .build();
+  }
+
+  private Response handleDataNodeMetrics(int limit) {
+    if (limit < 1) {
+      return Response.status(Response.Status.BAD_REQUEST)
+          .entity("Limit query parameter must be at-least 1").build();
+    }
+    DataNodeMetricsServiceResponse response = dataNodeMetricsService.getCollectedMetrics(limit);
     if (response.getStatus() == DataNodeMetricsService.MetricCollectionStatus.FINISHED) {
       return Response.ok(response).build();
     } else {
