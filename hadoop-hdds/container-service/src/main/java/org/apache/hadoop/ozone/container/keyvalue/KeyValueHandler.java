@@ -1037,6 +1037,9 @@ public class KeyValueHandler extends Handler {
     }
 
     ContainerProtos.BlockData blockDataProto = null;
+    long bytesWritten = 0;
+    boolean writeChunkSucceeded = false;
+    
     try {
       checkContainerOpen(kvContainer);
 
@@ -1057,9 +1060,11 @@ public class KeyValueHandler extends Handler {
             ChunkBuffer.wrap(writeChunk.getData().asReadOnlyByteBufferList());
         // TODO: Can improve checksum validation here. Make this one-shot after protocol change.
         validateChunkChecksumData(data, chunkInfo);
+        bytesWritten = chunkInfo.getLen();
       }
       chunkManager
           .writeChunk(kvContainer, blockID, chunkInfo, data, dispatcherContext);
+      writeChunkSucceeded = true;
 
       final boolean isCommit = dispatcherContext.getStage().isCommit();
       if (isCommit && writeChunk.hasBlock()) {
@@ -1092,14 +1097,29 @@ public class KeyValueHandler extends Handler {
             .getChunkData().getLen());
       }
     } catch (StorageContainerException ex) {
+      rollbackUsedSpaceOnWriteFailure(kvContainer, writeChunkSucceeded, bytesWritten);
       return ContainerUtils.logAndReturnError(LOG, ex, request);
     } catch (IOException ex) {
+      rollbackUsedSpaceOnWriteFailure(kvContainer, writeChunkSucceeded, bytesWritten);
       return ContainerUtils.logAndReturnError(LOG,
           new StorageContainerException("Write Chunk failed", ex, IO_EXCEPTION),
           request);
     }
 
     return getWriteChunkResponseSuccess(request, blockDataProto);
+  }
+
+  /**
+   * Roll back usedSpace when write operation fails after writeChunk succeeded.
+   */
+  private void rollbackUsedSpaceOnWriteFailure(KeyValueContainer kvContainer, boolean writeChunkSucceeded,
+      long bytesWritten) {
+    if (writeChunkSucceeded && bytesWritten > 0) {
+      HddsVolume volume = kvContainer.getContainerData().getVolume();
+      if (volume != null) {
+        volume.decrementUsedSpace(bytesWritten);
+      }
+    }
   }
 
   /**
