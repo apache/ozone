@@ -46,6 +46,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.DecommissionUtils;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -175,7 +176,7 @@ public class NodeEndpoint {
   private DatanodeStorageReport getStorageReport(DatanodeDetails datanode) {
     SCMNodeStat nodeStat =
         nodeManager.getNodeStat(datanode).get();
-    SCMNodeManager.FsUsageTotals fsUsage = nodeManager.getTotalFilesystemUsage(datanode);
+    SpaceUsageSource.Fixed fsUsage = nodeManager.getTotalFilesystemUsage(datanode);
     DatanodeStorageReport.Builder builder = DatanodeStorageReport.newBuilder()
         .setCapacity(nodeStat.getCapacity().get())
         .setUsed(nodeStat.getScmUsed().get())
@@ -186,7 +187,7 @@ public class NodeEndpoint {
     if (fsUsage != null) {
       builder.setFilesystemCapacity(fsUsage.getCapacity())
           .setFilesystemAvailable(fsUsage.getAvailable())
-          .setFilesystemUsed(fsUsage.getUsed());
+          .setFilesystemUsed(fsUsage.getUsedSpace());
     }
     return builder.build();
   }

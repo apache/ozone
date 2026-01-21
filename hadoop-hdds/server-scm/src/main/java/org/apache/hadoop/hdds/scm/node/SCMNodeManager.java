@@ -55,6 +55,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
@@ -1036,9 +1037,9 @@ public class SCMNodeManager implements NodeManager {
       usageInfo.setContainerCount(getContainerCount(dn));
       usageInfo.setPipelineCount(getPipeLineCount(dn));
       usageInfo.setReserved(getTotalReserved(dn));
-      FsUsageTotals fs = getTotalFilesystemUsage(dn);
+      SpaceUsageSource.Fixed fs = getTotalFilesystemUsage(dn);
       if (fs != null) {
-        usageInfo.setFilesystemUsage(fs.capacity, fs.available);
+        usageInfo.setFilesystemUsage(fs.getCapacity(), fs.getAvailable());
       }
     } catch (NodeNotFoundException ex) {
       LOG.error("Unknown datanode {}.", dn, ex);
@@ -1775,7 +1776,7 @@ public class SCMNodeManager implements NodeManager {
    * Compute aggregated raw filesystem capacity/available/used for a datanode
    * from the storage reports.
    */
-  public FsUsageTotals getTotalFilesystemUsage(DatanodeDetails datanodeDetails) {
+  public SpaceUsageSource.Fixed getTotalFilesystemUsage(DatanodeDetails datanodeDetails) {
     final DatanodeInfo datanodeInfo;
     try {
       datanodeInfo = nodeStateManager.getNode(datanodeDetails);
@@ -1800,34 +1801,7 @@ public class SCMNodeManager implements NodeManager {
     if (!hasFsReport) {
       LOG.debug("Datanode {} does not have filesystem storage stats in its storage reports.", datanodeDetails);
     }
-    return hasFsReport ? new FsUsageTotals(capacity, available, capacity - available) : null;
-  }
-
-  /**
-   * Simple class for grouping disk space related values.
-   */
-  public static final class FsUsageTotals {
-    private final long capacity;
-    private final long available;
-    private final long used;
-
-    private FsUsageTotals(long capacity, long available, long used) {
-      this.capacity = capacity;
-      this.available = available;
-      this.used = used;
-    }
-
-    public long getCapacity() {
-      return capacity;
-    }
-
-    public long getAvailable() {
-      return available;
-    }
-
-    public long getUsed() {
-      return used;
-    }
+    return hasFsReport ? new SpaceUsageSource.Fixed(capacity, available, capacity - available) : null;
   }
 
   @Override
