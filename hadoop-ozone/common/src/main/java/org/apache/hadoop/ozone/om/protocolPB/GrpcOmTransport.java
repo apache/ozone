@@ -72,6 +72,8 @@ public class GrpcOmTransport implements OmTransport {
       LoggerFactory.getLogger(GrpcOmTransport.class);
 
   private static final String CLIENT_NAME = "GrpcOmTransport";
+  private static final int SHUTDOWN_WAIT_INTERVAL = 100;
+  private static final int SHUTDOWN_MAX_WAIT_MILLIS = 5;
   private final AtomicBoolean isRunning = new AtomicBoolean(false);
 
   // gRPC specific
@@ -302,7 +304,7 @@ public class GrpcOmTransport implements OmTransport {
       channel.shutdown();
     }
 
-    final long maxWaitMillis = TimeUnit.SECONDS.toMillis(5);
+    final long maxWaitMillis = TimeUnit.SECONDS.toMillis(SHUTDOWN_MAX_WAIT_MILLIS);
     long deadline = System.currentTimeMillis() + maxWaitMillis;
     List<Map.Entry<String, ManagedChannel>> nonTerminated =
         new ArrayList<>(channels.entrySet());
@@ -313,7 +315,7 @@ public class GrpcOmTransport implements OmTransport {
         break;
       }
       try {
-        Thread.sleep(100);
+        Thread.sleep(SHUTDOWN_WAIT_INTERVAL);
       } catch (InterruptedException e) {
         LOG.error("Interrupted while waiting for channels to terminate", e);
         Thread.currentThread().interrupt();
