@@ -265,7 +265,6 @@ Apache License 2.0
    ch.qos.reload4j:reload4j
    com.amazonaws:aws-java-sdk-core
    com.amazonaws:aws-java-sdk-kms
-   com.amazonaws:aws-java-sdk-logs
    com.amazonaws:aws-java-sdk-s3
    com.amazonaws:jmespath-java
    com.carrotsearch:hppc
@@ -383,10 +382,7 @@ Apache License 2.0
    org.apache.hadoop:hadoop-hdfs-client
    org.apache.hadoop:hadoop-shaded-guava
    org.apache.hadoop:hadoop-shaded-protobuf_3_25
-   org.apache.httpcomponents:httpasyncclient
    org.apache.httpcomponents:httpcore
-   org.apache.httpcomponents:httpcore-nio
-   org.apache.httpcomponents:httpmime
    org.apache.kerby:kerb-admin
    org.apache.kerby:kerb-client
    org.apache.kerby:kerb-common
@@ -404,11 +400,9 @@ Apache License 2.0
    org.apache.kerby:token-provider
    org.apache.logging.log4j:log4j-api
    org.apache.logging.log4j:log4j-core
-   org.apache.orc:orc-core
-   org.apache.orc:orc-shims
+   org.apache.ranger:ranger-audit-core
    org.apache.ranger:ranger-intg
    org.apache.ranger:ranger-plugin-classloader
-   org.apache.ranger:ranger-plugin-audit
    org.apache.ranger:ranger-plugin-common
    org.apache.ranger:ranger-plugin-cred
    org.apache.ratis:ratis-client
@@ -424,7 +418,6 @@ Apache License 2.0
    org.apache.ratis:ratis-tools
    org.apache.zookeeper:zookeeper
    org.apache.zookeeper:zookeeper-jute
-   org.eclipse.jetty:jetty-client
    org.eclipse.jetty:jetty-http
    org.eclipse.jetty:jetty-io
    org.eclipse.jetty:jetty-security
