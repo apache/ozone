@@ -20,6 +20,8 @@
     {{ ozone_bin }} sh bucket create {{ vol }}/{{ bucket }} || true
     {{ ozone_bin }} {{ create_key_cmd }} {{ vol }}/{{ bucket }}/{{ key }} /tmp/oz_smoke.bin
     rm -f /tmp/oz_smoke.bin
+  args:
+    executable: /bin/bash
   register: smoke_commands_result
   failed_when: smoke_commands_result.rc != 0
   run_once: true
@@ -30,6 +32,8 @@
   shell: |
     set -euo pipefail
     {{ ozone_bin }} sh key info {{ vol }}/{{ bucket }}/{{ key }}
+  args:
+    executable: /bin/bash
   register: key_info
   failed_when: key_info.rc != 0
   run_once: true

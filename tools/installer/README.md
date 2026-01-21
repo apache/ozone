@@ -1,5 +1,18 @@
 # Ozone Installer (Ansible)
 
+## On‑prem quickstart (with ozone-installer)
+
+This installer automates the on‑prem steps described in the official Ozone docs, including SCM/OM initialization and starting services (SCM, OM, Datanodes, Recon). See the Ozone on‑prem guide for the conceptual background and properties such as `ozone.metadata.dirs`, `ozone.scm.names`, and `ozone.om.address` [Ozone On Premise Installation](https://ozone.apache.org/docs/edge/start/onprem.html).
+
+
+What the installer does (mapped to the on‑prem doc):
+- Initializes SCM and OM once, in the correct order, then starts them
+- Starts Datanodes on all DN hosts
+- Starts Recon on the first Recon host
+- Renders `ozone-site.xml` with addresses derived from inventory (SCM names, OM address/service IDs, replication factor based on DN count)
+
+Ports and service behavior follow Ozone defaults; consult the official documentation for details [Ozone On Premise Installation](https://ozone.apache.org/docs/edge/start/onprem.html).
+
 ## Software Requirements
 
 - Controller: Python 3.10–3.12 (prefer 3.11) and pip
@@ -26,7 +39,6 @@ pip install -r requirements.txt
 ## File structure
 
 - `ansible.cfg` (defaults and logging)
-- `inventories/dev/hosts.ini` + `inventories/dev/group_vars/all.yml`
 - `playbooks/` (`cluster.yml`)
 - `roles/` (ssh_bootstrap, ozone_user, java, ozone_layout, ozone_fetch, ozone_config, ozone_service, ozone_smoke, cleanup, ozone_ui)
 
@@ -87,10 +99,11 @@ ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/dev/hosts.ini playboo
 
 ## Inventory
 
-Edit `inventories/dev/hosts.ini` and group vars in `inventories/dev/group_vars/all.yml`:
+When using the Python wrapper, inventory is built dynamically from `-H/--host` and persisted for reuse at:
+- `logs/last_inventory.ini` (groups: `[om]`, `[scm]`, `[datanodes]`, `[recon]` and optional `[s3g]`)
+- `logs/last_vars.json` (effective variables passed to the play)
 
-- Groups: `[om]`, `[scm]`, `[datanodes]`, `[recon]`
-- Key vars: `ozone_version`, `install_base`, `data_base`, `jdk_major`, `service_user`, `start_after_install`
+For direct Ansible runs, you may edit `inventories/dev/hosts.ini` and `inventories/dev/group_vars/all.yml`, or point to `logs/last_inventory.ini` and `logs/last_vars.json` that the wrapper generated.
 
 ## Non-HA
 
@@ -107,9 +120,26 @@ ANSIBLE_CONFIG=ansible.cfg ansible-playbook -i inventories/dev/hosts.ini playboo
 ## Notes
 
 - Idempotent where possible; runtime `ozone` init/start guarded with `creates:`.
-- JAVA_HOME and OZONE_HOME are exported in `/etc/profile.d/ozone.sh`.
+- JAVA_HOME and PATH are persisted for resume; runtime settings are exported via `ozone-env.sh`.
 - Local snapshot mode archives from the controller and uploads/extracts on targets using `unarchive`.
 - Logs are written to a per-run file under `logs/` named:
   - `ansible-<timestamp>-<hosts_raw_sanitized>.log`
   - Ansible and the Python wrapper share the same logfile.
+- After a successful run, the wrapper prints where to find process logs on target hosts, e.g. `<install base>/current/logs/ozone-<service-user>-<process>-<host>.log`.
+
+## Components and config mapping
+
+- Components (per the Ozone docs): Ozone Manager (OM), Storage Container Manager (SCM), Datanodes (DN), and Recon. The installer maps:
+  - Non‑HA: first host runs OM+SCM+Recon; all hosts are DNs.
+  - HA: first three hosts serve as OM and SCM sets; all hosts are DNs; first host is Recon.
+- `ozone-site.xml` is rendered from templates based on inventory groups:
+  - `ozone.scm.names`, `ozone.scm.client.address`, `ozone.om.address` or HA service IDs
+  - `ozone.metadata.dirs`, `hdds.datanode.dir`, and related paths map to `data_base`
+  - Replication is set to ONE if DN count < 3, otherwise THREE
+
+## Optional: S3 Gateway (S3G) and smoke
+
+- Define a `[s3g]` group in inventory (commonly the first OM host) to enable S3G properties in `ozone-site.xml` (default HTTP port 9878).
+- The smoke role can optionally install `awscli` on the first S3G host, configure dummy credentials, and create/list a test bucket against `http://localhost:9878` (for simple functional verification).
+
 
