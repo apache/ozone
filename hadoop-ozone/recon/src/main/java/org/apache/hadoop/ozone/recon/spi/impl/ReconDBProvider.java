@@ -121,21 +121,6 @@ public class ReconDBProvider {
         KeyValue<Object, Object> entry = tableIterator.next();
         table.delete(entry.getKey());
       }
-    } catch (Exception e) {
-      // Check if this is a closed database exception
-      if (e.getMessage() != null && e.getMessage().contains("closed")) {
-        // Log warning but don't fail if database is already closed
-        // This can happen during test cleanup or concurrent access scenarios
-        LOG.warn("Cannot truncate table {} - database is closed. " +
-            "Table may already be cleared or in process of being reinitialized.",
-            table.getName());
-        return;
-      }
-      // Re-throw other exceptions as they indicate real problems
-      if (e instanceof IOException) {
-        throw (IOException) e;
-      }
-      throw new IOException("Failed to truncate table " + table.getName(), e);
     }
   }
 

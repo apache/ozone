@@ -86,6 +86,7 @@ import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTaskOBS;
 import org.apache.hadoop.ozone.recon.tasks.GlobalStatsValue;
@@ -109,6 +110,8 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   private ReconOMMetadataManager reconOMMetadataManager;
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private OMDBInsightEndpoint omdbInsightEndpoint;
+  private OzoneStorageContainerManager ozoneStorageContainerManager;
+  private ReconDBProvider reconDBProvider;
   private Pipeline pipeline;
   private Random random = new Random();
   private OzoneConfiguration ozoneConfiguration;
@@ -316,8 +319,9 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
         reconTestInjector.getInstance(ReconContainerMetadataManager.class);
     omdbInsightEndpoint = reconTestInjector.getInstance(
         OMDBInsightEndpoint.class);
-    OzoneStorageContainerManager ozoneStorageContainerManager =
+    ozoneStorageContainerManager =
         reconTestInjector.getInstance(OzoneStorageContainerManager.class);
+    reconDBProvider = reconTestInjector.getInstance(ReconDBProvider.class);
     ReconPipelineManager reconPipelineManager = (ReconPipelineManager)
                                                     ozoneStorageContainerManager.getPipelineManager();
     pipeline = getRandomPipeline();
@@ -349,6 +353,12 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   public void tearDown() throws Exception {
     if (reconOMMetadataManager != null) {
       reconOMMetadataManager.stop();
+    }
+    if (ozoneStorageContainerManager != null) {
+      ozoneStorageContainerManager.stop();
+    }
+    if (reconDBProvider != null) {
+      reconDBProvider.close();
     }
   }
 
