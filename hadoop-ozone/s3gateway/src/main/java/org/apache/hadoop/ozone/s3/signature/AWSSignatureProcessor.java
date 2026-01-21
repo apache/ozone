@@ -103,11 +103,45 @@ public class AWSSignatureProcessor implements SignatureProcessor {
     if (signatureInfo == null) {
       signatureInfo = new SignatureInfo.Builder(Version.NONE).setService("s3").build();
     }
+
+    // Capture STS session token if present (header-based or query-based).
+    // - Header-based SigV4: x-amz-security-token
+    // - Query-based (for presigned URLs): X-Amz-Security-Token
+    final String sessionToken = extractSessionToken(headers);
+    if (sessionToken != null && !sessionToken.isEmpty()) {
+      signatureInfo.setSessionToken(sessionToken);
+    }
+
     String payloadHash = getPayloadHash(headers, signatureInfo);
     signatureInfo.setPayloadHash(payloadHash);
     signatureInfo.setUnfilteredURI(
         context.getUriInfo().getRequestUri().getPath());
     return signatureInfo;
+  }
+
+  private String extractSessionToken(LowerCaseKeyStringMap headers) {
+    // Header-based token
+    final String headerToken = headers.get("x-amz-security-token");
+    if (headerToken != null && !headerToken.isEmpty()) {
+      return headerToken;
+    }
+
+    // Query-based token - this would be used for presigned URLs
+    final MultivaluedMap<String, String> queryParams = context.getUriInfo().getQueryParameters();
+    if (queryParams == null) {
+      return null;
+    }
+    final String stsQueryParam = queryParams.getFirst("X-Amz-Security-Token");
+    if (stsQueryParam != null && !stsQueryParam.isEmpty()) {
+      return stsQueryParam;
+    }
+
+    // Check lowercase query parameter as well.
+    final String stsQueryParamLowercase = queryParams.getFirst("x-amz-security-token");
+    if (stsQueryParamLowercase != null && !stsQueryParamLowercase.isEmpty()) {
+      return stsQueryParamLowercase;
+    }
+    return null;
   }
 
   private String getPayloadHash(Map<String, String> headers, SignatureInfo signatureInfo)
