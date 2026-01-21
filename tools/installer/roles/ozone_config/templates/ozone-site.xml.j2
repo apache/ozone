@@ -4,6 +4,7 @@
 {% set _scm_all = groups.get('scm', []) | list %}
 {% set _all_dn_count = groups.get('datanodes', []) | list | length %}
 {% set recon_hosts = groups.get('recon', []) | list %}
+{% set s3g_hosts = groups.get('s3g', []) | list %}
 {% set om_hosts = (_om_all[:1] if not (ha_enabled | default(false)) else _om_all) %}
 {% set scm_hosts = (_scm_all[:1] if not (ha_enabled | default(false)) else _scm_all) %}
 
@@ -70,6 +71,16 @@
   <property>
     <name>ozone.recon.address</name>
     <value>{{ recon_hosts[0] }}:9891</value>
+  </property>
+{% endif %}
+{% if s3g_hosts|length > 0 %}
+  <property>
+    <name>ozone.s3g.http-address</name>
+    <value>{{ s3g_hosts[0] }}:9878</value>
+  </property>
+  <property>
+    <name>ozone.s3g.webadmin.http-address</name>
+    <value>{{ s3g_hosts[0] }}:19878</value>
   </property>
 {% endif %}
   <property>

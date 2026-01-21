@@ -285,7 +285,7 @@ def auto_cluster_mode(hosts: List[dict], forced: Optional[str] = None) -> str:
 
 def build_inventory(hosts: List[dict], ssh_user: Optional[str] = None, keyfile: Optional[str] = None, password: Optional[str] = None, cluster_mode: str = "non-ha") -> str:
     """
-    Returns INI inventory text for our groups: [om], [scm], [datanodes], [recon]
+    Returns INI inventory text for our groups: [om], [scm], [datanodes], [recon], [s3g]
     """
     if not hosts:
         return ""
@@ -293,7 +293,7 @@ def build_inventory(hosts: List[dict], ssh_user: Optional[str] = None, keyfile: 
     if cluster_mode == "non-ha":
         h = hosts[0]
         return _render_inv_groups(
-            om=[h], scm=[h], dn=hosts, recon=[h],
+            om=[h], scm=[h], dn=hosts, recon=[h], s3g=[h],
             ssh_user=ssh_user, keyfile=keyfile, password=password
         )
     # HA: first 3 go to OM and SCM; all to datanodes; recon is first if present
@@ -301,10 +301,11 @@ def build_inventory(hosts: List[dict], ssh_user: Optional[str] = None, keyfile: 
     scm = hosts[:3] if len(hosts) >= 3 else hosts
     dn = hosts
     recon = [hosts[0]]
-    return _render_inv_groups(om=om, scm=scm, dn=dn, recon=recon,
+    s3g = [hosts[0]]
+    return _render_inv_groups(om=om, scm=scm, dn=dn, recon=recon, s3g=s3g,
                               ssh_user=ssh_user, keyfile=keyfile, password=password)
 
-def _render_inv_groups(om: List[dict], scm: List[dict], dn: List[dict], recon: List[dict], ssh_user: Optional[str] = None, keyfile: Optional[str] = None, password: Optional[str] = None) -> str:
+def _render_inv_groups(om: List[dict], scm: List[dict], dn: List[dict], recon: List[dict], s3g: List[dict], ssh_user: Optional[str] = None, keyfile: Optional[str] = None, password: Optional[str] = None) -> str:
     def hostline(hd):
         parts = [hd["host"]]
         if ssh_user or hd.get("user"):
@@ -326,6 +327,8 @@ def _render_inv_groups(om: List[dict], scm: List[dict], dn: List[dict], recon: L
     sections += [hostline(h) for h in dn]
     sections.append("\n[recon]")
     sections += [hostline(h) for h in recon]
+    sections.append("\n[s3g]")
+    sections += [hostline(h) for h in s3g]
     sections.append("\n")
     return "\n".join(sections)
 

@@ -33,6 +33,7 @@
         - "org.apache.hadoop.hdds.scm.server.StorageContainerManagerStarter"
         - "org.apache.hadoop.ozone.HddsDatanodeService"
         - "org.apache.hadoop.ozone.recon.ReconServer"
+        - "org.apache.hadoop.ozone.s3.Gateway"
       loop_control:
         label: "{{ item }}"
 

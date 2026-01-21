@@ -91,4 +91,10 @@
       register: recon_start
       failed_when: recon_start.rc != 0
 
+    - name: "Start S3G on first s3g host"
+      command: "ozone --daemon start s3g"
+      when: (groups.get('s3g', []) | length > 0) and (inventory_hostname == groups['s3g'][0])
+      register: s3g_start
+      failed_when: s3g_start.rc != 0
+
 

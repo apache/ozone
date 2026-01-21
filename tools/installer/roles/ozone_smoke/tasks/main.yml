@@ -4,6 +4,7 @@
     create_key_cmd: "{{ 'sh key put --type RATIS --replication ONE' if groups.get('datanodes', []) | length < 3 else 'sh key put' }}"
     vol: "demovol"
     bucket: "demobuck"
+    s3g_bucket: "demos3g"
     key: "demokey"
     ozone_bin: "{{ install_base }}/current/bin/ozone"
 
@@ -42,3 +43,43 @@
       - "Stderr: {{ (key_info.stderr_lines | default([])) | join('\n') }}"
   run_once: true
 
+- name: "Create test bucket on S3G host (if present)"
+  block:
+    - name: "Install awscli on S3G host"
+      package:
+        name: awscli
+        state: present
+      become: true
+
+    - name: "AWS CLI configure dummy credentials for S3G tests"
+      shell: |
+        set -euo pipefail
+        aws configure set aws_access_key_id dummy
+        aws configure set aws_secret_access_key dummy
+
+    - name: "AWS CLI S3G: create test bucket '{{ s3g_bucket }}'"
+      shell: |
+        set -o pipefail
+        aws s3api create-bucket --bucket {{ s3g_bucket }} --endpoint-url "http://{{ groups['s3g'][0] }}:9878" || true
+      args:
+        executable: /bin/bash
+      register: aws_create_result
+      changed_when: false
+
+    - name: "AWS CLI S3G: list buckets"
+      shell: |
+        set -o pipefail
+        aws s3api list-buckets --endpoint-url "http://{{ groups['s3g'][0] }}:9878"
+      args:
+        executable: /bin/bash
+      register: aws_list_result
+      changed_when: false
+
+    - name: "Show AWS CLI S3G check output"
+      debug:
+        msg:
+          - "Create bucket output: {{ (aws_create_result.stdout | default('')) }}"
+          - "List buckets output: {{ (aws_list_result.stdout | default('')) }}"
+  when:
+    - groups.get('s3g', []) | length > 0
+    - inventory_hostname == groups['s3g'][0]
