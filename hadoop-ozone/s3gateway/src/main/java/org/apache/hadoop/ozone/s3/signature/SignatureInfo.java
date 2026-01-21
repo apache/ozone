@@ -59,6 +59,13 @@ public class SignatureInfo {
 
   private String service = null;
 
+  /**
+   * Optional AWS session token (x-amz-security-token / X-Amz-Security-Token).
+   * <p>
+   * This is required for STS temporary credentials when calling S3 APIs.
+   */
+  private String sessionToken = null;
+
   public SignatureInfo() { }
 
   private SignatureInfo(Builder b) {
@@ -78,7 +85,8 @@ public class SignatureInfo {
         .setUnfilteredURI(signatureInfo.getUnfilteredURI())
         .setStringToSign(signatureInfo.getStringToSign())
         .setPayloadHash(signatureInfo.getPayloadHash())
-        .setService(signatureInfo.getService()));
+        .setService(signatureInfo.getService())
+        .setSessionToken(signatureInfo.getSessionToken()));
   }
 
   private void initialize(Builder b) {
@@ -95,6 +103,7 @@ public class SignatureInfo {
     this.stringToSign = b.stringToSign;
     this.payloadHash = b.payloadHash;
     this.service = b.service;
+    this.sessionToken = b.sessionToken;
   }
 
   public String getAwsAccessId() {
@@ -165,6 +174,14 @@ public class SignatureInfo {
     this.service = service;
   }
 
+  public String getSessionToken() {
+    return sessionToken;
+  }
+
+  public void setSessionToken(String sessionToken) {
+    this.sessionToken = sessionToken;
+  }
+
   /**
    * Signature version.
    */
@@ -189,6 +206,7 @@ public class SignatureInfo {
     private String stringToSign = null;
     private String payloadHash = null;
     private String service = null;
+    private String sessionToken = null;
 
     public Builder(Version version) {
       this.version = version;
@@ -251,6 +269,11 @@ public class SignatureInfo {
 
     public Builder setService(String service) {
       this.service = service;
+      return this;
+    }
+
+    public Builder setSessionToken(String sessionToken) {
+      this.sessionToken = sessionToken;
       return this;
     }
 
