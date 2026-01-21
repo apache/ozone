@@ -108,18 +108,13 @@ public class ReconServer extends GenericCli implements Callable<Void> {
             ReconServer.class, originalArgs, LOG, configuration);
     ConfigurationProvider.setConfiguration(configuration);
 
-    String reconStarterUser = UserGroupInformation.getCurrentUser().getShortUserName();
-    Collection<String> adminUsers =
-        OzoneAdmins.getOzoneAdminsFromConfig(configuration, reconStarterUser);
-    adminUsers.addAll(
-        configuration.getStringCollection(ReconConfigKeys.OZONE_RECON_ADMINISTRATORS));
-
-    Collection<String> adminGroups =
-        OzoneAdmins.getOzoneAdminsGroupsFromConfig(configuration);
-    adminGroups.addAll(
-        configuration.getStringCollection(ReconConfigKeys.OZONE_RECON_ADMINISTRATORS_GROUPS));
-
-    reconAdmins = new OzoneAdmins(adminUsers, adminGroups);
+    try {
+      reconAdmins = createReconAdmins(configuration);
+    } catch (IOException e) {
+      LOG.error("Failed to identify current user for Recon admin initialization. " +
+          "Please check Kerberos configuration or system user settings.", e);
+      throw e;
+    }
     LOG.info("Recon start with adminUsers: {}", reconAdmins.getAdminUsernames());
 
     LOG.info("Initializing Recon server...");
@@ -444,6 +439,28 @@ public class ReconServer extends GenericCli implements Callable<Void> {
   @VisibleForTesting
   ReconHttpServer getHttpServer() {
     return httpServer;
+  }
+
+  /**
+   * Creates OzoneAdmins for Recon with the starter user and configured admins.
+   *
+   * @param conf OzoneConfiguration
+   * @return OzoneAdmins instance
+   * @throws IOException if unable to get current user
+   */
+  private OzoneAdmins createReconAdmins(OzoneConfiguration conf) throws IOException {
+    String starterUser = UserGroupInformation.getCurrentUser().getShortUserName();
+    Collection<String> adminUsers =
+        OzoneAdmins.getOzoneAdminsFromConfig(conf, starterUser);
+    adminUsers.addAll(
+        conf.getStringCollection(ReconConfigKeys.OZONE_RECON_ADMINISTRATORS));
+
+    Collection<String> adminGroups =
+        OzoneAdmins.getOzoneAdminsGroupsFromConfig(conf);
+    adminGroups.addAll(
+        conf.getStringCollection(ReconConfigKeys.OZONE_RECON_ADMINISTRATORS_GROUPS));
+
+    return new OzoneAdmins(adminUsers, adminGroups);
   }
 
   /**
