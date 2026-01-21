@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import { Popover, Tag, Tooltip, Typography } from 'antd';
+import { Popover, Tag, Typography } from 'antd';
 import React from 'react';
 import AutoReloadPanel from '@/components/autoReloadPanel/autoReloadPanel';
 
@@ -27,6 +27,7 @@ import CapacityBreakdown from '@/v2/pages/capacity/components/CapacityBreakdown'
 import CapacityDetail from '@/v2/pages/capacity/components/CapacityDetail';
 import {
   datanodesPendingDeletionDesc,
+  nodeSelectorMessage,
   otherUsedSpaceDesc,
   ozoneUsedSpaceDesc,
   totalCapacityDesc
@@ -174,7 +175,7 @@ const Capacity: React.FC<object> = () => {
 
   const dnReportStatus = (
     (dnPendingDeletes.data.totalNodeQueriesFailed ?? 0) > 0
-    ? <Tooltip title={<>
+    ? <Popover content={<>
       { (dnPendingDeletes.data.totalNodesQueried ?? 0)
         - (dnPendingDeletes.data.totalNodeQueriesFailed ?? 0)
       } / { (dnPendingDeletes.data.totalNodesQueried ?? 0) } DNs
@@ -182,16 +183,16 @@ const Capacity: React.FC<object> = () => {
     }>
       <WarningFilled style={{ color: '#f6a62eff', marginRight: 8, fontSize: 14 }} />
       Datanodes
-    </Tooltip>
-    : <Tooltip title={
+    </Popover>
+    : <Popover content={
       <>
         {dnPendingDeletes.data.totalNodesQueried ?? 0} / {dnPendingDeletes.data.totalNodesQueried ?? 0} DNs
       </>
     }>
       <CheckCircleFilled style={{ color: '#1ea57a', marginRight: 8, fontSize: 14 }} />
         Datanodes  
-    </Tooltip>
-  )
+    </Popover>
+  );
 
   const unusedSpaceBreakdown = (
     <span>
@@ -211,7 +212,13 @@ const Capacity: React.FC<object> = () => {
         <InfoCircleOutlined style={{ color: '#2f84d8', fontSize: 12, marginLeft: 4 }} />
       </Popover>
     </span>
-  )
+  );
+
+  const dnSelectorTitle = (
+    <span>
+      Node Selector <WrappedInfoIcon title={nodeSelectorMessage} />
+    </span>
+  );
 
   return (
     <>
@@ -346,6 +353,7 @@ const Capacity: React.FC<object> = () => {
             title={dnReportStatus}
             loading={dnPendingDeletes.loading || dnPendingDeletes.data.status !== "FINISHED"}
             showDropdown={true}
+            selectorTitle={dnSelectorTitle}
             downloadUrl={DN_CSV_DOWNLOAD_URL}
             onDownloadClick={() => downloadCsv(DN_CSV_DOWNLOAD_URL)}
             handleSelect={setSelectedDatanode}

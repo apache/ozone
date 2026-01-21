@@ -23,3 +23,5 @@ export const otherUsedSpaceDesc = 'This is the space occupied by other Ozone rel
 export const ozoneUsedSpaceDesc = 'These could also include potential missing space or extra occupied space due to situations like under-replication, over-replication, mismatched replicas, etc.';
 
 export const datanodesPendingDeletionDesc = 'This is the unreplicated size and a cumulative value of all the blocks across all the datanodes in the cluster.';
+
+export const nodeSelectorMessage = "This contains the list of the top 15 DNs by pending deletion size. The information on all the DNs is available as a CSV download."

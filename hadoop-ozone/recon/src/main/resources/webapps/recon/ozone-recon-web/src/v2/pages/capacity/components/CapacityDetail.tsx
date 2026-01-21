@@ -35,6 +35,7 @@ type DataDetailItem = {
 type CapacityDetailProps = {
   title: string | React.ReactNode;
   showDropdown: boolean;
+  selectorTitle?: string | React.ReactNode;
   dataDetails: DataDetailItem[];
   downloadUrl?: string;
   dropdownItems?: {
@@ -98,6 +99,7 @@ const CapacityDetail: React.FC<CapacityDetailProps> = (
   {
     title,
     showDropdown,
+    selectorTitle,
     downloadUrl,
     dropdownItems,
     onDownloadClick,
@@ -140,7 +142,7 @@ const CapacityDetail: React.FC<CapacityDetailProps> = (
           <>
             { showDropdown && options.length > 0 &&
               <div className='node-select-container'>
-                <strong>Node Selector:</strong>
+                {selectorTitle}
                 <Select
                   showSearch
                   defaultValue={options?.[0]?.value}

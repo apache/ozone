@@ -56,7 +56,7 @@
   "/datanodes/remove": "/datanodesRemove",
 
   "/storageDistribution": "/utilization",
-  "/pendingDeletion?component=dn": "/pendingDeletionDN",
+  "/pendingDeletion?component=dn&limit=*": "/pendingDeletionDN",
   "/pendingDeletion?component=om": "/pendingDeletionOM",
   "/pendingDeletion?component=scm": "/pendingDeletionSCM"
 }

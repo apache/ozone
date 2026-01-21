@@ -128,7 +128,7 @@ public class PendingDeletionEndpoint {
     return Response.status(Response.Status.ACCEPTED)
         .entity(stream)
         .type("text/csv")
-        .header("Content-Disposition", "attachment; filename=\"pending_deletion_stats.csv\"")
+        .header("Content-Disposition", "attachment; filename=\"pending_deletion_all_datanode_stats.csv\"")
         .build();
   }
 
