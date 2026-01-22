@@ -232,7 +232,7 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider<T> implements Failover
     public Object invoke(Object proxy, final Method method, final Object[] args)
         throws Throwable {
       lastProxy = null;
-      if (method.getDeclaringClass() != OzoneManagerProtocolPB.class) {
+      if (method.getDeclaringClass() == Object.class) {
         // If the method is not a OzoneManagerProtocolPB method (e.g. Object#toString()),
         // we should invoke the method on the current proxy
         return method.invoke(this, args);
