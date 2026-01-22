@@ -167,7 +167,7 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider<T> implements Failover
       error = "args.length == " + args.length + " < 2";
     } else if (args[1] == null) {
       error = "args[1] == null";
-    } else if (!(args[1] instanceof OMRequest)){
+    } else if (!(args[1] instanceof OMRequest)) {
       error = "Non-OMRequest: " + args[1].getClass();
     }
     if (error != null) {
