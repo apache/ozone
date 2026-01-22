@@ -242,7 +242,7 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider<T> implements Failover
       OMRequest omRequest = parseOMRequest(args);
       if (useFollowerRead && OmUtils.shouldSendToFollower(omRequest)) {
         int failedCount = 0;
-        for (int i = 0; i < failoverProxy.getOmNodesInOrder().size(); i++) {
+        for (int i = 0; useFollowerRead && i < failoverProxy.getOmNodesInOrder().size(); i++) {
           OMProxyInfo<T> current = getCurrentProxy();
           LOG.debug("Attempting to service {} with cmdType {} using proxy {}",
               method.getName(), omRequest.getCmdType(), current.proxyInfo);
