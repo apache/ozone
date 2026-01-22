@@ -281,11 +281,11 @@ public class DeletedBlockLogImpl
       if (!transactionStatusManager.isDuplication(
           datanodeID, tx.getTxID(), commandStatus)) {
         transactions.addTransactionToDN(datanodeID, tx);
-        addTxToTxSizeMap(tx);
         flag = true;
       }
     }
     if (flag) {
+      addTxToTxSizeMap(tx);
       metrics.incrProcessedTransaction();
     }
   }
@@ -440,10 +440,9 @@ public class DeletedBlockLogImpl
         lastProcessedTransactionId = keyValue != null ? keyValue.getKey() : -1;
 
         if (!txIDs.isEmpty()) {
-          deletedBlockLogStateManager.removeTransactionsFromDB(txIDs);
+          transactionStatusManager.removeTransactions(txIDs);
           getSCMDeletedBlockTransactionStatusManager().removeTransactionFromDNsCommitMap(txIDs);
           getSCMDeletedBlockTransactionStatusManager().removeTransactionFromDNsRetryCountMap(txIDs);
-          transactionStatusManager.removeTransactions(txIDs);
           metrics.incrBlockDeletionTransactionCompleted(txIDs.size());
         }
       }
