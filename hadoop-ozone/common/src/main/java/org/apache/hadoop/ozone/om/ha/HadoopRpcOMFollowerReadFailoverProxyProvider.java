@@ -21,7 +21,6 @@ import static org.apache.hadoop.ozone.om.ha.OMFailoverProxyProviderBase.getLeade
 import static org.apache.hadoop.ozone.om.ha.OMFailoverProxyProviderBase.getNotLeaderException;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.protobuf.Message;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
