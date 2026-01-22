@@ -161,16 +161,17 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider<T> implements Failover
    * @return parsed OM request.
    */
   private static OMRequest parseOMRequest(Object[] args) throws ServiceException {
-    if (args == null || args.length < 2 || !(args[1] instanceof Message)) {
-      LOG.error("Request failed since OM request is null and cannot be parsed");
+    final String error = args == null ? "args == null"
+        : args.length < 2 ? "args.length == " + args.length + " < 2"
+        : !(args[1] instanceof OMRequest) ? "Non-OMRequest: " + args[1].getClass()
+        : null;
+    if (error != null) {
       // Throws a non-retriable exception to prevent retry and failover
       // See the HddsUtils#shouldNotFailoverOnRpcException used in
       // OMFailoverProxyProviderBase#shouldFailover
-      throw wrapInServiceException(
-          new RpcNoSuchProtocolException("OM request is null and cannot be parsed"));
+      throw wrapInServiceException(new RpcNoSuchProtocolException("Failed to parseOMRequest: " + error));
     }
-    final Message theRequest = (Message) args[1];
-    return (OMRequest) theRequest;
+    return (OMRequest) args[1];
   }
 
   @VisibleForTesting
