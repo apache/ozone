@@ -117,7 +117,7 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider<T> implements Failover
     T wrappedProxy = (T) Proxy.newProxyInstance(
         FollowerReadInvocationHandler.class.getClassLoader(),
         new Class<?>[] {protocol}, new FollowerReadInvocationHandler());
-    combinedProxy = new ProxyInfo<>(wrappedProxy, combinedInfo.toString());
+    combinedProxy = new ProxyInfo<>(wrappedProxy, combinedInfo);
 
     if (wrappedProxy instanceof OzoneManagerProtocolPB) {
       this.useFollowerRead = true;
