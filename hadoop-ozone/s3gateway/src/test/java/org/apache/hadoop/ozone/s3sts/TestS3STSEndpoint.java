@@ -118,8 +118,7 @@ public class TestS3STSEndpoint {
 
   @Test
   public void testStsAssumeRoleValidForGetMethod() throws Exception {
-    Response response = endpoint.get(
-        "AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null);
+    final Response response = endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null);
 
     assertEquals(200, response.getStatus());
     verify(auditLogger).logWriteSuccess(any(AuditMessage.class));
@@ -157,6 +156,7 @@ public class TestS3STSEndpoint {
 
   @Test
   public void testStsAssumeRoleValidForPostMethod() throws Exception {
+    //noinspection resource
     final Response response = endpoint.post("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null);
 
     assertEquals(200, response.getStatus());
@@ -305,7 +305,7 @@ public class TestS3STSEndpoint {
     final String requestId = "test-request-id";
     ex.setRequestId(requestId);
     assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError",
-        "Invalid RoleArn: must be in the format arn:aws:iam::<account-id>:role/<role-name>");
+        "Invalid role ARN (does not start with arn:aws:iam::)");
   }
 
   @Test
@@ -335,7 +335,7 @@ public class TestS3STSEndpoint {
 
     final String requestId = "test-request-id";
     ex.setRequestId(requestId);
-    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", "Invalid RoleArn: must be in the format");
+    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", "Invalid role ARN: missing role name");
   }
 
   @Test
@@ -351,7 +351,7 @@ public class TestS3STSEndpoint {
 
     final String requestId = "test-request-id";
     ex.setRequestId(requestId);
-    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", "Invalid RoleArn: must be in the format"
+    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", "Invalid AWS account ID in ARN"
     );
   }
 
@@ -426,7 +426,7 @@ public class TestS3STSEndpoint {
 
     final String requestId = "test-request-id";
     ex.setRequestId(requestId);
-    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", "Invalid RoleArn: must be in the format");
+    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", "Invalid role ARN (unexpected field count)");
   }
 
   @Test

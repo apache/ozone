@@ -15,11 +15,12 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.request.s3.security;
+package org.apache.hadoop.ozone.om.helpers;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.junit.jupiter.api.Test;
 
@@ -38,12 +39,12 @@ public class TestAwsRoleArnValidator {
     assertThat(AwsRoleArnValidator.validateAndExtractRoleNameFromArn(ROLE_ARN_2)).isEqualTo("Role2");
 
     // Path name right at 511-char max boundary
-    final String arnPrefixLen511 = S3SecurityTestUtils.repeat('p', 510) + "/"; // 510 chars + '/' = 511
+    final String arnPrefixLen511 = StringUtils.repeat('p', 510) + "/"; // 510 chars + '/' = 511
     final String arnMaxPath = "arn:aws:iam::123456789012:role/" + arnPrefixLen511 + "RoleB";
     assertThat(AwsRoleArnValidator.validateAndExtractRoleNameFromArn(arnMaxPath)).isEqualTo("RoleB");
 
     // Role name right at 64-char max boundary
-    final String roleName64 = S3SecurityTestUtils.repeat('A', 64);
+    final String roleName64 = StringUtils.repeat('A', 64);
     final String arn64 = "arn:aws:iam::123456789012:role/" + roleName64;
     assertThat(AwsRoleArnValidator.validateAndExtractRoleNameFromArn(arn64)).isEqualTo(roleName64);
   }
@@ -61,7 +62,8 @@ public class TestAwsRoleArnValidator {
     final OMException e2 = assertThrows(
         OMException.class, () -> AwsRoleArnValidator.validateAndExtractRoleNameFromArn(null));
     assertThat(e2.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
-    assertThat(e2.getMessage()).isEqualTo("Role ARN is required");
+    assertThat(e2.getMessage()).isEqualTo(
+        "Value null at 'roleArn' failed to satisfy constraint: Member must not be null");
 
     // String without role name
     final OMException e3 = assertThrows(
@@ -90,7 +92,8 @@ public class TestAwsRoleArnValidator {
     final OMException e6 = assertThrows(
         OMException.class, () -> AwsRoleArnValidator.validateAndExtractRoleNameFromArn(""));
     assertThat(e6.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
-    assertThat(e6.getMessage()).isEqualTo("Role ARN is required");
+    assertThat(e6.getMessage()).isEqualTo(
+        "Value null at 'roleArn' failed to satisfy constraint: Member must not be null");
 
     // String with only slash
     final OMException e7 = assertThrows(
@@ -102,10 +105,10 @@ public class TestAwsRoleArnValidator {
     final OMException e8 = assertThrows(
         OMException.class, () -> AwsRoleArnValidator.validateAndExtractRoleNameFromArn("     "));
     assertThat(e8.getResult()).isEqualTo(OMException.ResultCodes.INVALID_REQUEST);
-    assertThat(e8.getMessage()).isEqualTo("Role ARN is required");
+    assertThat(e8.getMessage()).isEqualTo("Role ARN length must be between 20 and 2048");
 
     // Path name too long (> 511 characters)
-    final String arnPrefixLen512 = S3SecurityTestUtils.repeat('q', 511) + "/"; // 511 chars + '/' = 512
+    final String arnPrefixLen512 = StringUtils.repeat('q', 511) + "/"; // 511 chars + '/' = 512
     final String arnTooLongPath = "arn:aws:iam::123456789012:role/" + arnPrefixLen512 + "RoleA";
     final OMException e9 = assertThrows(
         OMException.class, () -> AwsRoleArnValidator.validateAndExtractRoleNameFromArn(arnTooLongPath));
@@ -120,7 +123,7 @@ public class TestAwsRoleArnValidator {
     assertThat(e10.getMessage()).isEqualTo("Invalid role ARN: missing role name");  // MyRole/ is considered a path
 
     // 65-char role name
-    final String roleName65 = S3SecurityTestUtils.repeat('B', 65);
+    final String roleName65 = StringUtils.repeat('B', 65);
     final String roleArn65 = "arn:aws:iam::123456789012:role/" + roleName65;
     final OMException e11 = assertThrows(
         OMException.class, () -> AwsRoleArnValidator.validateAndExtractRoleNameFromArn(roleArn65));
@@ -128,4 +131,3 @@ public class TestAwsRoleArnValidator {
     assertThat(e11.getMessage()).isEqualTo("Invalid role name: " + roleName65);
   }
 }
-

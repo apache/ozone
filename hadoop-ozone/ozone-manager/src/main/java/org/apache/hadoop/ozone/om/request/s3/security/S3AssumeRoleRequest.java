@@ -37,6 +37,7 @@ import org.apache.hadoop.ozone.om.OzoneAclUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
+import org.apache.hadoop.ozone.om.helpers.AwsRoleArnValidator;
 import org.apache.hadoop.ozone.om.helpers.S3STSUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -68,14 +69,10 @@ public class S3AssumeRoleRequest extends OMClientRequest {
     SECURE_RANDOM = secureRandom;
   }
 
-  private static final int MIN_TOKEN_EXPIRATION_SECONDS = 900;    // 15 minutes in seconds
-  private static final int MAX_TOKEN_EXPIRATION_SECONDS = 43200;  // 12 hours in seconds
   private static final int STS_ACCESS_KEY_ID_LENGTH = 20;
   private static final int STS_SECRET_ACCESS_KEY_LENGTH = 40;
   private static final int STS_ROLE_ID_LENGTH = 16;
   private static final String ASSUME_ROLE_ID_PREFIX = "AROA";
-  private static final int ASSUME_ROLE_SESSION_NAME_MIN_LENGTH = 2;
-  private static final int ASSUME_ROLE_SESSION_NAME_MAX_LENGTH = 64;
   private static final String CHARS_FOR_ACCESS_KEY_IDS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   private static final int CHARS_FOR_ACCESS_KEY_IDS_LENGTH = CHARS_FOR_ACCESS_KEY_IDS.length();
   private static final String CHARS_FOR_SECRET_ACCESS_KEYS = CHARS_FOR_ACCESS_KEY_IDS +
@@ -113,14 +110,10 @@ public class S3AssumeRoleRequest extends OMClientRequest {
     OMClientResponse omClientResponse;
     try {
       // Validate duration
-      if (durationSeconds < MIN_TOKEN_EXPIRATION_SECONDS || durationSeconds > MAX_TOKEN_EXPIRATION_SECONDS) {
-        throw new OMException(
-            "Duration must be between " + MIN_TOKEN_EXPIRATION_SECONDS + " and " + MAX_TOKEN_EXPIRATION_SECONDS,
-            OMException.ResultCodes.INVALID_REQUEST);
-      }
+      S3STSUtils.validateDuration(durationSeconds);
 
       // Validate role session name
-      validateRoleSessionName(roleSessionName);
+      S3STSUtils.validateRoleSessionName(roleSessionName);
 
       // Validate role ARN and extract role
       final String targetRoleName = AwsRoleArnValidator.validateAndExtractRoleNameFromArn(roleArn);
@@ -176,21 +169,6 @@ public class S3AssumeRoleRequest extends OMClientRequest {
     markForAudit(auditLogger, buildAuditMessage(OMAction.S3_ASSUME_ROLE, auditMap, exception, userInfo));
 
     return omClientResponse;
-  }
-
-  /**
-   * Ensures RoleSessionName is valid.
-   */
-  private void validateRoleSessionName(String roleSessionName) throws OMException {
-    if (StringUtils.isBlank(roleSessionName)) {
-      throw new OMException("RoleSessionName is required", OMException.ResultCodes.INVALID_REQUEST);
-    }
-    if (roleSessionName.length() < ASSUME_ROLE_SESSION_NAME_MIN_LENGTH ||
-        roleSessionName.length() > ASSUME_ROLE_SESSION_NAME_MAX_LENGTH) {
-      throw new OMException(
-          "RoleSessionName length must be between " + ASSUME_ROLE_SESSION_NAME_MIN_LENGTH + " and " +
-          ASSUME_ROLE_SESSION_NAME_MAX_LENGTH, OMException.ResultCodes.INVALID_REQUEST);
-    }
   }
 
   /**

@@ -15,9 +15,9 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.request.s3.security;
+package org.apache.hadoop.ozone.om.helpers;
 
-import org.apache.commons.lang3.StringUtils;
+import com.google.common.base.Strings;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 
 /**
@@ -46,8 +46,10 @@ public final class AwsRoleArnValidator {
    * @throws OMException if the ARN is invalid
    */
   public static String validateAndExtractRoleNameFromArn(String roleArn) throws OMException {
-    if (StringUtils.isBlank(roleArn)) {
-      throw new OMException("Role ARN is required", OMException.ResultCodes.INVALID_REQUEST);
+    if (Strings.isNullOrEmpty(roleArn)) {
+      throw new OMException(
+          "Value null at 'roleArn' failed to satisfy constraint: Member must not be null",
+          OMException.ResultCodes.INVALID_REQUEST);
     }
 
     final int roleArnLength = roleArn.length();
@@ -125,7 +127,7 @@ public final class AwsRoleArnValidator {
    */
   private static boolean hasCharNotAllowedInIamRoleArn(String s) {
     for (int i = 0; i < s.length(); i++) {
-      if (!isCharAllowedInIamRoleArn(s.charAt(i))) {
+      if (!isCharAllowedInIamRoleArn(s.codePointAt(i))) {
         return true;
       }
     }
@@ -134,12 +136,11 @@ public final class AwsRoleArnValidator {
 
   /**
    * Checks if the supplied char is allowed in IAM Role ARN.
+   * Pattern: [\u0009\u000A\u000D\u0020-\u007E\u0085\u00A0-\uD7FF\uE000-\uFFFD\u10000-\u10FFFF]+
    */
-  private static boolean isCharAllowedInIamRoleArn(char c) {
-    return (c >= 'A' && c <= 'Z')
-        || (c >= 'a' && c <= 'z')
-        || (c >= '0' && c <= '9')
-        || c == '+' || c == '=' || c == ',' || c == '.' || c == '@' || c == '_' || c == '-';
+  private static boolean isCharAllowedInIamRoleArn(int c) {
+    return c == 0x09 || c == 0x0A || c == 0x0D || (c >= 0x20 && c <= 0x7E) || c == 0x85 || (c >= 0xA0 && c <= 0xD7FF) ||
+        (c >= 0xE000 && c <= 0xFFFD) || (c >= 0x10000 && c <= 0x10FFFF);
   }
 }
 

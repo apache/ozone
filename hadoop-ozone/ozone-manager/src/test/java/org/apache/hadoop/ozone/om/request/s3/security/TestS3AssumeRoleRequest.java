@@ -154,7 +154,8 @@ public class TestS3AssumeRoleRequest {
     final OMResponse omResponse = response.getOMResponse();
 
     assertThat(omResponse.getStatus()).isEqualTo(Status.INVALID_REQUEST);
-    assertThat(omResponse.getMessage()).isEqualTo("Duration must be between 900 and 43200");
+    assertThat(omResponse.getMessage()).isEqualTo(
+        "Invalid Value: DurationSeconds must be between 900 and 43200 seconds");
     assertThat(omResponse.hasAssumeRoleResponse()).isFalse();
     assertMarkForAuditCalled(request);
   }
@@ -175,7 +176,8 @@ public class TestS3AssumeRoleRequest {
     final OMResponse omResponse = response.getOMResponse();
 
     assertThat(omResponse.getStatus()).isEqualTo(Status.INVALID_REQUEST);
-    assertThat(omResponse.getMessage()).isEqualTo("Duration must be between 900 and 43200");
+    assertThat(omResponse.getMessage()).isEqualTo(
+        "Invalid Value: DurationSeconds must be between 900 and 43200 seconds");
     assertThat(omResponse.hasAssumeRoleResponse()).isFalse();
     assertMarkForAuditCalled(request);
   }
@@ -355,7 +357,8 @@ public class TestS3AssumeRoleRequest {
     final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
     final OMClientResponse response = request.validateAndUpdateCache(ozoneManager, context);
     assertThat(response.getOMResponse().getStatus()).isEqualTo(Status.INVALID_REQUEST);
-    assertThat(response.getOMResponse().getMessage()).isEqualTo("RoleSessionName is required");
+    assertThat(response.getOMResponse().getMessage()).isEqualTo(
+        "Value null at 'roleSessionName' failed to satisfy constraint: Member must not be null");
     assertMarkForAuditCalled(request);
   }
 
@@ -374,7 +377,9 @@ public class TestS3AssumeRoleRequest {
     final OMResponse omResponse = response.getOMResponse();
 
     assertThat(omResponse.getStatus()).isEqualTo(Status.INVALID_REQUEST);
-    assertThat(omResponse.getMessage()).isEqualTo("RoleSessionName length must be between 2 and 64");
+    assertThat(omResponse.getMessage()).isEqualTo(
+        "Invalid RoleSessionName: must be 2-64 characters long and contain only alphanumeric " +
+        "characters, +, =, ,, ., @, -");
     assertThat(omResponse.hasAssumeRoleResponse()).isFalse();
     assertMarkForAuditCalled(request);
   }
@@ -395,7 +400,10 @@ public class TestS3AssumeRoleRequest {
     final OMResponse omResponse = response.getOMResponse();
 
     assertThat(omResponse.getStatus()).isEqualTo(Status.INVALID_REQUEST);
-    assertThat(omResponse.getMessage()).isEqualTo("RoleSessionName length must be between 2 and 64");
+    assertThat(omResponse.getMessage()).isEqualTo(
+        "Invalid RoleSessionName: must be 2-64 characters long and contain only alphanumeric " +
+        "characters, +, =, ,, ., @, -"
+    );
     assertThat(omResponse.hasAssumeRoleResponse()).isFalse();
     assertMarkForAuditCalled(request);
   }
