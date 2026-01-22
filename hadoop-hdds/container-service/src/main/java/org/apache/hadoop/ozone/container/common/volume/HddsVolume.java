@@ -93,6 +93,7 @@ public class HddsVolume extends StorageVolume {
   private ContainerController controller;
 
   private final AtomicLong committedBytes = new AtomicLong(); // till Open containers become full
+  private final AtomicLong spaceReservedForWrites = new AtomicLong(); // for in-flight writes
   private Function<HddsVolume, Long> gatherContainerUsages = (K) -> 0L;
 
   private final ConcurrentSkipListSet<Long> containerIds = new ConcurrentSkipListSet<>();
@@ -408,6 +409,24 @@ public class HddsVolume extends StorageVolume {
    */
   public long getCommittedBytes() {
     return committedBytes.get();
+  }
+
+  /**
+   * Reserve space for an in-flight write operation.
+   *
+   * @param bytes bytes to reserve
+   */
+  public void reserveSpaceForWrite(long bytes) {
+    spaceReservedForWrites.addAndGet(bytes);
+  }
+
+  /**
+   * Release space reserved for write when write completes or fails.
+   *
+   * @param bytes bytes to release
+   */
+  public void releaseReservedSpaceForWrite(long bytes) {
+    spaceReservedForWrites.addAndGet(-bytes);
   }
 
   public long getFreeSpaceToSpare(long volumeCapacity) {
