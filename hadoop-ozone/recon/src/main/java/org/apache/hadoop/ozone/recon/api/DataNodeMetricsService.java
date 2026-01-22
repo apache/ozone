@@ -300,7 +300,7 @@ public class DataNodeMetricsService {
     totalNodesFailed = 0;
   }
 
-  public DataNodeMetricsServiceResponse getCollectedMetrics(int limit) {
+  public DataNodeMetricsServiceResponse getCollectedMetrics(Integer limit) {
     startTask();
     if (currentStatus == MetricCollectionStatus.FINISHED) {
       DataNodeMetricsServiceResponse.Builder dnMetricsBuilder = DataNodeMetricsServiceResponse.newBuilder();
@@ -310,7 +310,7 @@ public class DataNodeMetricsService {
           .setTotalNodesQueried(totalNodesQueried)
           .setTotalNodeQueryFailures(totalNodesFailed);
 
-      if (limit < 0) {
+      if (null == limit) {
         return dnMetricsBuilder.setPendingDeletion(pendingDeletionList).build();
       } else {
         return dnMetricsBuilder.setPendingDeletion(

@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.recon.api;
 
 import java.io.BufferedWriter;
 import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
@@ -67,12 +68,13 @@ public class PendingDeletionEndpoint {
       @QueryParam("component")
       String component,
       @QueryParam("limit")
-      int limit
+      Integer limit
   ) {
     if (component == null || component.isEmpty()) {
       return Response.status(Response.Status.BAD_REQUEST)
           .entity("component query parameter is required").build();
     }
+
     final String normalizedComponent = component.trim().toLowerCase();
     switch (normalizedComponent) {
     case "dn":
@@ -90,7 +92,7 @@ public class PendingDeletionEndpoint {
   @GET
   @Path("/download")
   public Response downloadPendingDeleteData() {
-    DataNodeMetricsServiceResponse dnMetricsResponse = dataNodeMetricsService.getCollectedMetrics(-1);
+    DataNodeMetricsServiceResponse dnMetricsResponse = dataNodeMetricsService.getCollectedMetrics(null);
 
     if (dnMetricsResponse.getStatus() != DataNodeMetricsService.MetricCollectionStatus.FINISHED) {
       return Response.status(Response.Status.ACCEPTED)
@@ -110,7 +112,7 @@ public class PendingDeletionEndpoint {
       CSVFormat format = CSVFormat.DEFAULT.builder()
           .setHeader("HostName", "Datanode UUID", "Pending Block Size (bytes)").build();
       try (CSVPrinter csvPrinter = new CSVPrinter(
-          new BufferedWriter(new OutputStreamWriter(output)), format)) {
+          new BufferedWriter(new OutputStreamWriter(output, StandardCharsets.UTF_8)), format)) {
         for (DatanodePendingDeletionMetrics metric : dnMetricsResponse.getPendingDeletionPerDataNode()) {
           csvPrinter.printRecord(
               metric.getHostName(),
@@ -132,11 +134,12 @@ public class PendingDeletionEndpoint {
         .build();
   }
 
-  private Response handleDataNodeMetrics(int limit) {
-    if (limit < 1) {
+  private Response handleDataNodeMetrics(Integer limit) {
+    if (null != limit && limit < 1) {
       return Response.status(Response.Status.BAD_REQUEST)
           .entity("Limit query parameter must be at-least 1").build();
     }
+
     DataNodeMetricsServiceResponse response = dataNodeMetricsService.getCollectedMetrics(limit);
     if (response.getStatus() == DataNodeMetricsService.MetricCollectionStatus.FINISHED) {
       return Response.ok(response).build();
