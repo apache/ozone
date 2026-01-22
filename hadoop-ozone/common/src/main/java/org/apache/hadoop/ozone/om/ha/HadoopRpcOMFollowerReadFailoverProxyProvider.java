@@ -104,7 +104,7 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider<T> implements Failover
   }
 
   public HadoopRpcOMFollowerReadFailoverProxyProvider(String omServiceId, Class<T> protocol,
-      HadoopRpcOMFailoverProxyProvider<T> failoverProxy) throws IOException {
+      HadoopRpcOMFailoverProxyProvider<T> failoverProxy) {
     this.protocolClass = protocol;
     this.failoverProxy = failoverProxy;
 
