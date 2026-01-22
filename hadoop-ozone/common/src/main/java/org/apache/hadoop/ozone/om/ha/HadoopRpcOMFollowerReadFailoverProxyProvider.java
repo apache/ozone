@@ -103,7 +103,6 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider<T> implements Failover
         new HadoopRpcOMFailoverProxyProvider<>(configuration, ugi, omServiceId, protocol));
   }
 
-  @SuppressWarnings("unchecked")
   public HadoopRpcOMFollowerReadFailoverProxyProvider(String omServiceId, Class<T> protocol,
       HadoopRpcOMFailoverProxyProvider<T> failoverProxy) throws IOException {
     this.protocolClass = protocol;
@@ -119,6 +118,7 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider<T> implements Failover
       combinedInfo.append(failoverProxy.getOMProxies().get(i).proxyInfo);
     }
     combinedInfo.append(']');
+    @SuppressWarnings("unchecked")
     T wrappedProxy = (T) Proxy.newProxyInstance(
         FollowerReadInvocationHandler.class.getClassLoader(),
         new Class<?>[] {protocol}, new FollowerReadInvocationHandler());
