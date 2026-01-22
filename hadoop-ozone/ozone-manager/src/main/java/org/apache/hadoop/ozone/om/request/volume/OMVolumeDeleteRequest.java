@@ -94,8 +94,7 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
         .setUserInfo(getUserInfo())
         .build();
   }
-
-
+  
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     final long transactionLogIndex = context.getIndex();

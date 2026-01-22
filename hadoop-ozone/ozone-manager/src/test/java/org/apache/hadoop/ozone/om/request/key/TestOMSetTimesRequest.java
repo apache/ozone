@@ -17,6 +17,10 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.UUID;
@@ -31,9 +35,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetTime
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.when;
 
 /**
  * Test cases for OMSetTimesRequest.
@@ -91,7 +92,6 @@ public class TestOMSetTimesRequest extends TestOMKeyRequest {
         () -> setTimes.preExecute(ozoneManager));
     assertEquals(OMException.ResultCodes.PERMISSION_DENIED, e.getResult());
   }
-
 
   protected void executeAndReturn(long mtime)
       throws IOException {

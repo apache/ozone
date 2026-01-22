@@ -82,7 +82,6 @@ public class TestOMVolumeDeleteRequest extends TestOMVolumeRequest {
     assertEquals(OMException.ResultCodes.PERMISSION_DENIED, e.getResult());
   }
 
-
   @Test
   public void testValidateAndUpdateCacheSuccess() throws Exception {
     String volumeName = UUID.randomUUID().toString();
