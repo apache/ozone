@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om;
 
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
+import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFollowerReadFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.protocolPB.Hadoop3OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
@@ -32,6 +33,16 @@ public interface OmTestUtil {
     Hadoop3OmTransport transport =
         (Hadoop3OmTransport) ozoneManagerClient.getTransport();
     return transport.getOmFailoverProxyProvider();
+  }
+
+  static HadoopRpcOMFollowerReadFailoverProxyProvider<OzoneManagerProtocolPB> getFollowerReadFailoverProxyProvider(
+      ObjectStore store) {
+    OzoneManagerProtocolClientSideTranslatorPB ozoneManagerClient =
+        (OzoneManagerProtocolClientSideTranslatorPB) store.getClientProxy().getOzoneManagerClient();
+
+    Hadoop3OmTransport transport =
+        (Hadoop3OmTransport) ozoneManagerClient.getTransport();
+    return transport.getOmFollowerReadFailoverProxyProvider();
   }
 
   static String getCurrentOmProxyNodeId(ObjectStore store) {

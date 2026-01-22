@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om;
 import static java.util.UUID.randomUUID;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
@@ -51,18 +52,23 @@ import javax.management.MBeanInfo;
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
+import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFollowerReadFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.OMProxyInfo;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
@@ -371,7 +377,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
     assertSame(followerOM.getOmRatisServer().getLeaderStatus(),
         OzoneManagerRatisServer.RaftServerStatus.NOT_LEADER);
 
-    OzoneManagerProtocolProtos.OMRequest writeRequest =
+    OzoneManagerProtocolProtos.OMRequest readRequest =
         OzoneManagerProtocolProtos.OMRequest.newBuilder()
             .setCmdType(OzoneManagerProtocolProtos.Type.ListVolume)
             .setVersion(ClientVersion.CURRENT_VERSION)
@@ -381,7 +387,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
     OzoneManagerProtocolServerSideTranslatorPB omServerProtocol =
         followerOM.getOmServerProtocol();
     ServiceException ex = assertThrows(ServiceException.class,
-        () -> omServerProtocol.submitRequest(null, writeRequest));
+        () -> omServerProtocol.submitRequest(null, readRequest));
     assertThat(ex).hasCauseInstanceOf(OMNotLeaderException.class)
         .hasMessageEndingWith("Suggested leader is OM:" + leaderOMNodeId + "[" + leaderOMAddress + "].");
   }
@@ -1142,6 +1148,63 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
     assertTrue(ratisSnapshotIndexNew > ratisSnapshotIndex,
         "Latest snapshot index must be greater than previous " +
             "snapshot indices");
+
+  }
+
+  @Test
+  void testOMFollowerReadWithClusterDisabled() throws Exception {
+    OzoneConfiguration clientConf = OzoneConfiguration.of(getConf());
+    clientConf.setBoolean(OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, true);
+
+    String userName = "user" + RandomStringUtils.randomNumeric(5);
+    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+
+    VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
+        .setOwner(userName)
+        .setAdmin(adminName)
+        .build();
+    OzoneClient ozoneClient = null;
+    try {
+      ozoneClient = OzoneClientFactory.getRpcClient(clientConf);
+      ObjectStore objectStore = ozoneClient.getObjectStore();
+      HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> leaderFailoverProxyProvider =
+          OmTestUtil.getFailoverProxyProvider(objectStore);
+      HadoopRpcOMFollowerReadFailoverProxyProvider<OzoneManagerProtocolPB> followerReadFailoverProxyProvider =
+          OmTestUtil.getFollowerReadFailoverProxyProvider(objectStore);
+      assertNotNull(followerReadFailoverProxyProvider);
+      assertTrue(followerReadFailoverProxyProvider.isUseFollowerRead());
+
+
+      // Trigger write so that the leader failover proxy provider points to the leader
+      objectStore.createVolume(volumeName, createVolumeArgs);
+
+      // Get the leader OM node ID
+      String leaderOMNodeId = leaderFailoverProxyProvider.getCurrentProxyOMNodeId();
+
+      // Pick a follower and tigger read so that read failover proxy provider fall back to the leader-only read
+      // on encountering OMNotLeaderException
+      String followerOMNodeId = null;
+      for (OzoneManager om : getCluster().getOzoneManagersList()) {
+        if (!om.getOMNodeId().equals(leaderOMNodeId)) {
+          followerOMNodeId = om.getOMNodeId();
+          break;
+        }
+      }
+      assertNotNull(followerOMNodeId);
+      followerReadFailoverProxyProvider.changeInitialProxyForTest(followerOMNodeId);
+      objectStore.getVolume(volumeName);
+
+      // Client follower read is disabled since it detected that the cluster does not
+      // support follower read
+      assertFalse(followerReadFailoverProxyProvider.isUseFollowerRead());
+      OMProxyInfo<OzoneManagerProtocolPB> lastProxy =
+          (OMProxyInfo<OzoneManagerProtocolPB>) followerReadFailoverProxyProvider.getLastProxy();
+      // The last read will be done on the leader
+      assertEquals(leaderFailoverProxyProvider.getCurrentProxyOMNodeId(), lastProxy.getNodeId());
+    } finally {
+      IOUtils.closeQuietly(ozoneClient);
+    }
 
   }
 }

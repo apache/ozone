@@ -416,6 +416,10 @@ public abstract class OMFailoverProxyProviderBase<T> implements
     return omProxies;
   }
 
+  protected synchronized OMProxyInfo<T> getOmProxy(String nodeId) {
+    return omProxies.get(nodeId);
+  }
+
   /**
    * Unwrap the exception and return the wrapped OMLeaderNotReadyException if any.
    *

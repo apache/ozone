@@ -29,6 +29,7 @@ import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
+import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFollowerReadFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -45,6 +46,7 @@ public class Hadoop27RpcTransport implements OmTransport {
   private final OzoneManagerProtocolPB rpcProxy;
 
   private final HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> omFailoverProxyProvider;
+  private HadoopRpcOMFollowerReadFailoverProxyProvider<OzoneManagerProtocolPB> followerReadFailoverProxyProvider;
 
   public Hadoop27RpcTransport(ConfigurationSource conf,
       UserGroupInformation ugi, String omServiceId) throws IOException {
@@ -56,10 +58,28 @@ public class Hadoop27RpcTransport implements OmTransport {
     this.omFailoverProxyProvider = new HadoopRpcOMFailoverProxyProvider<>(
             conf, ugi, omServiceId, OzoneManagerProtocolPB.class);
 
+    boolean followerReadEnabled = conf.getBoolean(
+        OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY,
+        OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_DEFAULT
+    );
+
     int maxFailovers = conf.getInt(
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY,
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT);
-    this.rpcProxy = OzoneManagerProtocolPB.newProxy(omFailoverProxyProvider, maxFailovers);
+
+    if (followerReadEnabled) {
+      this.followerReadFailoverProxyProvider = new HadoopRpcOMFollowerReadFailoverProxyProvider<>(
+          omServiceId, OzoneManagerProtocolPB.class, omFailoverProxyProvider
+      );
+      this.rpcProxy = OzoneManagerProtocolPB.newProxy(followerReadFailoverProxyProvider, maxFailovers);
+    } else {
+      // TODO: It should be possible to simply instantiate HadoopRpcOMFollowerReadFailoverProxyProvider
+      //  even if the follower read is not enabled. We can try this to ensure that the tests still pass which
+      //  suggests that the HadoopRpcOMFollowerReadFailoverProxyProvider is a indeed a superset of
+      //  HadoopRpcOMFollowerReadFailoverProxyProvider
+      this.rpcProxy = OzoneManagerProtocolPB.newProxy(omFailoverProxyProvider, maxFailovers);
+    }
+
   }
 
   @Override
@@ -94,6 +114,10 @@ public class Hadoop27RpcTransport implements OmTransport {
 
   @Override
   public void close() throws IOException {
-    omFailoverProxyProvider.close();
+    if (followerReadFailoverProxyProvider != null) {
+      followerReadFailoverProxyProvider.close();
+    } else {
+      omFailoverProxyProvider.close();
+    }
   }
 }

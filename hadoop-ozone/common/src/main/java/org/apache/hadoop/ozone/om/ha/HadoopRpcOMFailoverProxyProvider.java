@@ -45,7 +45,7 @@ import org.slf4j.LoggerFactory;
 public class HadoopRpcOMFailoverProxyProvider<T> extends
       OMFailoverProxyProviderBase<T> {
 
-  private static final Logger LOG =
+  protected static final Logger LOG =
       LoggerFactory.getLogger(HadoopRpcOMFailoverProxyProvider.class);
 
   private final Text delegationTokenService;
@@ -123,7 +123,7 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
   /**
    * Creates proxy object.
    */
-  protected ProxyInfo<T> createOMProxyIfNeeded(OMProxyInfo<T> omProxyInfo) {
+  protected synchronized ProxyInfo<T> createOMProxyIfNeeded(OMProxyInfo<T> omProxyInfo) {
     if (omProxyInfo.proxy == null) {
       try {
         omProxyInfo.proxy = createOMProxy(omProxyInfo.getAddress());
@@ -134,6 +134,11 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
       }
     }
     return omProxyInfo;
+  }
+
+  protected synchronized ProxyInfo<T> createOMProxyIfNeeded(String omNodeId) {
+    OMProxyInfo<T> omProxyInfo = getOmProxy(omNodeId);
+    return createOMProxyIfNeeded(omProxyInfo);
   }
 
   public Text getCurrentProxyDelegationToken() {
