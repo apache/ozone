@@ -148,8 +148,4 @@ public class ECPipelineProvider extends PipelineProvider<ECReplicationConfig> {
   protected void close(Pipeline pipeline) throws IOException {
   }
 
-  @Override
-  protected void shutdown() {
-  }
-
 }

@@ -25,6 +25,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Strings;
 import java.io.PrintWriter;
 import java.io.StringReader;
@@ -39,10 +40,10 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import org.apache.hadoop.hdds.JsonTestUtils;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdds.server.http.HttpServer2;
 import org.apache.hadoop.hdds.utils.HttpServletUtils;
 import org.apache.hadoop.util.XMLUtils;
-import org.eclipse.jetty.util.ajax.JSON;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.w3c.dom.Document;
@@ -103,7 +104,6 @@ public class TestHddsConfServlet {
   }
 
   @Test
-  @SuppressWarnings("unchecked")
   public void testWriteJson() throws Exception {
     StringWriter sw = new StringWriter();
     PrintWriter pw = new PrintWriter(sw);
@@ -111,19 +111,18 @@ public class TestHddsConfServlet {
     when(response.getWriter()).thenReturn(pw);
 
     OzoneConfiguration conf = getTestConf();
-    HttpServletUtils.writeResponse(response, HttpServletUtils.ResponseFormat.JSON, (out) -> {
-      OzoneConfiguration.dumpConfiguration(conf, null, out);
-    }, IllegalArgumentException.class);
+    HttpServletUtils.writeResponse(response, HttpServletUtils.ResponseFormat.JSON,
+        out -> OzoneConfiguration.dumpConfiguration(conf, null, out),
+        IllegalArgumentException.class);
 
     String json = sw.toString();
     boolean foundSetting = false;
-    Object parsed = JSON.parse(json);
-    Object[] properties = ((Map<String, Object[]>) parsed).get("properties");
-    for (Object o : properties) {
-      Map<String, Object> propertyInfo = (Map<String, Object>) o;
-      String key = (String) propertyInfo.get("key");
-      String val = (String) propertyInfo.get("value");
-      String resource = (String) propertyInfo.get("resource");
+    JsonNode parsed = JsonUtils.readTree(json);
+    JsonNode properties = parsed.path("properties");
+    for (JsonNode propertyInfo : properties) {
+      String key = propertyInfo.path("key").asText();
+      String val = propertyInfo.path("value").asText();
+      String resource = propertyInfo.path("resource").asText();
       if (TEST_KEY.equals(key) && TEST_VAL.equals(val)
           && "programmatically".equals(resource)) {
         foundSetting = true;
@@ -140,9 +139,9 @@ public class TestHddsConfServlet {
     when(response.getWriter()).thenReturn(pw);
 
     OzoneConfiguration conf = getTestConf();
-    HttpServletUtils.writeResponse(response, HttpServletUtils.ResponseFormat.XML, (out) -> {
-      conf.writeXml(null, out);
-    }, IllegalArgumentException.class);
+    HttpServletUtils.writeResponse(response, HttpServletUtils.ResponseFormat.XML,
+        out -> conf.writeXml(null, out),
+        IllegalArgumentException.class);
 
     String xml = sw.toString();
 

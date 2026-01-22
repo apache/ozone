@@ -15,23 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.conf;
-
 /**
- * Example configuration to test inherited configuration injection.
+ This package contains policy classes related to the DiskBalancer service.
  */
-public class ConfigurationExampleParent
-    extends ConfigurationExampleGrandParent {
-
-  @Config(key = "secure", defaultValue = "true", description = "Make "
-      + "everything secure.", tags = ConfigTag.MANAGEMENT)
-  private boolean secure = true;
-
-  public boolean isSecure() {
-    return secure;
-  }
-
-  public void setSecure(boolean secure) {
-    this.secure = secure;
-  }
-}
+package org.apache.hadoop.ozone.container.diskbalancer.policy;

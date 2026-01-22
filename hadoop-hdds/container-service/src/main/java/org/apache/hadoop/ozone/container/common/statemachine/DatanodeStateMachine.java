@@ -32,7 +32,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
@@ -146,7 +145,7 @@ public class DatanodeStateMachine implements Closeable {
    * @param certClient - Datanode Certificate client, required if security is
    *                     enabled
    */
-  @SuppressWarnings("checkstyle:ParameterNumber")
+  @SuppressWarnings({"checkstyle:ParameterNumber", "checkstyle:methodlength"})
   public DatanodeStateMachine(HddsDatanodeService hddsDatanodeService,
                               DatanodeDetails datanodeDetails,
                               ConfigurationSource conf,
@@ -261,7 +260,7 @@ public class DatanodeStateMachine implements Closeable {
 
     // When we add new handlers just adding a new handler here should do the
     // trick.
-    commandDispatcher = CommandDispatcher.newBuilder()
+    CommandDispatcher.Builder dispatcherBuilder = CommandDispatcher.newBuilder()
         .addHandler(new CloseContainerCommandHandler(
             dnConf.getContainerCloseThreads(),
             dnConf.getCommandQueueLimit(), threadNamePrefix))
@@ -277,15 +276,25 @@ public class DatanodeStateMachine implements Closeable {
             closePipelineCommandExecutorService))
         .addHandler(new CreatePipelineCommandHandler(conf,
             createPipelineCommandExecutorService))
-        .addHandler(new SetNodeOperationalStateCommandHandler(conf,
-            supervisor::nodeStateUpdated))
         .addHandler(new FinalizeNewLayoutVersionCommandHandler())
         .addHandler(new RefreshVolumeUsageCommandHandler())
-        .addHandler(new ReconcileContainerCommandHandler(supervisor, dnClient))
+        .addHandler(new ReconcileContainerCommandHandler(supervisor, dnClient));
+
+    if (container.getDiskBalancerService() != null) {
+      dispatcherBuilder.addHandler(new SetNodeOperationalStateCommandHandler(
+          conf, supervisor::nodeStateUpdated,
+          container.getDiskBalancerService()::nodeStateUpdated));
+    } else {
+      dispatcherBuilder.addHandler(new SetNodeOperationalStateCommandHandler(
+          conf, supervisor::nodeStateUpdated, null));
+    }
+
+    dispatcherBuilder
         .setConnectionManager(connectionManager)
         .setContainer(container)
-        .setContext(context)
-        .build();
+        .setContext(context);
+
+    commandDispatcher = dispatcherBuilder.build();
 
     reportManager = ReportManager.newBuilder(conf)
         .setStateContext(context)
@@ -314,7 +323,7 @@ public class DatanodeStateMachine implements Closeable {
     int totalServerCount = 1;
 
     try {
-      totalServerCount += HddsUtils.getSCMAddressForDatanodes(conf).size();
+      totalServerCount += HddsServerUtil.getSCMAddressForDatanodes(conf).size();
     } catch (Exception e) {
       LOG.error("Fail to get scm addresses", e);
     }

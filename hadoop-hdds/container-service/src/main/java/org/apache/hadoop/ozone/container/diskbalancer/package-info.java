@@ -15,22 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.conf;
-
 /**
- * Parent class for the example configuration.
+ This package contains classes related to the DiskBalancer service.
  */
-public class SimpleConfigurationParent extends ReconfigurableConfig {
-
-  @Config(key = "enabled", defaultValue = "true", description = "Example "
-      + "boolean config.", tags = ConfigTag.MANAGEMENT)
-  private boolean enabled;
-
-  public boolean isEnabled() {
-    return enabled;
-  }
-
-  public void setEnabled(boolean enabled) {
-    this.enabled = enabled;
-  }
-}
+package org.apache.hadoop.ozone.container.diskbalancer;

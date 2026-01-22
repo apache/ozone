@@ -15,26 +15,22 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.conf;
+package org.apache.hadoop.hdds.protocolPB;
+
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.protocol.proto.DiskBalancerProtocolProtos.DiskBalancerProtocolService;
+import org.apache.hadoop.ipc_.ProtocolInfo;
+import org.apache.hadoop.security.KerberosInfo;
 
 /**
- * Example configuration to test inherited configuration injection.
+ * Protocol that clients use to communicate directly with Datanodes
+ * for DiskBalancer operations.
  */
-public class ConfigurationExampleGrandParent extends ReconfigurableConfig {
-
-  @Config(key = "number", defaultValue = "2", description = "Example numeric "
-      + "configuration", tags = ConfigTag.MANAGEMENT)
-  private int number = 1;
-
-  @Config(key = "grandpa.dyna", reconfigurable = true, defaultValue = "x",
-      description = "Test inherited dynamic property", tags = {})
-  private String grandpaDynamic;
-
-  public int getNumber() {
-    return number;
-  }
-
-  public void setNumber(int number) {
-    this.number = number;
-  }
+@ProtocolInfo(
+    protocolName = "org.apache.hadoop.hdds.protocol.DiskBalancerProtocol",
+    protocolVersion = 1)
+@KerberosInfo(serverPrincipal = HddsConfigKeys.HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY)
+public interface DiskBalancerProtocolPB extends
+    DiskBalancerProtocolService.BlockingInterface {
 }
+
