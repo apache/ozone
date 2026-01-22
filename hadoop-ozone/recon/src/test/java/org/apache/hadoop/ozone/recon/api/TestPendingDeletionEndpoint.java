@@ -42,6 +42,17 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+/**
+ * Test class for PendingDeletionEndpoint.
+ *
+ * This class tests pending deletion endpoint behaviors, including:
+ *
+ * 1. Component validation and error handling for missing/invalid components.
+ * 2. DataNode metrics responses for finished, in-progress, and null-limit requests.
+ * 3. SCM pending deletion summaries for success, no-content, and exception fallback.
+ * 4. OM pending deletion response pass-through values.
+ * 5. CSV download responses for pending, missing metrics, and successful exports.
+ */
 public class TestPendingDeletionEndpoint {
   private PendingDeletionEndpoint pendingDeletionEndpoint;
   private ReconGlobalMetricsService reconGlobalMetricsService;
@@ -111,6 +122,22 @@ public class TestPendingDeletionEndpoint {
     when(dataNodeMetricsService.getCollectedMetrics(5)).thenReturn(metricsResponse);
 
     Response response = pendingDeletionEndpoint.getPendingDeletionByComponent("DN", 5);
+
+    assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    assertEquals(metricsResponse, response.getEntity());
+  }
+
+  @Test
+  public void testDnComponentAllowsNullLimit() {
+    DataNodeMetricsServiceResponse metricsResponse = DataNodeMetricsServiceResponse.newBuilder()
+        .setStatus(DataNodeMetricsService.MetricCollectionStatus.FINISHED)
+        .setTotalPendingDeletionSize(100L)
+        .setTotalNodesQueried(1)
+        .setTotalNodeQueryFailures(0)
+        .build();
+    when(dataNodeMetricsService.getCollectedMetrics(null)).thenReturn(metricsResponse);
+
+    Response response = pendingDeletionEndpoint.getPendingDeletionByComponent("dn", null);
 
     assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     assertEquals(metricsResponse, response.getEntity());
@@ -191,7 +218,7 @@ public class TestPendingDeletionEndpoint {
     DataNodeMetricsServiceResponse metricsResponse = DataNodeMetricsServiceResponse.newBuilder()
         .setStatus(DataNodeMetricsService.MetricCollectionStatus.IN_PROGRESS)
         .build();
-    when(dataNodeMetricsService.getCollectedMetrics(-1)).thenReturn(metricsResponse);
+    when(dataNodeMetricsService.getCollectedMetrics(null)).thenReturn(metricsResponse);
 
     Response response = pendingDeletionEndpoint.downloadPendingDeleteData();
 
@@ -205,7 +232,7 @@ public class TestPendingDeletionEndpoint {
     DataNodeMetricsServiceResponse metricsResponse = DataNodeMetricsServiceResponse.newBuilder()
         .setStatus(DataNodeMetricsService.MetricCollectionStatus.FINISHED)
         .build();
-    when(dataNodeMetricsService.getCollectedMetrics(-1)).thenReturn(metricsResponse);
+    when(dataNodeMetricsService.getCollectedMetrics(null)).thenReturn(metricsResponse);
 
     Response response = pendingDeletionEndpoint.downloadPendingDeleteData();
 
@@ -223,7 +250,7 @@ public class TestPendingDeletionEndpoint {
         .setStatus(DataNodeMetricsService.MetricCollectionStatus.FINISHED)
         .setPendingDeletion(pendingDeletionMetrics)
         .build();
-    when(dataNodeMetricsService.getCollectedMetrics(-1)).thenReturn(metricsResponse);
+    when(dataNodeMetricsService.getCollectedMetrics(null)).thenReturn(metricsResponse);
 
     Response response = pendingDeletionEndpoint.downloadPendingDeleteData();
 
