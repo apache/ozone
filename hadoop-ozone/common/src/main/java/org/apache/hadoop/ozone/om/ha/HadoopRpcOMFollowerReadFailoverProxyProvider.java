@@ -169,7 +169,7 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider<T> implements Failover
       // Throws a non-retriable exception to prevent retry and failover
       // See the HddsUtils#shouldNotFailoverOnRpcException used in
       // OMFailoverProxyProviderBase#shouldFailover
-      throw wrapInServiceException(new RpcNoSuchProtocolException("Failed to parseOMRequest: " + error));
+      throwServiceException(new RpcNoSuchProtocolException("Failed to parseOMRequest: " + error));
     }
     return (OMRequest) args[1];
   }
@@ -238,7 +238,7 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider<T> implements Failover
         // we should invoke the method on the current proxy
         return method.invoke(this, args);
       }
-      Object retVal;
+      Object retVal = null;
       OMRequest omRequest = parseOMRequest(args);
       if (useFollowerRead && OmUtils.shouldSendToFollower(omRequest)) {
         int failedCount = 0;
@@ -256,7 +256,7 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider<T> implements Failover
             LOG.debug("Invocation of {} with cmdType {} using proxy {} failed", method.getName(),
                 omRequest.getCmdType(), current.proxyInfo, ite);
             if (!(ite.getCause() instanceof Exception)) {
-              throw wrapInServiceException(ite.getCause());
+              throwServiceException(ite.getCause());
             }
             Exception e = (Exception) ite.getCause();
             if (e instanceof InterruptedIOException ||
@@ -264,7 +264,7 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider<T> implements Failover
               // If interrupted, do not retry.
               LOG.warn("Invocation returned interrupted exception on [{}];",
                   current.proxyInfo, e);
-              throw wrapInServiceException(e);
+              throwServiceException(e);
             }
 
             if (e instanceof ServiceException) {
@@ -342,7 +342,7 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider<T> implements Failover
         LOG.debug("Exception thrown from leader-based failoverProxy", e.getCause());
         // This exception will be handled by the OMFailoverProxyProviderBase#getRetryPolicy
         // (see getRetryPolicy). This ensures that the leader-only failover should still work.
-        throw wrapInServiceException(e.getCause());
+        throwServiceException(e.getCause());
       }
       lastProxy = leaderProxy;
       return retVal;
@@ -392,19 +392,15 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider<T> implements Failover
   }
 
   /**
-   * Wrap the throwable in {@link ServiceException} if necessary.
+   * Throw the passed {@link Throwable} wrapped in {@link ServiceException}.
    * This is required to prevent {@link java.lang.reflect.UndeclaredThrowableException} to be thrown
    * since {@link OzoneManagerProtocolPB#submitRequest(RpcController, OMRequest)} only
    * throws {@link ServiceException}.
    * @param e exception to wrap in {@link ServiceException}.
-   * @return if the throwable is already an instance {@link ServiceException} simply returns the exception itself.
-   *         Otherwise, return the exception wrapped in {@link ServiceException}
+   * @throws ServiceException the exception that wraps the passed throwable.
    */
-  private static ServiceException wrapInServiceException(Throwable e) {
-    if (e instanceof ServiceException) {
-      return (ServiceException) e;
-    }
-    return new ServiceException(e);
+  private static void throwServiceException(Throwable e) throws ServiceException {
+    throw e instanceof ServiceException ? (ServiceException) e : new ServiceException(e);
   }
 
 }
