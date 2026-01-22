@@ -1192,7 +1192,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
               ozoneClient.getProxy()
           );
       assertNotNull(followerReadFailoverProxyProvider);
-      assertTrue(followerReadFailoverProxyProvider.isFollowerReadEnabled());
+      assertTrue(followerReadFailoverProxyProvider.isUseFollowerRead());
 
       ObjectStore objectStore = ozoneClient.getObjectStore();
 
@@ -1217,7 +1217,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
 
       // Client follower read is disabled since it detected that the cluster does not
       // support follower read
-      assertFalse(followerReadFailoverProxyProvider.isFollowerReadEnabled());
+      assertFalse(followerReadFailoverProxyProvider.isUseFollowerRead());
       OMProxyInfo<OzoneManagerProtocolPB> lastProxy =
           (OMProxyInfo<OzoneManagerProtocolPB>) followerReadFailoverProxyProvider.getLastProxy();
       // The last read will be done on the leader

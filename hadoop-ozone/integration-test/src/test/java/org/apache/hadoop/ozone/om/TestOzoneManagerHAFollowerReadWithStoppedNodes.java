@@ -255,7 +255,7 @@ public class TestOzoneManagerHAFollowerReadWithStoppedNodes extends TestOzoneMan
     // Verify that a failover occurred. the new proxy nodeId should be
     // different from the old proxy nodeId.
     assertNotEquals(firstProxyNodeId, newProxyNodeId);
-    assertTrue(followerReadFailoverProxyProvider.isFollowerReadEnabled());
+    assertTrue(followerReadFailoverProxyProvider.isUseFollowerRead());
   }
 
   @Test

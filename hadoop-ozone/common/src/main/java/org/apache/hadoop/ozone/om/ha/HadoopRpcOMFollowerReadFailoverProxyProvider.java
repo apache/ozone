@@ -79,7 +79,7 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider<T> implements Failover
    * Whether reading from follower is enabled. If this is false, all read
    * requests will still go to OM leader.
    */
-  private volatile boolean followerReadEnabled;
+  private volatile boolean useFollowerRead;
 
   /**
    * The current index of the underlying leader-based proxy provider's omNodesInOrder currently being used.
@@ -125,11 +125,11 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider<T> implements Failover
     combinedProxy = new ProxyInfo<>(wrappedProxy, combinedInfo.toString());
 
     if (wrappedProxy instanceof OzoneManagerProtocolPB) {
-      this.followerReadEnabled = true;
+      this.useFollowerRead = true;
     } else {
       LOG.debug("Disabling follower reads for {} because the requested proxy "
           + "class does not implement {}", omServiceId, OzoneManagerProtocolPB.class.getName());
-      this.followerReadEnabled = false;
+      this.useFollowerRead = false;
     }
   }
 
@@ -179,8 +179,8 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider<T> implements Failover
   }
 
   @VisibleForTesting
-  void setFollowerReadEnabled(boolean flag) {
-    this.followerReadEnabled = flag;
+  void setUseFollowerRead(boolean flag) {
+    this.useFollowerRead = flag;
   }
 
   @VisibleForTesting
@@ -244,7 +244,7 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider<T> implements Failover
       }
       Object retVal;
       OMRequest omRequest = parseOMRequest(args);
-      if (followerReadEnabled && OmUtils.shouldSendToFollower(omRequest)) {
+      if (useFollowerRead && OmUtils.shouldSendToFollower(omRequest)) {
         int failedCount = 0;
         for (int i = 0; i < failoverProxy.getOmNodesInOrder().size(); i++) {
           OMProxyInfo<T> current = getCurrentProxy();
@@ -279,7 +279,7 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider<T> implements Failover
                 // the OM follower does not support / disable follower read or something is misconfigured
                 LOG.debug("Encountered OMNotLeaderException from {}. " +
                     "Disable OM follower read and retry OM leader directly.", current.proxyInfo);
-                followerReadEnabled = false;
+                useFollowerRead = false;
                 // Break here instead of throwing exception so that it is not counted
                 // as a failover
                 break;
@@ -359,7 +359,7 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider<T> implements Failover
 
     @Override
     public ConnectionId getConnectionId() {
-      return RPC.getConnectionIdForProxy(followerReadEnabled
+      return RPC.getConnectionIdForProxy(useFollowerRead
           ? getCurrentProxy().proxy : failoverProxy.getProxy().proxy);
     }
   }
@@ -372,8 +372,8 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider<T> implements Failover
   }
 
   @VisibleForTesting
-  public boolean isFollowerReadEnabled() {
-    return followerReadEnabled;
+  public boolean isUseFollowerRead() {
+    return useFollowerRead;
   }
 
   @VisibleForTesting
