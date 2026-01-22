@@ -47,8 +47,7 @@ class TestConfigurationSource {
   void reconfigurableProperties() {
     String prefix = "ozone.test.config";
     ImmutableSet<String> expected = ImmutableSet.of(
-        prefix + ".dynamic",
-        prefix + ".grandpa.dyna"
+        prefix + ".dynamic"
     );
 
     ConfigurationExample obj = new InMemoryConfigurationForTesting().getObject(

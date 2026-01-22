@@ -944,4 +944,9 @@ public class PipelineManagerImpl implements PipelineManager {
   public void releaseWriteLock() {
     lock.writeLock().unlock();
   }
+
+  @Override
+  public SCMPipelineMetrics getMetrics() {
+    return metrics;
+  }
 }

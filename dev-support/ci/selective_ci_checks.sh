@@ -306,6 +306,7 @@ function get_count_robot_files() {
 function check_needs_build() {
     start_end::group_start "Check if build is needed"
     local pattern_array=(
+        "^hadoop-ozone/dev-support/checks/_build.sh"
         "^hadoop-ozone/dev-support/checks/build.sh"
         "^hadoop-ozone/dev-support/checks/dependency.sh"
         "^hadoop-ozone/dist/src/main/license/update-jar-report.sh"
@@ -323,9 +324,11 @@ function check_needs_build() {
 }
 
 function check_needs_compile() {
-    start_end::group_start "Check if compile is needed"
+    start_end::group_start "Check if compile or javadoc is needed"
     local pattern_array=(
-        "^hadoop-ozone/dev-support/checks/build.sh"
+        "^hadoop-ozone/dev-support/checks/_build.sh"
+        "^hadoop-ozone/dev-support/checks/compile.sh"
+        "^hadoop-ozone/dev-support/checks/javadoc.sh"
         "src/..../java"
         "src/..../proto"
         "pom.xml"

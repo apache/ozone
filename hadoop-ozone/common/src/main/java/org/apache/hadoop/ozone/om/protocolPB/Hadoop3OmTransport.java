@@ -24,7 +24,6 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ipc_.ProtobufHelper;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.RPC;
@@ -78,13 +77,13 @@ public class Hadoop3OmTransport implements OmTransport {
       this.followerReadFailoverProxyProvider = new HadoopRpcOMFollowerReadFailoverProxyProvider<>(
           omServiceId, OzoneManagerProtocolPB.class, omFailoverProxyProvider
       );
-      this.rpcProxy = createRetryProxy(followerReadFailoverProxyProvider, maxFailovers);
+      this.rpcProxy = OzoneManagerProtocolPB.newProxy(followerReadFailoverProxyProvider, maxFailovers);
     } else {
       // TODO: It should be possible to simply instantiate HadoopRpcOMFollowerReadFailoverProxyProvider
       //  even if the follower read is not enabled. We can try this to ensure that the tests still pass which
       //  suggests that the HadoopRpcOMFollowerReadFailoverProxyProvider is a indeed a superset of
       //  HadoopRpcOMFollowerReadFailoverProxyProvider
-      this.rpcProxy = createRetryProxy(omFailoverProxyProvider, maxFailovers);
+      this.rpcProxy = OzoneManagerProtocolPB.newProxy(omFailoverProxyProvider, maxFailovers);
     }
   }
 
@@ -118,35 +117,8 @@ public class Hadoop3OmTransport implements OmTransport {
     return omFailoverProxyProvider.getCurrentProxyDelegationToken();
   }
 
-  /**
-   * Creates a {@link RetryProxy} encapsulating the
-   * {@link HadoopRpcOMFailoverProxyProvider}. The retry proxy
-   * fails over on network exception or if the current proxy
-   * is not the leader OM.
-   */
-  private OzoneManagerProtocolPB createRetryProxy(
-      HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> failoverProxyProvider,
-      int maxFailovers) {
-    return (OzoneManagerProtocolPB) RetryProxy.create(
-        OzoneManagerProtocolPB.class, failoverProxyProvider,
-        failoverProxyProvider.getRetryPolicy(maxFailovers));
-  }
-
-  /**
-   * Creates a {@link RetryProxy} encapsulating the
-   * {@link HadoopRpcOMFollowerReadFailoverProxyProvider}.
-   */
-  private OzoneManagerProtocolPB createRetryProxy(
-      HadoopRpcOMFollowerReadFailoverProxyProvider<OzoneManagerProtocolPB> failoverProxyProvider,
-      int maxFailovers) {
-    return (OzoneManagerProtocolPB) RetryProxy.create(
-        OzoneManagerProtocolPB.class, failoverProxyProvider,
-        failoverProxyProvider.getRetryPolicy(maxFailovers)
-    );
-  }
-
   @VisibleForTesting
-  public HadoopRpcOMFailoverProxyProvider getOmFailoverProxyProvider() {
+  public HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> getOmFailoverProxyProvider() {
     return omFailoverProxyProvider;
   }
 
