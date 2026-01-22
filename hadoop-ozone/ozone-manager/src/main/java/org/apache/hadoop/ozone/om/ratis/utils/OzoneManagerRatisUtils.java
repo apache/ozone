@@ -30,6 +30,8 @@ import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Clock;
+import java.time.ZoneOffset;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -68,6 +70,7 @@ import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixRemoveAclReques
 import org.apache.hadoop.ozone.om.request.key.acl.prefix.OMPrefixSetAclRequest;
 import org.apache.hadoop.ozone.om.request.s3.multipart.S3ExpiredMultipartUploadsAbortRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.OMSetSecretRequest;
+import org.apache.hadoop.ozone.om.request.s3.security.S3AssumeRoleRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3DeleteRevokedSTSTokensRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3GetSecretRequest;
 import org.apache.hadoop.ozone.om.request.s3.security.S3RevokeSTSTokenRequest;
@@ -118,6 +121,8 @@ import org.slf4j.LoggerFactory;
 public final class OzoneManagerRatisUtils {
   private static final Logger LOG = LoggerFactory
       .getLogger(OzoneManagerRatisUtils.class);
+
+  private static final Clock CLOCK = Clock.system(ZoneOffset.UTC);
 
   private OzoneManagerRatisUtils() {
   }
@@ -198,6 +203,9 @@ public final class OzoneManagerRatisUtils {
       return new OMSetSecretRequest(omRequest);
     case RevokeS3Secret:
       return new S3RevokeSecretRequest(omRequest);
+    case AssumeRole:
+      ozoneManager.checkS3STSEnabled();
+      return new S3AssumeRoleRequest(omRequest, CLOCK);
     case RevokeSTSToken:
       return new S3RevokeSTSTokenRequest(omRequest);
     case DeleteRevokedSTSTokens:

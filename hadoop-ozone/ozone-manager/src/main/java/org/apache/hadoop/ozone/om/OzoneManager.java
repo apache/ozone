@@ -476,6 +476,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   private final boolean isS3MultiTenancyEnabled;
   private final boolean isStrictS3;
+  private final boolean isS3STSEnabled;
   private ExitManager exitManager;
 
   private OzoneManagerPrepareState prepareState;
@@ -684,6 +685,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     // Enable S3 multi-tenancy if config keys are set
     this.isS3MultiTenancyEnabled =
         OMMultiTenantManager.checkAndEnableMultiTenancy(this, conf);
+
+    // Enable S3 STS if config key is set
+    this.isS3STSEnabled = conf.getBoolean(
+        OzoneConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_KEY,
+        OzoneConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_DEFAULT);
 
     metrics = OMMetrics.create();
     omSnapshotIntMetrics = OmSnapshotInternalMetrics.create();
@@ -1138,6 +1144,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
+   * Returns true if S3 STS is enabled; false otherwise.
+   */
+  public boolean isS3STSEnabled() {
+    return isS3STSEnabled;
+  }
+
+  /**
    * Throws OMException FEATURE_NOT_ENABLED if S3 multi-tenancy is not enabled.
    */
   public void checkS3MultiTenancyEnabled() throws OMException {
@@ -1148,6 +1161,21 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     throw new OMException("S3 multi-tenancy feature is not enabled. Please "
         + "set ozone.om.multitenancy.enabled to true and restart all OMs.",
         FEATURE_NOT_ENABLED);
+  }
+
+  /**
+   * Throws OMException FEATURE_NOT_ENABLED if S3 STS (AssumeRole) is not enabled.
+   */
+  public void checkS3STSEnabled() throws OMException {
+    if (isS3STSEnabled()) {
+      if (getAccessAuthorizer().isNative()) {
+        throw new OMException("S3 STS is not enabled for Ozone Native Authorizer", FEATURE_NOT_ENABLED);
+      }
+      return;
+    }
+
+    throw new OMException("S3 STS is not enabled. Please set " + OzoneConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_KEY +
+        " to true and restart all OMs.", FEATURE_NOT_ENABLED);
   }
 
   /**

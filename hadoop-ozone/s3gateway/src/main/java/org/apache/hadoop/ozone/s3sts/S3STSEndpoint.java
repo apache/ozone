@@ -18,10 +18,10 @@
 package org.apache.hadoop.ozone.s3sts;
 
 import java.io.IOException;
+import java.io.StringWriter;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
-import java.util.Base64;
-import java.util.Random;
 import java.util.UUID;
 import javax.ws.rs.FormParam;
 import javax.ws.rs.GET;
@@ -31,6 +31,13 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.xml.bind.JAXBContext;
+import javax.xml.bind.JAXBException;
+import javax.xml.bind.Marshaller;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
+import org.apache.hadoop.ozone.om.helpers.AwsRoleArnValidator;
+import org.apache.hadoop.ozone.om.helpers.S3STSUtils;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,19 +62,12 @@ public class S3STSEndpoint extends S3STSEndpointBase {
   // STS API constants
   private static final String STS_ACTION_PARAM = "Action";
   private static final String ASSUME_ROLE_ACTION = "AssumeRole";
-  private static final String ROLE_ARN_PARAM = "RoleArn";
-  private static final String ROLE_DURATION_SECONDS_PARAM = "DurationSeconds";
   private static final String GET_SESSION_TOKEN_ACTION = "GetSessionToken";
   private static final String ASSUME_ROLE_WITH_SAML_ACTION = "AssumeRoleWithSAML";
   private static final String ASSUME_ROLE_WITH_WEB_IDENTITY_ACTION = "AssumeRoleWithWebIdentity";
   private static final String GET_CALLER_IDENTITY_ACTION = "GetCallerIdentity";
   private static final String DECODE_AUTHORIZATION_MESSAGE_ACTION = "DecodeAuthorizationMessage";
   private static final String GET_ACCESS_KEY_INFO_ACTION = "GetAccessKeyInfo";
-
-  // Default token duration (in seconds) - AWS default is 3600 (1 hour)
-  private static final int DEFAULT_DURATION_SECONDS = 3600;
-  private static final int MAX_DURATION_SECONDS = 43200; // 12 hours
-  private static final int MIN_DURATION_SECONDS = 900;   // 15 minutes
 
   /**
    * STS endpoint that handles GET requests with query parameters.
@@ -87,9 +87,10 @@ public class S3STSEndpoint extends S3STSEndpointBase {
       @QueryParam("RoleArn") String roleArn,
       @QueryParam("RoleSessionName") String roleSessionName,
       @QueryParam("DurationSeconds") Integer durationSeconds,
-      @QueryParam("Version") String version) throws OS3Exception {
+      @QueryParam("Version") String version,
+      @QueryParam("Policy") String awsIamSessionPolicy) throws OS3Exception {
 
-    return handleSTSRequest(action, roleArn, roleSessionName, durationSeconds, version);
+    return handleSTSRequest(action, roleArn, roleSessionName, durationSeconds, version, awsIamSessionPolicy);
   }
 
   /**
@@ -110,28 +111,20 @@ public class S3STSEndpoint extends S3STSEndpointBase {
       @FormParam("RoleArn") String roleArn,
       @FormParam("RoleSessionName") String roleSessionName,
       @FormParam("DurationSeconds") Integer durationSeconds,
-      @FormParam("Version") String version) throws OS3Exception {
+      @FormParam("Version") String version,
+      @FormParam("Policy") String awsIamSessionPolicy) throws OS3Exception {
 
-    return handleSTSRequest(action, roleArn, roleSessionName, durationSeconds, version);
+    return handleSTSRequest(action, roleArn, roleSessionName, durationSeconds, version, awsIamSessionPolicy);
   }
 
   private Response handleSTSRequest(String action, String roleArn, String roleSessionName,
-      Integer durationSeconds, String version) throws OS3Exception {
+      Integer durationSeconds, String version, String awsIamSessionPolicy) throws OS3Exception {
     try {
       if (action == null) {
         return Response.status(Response.Status.BAD_REQUEST)
             .entity("Missing required parameter: " + STS_ACTION_PARAM)
             .build();
       }
-      int duration;
-      try {
-        duration = validateDuration(durationSeconds);
-      } catch (IllegalArgumentException e) {
-        return Response.status(Response.Status.BAD_REQUEST)
-            .entity(e.getMessage())
-            .build();
-      }
-
       if (version == null || !version.equals("2011-06-15")) {
         return Response.status(Response.Status.BAD_REQUEST)
             .entity("Invalid or missing Version parameter. Supported version is 2011-06-15.")
@@ -140,7 +133,7 @@ public class S3STSEndpoint extends S3STSEndpointBase {
 
       switch (action) {
       case ASSUME_ROLE_ACTION:
-        return handleAssumeRole(roleArn, roleSessionName, duration);
+        return handleAssumeRole(roleArn, roleSessionName, durationSeconds, awsIamSessionPolicy);
       // These operations are not supported yet
       case GET_SESSION_TOKEN_ACTION:
       case ASSUME_ROLE_WITH_SAML_ACTION:
@@ -166,134 +159,78 @@ public class S3STSEndpoint extends S3STSEndpointBase {
     }
   }
 
-  private int validateDuration(Integer durationSeconds) throws IllegalArgumentException, OS3Exception {
-    if (durationSeconds == null) {
-      return DEFAULT_DURATION_SECONDS;
-    }
-
-    if (durationSeconds < MIN_DURATION_SECONDS || durationSeconds > MAX_DURATION_SECONDS) {
-      throw new IllegalArgumentException(
-          "Invalid Value: " + ROLE_DURATION_SECONDS_PARAM + " must be between " + MIN_DURATION_SECONDS +
-              " and " + MAX_DURATION_SECONDS + " seconds");
-    }
-
-    return durationSeconds;
-  }
-
-  private Response handleAssumeRole(String roleArn, String roleSessionName, int duration)
-      throws IOException, OS3Exception {
-    // Validate required parameters for AssumeRole. RoleArn is required to pass the
-    if (roleArn == null || roleArn.isEmpty()) {
+  private Response handleAssumeRole(String roleArn, String roleSessionName, Integer durationSeconds,
+      String awsIamSessionPolicy) throws IOException, OS3Exception {
+    // Validate parameters
+    int duration;
+    try {
+      duration = S3STSUtils.validateDuration(durationSeconds);
+      AwsRoleArnValidator.validateAndExtractRoleNameFromArn(roleArn);
+      S3STSUtils.validateRoleSessionName(roleSessionName);
+      S3STSUtils.validateSessionPolicy(awsIamSessionPolicy);
+    } catch (OMException e) {
       return Response.status(Response.Status.BAD_REQUEST)
-          .entity("Missing required parameter: " + ROLE_ARN_PARAM)
+          .entity(e.getMessage())
           .build();
     }
 
-    if (roleSessionName == null || roleSessionName.isEmpty()) {
+    final String assumedRoleUserArn;
+    try {
+      assumedRoleUserArn = S3STSUtils.toAssumedRoleUserArn(roleArn, roleSessionName);
+    } catch (OMException e) {
       return Response.status(Response.Status.BAD_REQUEST)
-          .entity("Missing required parameter: RoleSessionName")
+          .entity(e.getMessage())
           .build();
     }
 
-    // Validate role session name format (AWS requirements)
-    if (!isValidRoleSessionName(roleSessionName)) {
-      return Response.status(Response.Status.BAD_REQUEST)
-          .entity("Invalid RoleSessionName: must be 2-64 characters long and " +
-              "contain only alphanumeric characters, +, =, ,, ., @, -")
-          .build();
-    }
-
-    // TODO: Integrate with Ozone Manager to get actual temporary credentials
-    // String dummyCredentials = getClient().getObjectStore().getS3StsToken(userNameFromRequest());
+    final AssumeRoleResponseInfo responseInfo = getClient()
+        .getObjectStore()
+        .assumeRole(roleArn, roleSessionName, duration, awsIamSessionPolicy);
     // Generate AssumeRole response
-    String responseXml = generateAssumeRoleResponse(roleArn, roleSessionName, duration);
-
+    final String responseXml = generateAssumeRoleResponse(assumedRoleUserArn, responseInfo);
     return Response.ok(responseXml)
         .header("Content-Type", "text/xml")
         .build();
   }
 
-  private boolean isValidRoleSessionName(String roleSessionName) {
-    if (roleSessionName.length() < 2 || roleSessionName.length() > 64) {
-      return false;
+  private String generateAssumeRoleResponse(String assumedRoleUserArn, AssumeRoleResponseInfo responseInfo)
+      throws IOException {
+    final String accessKeyId = responseInfo.getAccessKeyId();
+    final String secretAccessKey = responseInfo.getSecretAccessKey();
+    final String sessionToken = responseInfo.getSessionToken();
+    final String assumedRoleId = responseInfo.getAssumedRoleId();
+
+    final String expiration = DateTimeFormatter.ISO_INSTANT.format(
+        Instant.ofEpochSecond(responseInfo.getExpirationEpochSeconds()).atOffset(ZoneOffset.UTC).toInstant());
+
+    final String requestId = UUID.randomUUID().toString();
+
+    try {
+      final S3AssumeRoleResponseXml response = new S3AssumeRoleResponseXml();
+      final S3AssumeRoleResponseXml.AssumeRoleResult result = new S3AssumeRoleResponseXml.AssumeRoleResult();
+      final S3AssumeRoleResponseXml.Credentials credentials = new S3AssumeRoleResponseXml.Credentials();
+      credentials.setAccessKeyId(accessKeyId);
+      credentials.setSecretAccessKey(secretAccessKey);
+      credentials.setSessionToken(sessionToken);
+      credentials.setExpiration(expiration);
+      result.setCredentials(credentials);
+      final S3AssumeRoleResponseXml.AssumedRoleUser user = new S3AssumeRoleResponseXml.AssumedRoleUser();
+      user.setAssumedRoleId(assumedRoleId);
+      user.setArn(assumedRoleUserArn);
+      result.setAssumedRoleUser(user);
+      response.setAssumeRoleResult(result);
+      final S3AssumeRoleResponseXml.ResponseMetadata meta = new S3AssumeRoleResponseXml.ResponseMetadata();
+      meta.setRequestId(requestId);
+      response.setResponseMetadata(meta);
+
+      final JAXBContext jaxbContext = JAXBContext.newInstance(S3AssumeRoleResponseXml.class);
+      final Marshaller marshaller = jaxbContext.createMarshaller();
+      marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
+      final StringWriter stringWriter = new StringWriter();
+      marshaller.marshal(response, stringWriter);
+      return stringWriter.toString();
+    } catch (JAXBException e) {
+      throw new IOException("Failed to marshal AssumeRole response", e);
     }
-
-    // AWS allows: alphanumeric, +, =, ,, ., @, -
-    return roleSessionName.matches("[a-zA-Z0-9+=,.@\\-]+");
-  }
-
-  // TODO: replace mock implementation with actual logic to generate new credentials
-  private String generateAssumeRoleResponse(String roleArn, String roleSessionName, int duration) {
-    // Generate realistic-looking temporary credentials
-    String accessKeyId = "ASIA" + generateRandomAlphanumeric(16); // AWS temp keys start with ASIA
-    String secretAccessKey = generateRandomBase64(40);
-    String sessionToken = generateSessionToken();
-    String expiration = getExpirationTime(duration);
-
-    // Generate AssumedRoleId (format: AROLEID:RoleSessionName)
-    String roleId = "AROA" + generateRandomAlphanumeric(16);
-    String assumedRoleId = roleId + ":" + roleSessionName;
-
-    String requestId = UUID.randomUUID().toString();
-
-    return String.format(
-        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>%n" +
-            "<AssumeRoleResponse xmlns=\"https://sts.amazonaws.com/doc/2011-06-15/\">%n" +
-            "  <AssumeRoleResult>%n" +
-            "    <Credentials>%n" +
-            "      <AccessKeyId>%s</AccessKeyId>%n" +
-            "      <SecretAccessKey>%s</SecretAccessKey>%n" +
-            "      <SessionToken>%s</SessionToken>%n" +
-            "      <Expiration>%s</Expiration>%n" +
-            "    </Credentials>%n" +
-            "    <AssumedRoleUser>%n" +
-            "      <AssumedRoleId>%s</AssumedRoleId>%n" +
-            "      <Arn>%s</Arn>%n" +
-            "    </AssumedRoleUser>%n" +
-            "  </AssumeRoleResult>%n" +
-            "  <ResponseMetadata>%n" +
-            "    <RequestId>%s</RequestId>%n" +
-            "  </ResponseMetadata>%n" +
-            "</AssumeRoleResponse>",
-        accessKeyId, secretAccessKey, sessionToken, expiration,
-        assumedRoleId, roleArn, requestId);
-  }
-
-  // TODO: this method should be removed once actual credential response from OM is implemented and used in the endpoint
-  private String generateRandomAlphanumeric(int length) {
-    String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    StringBuilder sb = new StringBuilder();
-    Random random = new Random();
-    for (int i = 0; i < length; i++) {
-      sb.append(chars.charAt(random.nextInt(chars.length())));
-    }
-    return sb.toString();
-  }
-
-  // TODO: this method should be removed once actual credential response from OM is implemented and used in the endpoint
-  private String generateRandomBase64(int length) {
-    String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    StringBuilder sb = new StringBuilder();
-    Random random = new Random();
-    for (int i = 0; i < length; i++) {
-      sb.append(chars.charAt((random.nextInt(chars.length()))));
-    }
-    return sb.toString();
-  }
-
-  // TODO: this method should be removed once actual credential response from OM is implemented and used in the endpoint
-  private String generateSessionToken() {
-    byte[] tokenBytes = new byte[128];
-    Random random = new Random();
-    for (int i = 0; i < tokenBytes.length; i++) {
-      tokenBytes[i] = (byte) random.nextInt(256);
-    }
-    return Base64.getEncoder().encodeToString(tokenBytes);
-  }
-
-  // TODO: this method should be removed once actual credential response from OM is implemented and used in the endpoint
-  private String getExpirationTime(int durationSeconds) {
-    Instant expiration = Instant.now().plusSeconds(durationSeconds);
-    return DateTimeFormatter.ISO_INSTANT.format(expiration);
   }
 }

@@ -17,13 +17,15 @@
 
 package org.apache.hadoop.ozone.s3sts;
 
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+
 /**
  * This class contains constants for configuration keys used
  * in S3 STS endpoint.
  */
 public final class S3STSConfigKeys {
   public static final String OZONE_S3G_STS_HTTP_ENABLED_KEY =
-      "ozone.s3g.sts.http.enabled";
+      OzoneConfigKeys.OZONE_S3G_STS_HTTP_ENABLED_KEY;
   public static final String OZONE_S3G_STS_HTTP_BIND_HOST_KEY =
       "ozone.s3g.sts.http-bind-host";
   public static final String OZONE_S3G_STS_HTTPS_BIND_HOST_KEY =

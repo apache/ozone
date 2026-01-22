@@ -33,6 +33,8 @@ import org.apache.hadoop.ozone.om.OzoneAclUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
+import org.apache.hadoop.ozone.om.helpers.AwsRoleArnValidator;
+import org.apache.hadoop.ozone.om.helpers.S3STSUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -62,14 +64,10 @@ public class S3AssumeRoleRequest extends OMClientRequest {
     SECURE_RANDOM = secureRandom;
   }
 
-  private static final int MIN_TOKEN_EXPIRATION_SECONDS = 900;    // 15 minutes in seconds
-  private static final int MAX_TOKEN_EXPIRATION_SECONDS = 43200;  // 12 hours in seconds
   private static final int STS_ACCESS_KEY_ID_LENGTH = 20;
   private static final int STS_SECRET_ACCESS_KEY_LENGTH = 40;
   private static final int STS_ROLE_ID_LENGTH = 16;
   private static final String ASSUME_ROLE_ID_PREFIX = "AROA";
-  private static final int ASSUME_ROLE_SESSION_NAME_MIN_LENGTH = 2;
-  private static final int ASSUME_ROLE_SESSION_NAME_MAX_LENGTH = 64;
   private static final String CHARS_FOR_ACCESS_KEY_IDS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   private static final int CHARS_FOR_ACCESS_KEY_IDS_LENGTH = CHARS_FOR_ACCESS_KEY_IDS.length();
   private static final String CHARS_FOR_SECRET_ACCESS_KEYS = CHARS_FOR_ACCESS_KEY_IDS +
@@ -91,19 +89,20 @@ public class S3AssumeRoleRequest extends OMClientRequest {
     final int durationSeconds = assumeRoleRequest.getDurationSeconds();
 
     // Validate duration
-    if (durationSeconds < MIN_TOKEN_EXPIRATION_SECONDS || durationSeconds > MAX_TOKEN_EXPIRATION_SECONDS) {
-      final OMException omException = new OMException(
-          "Duration must be between " + MIN_TOKEN_EXPIRATION_SECONDS + " and " + MAX_TOKEN_EXPIRATION_SECONDS,
-          OMException.ResultCodes.INVALID_REQUEST);
+    try {
+      S3STSUtils.validateDuration(durationSeconds);
+    } catch (OMException e) {
       return new S3AssumeRoleResponse(
-          createErrorOMResponse(OmResponseUtil.getOMResponseBuilder(omRequest), omException));
+          createErrorOMResponse(OmResponseUtil.getOMResponseBuilder(omRequest), e));
     }
 
     // Validate role session name
     final String roleSessionName = assumeRoleRequest.getRoleSessionName();
-    final S3AssumeRoleResponse roleSessionNameErrorResponse = validateRoleSessionName(roleSessionName, omRequest);
-    if (roleSessionNameErrorResponse != null) {
-      return roleSessionNameErrorResponse;
+    try {
+      S3STSUtils.validateRoleSessionName(roleSessionName);
+    } catch (OMException e) {
+      return new S3AssumeRoleResponse(
+          createErrorOMResponse(OmResponseUtil.getOMResponseBuilder(omRequest), e));
     }
 
     final String roleArn = assumeRoleRequest.getRoleArn();
@@ -153,27 +152,6 @@ public class S3AssumeRoleRequest extends OMClientRequest {
       return new S3AssumeRoleResponse(
           createErrorOMResponse(OmResponseUtil.getOMResponseBuilder(omRequest), omException));
     }
-  }
-
-  /**
-   * Ensures RoleSessionName is valid.
-   */
-  private S3AssumeRoleResponse validateRoleSessionName(String roleSessionName, OMRequest omRequest) {
-    if (StringUtils.isBlank(roleSessionName)) {
-      final OMException omException = new OMException(
-          "RoleSessionName is required", OMException.ResultCodes.INVALID_REQUEST);
-      return new S3AssumeRoleResponse(
-          createErrorOMResponse(OmResponseUtil.getOMResponseBuilder(omRequest), omException));
-    }
-    if (roleSessionName.length() < ASSUME_ROLE_SESSION_NAME_MIN_LENGTH ||
-        roleSessionName.length() > ASSUME_ROLE_SESSION_NAME_MAX_LENGTH) {
-      final OMException omException = new OMException(
-          "RoleSessionName length must be between " + ASSUME_ROLE_SESSION_NAME_MIN_LENGTH + " and " +
-          ASSUME_ROLE_SESSION_NAME_MAX_LENGTH, OMException.ResultCodes.INVALID_REQUEST);
-      return new S3AssumeRoleResponse(
-          createErrorOMResponse(OmResponseUtil.getOMResponseBuilder(omRequest), omException));
-    }
-    return null;
   }
 
   /**
