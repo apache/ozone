@@ -42,7 +42,6 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.io.retry.FailoverProxyProvider.ProxyInfo;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -58,6 +57,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFollowerReadFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.OMProxyInfo;
+import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateVolumeRequest;
@@ -74,14 +74,10 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends TestOzoneManag
 
   @Test
   void testOMFollowerReadProxyProviderInitialization() {
-    OzoneClient rpcClient = getClient();
+    HadoopRpcOMFollowerReadFailoverProxyProvider<OzoneManagerProtocolPB> followerReadFailoverProxyProvider =
+        OmTestUtil.getFollowerReadFailoverProxyProvider(getObjectStore());
 
-    HadoopRpcOMFollowerReadFailoverProxyProvider followerReadFailoverProxyProvider =
-        OmFailoverProxyUtil.getFollowerReadFailoverProxyProvider(
-            rpcClient.getObjectStore().getClientProxy()
-        );
-
-    List<ProxyInfo> omProxies =
+    List<OMProxyInfo<OzoneManagerProtocolPB>> omProxies =
         followerReadFailoverProxyProvider.getOMProxies();
 
     assertEquals(getNumOfOMs(), omProxies.size());
@@ -90,8 +86,7 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends TestOzoneManag
       OzoneManager om = getCluster().getOzoneManager(i);
       InetSocketAddress omRpcServerAddr = om.getOmRpcServerAddr();
       boolean omClientProxyExists = false;
-      for (ProxyInfo proxyInfo : omProxies) {
-        OMProxyInfo omProxyInfo = (OMProxyInfo) proxyInfo;
+      for (OMProxyInfo<OzoneManagerProtocolPB> omProxyInfo : omProxies) {
         if (omProxyInfo.getAddress().equals(omRpcServerAddr)) {
           omClientProxyExists = true;
           break;
@@ -105,8 +100,8 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends TestOzoneManag
   @Test
   void testFollowerReadTargetsFollower() throws Exception {
     ObjectStore objectStore = getObjectStore();
-    HadoopRpcOMFollowerReadFailoverProxyProvider followerReadFailoverProxyProvider =
-        OmFailoverProxyUtil.getFollowerReadFailoverProxyProvider(objectStore.getClientProxy());
+    HadoopRpcOMFollowerReadFailoverProxyProvider<OzoneManagerProtocolPB> followerReadFailoverProxyProvider =
+        OmTestUtil.getFollowerReadFailoverProxyProvider(objectStore);
 
     String leaderOMNodeId = getCluster().getOMLeader().getOMNodeId();
     String followerOMNodeId = null;
@@ -121,8 +116,8 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends TestOzoneManag
     followerReadFailoverProxyProvider.changeInitialProxyForTest(followerOMNodeId);
     objectStore.getClientProxy().listVolumes(null, null, 10);
 
-    OMProxyInfo lastProxy =
-        (OMProxyInfo) followerReadFailoverProxyProvider.getLastProxy();
+    OMProxyInfo<OzoneManagerProtocolPB> lastProxy =
+        (OMProxyInfo<OzoneManagerProtocolPB>) followerReadFailoverProxyProvider.getLastProxy();
     assertNotNull(lastProxy);
     assertEquals(followerOMNodeId, lastProxy.getNodeId());
   }
@@ -130,12 +125,10 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends TestOzoneManag
   @Test
   public void testOMProxyProviderFailoverToCurrentLeader() throws Exception {
     ObjectStore objectStore = getObjectStore();
-    HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider =
-        OmFailoverProxyUtil
-            .getFailoverProxyProvider(objectStore.getClientProxy());
-    HadoopRpcOMFollowerReadFailoverProxyProvider followerReadFailoverProxyProvider =
-        OmFailoverProxyUtil
-            .getFollowerReadFailoverProxyProvider(objectStore.getClientProxy());
+    HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> omFailoverProxyProvider =
+        OmTestUtil.getFailoverProxyProvider(objectStore);
+    HadoopRpcOMFollowerReadFailoverProxyProvider<OzoneManagerProtocolPB> followerReadFailoverProxyProvider =
+        OmTestUtil.getFollowerReadFailoverProxyProvider(objectStore);
     String initialFollowerReadNodeId = followerReadFailoverProxyProvider.getCurrentProxy().getNodeId();
 
     // Run couple of createVolume tests to discover the current Leader OM
@@ -179,9 +172,8 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends TestOzoneManag
    */
   @Test
   public void testFailoverWithSuggestedLeader() throws Exception {
-    HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider =
-        OmFailoverProxyUtil
-            .getFailoverProxyProvider(getObjectStore().getClientProxy());
+    HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> omFailoverProxyProvider =
+        OmTestUtil.getFailoverProxyProvider(getObjectStore());
 
     // Make sure All OMs are ready.
     createVolumeTest(true);
@@ -245,12 +237,12 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends TestOzoneManag
 
       // Ensure that the proxy provider of the two clients are not shared
       assertNotSame(
-          OmFailoverProxyUtil.getFailoverProxyProvider(getObjectStore().getClientProxy()),
-          OmFailoverProxyUtil.getFailoverProxyProvider(anotherObjectStore.getClientProxy()));
-      HadoopRpcOMFollowerReadFailoverProxyProvider otherClientFollowerReadProxyProvider =
-          OmFailoverProxyUtil.getFollowerReadFailoverProxyProvider(anotherObjectStore.getClientProxy());
+          OmTestUtil.getFailoverProxyProvider(getObjectStore()),
+          OmTestUtil.getFailoverProxyProvider(anotherObjectStore));
+      HadoopRpcOMFollowerReadFailoverProxyProvider<OzoneManagerProtocolPB> otherClientFollowerReadProxyProvider =
+          OmTestUtil.getFollowerReadFailoverProxyProvider(anotherObjectStore);
       assertNotSame(
-          OmFailoverProxyUtil.getFollowerReadFailoverProxyProvider(getObjectStore().getClientProxy()),
+          OmTestUtil.getFollowerReadFailoverProxyProvider(getObjectStore()),
           otherClientFollowerReadProxyProvider);
       String initialProxyOmNodeId = otherClientFollowerReadProxyProvider.getCurrentProxy().getNodeId();
 

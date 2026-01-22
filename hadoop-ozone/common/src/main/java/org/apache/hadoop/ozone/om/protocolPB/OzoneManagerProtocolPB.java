@@ -21,6 +21,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.io.retry.RetryProxy;
 import org.apache.hadoop.ipc_.ProtocolInfo;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFollowerReadFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.OMFailoverProxyProviderBase;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneManagerService;
 import org.apache.hadoop.ozone.security.OzoneDelegationTokenSelector;
@@ -43,5 +44,11 @@ public interface OzoneManagerProtocolPB
       int maxFailovers) {
     return (OzoneManagerProtocolPB) RetryProxy.create(OzoneManagerProtocolPB.class, failoverProxyProvider,
         failoverProxyProvider.getRetryPolicy(maxFailovers));
+  }
+  
+  static OzoneManagerProtocolPB newProxy(HadoopRpcOMFollowerReadFailoverProxyProvider<OzoneManagerProtocolPB>
+      followerReadFailoverProxyProvider, int maxFailovers) {
+    return (OzoneManagerProtocolPB) RetryProxy.create(OzoneManagerProtocolPB.class, followerReadFailoverProxyProvider,
+        followerReadFailoverProxyProvider.getRetryPolicy(maxFailovers));
   }
 }

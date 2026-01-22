@@ -35,7 +35,8 @@ public interface OmTestUtil {
     return transport.getOmFailoverProxyProvider();
   }
 
-  static HadoopRpcOMFollowerReadFailoverProxyProvider getFollowerReadFailoverProxyProvider(ObjectStore store) {
+  static HadoopRpcOMFollowerReadFailoverProxyProvider<OzoneManagerProtocolPB> getFollowerReadFailoverProxyProvider(
+      ObjectStore store) {
     OzoneManagerProtocolClientSideTranslatorPB ozoneManagerClient =
         (OzoneManagerProtocolClientSideTranslatorPB) store.getClientProxy().getOzoneManagerClient();
 

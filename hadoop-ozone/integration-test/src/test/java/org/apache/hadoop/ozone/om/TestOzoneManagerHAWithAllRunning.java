@@ -61,6 +61,7 @@ import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
@@ -1166,18 +1167,14 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
     OzoneClient ozoneClient = null;
     try {
       ozoneClient = OzoneClientFactory.getRpcClient(clientConf);
-
-      HadoopRpcOMFailoverProxyProvider leaderFailoverProxyProvider =
-          OmFailoverProxyUtil
-              .getFailoverProxyProvider(ozoneClient.getProxy());
-      HadoopRpcOMFollowerReadFailoverProxyProvider followerReadFailoverProxyProvider =
-          OmFailoverProxyUtil.getFollowerReadFailoverProxyProvider(
-              ozoneClient.getProxy()
-          );
+      ObjectStore objectStore = ozoneClient.getObjectStore();
+      HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> leaderFailoverProxyProvider =
+          OmTestUtil.getFailoverProxyProvider(objectStore);
+      HadoopRpcOMFollowerReadFailoverProxyProvider<OzoneManagerProtocolPB> followerReadFailoverProxyProvider =
+          OmTestUtil.getFollowerReadFailoverProxyProvider(objectStore);
       assertNotNull(followerReadFailoverProxyProvider);
       assertTrue(followerReadFailoverProxyProvider.isUseFollowerRead());
 
-      ObjectStore objectStore = ozoneClient.getObjectStore();
 
       // Trigger write so that the leader failover proxy provider points to the leader
       objectStore.createVolume(volumeName, createVolumeArgs);

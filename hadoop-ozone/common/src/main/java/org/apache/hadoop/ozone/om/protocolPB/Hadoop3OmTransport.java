@@ -123,7 +123,8 @@ public class Hadoop3OmTransport implements OmTransport {
   }
 
   @VisibleForTesting
-  public HadoopRpcOMFollowerReadFailoverProxyProvider getOmFollowerReadFailoverProxyProvider() {
+  public HadoopRpcOMFollowerReadFailoverProxyProvider<OzoneManagerProtocolPB>
+      getOmFollowerReadFailoverProxyProvider() {
     return followerReadFailoverProxyProvider;
   }
 
