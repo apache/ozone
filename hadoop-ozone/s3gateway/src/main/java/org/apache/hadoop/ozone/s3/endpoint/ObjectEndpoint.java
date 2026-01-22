@@ -472,10 +472,10 @@ public class ObjectEndpoint extends EndpointBase {
       responseBuilder
           .header(ACCEPT_RANGE_HEADER, RANGE_HEADER_SUPPORTED_UNIT);
 
-      String md5Hash = keyDetails.getMetadata().get(OzoneConsts.ETAG);
-      if (md5Hash != null) {
-        responseBuilder.header(HttpHeaders.ETAG, wrapInQuotes(md5Hash));
-        String partsCount = extractPartsCount(md5Hash);
+      String eTag = keyDetails.getMetadata().get(OzoneConsts.ETAG);
+      if (eTag != null) {
+        responseBuilder.header(HttpHeaders.ETAG, wrapInQuotes(eTag));
+        String partsCount = extractPartsCount(eTag);
         if (partsCount != null) {
           responseBuilder.header(MP_PARTS_COUNT, partsCount);
         }
