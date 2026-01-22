@@ -110,14 +110,9 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider<T> implements Failover
 
     // Create a wrapped proxy containing all the proxies. Since this combined
     // proxy is just redirecting to other proxies, all invocations can share it.
-    StringBuilder combinedInfo = new StringBuilder("[");
-    for (int i = 0; i < failoverProxy.getOMProxies().size(); i++) {
-      if (i > 0) {
-        combinedInfo.append(',');
-      }
-      combinedInfo.append(failoverProxy.getOMProxies().get(i).proxyInfo);
-    }
-    combinedInfo.append(']');
+    final String combinedInfo = "[" + failoverProxy.getOMProxies().stream()
+        .map(a -> a.proxyInfo)
+        .reduce((a, b) -> a + ", " + b).orElse("") + "]";
     @SuppressWarnings("unchecked")
     T wrappedProxy = (T) Proxy.newProxyInstance(
         FollowerReadInvocationHandler.class.getClassLoader(),
