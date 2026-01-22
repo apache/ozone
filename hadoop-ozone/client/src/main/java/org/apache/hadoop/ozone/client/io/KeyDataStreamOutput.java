@@ -111,6 +111,27 @@ public class KeyDataStreamOutput extends AbstractDataStreamOutput
     return clientID;
   }
 
+  @VisibleForTesting
+  public KeyDataStreamOutput() {
+    super(null);
+    this.config = new OzoneClientConfig();
+    OmKeyInfo info = new OmKeyInfo.Builder().setKeyName("test").build();
+    blockDataStreamOutputEntryPool =
+        new BlockDataStreamOutputEntryPool(
+            config,
+            null,
+            null,
+            null, 0,
+            false, info,
+            false,
+            null,
+            0L);
+
+    this.writeOffset = 0;
+    this.clientID = 0L;
+    this.atomicKeyCreation = false;
+  }
+
   @SuppressWarnings({"parameternumber", "squid:S00107"})
   public KeyDataStreamOutput(
       OzoneClientConfig config,

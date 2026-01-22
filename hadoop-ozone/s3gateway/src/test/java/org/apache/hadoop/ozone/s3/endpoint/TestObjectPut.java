@@ -56,7 +56,10 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
 import java.util.Map;
 import java.util.stream.Stream;
 import javax.ws.rs.core.HttpHeaders;
@@ -250,7 +253,7 @@ class TestObjectPut {
       mocked.when(() -> IOUtils.copyLarge(any(InputStream.class), any(OutputStream.class), anyLong(),
               anyLong(), any(byte[].class)))
           .thenThrow(IOException.class);
-      when(objectEndpoint.getMessageDigestInstance()).thenReturn(messageDigest);
+      when(objectEndpoint.getMD5DigestInstance()).thenReturn(messageDigest);
 
       assertThrows(IOException.class, () -> putObject(CONTENT).close());
 
@@ -368,7 +371,7 @@ class TestObjectPut {
     MessageDigest messageDigest = mock(MessageDigest.class);
     try (MockedStatic<IOUtils> mocked = mockStatic(IOUtils.class)) {
       // Add the mocked methods only during the copy request
-      when(objectEndpoint.getMessageDigestInstance()).thenReturn(messageDigest);
+      when(objectEndpoint.getMD5DigestInstance()).thenReturn(messageDigest);
       mocked.when(() -> IOUtils.copyLarge(any(InputStream.class), any(OutputStream.class), anyLong(),
               anyLong(), any(byte[].class)))
           .thenThrow(IOException.class);
@@ -502,6 +505,47 @@ class TestObjectPut {
   public void testPutEmptyObject() throws Exception {
     assertSucceeds(() -> putObject(""));
     assertEquals(0, bucket.getKey(KEY_NAME).getDataSize());
+  }
+
+  @Test
+  public void testPutObjectWithContentMD5() throws Exception {
+    // GIVEN
+    byte[] contentBytes = CONTENT.getBytes(StandardCharsets.UTF_8);
+    byte[] md5Bytes = MessageDigest.getInstance("MD5").digest(contentBytes);
+    String md5Base64 = Base64.getEncoder().encodeToString(md5Bytes);
+
+    when(headers.getHeaderString("Content-MD5")).thenReturn(md5Base64);
+
+    // WHEN
+    assertSucceeds(() -> putObject(CONTENT));
+
+    // THEN
+    OzoneKeyDetails keyDetails = assertKeyContent(bucket, KEY_NAME, CONTENT);
+    assertEquals(CONTENT.length(), keyDetails.getDataSize());
+    assertNotNull(keyDetails.getMetadata());
+    assertThat(keyDetails.getMetadata().get(OzoneConsts.ETAG)).isNotEmpty();
+  }
+
+  public static Stream<Arguments> wrongContentMD5Provider() throws NoSuchAlgorithmException {
+    byte[] wrongContentBytes = "wrong".getBytes(StandardCharsets.UTF_8);
+    byte[] wrongMd5Bytes = MessageDigest.getInstance("MD5").digest(wrongContentBytes);
+    String wrongMd5Base64 = Base64.getEncoder().encodeToString(wrongMd5Bytes);
+    return Stream.of(
+        Arguments.arguments(wrongMd5Base64),
+        Arguments.arguments("invalid-base64")
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("wrongContentMD5Provider")
+  public void testPutObjectWithWrongContentMD5(String wrongContentMD5) throws Exception {
+
+    // WHEN
+    when(headers.getHeaderString("Content-MD5")).thenReturn(wrongContentMD5);
+
+    // WHEN/THEN
+    OS3Exception ex = assertErrorResponse(S3ErrorTable.BAD_DIGEST, () -> putObject(CONTENT));
+    assertThat(ex.getErrorMessage()).contains(S3ErrorTable.BAD_DIGEST.getErrorMessage());
   }
 
   private HttpHeaders newMockHttpHeaders() {

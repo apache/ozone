@@ -121,11 +121,11 @@ public abstract class EndpointBase {
 
   protected static final String ETAG_CUSTOM = "etag-custom";
 
-  private static final ThreadLocal<MessageDigest> E_TAG_PROVIDER;
+  private static final ThreadLocal<MessageDigest> MD5_PROVIDER;
   private static final ThreadLocal<MessageDigest> SHA_256_PROVIDER;
 
   static {
-    E_TAG_PROVIDER = ThreadLocal.withInitial(() -> {
+    MD5_PROVIDER = ThreadLocal.withInitial(() -> {
       try {
         return MessageDigest.getInstance(OzoneConsts.MD5_HASH);
       } catch (NoSuchAlgorithmException e) {
@@ -796,10 +796,10 @@ public abstract class EndpointBase {
       effectiveLength = contentLength;
     }
 
-    // MessageDigest is used for ETag calculation
+    // MD5MessageDigest is used for ETag calculation
     // and Sha256Digest is used for "x-amz-content-sha256" header verification
     List<MessageDigest> digests = new ArrayList<>();
-    digests.add(getMessageDigestInstance());
+    digests.add(getMD5DigestInstance());
     if (!hasUnsignedPayload(amzContentSha256Header) && !hasMultiChunksPayload(amzContentSha256Header)) {
       digests.add(getSha256DigestInstance());
     }
@@ -820,8 +820,8 @@ public abstract class EndpointBase {
     return chunkSize;
   }
 
-  public MessageDigest getMessageDigestInstance() {
-    return E_TAG_PROVIDER.get();
+  public MessageDigest getMD5DigestInstance() {
+    return MD5_PROVIDER.get();
   }
 
   public MessageDigest getSha256DigestInstance() {
