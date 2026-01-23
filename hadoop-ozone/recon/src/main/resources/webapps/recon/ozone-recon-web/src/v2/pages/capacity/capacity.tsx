@@ -48,6 +48,8 @@ type CapacityState = {
 const Capacity: React.FC<object> = () => {
   const PENDING_POLL_INTERVAL = 5 * 1000;
   const DN_CSV_DOWNLOAD_URL = '/api/v1/pendingDeletion/download';
+  const DN_STATUS_URL = '/api/v1/pendingDeletion?component=dn';
+  const DOWNLOAD_POLL_TIMEOUT_MS = 10 * 60 * 1000;
 
   const [state, setState] = React.useState<CapacityState>({
     isDNPending: true,
@@ -133,16 +135,42 @@ const Capacity: React.FC<object> = () => {
     }
   }, [selectedDatanode, storageDistribution.data.dataNodeUsage, dnPendingDeletes.data.pendingDeletionPerDataNode]);
 
+  const waitForDnFinished = async () => {
+    const startTime = Date.now();
+    while (Date.now() - startTime < DOWNLOAD_POLL_TIMEOUT_MS) {
+      const response = await fetch(DN_STATUS_URL);
+      if (!response.ok) {
+        throw new Error(`Status check failed: ${response.statusText}`);
+      }
+      const data = await response.json() as DNPendingDeletion;
+      if (data.status === "FINISHED") {
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, PENDING_POLL_INTERVAL));
+    }
+    throw new Error('CSV download not ready. Please try again later.');
+  };
+
   const downloadCsv = async (url: string) => {
     try {
+      await waitForDnFinished();
       const response = await fetch(url);
       if (!response.ok) {
         showDataFetchError(`CSV download failed: ${response.statusText}`);
         return;
       }
-      const blob = await response.blob();
+      const contentType = response.headers.get('content-type') ?? '';
+      if (!contentType.includes('text/csv')) {
+        showDataFetchError('CSV download not ready. Please try again later.');
+        return;
+      }
       const contentDisposition = response.headers.get('content-disposition');
       const filenameMatch = contentDisposition?.match(/filename="([^"]+)"/);
+      if (!filenameMatch) {
+        showDataFetchError('CSV download not ready. Please try again later.');
+        return;
+      }
+      const blob = await response.blob();
       const filename = filenameMatch?.[1] ?? 'pending_deletion_stats.csv';
       const link = document.createElement('a');
       link.href = window.URL.createObjectURL(blob);
@@ -150,7 +178,7 @@ const Capacity: React.FC<object> = () => {
       link.click();
       window.URL.revokeObjectURL(link.href);
     } catch (error) {
-      showDataFetchError((error as Error).toString());
+      showDataFetchError((error as Error).message);
     }
   };
 
@@ -364,7 +392,8 @@ const Capacity: React.FC<object> = () => {
                   <span className="dn-select-option-uuid">{datanode.datanodeUuid}</span>
                 </>
               ),
-              value: datanode.hostName
+              value: datanode.hostName,
+              key: datanode.datanodeUuid
             }))}
             disabledOpts={
               (dnPendingDeletes.data.pendingDeletionPerDataNode ?? [])
