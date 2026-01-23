@@ -617,7 +617,9 @@ public final class OzoneManagerRatisServer {
 
   private OMResponse getOMResponse(RaftClientReply reply) throws ServiceException {
     try {
-      return OMRatisHelper.getOMResponseFromRaftClientReply(reply);
+      RaftPeerId currentLeader = getLeaderId();
+      return OMRatisHelper.getOMResponseFromRaftClientReply(reply,
+          currentLeader != null ? currentLeader.toString() : null);
     } catch (IOException ex) {
       if (ex.getMessage() != null) {
         throw new ServiceException(ex.getMessage(), ex);

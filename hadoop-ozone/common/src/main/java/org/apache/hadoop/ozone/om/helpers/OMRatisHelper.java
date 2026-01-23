@@ -64,14 +64,14 @@ public final class OMRatisHelper {
   }
 
   /** Convert the given reply with proto 3 {@link ByteString} to a proto 2 response. */
-  public static OMResponse getOMResponseFromRaftClientReply(RaftClientReply reply) throws IOException {
+  public static OMResponse getOMResponseFromRaftClientReply(RaftClientReply reply, String leaderOMNodeId)
+      throws IOException {
     final OMResponse response = convertByteStringToOMResponse(reply.getMessage().getContent());
-    if (reply.getReplierId().equals(response.getLeaderOMNodeId())) {
-      return response;
+    OMResponse.Builder omResponse = OMResponse.newBuilder(response);
+    if (leaderOMNodeId != null) {
+      omResponse.setLeaderOMNodeId(leaderOMNodeId);
     }
-    return OMResponse.newBuilder(response)
-        .setLeaderOMNodeId(reply.getReplierId())
-        .build();
+    return omResponse.build();
   }
 
   /** Convert the given {@link StateMachineLogEntryProto} to a short {@link String}. */
