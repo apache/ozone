@@ -148,7 +148,7 @@ public final class OMProxyInfo<T> extends ProxyInfo<T> {
 
     private void assertInvariants() {
       // assert Invariant 1
-      for(String nodeId : getNodeIds()) {
+      for (String nodeId : getNodeIds()) {
         final Integer i = indexOf(nodeId);
         Objects.requireNonNull(i, () -> "nodeId " + nodeId + " not found");
         final OMProxyInfo<P> info = get(i);
