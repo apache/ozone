@@ -46,7 +46,7 @@ public interface OzoneManagerProtocolPB
         failoverProxyProvider.getRetryPolicy(maxFailovers));
   }
   
-  static OzoneManagerProtocolPB newProxy(HadoopRpcOMFollowerReadFailoverProxyProvider<OzoneManagerProtocolPB>
+  static OzoneManagerProtocolPB newProxy(HadoopRpcOMFollowerReadFailoverProxyProvider
       followerReadFailoverProxyProvider, int maxFailovers) {
     return (OzoneManagerProtocolPB) RetryProxy.create(OzoneManagerProtocolPB.class, followerReadFailoverProxyProvider,
         followerReadFailoverProxyProvider.getRetryPolicy(maxFailovers));

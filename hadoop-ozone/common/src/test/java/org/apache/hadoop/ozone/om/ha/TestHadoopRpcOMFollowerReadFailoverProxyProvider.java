@@ -58,7 +58,6 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
-import org.apache.hadoop.ozone.om.protocolPB.OMAdminProtocolPB;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoRequest;
@@ -80,22 +79,11 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
   private static final long SLOW_RESPONSE_SLEEP_TIME = TimeUnit.SECONDS.toMillis(2);
   private static final String OM_SERVICE_ID = "om-service-test1";
   private static final String NODE_ID_BASE_STR = "omNode-";
-  private OzoneConfiguration conf;
 
-  private HadoopRpcOMFollowerReadFailoverProxyProvider<OzoneManagerProtocolPB> proxyProvider;
+  private HadoopRpcOMFollowerReadFailoverProxyProvider proxyProvider;
   private OzoneManagerProtocolPB retryProxy;
   private String[] omNodeIds;
   private OMAnswer[] omNodeAnswers;
-
-  @Test
-  public void testWithNonClientProxy() throws Exception {
-    setupProxyProvider(2);
-    HadoopRpcOMFollowerReadFailoverProxyProvider<OMAdminProtocolPB> adminProxyProvider =
-        new HadoopRpcOMFollowerReadFailoverProxyProvider<>(conf,
-            UserGroupInformation.getCurrentUser(), OM_SERVICE_ID, OMAdminProtocolPB.class);
-    // follower read is only enabled for OzoneManagerProtocolPB and disabled otherwise
-    assertFalse(adminProxyProvider.isUseFollowerRead());
-  }
 
   @Test
   void testWriteOperationOnLeader() throws Exception {
@@ -429,8 +417,8 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
         };
 
     // Wrap the leader-based failover proxy provider with follower read proxy provider
-    proxyProvider = new HadoopRpcOMFollowerReadFailoverProxyProvider<>(
-        OM_SERVICE_ID, OzoneManagerProtocolPB.class, underlyingProxyProvider);
+    proxyProvider = new HadoopRpcOMFollowerReadFailoverProxyProvider(
+        OM_SERVICE_ID, underlyingProxyProvider);
     assertTrue(proxyProvider.isUseFollowerRead());
     // Wrap the follower read proxy provider in retry proxy to allow automatic failover
     retryProxy = (OzoneManagerProtocolPB) RetryProxy.create(
@@ -440,7 +428,6 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
     // This is currently added to prevent IllegalStateException in
     // Client#setCallIdAndRetryCount since it seems that callId is set but not unset properly
     RetryInvocationHandler.SET_CALL_ID_FOR_TEST.set(false);
-    conf = config;
   }
 
   private void doRead() throws Exception {
