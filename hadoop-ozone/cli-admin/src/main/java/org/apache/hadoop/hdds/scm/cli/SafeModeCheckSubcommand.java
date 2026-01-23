@@ -76,6 +76,7 @@ public class SafeModeCheckSubcommand extends ScmSubcommand {
     // If SCM HA mode, query the leader node.
     if (serviceId != null) {
       leaderNodeId = findLeaderNodeId(scmClient);
+      System.out.printf("SCM node %s%n", leaderNodeId);
       inSafeMode = scmClient.inSafeModeForNode(leaderNodeId);
       if (isVerbose()) {
         rules = scmClient.getSafeModeRuleStatusesForNode(leaderNodeId);
@@ -106,18 +107,26 @@ public class SafeModeCheckSubcommand extends ScmSubcommand {
   private String findLeaderNodeId(ScmClient scmClient) throws IOException {
     try {
       List<String> roles = scmClient.getScmRoles();
+
       for (String role : roles) {
         String[] parts = role.split(":");
-        if (parts.length >= 3 && "LEADER".equalsIgnoreCase(parts[2])) {
-          String leaderHostname = parts[0];
-          for (SCMNodeInfo node : nodes) {
-            String nodeHostname = node.getScmClientAddress().split(":")[0];
-            if (nodeHostname.equalsIgnoreCase(leaderHostname)) {
-              return node.getNodeId();
-            }
+        if (parts.length < 3 || !"LEADER".equalsIgnoreCase(parts[2])) {
+          continue;
+        }
+        
+        String leaderHost = parts[0];
+        String leaderIp = parts.length >= 5 ? parts[4] : null;
+
+        for (SCMNodeInfo node : nodes) {
+          String nodeHost = node.getScmClientAddress().split(":")[0];
+
+          if (matchesAddress(leaderHost, nodeHost) || (leaderIp != null && !leaderIp.isEmpty() &&
+                  matchesAddress(leaderIp, nodeHost))) {
+            return node.getNodeId();
           }
         }
       }
+
       return null;
     } catch (IOException e) {
       throw new IOException("Could not determine leader node for service: " + serviceId, e);
@@ -133,7 +142,7 @@ public class SafeModeCheckSubcommand extends ScmSubcommand {
     System.out.println("Service ID: " + serviceId);
     // Find the node matching the --scm address
     List<SCMNodeInfo> matchedNodes = nodes.stream()
-        .filter(node -> matchesAddress(node, scmAddress))
+        .filter(node -> matchesAddress(node.getScmClientAddress(), scmAddress))
         .collect(Collectors.toList());
 
     if (matchedNodes.isEmpty()) {
@@ -187,26 +196,28 @@ public class SafeModeCheckSubcommand extends ScmSubcommand {
    * Check if the given SCMNodeInfo matches the target address.
    * Tries to match by direct string comparison and by resolved address.
    */
-  private boolean matchesAddress(SCMNodeInfo node, String targetAddress) {
-    String nodeAddress = node.getScmClientAddress();
-
-    // Direct match
-    if (nodeAddress.equals(targetAddress)) {
+  private boolean matchesAddress(String address1, String address2) {
+    if (address1.equalsIgnoreCase(address2)) {
       return true;
     }
 
-    // Try normalizing both addresses and comparing
+    // Normalizing both addresses and comparing
     try {
-      InetSocketAddress target = NetUtils.createSocketAddr(targetAddress);
-      InetSocketAddress nodeAddr = NetUtils.createSocketAddr(nodeAddress);
+      InetSocketAddress addr1 = NetUtils.createSocketAddr(address1);
+      InetSocketAddress addr2 = NetUtils.createSocketAddr(address2);
 
-      // Match by resolved IP and port
-      return target.getPort() == nodeAddr.getPort() &&
-          target.getAddress().equals(nodeAddr.getAddress());
+      if (addr1.getAddress() == null || addr2.getAddress() == null) {
+        return false;
+      }
+      return addr1.getAddress().equals(addr2.getAddress()) &&
+          (addr1.getPort() == 0 || addr2.getPort() == 0 ||
+              addr1.getPort() == addr2.getPort());
+
     } catch (Exception e) {
       // If address resolution fails, no match
       if (isVerbose()) {
-        System.err.println("Warning: Failed to resolve address: " + e.getMessage());
+        System.err.println("Warning: Could not resolve address during comparison: " +
+            address1 + " vs " + address2 + " - " + e.getMessage());
       }
       return false;
     }
