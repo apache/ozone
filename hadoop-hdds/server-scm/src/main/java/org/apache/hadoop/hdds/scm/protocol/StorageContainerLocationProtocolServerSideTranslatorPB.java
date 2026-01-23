@@ -29,7 +29,7 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProt
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.ListContainer;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.ListPipelines;
 import static org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol.ADMIN_COMMAND_TYPE;
-import static org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol.FOLLOWER_READABLE_COMMAND_TYPE;
+import static org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol.FOLLOWER_READABLE_COMMAND_TYPES;
 
 import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
@@ -216,7 +216,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     // or this is a follower-readable command.
     if (!scm.checkLeader()
         && !ADMIN_COMMAND_TYPE.contains(request.getCmdType())
-        && !FOLLOWER_READABLE_COMMAND_TYPE.contains(request.getCmdType())) {
+        && !FOLLOWER_READABLE_COMMAND_TYPES.contains(request.getCmdType())) {
       RatisUtil.checkRatisException(
           scm.getScmHAManager().getRatisServer().triggerNotLeaderException(),
           scm.getClientRpcPort(), scm.getScmId(), scm.getHostname(), ROLE_TYPE);

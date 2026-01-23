@@ -77,7 +77,7 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * Read-only commands that can execute on followers without leader check.
    * These commands respect the --scm parameter and query the specified SCM.
    */
-  Set<Type> FOLLOWER_READABLE_COMMAND_TYPE = Collections.unmodifiableSet(EnumSet.of(
+  Set<Type> FOLLOWER_READABLE_COMMAND_TYPES = Collections.unmodifiableSet(EnumSet.of(
       Type.InSafeMode,
       Type.GetSafeModeRuleStatuses));
   

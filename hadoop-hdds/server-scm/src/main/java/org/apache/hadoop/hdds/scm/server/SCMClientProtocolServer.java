@@ -1038,7 +1038,7 @@ public class SCMClientProtocolServer implements
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("nodeId", nodeId);
     try {
-      boolean result = inSafeMode();
+      boolean result = scm.isInSafeMode();
       AUDIT.logReadSuccess(
           buildAuditMessageForSuccess(SCMAction.IN_SAFE_MODE, auditMap)
       );
@@ -1056,7 +1056,7 @@ public class SCMClientProtocolServer implements
     Map<String, String> auditMap = Maps.newHashMap();
     auditMap.put("nodeId", nodeId);
     try {
-      Map<String, Pair<Boolean, String>> result = getSafeModeRuleStatuses();
+      Map<String, Pair<Boolean, String>> result = scm.getRuleStatus();
       AUDIT.logReadSuccess(
           buildAuditMessageForSuccess(SCMAction.GET_SAFE_MODE_RULE_STATUSES, auditMap)
       );

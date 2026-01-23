@@ -76,6 +76,9 @@ public class SafeModeCheckSubcommand extends ScmSubcommand {
     // If SCM HA mode, query the leader node.
     if (serviceId != null) {
       leaderNodeId = findLeaderNodeId(scmClient);
+      if (leaderNodeId == null) {
+        throw new IOException("Unable to determine SCM leader for the service " + serviceId);
+      }
       System.out.printf("SCM node %s%n", leaderNodeId);
       inSafeMode = scmClient.inSafeModeForNode(leaderNodeId);
       if (isVerbose()) {
