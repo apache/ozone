@@ -3142,6 +3142,13 @@
     </description>
   </property>
   <property>
+    <name>ozone.client.follower.read.enabled</name>
+    <value>false</value>
+    <description>
+      Enable client to read from OM followers.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.admin.protocol.max.retries</name>
     <value>20</value>
     <tag>OM, MANAGEMENT</tag>

@@ -17,32 +17,35 @@
 
 package org.apache.hadoop.ozone.om;
 
-import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
-import org.apache.hadoop.ozone.client.rpc.RpcClient;
+import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
+import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFollowerReadFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.protocolPB.Hadoop3OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 
-/**
- * Test utility to get the FailoverProxyProvider with cast.
- */
-public final class OmFailoverProxyUtil {
-
-  private OmFailoverProxyUtil() {
-  }
-
-  /**
-   * Get FailoverProxyProvider from RpcClient / ClientProtocol.
-   */
-  public static HadoopRpcOMFailoverProxyProvider getFailoverProxyProvider(
-      ClientProtocol clientProtocol) {
-
+/** Utilities for testing {@link OzoneManager}. */
+public interface OmTestUtil {
+  static HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> getFailoverProxyProvider(ObjectStore store) {
     OzoneManagerProtocolClientSideTranslatorPB ozoneManagerClient =
-        (OzoneManagerProtocolClientSideTranslatorPB)
-            ((RpcClient) clientProtocol).getOzoneManagerClient();
+        (OzoneManagerProtocolClientSideTranslatorPB) store.getClientProxy().getOzoneManagerClient();
     
     Hadoop3OmTransport transport =
         (Hadoop3OmTransport) ozoneManagerClient.getTransport();
     return transport.getOmFailoverProxyProvider();
+  }
+
+  static HadoopRpcOMFollowerReadFailoverProxyProvider<OzoneManagerProtocolPB> getFollowerReadFailoverProxyProvider(
+      ObjectStore store) {
+    OzoneManagerProtocolClientSideTranslatorPB ozoneManagerClient =
+        (OzoneManagerProtocolClientSideTranslatorPB) store.getClientProxy().getOzoneManagerClient();
+
+    Hadoop3OmTransport transport =
+        (Hadoop3OmTransport) ozoneManagerClient.getTransport();
+    return transport.getOmFollowerReadFailoverProxyProvider();
+  }
+
+  static String getCurrentOmProxyNodeId(ObjectStore store) {
+    return getFailoverProxyProvider(store).getCurrentProxyOMNodeId();
   }
 }

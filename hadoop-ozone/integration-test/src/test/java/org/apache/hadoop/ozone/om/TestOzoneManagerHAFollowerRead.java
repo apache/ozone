@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
@@ -70,7 +71,7 @@ import org.junit.jupiter.api.BeforeAll;
 /**
  * Base class for Ozone Manager HA tests.
  */
-public abstract class TestOzoneManagerHA {
+public abstract class TestOzoneManagerHAFollowerRead {
 
   private static MiniOzoneHAClusterImpl cluster = null;
   private static ObjectStore objectStore;
@@ -155,6 +156,10 @@ public abstract class TestOzoneManagerHA {
 
     omHAConfig.setRetryCacheTimeout(RETRY_CACHE_DURATION);
 
+    // Enable the OM follower read
+    omHAConfig.setReadOption("LINEARIZABLE");
+    omHAConfig.setReadLeaderLeaseEnabled(true);
+
     conf.setFromObject(omHAConfig);
 
     // config for key deleting service.
@@ -167,7 +172,10 @@ public abstract class TestOzoneManagerHA {
 
     cluster = clusterBuilder.build();
     cluster.waitForClusterToBeReady();
-    client = OzoneClientFactory.getRpcClient(omServiceId, conf);
+
+    OzoneConfiguration clientConf = OzoneConfiguration.of(conf);
+    clientConf.setBoolean(OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, true);
+    client = OzoneClientFactory.getRpcClient(omServiceId, clientConf);
     objectStore = client.getObjectStore();
   }
 
@@ -269,18 +277,6 @@ public abstract class TestOzoneManagerHA {
   }
 
   /**
-   * Stop the current leader OM.
-   */
-  protected void stopLeaderOM() {
-    // The omFailoverProxyProvider will point to the current leader OM node.
-    final String leaderOMNodeId = OmTestUtil.getCurrentOmProxyNodeId(getObjectStore());
-
-    // Stop one of the ozone manager, to see when the OM leader changes
-    // multipart upload is happening successfully or not.
-    cluster.stopOzoneManager(leaderOMNodeId);
-  }
-
-  /**
    * Create a volume and test its attribute.
    */
   protected void createVolumeTest(boolean checkSuccess) throws Exception {
@@ -336,8 +332,8 @@ public abstract class TestOzoneManagerHA {
    * @throws Exception
    */
   protected void testCreateFile(OzoneBucket ozoneBucket, String keyName,
-                                String data, boolean recursive,
-                                boolean overwrite)
+      String data, boolean recursive,
+      boolean overwrite)
       throws Exception {
 
     OzoneOutputStream ozoneOutputStream = ozoneBucket.createFile(keyName,
