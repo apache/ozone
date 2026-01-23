@@ -208,7 +208,7 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider<T> implements Failover
       // Must have been a concurrent modification; ignore the move request
       return currentProxy;
     }
-    final OMProxyInfo.Map<T> omProxies = failoverProxy.getOMProxyMap();
+    final OMProxyInfo.OrderedMap<T> omProxies = failoverProxy.getOMProxyMap();
     currentIndex = (currentIndex + 1) % omProxies.size();
     final String currentOmNodeId = omProxies.getNodeId(currentIndex);
     currentProxy = failoverProxy.createOMProxyIfNeeded(currentOmNodeId);

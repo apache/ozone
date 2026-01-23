@@ -65,7 +65,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
   private final ConfigurationSource conf;
   private final Class<T> protocolClass;
 
-  private final OMProxyInfo.Map<T> omProxies;
+  private final OMProxyInfo.OrderedMap<T> omProxies;
 
   // These are used to identify the current and next OM node
   // Note that these fields need to be modified atomically (e.g. using synchronized)
@@ -99,7 +99,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
         OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY,
         OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT);
 
-    this.omProxies = new OMProxyInfo.Map<>(initOmProxiesFromConfigs(conf, omServiceId));
+    this.omProxies = new OMProxyInfo.OrderedMap<>(initOmProxiesFromConfigs(conf, omServiceId));
     nextProxyIndex = 0;
     currentProxyIndex = 0;
   }
@@ -386,7 +386,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
     return omProxies.getProxies();
   }
 
-  public OMProxyInfo.Map<T> getOMProxyMap() {
+  public OMProxyInfo.OrderedMap<T> getOMProxyMap() {
     return omProxies;
   }
 

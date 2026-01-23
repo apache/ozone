@@ -20,11 +20,12 @@ package org.apache.hadoop.ozone.om.ha;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Collections;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.SortedMap;
-import java.util.TreeMap;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.retry.FailoverProxyProvider.ProxyInfo;
 import org.apache.hadoop.net.NetUtils;
@@ -105,10 +106,12 @@ public final class OMProxyInfo<T> extends ProxyInfo<T> {
   }
 
   /**
-   * An {@link OMProxyInfo} map,
-   * where the underlying collections are unmodifiable.
+   * A {@link OMProxyInfo} map with a particular order,
+   * <p>
+   * Note the underlying collections are unmodifiable.
+   * As a result, this class is thread-safe without any synchronizations.
    */
-  public static class Map<P> {
+  public static class OrderedMap<P> {
     /** A list of proxies in a particular order. */
     private final List<OMProxyInfo<P>> proxies;
     /**
@@ -120,20 +123,56 @@ public final class OMProxyInfo<T> extends ProxyInfo<T> {
      * <p>
      * Invariant 2: Given 0 <= i < proxies.size(), let nodeId = proxies.get(i).getNodeId().
      *              Then, ordering.get(nodeId) == i.
+     * <p>
+     * Invariant 3: Let p = proxies.iterator() and o = ordering.entrySet().iterator().
+     *              Then, p.hasNext() == o.hasNext().
+     *              If p.hasNext() == true, then p.next().getNodeId().equals(o.next().getKey()).
+     *
+     * @see #assertInvariants()
      */
-    private final SortedMap<String, Integer> ordering;
+    private final Map<String, Integer> ordering;
 
-    public Map(List<OMProxyInfo<P>> proxies) {
+    public OrderedMap(List<OMProxyInfo<P>> proxies) {
       this.proxies = Collections.unmodifiableList(proxies);
 
-      final SortedMap<String, Integer> map = new TreeMap<>();
+      final Map<String, Integer> map = new LinkedHashMap<>(); // use LinkedHashMap to preserve iteration ordering
       for (int i = 0; i < proxies.size(); i++) {
         final String nid = proxies.get(i).getNodeId();
         final Integer previous = map.put(nid, i);
         Preconditions.assertNull(previous, () -> "Duplicate nodeId " + nid + " in " + proxies);
       }
-      Preconditions.assertSame(proxies.size(), map.size(), "size");
-      this.ordering = Collections.unmodifiableSortedMap(map);
+      this.ordering = Collections.unmodifiableMap(map);
+
+      assertInvariants();
+    }
+
+    private void assertInvariants() {
+      // assert Invariant 1
+      for(String nodeId : getNodeIds()) {
+        final Integer i = indexOf(nodeId);
+        Objects.requireNonNull(i, () -> "nodeId " + nodeId + " not found");
+        final OMProxyInfo<P> info = get(i);
+        Objects.requireNonNull(info, () -> "info not found for index " + i);
+        Preconditions.assertSame(nodeId, info.getNodeId(), "nodeId");
+      }
+      // assert Invariant 2
+      for (int index = 0; index < proxies.size(); index++) {
+        final String nodeId = getNodeId(index);
+        final Integer i = ordering.get(nodeId);
+        Objects.requireNonNull(i, () -> "nodeId " + nodeId + " not found");
+        Preconditions.assertSame(index, i.intValue(), "index");
+      }
+      // assert Invariant 3
+      final Iterator<OMProxyInfo<P>> p = proxies.iterator();
+      final Iterator<Map.Entry<String, Integer>> o = ordering.entrySet().iterator();
+      for (int i = 0; p.hasNext(); i++) {
+        Preconditions.assertTrue(o.hasNext());
+        final Map.Entry<String, Integer> e = o.next();
+        Preconditions.assertSame(p.next().getNodeId(), e.getKey(), "nodeId");
+        Preconditions.assertSame(i, e.getValue().intValue(), "index");
+      }
+      Preconditions.assertTrue(!o.hasNext());
+      Preconditions.assertSame(proxies.size(), ordering.size(), "size");
     }
 
     public Set<String> getNodeIds() {
@@ -148,22 +187,22 @@ public final class OMProxyInfo<T> extends ProxyInfo<T> {
       return proxies.size();
     }
 
-    OMProxyInfo<P> get(int i) {
-      return i >= 0 && i < proxies.size() ? proxies.get(i) : null;
-    }
-
     String getNodeId(int i) {
       final OMProxyInfo<P> proxy = get(i);
       return proxy != null ? proxy.getNodeId() : null;
     }
 
-    Integer indexOf(String nodeID) {
-      return ordering.get(nodeID);
+    OMProxyInfo<P> get(int i) {
+      return i >= 0 && i < proxies.size() ? proxies.get(i) : null;
     }
 
     public OMProxyInfo<P> get(String nodeID) {
       final Integer i = indexOf(nodeID);
       return i != null ? get(i) : null;
+    }
+
+    Integer indexOf(String nodeID) {
+      return ordering.get(nodeID);
     }
 
     boolean contains(String nodeId, String address) {
