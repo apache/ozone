@@ -296,7 +296,7 @@ class TestKeyDeletingService extends OzoneTestBase {
 
       // Process the key deletion
       testService.processKeyDeletes(blockGroups, new HashMap<>(), new ArrayList<>(), null, null);
-      // Verify that SCM's deleteKeyBlocks was never called (empty keys are filtered out)
+      // Verify that SCM's deleteKeyBlocks was called.
       verify(scmClientSpy, times(1)).deleteKeyBlocks(any());
       // Cleanup
       testService.shutdown();
