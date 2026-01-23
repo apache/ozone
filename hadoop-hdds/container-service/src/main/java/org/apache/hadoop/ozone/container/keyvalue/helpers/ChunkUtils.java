@@ -1,58 +1,21 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.container.keyvalue.helpers;
-
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InterruptedIOException;
-import java.io.UncheckedIOException;
-import java.nio.ByteBuffer;
-import java.nio.MappedByteBuffer;
-import java.nio.channels.FileChannel;
-import java.nio.channels.FileLock;
-import java.nio.file.NoSuchFileException;
-import java.nio.file.OpenOption;
-import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
-import java.nio.file.attribute.FileAttribute;
-import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Supplier;
-import java.util.function.ToLongFunction;
-
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.common.ChunkBuffer;
-import org.apache.hadoop.ozone.common.utils.BufferUtils;
-import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
-import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.util.Time;
-
-import com.google.common.annotations.VisibleForTesting;
 
 import static java.nio.channels.FileChannel.open;
 import static java.util.Collections.unmodifiableSet;
@@ -65,6 +28,46 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNSUPPORTED_REQUEST;
 import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.util.concurrent.Striped;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InterruptedIOException;
+import java.io.UncheckedIOException;
+import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.OpenOption;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.FileAttribute;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.function.ToLongFunction;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
+import org.apache.hadoop.ozone.common.utils.BufferUtils;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.keyvalue.impl.MappedBufferManager;
+import org.apache.hadoop.util.Time;
+import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
+import org.apache.ratis.thirdparty.io.netty.buffer.PooledByteBufAllocator;
+import org.apache.ratis.thirdparty.io.netty.handler.stream.ChunkedNioFile;
+import org.apache.ratis.util.AutoCloseableLock;
 import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,8 +76,6 @@ import org.slf4j.LoggerFactory;
  * Utility methods for chunk operations for KeyValue container.
  */
 public final class ChunkUtils {
-
-  private static final Set<Path> LOCKS = ConcurrentHashMap.newKeySet();
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ChunkUtils.class);
@@ -91,10 +92,29 @@ public final class ChunkUtils {
           StandardOpenOption.READ
       ));
   public static final FileAttribute<?>[] NO_ATTRIBUTES = {};
+  public static final int DEFAULT_FILE_LOCK_STRIPED_SIZE = 2048;
+  private static Striped<ReadWriteLock> fileStripedLock =
+      Striped.readWriteLock(DEFAULT_FILE_LOCK_STRIPED_SIZE);
 
   /** Never constructed. **/
   private ChunkUtils() {
+  }
 
+  @VisibleForTesting
+  public static void setStripedLock(Striped<ReadWriteLock> stripedLock) {
+    fileStripedLock = stripedLock;
+  }
+
+  private static ReadWriteLock getFileLock(Path filePath) {
+    return fileStripedLock.get(filePath);
+  }
+
+  private static AutoCloseableLock getFileReadLock(Path filePath) {
+    return AutoCloseableLock.acquire(getFileLock(filePath).readLock());
+  }
+
+  private static AutoCloseableLock getFileWriteLock(Path filePath) {
+    return AutoCloseableLock.acquire(getFileLock(filePath).writeLock());
   }
 
   /**
@@ -156,24 +176,16 @@ public final class ChunkUtils {
   private static long writeDataToFile(File file, ChunkBuffer data,
       long offset, boolean sync) {
     final Path path = file.toPath();
-    try {
-      return processFileExclusively(path, () -> {
-        FileChannel channel = null;
-        try {
-          channel = open(path, WRITE_OPTIONS, NO_ATTRIBUTES);
-
-          try (FileLock ignored = channel.lock()) {
-            return writeDataToChannel(channel, data, offset);
-          }
-        } catch (IOException e) {
-          throw new UncheckedIOException(e);
-        } finally {
-          closeFile(channel, sync);
-        }
-      });
-    } catch (InterruptedException e) {
-      throw new UncheckedIOException(new InterruptedIOException(
-          "Interrupted while waiting to write file " + path));
+    try (AutoCloseableLock ignoredLock = getFileWriteLock(path)) {
+      FileChannel channel = null;
+      try {
+        channel = open(path, WRITE_OPTIONS, NO_ATTRIBUTES);
+        return writeDataToChannel(channel, data, offset);
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      } finally {
+        closeFile(channel, sync);
+      }
     }
   }
 
@@ -187,11 +199,12 @@ public final class ChunkUtils {
     }
   }
 
+  @SuppressWarnings("checkstyle:parameternumber")
   public static ChunkBuffer readData(long len, int bufferCapacity,
-      File file, long off, HddsVolume volume, int readMappedBufferThreshold)
-      throws StorageContainerException {
-    if (len > readMappedBufferThreshold) {
-      return readData(file, bufferCapacity, off, len, volume);
+      File file, long off, HddsVolume volume, int readMappedBufferThreshold, boolean mmapEnabled,
+      MappedBufferManager mappedBufferManager) throws StorageContainerException {
+    if (mmapEnabled && len > readMappedBufferThreshold && bufferCapacity > readMappedBufferThreshold) {
+      return readData(file, bufferCapacity, off, len, volume, mappedBufferManager);
     } else if (len == 0) {
       return ChunkBuffer.wrap(Collections.emptyList());
     }
@@ -204,27 +217,18 @@ public final class ChunkUtils {
   }
 
   private static void readData(File file, long offset, long len,
-      CheckedFunction<FileChannel, Long, IOException> readMethod,
+      CheckedFunction<FileChannel, Long, Exception> readMethod,
       HddsVolume volume) throws StorageContainerException {
 
     final Path path = file.toPath();
     final long startTime = Time.monotonicNow();
     final long bytesRead;
 
-    try {
-      bytesRead = processFileExclusively(path, () -> {
-        try (FileChannel channel = open(path, READ_OPTIONS, NO_ATTRIBUTES);
-             FileLock ignored = channel.lock(offset, len, true)) {
-          return readMethod.apply(channel);
-        } catch (IOException e) {
-          onFailure(volume);
-          throw new UncheckedIOException(e);
-        }
-      });
-    } catch (UncheckedIOException e) {
+    try (AutoCloseableLock ignoredLock = getFileReadLock(path);
+         FileChannel channel = open(path, READ_OPTIONS, NO_ATTRIBUTES)) {
+      bytesRead = readMethod.apply(channel);
+    } catch (Exception e) {
       onFailure(volume);
-      throw wrapInStorageContainerException(e.getCause());
-    } catch (InterruptedException e) {
       throw wrapInStorageContainerException(e);
     }
 
@@ -252,25 +256,83 @@ public final class ChunkUtils {
    * @return a list of {@link MappedByteBuffer} containing the data.
    */
   private static ChunkBuffer readData(File file, int chunkSize,
-      long offset, long length, HddsVolume volume)
+      long offset, long length, HddsVolume volume, MappedBufferManager mappedBufferManager)
       throws StorageContainerException {
 
-    final List<ByteBuffer> buffers = new ArrayList<>(
-        Math.toIntExact((length - 1) / chunkSize) + 1);
+    final int bufferNum = Math.toIntExact((length - 1) / chunkSize) + 1;
+    if (!mappedBufferManager.getQuota(bufferNum)) {
+      // proceed with normal buffer
+      final ByteBuffer[] buffers = BufferUtils.assignByteBuffers(length,
+          chunkSize);
+      readData(file, offset, length, c -> c.position(offset).read(buffers), volume);
+      Arrays.stream(buffers).forEach(ByteBuffer::flip);
+      return ChunkBuffer.wrap(Arrays.asList(buffers));
+    } else {
+      try {
+        // proceed with mapped buffer
+        final List<ByteBuffer> buffers = new ArrayList<>(bufferNum);
+        readData(file, offset, length, channel -> {
+          long readLen = 0;
+          while (readLen < length) {
+            final int n = Math.toIntExact(Math.min(length - readLen, chunkSize));
+            final long finalOffset = offset + readLen;
+            final AtomicReference<IOException> exception = new AtomicReference<>();
+            ByteBuffer mapped = mappedBufferManager.computeIfAbsent(file.getAbsolutePath(), finalOffset, n,
+                () -> {
+                  try {
+                    return channel.map(FileChannel.MapMode.READ_ONLY, finalOffset, n);
+                  } catch (IOException e) {
+                    LOG.error("Failed to map file {} with offset {} and length {}", file, finalOffset, n);
+                    exception.set(e);
+                    return null;
+                  }
+                });
+            if (mapped == null) {
+              throw exception.get();
+            }
+            LOG.debug("mapped: offset={}, readLen={}, n={}, {}", finalOffset, readLen, n, mapped.getClass());
+            readLen += mapped.remaining();
+            buffers.add(mapped);
+          }
+          return readLen;
+        }, volume);
+        return ChunkBuffer.wrap(buffers);
+      } catch (Throwable e) {
+        mappedBufferManager.releaseQuota(bufferNum);
+        throw e;
+      }
+    }
+  }
+
+  public static ChunkBufferToByteString readData(File file, long chunkSize,
+      long offset, long length, HddsVolume volume, DispatcherContext context)
+      throws StorageContainerException {
+    final List<ByteBuf> buffers = readDataNettyChunkedNioFile(
+        file, Math.toIntExact(chunkSize), offset, length, volume);
+    final ChunkBufferToByteString b = ChunkBufferToByteString.wrap(buffers);
+    context.setReleaseMethod(b::release);
+    return b;
+  }
+
+  /**
+   * Read data from the given file using {@link ChunkedNioFile}.
+   *
+   * @return a list of {@link ByteBuf} containing the data.
+   */
+  private static List<ByteBuf> readDataNettyChunkedNioFile(
+      File file, int chunkSize, long offset, long length, HddsVolume volume) throws StorageContainerException {
+    final List<ByteBuf> buffers = new ArrayList<>(Math.toIntExact((length - 1) / chunkSize) + 1);
     readData(file, offset, length, channel -> {
+      final ChunkedNioFile f = new ChunkedNioFile(channel, offset, length, chunkSize);
       long readLen = 0;
       while (readLen < length) {
-        final int n = Math.toIntExact(Math.min(length - readLen, chunkSize));
-        final ByteBuffer mapped = channel.map(
-            FileChannel.MapMode.READ_ONLY, offset + readLen, n);
-        LOG.debug("mapped: offset={}, readLen={}, n={}, {}",
-            offset, readLen, n, mapped.getClass());
-        readLen += mapped.remaining();
-        buffers.add(mapped);
+        final ByteBuf buf = f.readChunk(PooledByteBufAllocator.DEFAULT);
+        readLen += buf.readableBytes();
+        buffers.add(buf);
       }
       return readLen;
     }, volume);
-    return ChunkBuffer.wrap(buffers);
+    return buffers;
   }
 
   /**
@@ -298,7 +360,6 @@ public final class ChunkUtils {
 
     return false;
   }
-
 
   /**
    * Validates chunk data and returns a boolean value that indicates if the
@@ -388,29 +449,6 @@ public final class ChunkUtils {
       throw new StorageContainerException(
           "Chunk file not found: " + file.getPath(),
           UNABLE_TO_FIND_CHUNK);
-    }
-  }
-
-  @VisibleForTesting
-  static <T> T processFileExclusively(Path path, Supplier<T> op)
-      throws InterruptedException {
-    long period = 1;
-    for (;;) {
-      if (LOCKS.add(path)) {
-        break;
-      } else {
-        Thread.sleep(period);
-        // exponentially backoff until the sleep time is over 1 second.
-        if (period < 1000) {
-          period *= 2;
-        }
-      }
-    }
-
-    try {
-      return op.get();
-    } finally {
-      LOCKS.remove(path);
     }
   }
 

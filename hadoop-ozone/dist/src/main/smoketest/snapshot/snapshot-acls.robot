@@ -18,7 +18,8 @@ Documentation       Test for reading snapshots with ACLs as different users
 Library             OperatingSystem
 Resource            snapshot-setup.robot
 Test Timeout        5 minutes
-Suite Setup         Run Keyword if  '${SECURITY_ENABLED}' == 'false'    BuiltIn.Skip
+Suite Setup         Run Keywords       Get Security Enabled From Config
+...    AND          Run Keyword if  '${SECURITY_ENABLED}' == 'false'    BuiltIn.Skip
 
 *** Variables ***
 ${USER1} =              testuser
@@ -64,10 +65,10 @@ Test reading first snapshot as user2
     Execute             kdestroy
     Kinit test user     ${USER2}                ${USER2}.keytab
     ${keyDest} =        Generate Random String  5   [LOWER]
-    ${result} =         Get key                 ${FIRST_SNAPSHOT}     ${keyDest}
+    ${result} =         Get key                 ${FIRST_SNAPSHOT}     ${TEMP_DIR}/${keyDest}
     Should contain      ${result}               PERMISSION_DENIED
 
 Test reading second snapshot as user2
     ${keyDest} =            Generate Random String  5   [LOWER]
-    ${result} =             Get key                 ${SECOND_SNAPSHOT}     ${keyDest}
+    ${result} =             Get key                 ${SECOND_SNAPSHOT}     ${TEMP_DIR}/${keyDest}
     Should not contain      ${result}               PERMISSION_DENIED

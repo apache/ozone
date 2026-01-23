@@ -1,31 +1,56 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.container.replication;
+
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Stream;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -49,32 +74,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.stream.Stream;
-
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
-
 /**
  * This class tests the replication manager using a set of scenarios defined in
  * JSON files. The scenarios define a container and a set of replicas, and the
@@ -90,7 +89,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  */
 
 public class TestReplicationManagerScenarios {
-  private static final Map<String, UUID> ORIGINS = new HashMap<>();
+  private static final Map<String, DatanodeID> ORIGINS = new HashMap<>();
   private static final Map<String, DatanodeDetails> DATANODE_ALIASES
       = new HashMap<>();
   private static final Map<DatanodeDetails, NodeStatus> NODE_STATUS_MAP
@@ -101,11 +100,9 @@ public class TestReplicationManagerScenarios {
   private Map<ContainerID, Set<ContainerReplica>> containerReplicaMap;
   private Set<ContainerInfo> containerInfoSet;
   private ContainerReplicaPendingOps containerReplicaPendingOps;
-  private Set<Pair<UUID, SCMCommand<?>>> commandsSent;
+  private Set<Pair<DatanodeID, SCMCommand<?>>> commandsSent;
 
   private OzoneConfiguration configuration;
-  private ReplicationManager replicationManager;
-  private LegacyReplicationManager legacyReplicationManager;
   private ContainerManager containerManager;
   private PlacementPolicy ratisPlacementPolicy;
   private PlacementPolicy ecPlacementPolicy;
@@ -132,6 +129,7 @@ public class TestReplicationManagerScenarios {
 
   private static List<Scenario> loadTestsInFile(URI testFile)
       throws IOException {
+    System.out.println("Loading test file: " + testFile);
     ObjectReader reader = new ObjectMapper().readerFor(Scenario.class);
     try (InputStream stream = testFile.toURL().openStream()) {
       try (MappingIterator<Scenario> iterator = reader.readValues(stream)) {
@@ -184,9 +182,8 @@ public class TestReplicationManagerScenarios {
       return null;
     }).when(nodeManager).addDatanodeCommand(any(), any());
 
-    legacyReplicationManager = mock(LegacyReplicationManager.class);
     clock = new TestClock(Instant.now(), ZoneId.systemDefault());
-    containerReplicaPendingOps = new ContainerReplicaPendingOps(clock);
+    containerReplicaPendingOps = new ContainerReplicaPendingOps(clock, null);
 
     when(containerManager.getContainerReplicas(any(ContainerID.class))).thenAnswer(
         invocation -> {
@@ -224,6 +221,7 @@ public class TestReplicationManagerScenarios {
 
   private ReplicationManager createReplicationManager() throws IOException {
     return new ReplicationManager(
+        configuration.getObject(ReplicationManager.ReplicationManagerConfiguration.class),
         configuration,
         containerManager,
         ratisPlacementPolicy,
@@ -232,7 +230,6 @@ public class TestReplicationManagerScenarios {
         scmContext,
         nodeManager,
         clock,
-        legacyReplicationManager,
         containerReplicaPendingOps) {
       @Override
       protected void startSubServices() {
@@ -241,8 +238,8 @@ public class TestReplicationManagerScenarios {
     };
   }
 
-  protected static UUID getOrCreateOrigin(String origin) {
-    return ORIGINS.computeIfAbsent(origin, (k) -> UUID.randomUUID());
+  protected static DatanodeID getOrCreateOrigin(String origin) {
+    return ORIGINS.computeIfAbsent(origin, k -> DatanodeID.randomID());
   }
 
   private static Stream<Scenario> getTestScenarios() {
@@ -253,10 +250,10 @@ public class TestReplicationManagerScenarios {
     for (PendingReplica r : scenario.getPendingReplicas()) {
       if (r.getType() == ContainerReplicaOp.PendingOpType.ADD) {
         containerReplicaPendingOps.scheduleAddReplica(container.containerID(), r.getDatanodeDetails(),
-            r.getReplicaIndex(), Long.MAX_VALUE);
+            r.getReplicaIndex(), null, Long.MAX_VALUE, 5L, clock.millis());
       } else if (r.getType() == ContainerReplicaOp.PendingOpType.DELETE) {
         containerReplicaPendingOps.scheduleDeleteReplica(container.containerID(), r.getDatanodeDetails(),
-            r.getReplicaIndex(), Long.MAX_VALUE);
+            r.getReplicaIndex(), null, Long.MAX_VALUE);
       }
     }
   }
@@ -264,14 +261,14 @@ public class TestReplicationManagerScenarios {
   @ParameterizedTest
   @MethodSource("getTestScenarios")
   public void testAllScenarios(Scenario scenario) throws IOException {
-    ReplicationManagerReport repReport = new ReplicationManagerReport();
     ReplicationQueue repQueue = new ReplicationQueue();
     ReplicationManager.ReplicationManagerConfiguration conf =
         new ReplicationManager.ReplicationManagerConfiguration();
     conf.setMaintenanceRemainingRedundancy(scenario.getEcMaintenanceRedundancy());
     conf.setMaintenanceReplicaMinimum(scenario.getRatisMaintenanceMinimum());
     configuration.setFromObject(conf);
-    replicationManager = createReplicationManager();
+    ReplicationManager replicationManager = createReplicationManager();
+    ReplicationManagerReport repReport = new ReplicationManagerReport(conf.getContainerSampleLimit());
 
     ContainerInfo containerInfo = scenario.buildContainerInfo();
     loadPendingOps(containerInfo, scenario);
@@ -299,7 +296,7 @@ public class TestReplicationManagerScenarios {
     assertExpectedCommands(scenario, scenario.getCheckCommands());
     commandsSent.clear();
 
-    ReplicationManagerReport roReport = new ReplicationManagerReport();
+    ReplicationManagerReport roReport = new ReplicationManagerReport(conf.getContainerSampleLimit());
     replicationManager.checkContainerStatus(containerInfo, roReport);
     assertEquals(0, commandsSent.size());
     assertExpectations(scenario, roReport);
@@ -334,13 +331,12 @@ public class TestReplicationManagerScenarios {
     // datanodes.
     for (ExpectedCommands expectedCommand : expectedCommands) {
       boolean found = false;
-      for (Pair<UUID, SCMCommand<?>> command : commandsSent) {
+      for (Pair<DatanodeID, SCMCommand<?>> command : commandsSent) {
         if (command.getRight().getType() == expectedCommand.getType()) {
-          DatanodeDetails targetDatanode = expectedCommand.getTargetDatanode();
-          if (targetDatanode != null) {
+          if (expectedCommand.hasExpectedDatanode()) {
             // We need to assert against the command the datanode is sent to
-            DatanodeDetails commandDatanode = findDatanodeFromUUID(command.getKey());
-            if (commandDatanode != null && commandDatanode.equals(targetDatanode)) {
+            DatanodeDetails commandDatanode = findDatanode(command.getKey());
+            if (commandDatanode != null && expectedCommand.isTargetExpected(commandDatanode)) {
               found = true;
               commandsSent.remove(command);
               break;
@@ -357,9 +353,9 @@ public class TestReplicationManagerScenarios {
     }
   }
 
-  private DatanodeDetails findDatanodeFromUUID(UUID uuid) {
+  private DatanodeDetails findDatanode(DatanodeID uuid) {
     for (DatanodeDetails dn : DATANODE_ALIASES.values()) {
-      if (dn.getUuid().equals(uuid)) {
+      if (dn.getID().equals(uuid)) {
         return dn;
       }
     }
@@ -386,7 +382,7 @@ public class TestReplicationManagerScenarios {
     private long used = 10;
     private boolean isEmpty = false;
     private String origin;
-    private UUID originId;
+    private DatanodeID originId;
 
     public void setContainerId(long containerId) {
       this.containerId = containerId;
@@ -451,12 +447,12 @@ public class TestReplicationManagerScenarios {
     public ContainerReplica buildContainerReplica() {
       createDatanodeDetails();
       createOrigin();
-      NODE_STATUS_MAP.put(datanodeDetails, new NodeStatus(operationalState, healthState));
+      NODE_STATUS_MAP.put(datanodeDetails, NodeStatus.valueOf(operationalState, healthState));
       datanodeDetails.setPersistedOpState(operationalState);
 
       ContainerReplica.ContainerReplicaBuilder builder = new ContainerReplica.ContainerReplicaBuilder();
       return builder.setReplicaIndex(index)
-          .setContainerID(new ContainerID(containerId))
+          .setContainerID(ContainerID.valueOf(containerId))
           .setContainerState(state)
           .setSequenceId(sequenceId)
           .setDatanodeDetails(datanodeDetails)
@@ -485,7 +481,7 @@ public class TestReplicationManagerScenarios {
       if (origin != null) {
         originId = getOrCreateOrigin(origin);
       } else {
-        originId = UUID.randomUUID();
+        originId = DatanodeID.randomID();
       }
     }
   }
@@ -502,35 +498,35 @@ public class TestReplicationManagerScenarios {
     private int underReplicatedQueue = 0;
     private int overReplicatedQueue = 0;
 
-    private void setUnderReplicated(int underReplicated) {
+    public void setUnderReplicated(int underReplicated) {
       stateCounts.put(ReplicationManagerReport.HealthState.UNDER_REPLICATED, underReplicated);
     }
 
-    private void setOverReplicated(int overReplicated) {
+    public void setOverReplicated(int overReplicated) {
       stateCounts.put(ReplicationManagerReport.HealthState.OVER_REPLICATED, overReplicated);
     }
 
-    private void setMisReplicated(int misReplicated) {
+    public void setMisReplicated(int misReplicated) {
       stateCounts.put(ReplicationManagerReport.HealthState.MIS_REPLICATED, misReplicated);
     }
 
-    private void setUnhealthy(int unhealthy) {
+    public void setUnhealthy(int unhealthy) {
       stateCounts.put(ReplicationManagerReport.HealthState.UNHEALTHY, unhealthy);
     }
 
-    private void setMissing(int missing) {
+    public void setMissing(int missing) {
       stateCounts.put(ReplicationManagerReport.HealthState.MISSING, missing);
     }
 
-    private void setEmpty(int empty) {
+    public void setEmpty(int empty) {
       stateCounts.put(ReplicationManagerReport.HealthState.EMPTY,  empty);
     }
 
-    private void setQuasiClosedStuck(int quasiClosedStuck) {
+    public void setQuasiClosedStuck(int quasiClosedStuck) {
       stateCounts.put(ReplicationManagerReport.HealthState.QUASI_CLOSED_STUCK, quasiClosedStuck);
     }
 
-    private void setOpenUnhealthy(int openUnhealthy) {
+    public void setOpenUnhealthy(int openUnhealthy) {
       stateCounts.put(ReplicationManagerReport.HealthState.OPEN_UNHEALTHY, openUnhealthy);
     }
 
@@ -554,6 +550,7 @@ public class TestReplicationManagerScenarios {
   public static class ExpectedCommands {
     private SCMCommandProto.Type type;
     private String datanode;
+    private Set<DatanodeDetails> expectedDatanodes;
 
     public void setDatanode(String datanode) {
       this.datanode = datanode;
@@ -568,15 +565,33 @@ public class TestReplicationManagerScenarios {
       return type;
     }
 
-    public DatanodeDetails getTargetDatanode() {
+    public boolean hasExpectedDatanode() {
+      createExpectedDatanodes();
+      return !expectedDatanodes.isEmpty();
+    }
+
+    public boolean isTargetExpected(DatanodeDetails dn) {
+      createExpectedDatanodes();
+      return expectedDatanodes.contains(dn);
+    }
+
+    private void createExpectedDatanodes() {
+      if (expectedDatanodes != null) {
+        return;
+      }
+      this.expectedDatanodes = new HashSet<>();
       if (datanode == null) {
-        return null;
+        return;
       }
-      DatanodeDetails datanodeDetails = DATANODE_ALIASES.get(this.datanode);
-      if (datanodeDetails == null) {
-        fail("Unable to find a datanode for the alias: " + datanode + " in the expected commands.");
+      String[] nodes = datanode.split("\\|");
+      for (String n : nodes) {
+        DatanodeDetails dn = DATANODE_ALIASES.get(n);
+        if (dn != null) {
+          expectedDatanodes.add(dn);
+        } else {
+          fail("Expected datanode not found: " + datanode);
+        }
       }
-      return datanodeDetails;
     }
   }
 

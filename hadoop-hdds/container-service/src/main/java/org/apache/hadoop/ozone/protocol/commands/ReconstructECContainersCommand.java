@@ -1,37 +1,34 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.protocol.commands;
 
+import com.google.protobuf.ByteString;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
-
-import com.google.protobuf.ByteString;
 import org.apache.hadoop.hdds.HddsIdFactory;
-import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReconstructECContainersCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReconstructECContainersCommandProto.Builder;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
-
-import com.google.common.base.Preconditions;
 
 /**
  * SCM command to request reconstruction of EC containers.
@@ -91,7 +88,7 @@ public class ReconstructECContainersCommand
 
   public static ReconstructECContainersCommand getFromProtobuf(
       ReconstructECContainersCommandProto protoMessage) {
-    Preconditions.checkNotNull(protoMessage);
+    Objects.requireNonNull(protoMessage, "protoMessage == null");
 
     List<DatanodeDetailsAndReplicaIndex> srcDatanodeDetails =
         protoMessage.getSourcesList().stream()
@@ -132,17 +129,22 @@ public class ReconstructECContainersCommand
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append(getType())
-        .append(": containerID: ").append(containerID)
+        .append(": cmdID: ").append(getId())
+        .append(", encodedToken: \"").append(getEncodedToken()).append('"')
+        .append(", term: ").append(getTerm())
+        .append(", deadlineMsSinceEpoch: ").append(getDeadline())
+        .append(", containerID: ").append(containerID)
         .append(", replicationConfig: ").append(ecReplicationConfig)
         .append(", sources: [").append(getSources().stream()
             .map(a -> a.dnDetails
                 + " replicaIndex: " + a.getReplicaIndex())
-            .collect(Collectors.joining(", "))).append("]")
+            .collect(Collectors.joining(", "))).append(']')
         .append(", targets: ").append(getTargetDatanodes())
         .append(", missingIndexes: ").append(
-            StringUtils.bytes2String(missingContainerIndexes.asReadOnlyByteBuffer()));
+            Arrays.toString(missingContainerIndexes.toByteArray()));
     return sb.toString();
   }
+
   /**
    * To store the datanode details with replica index.
    */

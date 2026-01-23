@@ -18,7 +18,6 @@ Resource            ../lib/os.robot
 
 *** Variables ***
 ${OM_HA_PARAM}         ${EMPTY}
-${SECURITY_ENABLED}    false
 
 *** Keywords ***
 Freon DCG
@@ -67,3 +66,9 @@ Freon OMBR
     [arguments]    ${prefix}=ombg    ${n}=1    ${threads}=1    ${args}=${EMPTY}
     ${result} =        Execute          ozone freon ombr ${OM_HA_PARAM} -t ${threads} -n${n} -p ${prefix} ${args}
                        Should contain   ${result}   Successful executions: ${n}
+
+Freon DFSG
+    [arguments]    ${prefix}=dfsg    ${n}=1000    ${path}={EMPTY}    ${threads}=1    ${sync}=HSYNC    ${buffer}=1024    ${copy-buffer}=1024    ${size}=10240    ${args}=${EMPTY}
+    ${result} =    Execute    ozone freon dfsg -n ${n} --sync ${sync} -s ${size} --path ${path} --buffer ${buffer} --copy-buffer ${copy-buffer} -p ${prefix} -t ${threads} ${args}
+                   Should contain   ${result}   Successful executions: ${n}
+

@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,10 +17,9 @@
 
 package org.apache.hadoop.fs.ozone;
 
-import org.apache.hadoop.fs.StorageStatistics.CommonStatisticNames;
-
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.hadoop.fs.StorageStatistics.CommonStatisticNames;
 
 /**
  * Statistic which are collected in OzoneFileSystem.
@@ -77,8 +75,10 @@ public enum Statistic {
       "Calls of setTimes()"),
   INVOCATION_IS_FILE_CLOSED("op_is_file_closed",
       "Calls of isFileClosed()"),
-  INVOCATION_RECOVER_LEASE("op_recover_lease",
-      "Calls of recoverLease()"),
+  INVOCATION_RECOVER_FILE_PREPARE("op_recover_file_prepare",
+      "Calls of recoverFilePrepare()"),
+  INVOCATION_RECOVER_FILE("op_recover_file", "Calls of recoverFile()"),
+  INVOCATION_FINALIZE_BLOCK("op_finalize_block", "Calls of finalizeBlock()"),
   INVOCATION_SET_SAFE_MODE("op_set_safe_mode",
       "Calls of setSafeMode()");
 
@@ -90,13 +90,13 @@ public enum Statistic {
     }
   }
 
+  private final String symbol;
+  private final String description;
+
   Statistic(String symbol, String description) {
     this.symbol = symbol;
     this.description = description;
   }
-
-  private final String symbol;
-  private final String description;
 
   public String getSymbol() {
     return symbol;

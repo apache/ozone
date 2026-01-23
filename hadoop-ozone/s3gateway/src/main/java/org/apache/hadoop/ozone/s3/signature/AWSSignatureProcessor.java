@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,19 +14,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.s3.signature;
 
-import javax.enterprise.context.RequestScoped;
-import javax.ws.rs.container.ContainerRequestContext;
-import javax.ws.rs.core.Context;
-import javax.ws.rs.core.MultivaluedMap;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
+
+import com.google.common.annotations.VisibleForTesting;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
+import javax.enterprise.context.RequestScoped;
+import javax.ws.rs.container.ContainerRequestContext;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.MultivaluedMap;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditLoggerType;
@@ -36,16 +38,12 @@ import org.apache.hadoop.ozone.s3.HeaderPreprocessor;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo.Version;
-
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.ozone.s3.util.AuditUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
-
 /**
- * Parser to process AWS V2 & V4 auth request. Creates string to sign and auth
+ * Parser to process AWS V2 and V4 auth request. Creates string to sign and auth
  * header. For more details refer to AWS documentation https://docs.aws
  * .amazon.com/general/latest/gr/sigv4-create-canonical-request.html.
  **/
@@ -61,6 +59,7 @@ public class AWSSignatureProcessor implements SignatureProcessor {
   @Context
   private ContainerRequestContext context;
 
+  @Override
   public SignatureInfo parseSignature() throws OS3Exception {
 
     LowerCaseKeyStringMap headers =
@@ -90,10 +89,7 @@ public class AWSSignatureProcessor implements SignatureProcessor {
       }
     }
     if (signatureInfo == null) {
-      signatureInfo = new SignatureInfo(
-          Version.NONE,
-          "", "", "", "", "", "", "", false
-      );
+      signatureInfo = new SignatureInfo.Builder(Version.NONE).build();
     }
     signatureInfo.setUnfilteredURI(
         context.getUriInfo().getRequestUri().getPath());
@@ -138,7 +134,7 @@ public class AWSSignatureProcessor implements SignatureProcessor {
           new LowerCaseKeyStringMap();
 
       for (Entry<String, List<String>> headerEntry : rawHeaders.entrySet()) {
-        if (0 < headerEntry.getValue().size()) {
+        if (!headerEntry.getValue().isEmpty()) {
           String headerKey = headerEntry.getKey();
           if (headers.containsKey(headerKey)) {
             //multiple headers from the same type are combined

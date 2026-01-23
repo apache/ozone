@@ -1,24 +1,40 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.STAND_ALONE;
+import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.NEW_NODE_HANDLER_TRIGGERED;
+import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.NODE_ADDRESS_UPDATE_HANDLER_TRIGGERED;
+import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.PRE_CHECK_COMPLETED;
+import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED;
+
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import org.apache.commons.collections.iterators.LoopingIterator;
+import java.io.IOException;
+import java.time.Clock;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+import org.apache.commons.collections4.iterators.LoopingIterator;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -32,22 +48,6 @@ import org.apache.hadoop.hdds.scm.ha.SCMService;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.time.Clock;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
-
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.STAND_ALONE;
-import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.NODE_ADDRESS_UPDATE_HANDLER_TRIGGERED;
-import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED;
-import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.NEW_NODE_HANDLER_TRIGGERED;
-import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.PRE_CHECK_COMPLETED;
 
 /**
  * Implements api for running background pipeline creation jobs.
@@ -88,7 +88,6 @@ public class BackgroundPipelineCreator implements SCMService {
   private final AtomicBoolean running = new AtomicBoolean(false);
   private final long intervalInMillis;
   private final Clock clock;
-
 
   BackgroundPipelineCreator(PipelineManager pipelineManager,
       ConfigurationSource conf, SCMContext scmContext, Clock clock) {
@@ -132,6 +131,8 @@ public class BackgroundPipelineCreator implements SCMService {
         .setUncaughtExceptionHandler((Thread t, Throwable ex) -> {
           String message = "Terminate SCM, encounter uncaught exception"
               + " in " + threadName;
+          LOG.error("BackgroundPipelineCreator thread encountered an error. "
+                  + "Thread: {}", t.toString(), ex);
           scmContext.getScm().shutDown(message);
         })
         .build()
@@ -143,6 +144,7 @@ public class BackgroundPipelineCreator implements SCMService {
   /**
    * Stop RatisPipelineUtilsThread.
    */
+  @Override
   public void stop() {
     if (!running.compareAndSet(true, false)) {
       LOG.warn("{} is not running, just ignore.", threadName);
@@ -217,8 +219,16 @@ public class BackgroundPipelineCreator implements SCMService {
       if (factor == ReplicationFactor.ZERO) {
         continue; // Ignore it.
       }
-      final ReplicationConfig replicationConfig =
-          ReplicationConfig.fromProtoTypeAndFactor(type, factor);
+      final ReplicationConfig replicationConfig;
+      if (type != EC) {
+        replicationConfig =
+            ReplicationConfig.fromProtoTypeAndFactor(type, factor);
+      } else if (factor == ReplicationFactor.ONE) {
+        replicationConfig =
+            ReplicationConfig.fromProtoTypeAndFactor(RATIS, factor);
+      } else {
+        continue;
+      }
       if (skipCreation(replicationConfig, autoCreateFactorOne)) {
         // Skip this iteration for creating pipeline
         continue;

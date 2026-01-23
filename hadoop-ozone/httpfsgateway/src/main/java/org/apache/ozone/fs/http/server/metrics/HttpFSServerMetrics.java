@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,10 +14,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.ozone.fs.http.server.metrics;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_METRICS_SESSION_ID_KEY;
 import static org.apache.hadoop.metrics2.impl.MsInfo.SessionId;
 
+import java.util.concurrent.ThreadLocalRandom;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.metrics2.MetricsSystem;
@@ -28,8 +30,6 @@ import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.source.JvmMetrics;
-
-import java.util.concurrent.ThreadLocalRandom;
 
 /**
  *
@@ -47,8 +47,6 @@ import java.util.concurrent.ThreadLocalRandom;
 @Metrics(about = "HttpFSServer metrics", context = "httpfs")
 public class HttpFSServerMetrics {
 
-  private static final String DFS_METRICS_SESSION_ID_KEY
-      = "dfs.metrics.session-id";
   private @Metric MutableCounterLong bytesWritten;
   private @Metric MutableCounterLong bytesRead;
 
@@ -79,7 +77,7 @@ public class HttpFSServerMetrics {
 
   public static HttpFSServerMetrics create(Configuration conf,
       String serverName) {
-    String sessionId = conf.get(DFS_METRICS_SESSION_ID_KEY);
+    String sessionId = conf.get(HDDS_METRICS_SESSION_ID_KEY);
     MetricsSystem ms = DefaultMetricsSystem.instance();
     JvmMetrics jm = JvmMetrics.create("HttpFSServer", sessionId, ms);
     String name = "ServerActivity-" + (serverName.isEmpty()
@@ -150,8 +148,40 @@ public class HttpFSServerMetrics {
     DefaultMetricsSystem.shutdown();
   }
 
+  public long getBytesWritten() {
+    return bytesWritten.value();
+  }
+
+  public long getBytesRead() {
+    return bytesRead.value();
+  }
+
+  public long getOpsCreate() {
+    return opsCreate.value();
+  }
+
+  public long getOpsAppend() {
+    return opsAppend.value();
+  }
+
+  public long getOpsTruncate() {
+    return opsTruncate.value();
+  }
+
+  public long getOpsDelete() {
+    return opsDelete.value();
+  }
+
+  public long getOpsRename() {
+    return opsRename.value();
+  }
+
   public long getOpsMkdir() {
     return opsMkdir.value();
+  }
+
+  public long getOpsOpen() {
+    return opsOpen.value();
   }
 
   public long getOpsListing() {
@@ -160,5 +190,9 @@ public class HttpFSServerMetrics {
 
   public long getOpsStat() {
     return opsStat.value();
+  }
+
+  public long getOpsCheckAccess() {
+    return opsCheckAccess.value();  
   }
 }

@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,56 +17,45 @@
 
 package org.apache.hadoop.ozone.om.request.volume.acl;
 
-import org.apache.ratis.server.protocol.TermIndex;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
+
+import java.io.IOException;
+import java.nio.file.InvalidPathException;
+import java.util.List;
+import java.util.Map;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.request.util.AclOp;
 import org.apache.hadoop.ozone.om.request.volume.OMVolumeRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-import org.apache.ratis.util.function.CheckedBiConsumer;
-
-import java.io.IOException;
-import java.nio.file.InvalidPathException;
-import java.util.List;
-import java.util.Map;
-
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 
 /**
  * Base class for OMVolumeAcl Request.
  */
 public abstract class OMVolumeAclRequest extends OMVolumeRequest {
 
-  /**
-   * Volume ACL operation.
-   */
-  public interface VolumeAclOp extends
-      CheckedBiConsumer<List<OzoneAcl>, OmVolumeArgs, IOException> {
-    // just a shortcut to avoid having to repeat long list of generic parameters
-  }
+  private final AclOp omVolumeAclOp;
 
-  private final VolumeAclOp omVolumeAclOp;
-
-  OMVolumeAclRequest(OzoneManagerProtocolProtos.OMRequest omRequest,
-      VolumeAclOp aclOp) {
+  OMVolumeAclRequest(OzoneManagerProtocolProtos.OMRequest omRequest, AclOp aclOp) {
     super(omRequest);
     omVolumeAclOp = aclOp;
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
-    final long trxnLogIndex = termIndex.getIndex();
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    final long trxnLogIndex = context.getIndex();
     // protobuf guarantees volume and acls are non-null.
     String volume = getVolumeName();
     List<OzoneAcl> ozoneAcls = getAcls();
@@ -93,32 +81,25 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
           VOLUME_LOCK, volume));
       lockAcquired = getOmLockDetails().isLockAcquired();
       OmVolumeArgs omVolumeArgs = getVolumeInfo(omMetadataManager, volume);
+      OmVolumeArgs.Builder builder = omVolumeArgs.toBuilder();
 
       // result is false upon add existing acl or remove non-existing acl
-      boolean applyAcl = true;
-      try {
-        omVolumeAclOp.accept(ozoneAcls, omVolumeArgs);
-      } catch (OMException ex) {
-        applyAcl = false;
-      }
+      boolean applyAcl = omVolumeAclOp.test(ozoneAcls, builder.acls());
 
       // Update only when
       if (applyAcl) {
         // Update the modification time when updating ACLs of Volume.
-        long modificationTime = omVolumeArgs.getModificationTime();
         if (getOmRequest().getAddAclRequest().hasObj()) {
-          modificationTime = getOmRequest().getAddAclRequest()
-              .getModificationTime();
+          builder.setModificationTime(getOmRequest().getAddAclRequest().getModificationTime());
         } else if (getOmRequest().getSetAclRequest().hasObj()) {
-          modificationTime = getOmRequest().getSetAclRequest()
-              .getModificationTime();
+          builder.setModificationTime(getOmRequest().getSetAclRequest().getModificationTime());
         } else if (getOmRequest().getRemoveAclRequest().hasObj()) {
-          modificationTime = getOmRequest().getRemoveAclRequest()
-              .getModificationTime();
+          builder.setModificationTime(getOmRequest().getRemoveAclRequest().getModificationTime());
         }
-        omVolumeArgs.setModificationTime(modificationTime);
 
-        omVolumeArgs.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+        omVolumeArgs = builder
+            .setUpdateID(trxnLogIndex)
+            .build();
 
         // update cache.
         omMetadataManager.getVolumeTable().addCacheEntry(
@@ -202,4 +183,5 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
    */
   abstract void onComplete(Result result, Exception ex, long trxnLogIndex,
       AuditLogger auditLogger, Map<String, String> auditMap);
+
 }

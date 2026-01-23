@@ -24,7 +24,7 @@
         require: {
             overview: "^overview"
         },
-        controller: function ($http,$scope) {
+        controller: function ($http,$scope,$sce) {
             var ctrl = this;
             $scope.reverse = false;
             $scope.columnName = "hostname";
@@ -32,6 +32,62 @@
             $scope.RecordsToDisplay = "10";
             $scope.currentPage = 1;
             $scope.lastIndex = 0;
+            $scope.statistics = {
+                nodes : {
+                    usages : {
+                        min : "N/A",
+                        max : "N/A",
+                        median : "N/A",
+                        stdev : "N/A"
+                    },
+                    state : {
+                        healthy : "N/A",
+                        dead : "N/A",
+                        decommissioning : "N/A",
+                        enteringmaintenance : "N/A",
+                        volumefailures : "N/A"
+                    },
+                    space : {
+                        capacity : "N/A",
+                        scmused : "N/A",
+                        remaining : "N/A",
+                        nonscmused : "N/A"
+                    }
+                },
+                pipelines : {
+                    closed : "N/A",
+                    allocated : "N/A",
+                    open : "N/A",
+                    dormant : "N/A"
+                },
+                containers : {
+                    lifecycle : {
+                        open : "N/A",
+                        closing : "N/A",
+                        quasi_closed : "N/A",
+                        closed : "N/A",
+                        deleting : "N/A",
+                        deleted : "N/A",
+                        recovering : "N/A"
+                    },
+                    health : {
+                        under_replicated : "N/A",
+                        mis_replicated : "N/A",
+                        over_replicated : "N/A",
+                        missing : "N/A",
+                        unhealthy : "N/A",
+                        empty : "N/A",
+                        open_unhealthy : "N/A",
+                        quasi_closed_stuck : "N/A",
+                        open_without_pipeline : "N/A"
+                    }
+                }
+            }
+
+            $http.get("jmx?qry=Ratis:service=RaftServer,group=*,id=*")
+                .then(function (result) {
+                    ctrl.role = result.data.beans[0];
+            });
 
             function get_protocol(URLScheme, value, baseProto, fallbackProto) {
                 let protocol = "unknown"
@@ -72,6 +128,8 @@
                                     capacity: value && value.find((element) => element.key === "CAPACITY").value,
                                     comstate: value && value.find((element) => element.key === "COMSTATE").value,
                                     lastheartbeat: value && value.find((element) => element.key === "LASTHEARTBEAT").value,
+                                    uuid: value && value.find((element) => element.key === "UUID").value,
+                                    version: value && value.find((element) => element.key === "VERSION").value,
                                     port: portSpec.port,
                                     protocol: portSpec.proto
                                 }
@@ -81,7 +139,85 @@
                     $scope.totalItems = nodeStatusCopy.length;
                     $scope.lastIndex = Math.ceil(nodeStatusCopy.length / $scope.RecordsToDisplay);
                     $scope.nodeStatus = nodeStatusCopy.slice(0, $scope.RecordsToDisplay);
+
+                    $scope.formatValue = function(value) {
+                        if (value && value.includes(';')) {
+                            return $sce.trustAsHtml(value.replace('/;/g', '<br>'));
+                        } else {
+                            return $sce.trustAsHtml(value);
+                        }
+                    };
+
+                    ctrl.nodemanagermetrics.NodeStatistics.forEach(({key, value}) => {
+                        if(key == "Min") {
+                            $scope.statistics.nodes.usages.min = value;
+                        } else if(key == "Max") {
+                            $scope.statistics.nodes.usages.max = value;
+                        } else if(key == "Median") {
+                            $scope.statistics.nodes.usages.median = value;
+                        } else if(key == "Stdev") {
+                            $scope.statistics.nodes.usages.stdev = value;
+                        } else if(key == "Healthy") {
+                            $scope.statistics.nodes.state.healthy = value;
+                        } else if(key == "Dead") {
+                            $scope.statistics.nodes.state.dead = value;
+                        } else if(key == "Decommissioning") {
+                            $scope.statistics.nodes.state.decommissioning = value;
+                        } else if(key == "EnteringMaintenance") {
+                            $scope.statistics.nodes.state.enteringmaintenance = value;
+                        } else if(key == "VolumeFailures") {
+                            $scope.statistics.nodes.state.volumefailures = value;
+                        } else if(key == "Capacity") {
+                            $scope.statistics.nodes.space.capacity = value;
+                        } else if(key == "Scmused") {
+                            $scope.statistics.nodes.space.scmused = value;
+                        } else if(key == "Remaining") {
+                            $scope.statistics.nodes.space.remaining = value;
+                        } else if(key == "NonScmused") {
+                            $scope.statistics.nodes.space.nonscmused = value;
+                        }
+                    });
                 });
+
+            $http.get("jmx?qry=Hadoop:service=SCMPipelineManager,name=SCMPipelineManagerInfo")
+                .then(function (result) {
+                    const URLScheme = location.protocol.replace(":" , "");
+                    ctrl.scmpipelinemanager = result.data.beans[0];
+                    ctrl.scmpipelinemanager.PipelineInfo.forEach(({key, value}) => {
+                        if(key == "CLOSED") {
+                            $scope.statistics.pipelines.closed = value;
+                        } else if(key == "ALLOCATED") {
+                            $scope.statistics.pipelines.allocated = value;
+                        } else if(key == "OPEN") {
+                            $scope.statistics.pipelines.open = value;
+                        } else if(key == "DORMANT") {
+                            $scope.statistics.pipelines.dormant = value;
+                        }
+                    });
+                });
+
+            $http.get("jmx?qry=Hadoop:service=StorageContainerManager,name=ReplicationManagerMetrics")
+                .then(function (result) {
+                    const URLScheme = location.protocol.replace(":" , "");
+                    ctrl.scmcontainermanager = result.data.beans[0];
+                    $scope.statistics.containers.lifecycle.open = ctrl.scmcontainermanager.OpenContainers;
+                    $scope.statistics.containers.lifecycle.closing = ctrl.scmcontainermanager.ClosingContainers;
+                    $scope.statistics.containers.lifecycle.quasi_closed = ctrl.scmcontainermanager.QuasiClosedContainers;
+                    $scope.statistics.containers.lifecycle.closed = ctrl.scmcontainermanager.ClosedContainers;
+                    $scope.statistics.containers.lifecycle.deleting = ctrl.scmcontainermanager.DeletingContainers;
+                    $scope.statistics.containers.lifecycle.deleted = ctrl.scmcontainermanager.DeletedContainers;
+                    $scope.statistics.containers.lifecycle.recovering = ctrl.scmcontainermanager.RecoveringContainers;
+                    $scope.statistics.containers.health.under_replicated = ctrl.scmcontainermanager.UnderReplicatedContainers;
+                    $scope.statistics.containers.health.mis_replicated = ctrl.scmcontainermanager.MisReplicatedContainers;
+                    $scope.statistics.containers.health.over_replicated = ctrl.scmcontainermanager.OverReplicatedContainers;
+                    $scope.statistics.containers.health.missing = ctrl.scmcontainermanager.MissingContainers;
+                    $scope.statistics.containers.health.unhealthy = ctrl.scmcontainermanager.UnhealthyContainers;
+                    $scope.statistics.containers.health.empty = ctrl.scmcontainermanager.EmptyContainers;
+                    $scope.statistics.containers.health.open_unhealthy = ctrl.scmcontainermanager.OpenUnhealthyContainers;
+                    $scope.statistics.containers.health.quasi_closed_stuck = ctrl.scmcontainermanager.StuckQuasiClosedContainers;
+                    $scope.statistics.containers.health.open_without_pipeline = ctrl.scmcontainermanager.OpenContainersWithoutPipeline;
+                });
+
             /*if option is 'All' display all records else display specified record on page*/
             $scope.UpdateRecordsToShow = () => {
                 if($scope.RecordsToDisplay == 'All') {

@@ -21,8 +21,9 @@ OZONE-SITE.XML_ozone.scm.container.size=1GB
 OZONE-SITE.XML_ozone.scm.datanode.ratis.volume.free-space.min=10MB
 OZONE-SITE.XML_ozone.scm.pipeline.creation.interval=30s
 OZONE-SITE.XML_ozone.scm.pipeline.owner.container.count=1
+OZONE-SITE.XML_ozone.scm.ec.pipeline.minimum=1
 OZONE-SITE.XML_ozone.scm.names=scm
-OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data
+OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data/metadata
 OZONE-SITE.XML_ozone.scm.block.client.address=scm
 OZONE-SITE.XML_ozone.metadata.dirs=/data/metadata
 OZONE-SITE.XML_ozone.handler.type=distributed
@@ -37,6 +38,7 @@ OZONE-SITE.XML_ozone.om.kerberos.principal=om/om@EXAMPLE.COM
 OZONE-SITE.XML_ozone.om.kerberos.keytab.file=/etc/security/keytabs/om.keytab
 OZONE-SITE.XML_ozone.administrators=*
 OZONE-SITE.XML_ozone.s3.administrators="s3g"
+OZONE-SITE.XML_ozone.http.basedir=/tmp/ozone_http
 
 OZONE-SITE.XML_ozone.security.enabled=true
 OZONE-SITE.XML_ozone.security.http.kerberos.enabled=true
@@ -55,13 +57,12 @@ OZONE-SITE.XML_hdds.grpc.tls.enabled=true
 OZONE-SITE.XML_ozone.s3g.kerberos.keytab.file=/etc/security/keytabs/s3g.keytab
 OZONE-SITE.XML_ozone.s3g.kerberos.principal=s3g/s3g@EXAMPLE.COM
 
-HDFS-SITE.XML_dfs.datanode.kerberos.principal=dn/dn@EXAMPLE.COM
-HDFS-SITE.XML_dfs.datanode.kerberos.keytab.file=/etc/security/keytabs/dn.keytab
-HDFS-SITE.XML_dfs.web.authentication.kerberos.principal=HTTP/dn@EXAMPLE.COM
-HDFS-SITE.XML_dfs.web.authentication.kerberos.keytab=/etc/security/keytabs/dn.keytab
+OZONE-SITE.XML_hdds.datanode.kerberos.principal=dn/dn@EXAMPLE.COM
+OZONE-SITE.XML_hdds.datanode.kerberos.keytab.file=/etc/security/keytabs/dn.keytab
 
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 OZONE-SITE.XML_hdds.datanode.volume.min.free.space=100MB
+OZONE-SITE.XML_hdds.datanode.volume.min.free.space.percent=0
 
 CORE-SITE.XML_dfs.data.transfer.protection=authentication
 CORE-SITE.XML_hadoop.security.authentication=kerberos

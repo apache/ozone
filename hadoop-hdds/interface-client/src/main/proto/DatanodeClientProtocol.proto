@@ -75,6 +75,10 @@ package hadoop.hdds.datanode;
  *  17. CloseContainer - Closes an open container and makes it immutable.
  *
  *  18. CopyContainer - Copies a container from a remote machine.
+ *
+ *  19. FinalizeBlock - Finalize block request from client.
+ *
+ *  20. ReadBlock - Allows us to read a block.
  */
 
 enum Type {
@@ -103,7 +107,10 @@ enum Type {
 
   StreamInit = 19;
   StreamWrite = 20;
-  Echo = 21;
+  FinalizeBlock = 21;
+  Echo = 22;
+  GetContainerChecksumInfo = 23;
+  ReadBlock = 24;
 }
 
 
@@ -153,6 +160,8 @@ enum Result {
   DELETE_ON_NON_EMPTY_CONTAINER = 44;
   EXPORT_CONTAINER_METADATA_FAILED = 45;
   IMPORT_CONTAINER_METADATA_FAILED = 46;
+  BLOCK_ALREADY_FINALIZED = 47;
+  CONTAINER_ID_MISMATCH = 48;
 }
 
 /**
@@ -209,7 +218,10 @@ message ContainerCommandRequestProto {
 
   optional   string encodedToken = 23;
   optional   uint32 version = 24;
-  optional   EchoRequestProto echo = 25;
+  optional   FinalizeBlockRequestProto finalizeBlock = 25;
+  optional   EchoRequestProto echo = 26;
+  optional   GetContainerChecksumInfoRequestProto getContainerChecksumInfo = 27;
+  optional   ReadBlockRequestProto readBlock = 28;
 }
 
 message ContainerCommandResponseProto {
@@ -238,9 +250,11 @@ message ContainerCommandResponseProto {
 
   optional   PutSmallFileResponseProto putSmallFile = 19;
   optional   GetSmallFileResponseProto getSmallFile = 20;
-
-  optional GetCommittedBlockLengthResponseProto getCommittedBlockLength = 21;
-  optional   EchoResponseProto echo = 22;
+  optional   GetCommittedBlockLengthResponseProto getCommittedBlockLength = 21;
+  optional   FinalizeBlockResponseProto finalizeBlock = 22;
+  optional   EchoResponseProto echo = 23;
+  optional   GetContainerChecksumInfoResponseProto getContainerChecksumInfo = 24;
+  optional   ReadBlockResponseProto readBlock = 25;
 }
 
 message ContainerDataProto {
@@ -275,43 +289,43 @@ enum ContainerType {
 
 
 // Container Messages.
-message  CreateContainerRequestProto {
+message CreateContainerRequestProto {
   repeated KeyValue metadata = 2;
   optional ContainerType containerType = 3 [default = KeyValueContainer];
   optional int32 replicaIndex = 4;
   optional ContainerDataProto.State state = 5;
 }
 
-message  CreateContainerResponseProto {
+message CreateContainerResponseProto {
 }
 
-message  ReadContainerRequestProto {
+message ReadContainerRequestProto {
 }
 
-message  ReadContainerResponseProto {
+message ReadContainerResponseProto {
   optional ContainerDataProto containerData = 1;
 }
 
-message  UpdateContainerRequestProto {
+message UpdateContainerRequestProto {
   repeated KeyValue metadata = 2;
   optional bool forceUpdate = 3 [default = false];
 }
 
-message  UpdateContainerResponseProto {
+message UpdateContainerResponseProto {
 }
 
-message  DeleteContainerRequestProto {
+message DeleteContainerRequestProto {
   optional bool forceDelete = 2 [default = false];
 }
 
-message  DeleteContainerResponseProto {
+message DeleteContainerResponseProto {
 }
 
-message  ListContainerRequestProto {
+message ListContainerRequestProto {
   optional uint32 count = 2; // Max Results to return
 }
 
-message  ListContainerResponseProto {
+message ListContainerResponseProto {
   repeated ContainerDataProto containerData = 1;
 }
 
@@ -332,61 +346,90 @@ message BlockData {
 }
 
 // Block Messages.
-message  PutBlockRequestProto {
+message PutBlockRequestProto {
   required BlockData blockData = 1;
   optional bool eof = 2;
 }
 
-message  PutBlockResponseProto {
+message PutBlockResponseProto {
   required GetCommittedBlockLengthResponseProto committedBlockLength = 1;
 }
 
-message  GetBlockRequestProto  {
+message FinalizeBlockRequestProto  {
   required DatanodeBlockID blockID = 1;
 }
 
-message  GetBlockResponseProto  {
+message FinalizeBlockResponseProto  {
+  required BlockData blockData = 1;
+}
+
+message GetBlockRequestProto  {
+  required DatanodeBlockID blockID = 1;
+}
+
+message GetBlockResponseProto  {
   required BlockData blockData = 1;
 }
 
 
-message  DeleteBlockRequestProto {
+message DeleteBlockRequestProto {
   required DatanodeBlockID blockID = 1;
 }
 
-message  GetCommittedBlockLengthRequestProto {
+message GetCommittedBlockLengthRequestProto {
   required DatanodeBlockID blockID = 1;
 }
 
-message  GetCommittedBlockLengthResponseProto {
+message GetCommittedBlockLengthResponseProto {
   required DatanodeBlockID blockID = 1;
   required int64 blockLength = 2;
 }
 
-message   DeleteBlockResponseProto {
+message DeleteBlockResponseProto {
 }
 
-message  ListBlockRequestProto {
+message ListBlockRequestProto {
   optional int64 startLocalID = 2;
   required uint32 count = 3;
 
 }
 
-message  ListBlockResponseProto {
+message ListBlockResponseProto {
   repeated BlockData blockData = 1;
 }
 
-message  EchoRequestProto {
+message ReadBlockRequestProto {
+  required DatanodeBlockID blockID = 1;
+  required uint64 offset = 2;
+  optional uint64 length = 3;
+  optional uint32 responseDataSize = 4;
+}
+
+message ReadBlockResponseProto {
+  required ChecksumData checksumData = 1;
+  required uint64 offset = 2;
+  required bytes data = 3;
+}
+
+message EchoRequestProto {
   optional bytes payload = 1;
   optional int32 payloadSizeResp = 2;
   optional int32 sleepTimeMs = 3;
   optional bool readOnly = 4;
 }
 
-message  EchoResponseProto {
+message EchoResponseProto {
   optional bytes payload = 1;
 }
 
+message GetContainerChecksumInfoRequestProto {
+  optional int64 containerID = 1;
+}
+
+message GetContainerChecksumInfoResponseProto {
+  optional int64 containerID = 1;
+  optional bytes containerChecksumInfo = 2;
+}
 // Chunk Operations
 
 message ChunkInfo {
@@ -416,13 +459,15 @@ enum ChecksumType {
     MD5 = 5;
 }
 
-message  WriteChunkRequestProto  {
+message WriteChunkRequestProto  {
   required DatanodeBlockID blockID = 1;
   optional ChunkInfo chunkData = 2;
   optional bytes data = 3;
+  optional PutBlockRequestProto block = 4;
 }
 
-message  WriteChunkResponseProto {
+message WriteChunkResponseProto {
+  optional GetCommittedBlockLengthResponseProto committedBlockLength = 1;
 }
 
 enum ReadChunkVersion {
@@ -430,13 +475,13 @@ enum ReadChunkVersion {
   V1 = 1; // Response data is split into multiple buffers
 }
 
-message  ReadChunkRequestProto  {
+message ReadChunkRequestProto  {
   required DatanodeBlockID blockID = 1;
   required ChunkInfo chunkData = 2;
   optional ReadChunkVersion readChunkVersion = 3;
 }
 
-message  ReadChunkResponseProto {
+message ReadChunkResponseProto {
   required DatanodeBlockID blockID = 1;
   required ChunkInfo chunkData = 2;
   // Chunk data should be returned in one of the two for
@@ -450,21 +495,21 @@ message DataBuffers {
   repeated bytes buffers = 1;
 }
 
-message  DeleteChunkRequestProto {
+message DeleteChunkRequestProto {
   required DatanodeBlockID blockID = 1;
   required ChunkInfo chunkData = 2;
 }
 
-message  DeleteChunkResponseProto {
+message DeleteChunkResponseProto {
 }
 
-message  ListChunkRequestProto {
+message ListChunkRequestProto {
   required DatanodeBlockID blockID = 1;
   required string prevChunkName = 2;
   required uint32 count = 3;
 }
 
-message  ListChunkResponseProto {
+message ListChunkResponseProto {
   repeated ChunkInfo chunkData = 1;
 }
 
@@ -522,9 +567,35 @@ message SendContainerRequest {
   required bytes data = 3;
   optional int64 checksum = 4;
   optional CopyContainerCompressProto compression = 5;
+  optional int64 size = 6;
 }
 
 message SendContainerResponse {
+}
+
+// Each chunk contains multiple checksums. This message aggregates them into one checksum for the whole chunk.
+message ChunkMerkleTree {
+  optional int64 offset = 1;
+  optional int64 length = 2;
+  optional int64 dataChecksum = 3;
+  optional bool checksumMatches = 4;
+}
+
+message BlockMerkleTree {
+  optional int64 blockID = 1;
+  optional int64 dataChecksum = 2;
+  repeated ChunkMerkleTree chunkMerkleTree = 3;
+  optional bool deleted = 4;
+}
+
+message ContainerMerkleTree {
+  optional int64 dataChecksum = 1;
+  repeated BlockMerkleTree blockMerkleTree = 2;
+}
+
+message ContainerChecksumInfo {
+  optional int64 containerID = 1;
+  optional ContainerMerkleTree containerMerkleTree = 2;
 }
 
 service XceiverClientProtocolService {
@@ -538,4 +609,9 @@ service IntraDatanodeProtocolService {
   // An intradatanode service to copy the raw container data between nodes
   rpc download (CopyContainerRequestProto) returns (stream CopyContainerResponseProto);
   rpc upload (stream SendContainerRequest) returns (SendContainerResponse);
+}
+
+message ContainerCreateInfo {
+    required ContainerDataProto.State state = 1;
+    optional int32 replicaIndex = 2 [default = -1];
 }

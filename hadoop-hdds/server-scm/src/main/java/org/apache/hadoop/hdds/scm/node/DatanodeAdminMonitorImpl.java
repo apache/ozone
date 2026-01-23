@@ -1,23 +1,35 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.node;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -34,22 +46,8 @@ import org.apache.hadoop.hdds.scm.node.NodeDecommissionMetrics.ContainerStateInW
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Queue;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 /**
  * Monitor thread which watches for nodes to be decommissioned, recommissioned
@@ -74,7 +72,8 @@ import java.util.stream.Collectors;
  */
 public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
 
-  private OzoneConfiguration conf;
+  private static final Logger LOG = LoggerFactory.getLogger(DatanodeAdminMonitorImpl.class);
+
   private EventPublisher eventQueue;
   private NodeManager nodeManager;
   private ReplicationManager replicationManager;
@@ -88,6 +87,12 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
   private long trackedRecommission = 0;
   private long unClosedContainers = 0;
   private long underReplicatedContainers = 0;
+
+  private Map<String, ContainerStateInWorkflow> containerStateByHost;
+
+  // The number of containers for each of under replicated and unhealthy
+  // that will be logged in detail each time a node is checked.
+  private final int containerDetailsLoggingLimit;
 
   /**
    * Inner class for snapshot of Datanode ContainerState in
@@ -133,20 +138,11 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     }
   }
 
-  private Map<String, ContainerStateInWorkflow> containerStateByHost;
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(DatanodeAdminMonitorImpl.class);
-  // The number of containers for each of under replicated and unhealthy
-  // that will be logged in detail each time a node is checked.
-  private final int containerDetailsLoggingLimit;
-
   public DatanodeAdminMonitorImpl(
       OzoneConfiguration conf,
       EventPublisher eventQueue,
       NodeManager nodeManager,
       ReplicationManager replicationManager) {
-    this.conf = conf;
     this.eventQueue = eventQueue;
     this.nodeManager = nodeManager;
     this.replicationManager = replicationManager;
@@ -183,6 +179,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     cancelledNodes.add(tn);
   }
 
+  @Override
   public synchronized void setMetrics(NodeDecommissionMetrics metrics) {
     this.metrics = metrics;
   }
@@ -236,7 +233,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
         trackedDecomMaintenance = getTrackedNodeCount();
       }
       processTransitioningNodes();
-      if (trackedNodes.size() > 0 || pendingNodes.size() > 0) {
+      if (!trackedNodes.isEmpty() || !pendingNodes.isEmpty()) {
         LOG.info("There are {} nodes tracked for decommission and " +
             "maintenance.  {} pending nodes.",
             trackedNodes.size(), pendingNodes.size());
@@ -391,7 +388,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     Set<PipelineID> pipelines = nodeManager.getPipelines(dn
         .getDatanodeDetails());
     NodeStatus status = nodeManager.getNodeStatus(dn.getDatanodeDetails());
-    if (pipelines == null || pipelines.size() == 0
+    if (pipelines == null || pipelines.isEmpty()
         || status.operationalStateExpired()) {
       return true;
     } else {
@@ -441,20 +438,11 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
           continue;
         }
 
-        // If we get here, the container is closed or quasi-closed and all the replicas match that
-        // state, except for any which are unhealthy. As the container is closed, we can check
-        // if it is sufficiently replicated using replicationManager, but this only works if the
-        // legacy RM is not enabled.
-        boolean legacyEnabled = conf.getBoolean("hdds.scm.replication.enable" +
-            ".legacy", false);
-        boolean replicatedOK;
-        if (legacyEnabled) {
-          replicatedOK = replicaSet.isSufficientlyReplicatedForOffline(dn.getDatanodeDetails(), nodeManager);
-        } else {
-          ReplicationManagerReport report = new ReplicationManagerReport();
-          replicationManager.checkContainerStatus(replicaSet.getContainer(), report);
-          replicatedOK = report.getStat(ReplicationManagerReport.HealthState.UNDER_REPLICATED) == 0;
-        }
+        ReplicationManagerReport report = new ReplicationManagerReport(
+            replicationManager.getConfig().getContainerSampleLimit());
+        replicationManager.checkContainerStatus(replicaSet.getContainer(), report);
+        boolean replicatedOK = report.getStat(ReplicationManagerReport.HealthState.UNDER_REPLICATED) == 0;
+
         if (replicatedOK) {
           sufficientlyReplicated++;
         } else {
@@ -512,7 +500,7 @@ public class DatanodeAdminMonitorImpl implements DatanodeAdminMonitor {
     sb.append(replicas.stream()
         .map(Object::toString)
         .collect(Collectors.joining(",")));
-    sb.append("}");
+    sb.append('}');
     return sb.toString();
   }
 

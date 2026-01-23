@@ -16,15 +16,28 @@
  * limitations under the License.
  */
 
-import React, {ReactElement} from 'react';
-import {Icon, Card, Row, Col} from 'antd';
-import {withRouter, Link} from 'react-router-dom';
-import {RouteComponentProps} from 'react-router';
-import StorageBar from '../storageBar/storageBar';
-import {IStorageReport} from 'types/datanode.types';
+import React, { ReactElement } from 'react';
+import { Card, Row, Col } from 'antd';
+import {
+  ClusterOutlined,
+  DeploymentUnitOutlined,
+  DatabaseOutlined,
+  ContainerOutlined,
+  InboxOutlined,
+  FolderOpenOutlined,
+  FileTextOutlined,
+  QuestionCircleOutlined,
+  DeleteOutlined,
+  HourglassOutlined
+} from '@ant-design/icons';
+import { RouteComponentProps } from 'react-router';
+import { withRouter, Link } from 'react-router-dom';
+
+import StorageBar from '@/components/storageBar/storageBar';
+import { IStorageReport } from '@/types/datanode.types';
 import './overviewCard.less';
 
-const {Meta} = Card;
+const { Meta } = Card;
 
 interface IOverviewCardProps extends RouteComponentProps<object> {
   icon: string;
@@ -46,23 +59,51 @@ const defaultProps = {
 
 interface IOverviewCardWrapperProps {
   linkToUrl: string;
-  title: string
+  title: string;
+}
+
+const IconSelector = ({ iconType, ...extras }: { iconType: string }) => {
+  const Icons = {
+    'cluster': <ClusterOutlined {...extras} />,
+    'deployment-unit': <DeploymentUnitOutlined {...extras} />,
+    'database': <DatabaseOutlined {...extras} />,
+    'container': <ContainerOutlined {...extras} />,
+    'inbox': <InboxOutlined {...extras} />,
+    'folder-open': <FolderOpenOutlined {...extras} />,
+    'file-text': <FileTextOutlined {...extras} />,
+    'delete': <DeleteOutlined {...extras} />,
+    'hourglass': <HourglassOutlined {...extras} />
+  }
+
+  const selectIcon = (type: string) => {
+    // Setting the default Icon as a question mark in case no match found
+    let ico = <QuestionCircleOutlined style={{
+      fontSize: '50px',
+      float: 'right'
+    }} />
+    const found = Object.entries(Icons).find(([k]) => k.toLowerCase() === type.toLowerCase())
+    if (found) {
+      [, ico] = found;
+    }
+    return ico;
+  }
+  return selectIcon(iconType);
 }
 
 class OverviewCardWrapper extends React.Component<IOverviewCardWrapperProps> {
   // To set Current ACtive Tab for OM DB Insights
-  setCurrentActiveTab = (title: any) => {
-    if (title === "Open Keys Summary") {
+  setCurrentActiveTab = (title: string) => {
+    if (title === 'Open Keys Summary') {
       return {
         active: '2'
       }
     }
-    else if (title === "Pending Deleted Keys Summary") {
+    else if (title === 'Pending Deleted Keys Summary') {
       return {
         active: '3'
       }
     }
-    else if (title === "OM Service") {
+    else if (title === 'Ozone Service ID') {
       return {
         active: '4'
       }
@@ -70,7 +111,7 @@ class OverviewCardWrapper extends React.Component<IOverviewCardWrapperProps> {
   };
 
   render() {
-    const {linkToUrl, children} = this.props;
+    const { linkToUrl, children } = this.props;
     if (linkToUrl) {
       if (linkToUrl === '/Om') {
         return (
@@ -99,15 +140,26 @@ class OverviewCard extends React.Component<IOverviewCardProps> {
   static defaultProps = defaultProps;
 
   render() {
-    let {icon, data, title, loading, hoverable, storageReport, linkToUrl, error} = this.props;
-    let meta = <Meta title={data} description={title}/>;
-    const errorClass = error ? 'card-error' : '';
+    let { icon, data, title, loading, hoverable, storageReport, linkToUrl, error } = this.props;
+
+    let meta = <Meta title={data} description={title} data-testid={`overview-${title}`} />;
+    let errorClass = error ? 'card-error' : '';
+
+    if (typeof data === 'string' && data === 'N/A') {
+      errorClass = 'card-error';
+    }
+
     if (storageReport) {
       meta = (
         <div className='ant-card-percentage'>
           {meta}
           <div className='storage-bar'>
-            <StorageBar total={storageReport.capacity} used={storageReport.used} remaining={storageReport.remaining} showMeta={false}/>
+            <StorageBar
+              total={storageReport.capacity}
+              used={storageReport.used}
+              remaining={storageReport.remaining}
+              committed={storageReport.committed}
+              showMeta={false} />
           </div>
         </div>
       );
@@ -125,7 +177,10 @@ class OverviewCard extends React.Component<IOverviewCardProps> {
               </Row>
             </Col>
             <Col span={6}>
-              <Icon type={icon} style={{fontSize: '50px', float: 'right'}}/>
+              <IconSelector iconType={icon} style={{
+                fontSize: '50px',
+                float: 'right'
+              }} />
             </Col>
           </Row>
         </Card>

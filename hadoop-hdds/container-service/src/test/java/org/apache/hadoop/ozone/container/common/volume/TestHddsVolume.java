@@ -1,43 +1,21 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.container.common.volume;
-
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.time.Duration;
-import java.util.Properties;
-import java.util.UUID;
-import java.util.concurrent.atomic.AtomicLong;
-
-import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.fs.StorageType;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.conf.StorageSize;
-import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
-import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
-import org.apache.hadoop.hdds.fs.SpaceUsagePersistence;
-import org.apache.hadoop.hdds.fs.SpaceUsageSource;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 
 import static org.apache.hadoop.hdds.fs.MockSpaceUsagePersistence.inMemory;
 import static org.apache.hadoop.hdds.fs.MockSpaceUsageSource.fixed;
@@ -48,6 +26,29 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.Duration;
+import java.util.Properties;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
+import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.fs.StorageType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageSize;
+import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
+import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
+import org.apache.hadoop.hdds.fs.SpaceUsagePersistence;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
+import org.apache.hadoop.metrics2.MetricsCollector;
+import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.DatanodeVersionFile;
 import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
@@ -244,9 +245,10 @@ public class TestHddsVolume {
     volumeBuilder.usageCheckFactory(factory);
 
     HddsVolume volume = volumeBuilder.build();
+    volume.start();
 
     assertEquals(initialUsedSpace, savedUsedSpace.get());
-    assertEquals(expectedUsedSpace, volume.getUsedSpace());
+    assertEquals(expectedUsedSpace, volume.getCurrentUsage().getUsedSpace());
 
     // Shutdown the volume.
     volume.shutdown();
@@ -262,10 +264,12 @@ public class TestHddsVolume {
     StorageSize size = StorageSize.parse(RESERVED_SPACE);
     long reservedSpaceInBytes = (long) size.getUnit().toBytes(size.getValue());
 
+    SpaceUsageSource reportedUsage = volume.getCurrentUsage();
+
     assertEquals(spaceUsage.getCapacity(),
-        volume.getCapacity() + reservedSpaceInBytes);
+        reportedUsage.getCapacity() + reservedSpaceInBytes);
     assertEquals(spaceUsage.getAvailable(),
-        volume.getAvailable() + reservedSpaceInBytes);
+        reportedUsage.getAvailable() + reservedSpaceInBytes);
   }
 
   /**
@@ -297,9 +301,11 @@ public class TestHddsVolume {
     volumeBuilder.usageCheckFactory(factory);
 
     HddsVolume volume = volumeBuilder.build();
+    volume.start();
 
-    assertEquals(400, volume.getCapacity());
-    assertEquals(100, volume.getAvailable());
+    SpaceUsageSource usage = volume.getCurrentUsage();
+    assertEquals(400, usage.getCapacity());
+    assertEquals(100, usage.getAvailable());
 
     // Shutdown the volume.
     volume.shutdown();
@@ -325,8 +331,9 @@ public class TestHddsVolume {
 
     HddsVolume volume = volumeBuilder.build();
 
-    assertEquals(400, volume.getCapacity());
-    assertEquals(190, volume.getAvailable());
+    SpaceUsageSource usage = volume.getCurrentUsage();
+    assertEquals(400, usage.getCapacity());
+    assertEquals(190, usage.getAvailable());
 
     // Shutdown the volume.
     volume.shutdown();
@@ -350,9 +357,11 @@ public class TestHddsVolume {
     volumeBuilder.usageCheckFactory(factory);
 
     HddsVolume volume = volumeBuilder.build();
+    volume.start();
 
-    assertEquals(400, volume.getCapacity());
-    assertEquals(300, volume.getAvailable());
+    SpaceUsageSource usage = volume.getCurrentUsage();
+    assertEquals(400, usage.getCapacity());
+    assertEquals(300, usage.getAvailable());
 
     // Shutdown the volume.
     volume.shutdown();
@@ -376,9 +385,11 @@ public class TestHddsVolume {
     volumeBuilder.usageCheckFactory(factory);
 
     HddsVolume volume = volumeBuilder.build();
+    volume.start();
 
-    assertEquals(400, volume.getCapacity());
-    assertEquals(0, volume.getAvailable());
+    SpaceUsageSource usage = volume.getCurrentUsage();
+    assertEquals(400, usage.getCapacity());
+    assertEquals(0, usage.getAvailable());
 
     // Shutdown the volume.
     volume.shutdown();
@@ -504,13 +515,9 @@ public class TestHddsVolume {
     VolumeInfoMetrics volumeInfoMetrics = volume.getVolumeInfoStats();
 
     try {
-      // In case of failed volume all stats should return 0.
-      assertEquals(0, volumeInfoMetrics.getUsed());
-      assertEquals(0, volumeInfoMetrics.getAvailable());
-      assertEquals(0, volumeInfoMetrics.getCapacity());
-      assertEquals(0, volumeInfoMetrics.getReserved());
-      assertEquals(0, volumeInfoMetrics.getTotalCapacity());
-      assertEquals(0, volumeInfoMetrics.getCommitted());
+      // In case of failed volume, metrics should not throw
+      MetricsCollector collector = new MetricsCollectorImpl();
+      volumeInfoMetrics.getMetrics(collector, true);
     } finally {
       // Shutdown the volume.
       volume.shutdown();
@@ -525,13 +532,64 @@ public class TestHddsVolume {
     volume.createTmpDirs(CLUSTER_ID);
 
     VolumeCheckResult result = volume.check(false);
+    assertEquals(1, volume.getVolumeInfoStats().getNumScans());
     assertEquals(VolumeCheckResult.HEALTHY, result);
 
     File dbFile = new File(volume.getDbParentDir(), CONTAINER_DB_NAME);
     FileUtils.deleteDirectory(dbFile);
 
     result = volume.check(false);
+    assertEquals(2, volume.getVolumeInfoStats().getNumScans());
     assertEquals(VolumeCheckResult.FAILED, result);
+
+    volume.shutdown();
+  }
+
+  @Test
+  public void testGetContainerDirsPath() throws Exception {
+    HddsVolume volume = volumeBuilder.build();
+    volume.format(CLUSTER_ID);
+    volume.createWorkingDir(CLUSTER_ID, null);
+
+    File expectedPath = new File(new File(volume.getStorageDir(), CLUSTER_ID), Storage.STORAGE_DIR_CURRENT);
+    assertEquals(expectedPath, volume.getContainerDirsPath());
+
+    volume.shutdown();
+  }
+
+  @Test
+  public void testGetContainerDirsPathWhenNotFormatted() throws Exception {
+    HddsVolume volume = volumeBuilder.build();
+    assertNull(volume.getContainerDirsPath());
+    volume.shutdown();
+  }
+
+  @Test
+  public void testVolumeUsagesMetrics() throws Exception {
+    // Build a volume with mocked usage, with reserved: 100B, Min free: 10B
+    CONF.set("hdds.datanode.volume.min.free.space", "10B");
+    volumeBuilder.usageCheckFactory(MockSpaceUsageCheckFactory.of(new SpaceUsageSource.Fixed(1000, 100, 700),
+        Duration.ZERO, inMemory(new AtomicLong(0))));
+    HddsVolume volume = volumeBuilder.build();
+    volume.incCommittedBytes(100);
+
+    // available space (>= 0) available - committed - min.free.space = 100 - 100 - 10 = -10,
+    // insufficient space unavailable
+    volume.checkVolumeUsages();
+    assertEquals(1, volume.getVolumeInfoStats().getAvailableSpaceInsufficient());
+    // reserved used = capacity - available - used = 1000 - 100 - 700 = 200 more than 100B for reserved,
+    // reserve usages crosses limit true
+    assertEquals(1, volume.getVolumeInfoStats().getReservedCrossesLimit());
+
+    // remove committed, sufficient space is available, reset the flag of metrics
+    volume.incCommittedBytes(-100);
+    volume.checkVolumeUsages();
+    assertEquals(0, volume.getVolumeInfoStats().getAvailableSpaceInsufficient());
+
+    // reduce available less then min.free.space
+    volume.incrementUsedSpace(100);
+    volume.checkVolumeUsages();
+    assertEquals(1, volume.getVolumeInfoStats().getAvailableSpaceInsufficient());
 
     volume.shutdown();
   }

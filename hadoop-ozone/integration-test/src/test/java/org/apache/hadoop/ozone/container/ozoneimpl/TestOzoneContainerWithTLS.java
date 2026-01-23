@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,53 +16,6 @@
  */
 
 package org.apache.hadoop.ozone.container.ozoneimpl;
-
-import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
-import org.apache.hadoop.hdds.scm.XceiverClientManager;
-import org.apache.hadoop.hdds.scm.XceiverClientManager.ScmClientConfig;
-import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
-import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
-import org.apache.hadoop.hdds.security.token.ContainerTokenIdentifier;
-import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.client.SecretKeyTestClient;
-import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
-import org.apache.hadoop.hdds.scm.XceiverClientSpi;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
-import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
-import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
-import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.token.Token;
-import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.slf4j.event.Level;
-
-import java.io.IOException;
-import java.nio.file.Path;
-import java.security.cert.CertificateExpiredException;
-import java.security.cert.X509Certificate;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.UUID;
 
 import static java.time.Duration.ofSeconds;
 import static java.util.Collections.singletonList;
@@ -82,24 +34,77 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getCloseContainer;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getCreateContainerSecureRequest;
 import static org.apache.hadoop.ozone.container.ContainerTestHelper.getTestContainerID;
+import static org.apache.hadoop.ozone.container.common.helpers.TokenHelper.encode;
 import static org.apache.hadoop.ozone.container.replication.CopyContainerCompression.NO_COMPRESSION;
 import static org.apache.ozone.test.GenericTestUtils.LogCapturer.captureLogs;
 import static org.apache.ozone.test.GenericTestUtils.setLogLevel;
 import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.slf4j.LoggerFactory.getLogger;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.security.cert.CertificateExpiredException;
+import java.security.cert.X509Certificate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.UUID;
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
+import org.apache.hadoop.hdds.scm.XceiverClientGrpc;
+import org.apache.hadoop.hdds.scm.XceiverClientManager;
+import org.apache.hadoop.hdds.scm.XceiverClientManager.ScmClientConfig;
+import org.apache.hadoop.hdds.scm.XceiverClientSpi;
+import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
+import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
+import org.apache.hadoop.hdds.security.token.ContainerTokenIdentifier;
+import org.apache.hadoop.hdds.security.token.ContainerTokenSecretManager;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClientTestImpl;
+import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.ozone.client.SecretKeyTestClient;
+import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
+import org.apache.hadoop.ozone.container.common.helpers.TokenHelper;
+import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
+import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
+import org.apache.hadoop.ozone.container.replication.SimpleContainerDownloader;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.Token;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.slf4j.event.Level;
 
 /**
  * Tests ozone containers via secure grpc/netty.
  */
-@Timeout(300)
 public class TestOzoneContainerWithTLS {
 
   private static final int CERT_LIFETIME = 10; // seconds
@@ -145,8 +150,7 @@ public class TestOzoneContainerWithTLS {
     dn = aDatanode();
     pipeline = createPipeline(singletonList(dn));
 
-    Logger logger = LoggerFactory.getLogger(ClientTrustManager.class);
-    setLogLevel(logger, Level.DEBUG);
+    setLogLevel(ClientTrustManager.class, Level.DEBUG);
   }
 
   @Test
@@ -221,12 +225,77 @@ public class TestOzoneContainerWithTLS {
       if (client != null) {
         clientManager.releaseClient(client, true);
       }
+      IOUtils.closeQuietly(clientManager);
+    }
+  }
+
+  @ParameterizedTest(name = "Container token enabled: {0}")
+  @ValueSource(booleans = {false, true})
+  public void testDNContainerOperationClient(boolean containerTokenEnabled)
+      throws Exception {
+    conf.setBoolean(HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED,
+        containerTokenEnabled);
+    OzoneContainer container = createAndStartOzoneContainerInstance();
+    ScmClientConfig scmClientConf = conf.getObject(ScmClientConfig.class);
+    XceiverClientManager clientManager =
+        new XceiverClientManager(conf, scmClientConf, aClientTrustManager());
+    XceiverClientSpi client = null;
+    try (DNContainerOperationClient dnClient =
+             new DNContainerOperationClient(conf, caClient, keyClient)) {
+      client = clientManager.acquireClient(pipeline);
+      long containerId = createAndCloseContainer(client, containerTokenEnabled);
+      dnClient.getContainerChecksumInfo(containerId, dn);
+    } finally {
+      if (container != null) {
+        container.stop();
+      }
+      if (client != null) {
+        clientManager.releaseClient(client, true);
+      }
+      IOUtils.closeQuietly(clientManager);
+    }
+  }
+
+  @Test
+  public void testGetContainerMerkleTree() throws IOException {
+    conf.setBoolean(HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED, true);
+    OzoneContainer container = createAndStartOzoneContainerInstance();
+    ScmClientConfig scmClientConf = conf.getObject(ScmClientConfig.class);
+    XceiverClientManager clientManager =
+        new XceiverClientManager(conf, scmClientConf, aClientTrustManager());
+    XceiverClientSpi client = null;
+    try {
+      client = clientManager.acquireClient(pipeline);
+      long containerId = createAndCloseContainer(client, true);
+      TokenHelper tokenHelper = new TokenHelper(new SecurityConfig(conf), keyClient);
+      String containerToken = encode(tokenHelper.getContainerToken(
+          ContainerID.valueOf(containerId)));
+      ContainerProtos.GetContainerChecksumInfoResponseProto response =
+          ContainerProtocolCalls.getContainerChecksumInfo(client,
+              containerId, containerToken);
+      // Getting container merkle tree with valid container token
+      assertFalse(response.getContainerChecksumInfo().isEmpty());
+
+      // Getting container merkle tree with invalid container token
+      XceiverClientSpi finalClient = client;
+      StorageContainerException exception = assertThrows(StorageContainerException.class,
+          () -> ContainerProtocolCalls.getContainerChecksumInfo(
+          finalClient, containerId, "invalidContainerToken"));
+      assertEquals(ContainerProtos.Result.BLOCK_TOKEN_VERIFICATION_FAILED, exception.getResult());
+    } finally {
+      if (container != null) {
+        container.stop();
+      }
+      if (client != null) {
+        clientManager.releaseClient(client, true);
+      }
+      IOUtils.closeQuietly(clientManager);
     }
   }
 
   @Test
   public void testLongLivingClientWithCertRenews() throws Exception {
-    LogCapturer logs = captureLogs(getLogger(ClientTrustManager.class));
+    LogCapturer logs = captureLogs(ClientTrustManager.class);
     OzoneContainer container = createAndStartOzoneContainerInstance();
 
     ScmClientConfig scmClientConf = conf.getObject(ScmClientConfig.class);
@@ -286,6 +355,7 @@ public class TestOzoneContainerWithTLS {
       if (container != null) {
         container.stop();
       }
+      IOUtils.closeQuietly(clientManager);
     }
   }
 
@@ -310,11 +380,13 @@ public class TestOzoneContainerWithTLS {
     OzoneContainer container = null;
     try {
       StateContext stateContext = ContainerTestUtils.getMockContext(dn, conf);
+      VolumeChoosingPolicy volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
       container = new OzoneContainer(
-          dn, conf, stateContext, caClient, keyClient);
+          null, dn, conf, stateContext, caClient, keyClient, volumeChoosingPolicy);
       MutableVolumeSet volumeSet = container.getVolumeSet();
       StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList())
           .forEach(hddsVolume -> hddsVolume.setDbParentDir(tempFolder.toFile()));
+      ContainerTestUtils.initializeDatanodeLayout(conf, dn);
       container.start(clusterID);
     } catch (Throwable e) {
       if (container != null) {
@@ -327,7 +399,7 @@ public class TestOzoneContainerWithTLS {
 
   private void assertDownloadContainerFails(long containerId,
       List<DatanodeDetails> sourceDatanodes) {
-    LogCapturer logCapture = captureLogs(SimpleContainerDownloader.LOG);
+    LogCapturer logCapture = captureLogs(SimpleContainerDownloader.class);
     SimpleContainerDownloader downloader =
         new SimpleContainerDownloader(conf, caClient);
     Path file = downloader.getContainerDataFromReplicas(containerId,
@@ -397,7 +469,7 @@ public class TestOzoneContainerWithTLS {
 
   private DatanodeDetails aDatanode() {
     return MockDatanodeDetails.createDatanodeDetails(
-        UUID.randomUUID().toString(), "localhost", "0.0.0.0",
+        DatanodeID.randomID(), "localhost", "0.0.0.0",
         "/default-rack");
   }
 }

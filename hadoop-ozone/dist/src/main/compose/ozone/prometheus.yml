@@ -28,7 +28,7 @@ scrape_configs:
        labels:
          component: om
      - targets:
-        - "s3g:9878"
+        - "s3g:19878"
        labels:
          component: s3g
      - targets: # During compose bring up the number of datanodes can be specific, adding 10 nodes to account for that.

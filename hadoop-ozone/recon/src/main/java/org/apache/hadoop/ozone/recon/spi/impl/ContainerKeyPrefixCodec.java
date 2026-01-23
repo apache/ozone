@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,18 +17,15 @@
 
 package org.apache.hadoop.ozone.recon.spi.impl;
 
-import static org.apache.commons.compress.utils.CharsetNames.UTF_8;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
-import java.io.IOException;
+import com.google.common.primitives.Longs;
 import java.nio.ByteBuffer;
-
+import java.util.Objects;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 import org.apache.hadoop.hdds.utils.db.Codec;
-
-import com.google.common.base.Preconditions;
-import com.google.common.primitives.Longs;
+import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 
 /**
  * Codec to serialize/deserialize {@link ContainerKeyPrefix}.
@@ -51,9 +47,13 @@ public final class ContainerKeyPrefixCodec
   }
 
   @Override
-  public byte[] toPersistedFormat(ContainerKeyPrefix containerKeyPrefix)
-      throws IOException {
-    Preconditions.checkNotNull(containerKeyPrefix,
+  public Class<ContainerKeyPrefix> getTypeClass() {
+    return ContainerKeyPrefix.class;
+  }
+
+  @Override
+  public byte[] toPersistedFormat(ContainerKeyPrefix containerKeyPrefix) {
+    Objects.requireNonNull(containerKeyPrefix,
             "Null object can't be converted to byte array.");
     byte[] containerIdBytes = Longs.toByteArray(containerKeyPrefix
         .getContainerId());
@@ -76,9 +76,7 @@ public final class ContainerKeyPrefixCodec
   }
 
   @Override
-  public ContainerKeyPrefix fromPersistedFormat(byte[] rawData)
-      throws IOException {
-
+  public ContainerKeyPrefix fromPersistedFormat(byte[] rawData) {
     // First 8 bytes is the containerId.
     long containerIdFromDB = ByteBuffer.wrap(ArrayUtils.subarray(
         rawData, 0, Long.BYTES)).getLong();

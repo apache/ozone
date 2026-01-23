@@ -1,0 +1,77 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements. See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License. You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_size = 2
+indent_style = space
+insert_final_newline = true
+max_line_length = 120
+tab_width = 2
+ij_continuation_indent_size = 4
+ij_formatter_off_tag = @formatter:off
+ij_formatter_on_tag = @formatter:on
+ij_formatter_tags_enabled = true
+ij_smart_tabs = false
+ij_visual_guides = 
+ij_wrap_on_typing = false
+
+[*.java]
+ij_java_indent_case_from_switch = false
+ij_java_call_parameters_new_line_after_left_paren = false
+ij_java_call_parameters_right_paren_on_new_line = false
+ij_java_call_parameters_wrap = normal
+ij_java_method_parameters_new_line_after_left_paren = false
+ij_java_method_parameters_right_paren_on_new_line = false
+ij_java_method_parameters_wrap = normal
+ij_java_resource_list_new_line_after_left_paren = false
+ij_java_resource_list_right_paren_on_new_line = false
+ij_java_resource_list_wrap = normal
+ij_java_extends_list_wrap = normal
+ij_java_throws_list_wrap = normal
+ij_java_extends_keyword_wrap = normal
+ij_java_throws_keyword_wrap = normal
+ij_java_method_call_chain_wrap = normal
+ij_java_binary_operation_wrap = normal
+ij_java_ternary_operation_wrap = normal
+ij_java_for_statement_wrap = normal
+ij_java_array_initializer_wrap = normal
+ij_java_assignment_wrap = normal
+ij_java_assert_statement_wrap = normal
+ij_java_if_brace_force = always
+ij_java_do_while_brace_force = always
+ij_java_while_brace_force = always
+ij_java_for_brace_force = always
+ij_java_parameter_annotation_wrap = normal
+ij_java_variable_annotation_wrap = normal
+ij_java_enum_constants_wrap = normal
+ij_java_blank_lines_after_imports = 1
+ij_java_blank_lines_before_imports = 1
+ij_java_class_count_to_use_import_on_demand = 9999
+ij_java_packages_to_use_import_on_demand =
+ij_java_imports_layout = $*,|,*
+ij_java_layout_static_imports_separately = true
+ij_java_use_single_class_imports = true
+
+[.editorconfig]
+ij_editorconfig_align_group_field_declarations = false
+ij_editorconfig_space_after_colon = false
+ij_editorconfig_space_after_comma = true
+ij_editorconfig_space_before_colon = false
+ij_editorconfig_space_before_comma = false
+ij_editorconfig_spaces_around_assignment_operators = true

@@ -1,22 +1,27 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.common.statemachine;
 
-import javax.management.ObjectName;
+import static java.util.Collections.unmodifiableList;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmRpcRetryCount;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmRpcRetryInterval;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmRpcTimeOutInMilliseconds;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -28,26 +33,22 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-
+import javax.management.ObjectName;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
+import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine.EndPointStates;
 import org.apache.hadoop.ozone.protocolPB.ReconDatanodeProtocolPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolPB;
 import org.apache.hadoop.security.UserGroupInformation;
-
-import static java.util.Collections.unmodifiableList;
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmRpcTimeOutInMilliseconds;
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmRpcRetryCount;
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmRpcRetryInterval;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,7 +79,6 @@ public class SCMConnectionManager
         this);
   }
 
-
   /**
    * Returns Config.
    *
@@ -96,7 +96,6 @@ public class SCMConnectionManager
   public int getRpcTimeout() {
     return rpcTimeout;
   }
-
 
   /**
    * Takes a read lock.
@@ -229,15 +228,14 @@ public class SCMConnectionManager
   public void removeSCMServer(InetSocketAddress address) throws IOException {
     writeLock();
     try {
-      if (!scmMachines.containsKey(address)) {
+      EndpointStateMachine endPoint = scmMachines.remove(address);
+      if (endPoint == null) {
         LOG.warn("Trying to remove a non-existent SCM machine. " +
             "Ignoring the request.");
         return;
       }
-
-      EndpointStateMachine endPoint = scmMachines.get(address);
+      endPoint.setState(EndPointStates.SHUTDOWN);
       endPoint.close();
-      scmMachines.remove(address);
     } finally {
       writeUnlock();
     }
@@ -272,6 +270,18 @@ public class SCMConnectionManager
     readLock();
     try {
       return unmodifiableList(new ArrayList<>(scmMachines.values()));
+    } finally {
+      readUnlock();
+    }
+  }
+
+  /**
+   * @return the number of connections (both SCM and Recon)
+   */
+  public int getNumOfConnections() {
+    readLock();
+    try {
+      return scmMachines.size();
     } finally {
       readUnlock();
     }

@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,15 +13,11 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
 package org.apache.hadoop.hdds.security.x509.certificate.client;
 
-import org.apache.hadoop.hdds.security.exception.OzoneSecurityException;
-import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
-import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
+import static org.apache.hadoop.hdds.security.exception.OzoneSecurityException.ResultCodes.OM_PUBLIC_PRIVATE_KEY_FILE_NOT_EXIST;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -35,8 +30,13 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
-
-import static org.apache.hadoop.hdds.security.exception.OzoneSecurityException.ResultCodes.OM_PUBLIC_PRIVATE_KEY_FILE_NOT_EXIST;
+import org.apache.hadoop.hdds.scm.client.ClientTrustManager;
+import org.apache.hadoop.hdds.security.exception.OzoneSecurityException;
+import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
+import org.apache.hadoop.hdds.security.ssl.ReloadingX509KeyManager;
+import org.apache.hadoop.hdds.security.ssl.ReloadingX509TrustManager;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateSignRequest;
+import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 
 /**
  * Certificate client provides and interface to certificate operations that
@@ -127,23 +127,6 @@ public interface CertificateClient extends Closeable {
   Set<X509Certificate> getAllCaCerts();
 
   /**
-   * Return the pem encoded CA certificate list.
-   * <p>
-   * If initialized return list of pem encoded CA certificates, else return
-   * null.
-   *
-   * @return list of pem encoded CA certificates.
-   */
-  List<String> getCAList();
-
-  /**
-   * Update and returns the pem encoded CA certificate list.
-   * @return list of pem encoded  CA certificates.
-   * @throws IOException
-   */
-  List<String> updateCAList() throws IOException;
-
-  /**
    * Verifies a digital Signature, given the signature and the certificate of
    * the signer.
    * @param data - Data in byte array.
@@ -155,13 +138,13 @@ public interface CertificateClient extends Closeable {
       X509Certificate cert) throws CertificateException;
 
   /**
-   * Returns a CSR builder that can be used to create a Certificate sigining
-   * request.
+   * Returns a CertificateSignRequest Builder object, that can be used to configure the sign request
+   * which we use to get  a signed certificate from our CA server implementation.
    *
-   * @return CertificateSignRequest.Builder
+   * @return CertificateSignRequest.Builder a {@link CertificateSignRequest}
+   *           based on which the certificate may be issued to this client.
    */
-  CertificateSignRequest.Builder getCSRBuilder()
-      throws CertificateException;
+  CertificateSignRequest.Builder configureCSRBuilder() throws SCMSecurityException;
 
   default void assertValidKeysAndCertificate() throws OzoneSecurityException {
     try {
@@ -175,14 +158,30 @@ public interface CertificateClient extends Closeable {
   }
 
   /**
-   * Return the store factory for key manager and trust manager for server.
+   * Gets a KeyManager containing this CertificateClient's key material and trustchain.
+   * During certificate rotation this KeyManager is automatically updated with the new keys/certificates.
+   *
+   * @return A KeyManager containing keys and the trustchain for this CertificateClient.
+   * @throws CertificateException
    */
-  KeyStoresFactory getServerKeyStoresFactory() throws CertificateException;
+  ReloadingX509KeyManager getKeyManager() throws CertificateException;
 
   /**
-   * Return the store factory for key manager and trust manager for client.
+   * Gets a TrustManager containing the trusted certificates of this CertificateClient.
+   * During certificate rotation this TrustManager is automatically updated with the new certificates.
+   *
+   * @return A TrustManager containing trusted certificates for this CertificateClient.
+   * @throws CertificateException
    */
-  KeyStoresFactory getClientKeyStoresFactory() throws CertificateException;
+  ReloadingX509TrustManager getTrustManager() throws CertificateException;
+
+  /**
+   * Creates a ClientTrustManager instance using the trusted certificates of this certificate client.
+   *
+   * @return The new ClientTrustManager instance.
+   * @throws IOException
+   */
+  ClientTrustManager createClientTrustManager() throws IOException;
 
   /**
    * Register a receiver that will be called after the certificate renewed.

@@ -1,42 +1,40 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.fs.ozone;
 
+import com.google.protobuf.RpcController;
+import com.google.protobuf.ServiceException;
 import java.io.IOException;
-
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.io.retry.RetryProxy;
-import org.apache.hadoop.ipc.ProtobufHelper;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc_.ProtobufHelper;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
+import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
+import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFollowerReadFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.security.UserGroupInformation;
-
-import com.google.protobuf.RpcController;
-import com.google.protobuf.ServiceException;
 
 /**
  * Hadoop RPC based transport with failover support.
@@ -47,7 +45,8 @@ public class Hadoop27RpcTransport implements OmTransport {
 
   private final OzoneManagerProtocolPB rpcProxy;
 
-  private final HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider;
+  private final HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> omFailoverProxyProvider;
+  private HadoopRpcOMFollowerReadFailoverProxyProvider<OzoneManagerProtocolPB> followerReadFailoverProxyProvider;
 
   public Hadoop27RpcTransport(ConfigurationSource conf,
       UserGroupInformation ugi, String omServiceId) throws IOException {
@@ -56,14 +55,30 @@ public class Hadoop27RpcTransport implements OmTransport {
         OzoneManagerProtocolPB.class,
         ProtobufRpcEngine.class);
 
-    this.omFailoverProxyProvider = new HadoopRpcOMFailoverProxyProvider(
+    this.omFailoverProxyProvider = new HadoopRpcOMFailoverProxyProvider<>(
             conf, ugi, omServiceId, OzoneManagerProtocolPB.class);
+
+    boolean followerReadEnabled = conf.getBoolean(
+        OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY,
+        OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_DEFAULT
+    );
 
     int maxFailovers = conf.getInt(
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY,
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT);
 
-    rpcProxy = createRetryProxy(omFailoverProxyProvider, maxFailovers);
+    if (followerReadEnabled) {
+      this.followerReadFailoverProxyProvider = new HadoopRpcOMFollowerReadFailoverProxyProvider<>(
+          omServiceId, OzoneManagerProtocolPB.class, omFailoverProxyProvider
+      );
+      this.rpcProxy = OzoneManagerProtocolPB.newProxy(followerReadFailoverProxyProvider, maxFailovers);
+    } else {
+      // TODO: It should be possible to simply instantiate HadoopRpcOMFollowerReadFailoverProxyProvider
+      //  even if the follower read is not enabled. We can try this to ensure that the tests still pass which
+      //  suggests that the HadoopRpcOMFollowerReadFailoverProxyProvider is a indeed a superset of
+      //  HadoopRpcOMFollowerReadFailoverProxyProvider
+      this.rpcProxy = OzoneManagerProtocolPB.newProxy(omFailoverProxyProvider, maxFailovers);
+    }
 
   }
 
@@ -97,24 +112,12 @@ public class Hadoop27RpcTransport implements OmTransport {
     return null;
   }
 
-  /**
-   * Creates a {@link RetryProxy} encapsulating the
-   * {@link HadoopRpcOMFailoverProxyProvider}. The retry proxy fails over on
-   * network exception or if the current proxy is not the leader OM.
-   */
-  private OzoneManagerProtocolPB createRetryProxy(
-      HadoopRpcOMFailoverProxyProvider failoverProxyProvider,
-      int maxFailovers) {
-
-    OzoneManagerProtocolPB proxy = (OzoneManagerProtocolPB) RetryProxy.create(
-        OzoneManagerProtocolPB.class, failoverProxyProvider,
-        failoverProxyProvider.getRetryPolicy(maxFailovers));
-    return proxy;
-  }
-
   @Override
   public void close() throws IOException {
-    omFailoverProxyProvider.close();
+    if (followerReadFailoverProxyProvider != null) {
+      followerReadFailoverProxyProvider.close();
+    } else {
+      omFailoverProxyProvider.close();
+    }
   }
-
 }

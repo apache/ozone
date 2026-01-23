@@ -16,7 +16,9 @@
 *** Settings ***
 Documentation       Finalize Upgrade of the Ozone cluster
 Resource            ../commonlib.robot
+Resource            lib.robot
 Test Timeout        10 minutes
+Suite Setup         Get Security Enabled From Config
 Test Setup          Run Keyword if    '${SECURITY_ENABLED}' == 'true'    Kinit test user     testuser     testuser.keytab
 
 *** Test Cases ***
@@ -25,26 +27,21 @@ Check OM Finalized
     ${result} =        Execute      env
                        Log    ${result}
     Pass Execution If    '%{OZONE_UPGRADE_FROM}' == '1.1.0'    OM finalization not supported in version %{OZONE_UPGRADE_FROM}
-    ${result} =        Execute      ozone admin om finalizationstatus
-                       Log    ${result}
+    ${result} =        OM Finalization Status
                        Should Contain Any    ${result}    ALREADY_FINALIZED    FINALIZATION_DONE
 
 Check SCM Finalized
     [Tags]    scm    finalized
     Pass Execution If    '%{OZONE_UPGRADE_FROM}' == '1.1.0'    HDDS finalization not supported in version %{OZONE_UPGRADE_FROM}
-    ${result} =        Execute      ozone admin scm finalizationstatus
-                       Log    ${result}
+    ${result} =        SCM Finalization Status
                        Should Contain Any    ${result}    ALREADY_FINALIZED    FINALIZATION_DONE
 
 Check OM Pre Finalized
     [Tags]    om    pre-finalized
-    ${result} =        Execute      ozone admin om finalizationstatus
-                       Log    ${result}
+    ${result} =        OM Finalization Status
                        Should Contain Any    ${result}    FINALIZATION_REQUIRED
 
 Check SCM Pre Finalized
     [Tags]    scm    pre-finalized
-    ${result} =        Execute      ozone admin scm finalizationstatus
-                       Log    ${result}
+    ${result} =        SCM Finalization Status
                        Should Contain Any    ${result}    FINALIZATION_REQUIRED
-

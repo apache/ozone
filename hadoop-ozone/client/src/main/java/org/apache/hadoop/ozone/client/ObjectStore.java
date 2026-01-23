@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,22 +17,23 @@
 
 package org.apache.hadoop.ozone.client;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
-
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.crypto.key.KeyProvider;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneFsServerDefaults;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -47,12 +47,10 @@ import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse;
+import org.apache.hadoop.ozone.snapshot.ListSnapshotDiffJobResponse;
 import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.security.UserGroupInformation;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Strings;
 import org.apache.hadoop.security.token.Token;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,7 +64,6 @@ public class ObjectStore {
   private static final Logger LOG =
       LoggerFactory.getLogger(ObjectStore.class);
 
-  private final ConfigurationSource conf;
   /**
    * The proxy used for connecting to the cluster and perform
    * client operations.
@@ -78,7 +75,6 @@ public class ObjectStore {
    * Cache size to be used for listVolume calls.
    */
   private int listCacheSize;
-  private final String defaultS3Volume;
   private BucketLayout s3BucketLayout;
 
   /**
@@ -87,10 +83,8 @@ public class ObjectStore {
    * @param proxy ClientProtocol proxy.
    */
   public ObjectStore(ConfigurationSource conf, ClientProtocol proxy) {
-    this.conf = conf;
     this.proxy = TracingUtil.createProxy(proxy, ClientProtocol.class, conf);
     this.listCacheSize = HddsClientUtils.getListCacheSize(conf);
-    defaultS3Volume = HddsClientUtils.getDefaultS3VolumeName(conf);
     s3BucketLayout = OmUtils.validateBucketLayout(
         conf.getTrimmed(
             OzoneConfigKeys.OZONE_S3G_DEFAULT_BUCKET_LAYOUT_KEY,
@@ -100,9 +94,7 @@ public class ObjectStore {
   @VisibleForTesting
   protected ObjectStore() {
     // For the unit test
-    this.conf = new OzoneConfiguration();
     proxy = null;
-    defaultS3Volume = HddsClientUtils.getDefaultS3VolumeName(conf);
   }
 
   @VisibleForTesting
@@ -216,7 +208,7 @@ public class ObjectStore {
    * Set secretKey for accessId.
    * @param accessId
    * @param secretKey
-   * @return S3SecretValue <accessId, secretKey> pair
+   * @return {@code S3SecretValue <accessId, secretKey>} pair
    * @throws IOException
    */
   public S3SecretValue setS3Secret(String accessId, String secretKey)
@@ -389,6 +381,10 @@ public class ObjectStore {
    */
   public void deleteVolume(String volumeName) throws IOException {
     proxy.deleteVolume(volumeName);
+  }
+
+  public OzoneFsServerDefaults getServerDefaults() throws IOException {
+    return proxy.getServerDefaults();
   }
 
   public KeyProvider getKeyProvider() throws IOException {
@@ -739,16 +735,73 @@ public class ObjectStore {
    * @param volumeName Name of the volume to which the snapshotted bucket belong
    * @param bucketName Name of the bucket to which the snapshots belong
    * @param jobStatus JobStatus to be used to filter the snapshot diff jobs
-   * @param listAll Option to specify whether to list all jobs or not
-   * @return a list of SnapshotDiffJob objects
+   * @param listAllStatus Option to specify whether to list all jobs regardless of status
+   * @param prevSnapshotDiffJob list snapshot diff jobs after this snapshot diff job.
+   * @return an iterator of SnapshotDiffJob objects
    * @throws IOException in case there is a failure while getting a response.
    */
-  public List<OzoneSnapshotDiff> listSnapshotDiffJobs(String volumeName,
-                                                    String bucketName,
-                                                    String jobStatus,
-                                                    boolean listAll)
-      throws IOException {
-    return proxy.listSnapshotDiffJobs(volumeName,
-        bucketName, jobStatus, listAll);
+  public Iterator<OzoneSnapshotDiff> listSnapshotDiffJobs(
+      String volumeName,
+      String bucketName,
+      String jobStatus,
+      boolean listAllStatus,
+      String prevSnapshotDiffJob
+  ) throws IOException {
+    return new SnapshotDiffJobIterator(volumeName, bucketName, jobStatus, listAllStatus, prevSnapshotDiffJob);
+  }
+
+  /**
+   * An Iterator to iterate over {@link SnapshotDiffJobIterator} list.
+   */
+  private final class SnapshotDiffJobIterator implements Iterator<OzoneSnapshotDiff> {
+    private final String volumeName;
+    private final String bucketName;
+    private final String jobStatus;
+    private final boolean listAllJobs;
+    private String lastSnapshotDiffJob;
+    private Iterator<OzoneSnapshotDiff> currentIterator;
+
+    private SnapshotDiffJobIterator(
+        String volumeName,
+        String bucketName,
+        String jobStatus,
+        boolean listAllStatus,
+        String prevSnapshotDiffJob) throws IOException {
+      this.volumeName = volumeName;
+      this.bucketName = bucketName;
+      this.jobStatus = jobStatus;
+      this.listAllJobs = listAllStatus;
+      // Initialized the currentIterator and lastSnapshotDiffJob.
+      getNextListOfSnapshotDiffJobs(prevSnapshotDiffJob);
+    }
+
+    @Override
+    public boolean hasNext() {
+      if (!currentIterator.hasNext() && StringUtils.isNotEmpty(lastSnapshotDiffJob)) {
+        try {
+          // fetch the next page if continuationToken is not null.
+          getNextListOfSnapshotDiffJobs(lastSnapshotDiffJob);
+        } catch (IOException e) {
+          LOG.error("Error retrieving next batch of list for snapshot diff jobs.", e);
+        }
+      }
+      return currentIterator.hasNext();
+    }
+
+    @Override
+    public OzoneSnapshotDiff next() {
+      if (hasNext()) {
+        return currentIterator.next();
+      }
+      throw new NoSuchElementException();
+    }
+
+    private void getNextListOfSnapshotDiffJobs(String prevSnapshotDiffJob) throws IOException {
+      ListSnapshotDiffJobResponse response = proxy.listSnapshotDiffJobs(volumeName, bucketName, jobStatus, listAllJobs,
+          prevSnapshotDiffJob, listCacheSize);
+      this.currentIterator =
+          response.getSnapshotDiffJobs().stream().map(OzoneSnapshotDiff::fromSnapshotDiffJob).iterator();
+      this.lastSnapshotDiffJob = response.getLastSnapshotDiffJob();
+    }
   }
 }

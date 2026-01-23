@@ -1,46 +1,38 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
- *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import javax.ws.rs.core.Response;
-import java.io.IOException;
-import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertStatus;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.time.format.DateTimeFormatter;
+import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
-import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
-
-import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.s3.S3GatewayConfigKeys.OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.http.HttpStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -55,55 +47,35 @@ public class TestObjectHead {
 
   @BeforeEach
   public void setup() throws IOException {
-    //Create client stub and object store stub.
     OzoneClient clientStub = new OzoneClientStub();
-
-    // Create volume and bucket
     clientStub.getObjectStore().createS3Bucket(bucketName);
-
     bucket = clientStub.getObjectStore().getS3Bucket(bucketName);
 
-    // Create HeadBucket and setClient to OzoneClientStub
-    keyEndpoint = new ObjectEndpoint();
-    keyEndpoint.setClient(clientStub);
-    keyEndpoint.setOzoneConfiguration(new OzoneConfiguration());
+    keyEndpoint = EndpointBuilder.newObjectEndpointBuilder()
+        .setClient(clientStub)
+        .build();
   }
 
   @Test
   public void testHeadObject() throws Exception {
     //GIVEN
-    String value = RandomStringUtils.randomAlphanumeric(32);
-    OzoneOutputStream out = bucket.createKey("key1",
-        value.getBytes(UTF_8).length,
-        ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
-        ReplicationFactor.ONE), new HashMap<>());
-    out.write(value.getBytes(UTF_8));
-    out.close();
+    byte[] bytes = createKey("key1");
 
     //WHEN
     Response response = keyEndpoint.head(bucketName, "key1");
 
     //THEN
-    assertEquals(200, response.getStatus());
-    assertEquals(value.getBytes(UTF_8).length,
+    assertEquals(HttpStatus.SC_OK, response.getStatus());
+    assertEquals(bytes.length,
         Long.parseLong(response.getHeaderString("Content-Length")));
 
     DateTimeFormatter.RFC_1123_DATE_TIME
         .parse(response.getHeaderString("Last-Modified"));
-
   }
 
   @Test
   public void testHeadFailByBadName() throws Exception {
-    //Head an object that doesn't exist.
-    try {
-      Response response =  keyEndpoint.head(bucketName, "badKeyName");
-      assertEquals(404, response.getStatus());
-    } catch (OS3Exception ex) {
-      assertThat(ex.getCode()).contains("NoSuchObject");
-      assertThat(ex.getErrorMessage()).contains("object does not exist");
-      assertEquals(HTTP_NOT_FOUND, ex.getHttpCode());
-    }
+    assertStatus(HttpStatus.SC_NOT_FOUND, () -> keyEndpoint.head(bucketName, "badKeyName"));
   }
 
   @Test
@@ -114,20 +86,9 @@ public class TestObjectHead {
     OzoneConfiguration config = new OzoneConfiguration();
     config.set(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED, "true");
     keyEndpoint.setOzoneConfiguration(config);
-    String keyContent = "content";
-    OzoneOutputStream out = bucket.createKey(keyPath,
-        keyContent.getBytes(UTF_8).length,
-        ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
-            ReplicationFactor.ONE), new HashMap<>());
-    out.write(keyContent.getBytes(UTF_8));
-    out.close();
+    createKey(keyPath);
 
-    // WHEN
-    final Response response = keyEndpoint.head(bucketName, keyPath);
-
-    // THEN
-    assertEquals(HttpStatus.SC_OK, response.getStatus());
-    bucket.deleteKey(keyPath);
+    assertSucceeds(() -> keyEndpoint.head(bucketName, keyPath));
   }
 
   @Test
@@ -140,12 +101,7 @@ public class TestObjectHead {
     keyEndpoint.setOzoneConfiguration(config);
     bucket.createDirectory(keyPath);
 
-    // WHEN
-    final Response response = keyEndpoint.head(bucketName, keyPath);
-
-    // THEN
-    assertEquals(HttpStatus.SC_NOT_FOUND, response.getStatus());
-    bucket.deleteKey(keyPath);
+    assertStatus(HttpStatus.SC_NOT_FOUND, () -> keyEndpoint.head(bucketName, keyPath));
   }
 
   @Test
@@ -158,35 +114,27 @@ public class TestObjectHead {
     keyEndpoint.setOzoneConfiguration(config);
     bucket.createDirectory(keyPath);
 
-    // WHEN
-    final Response response = keyEndpoint.head(bucketName, keyPath);
-
     // THEN
-    assertEquals(HttpStatus.SC_OK, response.getStatus());
-    bucket.deleteKey(keyPath);
+    assertSucceeds(() -> keyEndpoint.head(bucketName, keyPath));
   }
 
   @Test
   public void testHeadWhenKeyIsAFileAndKeyPathEndsWithASlash()
       throws IOException, OS3Exception {
-    // GIVEN
     final String keyPath = "keyFile";
     OzoneConfiguration config = new OzoneConfiguration();
     config.set(OZONE_S3G_FSO_DIRECTORY_CREATION_ENABLED, "true");
     keyEndpoint.setOzoneConfiguration(config);
-    String keyContent = "content";
-    OzoneOutputStream out = bucket.createKey(keyPath,
-        keyContent.getBytes(UTF_8).length,
-        ReplicationConfig.fromTypeAndFactor(ReplicationType.RATIS,
-            ReplicationFactor.ONE), new HashMap<>());
-    out.write(keyContent.getBytes(UTF_8));
-    out.close();
+    createKey(keyPath);
 
-    // WHEN
-    final Response response = keyEndpoint.head(bucketName, keyPath + "/");
+    assertStatus(HttpStatus.SC_NOT_FOUND, () -> keyEndpoint.head(bucketName, keyPath + "/"));
+  }
 
-    // THEN
-    assertEquals(HttpStatus.SC_NOT_FOUND, response.getStatus());
-    bucket.deleteKey(keyPath);
+  private byte[] createKey(String keyPath) throws IOException {
+    byte[] bytes = RandomStringUtils.secure().nextAlphanumeric(32).getBytes(UTF_8);
+    try (OutputStream out = bucket.createKey(keyPath, bytes.length)) {
+      out.write(bytes);
+    }
+    return bytes;
   }
 }

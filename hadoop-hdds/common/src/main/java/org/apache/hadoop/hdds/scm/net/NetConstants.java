@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,18 +14,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.net;
 
-import  org.apache.hadoop.hdds.scm.net.NodeSchema.LayerType;
-import org.apache.hadoop.util.StringWithByteString;
+import org.apache.hadoop.hdds.scm.net.NodeSchema.LayerType;
+import org.apache.hadoop.ozone.util.StringWithByteString;
 
 /**
  * Class to hold network topology related constants and configurations.
  */
 public final class NetConstants {
-  private NetConstants() {
-    // Prevent instantiation
-  }
   public static final char PATH_SEPARATOR = '/';
   /** Path separator as a string. */
   public static final String PATH_SEPARATOR_STR = "/";
@@ -66,4 +63,8 @@ public final class NetConstants {
 
   public static final NodeSchema LEAF_SCHEMA =
       new NodeSchema.Builder().setType(LayerType.LEAF_NODE).build();
+
+  private NetConstants() {
+    // Prevent instantiation
+  }
 }

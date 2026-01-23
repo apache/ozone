@@ -25,7 +25,7 @@ ${n}    1
 *** Test Cases ***
 Get Container ID
     ${result} =          Execute        ozone admin container create
-    ${containerID} =     Execute        ozone admin container list --count 1 --state=OPEN | grep -o '"containerID" *: *[^,}]*' | awk -F'[:,]' '{print $2}' | tr -d '" '
+    ${containerID} =     Execute        ozone admin container list --count 1 --state=OPEN | jq -r '.[0].containerID'
     Set Suite Variable   ${containerID}
 
 [Read] Ozone DataNode Echo RPC Load Generator with request payload and response payload

@@ -1412,6 +1412,14 @@ function ozone_java_setup
   # Extract the major version number
   JAVA_MAJOR_VERSION=$(echo "$JAVA_VERSION_STRING" | sed -E -n 's/.* version "([^.-]*).*"/\1/p' | cut -d' ' -f1)
 
+  # Add JVM parameter (org.apache.ratis.thirdparty.io.netty.tryReflectionSetAccessible=true)
+  # to allow netty unsafe memory allocation in Java 9+.
+  RATIS_OPTS="${RATIS_OPTS:-}"
+
+  if [[ "${JAVA_MAJOR_VERSION}" -ge 9 ]]; then
+    RATIS_OPTS="-Dorg.apache.ratis.thirdparty.io.netty.tryReflectionSetAccessible=true ${RATIS_OPTS}"
+  fi
+
   ozone_set_module_access_args
 }
 
@@ -1552,6 +1560,18 @@ function ozone_add_client_opts
      || -z "${OZONE_SUBCMD_SUPPORTDAEMONIZATION}" ]]; then
     ozone_debug "Appending OZONE_CLIENT_OPTS onto OZONE_OPTS"
     OZONE_OPTS="${OZONE_OPTS} ${OZONE_CLIENT_OPTS}"
+  fi
+}
+
+## @description  Adds the OZONE_SERVER_OPTS variable to OZONE_OPTS if OZONE_SUBCMD_SUPPORTDAEMONIZATION is true
+## @audience     public
+## @stability    stable
+## @replaceable  yes
+function ozone_add_server_opts
+{
+  if [[ "${OZONE_SUBCMD_SUPPORTDAEMONIZATION}" == "true" ]] && [[ -n "${OZONE_SERVER_OPTS:-}" ]]; then
+    ozone_debug "Appending OZONE_SERVER_OPTS onto OZONE_OPTS"
+    OZONE_OPTS="${OZONE_OPTS} ${OZONE_SERVER_OPTS}"
   fi
 }
 
@@ -2779,6 +2799,33 @@ function ozone_validate_classpath_util
   fi
 }
 
+## @description Add items from .classpath file to the classpath
+## @audience private
+## @stability evolving
+## @replaceable no
+function ozone_add_classpath_from_file() {
+  local classpath_file="$1"
+
+  if [[ ! -e "$classpath_file" ]]; then
+    echo "Skip non-existent classpath file: $classpath_file" >&2
+    return
+  fi
+
+  local classpath
+  # shellcheck disable=SC1090,SC2086
+  source "$classpath_file"
+  local original_ifs=$IFS
+  IFS=':'
+
+  local jar
+  # shellcheck disable=SC2154
+  for jar in $classpath; do
+    ozone_add_classpath "$jar"
+  done
+
+  IFS=$original_ifs
+}
+
 ## @description Add all the required jar files to the classpath
 ## @audience private
 ## @stability evolving
@@ -2798,24 +2845,8 @@ function ozone_assemble_classpath() {
     echo "ERROR: Classpath file descriptor $CLASSPATH_FILE is missing"
     exit 255
   fi
-  # shellcheck disable=SC1090,SC2086
-  source "$CLASSPATH_FILE"
-  OIFS=$IFS
-  IFS=':'
-
-  # shellcheck disable=SC2154
-  for jar in $classpath; do
-    ozone_add_classpath "$jar"
-  done
+  ozone_add_classpath_from_file "$CLASSPATH_FILE"
   ozone_add_classpath "${OZONE_HOME}/share/ozone/web"
-
-  #We need to add the artifact manually as it's not part the generated classpath desciptor
-  local MAIN_ARTIFACT
-  MAIN_ARTIFACT=$(find "$HDDS_LIB_JARS_DIR" -name "${OZONE_RUN_ARTIFACT_NAME}-*.jar")
-  if [[ -z "$MAIN_ARTIFACT" ]] || [[ ! -e "$MAIN_ARTIFACT" ]]; then
-    echo "ERROR: Component jar file $MAIN_ARTIFACT is missing from ${HDDS_LIB_JARS_DIR}"
-  fi
-  ozone_add_classpath "${MAIN_ARTIFACT}"
 
   #Add optional jars to the classpath
   local OPTIONAL_CLASSPATH_DIR
@@ -2823,9 +2854,6 @@ function ozone_assemble_classpath() {
   if [[ -d "$OPTIONAL_CLASSPATH_DIR" ]]; then
     ozone_add_classpath "$OPTIONAL_CLASSPATH_DIR/*"
   fi
-
-  # TODO can be moved earlier? (after 'for jar in $classpath' loop)
-  IFS=$OIFS
 }
 
 ## @description  Fallback to value of `oldvar` if `newvar` is undefined

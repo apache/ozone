@@ -1,29 +1,29 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone;
-
-import org.apache.hadoop.hdds.ComponentVersion;
-
-import java.util.Arrays;
-import java.util.Map;
 
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toMap;
+
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.Map;
+import org.apache.hadoop.hdds.ComponentVersion;
 
 /**
  * Versioning for protocol clients.
@@ -41,10 +41,6 @@ public enum ClientVersion implements ComponentVersion {
   BUCKET_LAYOUT_SUPPORT(3,
       "This client version has support for Object Store and File " +
           "System Optimized Bucket Layouts."),
-
-  EC_REPLICA_INDEX_REQUIRED_IN_BLOCK_REQUEST(4,
-      "This client version enforces replica index is set for fixing read corruption that could occur when " +
-          "replicaIndex parameter is not validated before EC block reads."),
 
   FUTURE_VERSION(-1, "Used internally when the server side is older and an"
       + " unknown client version has arrived from the client.");
@@ -79,8 +75,8 @@ public enum ClientVersion implements ComponentVersion {
   }
 
   private static ClientVersion latest() {
-    ClientVersion[] versions = ClientVersion.values();
-    return versions[versions.length - 2];
+    return Arrays.stream(ClientVersion.values())
+        .max(Comparator.comparingInt(ComponentVersion::toProtoValue)).orElse(null);
   }
 
 }

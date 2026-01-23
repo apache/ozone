@@ -1,28 +1,29 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.common.states.endpoint;
 
 import java.io.IOException;
+import java.net.BindException;
+import java.util.Objects;
 import java.util.concurrent.Callable;
-
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
@@ -30,8 +31,6 @@ import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.apache.hadoop.ozone.protocol.VersionResponse;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
-
-import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,8 +39,7 @@ import org.slf4j.LoggerFactory;
  */
 public class VersionEndpointTask implements
     Callable<EndpointStateMachine.EndPointStates> {
-  public static final Logger LOG = LoggerFactory.getLogger(VersionEndpointTask
-      .class);
+  private static final Logger LOG = LoggerFactory.getLogger(VersionEndpointTask.class);
   private final EndpointStateMachine rpcEndPoint;
   private final ConfigurationSource configuration;
   private final OzoneContainer ozoneContainer;
@@ -77,21 +75,14 @@ public class VersionEndpointTask implements
           String scmId = response.getValue(OzoneConsts.SCM_ID);
           String clusterId = response.getValue(OzoneConsts.CLUSTER_ID);
 
-          Preconditions.checkNotNull(scmId,
-              "Reply from SCM: scmId cannot be null");
-          Preconditions.checkNotNull(clusterId,
-              "Reply from SCM: clusterId cannot be null");
+          Objects.requireNonNull(scmId, "scmId == null");
+          Objects.requireNonNull(clusterId, "clusterId == null");
 
           // Check DbVolumes, format DbVolume at first register time.
           checkVolumeSet(ozoneContainer.getDbVolumeSet(), scmId, clusterId);
 
           // Check HddsVolumes
           checkVolumeSet(ozoneContainer.getVolumeSet(), scmId, clusterId);
-
-          DatanodeLayoutStorage layoutStorage
-              = new DatanodeLayoutStorage(configuration);
-          layoutStorage.setClusterId(clusterId);
-          layoutStorage.persistCurrentState();
 
           // Start the container services after getting the version information
           ozoneContainer.start(clusterId);
@@ -104,7 +95,7 @@ public class VersionEndpointTask implements
         LOG.debug("Cannot execute GetVersion task as endpoint state machine " +
             "is in {} state", rpcEndPoint.getState());
       }
-    } catch (DiskOutOfSpaceException ex) {
+    } catch (DiskOutOfSpaceException | BindException ex) {
       rpcEndPoint.setState(EndpointStateMachine.EndPointStates.SHUTDOWN);
     } catch (IOException ex) {
       rpcEndPoint.logIfNeeded(ex);
@@ -132,7 +123,7 @@ public class VersionEndpointTask implements
           volumeSet.failVolume(volume.getStorageDir().getPath());
         }
       }
-      if (volumeSet.getVolumesList().size() == 0) {
+      if (volumeSet.getVolumesList().isEmpty()) {
         // All volumes are in inconsistent state
         throw new DiskOutOfSpaceException(
             "All configured Volumes are in Inconsistent State");

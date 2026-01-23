@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,16 +17,15 @@
 
 package org.apache.hadoop.hdds.conf;
 
-import org.apache.ratis.server.RaftServerConfigKeys;
-
-import java.time.Duration;
-
 import static org.apache.hadoop.hdds.conf.ConfigTag.DATANODE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.DATASTREAM;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.PERFORMANCE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.RATIS;
 import static org.apache.hadoop.hdds.ratis.RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY;
+
+import java.time.Duration;
+import org.apache.ratis.server.RaftServerConfigKeys;
 
 /**
  * Datanode Ratis server Configuration.
@@ -36,7 +34,7 @@ import static org.apache.hadoop.hdds.ratis.RatisHelper.HDDS_DATANODE_RATIS_PREFI
     + RaftServerConfigKeys.PREFIX)
 public class DatanodeRatisServerConfig {
 
-  @Config(key = "rpc.request.timeout",
+  @Config(key = "hdds.ratis.raft.server.rpc.request.timeout",
       defaultValue = "60s",
       type = ConfigType.TIME,
       tags = {OZONE, DATANODE, RATIS},
@@ -45,15 +43,7 @@ public class DatanodeRatisServerConfig {
   )
   private long requestTimeOut = Duration.ofSeconds(60).toMillis();
 
-  public long getRequestTimeOut() {
-    return requestTimeOut;
-  }
-
-  public void setRequestTimeOut(Duration duration) {
-    this.requestTimeOut = duration.toMillis();
-  }
-
-  @Config(key = "watch.timeout",
+  @Config(key = "hdds.ratis.raft.server.watch.timeout",
       defaultValue = "30s",
       type = ConfigType.TIME,
       tags = {OZONE, DATANODE, RATIS},
@@ -65,15 +55,7 @@ public class DatanodeRatisServerConfig {
   )
   private long watchTimeOut = Duration.ofSeconds(30).toMillis();
 
-  public long getWatchTimeOut() {
-    return watchTimeOut;
-  }
-
-  public void setWatchTimeOut(Duration duration) {
-    this.watchTimeOut = duration.toMillis();
-  }
-
-  @Config(key = "notification.no-leader.timeout",
+  @Config(key = "hdds.ratis.raft.server.notification.no-leader.timeout",
       defaultValue = "300s",
       type = ConfigType.TIME,
       tags = {OZONE, DATANODE, RATIS},
@@ -83,15 +65,7 @@ public class DatanodeRatisServerConfig {
   )
   private long noLeaderTimeout = Duration.ofSeconds(300).toMillis();
 
-  public long getNoLeaderTimeout() {
-    return noLeaderTimeout;
-  }
-
-  public void setNoLeaderTimeout(Duration duration) {
-    this.noLeaderTimeout = duration.toMillis();
-  }
-
-  @Config(key = "rpc.slowness.timeout",
+  @Config(key = "hdds.ratis.raft.server.rpc.slowness.timeout",
       defaultValue = "300s",
       type = ConfigType.TIME,
       tags = {OZONE, DATANODE, RATIS},
@@ -101,15 +75,7 @@ public class DatanodeRatisServerConfig {
   )
   private long followerSlownessTimeout = Duration.ofSeconds(300).toMillis();
 
-  public long getFollowerSlownessTimeout() {
-    return followerSlownessTimeout;
-  }
-
-  public void setFollowerSlownessTimeout(Duration duration) {
-    this.followerSlownessTimeout = duration.toMillis();
-  }
-
-  @Config(key = "write.element-limit",
+  @Config(key = "hdds.ratis.raft.server.write.element-limit",
       defaultValue = "1024",
       type = ConfigType.INT,
       tags = {OZONE, DATANODE, RATIS, PERFORMANCE},
@@ -118,15 +84,7 @@ public class DatanodeRatisServerConfig {
   )
   private int leaderNumPendingRequests;
 
-  public int getLeaderNumPendingRequests() {
-    return leaderNumPendingRequests;
-  }
-
-  public void setLeaderNumPendingRequests(int leaderNumPendingRequests) {
-    this.leaderNumPendingRequests = leaderNumPendingRequests;
-  }
-
-  @Config(key = "datastream.request.threads",
+  @Config(key = "hdds.ratis.raft.server.datastream.request.threads",
       defaultValue = "20",
       type = ConfigType.INT,
       tags = {OZONE, DATANODE, RATIS, DATASTREAM},
@@ -135,15 +93,7 @@ public class DatanodeRatisServerConfig {
   )
   private int streamRequestThreads;
 
-  public int getStreamRequestThreads() {
-    return streamRequestThreads;
-  }
-
-  public void setStreamRequestThreads(int streamRequestThreads) {
-    this.streamRequestThreads = streamRequestThreads;
-  }
-
-  @Config(key = "datastream.client.pool.size",
+  @Config(key = "hdds.ratis.raft.server.datastream.client.pool.size",
       defaultValue = "10",
       type = ConfigType.INT,
       tags = {OZONE, DATANODE, RATIS, DATASTREAM},
@@ -152,15 +102,7 @@ public class DatanodeRatisServerConfig {
   )
   private int clientPoolSize;
 
-  public int getClientPoolSize() {
-    return clientPoolSize;
-  }
-
-  public void setClientPoolSize(int clientPoolSize) {
-    this.clientPoolSize = clientPoolSize;
-  }
-
-  @Config(key = "delete.ratis.log.directory",
+  @Config(key = "hdds.ratis.raft.server.delete.ratis.log.directory",
           defaultValue = "true",
           type = ConfigType.BOOLEAN,
           tags = {OZONE, DATANODE, RATIS},
@@ -169,15 +111,7 @@ public class DatanodeRatisServerConfig {
   )
   private boolean shouldDeleteRatisLogDirectory;
 
-  public boolean shouldDeleteRatisLogDirectory() {
-    return shouldDeleteRatisLogDirectory;
-  }
-
-  public void setLeaderNumPendingRequests(boolean delete) {
-    this.shouldDeleteRatisLogDirectory = delete;
-  }
-
-  @Config(key = "leaderelection.pre-vote",
+  @Config(key = "hdds.ratis.raft.server.leaderelection.pre-vote",
       defaultValue = "true",
       type = ConfigType.BOOLEAN,
       tags = {OZONE, DATANODE, RATIS},
@@ -185,16 +119,8 @@ public class DatanodeRatisServerConfig {
   )
   private boolean preVoteEnabled = true;
 
-  public boolean isPreVoteEnabled() {
-    return preVoteEnabled;
-  }
-
-  public void setPreVote(boolean preVote) {
-    this.preVoteEnabled = preVote;
-  }
-
   /** @see RaftServerConfigKeys.Log.Appender#WAIT_TIME_MIN_KEY */
-  @Config(key = "log.appender.wait-time.min",
+  @Config(key = "hdds.ratis.raft.server.log.appender.wait-time.min",
       defaultValue = "0us",
       type = ConfigType.TIME,
       tags = {OZONE, DATANODE, RATIS, PERFORMANCE},
@@ -205,6 +131,78 @@ public class DatanodeRatisServerConfig {
           "retrying."
   )
   private long logAppenderWaitTimeMin;
+
+  public long getRequestTimeOut() {
+    return requestTimeOut;
+  }
+
+  public void setRequestTimeOut(Duration duration) {
+    this.requestTimeOut = duration.toMillis();
+  }
+
+  public long getWatchTimeOut() {
+    return watchTimeOut;
+  }
+
+  public void setWatchTimeOut(Duration duration) {
+    this.watchTimeOut = duration.toMillis();
+  }
+
+  public long getNoLeaderTimeout() {
+    return noLeaderTimeout;
+  }
+
+  public void setNoLeaderTimeout(Duration duration) {
+    this.noLeaderTimeout = duration.toMillis();
+  }
+
+  public long getFollowerSlownessTimeout() {
+    return followerSlownessTimeout;
+  }
+
+  public void setFollowerSlownessTimeout(Duration duration) {
+    this.followerSlownessTimeout = duration.toMillis();
+  }
+
+  public int getLeaderNumPendingRequests() {
+    return leaderNumPendingRequests;
+  }
+
+  public void setLeaderNumPendingRequests(int leaderNumPendingRequests) {
+    this.leaderNumPendingRequests = leaderNumPendingRequests;
+  }
+
+  public int getStreamRequestThreads() {
+    return streamRequestThreads;
+  }
+
+  public void setStreamRequestThreads(int streamRequestThreads) {
+    this.streamRequestThreads = streamRequestThreads;
+  }
+
+  public int getClientPoolSize() {
+    return clientPoolSize;
+  }
+
+  public void setClientPoolSize(int clientPoolSize) {
+    this.clientPoolSize = clientPoolSize;
+  }
+
+  public boolean shouldDeleteRatisLogDirectory() {
+    return shouldDeleteRatisLogDirectory;
+  }
+
+  public void setLeaderNumPendingRequests(boolean delete) {
+    this.shouldDeleteRatisLogDirectory = delete;
+  }
+
+  public boolean isPreVoteEnabled() {
+    return preVoteEnabled;
+  }
+
+  public void setPreVote(boolean preVote) {
+    this.preVoteEnabled = preVote;
+  }
 
   public long getLogAppenderWaitTimeMin() {
     return logAppenderWaitTimeMin;

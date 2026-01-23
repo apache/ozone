@@ -76,3 +76,49 @@ blocks that get reported. That is a 40x reduction in the block reports.
 This extra indirection helps tremendously with scaling Ozone. SCM has far
 less block data to process and the namespace service (Ozone Manager) as a
 different service are critical to scaling Ozone.
+
+## Data Volume Management
+
+### What is a Volume?
+
+In the context of an Ozone DataNode, a "volume" refers to a physical disk or storage device managed by the DataNode. Each volume can store many containers, which are the fundamental units of storage in Ozone. This is different from the "volume" concept in Ozone Manager, which refers to a namespace for organizing buckets and keys.
+
+The status of volumes, including used space, available space and whether or not they are operational (healthy) or failed, can be looked up from DataNode Web UI.
+
+### Defining Volumes with hdds.datanode.dir
+
+The property `hdds.datanode.dir` defines the set of volumes (disks) managed by a DataNode. You can specify one or more directories, separated by commas. Each directory represents a volume.
+For example: `/data1/disk1,/data2/disk2`, which configures the DataNode to manage two volumes.
+
+### Volume Choosing Policy
+
+When a DataNode needs to select a volume to store new data, it uses a volume choosing policy. The policy is controlled by the property `hdds.datanode.volume.choosing.policy`. There are two main policies:
+
+- **CapacityVolumeChoosingPolicy (default):**
+  This policy randomly selects two volumes with enough available space and chooses the one with lower utilization (i.e., more free space). This approach increases the likelihood that less-used disks are chosen, helping to balance disk usage over time.
+
+- **RoundRobinVolumeChoosingPolicy:**
+  This policy selects volumes in a round-robin order, cycling through all available volumes. It does not consider the current utilization of each disk, but ensures even distribution of new containers across all disks.
+
+### Volume-Related Configuration Properties
+
+| Property Name                                 | Default Value                | Description                                                                                  |
+|-----------------------------------------------|------------------------------|----------------------------------------------------------------------------------------------|
+| hdds.datanode.volume.choosing.policy          | CapacityVolumeChoosingPolicy | The policy used to select a volume for new containers.                                       |
+| hdds.datanode.volume.min.free.space           | 20GB                         | Minimum free space required on a volume to be eligible for new containers.                   |
+| hdds.datanode.volume.min.free.space.percent   | 0.02                         | Minimum free space percentage required on a volume to be eligible for new containers.        |
+
+### Disk Balancer
+
+Over time, operations like adding or replacing disks can cause uneven disk usage. The Ozone community is developing a Disk Balancer (see [HDDS-5713](https://issues.apache.org/jira/browse/HDDS-5713)) to automatically balance disk usage across DataNode volumes. This feature is under active development.
+
+## Notable configurations
+
+key | default | <div style="width: 300px;">description</div>
+----|---------|------------
+dfs.container.ratis.datanode.storage.dir | none | This directory is used for storing Ratis metadata like logs.
+ozone.scm.datanode.id.dir | none | The path that datanodes will use to store the datanode ID.
+hdds.datanode.dir | none | Determines where HDDS data will be stored on the local filesystem.
+hdds.datanode.dir.du.reserved | none | Reserved space in bytes per volume. Always leave this much space free for non dfs use.
+ozone.metadata.dirs | none | Directory to store persisted data (RocksDB).
+ozone.recon.address | 0.0.0.0:9891 | RPC address of the Recon. Use <host:port> to connect Recon.

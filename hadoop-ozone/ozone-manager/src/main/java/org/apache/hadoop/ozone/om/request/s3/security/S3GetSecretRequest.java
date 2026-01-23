@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -23,30 +22,28 @@ import java.nio.file.InvalidPathException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
-
 import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.ratis.server.protocol.TermIndex;
-import org.apache.hadoop.ozone.om.OMMultiTenantManager;
-import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.OMAction;
+import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.security.S3GetSecretResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3SecretRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3SecretResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UpdateGetS3SecretRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Secret;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UpdateGetS3SecretRequest;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Handles GetS3Secret request.
@@ -127,7 +124,7 @@ public class S3GetSecretRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     OMClientResponse omClientResponse = null;
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
@@ -157,7 +154,7 @@ public class S3GetSecretRequest extends OMClientRequest {
               // Not found in S3SecretTable.
               if (createIfNotExist) {
                 // Add new entry in this case
-                assignS3SecretValue = S3SecretValue.of(accessId, awsSecret.get(), termIndex.getIndex());
+                assignS3SecretValue = S3SecretValue.of(accessId, awsSecret.get(), context.getIndex());
                 // Add cache entry first.
                 s3SecretManager.updateCache(accessId, assignS3SecretValue);
               } else {
@@ -188,6 +185,14 @@ public class S3GetSecretRequest extends OMClientRequest {
                   OMException.ResultCodes.ACCESS_ID_NOT_FOUND);
             }
 
+            if (assignS3SecretValue != null && !s3SecretManager.isBatchSupported()) {
+              // A storage that does not support batch writing is likely to be a
+              // third-party secret storage that might throw an exception on write.
+              // In the case of the exception the request will fail.
+              s3SecretManager.storeSecret(assignS3SecretValue.getKerberosID(),
+                                          assignS3SecretValue);
+            }
+
             // Compose response
             final GetS3SecretResponse.Builder getS3SecretResponse =
                 GetS3SecretResponse.newBuilder().setS3Secret(
@@ -214,7 +219,7 @@ public class S3GetSecretRequest extends OMClientRequest {
     auditMap.put(OzoneConsts.S3_GETSECRET_USER, accessId);
 
     // audit log
-    auditLog(ozoneManager.getAuditLogger(), buildAuditMessage(
+    markForAudit(ozoneManager.getAuditLogger(), buildAuditMessage(
         OMAction.GET_S3_SECRET, auditMap,
         exception, getOmRequest().getUserInfo()));
 

@@ -18,10 +18,14 @@ Documentation       HttpFS gateway test with curl commands
 Library             Process
 Library             String
 Library             BuiltIn
+Library             OperatingSystem
 Resource            operations.robot
 Resource            ../lib/os.robot
 Resource            ../commonlib.robot
-Suite Setup         Generate volume
+Suite Setup         Run Keywords    Generate volume 
+...                 AND             Get Security Enabled From Config
+
+Test Timeout        2 minutes
 
 *** Variables ***
 ${volume}                      generated
@@ -61,10 +65,10 @@ Create second bucket
     Should contain  ${bucket.stdout}   true
 
 Create local testfile
-    Create file       testfile
+    Create File       ${TEMP_DIR}/testfile    "Hello world!"
 
 Create testfile
-    ${file} =       Execute create file command     ${volume}/buck1/testfile     testfile
+    ${file} =       Execute create file command     ${volume}/buck1/testfile     ${TEMP_DIR}/testfile
     Should contain     ${file.stdout}     http://httpfs:14000/webhdfs/v1/${volume}/buck1/testfile
 
 Read file

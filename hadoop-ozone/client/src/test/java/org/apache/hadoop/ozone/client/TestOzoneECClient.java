@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,6 +17,23 @@
 
 package org.apache.hadoop.ozone.client;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
@@ -51,24 +67,6 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 /**
  * Real unit test for OzoneECClient.
@@ -153,7 +151,7 @@ public class TestOzoneECClient {
     Map<DatanodeDetails, MockDatanodeStorage> storages =
         factoryStub.getStorages();
     DatanodeDetails[] dnDetails =
-        storages.keySet().toArray(new DatanodeDetails[storages.size()]);
+        storages.keySet().toArray(new DatanodeDetails[0]);
     Arrays.sort(dnDetails);
     for (int i = 0; i < inputChunks.length; i++) {
       MockDatanodeStorage datanodeStorage = storages.get(dnDetails[i]);
@@ -182,7 +180,7 @@ public class TestOzoneECClient {
     Map<DatanodeDetails, MockDatanodeStorage> storages =
         factoryStub.getStorages();
     DatanodeDetails[] dnDetails =
-        storages.keySet().toArray(new DatanodeDetails[storages.size()]);
+        storages.keySet().toArray(new DatanodeDetails[0]);
     Arrays.sort(dnDetails);
 
     for (int i = dataBlocks; i < parityBlocks + dataBlocks; i++) {
@@ -225,8 +223,8 @@ public class TestOzoneECClient {
     // replication in bucket, key should be EC key.
     try (OzoneOutputStream out = bucket.createKey("mykey", inputSize)) {
       assertInstanceOf(ECKeyOutputStream.class, out.getOutputStream());
-      for (int i = 0; i < inputChunks.length; i++) {
-        out.write(inputChunks[i]);
+      for (byte[] inputChunk : inputChunks) {
+        out.write(inputChunk);
       }
     }
   }
@@ -276,6 +274,7 @@ public class TestOzoneECClient {
           throws IOException {
     testMultipleChunksInSingleWriteOp(0, numChunks, numChunks);
   }
+
   private void testMultipleChunksInSingleWriteOp(int offset, int bufferChunks,
                                                  int numChunks)
       throws IOException {
@@ -469,8 +468,8 @@ public class TestOzoneECClient {
       assertInstanceOf(ECKeyOutputStream.class, out.getOutputStream());
       // Block Size is 2kb, so to create 3 blocks we need 6 iterations here
       for (int j = 0; j < 6; j++) {
-        for (int i = 0; i < inputChunks.length; i++) {
-          out.write(inputChunks[i]);
+        for (byte[] inputChunk : inputChunks) {
+          out.write(inputChunk);
         }
       }
     }
@@ -555,8 +554,8 @@ public class TestOzoneECClient {
         out.write(inputChunks[i]);
       }
 
-      for (int i = 0; i < lastChunk.length; i++) {
-        out.write(lastChunk[i]);
+      for (byte chunkData : lastChunk) {
+        out.write(chunkData);
       }
     }
 
@@ -740,9 +739,8 @@ public class TestOzoneECClient {
       List<DatanodeDetails> failedDNs = new ArrayList<>();
       List<HddsProtos.DatanodeDetailsProto> dns = blkAllocator.getClusterDns();
 
-      for (int j = 0; j < nodesIndexesToMarkFailure.length; j++) {
-        failedDNs.add(DatanodeDetails
-            .getFromProtoBuf(dns.get(nodesIndexesToMarkFailure[j])));
+      for (int nodeIndex : nodesIndexesToMarkFailure) {
+        failedDNs.add(DatanodeDetails.getFromProtoBuf(dns.get(nodeIndex)));
       }
 
       // First let's set storage as bad
@@ -791,9 +789,8 @@ public class TestOzoneECClient {
 
       List<DatanodeDetails> failedDNs = new ArrayList<>();
       List<HddsProtos.DatanodeDetailsProto> dns = allocator.getClusterDns();
-      for (int j = 0; j < nodesIndexesToMarkFailure.length; j++) {
-        failedDNs.add(DatanodeDetails
-            .getFromProtoBuf(dns.get(nodesIndexesToMarkFailure[j])));
+      for (int nodeIndex : nodesIndexesToMarkFailure) {
+        failedDNs.add(DatanodeDetails.getFromProtoBuf(dns.get(nodeIndex)));
       }
 
       // First let's set storage as bad
@@ -931,9 +928,8 @@ public class TestOzoneECClient {
 
       List<DatanodeDetails> failedDNs = new ArrayList<>();
       List<HddsProtos.DatanodeDetailsProto> dns = allocator.getClusterDns();
-      for (int j = 0; j < nodesIndexesToMarkFailure.length; j++) {
-        failedDNs.add(DatanodeDetails
-            .getFromProtoBuf(dns.get(nodesIndexesToMarkFailure[j])));
+      for (int nodeIndex : nodesIndexesToMarkFailure) {
+        failedDNs.add(DatanodeDetails.getFromProtoBuf(dns.get(nodeIndex)));
       }
 
       // First let's set storage as bad
@@ -1002,9 +998,8 @@ public class TestOzoneECClient {
       int[] nodesIndexesToMarkFailure = new int[] {0, 4};
       List<DatanodeDetails> failedDNs = new ArrayList<>();
       List<HddsProtos.DatanodeDetailsProto> dns = blkAllocator.getClusterDns();
-      for (int j = 0; j < nodesIndexesToMarkFailure.length; j++) {
-        failedDNs.add(DatanodeDetails
-            .getFromProtoBuf(dns.get(nodesIndexesToMarkFailure[j])));
+      for (int nodeIndex : nodesIndexesToMarkFailure) {
+        failedDNs.add(DatanodeDetails.getFromProtoBuf(dns.get(nodeIndex)));
       }
 
       // First let's set storage as bad
@@ -1091,9 +1086,8 @@ public class TestOzoneECClient {
       // Make the writes fail to trigger retry
       List<DatanodeDetails> failedDNs = new ArrayList<>();
       List<HddsProtos.DatanodeDetailsProto> dns = allocator.getClusterDns();
-      for (int j = 0; j < nodesIndexesToMarkFailure.length; j++) {
-        failedDNs.add(DatanodeDetails
-            .getFromProtoBuf(dns.get(nodesIndexesToMarkFailure[j])));
+      for (int nodeIndex : nodesIndexesToMarkFailure) {
+        failedDNs.add(DatanodeDetails.getFromProtoBuf(dns.get(nodeIndex)));
       }
       // First let's set storage as bad
       factoryStub.setFailedStorages(failedDNs);
@@ -1124,6 +1118,7 @@ public class TestOzoneECClient {
       DefaultReplicationConfig defaultReplicationConfig) throws IOException {
     return writeIntoECKey(0, data.length, data, key, defaultReplicationConfig);
   }
+
   private OzoneBucket writeIntoECKey(int offset, int length, byte[] data,
       String key, DefaultReplicationConfig defaultReplicationConfig)
       throws IOException {

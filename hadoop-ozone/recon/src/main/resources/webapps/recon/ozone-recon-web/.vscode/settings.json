@@ -1,0 +1,9 @@
+{
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.locale": "en",
+  "typescript.preferences.importModuleSpecifier": "non-relative",
+  "typescript.suggest.autoImports": true,
+  "prettier.printWidth": 120,
+  "prettier.semi": true,
+  "prettier.tabWidth": 2
+}

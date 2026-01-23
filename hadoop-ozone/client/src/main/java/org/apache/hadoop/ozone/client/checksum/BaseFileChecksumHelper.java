@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,13 +14,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.client.checksum;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.List;
 import org.apache.hadoop.fs.FileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32CastagnoliFileChecksum;
 import org.apache.hadoop.fs.MD5MD5CRC32GzipFileChecksum;
-import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.fs.PathIOException;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.MD5Hash;
@@ -36,9 +41,6 @@ import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.util.DataChecksum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.util.List;
 
 /**
  * The base class to support file checksum.
@@ -150,6 +152,121 @@ public abstract class BaseFileChecksumHelper {
     checksumType = type;
   }
 
+  protected abstract AbstractBlockChecksumComputer getBlockChecksumComputer(List<ContainerProtos.ChunkInfo> chunkInfos,
+      long blockLength);
+
+  protected abstract List<ContainerProtos.ChunkInfo> getChunkInfos(
+      OmKeyLocationInfo keyLocationInfo) throws IOException;
+
+  protected ByteBuffer getBlockChecksumFromChunkChecksums(AbstractBlockChecksumComputer blockChecksumComputer)
+      throws IOException {
+    blockChecksumComputer.compute(getCombineMode());
+    return blockChecksumComputer.getOutByteBuffer();
+  }
+
+  /**
+   * Parses out the raw blockChecksum bytes from {@code checksumData} byte
+   * buffer according to the blockChecksumType and populates the cumulative
+   * blockChecksumBuf with it.
+   *
+   * @return a debug-string representation of the parsed checksum if
+   *     debug is enabled, otherwise null.
+   */
+
+  protected String populateBlockChecksumBuf(ByteBuffer blockChecksumByteBuffer) throws IOException {
+    String blockChecksumForDebug = null;
+    switch (getCombineMode()) {
+    case MD5MD5CRC:
+      final MD5Hash md5 = new MD5Hash(blockChecksumByteBuffer.array());
+      md5.write(getBlockChecksumBuf());
+      if (LOG.isDebugEnabled()) {
+        blockChecksumForDebug = md5.toString();
+      }
+      break;
+    case COMPOSITE_CRC:
+      byte[] crcBytes = blockChecksumByteBuffer.array();
+      if (LOG.isDebugEnabled()) {
+        blockChecksumForDebug = CrcUtil.toMultiCrcString(crcBytes);
+      }
+      getBlockChecksumBuf().write(crcBytes);
+      break;
+    default:
+      throw new IOException(
+          "Unknown combine mode: " + getCombineMode());
+    }
+    return blockChecksumForDebug;
+  }
+
+  /**
+   * Compute block checksums block by block and append the raw bytes of the
+   * block checksums into getBlockChecksumBuf().
+   *
+   * @throws IOException
+   */
+  protected void checksumBlocks() throws IOException {
+    long currentLength = 0;
+    for (int blockIdx = 0;
+         blockIdx < getKeyLocationInfoList().size() && getRemaining() >= 0;
+         blockIdx++) {
+      OmKeyLocationInfo keyLocationInfo =
+          getKeyLocationInfoList().get(blockIdx);
+      if (currentLength > getLength()) {
+        return;
+      }
+
+      if (!checksumBlock(keyLocationInfo)) {
+        throw new PathIOException(getSrc(),
+            "Fail to get block checksum for " + keyLocationInfo
+                + ", checksum combine mode: " + getCombineMode());
+      }
+
+      currentLength += keyLocationInfo.getLength();
+    }
+  }
+
+  /**
+   * Return true when sounds good to continue or retry, false when severe
+   * condition or totally failed.
+   */
+  protected boolean checksumBlock(OmKeyLocationInfo keyLocationInfo)
+      throws IOException {
+    // for each block, send request
+    List<ContainerProtos.ChunkInfo> chunkInfos =
+        getChunkInfos(keyLocationInfo);
+    if (chunkInfos.isEmpty()) {
+      return false;
+    }
+
+    long blockNumBytes = keyLocationInfo.getLength();
+
+    if (getRemaining() < blockNumBytes) {
+      blockNumBytes = getRemaining();
+    }
+    setRemaining(getRemaining() - blockNumBytes);
+
+    ContainerProtos.ChecksumData checksumData =
+        chunkInfos.get(0).getChecksumData();
+    setChecksumType(checksumData.getType());
+    int bytesPerChecksum = checksumData.getBytesPerChecksum();
+    setBytesPerCRC(bytesPerChecksum);
+
+    AbstractBlockChecksumComputer blockChecksumComputer = getBlockChecksumComputer(chunkInfos,
+        keyLocationInfo.getLength());
+    ByteBuffer blockChecksumByteBuffer =
+        getBlockChecksumFromChunkChecksums(blockChecksumComputer);
+    String blockChecksumForDebug =
+        populateBlockChecksumBuf(blockChecksumByteBuffer);
+
+    LOG.debug("Got reply from {} {} for block {}: blockChecksum={}, " +
+            "blockChecksumType={}",
+        keyInfo.getReplicationConfig().getReplicationType() == HddsProtos.ReplicationType.EC
+            ? "EC pipeline" : "pipeline",
+        keyLocationInfo.getPipeline(), keyLocationInfo.getBlockID(),
+        blockChecksumForDebug, checksumData.getType());
+
+    return true;
+  }
+
   /**
    * Request the blocks created in the most recent version from Ozone Manager.
    *
@@ -220,14 +337,6 @@ public abstract class BaseFileChecksumHelper {
   }
 
   /**
-   * Compute block checksums block by block and append the raw bytes of the
-   * block checksums into getBlockChecksumBuf().
-   *
-   * @throws IOException
-   */
-  protected abstract void checksumBlocks() throws IOException;
-
-  /**
    * Make final file checksum result given the per-block or per-block-group
    * checksums collected into getBlockChecksumBuf().
    */
@@ -275,7 +384,7 @@ public abstract class BaseFileChecksumHelper {
 
   FileChecksum makeCompositeCrcResult() throws IOException {
     long blockSizeHint = 0;
-    if (keyLocationInfos.size() > 0) {
+    if (!keyLocationInfos.isEmpty()) {
       blockSizeHint = keyLocationInfos.get(0).getLength();
     }
     CrcComposer crcComposer =

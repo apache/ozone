@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,12 +17,12 @@
 
 package org.apache.hadoop.hdds.conf;
 
-import org.apache.ratis.grpc.GrpcConfigKeys;
-
 import static org.apache.hadoop.hdds.conf.ConfigTag.CLIENT;
 import static org.apache.hadoop.hdds.conf.ConfigTag.OZONE;
 import static org.apache.hadoop.hdds.conf.ConfigTag.PERFORMANCE;
 import static org.apache.hadoop.hdds.ratis.RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY;
+
+import org.apache.ratis.grpc.GrpcConfigKeys;
 
 /**
  * Ratis Grpc Config Keys.
@@ -31,24 +30,7 @@ import static org.apache.hadoop.hdds.ratis.RatisHelper.HDDS_DATANODE_RATIS_PREFI
 @ConfigGroup(prefix = HDDS_DATANODE_RATIS_PREFIX_KEY + "."
     + GrpcConfigKeys.PREFIX)
 public class DatanodeRatisGrpcConfig {
-  @Config(key = "message.size.max",
-      defaultValue = "32MB",
-      type = ConfigType.SIZE,
-      tags = {OZONE, CLIENT, PERFORMANCE},
-      description = "Maximum message size allowed to be received by Grpc " +
-          "Channel (Server)."
-  )
-  private int maximumMessageSize = 32 * 1024 * 1024;
-
-  public int getMaximumMessageSize() {
-    return maximumMessageSize;
-  }
-
-  public void setMaximumMessageSize(int maximumMessageSize) {
-    this.maximumMessageSize = maximumMessageSize;
-  }
-
-  @Config(key = "flow.control.window",
+  @Config(key = "hdds.ratis.raft.grpc.flow.control.window",
       defaultValue = "5MB",
       type = ConfigType.SIZE,
       tags =  {OZONE, CLIENT, PERFORMANCE},

@@ -1,21 +1,29 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.ha;
+
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -23,25 +31,13 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.StringJoiner;
-
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.BeforeEach;
-
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.
-    OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.
-    OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT;
-
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests OMFailoverProxyProvider failover behaviour.
@@ -50,7 +46,7 @@ public class TestOMFailoverProxyProvider {
   private static final String OM_SERVICE_ID = "om-service-test1";
   private static final String NODE_ID_BASE_STR = "omNode-";
   private static final String DUMMY_NODE_ADDR = "0.0.0.0:8080";
-  private HadoopRpcOMFailoverProxyProvider provider;
+  private HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> provider;
   private long waitBetweenRetries;
   private int numNodes = 3;
   private OzoneConfiguration config;
@@ -70,7 +66,7 @@ public class TestOMFailoverProxyProvider {
     }
     config.set(ConfUtils.addKeySuffixes(OZONE_OM_NODES_KEY, OM_SERVICE_ID),
         allNodeIds.toString());
-    provider = new HadoopRpcOMFailoverProxyProvider(config,
+    provider = new HadoopRpcOMFailoverProxyProvider<>(config,
         UserGroupInformation.getCurrentUser(), OM_SERVICE_ID,
         OzoneManagerProtocolPB.class);
   }
@@ -123,7 +119,7 @@ public class TestOMFailoverProxyProvider {
     Collection<String> allNodeIds = config.getTrimmedStringCollection(ConfUtils.
         addKeySuffixes(OZONE_OM_NODES_KEY, OM_SERVICE_ID));
     allNodeIds.remove(provider.getCurrentProxyOMNodeId());
-    assertTrue(allNodeIds.size() > 0,
+    assertTrue(!allNodeIds.isEmpty(),
         "This test needs at least 2 OMs");
     provider.setNextOmProxy(allNodeIds.iterator().next());
     assertEquals(0, provider.getWaitTime());
@@ -143,6 +139,38 @@ public class TestOMFailoverProxyProvider {
     // Next node failover should reset wait time.
     failoverToNextNode(numNodes - 1, 0);
     failoverToNextNode(1, waitBetweenRetries);
+  }
+
+  /**
+   * Ensure listener nodes are excluded from provider's proxy list.
+   */
+  @Test
+  public void testExcludesListenerNodes() throws Exception {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    StringJoiner allNodeIds = new StringJoiner(",");
+    for (int i = 1; i <= numNodes; i++) {
+      String nodeId = NODE_ID_BASE_STR + i;
+      conf.set(ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY, OM_SERVICE_ID,
+          nodeId), DUMMY_NODE_ADDR);
+      allNodeIds.add(nodeId);
+    }
+    conf.set(ConfUtils.addKeySuffixes(OZONE_OM_NODES_KEY, OM_SERVICE_ID),
+        allNodeIds.toString());
+    // Mark one of the nodes as listener (omNode-2)
+    String listenerNode = NODE_ID_BASE_STR + 2;
+    conf.set(ConfUtils.addKeySuffixes(
+        org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_LISTENER_NODES_KEY,
+        OM_SERVICE_ID), listenerNode);
+
+    try (HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> providerWithListeners =
+             new HadoopRpcOMFailoverProxyProvider<>(conf,
+                 UserGroupInformation.getCurrentUser(), OM_SERVICE_ID,
+                 OzoneManagerProtocolPB.class)) {
+      // Verify listener node is not included in proxy map
+      assertTrue(providerWithListeners.getOMProxyMap().containsKey(NODE_ID_BASE_STR + 1));
+      assertTrue(providerWithListeners.getOMProxyMap().containsKey(NODE_ID_BASE_STR + 3));
+      assertFalse(providerWithListeners.getOMProxyMap().containsKey(listenerNode));
+    }
   }
 
   /**
@@ -189,17 +217,17 @@ public class TestOMFailoverProxyProvider {
     }
     ozoneConf.set(ConfUtils.addKeySuffixes(OZONE_OM_NODES_KEY, OM_SERVICE_ID),
         allNodeIds.toString());
-    HadoopRpcOMFailoverProxyProvider prov =
-        new HadoopRpcOMFailoverProxyProvider(ozoneConf,
-            UserGroupInformation.getCurrentUser(),
-            OM_SERVICE_ID,
-            OzoneManagerProtocolPB.class);
+    try (HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> prov =
+             new HadoopRpcOMFailoverProxyProvider<>(ozoneConf,
+                 UserGroupInformation.getCurrentUser(),
+                 OM_SERVICE_ID,
+                 OzoneManagerProtocolPB.class)) {
+      Text dtService = prov.getCurrentProxyDelegationToken();
 
-    Text dtService = prov.getCurrentProxyDelegationToken();
-
-    Collections.sort(nodeAddrs);
-    String expectedDtService = String.join(",", nodeAddrs);
-    assertEquals(expectedDtService, dtService.toString());
+      Collections.sort(nodeAddrs);
+      String expectedDtService = String.join(",", nodeAddrs);
+      assertEquals(expectedDtService, dtService.toString());
+    }
   }
 
 }

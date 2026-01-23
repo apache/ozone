@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,7 +19,6 @@ package org.apache.hadoop.ozone.om.upgrade;
 
 import java.util.EnumMap;
 import java.util.Optional;
-
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 
@@ -40,11 +38,15 @@ public enum OMLayoutFeature implements LayoutFeature {
 
   MULTITENANCY_SCHEMA(3, "Multi-Tenancy Schema"),
 
+  @Deprecated
   HSYNC(4, "Support hsync"),
 
   FILESYSTEM_SNAPSHOT(5, "Ozone version supporting snapshot"),
 
-  QUOTA(6, "Ozone quota re-calculate");
+  QUOTA(6, "Ozone quota re-calculate"),
+  HBASE_SUPPORT(7, "Full support of hsync, lease recovery and listOpenFiles APIs for HBase"),
+  DELEGATION_TOKEN_SYMMETRIC_SIGN(8, "Delegation token signed by symmetric key"),
+  SNAPSHOT_DEFRAG(9, "Supporting defragmentation of snapshot");
 
   ///////////////////////////////  /////////////////////////////
   //    Example OM Layout Feature with Actions
@@ -88,6 +90,7 @@ public enum OMLayoutFeature implements LayoutFeature {
     this.actions.put(type, action);
   }
 
+  @Override
   public Optional<OmUpgradeAction> action(UpgradeActionType phase) {
     return Optional.ofNullable(actions.get(phase));
   }

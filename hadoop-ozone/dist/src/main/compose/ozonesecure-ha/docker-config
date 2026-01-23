@@ -30,14 +30,13 @@ OZONE-SITE.XML_ozone.om.address.omservice.om3=om3
 OZONE-SITE.XML_ozone.om.http-address.omservice.om1=om1
 OZONE-SITE.XML_ozone.om.http-address.omservice.om2=om2
 OZONE-SITE.XML_ozone.om.http-address.omservice.om3=om3
-OZONE-SITE.XML_ozone.om.ratis.enable=true
 
 OZONE-SITE.XML_ozone.scm.service.ids=scmservice
+OZONE-SITE.XML_ozone.scm.primordial.node.id=scm1
 OZONE-SITE.XML_ozone.scm.nodes.scmservice=scm1,scm2,scm3
 OZONE-SITE.XML_ozone.scm.address.scmservice.scm1=scm1.org
 OZONE-SITE.XML_ozone.scm.address.scmservice.scm2=scm2.org
 OZONE-SITE.XML_ozone.scm.address.scmservice.scm3=scm3.org
-OZONE-SITE.XML_ozone.scm.ratis.enable=true
 OZONE-SITE.XML_ozone.scm.close.container.wait.duration=5s
 
 OZONE-SITE.XML_ozone.om.volume.listall.allowed=false
@@ -46,8 +45,11 @@ OZONE-SITE.XML_ozone.scm.container.size=1GB
 OZONE-SITE.XML_ozone.scm.datanode.ratis.volume.free-space.min=10MB
 OZONE-SITE.XML_ozone.scm.pipeline.creation.interval=30s
 OZONE-SITE.XML_ozone.scm.pipeline.owner.container.count=1
-OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data
+OZONE-SITE.XML_ozone.scm.ec.pipeline.minimum=1
+OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data/metadata
 OZONE-SITE.XML_ozone.scm.block.client.address=scm
+OZONE-SITE.XML_ozone.scm.stale.node.interval=30s
+OZONE-SITE.XML_hdds.heartbeat.interval=5s
 OZONE-SITE.XML_ozone.metadata.dirs=/data/metadata
 OZONE-SITE.XML_ozone.handler.type=distributed
 OZONE-SITE.XML_ozone.scm.client.address=scm
@@ -67,11 +69,12 @@ OZONE-SITE.XML_ozone.recon.address=recon:9891
 OZONE-SITE.XML_ozone.security.enabled=true
 OZONE-SITE.XML_ozone.acl.enabled=true
 OZONE-SITE.XML_ozone.acl.authorizer.class=org.apache.hadoop.ozone.security.acl.OzoneNativeAuthorizer
-OZONE-SITE.XML_ozone.administrators="testuser,recon,om"
+OZONE-SITE.XML_ozone.administrators="testuser,recon,om,hdfs"
 OZONE-SITE.XML_ozone.s3.administrators="testuser,s3g"
 
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 OZONE-SITE.XML_hdds.datanode.volume.min.free.space=100MB
+OZONE-SITE.XML_hdds.datanode.volume.min.free.space.percent=0
 HDFS-SITE.XML_dfs.datanode.address=0.0.0.0:1019
 HDFS-SITE.XML_dfs.datanode.http.address=0.0.0.0:1012
 CORE-SITE.XML_dfs.data.transfer.protection=authentication
@@ -93,11 +96,8 @@ OZONE-SITE.XML_ozone.s3g.kerberos.principal=s3g/s3g@EXAMPLE.COM
 OZONE-SITE.XML_ozone.httpfs.kerberos.keytab.file=/etc/security/keytabs/httpfs.keytab
 OZONE-SITE.XML_ozone.httpfs.kerberos.principal=httpfs/httpfs@EXAMPLE.COM
 
-HDFS-SITE.XML_dfs.datanode.kerberos.principal=dn/dn@EXAMPLE.COM
-HDFS-SITE.XML_dfs.datanode.kerberos.keytab.file=/etc/security/keytabs/dn.keytab
-HDFS-SITE.XML_dfs.web.authentication.kerberos.principal=HTTP/ozone@EXAMPLE.COM
-HDFS-SITE.XML_dfs.web.authentication.kerberos.keytab=/etc/security/keytabs/HTTP.keytab
-
+OZONE-SITE.XML_hdds.datanode.kerberos.principal=dn/dn@EXAMPLE.COM
+OZONE-SITE.XML_hdds.datanode.kerberos.keytab.file=/etc/security/keytabs/dn.keytab
 
 OZONE-SITE.XML_ozone.security.http.kerberos.enabled=true
 OZONE-SITE.XML_ozone.s3g.secret.http.enabled=true
@@ -124,6 +124,7 @@ OZONE-SITE.XML_ozone.httpfs.http.auth.kerberos.principal=HTTP/httpfs@EXAMPLE.COM
 OZONE-SITE.XML_ozone.recon.http.auth.kerberos.principal=HTTP/recon@EXAMPLE.COM
 OZONE-SITE.XML_ozone.recon.http.auth.kerberos.keytab=/etc/security/keytabs/recon.keytab
 OZONE-SITE.XML_ozone.recon.http.auth.kerberos.keytab=/etc/security/keytabs/recon.keytab
+OZONE-SITE.XML_ozone.http.basedir=/tmp/ozone_http
 
 CORE-SITE.XML_hadoop.http.authentication.simple.anonymous.allowed=false
 CORE-SITE.XML_hadoop.http.authentication.signature.secret.file=/etc/security/http_secret
@@ -155,6 +156,7 @@ KMS-SITE.XML_hadoop.kms.proxyuser.s3g.hosts=*
 
 #Enable this variable to print out all hadoop rpc traffic to the stdout. See http://byteman.jboss.org/ to define your own instrumentation.
 #BYTEMAN_SCRIPT_URL=https://raw.githubusercontent.com/apache/hadoop/trunk/dev-support/byteman/hadooprpc.btm
+BYTEMAN_PORT=9091
 
 OZONE_DATANODE_SECURE_USER=root
 JSVC_HOME=/usr/bin
@@ -164,6 +166,8 @@ OZONE_LOG_DIR=/var/log/hadoop
 
 no_proxy=om,scm,recon,s3g,kdc,localhost,127.0.0.1
 
+OM_SERVICE_ID=omservice
+
 # Explicitly enable filesystem snapshot feature for this Docker compose cluster
 OZONE-SITE.XML_ozone.filesystem.snapshot.enabled=true
 
@@ -171,3 +175,6 @@ OZONE-SITE.XML_ozone.filesystem.snapshot.enabled=true
 OZONE-SITE.XML_hdds.secret.key.rotate.duration=5m
 OZONE-SITE.XML_hdds.secret.key.rotate.check.duration=1m
 OZONE-SITE.XML_hdds.secret.key.expiry.duration=1h
+OZONE-SITE.XML_ozone.manager.delegation.token.max-lifetime=30m
+OZONE-SITE.XML_ozone.manager.delegation.token.renew-interval=5m
+OZONE-SITE.XML_ozone.manager.delegation.remover.scan.interval=1m

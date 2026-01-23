@@ -1,39 +1,32 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.ozone.rocksdiff;
 
-import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReader;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedSstFileReaderIterator;
-import org.rocksdb.TableProperties;
-import org.rocksdb.RocksDBException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.apache.hadoop.hdds.StringUtils.getFirstNChars;
 
-import java.io.IOException;
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
+import org.apache.ozone.rocksdb.util.SstFileInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Helper methods for snap-diff operations.
@@ -49,68 +42,74 @@ public final class RocksDiffUtils {
   public static boolean isKeyWithPrefixPresent(String prefixForColumnFamily,
                                                String firstDbKey,
                                                String lastDbKey) {
-    String firstKeyPrefix = constructBucketKey(firstDbKey);
-    String endKeyPrefix = constructBucketKey(lastDbKey);
+    String firstKeyPrefix = getFirstNChars(firstDbKey, prefixForColumnFamily.length());
+    String endKeyPrefix = getFirstNChars(lastDbKey, prefixForColumnFamily.length());
     return firstKeyPrefix.compareTo(prefixForColumnFamily) <= 0
         && prefixForColumnFamily.compareTo(endKeyPrefix) <= 0;
   }
 
-  public static String constructBucketKey(String keyName) {
-    if (!keyName.startsWith(OM_KEY_PREFIX)) {
-      keyName = OM_KEY_PREFIX.concat(keyName);
-    }
-    String[] elements = keyName.split(OM_KEY_PREFIX);
-    String volume = elements[1];
-    String bucket = elements[2];
-    StringBuilder builder =
-        new StringBuilder().append(OM_KEY_PREFIX).append(volume);
-
-    if (StringUtils.isNotBlank(bucket)) {
-      builder.append(OM_KEY_PREFIX).append(bucket);
-    }
-    builder.append(OM_KEY_PREFIX);
-    return builder.toString();
-  }
-
-  public static void filterRelevantSstFiles(Set<String> inputFiles,
-      Map<String, String> tableToPrefixMap) throws IOException {
-    for (Iterator<String> fileIterator =
-         inputFiles.iterator(); fileIterator.hasNext();) {
-      String filepath = fileIterator.next();
-      if (!RocksDiffUtils.doesSstFileContainKeyRange(filepath,
-          tableToPrefixMap)) {
+  /**
+   * Filter sst files based on prefixes. The map of sst files to be filtered would be mutated.
+   * @param <T> Type of the key in the map.
+   * @param filesMapToBeFiltered Map of sst files to be filtered.
+   * @param tablesToLookup Set of column families to be included in the diff.
+   * @param tablePrefixInfo TablePrefixInfo to filter irrelevant SST files.
+   */
+  public static <T> Map<T, SstFileInfo> filterRelevantSstFiles(Map<T, SstFileInfo> filesMapToBeFiltered,
+      Set<String> tablesToLookup, TablePrefixInfo tablePrefixInfo) {
+    for (Iterator<Map.Entry<T, SstFileInfo>> fileIterator = filesMapToBeFiltered.entrySet().iterator();
+         fileIterator.hasNext();) {
+      SstFileInfo sstFileInfo = fileIterator.next().getValue();
+      if (shouldSkipNode(sstFileInfo, tablePrefixInfo, tablesToLookup)) {
         fileIterator.remove();
       }
     }
+    return filesMapToBeFiltered;
   }
 
-  public static boolean doesSstFileContainKeyRange(String filepath,
-      Map<String, String> tableToPrefixMap) throws IOException {
-
-    try (
-        ManagedOptions options = new ManagedOptions();
-        ManagedSstFileReader sstFileReader = new ManagedSstFileReader(options)) {
-      sstFileReader.open(filepath);
-      TableProperties properties = sstFileReader.getTableProperties();
-      String tableName = new String(properties.getColumnFamilyName(), UTF_8);
-      if (tableToPrefixMap.containsKey(tableName)) {
-        String prefix = tableToPrefixMap.get(tableName);
-
-        try (
-            ManagedReadOptions readOptions = new ManagedReadOptions();
-            ManagedSstFileReaderIterator iterator = ManagedSstFileReaderIterator.managed(
-                sstFileReader.newIterator(readOptions))) {
-          iterator.get().seek(prefix.getBytes(UTF_8));
-          String seekResultKey = new String(iterator.get().key(), UTF_8);
-          return seekResultKey.startsWith(prefix);
-        }
+  /**
+   * Filter sst files based on prefixes. The set of sst files to be filtered would be mutated.
+   * @param filesToBeFiltered sst files to be filtered.
+   * @param tablesToLookup Set of column families to be included in the diff.
+   * @param tablePrefixInfo TablePrefixInfo to filter irrelevant SST files.
+   */
+  public static Set<SstFileInfo> filterRelevantSstFiles(Set<SstFileInfo> filesToBeFiltered,
+      Set<String> tablesToLookup, TablePrefixInfo tablePrefixInfo) {
+    for (Iterator<SstFileInfo> fileIterator = filesToBeFiltered.iterator(); fileIterator.hasNext();) {
+      SstFileInfo sstFileInfo = fileIterator.next();
+      if (shouldSkipNode(sstFileInfo, tablePrefixInfo, tablesToLookup)) {
+        fileIterator.remove();
       }
-      return false;
-    } catch (RocksDBException e) {
-      LOG.error("Failed to read SST File ", e);
-      throw new IOException(e);
     }
+    return filesToBeFiltered;
   }
 
+  @VisibleForTesting
+  static boolean shouldSkipNode(SstFileInfo node, TablePrefixInfo tablePrefixInfo, Set<String> columnFamiliesToLookup) {
+    // This is for backward compatibility. Before the compaction log table
+    // migration, startKey, endKey and columnFamily information is not persisted
+    // in compaction log files.
+    // Also for the scenario when there is an exception in reading SST files
+    // for the file node.
+    if (node.getStartKey() == null || node.getEndKey() == null || node.getColumnFamily() == null) {
+      LOG.debug("Compaction node with fileName: {} doesn't have startKey, " +
+          "endKey and columnFamily details.", node.getFileName());
+      return false;
+    }
 
+    if (tablePrefixInfo.size() == 0) {
+      LOG.debug("Provided tablePrefixInfo is null or empty.");
+      return false;
+    }
+
+    if (!columnFamiliesToLookup.contains(node.getColumnFamily())) {
+      LOG.debug("SstFile node: {} is for columnFamily: {} while filter map " +
+              "contains columnFamilies: {}.", node.getFileName(),
+          node.getColumnFamily(), tablePrefixInfo);
+      return true;
+    }
+
+    String keyPrefix = tablePrefixInfo.getTablePrefix(node.getColumnFamily());
+    return !isKeyWithPrefixPresent(keyPrefix, node.getStartKey(), node.getEndKey());
+  }
 }

@@ -1,59 +1,28 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.ec.reconstruction;
+
+import static org.apache.hadoop.ozone.container.common.helpers.TokenHelper.encode;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.client.ECReplicationConfig;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
-import org.apache.hadoop.hdds.scm.OzoneClientConfig;
-import org.apache.hadoop.hdds.scm.StreamBufferArgs;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
-import org.apache.hadoop.hdds.scm.storage.BufferPool;
-import org.apache.hadoop.hdds.scm.storage.ECBlockOutputStream;
-import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
-import org.apache.hadoop.hdds.security.token.ContainerTokenIdentifier;
-import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
-import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.io.ByteBufferPool;
-import org.apache.hadoop.io.ElasticByteBufferPool;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.client.io.BlockInputStreamFactory;
-import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
-import org.apache.hadoop.ozone.client.io.ECBlockInputStreamProxy;
-import org.apache.hadoop.ozone.client.io.ECBlockReconstructedStripeInputStream;
-import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-import org.apache.hadoop.security.token.Token;
-import org.apache.ratis.util.MemoizedSupplier;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -75,8 +44,38 @@ import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-
-import static org.apache.hadoop.ozone.container.ec.reconstruction.TokenHelper.encode;
+import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
+import org.apache.hadoop.hdds.scm.OzoneClientConfig;
+import org.apache.hadoop.hdds.scm.StreamBufferArgs;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
+import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
+import org.apache.hadoop.hdds.scm.storage.BufferPool;
+import org.apache.hadoop.hdds.scm.storage.ECBlockOutputStream;
+import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
+import org.apache.hadoop.hdds.security.token.ContainerTokenIdentifier;
+import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.io.ByteBufferPool;
+import org.apache.hadoop.io.ElasticByteBufferPool;
+import org.apache.hadoop.ozone.client.io.BlockInputStreamFactory;
+import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
+import org.apache.hadoop.ozone.client.io.ECBlockInputStreamProxy;
+import org.apache.hadoop.ozone.client.io.ECBlockReconstructedStripeInputStream;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.TokenHelper;
+import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.security.token.Token;
+import org.apache.ratis.util.MemoizedSupplier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The Coordinator implements the main flow of reconstructing
@@ -291,7 +290,7 @@ public class ECReconstructionCoordinator implements Closeable {
           emptyBlockStreams[i] = getECBlockOutputStream(blockLocationInfo, datanodeDetails, repConfig, replicaIndex);
         }
 
-        if (toReconstructIndexes.size() > 0) {
+        if (!toReconstructIndexes.isEmpty()) {
           sis.setRecoveryIndexes(toReconstructIndexes.stream().map(i -> (i - 1))
               .collect(Collectors.toSet()));
           long length = safeBlockGroupLength;
@@ -370,12 +369,12 @@ public class ECReconstructionCoordinator implements Closeable {
           .append(" block length: ")
           .append(data.getSize())
           .append(" block group length: ")
-          .append(getBlockDataLength(data))
+          .append(data.getBlockGroupLength())
           .append(" chunk list: \n");
       int cnt = 0;
       for (ContainerProtos.ChunkInfo chunkInfo : data.getChunks()) {
         if (cnt > 0) {
-          sb.append("\n");
+          sb.append('\n');
         }
         sb.append("  chunkNum: ")
             .append(++cnt)
@@ -466,6 +465,7 @@ public class ECReconstructionCoordinator implements Closeable {
     if (ecReconstructWriteExecutor.isInitialized()) {
       ecReconstructWriteExecutor.get().shutdownNow();
     }
+    ecReconstructReadExecutor.shutdownNow();
   }
 
   private Pipeline rebuildInputPipeline(ECReplicationConfig repConfig,
@@ -495,7 +495,7 @@ public class ECReconstructionCoordinator implements Closeable {
 
     SortedMap<Long, BlockData[]> resultMap = new TreeMap<>();
     Token<ContainerTokenIdentifier> containerToken =
-        tokenHelper.getContainerToken(new ContainerID(containerID));
+        tokenHelper.getContainerToken(ContainerID.valueOf(containerID));
 
     Iterator<Map.Entry<Integer, DatanodeDetails>> iterator =
         sourceNodeMap.entrySet().iterator();
@@ -572,22 +572,12 @@ public class ECReconstructionCoordinator implements Closeable {
         continue;
       }
 
-      long putBlockLen = getBlockDataLength(blockGroup[i]);
+      long putBlockLen = blockGroup[i].getBlockGroupLength();
       // Use safe length is the minimum of the lengths recorded across the
       // stripe
       blockGroupLen = Math.min(putBlockLen, blockGroupLen);
     }
     return blockGroupLen == Long.MAX_VALUE ? 0 : blockGroupLen;
-  }
-
-  private long getBlockDataLength(BlockData blockData) {
-    String lenStr = blockData.getMetadata()
-        .get(OzoneConsts.BLOCK_GROUP_LEN_KEY_IN_PUT_BLOCK);
-    // If we don't have the length, then it indicates a problem with the stripe.
-    // All replica should carry the length, so if it is not there, we return 0,
-    // which will cause us to set the length of the block to zero and not
-    // attempt to reconstruct it.
-    return (lenStr == null) ? 0 : Long.parseLong(lenStr);
   }
 
   public ECReconstructionMetrics getECReconstructionMetrics() {

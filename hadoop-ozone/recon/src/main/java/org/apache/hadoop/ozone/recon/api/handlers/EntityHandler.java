@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,26 +14,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.recon.api.handlers;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+
+import java.io.IOException;
+import java.util.Set;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.recon.ReconConstants;
-import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
-import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
-import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
 import org.apache.hadoop.ozone.recon.api.types.EntityType;
+import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.api.types.NamespaceSummaryResponse;
+import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
-
-import java.io.IOException;
-
-import java.util.Set;
-
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 
 /**
  * Class for handling all entity types.
@@ -246,11 +244,8 @@ public abstract class EntityHandler {
     if (nsSummary == null) {
       return 0L;
     }
-    long totalCnt = nsSummary.getNumOfFiles();
-    for (long childId: nsSummary.getChildDir()) {
-      totalCnt += getTotalKeyCount(childId);
-    }
-    return totalCnt;
+    // With materialized optimization: getNumOfFiles now returns total count (including all subdirectories)
+    return nsSummary.getNumOfFiles();
   }
 
   /**
@@ -265,11 +260,8 @@ public abstract class EntityHandler {
     if (nsSummary == null) {
       return 0L;
     }
-    long totalSize = nsSummary.getSizeOfFiles();
-    for (long childId: nsSummary.getChildDir()) {
-      totalSize += getTotalSize(childId);
-    }
-    return totalSize;
+    // With materialized optimization: getSizeOfFiles now returns total size (including all subdirectories)
+    return nsSummary.getSizeOfFiles();
   }
 
   public static String[] parseRequestPath(String path) {

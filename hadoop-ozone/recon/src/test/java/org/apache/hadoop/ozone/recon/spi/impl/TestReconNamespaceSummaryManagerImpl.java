@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,14 +17,12 @@
 
 package org.apache.hadoop.ozone.recon.spi.impl;
 
-import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
-import org.apache.hadoop.ozone.recon.ReconTestInjector;
-import org.apache.hadoop.ozone.recon.api.types.NSSummary;
-import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
+import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -35,13 +32,14 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
-import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
+import org.apache.hadoop.ozone.recon.ReconTestInjector;
+import org.apache.hadoop.ozone.recon.api.types.NSSummary;
+import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Test for NSSummary manager.
@@ -50,14 +48,13 @@ public class TestReconNamespaceSummaryManagerImpl {
   @TempDir()
   private static Path temporaryFolder;
   private static ReconNamespaceSummaryManagerImpl reconNamespaceSummaryManager;
-  private static ReconOMMetadataManager reconOMMetadataManager;
   private static int[] testBucket;
   private static final Set<Long> TEST_CHILD_DIR =
           new HashSet<>(Arrays.asList(new Long[]{1L, 2L, 3L}));
 
   @BeforeAll
   public static void setupOnce() throws Exception {
-    reconOMMetadataManager = getTestReconOmMetadataManager(
+    ReconOMMetadataManager reconOMMetadataManager = getTestReconOmMetadataManager(
         initializeNewOmMetadataManager(Files.createDirectory(
             temporaryFolder.resolve("JunitOmDBDir")).toFile()),
         Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
@@ -114,10 +111,10 @@ public class TestReconNamespaceSummaryManagerImpl {
 
   private void putThreeNSMetadata() throws IOException {
     HashMap<Long, NSSummary> hmap = new HashMap<>();
-    hmap.put(1L, new NSSummary(1, 2, testBucket, TEST_CHILD_DIR, "dir1", -1));
-    hmap.put(2L, new NSSummary(3, 4, testBucket, TEST_CHILD_DIR, "dir2", -1));
-    hmap.put(3L, new NSSummary(5, 6, testBucket, TEST_CHILD_DIR, "dir3", -1));
-    RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
+    hmap.put(1L, new NSSummary(1, 2, 2 * 3, testBucket, TEST_CHILD_DIR, "dir1", -1));
+    hmap.put(2L, new NSSummary(3, 4, 4 * 3, testBucket, TEST_CHILD_DIR, "dir2", -1));
+    hmap.put(3L, new NSSummary(5, 6, 6 * 3, testBucket, TEST_CHILD_DIR, "dir3", -1));
+    RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation();
     for (Map.Entry entry: hmap.entrySet()) {
       reconNamespaceSummaryManager.batchStoreNSSummaries(rdbBatchOperation,
               (long)entry.getKey(), (NSSummary)entry.getValue());

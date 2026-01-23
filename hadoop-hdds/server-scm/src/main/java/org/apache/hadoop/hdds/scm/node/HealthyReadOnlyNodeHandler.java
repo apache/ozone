@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,11 +14,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.node;
 
 import java.io.IOException;
+import java.util.Objects;
 import java.util.Set;
-
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
@@ -30,7 +30,6 @@ import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.google.common.base.Preconditions;
 
 /**
  * Handles non healthy to healthy(ReadOnly) node event.
@@ -89,7 +88,7 @@ public class HealthyReadOnlyNodeHandler
                 "containers.",
             pipelineID, pipeline.getPipelineState(),
             HddsProtos.NodeState.HEALTHY_READONLY,
-            datanodeDetails.getUuidString());
+            datanodeDetails);
         pipelineManager.closePipeline(pipelineID);
       } catch (IOException ex) {
         LOG.error("Failed to close pipeline {} which uses HEALTHY READONLY " +
@@ -103,9 +102,9 @@ public class HealthyReadOnlyNodeHandler
       nt.add(datanodeDetails);
       // make sure after DN is added back into topology, DatanodeDetails
       // instance returned from nodeStateManager has parent correctly set.
-      Preconditions.checkNotNull(
-          nodeManager.getNodeByUuid(datanodeDetails.getUuid())
-              .getParent());
+      Objects.requireNonNull(
+          nodeManager.getNode(datanodeDetails.getID())
+              .getParent(), "Parent == null");
     }
   }
 }

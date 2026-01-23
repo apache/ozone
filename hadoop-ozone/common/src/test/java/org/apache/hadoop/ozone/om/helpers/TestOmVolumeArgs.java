@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,71 +17,90 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import java.util.Collections;
-
-import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.util.Time;
-import org.junit.jupiter.api.Test;
-
+import static java.util.Collections.emptyList;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+
+import com.google.common.collect.ImmutableMap;
+import java.io.IOException;
+import java.util.Collections;
+import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.util.Time;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 /**
  * Class to test {@link OmVolumeArgs}.
  */
 public class TestOmVolumeArgs {
 
+  private static final OzoneAcl USER1_READ = OzoneAcl.of(USER, "user1", ACCESS, READ);
+  private static final OzoneAcl USER1_WRITE = OzoneAcl.of(USER, "user1", ACCESS, WRITE);
+  private static String user;
+
+  @BeforeAll
+  static void setup() throws IOException {
+    user = UserGroupInformation.getCurrentUser().getUserName();
+  }
+
   @Test
-  public void testClone() throws Exception {
-    String volumeName = "vol1";
-    String admin = "admin";
-    String owner = UserGroupInformation.getCurrentUser().getUserName();
-    OmVolumeArgs omVolumeArgs = new OmVolumeArgs.Builder().setVolume(volumeName)
-        .setAdminName(admin).setCreationTime(Time.now()).setOwnerName(owner)
-        .setObjectID(1L).setUpdateID(1L).setQuotaInBytes(Long.MAX_VALUE)
-        .addMetadata("key1", "value1").addMetadata("key2", "value2")
-        .addOzoneAcls(
-            new OzoneAcl(IAccessAuthorizer.ACLIdentityType.USER, "user1",
-                ACCESS, IAccessAuthorizer.ACLType.READ)).build();
+  public void testClone() {
+    OmVolumeArgs subject = createSubject();
+    assertSame(subject, subject.copyObject());
+  }
 
-    OmVolumeArgs cloneVolumeArgs = omVolumeArgs.copyObject();
-
-    assertEquals(omVolumeArgs, cloneVolumeArgs);
-
+  @Test
+  void addAcl() {
+    OmVolumeArgs omVolumeArgs = createSubject();
     // add user acl to write.
-    omVolumeArgs.addAcl(new OzoneAcl(
-        IAccessAuthorizer.ACLIdentityType.USER, "user1",
-        ACCESS, IAccessAuthorizer.ACLType.WRITE));
+    OmVolumeArgs updated = omVolumeArgs.toBuilder()
+        .addAcl(USER1_WRITE)
+        .build();
 
-    // Now check clone acl
-    assertNotEquals(cloneVolumeArgs.getAcls().get(0),
-        omVolumeArgs.getAcls().get(0));
+    assertNotEquals(omVolumeArgs.getAcls().get(0), updated.getAcls().get(0));
+  }
+
+  @Test
+  void setAcls() {
+    OmVolumeArgs omVolumeArgs = createSubject();
 
     // Set user acl to Write_ACL.
-    omVolumeArgs.setAcls(Collections.singletonList(new OzoneAcl(
-        IAccessAuthorizer.ACLIdentityType.USER, "user1",
-        ACCESS, IAccessAuthorizer.ACLType.WRITE_ACL)));
+    OmVolumeArgs updated = omVolumeArgs.toBuilder()
+        .setAcls(Collections.singletonList(USER1_WRITE))
+        .build();
 
-    assertNotEquals(cloneVolumeArgs.getAcls().get(0),
-        omVolumeArgs.getAcls().get(0));
+    assertEquals(USER1_WRITE, updated.getAcls().get(0));
+    assertNotEquals(omVolumeArgs.getAcls().get(0), updated.getAcls().get(0));
+  }
 
-    // Now clone and check. It should have same as original acl.
-    cloneVolumeArgs = (OmVolumeArgs) omVolumeArgs.copyObject();
+  @Test
+  void removeAcl() {
+    OmVolumeArgs subject = createSubject();
 
-    assertEquals(omVolumeArgs, cloneVolumeArgs);
-    assertEquals(cloneVolumeArgs.getAcls().get(0),
-        omVolumeArgs.getAcls().get(0));
+    OmVolumeArgs updated = subject.toBuilder()
+        .removeAcl(USER1_READ)
+        .build();
 
-    omVolumeArgs.removeAcl(new OzoneAcl(
-        IAccessAuthorizer.ACLIdentityType.USER, "user1",
-        ACCESS, IAccessAuthorizer.ACLType.WRITE_ACL));
+    assertEquals(emptyList(), updated.getAcls());
+  }
 
-    // Removing acl, in original omVolumeArgs it should have no acls.
-    assertEquals(0, omVolumeArgs.getAcls().size());
-    assertEquals(1, cloneVolumeArgs.getAcls().size());
-
+  private static OmVolumeArgs createSubject() {
+    return new OmVolumeArgs.Builder()
+        .setVolume("vol1")
+        .setAdminName("admin")
+        .setCreationTime(Time.now())
+        .setOwnerName(user)
+        .setObjectID(1L)
+        .setUpdateID(1L)
+        .setQuotaInBytes(Long.MAX_VALUE)
+        .addAllMetadata(ImmutableMap.of("key1", "value1", "key2", "value2"))
+        .addAcl(USER1_READ)
+        .build();
   }
 }

@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,7 +13,6 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
 package org.apache.hadoop.ozone.om.response.s3.multipart;
@@ -23,41 +21,38 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
-
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadAbortResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
+import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
-
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .KeyInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .MultipartUploadAbortResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .PartKeyInfo;
-import org.apache.hadoop.util.Time;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.hdds.utils.db.BatchOperation;
 
 /**
  * Base test class for S3 MPU response.
@@ -87,8 +82,6 @@ public class TestS3MultipartResponse {
       batchOperation.close();
     }
   }
-
-
 
   public S3InitiateMultipartUploadResponse createS3InitiateMPUResponse(
       String volumeName, String bucketName, String keyName,
@@ -208,7 +201,6 @@ public class TestS3MultipartResponse {
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
             .setKeyName(fileName)
-            .setFileName(fileName)
             .setCreationTime(Time.now())
             .setModificationTime(Time.now())
             .setReplicationConfig(RatisReplicationConfig.getInstance(
@@ -264,7 +256,6 @@ public class TestS3MultipartResponse {
     String multipartKey = omMetadataManager
         .getMultipartKey(volumeName, bucketName, keyName, multipartUploadID);
 
-    boolean isRatisEnabled = true;
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
     OmBucketInfo omBucketInfo =
             omMetadataManager.getBucketTable().get(bucketKey);
@@ -273,7 +264,6 @@ public class TestS3MultipartResponse {
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
             .setKeyName(fileName)
-            .setFileName(fileName)
             .setCreationTime(Time.now())
             .setModificationTime(Time.now())
             .setReplicationConfig(RatisReplicationConfig.getInstance(
@@ -289,9 +279,19 @@ public class TestS3MultipartResponse {
                     OzoneManagerProtocolProtos.MultipartCommitUploadPartResponse
                             .newBuilder().setETag(volumeName).setPartName(volumeName)).build();
 
+    Map<String, RepeatedOmKeyInfo> keyToDeleteMap = new HashMap<>();
+    if (oldPartKeyInfo != null) {
+      OmKeyInfo partKeyToBeDeleted =
+          OmKeyInfo.getFromProtobuf(oldPartKeyInfo.getPartKeyInfo());
+      String delKeyName = omMetadataManager.getOzoneDeletePathKey(
+          partKeyToBeDeleted.getObjectID(), multipartKey);
+
+      keyToDeleteMap.put(delKeyName, new RepeatedOmKeyInfo(partKeyToBeDeleted, omBucketInfo.getObjectID()));
+    }
+
     return new S3MultipartUploadCommitPartResponseWithFSO(omResponse,
-        multipartKey, openKey, multipartKeyInfo, oldPartKeyInfo,
-        openPartKeyInfoToBeDeleted, isRatisEnabled, omBucketInfo,
+        multipartKey, openKey, multipartKeyInfo, keyToDeleteMap,
+        openPartKeyInfoToBeDeleted, omBucketInfo, omBucketInfo.getObjectID(),
         getBucketLayout());
   }
 
@@ -342,7 +342,7 @@ public class TestS3MultipartResponse {
       OmMultipartKeyInfo omMultipartKeyInfo, OmBucketInfo omBucketInfo,
       OMResponse omResponse) {
     return new S3MultipartUploadAbortResponse(omResponse, multipartKey,
-        multipartOpenKey, omMultipartKeyInfo, true, omBucketInfo,
+        multipartOpenKey, omMultipartKeyInfo, omBucketInfo,
         getBucketLayout());
   }
 

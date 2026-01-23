@@ -1,31 +1,23 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.container.keyvalue.impl;
 
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
-import org.apache.hadoop.ozone.container.common.impl.ContainerData;
-import org.apache.hadoop.util.Time;
-import org.apache.ratis.statemachine.StateMachine;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -34,8 +26,15 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.util.Time;
+import org.apache.ratis.statemachine.StateMachine;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * For write state machine data.
@@ -95,11 +94,17 @@ abstract class StreamDataChannelBase
     return getChannel().isOpen();
   }
 
+  protected void assertSpaceAvailability(int requested) throws StorageContainerException {
+    ContainerUtils.assertSpaceAvailability(containerData.getContainerID(), containerData.getVolume(), requested);
+  }
+
   public void setLinked() {
     linked.set(true);
   }
 
-  /** @return true iff {@link StateMachine.DataChannel} is already linked. */
+  /**
+   * @return true if {@link org.apache.ratis.statemachine.StateMachine.DataChannel} is already linked.
+   */
   public boolean cleanUp() {
     if (linked.get()) {
       // already linked, nothing to do.
@@ -130,11 +135,11 @@ abstract class StreamDataChannelBase
 
   final int writeFileChannel(ByteBuffer src) throws IOException {
     try {
-      final long startTime = Time.monotonicNow();
+      final long startTime = Time.monotonicNowNanos();
       final int writeBytes = getChannel().write(src);
       metrics.incContainerBytesStats(getType(), writeBytes);
       containerData.updateWriteStats(writeBytes, false);
-      metrics.incContainerOpsLatencies(getType(), Time.monotonicNow() - startTime);
+      metrics.incContainerOpsLatencies(getType(), Time.monotonicNowNanos() - startTime);
       return writeBytes;
     } catch (IOException e) {
       checkVolume();

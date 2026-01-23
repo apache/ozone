@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,21 +23,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
  * The replication factor to be used while writing key into ozone.
  */
 public enum ReplicationFactor {
-  ONE(1),
-  THREE(3);
-
-  /**
-   * Integer representation of replication.
-   */
-  private int value;
-
-  /**
-   * Initializes ReplicationFactor with value.
-   * @param value replication value
-   */
-  ReplicationFactor(int value) {
-    this.value = value;
-  }
+  ONE,
+  THREE;
 
   /**
    * Returns enum value corresponding to the int value.
@@ -86,16 +72,19 @@ public enum ReplicationFactor {
     case THREE:
       return HddsProtos.ReplicationFactor.THREE;
     default:
-      throw new IllegalArgumentException(
-          "Unsupported ProtoBuf replication factor: " + this);
+      throw new IllegalStateException("Unexpected enum value: " + this);
     }
   }
 
-  /**
-   * Returns integer representation of ReplicationFactor.
-   * @return replication value
-   */
+  /** @return the number of replication(s). */
   public int getValue() {
-    return value;
+    switch (this) {
+    case ONE:
+      return 1;
+    case THREE:
+      return 3;
+    default:
+      throw new IllegalStateException("Unexpected enum value: " + this);
+    }
   }
 }

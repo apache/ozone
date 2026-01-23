@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,8 +13,8 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
+
 package org.apache.hadoop.hdds.utils.db.managed;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -37,12 +36,6 @@ public class ManagedRocksObjectMetrics {
 
   private static final String SOURCE_NAME =
       ManagedRocksObjectMetrics.class.getSimpleName();
-
-  private static ManagedRocksObjectMetrics create() {
-    return DefaultMetricsSystem.instance().register(SOURCE_NAME,
-        "OzoneManager DoubleBuffer Metrics",
-        new ManagedRocksObjectMetrics());
-  }
 
   @Metric(about = "Total number of managed RocksObjects that are not " +
       "closed before being GCed.")
@@ -74,5 +67,11 @@ public class ManagedRocksObjectMetrics {
   @VisibleForTesting
   long totalManagedObjects() {
     return totalManagedObjects.value();
+  }
+
+  private static ManagedRocksObjectMetrics create() {
+    return DefaultMetricsSystem.instance().register(SOURCE_NAME,
+        "OzoneManager DoubleBuffer Metrics",
+        new ManagedRocksObjectMetrics());
   }
 }

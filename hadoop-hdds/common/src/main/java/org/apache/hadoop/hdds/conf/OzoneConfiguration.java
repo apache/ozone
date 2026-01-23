@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,14 +17,11 @@
 
 package org.apache.hadoop.hdds.conf;
 
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.JAXBException;
-import javax.xml.bind.Unmarshaller;
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlElement;
-import javax.xml.bind.annotation.XmlRootElement;
-import java.io.IOException;
+import static java.util.Collections.unmodifiableSortedSet;
+import static java.util.stream.Collectors.toCollection;
+import static org.apache.hadoop.hdds.ratis.RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKDIR;
+
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -33,35 +29,37 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
-
+import javax.xml.bind.JAXBContext;
+import javax.xml.bind.JAXBException;
+import javax.xml.bind.Unmarshaller;
+import javax.xml.bind.annotation.XmlAccessType;
+import javax.xml.bind.annotation.XmlAccessorType;
+import javax.xml.bind.annotation.XmlElement;
+import javax.xml.bind.annotation.XmlRootElement;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
-
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.ratis.server.RaftServerConfigKeys;
-
-import static java.util.Collections.unmodifiableSortedSet;
-import static java.util.stream.Collectors.toCollection;
-import static org.apache.hadoop.hdds.ratis.RatisHelper.HDDS_DATANODE_RATIS_PREFIX_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CONTAINER_COPY_WORKDIR;
+import org.slf4j.Logger;
 
 /**
  * Configuration for ozone.
  */
 @InterfaceAudience.Private
-public class OzoneConfiguration extends Configuration
-    implements MutableConfigurationSource {
+public class OzoneConfiguration extends Configuration implements MutableConfigurationSource {
 
   public static final SortedSet<String> TAGS = unmodifiableSortedSet(
       Arrays.stream(ConfigTag.values())
@@ -73,6 +71,8 @@ public class OzoneConfiguration extends Configuration
 
     activate();
   }
+
+  private Properties delegatingProps;
 
   public static OzoneConfiguration of(ConfigurationSource source) {
     if (source instanceof LegacyHadoopConfigurationSource) {
@@ -87,7 +87,7 @@ public class OzoneConfiguration extends Configuration
   }
 
   public static OzoneConfiguration of(Configuration conf) {
-    Preconditions.checkNotNull(conf);
+    Objects.requireNonNull(conf, "conf == null");
 
     return conf instanceof OzoneConfiguration
         ? (OzoneConfiguration) conf
@@ -104,42 +104,10 @@ public class OzoneConfiguration extends Configuration
   }
 
   public OzoneConfiguration() {
-    OzoneConfiguration.activate();
-    loadDefaults();
   }
 
   public OzoneConfiguration(Configuration conf) {
     super(conf);
-    //load the configuration from the classloader of the original conf.
-    setClassLoader(conf.getClassLoader());
-    if (!(conf instanceof OzoneConfiguration)) {
-      loadDefaults();
-      addResource(conf);
-    }
-  }
-
-  private void loadDefaults() {
-    try {
-      //there could be multiple ozone-default-generated.xml files on the
-      // classpath, which are generated by the annotation processor.
-      // Here we add all of them to the list of the available configuration.
-      Enumeration<URL> generatedDefaults =
-          OzoneConfiguration.class.getClassLoader().getResources(
-              "ozone-default-generated.xml");
-      while (generatedDefaults.hasMoreElements()) {
-        addResource(generatedDefaults.nextElement());
-      }
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
-    addResource("ozone-default.xml");
-    // Adding core-site here because properties from core-site are
-    // distributed to executors by spark driver. Ozone properties which are
-    // added to core-site, will be overridden by properties from adding Resource
-    // ozone-default.xml. So, adding core-site again will help to resolve
-    // this override issue.
-    addResource("core-site.xml");
-    addResource("ozone-site.xml");
   }
 
   public List<Property> readPropertyFromXml(URL url) throws JAXBException {
@@ -241,10 +209,45 @@ public class OzoneConfiguration extends Configuration
     }
   }
 
+  public static List<String> getConfigurationResourceFiles() {
+    List<String> resourceFiles = new ArrayList<>();
+
+    // even though core-default and core-site are added by the parent Configuration class,
+    // we add it here for them to be a part of the resourceFiles list.
+    // addDefaultResource is idempotent so any duplicate items in this list will be handled accordingly
+    resourceFiles.add("hdfs-default.xml");
+    resourceFiles.add("hdfs-site.xml");
+    resourceFiles.add("core-default.xml");
+    resourceFiles.add("core-site.xml");
+
+    // Modules with @Config annotations.  If new one is introduced, add it to this list.
+    String[] modules = new String[] {
+        "hdds-common",
+        "hdds-client",
+        "hdds-container-service",
+        "hdds-server-framework",
+        "hdds-server-scm",
+        "ozone-common",
+        "ozone-csi",
+        "ozone-manager",
+        "ozone-recon",
+    };
+    for (String module : modules) {
+      resourceFiles.add(module + "-default.xml");
+    }
+
+    // Non-generated configs
+    resourceFiles.add("ozone-default.xml");
+    resourceFiles.add("ozone-site.xml");
+
+    return resourceFiles;
+  }
+
+  /** Add default resources. */
   public static void activate() {
-    // adds the default resources
-    Configuration.addDefaultResource("hdfs-default.xml");
-    Configuration.addDefaultResource("hdfs-site.xml");
+    for (String resourceFile : getConfigurationResourceFiles()) {
+      addDefaultResource(resourceFile);
+    }
   }
 
   /**
@@ -317,7 +320,7 @@ public class OzoneConfiguration extends Configuration
            HDDS_DATANODE_RATIS_PREFIX_KEY + "."
            + RaftServerConfigKeys.PREFIX + "." + "rpc.slowness.timeout"),
         new DeprecationDelta("dfs.datanode.keytab.file",
-            DFSConfigKeysLegacy.DFS_DATANODE_KERBEROS_KEYTAB_FILE_KEY),
+            HddsConfigKeys.HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY),
         new DeprecationDelta("ozone.scm.chunk.layout",
             ScmConfigKeys.OZONE_SCM_CONTAINER_LAYOUT_KEY),
         new DeprecationDelta("hdds.datanode.replication.work.dir",
@@ -360,8 +363,6 @@ public class OzoneConfiguration extends Configuration
             ScmConfigKeys.HDDS_CONTAINER_RATIS_NUM_CONTAINER_OP_EXECUTORS_KEY),
         new DeprecationDelta("dfs.container.ratis.num.write.chunk.threads.per.volume",
             ScmConfigKeys.HDDS_CONTAINER_RATIS_NUM_WRITE_CHUNK_THREADS_PER_VOLUME),
-        new DeprecationDelta("dfs.container.ratis.replication.level",
-            ScmConfigKeys.HDDS_CONTAINER_RATIS_REPLICATION_LEVEL_KEY),
         new DeprecationDelta("dfs.container.ratis.rpc.type",
             ScmConfigKeys.HDDS_CONTAINER_RATIS_RPC_TYPE_KEY),
         new DeprecationDelta("dfs.container.ratis.segment.preallocated.size",
@@ -381,7 +382,37 @@ public class OzoneConfiguration extends Configuration
         new DeprecationDelta("dfs.ratis.server.retry-cache.timeout.duration",
             ScmConfigKeys.HDDS_RATIS_SERVER_RETRY_CACHE_TIMEOUT_DURATION_KEY),
         new DeprecationDelta("dfs.ratis.snapshot.threshold",
-            ScmConfigKeys.HDDS_RATIS_SNAPSHOT_THRESHOLD_KEY)
+            ScmConfigKeys.HDDS_RATIS_SNAPSHOT_THRESHOLD_KEY),
+        new DeprecationDelta("dfs.datanode.dns.interface",
+            HddsConfigKeys.HDDS_DATANODE_DNS_INTERFACE_KEY),
+        new DeprecationDelta("dfs.datanode.dns.nameserver",
+            HddsConfigKeys.HDDS_DATANODE_DNS_NAMESERVER_KEY),
+        new DeprecationDelta("dfs.datanode.hostname",
+            HddsConfigKeys.HDDS_DATANODE_HOST_NAME_KEY),
+        new DeprecationDelta("dfs.datanode.data.dir",
+            ScmConfigKeys.HDDS_DATANODE_DIR_KEY),
+        new DeprecationDelta("dfs.datanode.use.datanode.hostname",
+            HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME),
+        new DeprecationDelta("dfs.xframe.enabled",
+            HddsConfigKeys.HDDS_XFRAME_OPTION_ENABLED),
+        new DeprecationDelta("dfs.xframe.value",
+            HddsConfigKeys.HDDS_XFRAME_OPTION_VALUE),
+        new DeprecationDelta("dfs.metrics.session-id",
+            HddsConfigKeys.HDDS_METRICS_SESSION_ID_KEY),
+        new DeprecationDelta("dfs.client.https.keystore.resource",
+            OzoneConfigKeys.OZONE_CLIENT_HTTPS_KEYSTORE_RESOURCE_KEY),
+        new DeprecationDelta("dfs.https.server.keystore.resource",
+            OzoneConfigKeys.OZONE_SERVER_HTTPS_KEYSTORE_RESOURCE_KEY),
+        new DeprecationDelta("dfs.http.policy",
+            OzoneConfigKeys.OZONE_HTTP_POLICY_KEY),
+        new DeprecationDelta("dfs.datanode.kerberos.principal",
+            HddsConfigKeys.HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY),
+        new DeprecationDelta("dfs.datanode.kerberos.keytab.file",
+            HddsConfigKeys.HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY),
+        new DeprecationDelta("dfs.metrics.percentiles.intervals",
+            HddsConfigKeys.HDDS_METRICS_PERCENTILES_INTERVALS_KEY),
+        new DeprecationDelta("hdds.recon.heartbeat.interval",
+            HddsConfigKeys.HDDS_RECON_HEARTBEAT_INTERVAL),
     });
   }
 
@@ -406,5 +437,81 @@ public class OzoneConfiguration extends Configuration
       return defaultValue;
     }
     return Integer.parseInt(value);
+  }
+
+  @Override
+  public synchronized void reloadConfiguration() {
+    super.reloadConfiguration();
+    delegatingProps = null;
+  }
+
+  @Override
+  protected final synchronized Properties getProps() {
+    if (delegatingProps == null) {
+      String complianceMode = getPropertyUnsafe(OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE,
+          OzoneConfigKeys.OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED);
+      Properties cryptoProperties = getCryptoProperties();
+      delegatingProps = new DelegatingProperties(super.getProps(), complianceMode, cryptoProperties);
+    }
+    return delegatingProps;
+  }
+
+  /**
+   * Get a property value without the compliance check. It's needed to get the compliance
+   * mode from the configuration.
+   *
+   * @param key property name
+   * @param defaultValue default value
+   * @return property value, without compliance check
+   */
+  private String getPropertyUnsafe(String key, String defaultValue) {
+    return super.getProps().getProperty(key, defaultValue);
+  }
+
+  private Properties getCryptoProperties() {
+    try {
+      return super.getAllPropertiesByTag(ConfigTag.CRYPTO_COMPLIANCE.toString());
+    } catch (NoSuchMethodError e) {
+      // We need to handle NoSuchMethodError, because in Hadoop 2 we don't have the
+      // getAllPropertiesByTag method. We won't be supporting the compliance mode with
+      // that version, so we are safe to catch the exception and return a new Properties object.
+      return new Properties();
+    }
+  }
+
+  /**
+   * Get a duration value from the configuration, and default to the given value if it's invalid.
+   * @param logger the logger to use
+   * @param key the key to get the value from
+   * @param defaultValue the default value to use if the key is not set
+   * @param unit the unit of the duration
+   * @return the duration value
+   */
+  public long getOrFixDuration(Logger logger, String key, String defaultValue, TimeUnit unit) {
+    maybeFixInvalidDuration(logger, key, defaultValue, unit);
+    return getTimeDuration(key, defaultValue, unit);
+  }
+
+  private boolean maybeFixInvalidDuration(Logger logger, String key, String defaultValue, TimeUnit unit) {
+    boolean fixed = maybeFixInvalidDuration(key, defaultValue, unit);
+    if (fixed) {
+      logger.warn("{} must be greater than zero, defaulting to {}", key, defaultValue);
+    }
+    return fixed;
+  }
+
+  private boolean maybeFixInvalidDuration(String key, String defaultValue, TimeUnit unit) {
+    long duration = getTimeDuration(key, defaultValue, unit);
+    if (duration <= 0) {
+      set(key, defaultValue);
+      return true;
+    }
+    return false;
+  }
+
+  @Override
+  public Iterator<Map.Entry<String, String>> iterator() {
+    DelegatingProperties properties = (DelegatingProperties) getProps();
+    return properties.iterator();
   }
 }

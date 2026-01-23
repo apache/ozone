@@ -49,3 +49,15 @@ Ozone 的存储容器是一个自包含的超级块，容器中包含一系列�
 SCM 如何获得容器的位置？这一点和现有的 HDFS 十分相似。数据节点会定期发送类似于块报告的容器报告，容器报告比块报告的内容简洁的多，比如，对于一个存储容量为 196 TB 的集群，Ozone 大概会拥有四万个容器，相比于 HDFS 的一百五十万个块，块报告数量缩减为四十分之一。
 
 这种间接管理的方式大大地提高了 Ozone 的扩展性，因为 SCM 需要处理的块数据大大减少，且命名服务（OM）作为一个独特的服务主体对于扩展 Ozone 具有重要意义。
+
+
+## 需要关注的配置项
+
+配置项 |默认值 | <div style="width:300px;">描述</div>
+----|---------|------------
+dfs.container.ratis.datanode.storage.dir | none | 该目录用于存储 Ratis 元数据，如日志。
+ozone.scm.datanode.id.dir | none | 数据节点上用于存储数据节点 ID 的路径。 
+hdds.datanode.dir | none | 此配置决定数据节点上的数据将存储在本地文件系统的哪个位置。
+hdds.datanode.dir.du.reserved | none | 每个卷保留的存储空间（以字节为单位）。始终为非DFS用途保留这么多空闲空间。
+ozone.metadata.dirs | none | 用于存储持久化数据（RocksDB）的目录。
+ozone.recon.address | 0.0.0.0:9891 | Recon的RPC地址。 使用 <host:port> 连接到Recon。

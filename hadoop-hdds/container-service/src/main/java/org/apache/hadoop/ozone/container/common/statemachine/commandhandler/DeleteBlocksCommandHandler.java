@@ -1,64 +1,29 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
+
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
-import org.apache.hadoop.hdds.scm.container.common.helpers
-    .StorageContainerException;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto
-    .DeleteBlockTransactionResult;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.container.common.helpers.BlockData;
-import org.apache.hadoop.ozone.container.common.helpers.BlockDeletingServiceMetrics;
-import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
-import org.apache.hadoop.ozone.container.common.helpers
-    .DeletedContainerBlocksSummary;
-import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
-import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
-import org.apache.hadoop.ozone.container.common.statemachine
-    .SCMConnectionManager;
-import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
-import org.apache.hadoop.ozone.container.metadata.DeleteTransactionStore;
-import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
-import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
-import org.apache.hadoop.ozone.protocol.commands.DeleteBlockCommandStatus;
-import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
-import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.apache.hadoop.util.Daemon;
-import org.apache.hadoop.util.Time;
-import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -73,25 +38,55 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .Result.CONTAINER_NOT_FOUND;
-import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
-import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
-import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerBlocksDeletionACKProto.DeleteBlockTransactionResult;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.metrics2.lib.MetricsRegistry;
+import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.BlockDeletingServiceMetrics;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfoList;
+import org.apache.hadoop.ozone.container.common.helpers.DeletedContainerBlocksSummary;
+import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
+import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.metadata.DeleteTransactionStore;
+import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
+import org.apache.hadoop.ozone.protocol.commands.CommandStatus;
+import org.apache.hadoop.ozone.protocol.commands.DeleteBlockCommandStatus;
+import org.apache.hadoop.ozone.protocol.commands.DeleteBlocksCommand;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.util.Daemon;
+import org.apache.hadoop.util.Time;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Handle block deletion commands.
  */
 public class DeleteBlocksCommandHandler implements CommandHandler {
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(DeleteBlocksCommandHandler.class);
 
   private final ContainerSet containerSet;
   private final ConfigurationSource conf;
   private int invocationCount;
-  private long totalTime;
   private final ThreadPoolExecutor executor;
   private final LinkedBlockingQueue<DeleteCmdInfo> deleteCommandQueues;
   private final Daemon handlerThread;
@@ -99,6 +94,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   private final BlockDeletingServiceMetrics blockDeleteMetrics;
   private final long tryLockTimeoutMs;
   private final Map<String, SchemaHandler> schemaHandlers;
+  private final MutableRate opsLatencyMs;
 
   public DeleteBlocksCommandHandler(OzoneContainer container,
       ConfigurationSource conf, DatanodeConfiguration dnConf,
@@ -121,13 +117,16 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
         dnConf.getBlockDeleteThreads(), threadFactory);
     this.deleteCommandQueues =
         new LinkedBlockingQueue<>(dnConf.getBlockDeleteQueueLimit());
+    MetricsRegistry registry = new MetricsRegistry(
+        DeleteBlocksCommandHandler.class.getSimpleName());
+    this.opsLatencyMs = registry.newRate(SCMCommandProto.Type.deleteBlocksCommand + "Ms");
     long interval = dnConf.getBlockDeleteCommandWorkerInterval().toMillis();
     handlerThread = new Daemon(new DeleteCmdWorker(interval));
     handlerThread.start();
   }
 
   @Override
-  public void handle(SCMCommand command, OzoneContainer container,
+  public void handle(SCMCommand<?> command, OzoneContainer container,
       StateContext context, SCMConnectionManager connectionManager) {
     if (command.getType() != SCMCommandProto.Type.deleteBlocksCommand) {
       LOG.warn("Skipping handling command, expected command "
@@ -168,12 +167,12 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
 
   @Override
   public int getThreadPoolMaxPoolSize() {
-    return ((ThreadPoolExecutor)executor).getMaximumPoolSize();
+    return executor.getMaximumPoolSize();
   }
 
   @Override
   public int getThreadPoolActivePoolSize() {
-    return ((ThreadPoolExecutor)executor).getActiveCount();
+    return executor.getActiveCount();
   }
 
   /**
@@ -192,15 +191,19 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       this.container = container;
       this.connectionManager = connectionManager;
     }
+
     public DeleteBlocksCommand getCmd() {
       return this.cmd;
     }
+
     public StateContext getContext() {
       return this.context;
     }
+
     public OzoneContainer getContainer() {
       return this.container;
     }
+
     public SCMConnectionManager getConnectionManager() {
       return this.connectionManager;
     }
@@ -212,6 +215,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   public static final class DeleteBlockTransactionExecutionResult {
     private final DeleteBlockTransactionResult result;
     private final boolean lockAcquisitionFailed;
+
     public DeleteBlockTransactionExecutionResult(
         DeleteBlockTransactionResult result, boolean lockAcquisitionFailed) {
       this.result = result;
@@ -332,6 +336,10 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
                 "container={}, TXID={}", tx.getContainerID(), tx.getTxID(), e);
         Thread.currentThread().interrupt();
         txResultBuilder.setContainerID(containerId).setSuccess(false);
+      } catch (Exception e) {
+        LOG.error("Unexpected exception while deleting blocks for " +
+                "container={}, TXID={}", tx.getContainerID(), tx.getTxID(), e);
+        txResultBuilder.setContainerID(containerId).setSuccess(false);
       }
       return new DeleteBlockTransactionExecutionResult(
           txResultBuilder.build(), lockAcquisitionFailed);
@@ -343,6 +351,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
     ContainerBlocksDeletionACKProto blockDeletionACK = null;
     long startTime = Time.monotonicNow();
     boolean cmdExecuted = false;
+    int successCount = 0, failedCount = 0;
     try {
       // move blocks to deleting state.
       // this is a metadata update, the actual deletion happens in another
@@ -354,10 +363,11 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       DeletedContainerBlocksSummary summary =
           DeletedContainerBlocksSummary.getFrom(containerBlocks);
       LOG.info("Summary of deleting container blocks, numOfTransactions={}, "
-              + "numOfContainers={}, numOfBlocks={}",
+              + "numOfContainers={}, numOfBlocks={}, commandId={}.",
           summary.getNumOfTxs(),
           summary.getNumOfContainers(),
-          summary.getNumOfBlocks());
+          summary.getNumOfBlocks(),
+          cmd.getCmd().getId());
       if (LOG.isDebugEnabled()) {
         LOG.debug("Start to delete container blocks, TXIDs={}",
             summary.getTxIDSummary());
@@ -373,18 +383,27 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
 
       ContainerBlocksDeletionACKProto.Builder resultBuilder =
           ContainerBlocksDeletionACKProto.newBuilder().addAllResults(results);
-      resultBuilder.setDnId(cmd.getContext().getParent().getDatanodeDetails()
-          .getUuid().toString());
+      resultBuilder.setDnId(cmd.getContext().getParent().getDatanodeDetails().getUuidString());
       blockDeletionACK = resultBuilder.build();
 
       // Send ACK back to SCM as long as meta updated
       // TODO Or we should wait until the blocks are actually deleted?
       if (!containerBlocks.isEmpty()) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Sending following block deletion ACK to SCM");
-          for (DeleteBlockTransactionResult result : blockDeletionACK
-              .getResultsList()) {
-            LOG.debug("{} : {}", result.getTxID(), result.getSuccess());
+
+        for (DeleteBlockTransactionResult result : blockDeletionACK.getResultsList()) {
+          boolean success = result.getSuccess();
+
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("TxId = {} : ContainerId = {} : {}", result.getTxID(),
+                result.getContainerID(), success);
+          }
+
+          if (success) {
+            ++successCount;
+            blockDeleteMetrics.incrProcessedTransactionSuccessCount(1);
+          } else {
+            ++failedCount;
+            blockDeleteMetrics.incrProcessedTransactionFailCount(1);
           }
         }
       }
@@ -403,7 +422,9 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       };
       updateCommandStatus(cmd.getContext(), cmd.getCmd(), statusUpdater, LOG);
       long endTime = Time.monotonicNow();
-      totalTime += endTime - startTime;
+      this.opsLatencyMs.add(endTime - startTime);
+      LOG.info("Sending deletion ACK to SCM, successTransactionCount = {}," +
+          "failedTransactionCount = {}, time elapsed = {}", successCount, failedCount, opsLatencyMs);
       invocationCount++;
     }
   }
@@ -466,8 +487,10 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       try {
         DeleteBlockTransactionExecutionResult result = f.get();
         handler.accept(result);
-      } catch (InterruptedException | ExecutionException e) {
+      } catch (ExecutionException e) {
         LOG.error("task failed.", e);
+      } catch (InterruptedException e) {
+        LOG.error("task interrupted.", e);
         Thread.currentThread().interrupt();
       }
     });
@@ -623,10 +646,20 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
               containerData.getPendingDeleteBlockCountKey(),
               pendingDeleteBlocks);
 
-      // update pending deletion blocks count and delete transaction ID in
-      // in-memory container status
+      // Update pending deletion blocks count, blocks bytes and delete transaction ID in in-memory container status.
+      // Persist pending bytes only if the feature is finalized.
+      if (VersionedDatanodeFeatures.isFinalized(
+          HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION) && delTX.hasTotalBlockSize()) {
+        long pendingBytes = containerData.getBlockPendingDeletionBytes();
+        pendingBytes += delTX.getTotalBlockSize();
+        metadataTable
+            .putWithBatch(batchOperation,
+                containerData.getPendingDeleteBlockBytesKey(),
+                pendingBytes);
+      }
+      containerData.incrPendingDeletionBlocks(newDeletionBlocks,
+          delTX.hasTotalBlockSize() ? delTX.getTotalBlockSize() : 0);
       containerData.updateDeleteTransactionId(delTX.getTxID());
-      containerData.incrPendingDeletionBlocks(newDeletionBlocks);
     }
   }
 
@@ -638,7 +671,7 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
       if (metrics != null) {
         metrics.incOutOfOrderDeleteBlockTransactionCount();
       }
-      LOG.info(String.format("Delete blocks for containerId: %d"
+      LOG.debug(String.format("Delete blocks for containerId: %d"
               + " is received out of order, %d < %d", containerId, delTX.getTxID(),
           containerData.getDeleteTransactionId()));
     } else if (delTX.getTxID() == containerData.getDeleteTransactionId()) {
@@ -666,15 +699,12 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
 
   @Override
   public long getAverageRunTime() {
-    if (invocationCount > 0) {
-      return totalTime / invocationCount;
-    }
-    return 0;
+    return (long) this.opsLatencyMs.lastStat().mean();
   }
 
   @Override
   public long getTotalRunTime() {
-    return totalTime;
+    return (long) this.opsLatencyMs.lastStat().total();
   }
 
   @Override
@@ -734,22 +764,6 @@ public class DeleteBlocksCommandHandler implements CommandHandler {
   }
 
   public void setPoolSize(int size) {
-    if (size <= 0) {
-      throw new IllegalArgumentException("Pool size must be positive.");
-    }
-
-    int currentCorePoolSize = executor.getCorePoolSize();
-
-    // In ThreadPoolExecutor, maximumPoolSize must always be greater than or
-    // equal to the corePoolSize. We must make sure this invariant holds when
-    // changing the pool size. Therefore, we take into account whether the
-    // new size is greater or smaller than the current core pool size.
-    if (size > currentCorePoolSize) {
-      executor.setMaximumPoolSize(size);
-      executor.setCorePoolSize(size);
-    } else {
-      executor.setCorePoolSize(size);
-      executor.setMaximumPoolSize(size);
-    }
+    HddsServerUtil.setPoolSize(executor, size, LOG);
   }
 }

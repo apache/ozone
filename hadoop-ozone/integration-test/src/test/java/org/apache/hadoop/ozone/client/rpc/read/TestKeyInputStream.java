@@ -1,30 +1,37 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.client.rpc.read;
+
+import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.RS;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.ozone.container.TestHelper.countReplicas;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-
 import java.util.List;
-import java.util.Random;
-
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -34,7 +41,6 @@ import org.apache.hadoop.hdds.scm.XceiverClientMetrics;
 import org.apache.hadoop.hdds.scm.storage.BlockExtendedInputStream;
 import org.apache.hadoop.hdds.scm.storage.BlockInputStream;
 import org.apache.hadoop.hdds.scm.storage.ChunkInputStream;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.io.KeyInputStream;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
@@ -46,23 +52,18 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
-
-import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.RS;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
-import static org.apache.hadoop.ozone.container.TestHelper.countReplicas;
-import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
-import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_CHUNK;
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests {@link KeyInputStream}.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class TestKeyInputStream extends TestInputStreamBase {
 
   /**
@@ -96,9 +97,8 @@ class TestKeyInputStream extends TestInputStreamBase {
   private void randomPositionSeek(TestBucket bucket, int dataLength,
       KeyInputStream keyInputStream,
       byte[] inputData, int readSize) throws Exception {
-    Random rand = new Random();
     for (int i = 0; i < 100; i++) {
-      int position = rand.nextInt(dataLength - readSize);
+      int position = RandomUtils.secure().randomInt(0, dataLength - readSize);
       validate(bucket, keyInputStream, inputData, position, readSize);
     }
   }
@@ -112,7 +112,7 @@ class TestKeyInputStream extends TestInputStreamBase {
     keyInputStream.seek(seek);
 
     byte[] readData = new byte[readLength];
-    keyInputStream.read(readData, 0, readLength);
+    IOUtils.readFully(keyInputStream, readData);
 
     bucket.validateData(inputData, (int) seek, readData);
   }
@@ -123,20 +123,18 @@ class TestKeyInputStream extends TestInputStreamBase {
    */
   @ContainerLayoutTestInfo.ContainerTest
   void testNonReplicationReads(ContainerLayoutVersion layout) throws Exception {
-    try (MiniOzoneCluster cluster = newCluster(layout)) {
-      cluster.waitForClusterToBeReady();
+    try (OzoneClient client = getCluster().newClient()) {
+      updateConfig(layout);
 
-      try (OzoneClient client = cluster.newClient()) {
-        TestBucket bucket = TestBucket.newBuilder(client).build();
+      TestBucket bucket = TestBucket.newBuilder(client).build();
 
-        testInputStreams(bucket);
-        testSeekRandomly(bucket);
-        testSeek(bucket);
-        testReadChunkWithByteArray(bucket);
-        testReadChunkWithByteBuffer(bucket);
-        testSkip(bucket);
-        testECSeek(bucket);
-      }
+      testInputStreams(bucket);
+      testSeekRandomly(bucket);
+      testSeek(bucket);
+      testReadChunkWithByteArray(bucket);
+      testReadChunkWithByteBuffer(bucket);
+      testSkip(bucket);
+      testECSeek(bucket);
     }
   }
 
@@ -270,7 +268,7 @@ class TestKeyInputStream extends TestInputStreamBase {
         .getContainerOpCountMetrics(ContainerProtos.Type.ReadChunk));
 
     byte[] readData = new byte[CHUNK_SIZE];
-    keyInputStream.read(readData, 0, CHUNK_SIZE);
+    IOUtils.readFully(keyInputStream, readData);
 
     // Since we read data from index 150 to 250 and the chunk boundary is
     // 100 bytes, we need to read 2 chunks.
@@ -363,7 +361,7 @@ class TestKeyInputStream extends TestInputStreamBase {
         .getContainerOpCountMetrics(ContainerProtos.Type.ReadChunk));
 
     byte[] readData = new byte[CHUNK_SIZE];
-    keyInputStream.read(readData, 0, CHUNK_SIZE);
+    IOUtils.readFully(keyInputStream, readData);
 
     // Since we reading data from index 150 to 250 and the chunk boundary is
     // 100 bytes, we need to read 2 chunks.
@@ -379,32 +377,18 @@ class TestKeyInputStream extends TestInputStreamBase {
     }
   }
 
-  private static List<Arguments> readAfterReplicationArgs() {
-    return Arrays.asList(
-        Arguments.arguments(FILE_PER_BLOCK, false),
-        Arguments.arguments(FILE_PER_BLOCK, true),
-        Arguments.arguments(FILE_PER_CHUNK, false),
-        Arguments.arguments(FILE_PER_CHUNK, true)
-    );
-  }
-
   @ParameterizedTest
-  @MethodSource("readAfterReplicationArgs")
-  void readAfterReplication(ContainerLayoutVersion layout,
-      boolean doUnbuffer) throws Exception {
-    try (MiniOzoneCluster cluster = newCluster(layout)) {
-      cluster.waitForClusterToBeReady();
+  @ValueSource(booleans = {false, true})
+  @Order(Integer.MAX_VALUE) // shuts down datanodes
+  void readAfterReplication(boolean doUnbuffer) throws Exception {
+    try (OzoneClient client = getCluster().newClient()) {
+      TestBucket bucket = TestBucket.newBuilder(client).build();
 
-      try (OzoneClient client = cluster.newClient()) {
-        TestBucket bucket = TestBucket.newBuilder(client).build();
-
-        testReadAfterReplication(cluster, bucket, doUnbuffer);
-      }
+      testReadAfterReplication(bucket, doUnbuffer);
     }
   }
 
-  private void testReadAfterReplication(MiniOzoneCluster cluster,
-      TestBucket bucket, boolean doUnbuffer) throws Exception {
+  private void testReadAfterReplication(TestBucket bucket, boolean doUnbuffer) throws Exception {
     int dataLength = 2 * CHUNK_SIZE;
     String keyName = getNewKeyName();
     byte[] data = bucket.writeRandomBytes(keyName, dataLength);
@@ -415,7 +399,7 @@ class TestKeyInputStream extends TestInputStreamBase {
         .setKeyName(keyName)
         .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
         .build();
-    OmKeyInfo keyInfo = cluster.getOzoneManager()
+    OmKeyInfo keyInfo = getCluster().getOzoneManager()
         .getKeyInfo(keyArgs, false)
         .getKeyInfo();
 
@@ -425,23 +409,11 @@ class TestKeyInputStream extends TestInputStreamBase {
     assertEquals(1, locationInfoList.size());
     OmKeyLocationInfo loc = locationInfoList.get(0);
     long containerID = loc.getContainerID();
-    assertEquals(3, countReplicas(containerID, cluster));
+    assertEquals(3, countReplicas(containerID, getCluster()));
 
-    TestHelper.waitForContainerClose(cluster, containerID);
+    TestHelper.waitForContainerClose(getCluster(), containerID);
 
     List<DatanodeDetails> pipelineNodes = loc.getPipeline().getNodes();
-
-    // read chunk data
-    try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
-      int b = keyInputStream.read();
-      assertNotEquals(-1, b);
-      if (doUnbuffer) {
-        keyInputStream.unbuffer();
-      }
-      cluster.shutdownHddsDatanode(pipelineNodes.get(0));
-      // check that we can still read it
-      assertReadFully(data, keyInputStream, dataLength - 1, 1);
-    }
 
     // read chunk data with ByteBuffer
     try (KeyInputStream keyInputStream = bucket.getKeyInputStream(keyName)) {
@@ -450,7 +422,7 @@ class TestKeyInputStream extends TestInputStreamBase {
       if (doUnbuffer) {
         keyInputStream.unbuffer();
       }
-      cluster.shutdownHddsDatanode(pipelineNodes.get(0));
+      getCluster().shutdownHddsDatanode(pipelineNodes.get(0));
       // check that we can still read it
       assertReadFullyUsingByteBuffer(data, keyInputStream, dataLength - 1, 1);
     }

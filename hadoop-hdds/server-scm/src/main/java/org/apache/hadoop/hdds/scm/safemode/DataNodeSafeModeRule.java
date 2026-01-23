@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,16 +14,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.safemode;
 
 import java.util.HashSet;
-import java.util.UUID;
-
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import java.util.Set;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer.NodeRegistrationContainerReport;
-
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.TypedEvent;
 
@@ -39,16 +40,20 @@ public class DataNodeSafeModeRule extends
   private int requiredDns;
   private int registeredDns = 0;
   // Set to track registered DataNodes.
-  private HashSet<UUID> registeredDnSet;
+  private final Set<DatanodeID> registeredDnSet;
+  private NodeManager nodeManager;
 
-  public DataNodeSafeModeRule(String ruleName, EventQueue eventQueue,
+  public DataNodeSafeModeRule(EventQueue eventQueue,
       ConfigurationSource conf,
+      NodeManager nodeManager,
       SCMSafeModeManager manager) {
-    super(manager, ruleName, eventQueue);
+    super(manager, eventQueue);
     requiredDns = conf.getInt(
         HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE,
         HddsConfigKeys.HDDS_SCM_SAFEMODE_MIN_DATANODE_DEFAULT);
+    getSafeModeMetrics().setNumRequiredDatanodesThreshold(requiredDns);
     registeredDnSet = new HashSet<>(requiredDns * 2);
+    this.nodeManager = nodeManager;
   }
 
   @Override
@@ -58,15 +63,23 @@ public class DataNodeSafeModeRule extends
 
   @Override
   protected boolean validate() {
-    return registeredDns >= requiredDns;
+    if (validateBasedOnReportProcessing()) {
+      return registeredDns >= requiredDns;
+    }
+    return nodeManager.getNodes(NodeStatus.inServiceHealthy()).size() >= requiredDns;
   }
 
   @Override
   protected void process(NodeRegistrationContainerReport reportsProto) {
 
-    registeredDnSet.add(reportsProto.getDatanodeDetails().getUuid());
+    DatanodeID dnId = reportsProto.getDatanodeDetails().getID();
+    boolean added = registeredDnSet.add(dnId);
     registeredDns = registeredDnSet.size();
 
+    if (added) {
+      getSafeModeMetrics().incCurrentRegisteredDatanodesCount();
+    }
+    
     if (scmInSafeMode()) {
       SCMSafeModeManager.getLogger().info(
           "SCM in safe mode. {} DataNodes registered, {} required.",
@@ -86,7 +99,6 @@ public class DataNodeSafeModeRule extends
         .format("registered datanodes (=%d) >= required datanodes (=%d)",
             this.registeredDns, this.requiredDns);
   }
-
 
   @Override
   public void refresh(boolean forceRefresh) {

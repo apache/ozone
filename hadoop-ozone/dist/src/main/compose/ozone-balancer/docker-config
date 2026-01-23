@@ -26,15 +26,13 @@ OZONE-SITE.XML_ozone.om.nodes.om=om1,om2,om3
 OZONE-SITE.XML_ozone.om.address.om.om1=om1
 OZONE-SITE.XML_ozone.om.address.om.om2=om2
 OZONE-SITE.XML_ozone.om.address.om.om3=om3
-OZONE-SITE.XML_ozone.om.ratis.enable=true
 
 OZONE-SITE.XML_ozone.scm.service.ids=scmservice
 OZONE-SITE.XML_ozone.scm.nodes.scmservice=scm1,scm2,scm3
 OZONE-SITE.XML_ozone.scm.address.scmservice.scm1=scm1
 OZONE-SITE.XML_ozone.scm.address.scmservice.scm2=scm2
 OZONE-SITE.XML_ozone.scm.address.scmservice.scm3=scm3
-OZONE-SITE.XML_ozone.scm.ratis.enable=true
-OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data
+OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data/metadata
 OZONE-SITE.XML_ozone.scm.container.size=100MB
 OZONE-SITE.XML_ozone.scm.block.size=20MB
 OZONE-SITE.XML_ozone.scm.datanode.ratis.volume.free-space.min=10MB
@@ -43,6 +41,7 @@ OZONE-SITE.XML_hdds.node.report.interval=20s
 OZONE-SITE.XML_hdds.heartbeat.interval=20s
 OZONE-SITE.XML_hdds.datanode.du.refresh.period=20s
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
+OZONE-SITE.XML_hdds.datanode.container.db.dir=/data/metadata
 OZONE-SITE.XML_hdds.datanode.volume.min.free.space=100MB
 OZONE-SITE.XML_ozone.scm.pipeline.creation.auto.factor.one=false
 OZONE-SITE.XML_ozone.datanode.pipeline.limit=1
@@ -52,7 +51,9 @@ OZONE-SITE.XML_hdds.container.report.interval=30s
 OZONE-SITE.XML_ozone.om.s3.grpc.server_enabled=true
 OZONE-SITE.XML_ozone.recon.db.dir=/data/metadata/recon
 OZONE-SITE.XML_dfs.container.ratis.datastream.enabled=true
-
+OZONE-SITE.XML_ozone.http.basedir=/tmp/ozone_http
+OZONE-SITE.XML_hdds.container.balancer.balancing.iteration.interval=25s
+OZONE-SITE.XML_hdds.container.balancer.trigger.du.before.move.enable=false
 OZONE_CONF_DIR=/etc/hadoop
 OZONE_LOG_DIR=/var/log/hadoop
 

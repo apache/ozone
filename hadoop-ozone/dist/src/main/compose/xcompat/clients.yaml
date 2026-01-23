@@ -14,50 +14,66 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-version: "3.8"
+x-common-config:
+  &common-config
+  dns_search: .
+  env_file:
+    - docker-config
+  command: ["sleep","1000000"]
+
+x-old-config:
+  &old-config
+  <<: *common-config
+  volumes:
+    - ../..:/opt/ozone
+    - ../_keytabs:/etc/security/keytabs
+    - ./krb5.conf:/etc/krb5.conf
+    - ${TEST_DATA_DIR}:/testdata
+
+x-new-config:
+  &new-config
+  image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
+  <<: *common-config
+  volumes:
+    - ../..:/opt/hadoop
+    - ../_keytabs:/etc/security/keytabs
+    - ./krb5.conf:/etc/krb5.conf
+    - ${TEST_DATA_DIR}:/testdata
 
 services:
   old_client_1_0_0:
-    image: apache/ozone:1.0.0
-    env_file:
-      - docker-config
-    volumes:
-      - ../..:/opt/ozone
-    command: ["sleep","1000000"]
+    image: ${OZONE_IMAGE}:1.0.0${OZONE_IMAGE_FLAVOR}
+    <<: *old-config
+
   old_client_1_1_0:
-    image: apache/ozone:1.1.0
-    env_file:
-      - docker-config
-    volumes:
-      - ../..:/opt/ozone
-    command: ["sleep","1000000"]
+    image: ${OZONE_IMAGE}:1.1.0${OZONE_IMAGE_FLAVOR}
+    <<: *old-config
+
   old_client_1_2_1:
-    image: apache/ozone:1.2.1
-    env_file:
-      - docker-config
-    volumes:
-      - ../..:/opt/ozone
-    command: ["sleep","1000000"]
+    image: ${OZONE_IMAGE}:1.2.1${OZONE_IMAGE_FLAVOR}
+    <<: *old-config
+
   old_client_1_3_0:
-    image: apache/ozone:1.3.0
-    env_file:
-      - docker-config
-    volumes:
-      - ../..:/opt/ozone
-    command: ["sleep","1000000"]
+    image: ${OZONE_IMAGE}:1.3.0${OZONE_IMAGE_FLAVOR}
+    <<: *old-config
+
   old_client_1_4_0:
-    image: apache/ozone:1.4.0
-    env_file:
-      - docker-config
-    volumes:
-      - ../..:/opt/ozone
-    command: ["sleep","1000000"]
+    image: ${OZONE_IMAGE}:1.4.0${OZONE_IMAGE_FLAVOR}
+    <<: *old-config
+
+  old_client_1_4_1:
+    image: ${OZONE_IMAGE}:1.4.1${OZONE_IMAGE_FLAVOR}
+    <<: *old-config
+
+  old_client_2_0_0:
+    image: ${OZONE_IMAGE}:2.0.0${OZONE_IMAGE_FLAVOR}
+    <<: *old-config
+
+  old_client_2_1_0:
+    image: ${OZONE_IMAGE}:2.1.0${OZONE_IMAGE_FLAVOR}
+    <<: *old-config
+
   new_client:
-    image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
-    env_file:
-      - docker-config
-    volumes:
-      - ../..:/opt/hadoop
+    <<: *new-config
     environment:
       OZONE_OPTS:
-    command: ["sleep","1000000"]

@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,16 +17,14 @@
 
 package org.apache.hadoop.fs.contract;
 
+import static org.apache.hadoop.test.LambdaTestUtils.intercept;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Test;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
@@ -36,8 +33,8 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathExistsException;
 import org.assertj.core.api.Assertions;
-
-import static org.apache.hadoop.test.LambdaTestUtils.intercept;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
 
 public abstract class AbstractContractCopyFromLocalTest extends
     AbstractFSContractTestBase {
@@ -49,9 +46,7 @@ public abstract class AbstractContractCopyFromLocalTest extends
   @Override
   public void teardown() throws Exception {
     super.teardown();
-    if (file != null) {
-      file.delete();
-    }
+    FileUtils.deleteQuietly(file);
   }
 
   @Test
@@ -102,7 +97,7 @@ public abstract class AbstractContractCopyFromLocalTest extends
   public void testCopyMissingFile() throws Throwable {
     describe("Copying a file that's not there must fail.");
     file = createTempFile("test");
-    file.delete();
+    FileUtils.deleteQuietly(file);
     // first upload to create
     intercept(FileNotFoundException.class, "",
         () -> copyFromLocal(file, true));
@@ -265,7 +260,9 @@ public abstract class AbstractContractCopyFromLocalTest extends
     Files.createTempFile(srcDir, "test1", ".txt");
 
     Path src = new Path(srcDir.toUri());
-    Path dst = path(srcDir.getFileName().toString());
+    java.nio.file.Path fileName = srcDir.getFileName();
+    Assertions.assertThat(fileName).isNotNull();
+    Path dst = path(fileName.toString());
     getFileSystem().copyFromLocalFile(true, true, src, dst);
 
     Assertions.assertThat(srcDir)

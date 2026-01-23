@@ -1,38 +1,36 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-
-import com.google.common.base.Preconditions;
 import org.apache.ratis.thirdparty.io.netty.buffer.Unpooled;
+import org.apache.ratis.util.Preconditions;
 
 /**
  * Simple utility class to collection string conversion methods.
  */
 public final class StringUtils {
+  private static final Charset UTF8 = StandardCharsets.UTF_8;
 
   private StringUtils() {
   }
-
-  private static final Charset UTF8 = StandardCharsets.UTF_8;
 
   /**
    * Decode a specific range of bytes of the given byte array to a string
@@ -56,14 +54,22 @@ public final class StringUtils {
   }
 
   public static String bytes2Hex(ByteBuffer buffer, int max) {
+    Preconditions.assertTrue(max > 0, () -> "max = " + max + " <= 0");
     buffer = buffer.asReadOnlyBuffer();
     final int remaining = buffer.remaining();
-    final int n = Math.min(max, remaining);
-    final StringBuilder builder = new StringBuilder(3 * n);
-    for (int i = 0; i < n; i++) {
-      builder.append(String.format("%02X ", buffer.get()));
+    final boolean overflow = max < remaining;
+    final int n = overflow ? max : remaining;
+    final StringBuilder builder = new StringBuilder(3 * n + (overflow ? 3 : 0));
+    if (n > 0) {
+      for (int i = 0; i < n; i++) {
+        builder.append(String.format("%02X ", buffer.get()));
+      }
+      builder.setLength(builder.length() - 1);
     }
-    return builder + (remaining > max ? "..." : "");
+    if (overflow) {
+      builder.append("...");
+    }
+    return builder.toString();
   }
 
   public static String bytes2Hex(ByteBuffer buffer) {
@@ -92,8 +98,36 @@ public final class StringUtils {
     return str.getBytes(UTF8);
   }
 
-  public static String appendIfNotPresent(String str, char c) {
-    Preconditions.checkNotNull(str, "Input string is null");
-    return str.isEmpty() || str.charAt(str.length() - 1) != c ? str + c : str;
+  public static String getLexicographicallyLowerString(String val) {
+    if (val == null || val.isEmpty()) {
+      throw new IllegalArgumentException("Input string must not be null or empty");
+    }
+    char[] charVal = val.toCharArray();
+    int lastIdx = charVal.length - 1;
+    if (charVal[lastIdx] == Character.MIN_VALUE) {
+      throw new IllegalArgumentException("Cannot decrement character below Character.MIN_VALUE");
+    }
+    charVal[lastIdx] -= 1;
+    return String.valueOf(charVal);
+  }
+
+  public static String getLexicographicallyHigherString(String val) {
+    if (val == null || val.isEmpty()) {
+      throw new IllegalArgumentException("Input string must not be null or empty");
+    }
+    char[] charVal = val.toCharArray();
+    int lastIdx = charVal.length - 1;
+    if (charVal[lastIdx] == Character.MAX_VALUE) {
+      throw new IllegalArgumentException("Cannot increment character above Character.MAX_VALUE");
+    }
+    charVal[lastIdx] += 1;
+    return String.valueOf(charVal);
+  }
+
+  public static String getFirstNChars(String str, int n) {
+    if (str == null || str.length() < n) {
+      return str;
+    }
+    return str.substring(0, n);
   }
 }

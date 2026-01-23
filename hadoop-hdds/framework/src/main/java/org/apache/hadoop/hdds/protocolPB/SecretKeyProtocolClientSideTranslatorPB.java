@@ -1,24 +1,31 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.protocolPB;
 
 import com.google.common.base.Preconditions;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
+import java.io.Closeable;
+import java.io.IOException;
+import java.util.List;
+import java.util.UUID;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -35,16 +42,9 @@ import org.apache.hadoop.hdds.security.exception.SCMSecretKeyException;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.retry.RetryProxy;
-import org.apache.hadoop.ipc.ProtobufHelper;
-import org.apache.hadoop.ipc.ProtocolTranslator;
-import org.apache.hadoop.ipc.RPC;
-
-import java.io.Closeable;
-import java.io.IOException;
-import java.util.List;
-import java.util.UUID;
-import java.util.function.Consumer;
-import java.util.stream.Collectors;
+import org.apache.hadoop.ipc_.ProtobufHelper;
+import org.apache.hadoop.ipc_.ProtocolTranslator;
+import org.apache.hadoop.ipc_.RPC;
 
 /**
  * This class is the client-side translator that forwards requests for
@@ -58,13 +58,12 @@ public class SecretKeyProtocolClientSideTranslatorPB implements
    */
   private static final RpcController NULL_RPC_CONTROLLER = null;
   private final BlockingInterface rpcProxy;
-  private SecretKeyProtocolFailoverProxyProvider failoverProxyProvider;
 
   public SecretKeyProtocolClientSideTranslatorPB(
       SecretKeyProtocolFailoverProxyProvider<? extends BlockingInterface>
           proxyProvider, Class<? extends BlockingInterface> proxyClazz) {
     Preconditions.checkState(proxyProvider != null);
-    this.failoverProxyProvider = proxyProvider;
+    SecretKeyProtocolFailoverProxyProvider failoverProxyProvider = proxyProvider;
     this.rpcProxy = (BlockingInterface) RetryProxy.create(
         proxyClazz, failoverProxyProvider,
         failoverProxyProvider.getRetryPolicy());

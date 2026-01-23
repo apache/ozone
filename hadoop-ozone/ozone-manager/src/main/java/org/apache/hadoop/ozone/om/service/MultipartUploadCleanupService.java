@@ -1,26 +1,30 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
 package org.apache.hadoop.ozone.om.service;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ServiceException;
+import java.io.IOException;
+import java.time.Duration;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
@@ -29,25 +33,15 @@ import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
-import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ExpiredMultipartUploadsBucket;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.MultipartUploadsExpiredAbortRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.ClientId;
-import org.apache.ratis.protocol.Message;
-import org.apache.ratis.protocol.RaftClientRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.time.Duration;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * This is the background service to abort incomplete Multipart Upload.
@@ -144,10 +138,6 @@ public class MultipartUploadCleanupService extends BackgroundService {
     return !suspended.get() && ozoneManager.isLeaderReady();
   }
 
-  private boolean isRatisEnabled() {
-    return ozoneManager.isRatisEnabled();
-  }
-
   private class MultipartUploadCleanupTask implements BackgroundTask {
 
     @Override
@@ -208,24 +198,7 @@ public class MultipartUploadCleanupService extends BackgroundService {
 
     private void submitRequest(OMRequest omRequest) {
       try {
-        if (isRatisEnabled()) {
-          OzoneManagerRatisServer server = ozoneManager.getOmRatisServer();
-
-          RaftClientRequest raftClientRequest = RaftClientRequest.newBuilder()
-              .setClientId(clientId)
-              .setServerId(server.getRaftPeerId())
-              .setGroupId(server.getRaftGroupId())
-              .setCallId(runCount.get())
-              .setMessage(Message.valueOf(
-                  OMRatisHelper.convertRequestToByteString(omRequest)))
-              .setType(RaftClientRequest.writeRequestType())
-              .build();
-
-          server.submitRequest(omRequest, raftClientRequest);
-        } else {
-          ozoneManager.getOmServerProtocol().submitRequest(null,
-              omRequest);
-        }
+        OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, runCount.get());
       } catch (ServiceException e) {
         LOG.error("Expired multipart info delete request failed. " +
             "Will retry at next run.", e);

@@ -17,6 +17,7 @@
 Documentation       Test ozone admin cert command
 Resource            ../commonlib.robot
 Test Timeout        5 minutes
+Suite Setup         Get Security Enabled From Config
 
 *** Keywords ***
 Setup Test
@@ -30,10 +31,9 @@ List certificates
 
 List certificates as JSON
     Pass Execution If      '${SECURITY_ENABLED}' == 'false'    N/A
-    Execute                 ozone admin cert list --json 1>> outStream 2>> errStream
-    ${output}               Execute             cat outStream | jq -r '.[0] | keys'
+    Execute                 ozone admin cert list --json 1>> ${TEMP_DIR}/outStream 2>> ${TEMP_DIR}/errStream
+    ${output}               Execute             cat ${TEMP_DIR}/outStream | jq -r '.[0] | keys'
                             Should Contain          ${output}           serialNumber
-    ${errOutput} =          Execute                 cat errStream
+    ${errOutput} =          Execute                 cat ${TEMP_DIR}/errStream
                             Should Contain          ${errOutput}        Certificate list:(BatchSize=
-    Execute                 rm outStream
-    Execute                 rm errStream
+    [teardown]              Remove Files            ${TEMP_DIR}/outStream    ${TEMP_DIR}/errStream

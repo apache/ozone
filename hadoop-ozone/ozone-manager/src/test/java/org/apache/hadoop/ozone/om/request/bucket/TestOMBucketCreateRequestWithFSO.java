@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,11 +13,21 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
 package org.apache.hadoop.ozone.om.request.bucket;
 
+import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newBucketInfoBuilder;
+import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newCreateBucketRequest;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketLayoutProto.FILE_SYSTEM_OPTIMIZED;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.when;
+
+import java.util.UUID;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -26,18 +35,9 @@ import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
-import java.util.UUID;
-
-import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newBucketInfoBuilder;
-import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newCreateBucketRequest;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketLayoutProto.FILE_SYSTEM_OPTIMIZED;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.mockito.Mockito.when;
 
 /**
  * Tests OMBucketCreateRequest class, which handles CreateBucket request.
@@ -133,6 +133,7 @@ public class TestOMBucketCreateRequestWithFSO
     return new OMBucketCreateRequest(modifiedRequest);
   }
 
+  @Override
   protected void doValidateAndUpdateCache(String volumeName, String bucketName,
       OMRequest modifiedRequest) throws Exception {
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucketName);
@@ -143,7 +144,7 @@ public class TestOMBucketCreateRequestWithFSO
     assertNull(omMetadataManager.getBucketTable().get(bucketKey));
     OMBucketCreateRequest omBucketCreateRequest =
         new OMBucketCreateRequest(modifiedRequest);
-
+    omBucketCreateRequest.setUGI(UserGroupInformation.getCurrentUser());
 
     OMClientResponse omClientResponse =
         omBucketCreateRequest.validateAndUpdateCache(ozoneManager, 1);
@@ -166,8 +167,7 @@ public class TestOMBucketCreateRequestWithFSO
         dbBucketInfo.getCreationTime());
     assertEquals(bucketInfoFromProto.getModificationTime(),
         dbBucketInfo.getModificationTime());
-    assertEquals(bucketInfoFromProto.getAcls(),
-        dbBucketInfo.getAcls());
+    assertTrue(dbBucketInfo.getAcls().containsAll(bucketInfoFromProto.getAcls()));
     assertEquals(bucketInfoFromProto.getIsVersionEnabled(),
         dbBucketInfo.getIsVersionEnabled());
     assertEquals(bucketInfoFromProto.getStorageType(),
@@ -182,5 +182,37 @@ public class TestOMBucketCreateRequestWithFSO
     // verify OMResponse.
     verifySuccessCreateBucketResponse(omClientResponse.getOMResponse());
 
+  }
+
+  @Test
+  public void testNonS3BucketNameAllowedForFSOWhenStrictDisabled() throws Exception {
+    // Arrange
+    ozoneManager.getConfiguration().setBoolean(
+        OMConfigKeys.OZONE_OM_NAMESPACE_STRICT_S3, false);
+
+    when(ozoneManager.getOMDefaultBucketLayout()).thenReturn(
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = "bucket_with_underscore"; // non-S3-compliant name
+    addCreateVolumeToTable(volumeName, omMetadataManager);
+
+    OzoneManagerProtocolProtos.BucketInfo.Builder bucketInfo =
+        newBucketInfoBuilder(bucketName, volumeName)
+            .setBucketLayout(FILE_SYSTEM_OPTIMIZED)
+            .addMetadata(OMRequestTestUtils.fsoMetadata());
+
+    OMRequest originalRequest = newCreateBucketRequest(bucketInfo).build();
+    OMBucketCreateRequest req = new OMBucketCreateRequest(originalRequest);
+
+    // Act
+    OMRequest modifiedRequest = req.preExecute(ozoneManager);
+
+    // Assert: validateAndUpdateCache should succeed
+    assertDoesNotThrow(() -> {
+      OMBucketCreateRequest omReq = new OMBucketCreateRequest(modifiedRequest);
+      omReq.setUGI(UserGroupInformation.getCurrentUser());
+      omReq.validateAndUpdateCache(ozoneManager, 1);
+    });
   }
 }

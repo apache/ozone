@@ -1,62 +1,36 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.snapshot;
 
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.conf.StorageUnit;
-import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
-import org.apache.hadoop.ozone.client.BucketArgs;
-import org.apache.hadoop.ozone.client.ObjectStore;
-import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
-import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.VolumeArgs;
-import org.apache.hadoop.ozone.client.io.OzoneInputStream;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.OmFailoverProxyUtil;
-import org.apache.hadoop.ozone.om.OmSnapshot;
-import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
-import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
-import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
-import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
-import org.apache.ozone.compaction.log.CompactionLogEntry;
-import org.apache.ozone.rocksdiff.CompactionNode;
-import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.LambdaTestUtils;
-import org.apache.ratis.server.protocol.TermIndex;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInfo;
-import org.junit.jupiter.api.Timeout;
+import static java.util.stream.Collectors.toSet;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.TestDataUtil.readFully;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
+import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithStoppedNodes.createKey;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.File;
 import java.io.IOException;
@@ -69,25 +43,52 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-
-import static java.util.stream.Collectors.toSet;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_MAX_TIME_ALLOWED;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
-import static org.apache.hadoop.ozone.om.TestOzoneManagerHAWithStoppedNodes.createKey;
-import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.fail;
+import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.hdds.utils.db.RDBCheckpointUtils;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
+import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.client.BucketArgs;
+import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.VolumeArgs;
+import org.apache.hadoop.ozone.conf.OMClientConfig;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OmSnapshot;
+import org.apache.hadoop.ozone.om.OmTestUtil;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.SstFilteringService;
+import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
+import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
+import org.apache.ozone.compaction.log.CompactionLogEntry;
+import org.apache.ozone.rocksdiff.CompactionNode;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.LambdaTestUtils;
+import org.apache.ozone.test.tag.Flaky;
+import org.apache.ratis.server.protocol.TermIndex;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInfo;
 
 /**
  * Tests snapshot background services.
  */
-@Timeout(5000)
 public class TestSnapshotBackgroundServices {
   private MiniOzoneHAClusterImpl cluster;
   private ObjectStore objectStore;
@@ -104,11 +105,6 @@ public class TestSnapshotBackgroundServices {
   private OzoneClient client;
   private final AtomicInteger counter = new AtomicInteger();
 
-  /**
-   * Create a MiniOzoneCluster for testing. The cluster initially has one
-   * inactive OM. So at the start of the cluster, there will be 2 active and 1
-   * inactive OM.
-   */
   @BeforeEach
   public void init(TestInfo testInfo) throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -116,6 +112,11 @@ public class TestSnapshotBackgroundServices {
     OzoneManagerRatisServerConfig omRatisConf = conf.getObject(OzoneManagerRatisServerConfig.class);
     omRatisConf.setLogAppenderWaitTimeMin(10);
     conf.setFromObject(omRatisConf);
+
+    OMClientConfig clientConfig = conf.getObject(OMClientConfig.class);
+    clientConfig.setRpcTimeOut(TimeUnit.SECONDS.toMillis(5));
+    conf.setFromObject(clientConfig);
+
     conf.setInt(OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP, LOG_PURGE_GAP);
     conf.setStorageSize(OMConfigKeys.OZONE_OM_RATIS_SEGMENT_SIZE_KEY, 16, StorageUnit.KB);
     conf.setStorageSize(OMConfigKeys.OZONE_OM_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY, 16, StorageUnit.KB);
@@ -187,9 +188,6 @@ public class TestSnapshotBackgroundServices {
     ozoneBucket = retVolumeinfo.getBucket(bucketName);
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);
@@ -260,7 +258,7 @@ public class TestSnapshotBackgroundServices {
 
     // get snapshot c
     OmSnapshot snapC;
-    try (ReferenceCounted<OmSnapshot> rcC = newLeaderOM
+    try (UncheckedAutoCloseableSupplier<OmSnapshot> rcC = newLeaderOM
         .getOmSnapshotManager()
         .getSnapshot(volumeName, bucketName, snapshotInfoC.getName())) {
       assertNotNull(rcC);
@@ -284,7 +282,7 @@ public class TestSnapshotBackgroundServices {
 
     // get snapshot d
     OmSnapshot snapD;
-    try (ReferenceCounted<OmSnapshot> rcD = newLeaderOM
+    try (UncheckedAutoCloseableSupplier<OmSnapshot> rcD = newLeaderOM
         .getOmSnapshotManager()
         .getSnapshot(volumeName, bucketName, snapshotInfoD.getName())) {
       assertNotNull(rcD);
@@ -307,7 +305,7 @@ public class TestSnapshotBackgroundServices {
   }
 
   private static <V> boolean isKeyInTable(String key, Table<String, V> table) {
-    try (TableIterator<String, ? extends Table.KeyValue<String, V>> iterator
+    try (Table.KeyValueIterator<String, V> iterator
              = table.iterator()) {
       while (iterator.hasNext()) {
         Table.KeyValue<String, V> next = iterator.next();
@@ -368,14 +366,13 @@ public class TestSnapshotBackgroundServices {
   }
 
   private OzoneManager getLeaderOM() {
-    String leaderOMNodeId = OmFailoverProxyUtil
-        .getFailoverProxyProvider(objectStore.getClientProxy())
-        .getCurrentProxyOMNodeId();
+    final String leaderOMNodeId = OmTestUtil.getCurrentOmProxyNodeId(objectStore);
     return cluster.getOzoneManager(leaderOMNodeId);
   }
 
   @Test
   @DisplayName("testCompactionLogBackgroundService")
+  @Flaky("HDDS-11672")
   public void testCompactionLogBackgroundService()
       throws IOException, InterruptedException, TimeoutException {
     OzoneManager leaderOM = getLeaderOM();
@@ -427,8 +424,7 @@ public class TestSnapshotBackgroundServices {
   private List<CompactionLogEntry> getCompactionLogEntries(OzoneManager om)
       throws IOException {
     List<CompactionLogEntry> compactionLogEntries = new ArrayList<>();
-    try (TableIterator<String,
-        ? extends Table.KeyValue<String, CompactionLogEntry>>
+    try (Table.KeyValueIterator<String, CompactionLogEntry>
              iterator = om.getMetadataManager().getCompactionLogTable()
         .iterator()) {
       iterator.seekToFirst();
@@ -572,7 +568,7 @@ public class TestSnapshotBackgroundServices {
       } catch (IOException e) {
         fail();
       }
-      return snapshotInfo.isSstFiltered();
+      return SstFilteringService.isSstFiltered(ozoneManager.getConfiguration(), snapshotInfo);
     }, 1000, 10000);
   }
 
@@ -633,7 +629,7 @@ public class TestSnapshotBackgroundServices {
         .getSnapshotInfoTable()
         .get(tableKey);
     // Allow the snapshot to be written to disk
-    String fileName = getSnapshotPath(leaderOM.getConfiguration(), snapshotInfo);
+    String fileName = getSnapshotPath(leaderOM.getConfiguration(), snapshotInfo, 0);
     File snapshotDir = new File(fileName);
     if (!RDBCheckpointUtils.waitForCheckpointDirectoryExist(snapshotDir)) {
       throw new IOException("snapshot directory doesn't exist");
@@ -655,10 +651,7 @@ public class TestSnapshotBackgroundServices {
 
   private void readKeys(List<String> keys) throws IOException {
     for (String keyName : keys) {
-      OzoneInputStream inputStream = ozoneBucket.readKey(keyName);
-      byte[] data = new byte[100];
-      inputStream.read(data, 0, 100);
-      inputStream.close();
+      readFully(ozoneBucket, keyName);
     }
   }
 }

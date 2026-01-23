@@ -1,39 +1,35 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om;
 
 import com.google.protobuf.RpcController;
 import io.grpc.Status;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.ipc.Server;
+import java.io.IOException;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerServiceGrpc.OzoneManagerServiceImplBase;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
-import org.apache.hadoop.ozone.security.OzoneDelegationTokenSecretManager;
-import org.apache.hadoop.util.UUIDUtil;
+import org.apache.hadoop.ozone.util.UUIDUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Grpc Service for handling S3 gateway OzoneManagerProtocol client requests.
@@ -46,16 +42,10 @@ public class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
    */
   private static final RpcController NULL_RPC_CONTROLLER = null;
   private final OzoneManagerProtocolServerSideTranslatorPB omTranslator;
-  private final OzoneDelegationTokenSecretManager delegationTokenMgr;
-  private final SecurityConfig secConfig;
 
   OzoneManagerServiceGrpc(
-      OzoneManagerProtocolServerSideTranslatorPB omTranslator,
-      OzoneDelegationTokenSecretManager delegationTokenMgr,
-      OzoneConfiguration configuration) {
+      OzoneManagerProtocolServerSideTranslatorPB omTranslator) {
     this.omTranslator = omTranslator;
-    this.delegationTokenMgr = delegationTokenMgr;
-    this.secConfig = new SecurityConfig(configuration);
   }
 
   @Override
@@ -67,7 +57,7 @@ public class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
         request.getCmdType().name());
     AtomicInteger callCount = new AtomicInteger(0);
 
-    org.apache.hadoop.ipc.Server.getCurCall().set(new Server.Call(1,
+    org.apache.hadoop.ipc_.Server.getCurCall().set(new Server.Call(1,
         callCount.incrementAndGet(),
         null,
         null,

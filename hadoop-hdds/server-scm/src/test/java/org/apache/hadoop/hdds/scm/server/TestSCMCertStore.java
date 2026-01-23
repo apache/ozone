@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,19 +17,15 @@
 
 package org.apache.hadoop.hdds.scm.server;
 
-import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
-import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
-import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.hdds.security.x509.CertificateTestUtils;
-import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
-import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.DATANODE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.OM;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.AdditionalAnswers.returnsLastArg;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.math.BigInteger;
 import java.nio.file.Files;
@@ -39,11 +34,21 @@ import java.security.KeyPair;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.List;
-
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.DATANODE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.OM;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
+import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
+import org.apache.hadoop.hdds.security.SecurityConfig;
+import org.apache.hadoop.hdds.security.x509.CertificateTestUtils;
+import org.apache.hadoop.hdds.security.x509.certificate.authority.CertificateStore;
+import org.apache.hadoop.security.ssl.KeyStoreTestUtil;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Test class for @{@link SCMCertStore}.
@@ -52,24 +57,26 @@ public class TestSCMCertStore {
 
   private static final String COMPONENT_NAME = "scm";
 
-  private OzoneConfiguration config;
   private SCMMetadataStore scmMetadataStore;
   private CertificateStore scmCertStore;
-  private SecurityConfig securityConfig;
   private KeyPair keyPair;
 
   @BeforeEach
   public void setUp(@TempDir Path tempDir) throws Exception {
-    config = new OzoneConfiguration();
+    OzoneConfiguration config = new OzoneConfiguration();
 
     config.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         tempDir.toAbsolutePath().toString());
 
-    securityConfig = new SecurityConfig(config);
+    SecurityConfig securityConfig = new SecurityConfig(config);
     keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
 
+    final SCMRatisServer ratisServer = mock(SCMRatisServer.class);
+    when(ratisServer.getProxyHandler(eq(SCMRatisProtocol.RequestType.CERT_STORE),
+        eq(CertificateStore.class), any(CertificateStore.class)))
+        .then(returnsLastArg());
     scmMetadataStore = new SCMMetadataStoreImpl(config);
-    scmCertStore = new SCMCertStore.Builder().setRatisServer(null)
+    scmCertStore = new SCMCertStore.Builder().setRatisServer(ratisServer)
         .setMetadaStore(scmMetadataStore)
         .build();
 

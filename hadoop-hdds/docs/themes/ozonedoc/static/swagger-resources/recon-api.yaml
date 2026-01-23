@@ -25,6 +25,10 @@ servers:
 tags:
   - name: Containers
     description: APIs to fetch information about the available containers. **Admin Only**
+  - name: Volumes
+    description: APIs to fetch information about the available volumes. **Admin Only**
+  - name: Buckets
+    description: APIs to fetch information about the available buckets. **Admin Only**
   - name: Keys
     description: APIs to fetch information about the available keys. **Admin Only**
   - name: Containers and Keys
@@ -62,6 +66,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ContainerMetadata'
+  /containers/deleted:
+    get:
+      tags:
+        - Containers
+      summary: Return all DELETED containers in SCM
+      operationId: getSCMDeletedContainers
+      responses:
+        200:
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletedContainers'
   /containers/missing:
     get:
       tags:
@@ -109,7 +126,7 @@ paths:
     get:
       tags:
         - Containers
-      summary: Get UnhealthyContainerMetadata for all the unhealthy containers 
+      summary: Get UnhealthyContainerMetadata for all the unhealthy containers
       operationId: getUnhealthyContainers
       parameters:
         - name: batchNum
@@ -228,7 +245,67 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/responses/DeletedMismatchedContainers'
+                $ref: '#/components/schemas/DeletedMismatchedContainers'
+  /volumes:
+    get:
+      tags:
+        - Volumes
+      summary: Returns the set of all volumes present
+      operationId: getVolumes
+      parameters:
+        - name: prevKey
+          in: query
+          description: Stores the previous key after which to fetch the data
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Stores the limit for the number of results to fetch
+          required: false
+          schema:
+            type: integer
+            default: 1000
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Volumes'
+  /buckets:
+    get:
+      tags:
+        - Buckets
+      summary: Returns the set of all buckets across all volumes
+      operationId: getBuckets
+      parameters:
+        - name: volume
+          in: query
+          description: Stores the name of the volumes whose buckets to fetch
+          required: false
+          schema:
+            type: string
+        - name: prevKey
+          in: query
+          description: Stores the previous key after which to fetch the data
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Stores the limit for the number of results to fetch
+          required: false
+          schema:
+            type: integer
+            default: 1000
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Buckets'
   /keys/open:
     get:
       tags:
@@ -249,6 +326,11 @@ paths:
           schema:
             type: integer
             default: 1000
+        - name: startPrefix
+          in: query
+          description: Will return keys matching this prefix
+          schema:
+            type: integer
         - name: includeFso
           in: query
           description: Boolean value to determine whether to include FSO keys or not
@@ -269,7 +351,21 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/responses/OpenKeys'
+                $ref: '#/components/schemas/OpenKeys'
+  /keys/open/summary:
+    get:
+      tags:
+        - Keys
+      summary: Returns the summary of all open keys info
+      operationId: getOpenKeySummary
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenKeysSummary'
+
   /keys/deletePending:
     get:
       tags:
@@ -290,13 +386,18 @@ paths:
           schema:
             type: integer
             default: 1000
+        - name: startPrefix
+          in: query
+          description: Will return keys matching this prefix
+          schema:
+            type: string
       responses:
         '200':
           description: Successful operation
           content:
             application/json:
               schema:
-                $ref: '#/components/responses/DeletePendingKeys'
+                $ref: '#/components/schemas/DeletePendingKeys'
   /keys/deletePending/dirs:
     get:
       tags:
@@ -323,7 +424,36 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/responses/DeletePendingDirs'
+                $ref: '#/components/schemas/DeletePendingDirs'
+  /keys/deletePending/summary:
+    get:
+      tags:
+        - Keys
+      summary: Returns the summary of all keys pending deletion info
+      operationId: getDeletedKeySummary
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletePendingSummary'
+  /keys/deletePending/dirs/summary:
+    get:
+      tags:
+        - Keys
+      summary: Retrieves the summary of deleted directories.
+      operationId: getDeletedDirectorySummary
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalDeletedDirectories:
+                    type: integer
   /containers/{id}/keys:
     get:
       tags:
@@ -384,7 +514,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/responses/DeletePendingBlocks'
+                $ref: '#/components/schemas/DeletePendingBlocks'
   /namespace/summary:
     get:
       tags:
@@ -409,12 +539,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/responses/NamespaceMetadataResponse'
-  /namespace/du:
+                $ref: '#/components/schemas/NamespaceMetadataResponse'
+  /namespace/usage:
     get:
       tags:
         - Namespace Metadata
-      summary: Returns disk usage of all sub-paths under the path.
+      summary: Returns namespace usage of all sub-paths under the path.
       operationId: getDiskUsage
       parameters:
         - name: path
@@ -426,14 +556,14 @@ paths:
             type: string
         - name: files
           in: query
-          description: This boolean has a default value of false. When set to true, it calculates the disk usage for keys within the specified path and also provides a list of their corresponding sub-paths.
+          description: This boolean has a default value of false. When set to true, it calculates the namespace usage for keys within the specified path and also provides a list of their corresponding sub-paths.
           example: true
           required: false
           schema:
             type: boolean
         - name: replica
           in: query
-          description: A boolean with a default value of false. If set to true, computes disk usage with replicated size of keys.
+          description: A boolean with a default value of false. If set to true, computes namespace usage with replicated size of keys.
           example: true
           required: false
           schema:
@@ -443,7 +573,7 @@ paths:
           description: |
             Successful operation<br>
             #### **Note**:
-            #### The below example response is for the sample endpoint: **namespace/du?path=/vol1/bucket1&files=true&replica=true**
+            #### The below example response is for the sample endpoint: **namespace/usage?path=/vol1/bucket1&files=true&replica=true**
             #### status can be either **OK** if path exists else **PATH_NOT_FOUND**
             #### If files is set to **false**, sub-path **/vol1/bucket1/key1-1 is omitted**.
             #### If replica is set to **false**, **sizeWithReplica returns -1**.
@@ -451,7 +581,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/responses/MetadataDiskUsage'
+                $ref: '#/components/schemas/MetadataDiskUsage'
   /namespace/quota:
     get:
       tags:
@@ -476,7 +606,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/responses/MetadataQuota'
+                $ref: '#/components/schemas/MetadataQuota'
   /namespace/dist:
     get:
       tags:
@@ -503,7 +633,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/responses/MetadataSpaceDist'
+                $ref: '#/components/schemas/MetadataSpaceDist'
   /clusterState:
     get:
       tags:
@@ -516,7 +646,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/responses/ClusterState'
+                $ref: '#/components/schemas/ClusterState'
   /datanodes:
     get:
       tags:
@@ -529,21 +659,68 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/responses/DatanodesSummary'
-
-  /datanodes/remove:
+                $ref: '#/components/schemas/DatanodesSummary'
+  /datanodes/decommission/info:
     get:
       tags:
         - Datanodes
-      summary: Removes datanodes from Recon's memory and nodes table in Recon DB.
-      operationId: removeDatanodes
+      summary: Returns all the datanodes in the decommissioning state
+      operationId: getDecommissioningDatanodes
       responses:
         '200':
           description: Successful Operation
           content:
             application/json:
               schema:
-                $ref: '#/components/responses/RemovedDatanodesResponse'
+                $ref: '#/components/schemas/DatanodesDecommissionInfo'
+  /datanodes/decommission/info/datanode:
+    get:
+      tags:
+        - Datanodes
+      summary: Returns info of a specific datanode for which decommissioning is initiated
+      operationId: getDecommissionInfoForDatanode
+      parameters:
+        - name: uuid
+          in: query
+          description: The uuid of the datanode being decommissioned.
+          required: false
+          schema:
+            type: string
+        - name: ipAddress
+          in: query
+          description: The ipAddress of the datanode being decommissioned.
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful Operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatanodesDecommissionInfo'
+  /datanodes/remove:
+    put:
+      tags:
+        - Datanodes
+      summary: Removes datanodes from Recon's memory and nodes table in Recon DB.
+      operationId: removeDatanodes
+      requestBody:
+        description: List of datanodes to be removed
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: string
+      responses:
+        '200':
+          description: Successful Operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RemovedDatanodesResponse'
 
   /pipelines:
     get:
@@ -560,7 +737,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/responses/PipelinesSummary'
+                $ref: '#/components/schemas/PipelinesSummary'
   /task/status:
     get:
       tags:
@@ -573,7 +750,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/responses/TasksStatus'
+                $ref: '#/components/schemas/TasksStatus'
   /utilization/fileCount:
     get:
       tags:
@@ -610,7 +787,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/responses/FileSizeUtilization'
+                $ref: '#/components/schemas/FileSizeUtilization'
   /utilization/containerCount:
     get:
       tags:
@@ -633,7 +810,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/responses/ContainerUtilization'
+                $ref: '#/components/schemas/ContainerUtilization'
   /metrics/query:
     get:
       tags:
@@ -646,15 +823,108 @@ paths:
           description: The query in a Prometheus query format for which to fetch results
           example: ratis_leader_election_electionCount
           required: true
+          schema:
+            type: string
+          allowReserved: true
       responses:
         '200':
           description: Successful Operation
           content:
             application/json:
               schema:
-                $ref: '#/components/responses/MetricsQuery'
+                $ref: '#/components/schemas/MetricsQuery'
 components:
   schemas:
+    Volumes:
+      type: object
+      properties:
+        totalCount:
+          type: integer
+        volumes:
+          type: array
+          items:
+            type: object
+            properties:
+              metadata:
+                type: object
+              name:
+                type: string
+              quotaInBytes:
+                type: integer
+              quotaInNamespace:
+                type: integer
+              usedNamespace:
+                type: integer
+              creationTime:
+                type: integer
+              modificationTime:
+                type: integer
+              acls:
+                $ref: "#/components/schemas/ACL"
+              admin:
+                type: string
+              owner:
+                type: string
+              volume:
+                type: string
+    Buckets:
+      type: object
+      properties:
+        totalCount:
+          type: integer
+        buckets:
+          type: array
+          items:
+            type: object
+            properties:
+              versioningEnabled:
+                type: boolean
+              metadata:
+                type: object
+              name:
+                type: string
+              quotaInBytes:
+                type: integer
+              quotaInNamespace:
+                type: integer
+              usedNamespace:
+                type: integer
+              creationTime:
+                type: integer
+              modificationTime:
+                type: integer
+              acls:
+                $ref: "#/components/schemas/ACL"
+              volumeName:
+                type: string
+              storageType:
+                type: string
+              versioning:
+                type: boolean
+              usedBytes:
+                type: integer
+              encryptionInfo:
+                type: object
+                properties:
+                  version:
+                    type: string
+                  suite:
+                    type: string
+                  keyName:
+                    type: string
+              replicationConfigInfo:
+                type: object
+                nullable: true
+              sourceVolume:
+                type: string
+                nullable: true
+              sourceBucket:
+                type: string
+                nullable: true
+              bucketLayout:
+                type: string
+              owner:
+                type: string
     ContainerMetadata:
       type: object
       properties:
@@ -664,6 +934,9 @@ components:
             totalCount:
               type: integer
               example: 3
+            prevKey:
+              type: integer
+              example: 3019
             containers:
               type: array
               items:
@@ -675,23 +948,61 @@ components:
                   NumberOfKeys:
                     type: integer
                     example: 834
+                  pipelines:
+                    type: string
+                    nullable: true
                 xml:
                   name: containerMetadata
               example:
                 - ContainerID: 1
                   NumberOfKeys: 834
+                  pipelines: null
                 - ContainerID: 2
                   NumberOfKeys: 833
+                  pipelines: null
                 - ContainerID: 3
                   NumberOfKeys: 833
+                  pipelines: null
       xml:
         name: containerMetadataResponse
+    DeletedContainers:
+      type: array
+      items:
+        type: object
+        properties:
+          containerId:
+            type: integer
+          pipelineId:
+            type: object
+            properties:
+              id:
+                type: string
+          containerState:
+            type: string
+          stateEnterTime:
+            type: integer
+          lastUsed:
+            type: integer
+          replicationConfig:
+            type: object
+            properties:
+              replicationType:
+                type: string
+              replicationFactor:
+                type: string
+              replicationNodes:
+                type: integer
+          replicationFactor:
+            type: string
     KeyMetadata:
       type: object
       properties:
         totalCount:
           type: integer
           example: 7
+        lastKey:
+          type: string
+          example: /vol1/buck1/file1
         keys:
           type: array
           items:
@@ -706,6 +1017,9 @@ components:
               Key:
                 type: string
                 example: key-0-43637
+              CompletePath:
+                type: string
+                example: /vol1/buck1/dir1/dir2/file1
               DataSize:
                 type: integer
                 example: 1000
@@ -719,7 +1033,7 @@ components:
                 properties:
                   0:
                     type: array
-                    items: 
+                    items:
                       type: object
                       properties:
                         containerID:
@@ -743,15 +1057,24 @@ components:
         containerID:
           type: integer
           example: 1
+        datanodeUuid:
+          type: string
+          example: 841be80f-0454-47df-b676
         datanodeHost:
           type: string
           example: localhost-1
-        firstReportTimestamp:
+        firstSeenTime:
           type: number
           example: 1605724047057
-        lastReportTimestamp:
+        lastSeenTime:
           type: number
           example: 1605731201301
+        lastBcsId:
+          type: integer
+          example: 123
+        state:
+          type: string
+          example: OPEN
     MissingContainerMetadata:
       type: object
       properties:
@@ -886,7 +1209,7 @@ components:
                     replicationFactor: ONE
                     requiredNodes: 1
                     replicationType: RATIS
-                  healthy: true                
+                  healthy: true
               existsAt: OM
             - containerId: 11
               numberOfKeys: 2
@@ -906,7 +1229,6 @@ components:
                     replicationType: RATIS
                   healthy: true
               existsAt: SCM
-  responses:
     DeletedMismatchedContainers:
       type: object
       properties:
@@ -981,26 +1303,38 @@ components:
                     requiredNodes: 1
                     replicationType: RATIS
                   healthy: true
+    OpenKeysSummary:
+      type: object
+      properties:
+        totalUnreplicatedDataSize:
+          type: integer
+        totalReplicatedDataSize:
+          type: integer
+        totalOpenKeys:
+          type: integer
     OpenKeys:
       type: object
+      required: ['lastKey', 'replicatedDataSize', 'unreplicatedDataSize', 'status']
       properties:
         lastKey:
           type: string
           example: /vol1/fso-bucket/dir1/dir2/file2
-        replicatedTotal:
+        replicatedDataSize:
           type: integer
           example: 13824
-        unreplicatedTotal:
+        unreplicatedDataSize:
           type: integer
           example: 4608
-        entities:
+        status:
+          type: string
+        fso:
           type: array
           items:
             type: object
             properties:
               path:
                 type: string
-              keyState:
+              key:
                 type: string
               inStateSince:
                 type: number
@@ -1008,63 +1342,200 @@ components:
                 type: integer
               replicatedSize:
                 type: integer
-              unreplicatedSize:
+              replicationInfo:
+                type: object
+                properties:
+                  replicationFactor:
+                    type: string
+                    example: THREE
+                  requiredNodes:
+                    type: integer
+                    example: 3
+                  replicationType:
+                    type: string
+                    example: RATIS
+              creationTime:
+                type: integer
+              modificationTime:
+                type: integer
+              isKey:
+                type: boolean
+        nonFSO:
+          type: array
+          items:
+            type: object
+            properties:
+              path:
+                type: string
+              key:
+                type: string
+              inStateSince:
+                type: number
+              size:
+                type: integer
+              replicatedSize:
+                type: integer
+              replicationInfo:
+                type: object
+                properties:
+                  replicationFactor:
+                    type: string
+                    example: THREE
+                  requiredNodes:
+                    type: integer
+                    example: 3
+                  replicationType:
+                    type: string
+                    example: RATIS
+              creationTime:
+                type: integer
+              modificationTime:
+                type: integer
+              isKey:
+                type: boolean
+    OMKeyInfoList:
+      type: array
+      items:
+        type: object
+        properties:
+          metadata:
+            type: object
+          objectID:
+            type: number
+          updateID:
+            type: number
+          parentObjectID:
+            type: number
+          volumeName:
+            type: string
+          bucketName:
+            type: string
+          keyName:
+            type: string
+          dataSize:
+            type: number
+          keyLocationVersions:
+            type: array
+            items:
+              $ref: "#/components/schemas/VersionLocation"
+          creationTime:
+            type: number
+          modificationTime:
+            type: number
+          replicationConfig:
+            type: object
+            properties:
+              replicationFactor:
+                type: string
+              requiredNodes:
                 type: integer
               replicationType:
                 type: string
-              replicationFactor:
-                type: string
-          example:
-            - path: /vol1/bucket1/key1
-              keyState: Open
-              inStateSince: 1667564193026
-              size: 1024
-              replicatedSize: 3072
-              unreplicatedSize: 1024
-              replicationType: RATIS
-              replicationFactor: THREE
-            - path: /vol1/bucket1/key2
-              keyState: Open
-              inStateSince: 1667564193026
-              size: 512
-              replicatedSize: 1536
-              unreplicatedSize: 512
-              replicationType: RATIS
-              replicationFactor: THREE
-            - path: /vol1/fso-bucket/dir1/file1
-              keyState: Open
-              inStateSince: 1667564193026
-              size: 1024
-              replicatedSize: 3072
-              unreplicatedSize: 1024
-              replicationType: RATIS
-              replicationFactor: THREE
-            - path: /vol1/fso-bucket/dir1/dir2/file2
-              keyState: Open
-              inStateSince: 1667564193026
-              size: 2048
-              replicatedSize: 6144
-              unreplicatedSize: 2048
-              replicationType: RATIS
-              replicationFactor: THREE
+          fileChecksum:
+            type: number
+            nullable: true
+          fileName:
+            type: string
+          ownerName:
+            type: string
+          acls:
+            $ref: "#/components/schemas/ACL"
+          tags:
+            type: object
+          expectedDataGeneration:
+            type: string
+            nullable: true
+          file:
+            type: boolean
+          path:
+            type: string
+          generation:
+            type: integer
+          replicatedSize:
+            type: number
+          fileEncryptionInfo:
+            type: string
+            nullable: true
+          objectInfo:
+            type: string
+          latestVersionLocations:
+            $ref: "#/components/schemas/VersionLocation"
+          hsync:
+            type: boolean
+    VersionLocation:
+      type: object
+      properties:
+        version:
+          type: integer
+        locationVersionMap:
+          type: object
+          properties:
+            0:
+              $ref: "#/components/schemas/LocationList"
+        multipartKey:
+          type: boolean
+        blocksLatestVersionOnly:
+          $ref: "#/components/schemas/LocationList"
+        locationListCount:
+          type: integer
+        locationLists:
+          type: array
+          items:
+            $ref: "#/components/schemas/LocationList"
+        locationList:
+          $ref: "#/components/schemas/LocationList"
+    LocationList:
+      type: array
+      items:
+        type: object
+        properties:
+          blockID:
+            type: object
+            properties:
+              containerBlockID:
+                type: object
+                properties:
+                  containerID:
+                    type: integer
+                  localID:
+                    type: integer
+              blockCommitSequenceID:
+                type: integer
+              replicaIndex:
+                type: integer
+                nullable: true
+              containerID:
+                type: integer
+              localID:
+                type: integer
+          length:
+            type: integer
+          offset:
+            type: integer
+          token:
+            type: string
+            nullable: true
+          createVersion:
+            type: integer
+          pipeline:
+            type: string
+            nullable: true
+          partNumber:
+            type: integer
+          underConstruction:
+            type: boolean
+          blockCommitSequenceId:
+            type: integer
+          containerID:
+            type: integer
+          localID:
+            type: integer
     DeletePendingKeys:
       type: object
       properties:
         lastKey:
           type: string
           example: sampleVol/bucketOne/key_one
-        keysSummary:
-          type: object
-          properties:
-            totalUnreplicatedDataSize:
-              type: integer
-              example: 29291
-            totalReplicatedDataSize:
-              type: integer
-              example: 87873
-            totalDeletedKeys:
-              type: integer
-              example: 3
         replicatedDataSize:
           type: number
           example: 300000000
@@ -1077,224 +1548,83 @@ components:
             type: object
             properties:
               omKeyInfoList:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    objectID:
-                      type: number
-                    updateID:
-                      type: number
-                    parentObjectID:
-                      type: number
-                    volumeName:
-                      type: string
-                    bucketName:
-                      type: string
-                    keyName:
-                      type: string
-                    dataSize:
-                      type: number
-                    creationTime:
-                      type: number
-                    modificationTime:
-                      type: number
-                    replicationConfig:
-                      type: object
-                      properties:
-                        replicationFactor:
-                          type: string
-                        requiredNodes:
-                          type: integer
-                        replicationType:
-                          type: string
-                    fileChecksum:
-                      type: number
-                      nullable: true
-                    fileName:
-                      type: string
-                    file:
-                      type: boolean
-                    path:
-                      type: string
-                    hsync:
-                      type: boolean
-                    replicatedSize:
-                      type: number
-                    fileEncryptionInfo:
-                      type: string
-                      nullable: true
-                    objectInfo:
-                      type: string
-                    updateIDset:
-                      type: boolean
-          example:
-            - omKeyInfoList:
-              - objectID: -9223372036844470271
-                updateID: 40429
-                parentObjectID: -9223372036844472575
-                volumeName: sampleVol
-                bucketName: bucketOne
-                keyName: key_one
-                dataSize: 20000000
-                creationTime: 1687189663661
-                modificationTime: 1687189672598
-                replicationConfig:
-                  replicationFactor: THREE
-                  requiredNodes: 3
-                  replicationType: RATIS
-                fileChecksum: null
-                fileName: List1File1
-                file: false
-                path: 0/key_one
-                hsync: false
-                replicatedSize: 30000000
-                fileEncryptionInfo: null
-                objectInfo: OMKeyInfo{volume='sampleVol', bucket='bucketOne', key='key_one', dataSize='10000000', creationTime='1687189663661', objectID='-9223372036844470271', parentID='-9223372036844472575', replication='RATIS/THREE', fileChecksum='null}
-                updateIDset: true
-              - objectID: -9223372036844470271
-                updateID: 40429
-                parentObjectID: -9223372036844472575
-                volumeName: sampleVol
-                bucketName: bucketOne
-                keyName: key_one
-                dataSize: 20000000
-                creationTime: 1687189663661
-                modificationTime: 1687189672598
-                replicationConfig:
-                  replicationFactor: THREE
-                  requiredNodes: 3
-                  replicationType: RATIS
-                fileChecksum: null
-                fileName: List1File1
-                file: false
-                path: 0/key_one
-                hsync: false
-                replicatedSize: 30000000
-                fileEncryptionInfo: null
-                objectInfo: OMKeyInfo{volume='sampleVol', bucket='bucketOne', key='key_one', dataSize='10000000', creationTime='1687189663661', objectID='-9223372036844470271', parentID='-9223372036844472575', replication='RATIS/THREE', fileChecksum='null}
-                updateIDset: true
-            - omKeyInfoList:
-              - objectID: -9223372036844470015
-                updateID: 40407
-                parentObjectID: -9223372036844472575
-                volumeName: sampleVol
-                bucketName: bucketOne
-                keyName: key_two
-                dataSize: 10000000
-                creationTime: 1687189663664
-                modificationTime: 1687189671884
-                replicationConfig:
-                  replicationFactor: THREE
-                  requiredNodes: 3
-                  replicationType: RATIS
-                fileChecksum: null
-                fileName: List2File2
-                file: false
-                path: 0/key_two
-                hsync: false
-                replicatedSize: 30000000
-                fileEncryptionInfo: null
-                objectInfo: OMKeyInfo{volume='sampleVol', bucket='bucketOne', key='key_two', dataSize='10000000', creationTime='1687189663664', objectID='-9223372036844470015', parentID='-9223372036844472575', replication='RATIS/THREE', fileChecksum='null}
-                updateIDset: true
+                $ref: "#/components/schemas/OMKeyInfoList"
+              totalSize:
+                type: object
+                properties:
+                  63:
+                    type: integer
+                    example: 189
+        status:
+          type: string
+          example: OK
+    DeletePendingSummary:
+      type: object
+      properties:
+        totalUnreplicatedDataSize:
+          type: integer
+        totalReplicatedDataSize:
+          type: integer
+        totalDeletedKeys:
+          type: integer
+    ACL:
+      type: object
+      properties:
+        type:
+          type: string
+        name:
+          type: string
+        aclScope:
+          type: string
+        aclList:
+          type: array
+          items:
+            type: string
     DeletePendingDirs:
       type: object
       properties:
         lastKey:
           type: string
           example: vol1/bucket1/bucket1/dir1
-        replicatedTotal:
+        replicatedDataSize:
           type: integer
           example: 13824
-        unreplicatedTotal:
+        unreplicatedDataSize:
           type: integer
           example: 4608
-        deletedKeyInfo:
+        deletedDirInfo:
           type: array
           items:
             type: object
             properties:
-              omKeyInfoList:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    metadata:
-                      type: object
-                    updateID:
-                      type: number
-                    parentObjectID:
-                      type: number
-                    volumeName:
-                      type: string
-                    bucketName:
-                      type: string
-                    keyName:
-                      type: string
-                    dataSize:
-                      type: number
-                    creationTime:
-                      type: number
-                    modificationTime:
-                      type: number
-                    replicationConfig:
-                      type: object
-                      properties:
-                        replicationFactor:
-                          type: string
-                        requiredNodes:
-                          type: integer
-                        replicationType:
-                          type: string
-                    fileChecksum:
-                      type: number
-                      nullable: true
-                    fileName:
-                      type: string
-                    acls:
-                      type: array
-                    path:
-                      type: string
-                    file:
-                      type: boolean
-                    latestVersionLocations:
-                      type: string
-                      nullable: true
-                    replicatedSize:
-                      type: number
-                    fileEncryptionInfo:
-                      type: string
-                      nullable: true
-                    objectInfo:
-                      type: string
-                    updateIDset:
-                      type: boolean
-          example:
-            - omKeyInfoList:
-                - metadata: {}
-                  objectID: -9223372036844470271
-                  updateID: 40429
-                  parentObjectID: -9223372036844472575
-                  volumeName: vol1
-                  bucketName: bucket1
-                  keyName: dir1
-                  dataSize: 20000000
-                  creationTime: 1687189663661
-                  modificationTime: 1687189672598
-                  replicationConfig:
-                    replicationFactor: ONE
-                    requiredNodes: 1
-                    replicationType: STANDALONE
-                  fileChecksum: null
-                  fileName: dir1
-                  acls: []
-                  path: 0/key_one
-                  file: false
-                  latestVersionLocations: null
-                  replicatedSize: 30000000
-                  fileEncryptionInfo: null
-                  objectInfo: OMKeyInfo{volume='vol1', bucket='bucket1', key='key_one', dataSize='10000000', creationTime='1687189663661', objectID='-9223372036844470271', parentID='-9223372036844472575', replication='STANDALONE/ONE', fileChecksum='null}
-                  updateIDset: false
+              path:
+                type: string
+              key:
+                type: string
+              inStateSince:
+                type: number
+              size:
+                type: integer
+              replicatedSize:
+                type: integer
+              replicationInfo:
+                type: object
+                properties:
+                  replicationFactor:
+                    type: string
+                    example: THREE
+                  requiredNodes:
+                    type: integer
+                    example: 3
+                  replicationType:
+                    type: string
+                    example: RATIS
+              creationTime:
+                type: integer
+              modificationTime:
+                type: integer
+              isKey:
+                type: boolean
         status:
           type: string
           example: OK
@@ -1311,6 +1641,8 @@ components:
                 example: 100
               localIDList:
                 type: array
+                items:
+                  type: integer
                 example:
                   - 1
                   - 2
@@ -1335,7 +1667,7 @@ components:
           type: number
           example: -1
         numBucket:
-          type: -1
+          type: integer
           example: 100
         numDir:
           type: number
@@ -1366,6 +1698,8 @@ components:
           items:
             type: object
             properties:
+              key:
+                type: boolean
               path:
                 type: string
               size:
@@ -1375,19 +1709,23 @@ components:
               isKey:
                 type: boolean
             example:
-              - path: /vol1/bucket1/dir1-1
+              - key: false
+                path: /vol1/bucket1/dir1-1
                 size: 30000
                 sizeWithReplica: 90000
                 isKey: false
-              - path: /vol1/bucket1/dir1-2
+              - key: false
+                path: /vol1/bucket1/dir1-2
                 size: 30000
                 sizeWithReplica: 90000
                 isKey": false
-              - path: /vol1/bucket1/dir1-3
+              - key: false
+                path: /vol1/bucket1/dir1-3
                 size: 30000
                 sizeWithReplica: 90000
                 isKey": false
-              - path: /vol1/bucket1/key1-1
+              - key: true
+                path: /vol1/bucket1/key1-1
                 size: 30000
                 sizeWithReplica: 90000
                 isKey": true
@@ -1414,6 +1752,8 @@ components:
           example: OK
         dist:
           type: array
+          items:
+            type: integer
           example:
             - 0
             - 0
@@ -1424,9 +1764,38 @@ components:
             - 0
             - 100
             - 40
+    StorageReport:
+      type: object
+      properties:
+        capacity:
+          type: number
+          example: 270429917184
+        used:
+          type: number
+          example: 358805504
+        remaining:
+          type: number
+          example: 270071111680
+        committed:
+          type: number
+          example: 27007111
     ClusterState:
       type: object
       properties:
+        deletedDirs:
+          type: integer
+        missingContainers:
+          type: integer
+        openContainers:
+          type: integer
+        deletedContainers:
+          type: integer
+        keysPendingDeletion:
+          type: integer
+        scmServiceId:
+          type: string
+        omServiceId:
+          type: string
         pipelines:
           type: integer
           example: 5
@@ -1437,20 +1806,7 @@ components:
           type: integer
           example: 4
         storageReport:
-          type: object
-          properties:
-            capacity:
-              type: number
-              example: 1081719668736
-            used:
-              type: number
-              example: 1309212672
-            remaining:
-              type: number
-              example: 1080410456064
-            committed:
-              type: number
-              example: 1080410456
+          $ref: "#/components/schemas/StorageReport"
         containers:
           type: integer
           example: 26
@@ -1474,6 +1830,20 @@ components:
           items:
             type: object
             properties:
+              buildDate:
+                type: string
+              layoutVersion:
+                type: integer
+              networkLocation:
+                type: string
+              opState:
+                type: string
+              revision:
+                type: string
+              setupTime:
+                type: integer
+              version:
+                type: string
               uuid:
                 type: string
                 example: f8f8cb45-3ab2-4123
@@ -1487,20 +1857,7 @@ components:
                 type: number
                 example: 1605738400544
               storageReport:
-                type: object
-                properties:
-                  capacity:
-                    type: number
-                    example: 270429917184
-                  used:
-                    type: number
-                    example: 358805504
-                  remaining:
-                    type: number
-                    example: 270071111680
-                  committed:
-                    type: number
-                    example: 27007111
+                $ref: "#/components/schemas/StorageReport"
               pipelines:
                 type: array
                 items:
@@ -1531,6 +1888,133 @@ components:
                 example: 1
     RemovedDatanodesResponse:
       type: object
+      properties:
+        datanodesResponseMap:
+          type: object
+          properties:
+            removedDatanodes:
+              type: object
+              properties:
+                totalCount:
+                  type: integer
+                datanodes:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      uuid:
+                        type: string
+                      hostname:
+                        type: string
+                      state:
+                        type: string
+                      pipelines:
+                        type: string
+                        nullable: true
+    DatanodesDecommissionInfo:
+      type: object
+      properties:
+        DatanodesDecommissionInfo:
+          type: array
+          items:
+            type: object
+            properties:
+              containers:
+                type: object
+              metrics:
+                type: object
+                properties:
+                  decommissionStartTime:
+                    type: string
+                  numOfUnclosedContainers:
+                    type: integer
+                  numOfUnclosedPipelines:
+                    type: integer
+                  numOfUnderReplicatedContainers:
+                    type: integer
+                nullable: true
+              datanodeDetails:
+                $ref: "#/components/schemas/DatanodeDetails"
+    ByteString:
+      type: object
+      properties:
+        string:
+          type: string
+        bytes:
+          type: object
+          properties:
+            validUtf8:
+              type: boolean
+            empty:
+              type: boolean
+    DatanodeDetails:
+      type: object
+      properties:
+        level:
+          type: integer
+        parent:
+          type: string
+          nullable: true
+        cost:
+          type: integer
+        uuid:
+          type: string
+        uuidString:
+          type: string
+        ipAddress:
+          type: string
+        hostName:
+          type: string
+        ports:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              value:
+                type: integer
+        certSerialId:
+          type: integer
+        version:
+          type: string
+          nullable: true
+        setupTime:
+          type: string
+        revision:
+          type: string
+          nullable: true
+        buildDate:
+          type: string
+          nullable: true
+        persistedOpState:
+          type: string
+        persistedOpStateExpiryEpochSec:
+          type: integer
+        initialVersion:
+          type: integer
+        currentVersion:
+          type: integer
+        decommissioned:
+          type: boolean
+        maintenance:
+          type: boolean
+        ipAddressAsByteString:
+          $ref: '#/components/schemas/ByteString'
+        hostNameAsByteString:
+          $ref: '#/components/schemas/ByteString'
+        networkName:
+          type: string
+        networkLocation:
+          type: string
+        networkFullPath:
+          type: string
+        numOfLeaves:
+          type: integer
+        networkNameAsByteString:
+          $ref: '#/components/schemas/ByteString'
+        networkLocationAsByteString:
+          $ref: '#/components/schemas/ByteString'
     PipelinesSummary:
       type: object
       properties:
@@ -1553,10 +2037,8 @@ components:
                 example: localhost-1
               datanodes:
                 type: array
-                example:
-                  - localhost-1
-                  - localhost-2
-                  - localhost-3
+                items:
+                  $ref: '#/components/schemas/DatanodeDetails'
               lastLeaderElection:
                 type: integer
                 example: 0
@@ -1580,7 +2062,7 @@ components:
       items:
         type: object
         properties:
-          taskName: 
+          taskName:
             type: string
           lastUpdatedTimestamp:
             type: number
@@ -1607,21 +2089,21 @@ components:
           count:
             type: integer
         example:
-          - volume: vol-2-04168,
-            bucket: bucket-0-11685,
-            fileSize: 1024,
+          - volume: vol-2-04168
+            bucket: bucket-0-11685
+            fileSize: 1024
             count: 1
-          - volume: vol-2-04168,
-            bucket: bucket-1-41795,
-            fileSize: 1024,
+          - volume: vol-2-04168
+            bucket: bucket-1-41795
+            fileSize: 1024
             count: 1
-          - volume: vol-2-04168,
-            bucket: bucket-2-93377,
-            fileSize: 1024,
+          - volume: vol-2-04168
+            bucket: bucket-2-93377
+            fileSize: 1024
             count: 1
-          - volume: vol-2-04168,
-            bucket: bucket-3-50336,
-            fileSize: 1024,
+          - volume: vol-2-04168
+            bucket: bucket-3-50336
+            fileSize: 1024
             count: 2
     ContainerUtilization:
       type: array
@@ -1673,7 +2155,9 @@ components:
                         type: string
                         example: ozone
                   value:
-                    type: array
+                    oneOf:
+                      - type: string
+                      - type: number
                     example:
                       - 1599159384.455
                       - "5"

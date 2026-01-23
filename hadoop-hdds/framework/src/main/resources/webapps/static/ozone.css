@@ -91,3 +91,26 @@ body {
 .om-roles-background {
     background-color: #dcfbcd!important;
 }
+
+.scm-roles-background {
+    background-color: #dcfbcd!important;
+}
+.toggle-btn {
+    background: transparent; /* No background color */
+    color: #007bff; /* Button text color */
+    border: none; /* No border */
+    font-size: 12px; /* Font size for better readability */
+    cursor: pointer; /* Pointer cursor on hover */
+    padding: 5px 10px; /* Padding around the text */
+    margin-bottom: 5px; /* Space below the button */
+    transition: color 0.3s, transform 0.3s; /* Smooth transition for color and transform */
+}
+
+.toggle-btn:hover {
+    color: #0056b3; /* Darker color on hover */
+    transform: scale(1.1); /* Slightly scale up the button on hover */
+}
+
+.toggle-btn:focus {
+    outline: none; /* Remove default focus outline */
+}

@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,11 +17,21 @@
 
 package org.apache.hadoop.ozone.om.request.snapshot;
 
+import static org.apache.hadoop.hdds.HddsUtils.fromProtobuf;
+import static org.apache.hadoop.hdds.HddsUtils.toProtobuf;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.SNAPSHOT_LOCK;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAPSHOT;
+
+import com.google.protobuf.ByteString;
+import java.io.IOException;
+import java.nio.file.InvalidPathException;
+import java.util.UUID;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.ratis.server.protocol.TermIndex;
-import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
@@ -32,8 +41,10 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
@@ -55,17 +66,6 @@ import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.nio.file.InvalidPathException;
-import java.util.UUID;
-
-import static org.apache.hadoop.hdds.HddsUtils.fromProtobuf;
-import static org.apache.hadoop.hdds.HddsUtils.toProtobuf;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.SNAPSHOT_LOCK;
-import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAPSHOT;
-
 /**
  * Handles CreateSnapshot Request.
  */
@@ -74,8 +74,8 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       LoggerFactory.getLogger(OMSnapshotCreateRequest.class);
 
   private final String snapshotPath;
-  private final String volumeName;
-  private final String bucketName;
+  private String volumeName;
+  private String bucketName;
   private final String snapshotName;
   private final SnapshotInfo snapshotInfo;
 
@@ -105,7 +105,11 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
     final OMRequest omRequest = super.preExecute(ozoneManager);
     // Verify name
     OmUtils.validateSnapshotName(snapshotName);
-
+    // Updating the volumeName & bucketName in case the bucket is a linked bucket. We need to do this before a
+    // permission check, since linked bucket permissions and source bucket permissions could be different.
+    ResolvedBucket bucket = ozoneManager.resolveBucketLink(Pair.of(volumeName, bucketName), this);
+    this.volumeName = bucket.realVolume();
+    this.bucketName = bucket.realBucket();
     UserGroupInformation ugi = createUGIForApi();
     String bucketOwner = ozoneManager.getBucketOwner(volumeName, bucketName,
         IAccessAuthorizer.ACLType.READ, OzoneObj.ResourceType.BUCKET);
@@ -115,16 +119,18 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
           "Only bucket owners and Ozone admins can create snapshots",
           OMException.ResultCodes.PERMISSION_DENIED);
     }
-
-    return omRequest.toBuilder().setCreateSnapshotRequest(
-        omRequest.getCreateSnapshotRequest().toBuilder()
-            .setSnapshotId(toProtobuf(UUID.randomUUID()))
-            .setCreationTime(Time.now())
-            .build()).build();
+    // verify snapshot limit
+    ozoneManager.getOmSnapshotManager().snapshotLimitCheck();
+    CreateSnapshotRequest.Builder createSnapshotRequest = omRequest.getCreateSnapshotRequest().toBuilder()
+        .setSnapshotId(toProtobuf(UUID.randomUUID()))
+        .setVolumeName(volumeName)
+        .setBucketName(this.bucketName)
+        .setCreationTime(Time.now());
+    return omRequest.toBuilder().setCreateSnapshotRequest(createSnapshotRequest.build()).build();
   }
   
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumSnapshotCreates();
@@ -160,13 +166,9 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
         throw new OMException("Snapshot already exists", FILE_ALREADY_EXISTS);
       }
 
-      // Note down RDB latest transaction sequence number, which is used
-      // as snapshot generation in the Differ.
-      final long dbLatestSequenceNumber =
-          ((RDBStore) omMetadataManager.getStore()).getDb()
-              .getLatestSequenceNumber();
-      snapshotInfo.setDbTxSequenceNumber(dbLatestSequenceNumber);
-
+      ByteString txnBytes = TransactionInfo.valueOf(context.getTermIndex()).toByteString();
+      snapshotInfo.setCreateTransactionInfo(txnBytes);
+      snapshotInfo.setLastTransactionInfo(txnBytes);
       // Snapshot referenced size should be bucket's used bytes
       OmBucketInfo omBucketInfo =
           getBucketInfo(omMetadataManager, volumeName, bucketName);
@@ -181,9 +183,9 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       // because it is a design goal of CreateSnapshot to be an O(1) operation.
       // TODO: [SNAPSHOT] Assign actual data size once we have the
       //  pre-replicated key size counter in OmBucketInfo.
-      snapshotInfo.setReferencedSize(estimateBucketDataSize(omBucketInfo));
+      snapshotInfo.setReferencedSize(estimateBucketDataSize(omBucketInfo, ozoneManager.getDefaultReplicationConfig()));
 
-      addSnapshotInfoToSnapshotChainAndCache(omMetadataManager, termIndex.getIndex());
+      addSnapshotInfoToSnapshotChainAndCache(ozoneManager, omMetadataManager, context.getIndex());
 
       omResponse.setCreateSnapshotResponse(
           CreateSnapshotResponse.newBuilder()
@@ -195,6 +197,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       omClientResponse = new OMSnapshotCreateResponse(
           createErrorOMResponse(omResponse, exception));
     } finally {
+      ozoneManager.getOmSnapshotManager().decrementInFlightSnapshotCount();
       if (acquiredSnapshotLock) {
         mergeOmLockDetails(
             omMetadataManager.getLock().releaseWriteLock(SNAPSHOT_LOCK,
@@ -211,7 +214,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
     }
 
     // Performing audit logging outside the lock.
-    auditLog(auditLogger, buildAuditMessage(OMAction.CREATE_SNAPSHOT,
+    markForAudit(auditLogger, buildAuditMessage(OMAction.CREATE_SNAPSHOT,
         snapshotInfo.toAuditMap(), exception, userInfo));
 
     if (exception == null) {
@@ -245,6 +248,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
    * it was removed at T-5.
    */
   private void addSnapshotInfoToSnapshotChainAndCache(
+      OzoneManager ozoneManager,
       OmMetadataManagerImpl omMetadataManager,
       long transactionLogIndex
   ) throws IOException {
@@ -326,18 +330,12 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
    * bucket used size (w/ replication) by the replication factor of the bucket.
    * @param bucketInfo OmBucketInfo
    */
-  private long estimateBucketDataSize(OmBucketInfo bucketInfo) {
+  private long estimateBucketDataSize(OmBucketInfo bucketInfo, ReplicationConfig defaultReplicationConfig) {
     DefaultReplicationConfig defRC = bucketInfo.getDefaultReplicationConfig();
     final ReplicationConfig rc;
     if (defRC == null) {
-      // Note: A lot of tests are not setting bucket DefaultReplicationConfig,
-      //  sometimes intentionally.
-      //  Fall back to config default and print warning level log.
-      rc = ReplicationConfig.getDefault(new OzoneConfiguration());
-      LOG.warn("DefaultReplicationConfig is not correctly set in " +
-          "OmBucketInfo for volume '{}' bucket '{}'. " +
-          "Falling back to config default '{}'",
-          bucketInfo.getVolumeName(), bucketInfo.getBucketName(), rc);
+      //  Fall back to config default.
+      rc = defaultReplicationConfig;
     } else {
       rc = defRC.getReplicationConfig();
     }

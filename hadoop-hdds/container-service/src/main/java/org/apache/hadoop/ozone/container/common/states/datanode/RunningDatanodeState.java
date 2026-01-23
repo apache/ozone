@@ -1,22 +1,33 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.common.states.datanode;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CompletionService;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
@@ -31,19 +42,6 @@ import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.EnumMap;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CompletionService;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorCompletionService;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-
 /**
  * Class that implements handshake with SCM.
  */
@@ -54,9 +52,10 @@ public class RunningDatanodeState implements DatanodeState {
   private final ConfigurationSource conf;
   private final StateContext context;
   private CompletionService<EndPointStates> ecs;
-  /** Cache the end point task per end point per end point state. */
-  private Map<EndpointStateMachine, Map<EndPointStates,
-      Callable<EndPointStates>>> endpointTasks;
+  // Since we connectionManager endpoints can be changed by reconfiguration
+  // we should not rely on ConnectionManager#getValues being unchanged between
+  // execute and await
+  private int executingEndpointCount = 0;
 
   public RunningDatanodeState(ConfigurationSource conf,
       SCMConnectionManager connectionManager,
@@ -64,55 +63,6 @@ public class RunningDatanodeState implements DatanodeState {
     this.connectionManager = connectionManager;
     this.conf = conf;
     this.context = context;
-    initEndPointTask();
-  }
-
-  /**
-   * Initialize end point tasks corresponding to each end point,
-   * each end point state.
-   */
-  private void initEndPointTask() {
-    endpointTasks = new HashMap<>();
-    for (EndpointStateMachine endpoint : connectionManager.getValues()) {
-      EnumMap<EndPointStates, Callable<EndPointStates>> endpointTaskForState =
-          new EnumMap<>(EndPointStates.class);
-
-      for (EndPointStates state : EndPointStates.values()) {
-        Callable<EndPointStates> endPointTask = null;
-        switch (state) {
-        case GETVERSION:
-          endPointTask = new VersionEndpointTask(endpoint, conf,
-              context.getParent().getContainer());
-          break;
-        case REGISTER:
-          endPointTask = RegisterEndpointTask.newBuilder()
-              .setConfig(conf)
-              .setEndpointStateMachine(endpoint)
-              .setContext(context)
-              .setDatanodeDetails(context.getParent().getDatanodeDetails())
-              .setOzoneContainer(context.getParent().getContainer())
-              .build();
-          break;
-        case HEARTBEAT:
-          endPointTask = HeartbeatEndpointTask.newBuilder()
-              .setConfig(conf)
-              .setEndpointStateMachine(endpoint)
-              .setDatanodeDetails(context
-                  .getParent()
-                  .getDatanodeDetails())
-              .setContext(context)
-              .build();
-          break;
-        default:
-          break;
-        }
-
-        if (endPointTask != null) {
-          endpointTaskForState.put(state, endPointTask);
-        }
-      }
-      endpointTasks.put(endpoint, endpointTaskForState);
-    }
   }
 
   /**
@@ -139,8 +89,9 @@ public class RunningDatanodeState implements DatanodeState {
   @Override
   public void execute(ExecutorService executor) {
     ecs = new ExecutorCompletionService<>(executor);
+    executingEndpointCount = 0;
     for (EndpointStateMachine endpoint : connectionManager.getValues()) {
-      Callable<EndPointStates> endpointTask = getEndPointTask(endpoint);
+      Callable<EndPointStates> endpointTask = buildEndPointTask(endpoint);
       if (endpointTask != null) {
         // Just do a timely wait. A slow EndpointStateMachine won't occupy
         // the thread in executor from DatanodeStateMachine for a long time,
@@ -152,9 +103,18 @@ public class RunningDatanodeState implements DatanodeState {
         } else {
           heartbeatFrequency = context.getHeartbeatFrequency();
         }
-        ecs.submit(() -> endpoint.getExecutorService()
-            .submit(endpointTask)
-            .get(heartbeatFrequency, TimeUnit.MILLISECONDS));
+        ecs.submit(() -> {
+          try {
+            return endpoint.getExecutorService()
+                .submit(endpointTask)
+                .get(context.getHeartbeatFrequency(), TimeUnit.MILLISECONDS);
+          } catch (TimeoutException e) {
+            TimeoutException timeoutEx = new TimeoutException("Timeout occurred on endpoint: " + endpoint.getAddress());
+            timeoutEx.initCause(e);
+            throw timeoutEx;
+          }
+        });
+        executingEndpointCount++;
       } else {
         // This can happen if a task is taking more time than the timeOut
         // specified for the task in await, and when it is completed the task
@@ -171,12 +131,37 @@ public class RunningDatanodeState implements DatanodeState {
     this.ecs = e;
   }
 
-  private Callable<EndPointStates> getEndPointTask(
+  @VisibleForTesting
+  public void setExecutingEndpointCount(int executingEndpointCount) {
+    this.executingEndpointCount = executingEndpointCount;
+  }
+
+  private Callable<EndPointStates> buildEndPointTask(
       EndpointStateMachine endpoint) {
-    if (endpointTasks.containsKey(endpoint)) {
-      return endpointTasks.get(endpoint).get(endpoint.getState());
-    } else {
-      throw new IllegalArgumentException("Illegal endpoint: " + endpoint);
+    switch (endpoint.getState()) {
+    case GETVERSION:
+      // set the next heartbeat time to current to avoid wait for next heartbeat as REGISTER can be triggered
+      // immediately after GETVERSION
+      context.getParent().setNextHB(Time.monotonicNow());
+      return new VersionEndpointTask(endpoint, conf,
+          context.getParent().getContainer());
+    case REGISTER:
+      return RegisterEndpointTask.newBuilder()
+          .setConfig(conf)
+          .setEndpointStateMachine(endpoint)
+          .setContext(context)
+          .setDatanodeDetails(context.getParent().getDatanodeDetails())
+          .setOzoneContainer(context.getParent().getContainer())
+          .build();
+    case HEARTBEAT:
+      return HeartbeatEndpointTask.newBuilder()
+          .setConfig(conf)
+          .setEndpointStateMachine(endpoint)
+          .setDatanodeDetails(context.getParent().getDatanodeDetails())
+          .setContext(context)
+          .build();
+    default:
+      return null;
     }
   }
 
@@ -204,7 +189,12 @@ public class RunningDatanodeState implements DatanodeState {
         LOG.error("Error in executing end point task.", e);
         Thread.currentThread().interrupt();
       } catch (ExecutionException e) {
-        LOG.error("Error in executing end point task.", e);
+        Throwable cause = e.getCause();
+        if (cause instanceof TimeoutException) {
+          LOG.warn("Detected timeout: {}", cause.getMessage());
+        } else {
+          LOG.error("Error in executing end point task.", e);
+        }
       }
     }
     return DatanodeStateMachine.DatanodeStates.RUNNING;
@@ -220,14 +210,13 @@ public class RunningDatanodeState implements DatanodeState {
   public DatanodeStateMachine.DatanodeStates
       await(long duration, TimeUnit timeUnit)
       throws InterruptedException {
-    int count = connectionManager.getValues().size();
     int returned = 0;
     long durationMS = timeUnit.toMillis(duration);
     long timeLeft = durationMS;
     long startTime = Time.monotonicNow();
     List<Future<EndPointStates>> results = new LinkedList<>();
 
-    while (returned < count && timeLeft > 0) {
+    while (returned < executingEndpointCount && timeLeft > 0) {
       Future<EndPointStates> result =
           ecs.poll(timeLeft, TimeUnit.MILLISECONDS);
       if (result != null) {
@@ -237,5 +226,10 @@ public class RunningDatanodeState implements DatanodeState {
       timeLeft = durationMS - (Time.monotonicNow() - startTime);
     }
     return computeNextContainerState(results);
+  }
+
+  @Override
+  public void clear() {
+    ecs = null;
   }
 }

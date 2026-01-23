@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,27 +14,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.repair;
 
-import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.hdds.utils.db.Codec;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
-import org.apache.hadoop.ozone.debug.RocksDBUtils;
-import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ratis.server.protocol.TermIndex;
-import org.junit.jupiter.api.Test;
-import org.mockito.MockedStatic;
-import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.RocksDB;
-import org.rocksdb.RocksDBException;
-
-import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.util.function.Supplier;
-
-import static org.apache.hadoop.ozone.om.OmMetadataManagerImpl.TRANSACTION_INFO_TABLE;
+import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
+import static org.apache.ozone.test.IntLambda.withTextFromSystemIn;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyString;
@@ -43,97 +28,129 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.when;
+
+import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedConfigOptions;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
+import org.apache.hadoop.ozone.debug.RocksDBUtils;
+import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.server.protocol.TermIndex;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.MockedStatic;
+import org.rocksdb.ColumnFamilyHandle;
+import org.rocksdb.DBOptions;
+import org.rocksdb.OptionsUtil;
+import org.rocksdb.RocksDB;
+import org.rocksdb.RocksDBException;
+import picocli.CommandLine;
 
 /**
  * Tests TransactionInfoRepair.
  */
 public class TestTransactionInfoRepair {
 
-
   private static final String DB_PATH = "testDBPath";
   private static final long TEST_TERM = 1;
   private static final long TEST_INDEX = 1;
+  private GenericTestUtils.PrintStreamCapturer out;
+  private GenericTestUtils.PrintStreamCapturer err;
 
-  @Test
-  public void testUpdateTransactionInfoTableSuccessful() throws Exception {
-    ManagedRocksDB mdb = mockRockDB();
-    try (GenericTestUtils.SystemOutCapturer outCapturer = new GenericTestUtils.SystemOutCapturer()) {
-      testCommand(mdb, mock(ColumnFamilyHandle.class), () -> {
-        try {
-          return outCapturer.getOutput();
-        } catch (UnsupportedEncodingException e) {
-          throw new RuntimeException(e);
-        }
-      }, new String[]{String.format("The original highest transaction Info was (t:%s, i:%s)",
-          TEST_TERM, TEST_INDEX),
-              String.format("The highest transaction info has been updated to: (t:%s, i:%s)",
-                  TEST_TERM, TEST_INDEX)});
-    }
+  @BeforeEach
+  void setup() {
+    out = GenericTestUtils.captureOut();
+    err = GenericTestUtils.captureErr();
   }
 
-  @Test
-  public void testCommandWhenTableNotInDBForGivenPath() throws Exception {
-    ManagedRocksDB mdb = mockRockDB();
-    IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-        () -> testCommand(mdb, null, null, new String[]{""}));
-    assertThat(exception.getMessage()).contains(TRANSACTION_INFO_TABLE +
-        " is not in a column family in DB for the given path");
+  @AfterEach
+  void cleanup() {
+    IOUtils.closeQuietly(out, err);
   }
 
-  @Test
-  public void testCommandWhenFailToUpdateRocksDBForGivenPath() throws Exception {
+  @ParameterizedTest
+  @ValueSource(strings = {"om", "scm"})
+  public void testUpdateTransactionInfoTableSuccessful(String component) {
+    ManagedRocksDB mdb = mockRockDB();
+    testCommand(component, mdb, mock(ColumnFamilyHandle.class));
+
+    assertThat(out.getOutput())
+        .contains(
+            String.format("The original highest transaction Info was (t:%s, i:%s)", TEST_TERM, TEST_INDEX),
+            String.format("The highest transaction info has been updated to: (t:%s, i:%s)", TEST_TERM, TEST_INDEX)
+        );
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"om", "scm"})
+  public void testCommandWhenTableNotInDBForGivenPath(String component) {
+    ManagedRocksDB mdb = mockRockDB();
+    testCommand(component, mdb, null);
+    assertThat(err.getOutput())
+        .contains(getColumnFamilyName(component) + " is not in a column family in DB for the given path");
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"om", "scm"})
+  public void testCommandWhenFailToUpdateRocksDBForGivenPath(String component) throws Exception {
     ManagedRocksDB mdb = mockRockDB();
     RocksDB rdb = mdb.get();
 
+    ColumnFamilyHandle mock = mock(ColumnFamilyHandle.class);
     doThrow(RocksDBException.class).when(rdb)
-        .put(any(ColumnFamilyHandle.class), any(byte[].class), any(byte[].class));
+        .put(eq(mock), any(byte[].class), any(byte[].class));
 
-    IOException exception = assertThrows(IOException.class,
-        () -> testCommand(mdb, mock(ColumnFamilyHandle.class), null, new String[]{""}));
-    assertThat(exception.getMessage()).contains("Failed to update RocksDB.");
-    assertThat(exception.getCause()).isInstanceOf(RocksDBException.class);
+    testCommand(component, mdb, mock);
+
+    assertThat(err.getOutput())
+        .contains("Failed to update RocksDB.");
   }
 
-
-  private void testCommand(ManagedRocksDB mdb, ColumnFamilyHandle columnFamilyHandle, Supplier<String> capturer,
-                           String[] messages) throws Exception {
+  private void testCommand(String component, ManagedRocksDB mdb, ColumnFamilyHandle columnFamilyHandle) {
+    final String expectedColumnFamilyName = getColumnFamilyName(component);
     try (MockedStatic<ManagedRocksDB> mocked = mockStatic(ManagedRocksDB.class);
-         MockedStatic<RocksDBUtils> mockUtil = mockStatic(RocksDBUtils.class)) {
-      mocked.when(() -> ManagedRocksDB.open(anyString(), anyList(), anyList())).thenReturn(mdb);
-      mockUtil.when(() -> RocksDBUtils.getColumnFamilyHandle(anyString(), anyList()))
+         MockedStatic<RocksDBUtils> mockUtil = mockStatic(RocksDBUtils.class);
+         MockedStatic<OptionsUtil> mockOptionsUtil = mockStatic(OptionsUtil.class)) {
+      mocked.when(() -> ManagedRocksDB.openWithLatestOptions(any(ManagedConfigOptions.class), any(DBOptions.class),
+          anyString(), anyList(), anyList())).thenReturn(mdb);
+      mockUtil.when(() -> RocksDBUtils.getColumnFamilyHandle(eq(expectedColumnFamilyName), anyList()))
           .thenReturn(columnFamilyHandle);
-      mockUtil.when(() ->
-          RocksDBUtils.getValue(any(ManagedRocksDB.class), any(ColumnFamilyHandle.class), anyString(),
-              any(Codec.class))).thenReturn(mock(TransactionInfo.class));
 
-      mockTransactionInfo(mockUtil);
+      mockUtil.when(() -> RocksDBUtils.getValue(eq(mdb), eq(columnFamilyHandle), eq(TRANSACTION_INFO_KEY),
+              eq(TransactionInfo.getCodec())))
+          .thenReturn(mock(TransactionInfo.class));
 
-      TransactionInfoRepair cmd = spy(TransactionInfoRepair.class);
-      RDBRepair rdbRepair = mock(RDBRepair.class);
-      when(rdbRepair.getDbPath()).thenReturn(DB_PATH);
-      when(cmd.getParent()).thenReturn(rdbRepair);
-      cmd.setHighestTransactionTerm(TEST_TERM);
-      cmd.setHighestTransactionIndex(TEST_INDEX);
+      mockUtil.when(() -> RocksDBUtils.getValue(eq(mdb), eq(columnFamilyHandle), eq(TRANSACTION_INFO_KEY),
+              eq(TransactionInfo.getCodec())))
+          .thenReturn(mock(TransactionInfo.class));
 
-      cmd.call();
-      for (String message : messages) {
-        assertThat(capturer.get()).contains(message);
-      }
+      TransactionInfo transactionInfo2 = TransactionInfo.valueOf(TermIndex.valueOf(TEST_TERM, TEST_INDEX));
+      mockUtil.when(() -> RocksDBUtils.getValue(eq(mdb), eq(columnFamilyHandle), eq(TRANSACTION_INFO_KEY),
+              eq(TransactionInfo.getCodec())))
+          .thenReturn(transactionInfo2);
+
+      CommandLine cli = new OzoneRepair().getCmd();
+      withTextFromSystemIn("y")
+          .execute(() -> cli.execute(
+              component,
+              "update-transaction",
+              "--db", DB_PATH,
+              "--term", String.valueOf(TEST_TERM),
+              "--index", String.valueOf(TEST_INDEX)
+          ));
     }
   }
 
-  private void mockTransactionInfo(MockedStatic<RocksDBUtils> mockUtil) {
-    mockUtil.when(() ->
-        RocksDBUtils.getValue(any(ManagedRocksDB.class), any(ColumnFamilyHandle.class), anyString(),
-            any(Codec.class))).thenReturn(mock(TransactionInfo.class));
-
-    TransactionInfo transactionInfo2 = mock(TransactionInfo.class);
-    doReturn(TermIndex.valueOf(TEST_TERM, TEST_INDEX)).when(transactionInfo2).getTermIndex();
-    mockUtil.when(() ->
-        RocksDBUtils.getValue(any(ManagedRocksDB.class), any(ColumnFamilyHandle.class), anyString(),
-            any(Codec.class))).thenReturn(transactionInfo2);
+  private String getColumnFamilyName(String component) {
+    switch (component) {
+    case "om": return OMDBDefinition.TRANSACTION_INFO_TABLE_DEF.getName();
+    case "scm": return SCMDBDefinition.TRANSACTIONINFO.getName();
+    default: return "";
+    }
   }
 
   private ManagedRocksDB mockRockDB() {

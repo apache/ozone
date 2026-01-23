@@ -1,30 +1,76 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.container.replication;
 
-import com.google.common.collect.ImmutableList;
-import com.google.protobuf.Proto2Utils;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.LOW;
+import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.ADD;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerInfo;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicasWithSameOrigin;
+import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.getNoNodesTestPlacementPolicy;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyList;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.isNull;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.google.common.collect.Lists;
+import com.google.protobuf.ProtoUtils;
+import java.io.IOException;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -53,7 +99,7 @@ import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-import org.apache.hadoop.util.Lists;
+import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.TestClock;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.junit.jupiter.api.AfterEach;
@@ -61,52 +107,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
-
-import java.io.IOException;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.function.Function;
-
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
-import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.LOW;
-import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.ADD;
-import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerInfo;
-import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
-import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicas;
-import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createReplicasWithSameOrigin;
-import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.getNoNodesTestPlacementPolicy;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.anyLong;
-import static org.mockito.Mockito.anyInt;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.anyList;
-import static org.mockito.Mockito.eq;
-import static org.mockito.Mockito.isNull;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.clearInvocations;
 
 /**
  * Tests for the ReplicationManager.
@@ -115,7 +117,7 @@ public class TestReplicationManager {
 
   private OzoneConfiguration configuration;
   private ReplicationManager replicationManager;
-  private LegacyReplicationManager legacyReplicationManager;
+  private ReplicationManager.ReplicationManagerConfiguration rmConf;
   private ContainerManager containerManager;
   private PlacementPolicy ratisPlacementPolicy;
   private PlacementPolicy ecPlacementPolicy;
@@ -130,12 +132,13 @@ public class TestReplicationManager {
   private ReplicationConfig repConfig;
   private ReplicationManagerReport repReport;
   private ReplicationQueue repQueue;
-  private Set<Pair<UUID, SCMCommand<?>>> commandsSent;
+  private Set<Pair<DatanodeID, SCMCommand<?>>> commandsSent;
 
   @BeforeEach
   public void setup() throws IOException {
     configuration = new OzoneConfiguration();
     configuration.set(HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT, "0s");
+    rmConf = configuration.getObject(ReplicationManager.ReplicationManagerConfiguration.class);
     containerManager = mock(ContainerManager.class);
     ratisPlacementPolicy = mock(PlacementPolicy.class);
     when(ratisPlacementPolicy.validateContainerPlacement(anyList(),
@@ -156,10 +159,9 @@ public class TestReplicationManager {
       return null;
     }).when(nodeManager).addDatanodeCommand(any(), any());
 
-    legacyReplicationManager = mock(LegacyReplicationManager.class);
     clock = new TestClock(Instant.now(), ZoneId.systemDefault());
     containerReplicaPendingOps =
-        new ContainerReplicaPendingOps(clock);
+        new ContainerReplicaPendingOps(clock, null);
 
     when(containerManager
         .getContainerReplicas(any(ContainerID.class))).thenAnswer(
@@ -174,7 +176,7 @@ public class TestReplicationManager {
     containerReplicaMap = new HashMap<>();
     containerInfoSet = new HashSet<>();
     repConfig = new ECReplicationConfig(3, 2);
-    repReport = new ReplicationManagerReport();
+    repReport = new ReplicationManagerReport(rmConf.getContainerSampleLimit());
     repQueue = new ReplicationQueue();
 
     // Ensure that RM will run when asked.
@@ -201,6 +203,7 @@ public class TestReplicationManager {
 
   private ReplicationManager createReplicationManager() throws IOException {
     return new ReplicationManager(
+        rmConf,
         configuration,
         containerManager,
         ratisPlacementPolicy,
@@ -209,7 +212,6 @@ public class TestReplicationManager {
         scmContext,
         nodeManager,
         clock,
-        legacyReplicationManager,
         containerReplicaPendingOps) {
       @Override
       protected void startSubServices() {
@@ -227,9 +229,9 @@ public class TestReplicationManager {
   @Test
   public void testPendingOpsClearedWhenStarting() {
     containerReplicaPendingOps.scheduleAddReplica(ContainerID.valueOf(1),
-        MockDatanodeDetails.randomDatanodeDetails(), 1, Integer.MAX_VALUE);
+        MockDatanodeDetails.randomDatanodeDetails(), 1, null, Integer.MAX_VALUE, 5L, clock.millis());
     containerReplicaPendingOps.scheduleDeleteReplica(ContainerID.valueOf(2),
-        MockDatanodeDetails.randomDatanodeDetails(), 1, Integer.MAX_VALUE);
+        MockDatanodeDetails.randomDatanodeDetails(), 1, null, Integer.MAX_VALUE);
     assertEquals(1, containerReplicaPendingOps
         .getPendingOpCount(ContainerReplicaOp.PendingOpType.ADD));
     assertEquals(1, containerReplicaPendingOps
@@ -374,7 +376,7 @@ public class TestReplicationManager {
     Set<ContainerReplica> replicas =
         createReplicasWithSameOrigin(container.containerID(),
             ContainerReplicaProto.State.QUASI_CLOSED, 0, 0, 0);
-    UUID origin = replicas.iterator().next().getOriginDatanodeId();
+    final DatanodeID origin = replicas.iterator().next().getOriginDatanodeId();
     ContainerReplica unhealthy =
         createContainerReplica(container.containerID(), 0, IN_SERVICE,
             ContainerReplicaProto.State.UNHEALTHY, 1, 123,
@@ -396,7 +398,7 @@ public class TestReplicationManager {
     handler.processAndSendCommands(replicas, Collections.emptyList(),
             repQueue.dequeueOverReplicatedContainer(), 2);
     assertTrue(commandsSent.iterator().hasNext());
-    assertEquals(unhealthy.getDatanodeDetails().getUuid(),
+    assertEquals(unhealthy.getDatanodeDetails().getID(),
         commandsSent.iterator().next().getKey());
     assertEquals(SCMCommandProto.Type.deleteContainerCommand,
         commandsSent.iterator().next().getValue().getType());
@@ -466,130 +468,12 @@ public class TestReplicationManager {
     storeContainerAndReplicas(container, replicas);
 
     replicationManager.processContainer(container, repQueue, repReport);
-    assertEquals(0, repReport.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    assertEquals(0, repReport.getStat(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED));
-    assertEquals(0, repQueue.underReplicatedQueueSize());
-    assertEquals(0, repQueue.overReplicatedQueueSize());
-  }
-
-  @Test
-  public void testQuasiClosedContainerWithVulnerableUnhealthyReplica()
-      throws IOException, NodeNotFoundException {
-    RatisReplicationConfig ratisRepConfig =
-        RatisReplicationConfig.getInstance(THREE);
-    long sequenceID = 10;
-    ContainerInfo container = createContainerInfo(ratisRepConfig, 1,
-        HddsProtos.LifeCycleState.QUASI_CLOSED, sequenceID);
-
-    // this method creates replicas with same origin id and zero sequence id
-    Set<ContainerReplica> replicas =
-        createReplicasWithSameOrigin(container.containerID(),
-            ContainerReplicaProto.State.QUASI_CLOSED, 0, 0, 0);
-    replicas.add(createContainerReplica(container.containerID(), 0,
-        IN_SERVICE, ContainerReplicaProto.State.UNHEALTHY, sequenceID));
-    ContainerReplica decommissioning =
-        createContainerReplica(container.containerID(), 0, DECOMMISSIONING,
-            ContainerReplicaProto.State.UNHEALTHY, sequenceID);
-    replicas.add(decommissioning);
-    storeContainerAndReplicas(container, replicas);
-    when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
-        .thenAnswer(invocation -> {
-          DatanodeDetails dn = invocation.getArgument(0);
-          if (dn.equals(decommissioning.getDatanodeDetails())) {
-            return new NodeStatus(DECOMMISSIONING, HddsProtos.NodeState.HEALTHY);
-          }
-
-          return NodeStatus.inServiceHealthy();
-        });
-
-    replicationManager.processContainer(container, repQueue, repReport);
     assertEquals(1, repReport.getStat(
         ReplicationManagerReport.HealthState.UNDER_REPLICATED));
     assertEquals(0, repReport.getStat(
         ReplicationManagerReport.HealthState.OVER_REPLICATED));
     assertEquals(1, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
-
-    when(ratisPlacementPolicy.chooseDatanodes(anyList(), anyList(), eq(null), eq(1), anyLong(),
-        anyLong())).thenAnswer(invocation -> ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()));
-    when(nodeManager.getTotalDatanodeCommandCounts(any(DatanodeDetails.class), any(), any()))
-        .thenAnswer(invocation -> {
-          Map<SCMCommandProto.Type, Integer> map = new HashMap<>();
-          map.put(SCMCommandProto.Type.replicateContainerCommand, 0);
-          map.put(SCMCommandProto.Type.reconstructECContainersCommand, 0);
-          return map;
-        });
-    RatisUnderReplicationHandler handler =
-        new RatisUnderReplicationHandler(ratisPlacementPolicy, configuration, replicationManager);
-
-    handler.processAndSendCommands(replicas, Collections.emptyList(), repQueue.dequeueUnderReplicatedContainer(), 2);
-    assertEquals(1, commandsSent.size());
-    Pair<UUID, SCMCommand<?>> command = commandsSent.iterator().next();
-    assertEquals(SCMCommandProto.Type.replicateContainerCommand, command.getValue().getType());
-    assertEquals(decommissioning.getDatanodeDetails().getUuid(), command.getKey());
-  }
-
-
-  /**
-   * There is a QUASI_CLOSED container with some UNHEALTHY replicas on unique origin nodes. If the datanode hosting
-   * one such replica is being taken offline, then the UNHEALTHY replica needs to be replicated to another node.
-   */
-  @Test
-  public void testQuasiClosedContainerWithUnhealthyReplicaOnDecommissioningNodeWithUniqueOrigin()
-      throws IOException, NodeNotFoundException {
-    RatisReplicationConfig ratisRepConfig =
-        RatisReplicationConfig.getInstance(THREE);
-    // create a QUASI_CLOSED container with 3 QUASI_CLOSED replicas on same origin, and 1 UNHEALTHY on unique origin
-    ContainerInfo container = createContainerInfo(ratisRepConfig, 1,
-        HddsProtos.LifeCycleState.QUASI_CLOSED);
-    Set<ContainerReplica> replicas =
-        createReplicasWithSameOrigin(container.containerID(),
-            ContainerReplicaProto.State.QUASI_CLOSED, 0, 0, 0);
-    ContainerReplica unhealthy =
-        createContainerReplica(container.containerID(), 0, DECOMMISSIONING,
-            ContainerReplicaProto.State.UNHEALTHY);
-    replicas.add(unhealthy);
-    storeContainerAndReplicas(container, replicas);
-    when(replicationManager.getNodeStatus(any(DatanodeDetails.class)))
-        .thenAnswer(invocation -> {
-          DatanodeDetails dn = invocation.getArgument(0);
-          if (dn.equals(unhealthy.getDatanodeDetails())) {
-            return new NodeStatus(DECOMMISSIONING, HddsProtos.NodeState.HEALTHY);
-          }
-
-          return NodeStatus.inServiceHealthy();
-        });
-
-    // the container should be under replicated and queued to under replication queue
-    replicationManager.processContainer(container, repQueue, repReport);
-    assertEquals(1, repReport.getStat(
-        ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    assertEquals(0, repReport.getStat(
-        ReplicationManagerReport.HealthState.OVER_REPLICATED));
-    assertEquals(1, repQueue.underReplicatedQueueSize());
-    assertEquals(0, repQueue.overReplicatedQueueSize());
-
-    // next, this test sets up some mocks to test if RatisUnderReplicationHandler will handle this container correctly
-    when(ratisPlacementPolicy.chooseDatanodes(anyList(), anyList(), eq(null), eq(1), anyLong(),
-        anyLong())).thenAnswer(invocation -> ImmutableList.of(MockDatanodeDetails.randomDatanodeDetails()));
-    when(nodeManager.getTotalDatanodeCommandCounts(any(DatanodeDetails.class), any(), any()))
-        .thenAnswer(invocation -> {
-          Map<SCMCommandProto.Type, Integer> map = new HashMap<>();
-          map.put(SCMCommandProto.Type.replicateContainerCommand, 0);
-          map.put(SCMCommandProto.Type.reconstructECContainersCommand, 0);
-          return map;
-        });
-    RatisUnderReplicationHandler handler =
-        new RatisUnderReplicationHandler(ratisPlacementPolicy, configuration, replicationManager);
-
-    handler.processAndSendCommands(replicas, Collections.emptyList(), repQueue.dequeueUnderReplicatedContainer(), 2);
-    assertEquals(1, commandsSent.size());
-    Pair<UUID, SCMCommand<?>> command = commandsSent.iterator().next();
-    // a replicate command should have been sent for the UNHEALTHY replica
-    assertEquals(SCMCommandProto.Type.replicateContainerCommand, command.getValue().getType());
-    assertEquals(unhealthy.getDatanodeDetails().getUuid(), command.getKey());
   }
 
   /**
@@ -736,8 +620,8 @@ public class TestReplicationManager {
         HddsProtos.LifeCycleState.CLOSED);
     addReplicas(container, ContainerReplicaProto.State.CLOSED, 1, 2, 3, 4);
     containerReplicaPendingOps.scheduleAddReplica(container.containerID(),
-        MockDatanodeDetails.randomDatanodeDetails(), 5,
-        clock.millis() + 10000);
+        MockDatanodeDetails.randomDatanodeDetails(), 5, null,
+        clock.millis() + 10000, 5L, clock.millis());
 
     replicationManager.processContainer(
         container, repQueue, repReport);
@@ -779,7 +663,7 @@ public class TestReplicationManager {
 
     ContainerReplica replica  = createContainerReplica(container.containerID(),
         1, IN_SERVICE, ContainerReplicaProto.State.CLOSED,
-        0, 0, MockDatanodeDetails.randomDatanodeDetails(), UUID.randomUUID());
+        0, 0, MockDatanodeDetails.randomDatanodeDetails(), DatanodeID.randomID());
 
     storeContainerAndReplicas(container, Collections.singleton(replica));
 
@@ -992,12 +876,12 @@ public class TestReplicationManager {
     // a delete command should also have been sent for UNHEALTHY replica of
     // index 1
     assertEquals(1, commandsSent.size());
-    Pair<UUID, SCMCommand<?>> command = commandsSent.iterator().next();
+    Pair<DatanodeID, SCMCommand<?>> command = commandsSent.iterator().next();
     assertEquals(SCMCommandProto.Type.deleteContainerCommand,
         command.getValue().getType());
     DeleteContainerCommand deleteCommand =
         (DeleteContainerCommand) command.getValue();
-    assertEquals(unhealthyReplica1.getDatanodeDetails().getUuid(),
+    assertEquals(unhealthyReplica1.getDatanodeDetails().getID(),
         command.getKey());
     assertEquals(container.containerID(),
         ContainerID.valueOf(deleteCommand.getContainerID()));
@@ -1027,7 +911,7 @@ public class TestReplicationManager {
     addReplicas(container, ContainerReplicaProto.State.CLOSED,
         1, 2, 3, 4, 5, 5);
     containerReplicaPendingOps.scheduleDeleteReplica(container.containerID(),
-        MockDatanodeDetails.randomDatanodeDetails(), 5,
+        MockDatanodeDetails.randomDatanodeDetails(), 5, null,
         clock.millis() + 10000);
     replicationManager.processContainer(
         container, repQueue, repReport);
@@ -1122,7 +1006,7 @@ public class TestReplicationManager {
         .thenReturn(new ContainerPlacementStatusDefault(4, 5, 5, 1,
             Lists.newArrayList(2, 1, 1, 1)));
 
-    repReport = new ReplicationManagerReport();
+    repReport = new ReplicationManagerReport(rmConf.getContainerSampleLimit());
     replicationManager.processContainer(container, repQueue, repReport);
     assertEquals(1, repQueue.underReplicatedQueueSize());
     assertEquals(0, repQueue.overReplicatedQueueSize());
@@ -1282,7 +1166,7 @@ public class TestReplicationManager {
 
     ReconstructECContainersCommand command = new ReconstructECContainersCommand(
         containerInfo.getContainerID(), sourceNodes, targetNodes,
-        Proto2Utils.unsafeByteString(missingIndexes), ecRepConfig);
+        ProtoUtils.unsafeByteString(missingIndexes), ecRepConfig);
 
     replicationManager.sendDatanodeCommand(command, containerInfo, target4);
 
@@ -1331,8 +1215,6 @@ public class TestReplicationManager {
 
     // Ensure that the command deadline is set to current time
     // + evenTime * factor
-    ReplicationManager.ReplicationManagerConfiguration rmConf = configuration
-        .getObject(ReplicationManager.ReplicationManagerConfiguration.class);
     long expectedDeadline = clock.millis() + rmConf.getEventTimeout() -
             rmConf.getDatanodeTimeoutOffset();
     assertEquals(expectedDeadline, command.getDeadline());
@@ -1397,8 +1279,6 @@ public class TestReplicationManager {
     replicationManager.sendDatanodeCommand(command, containerInfo, source);
 
     // check the command's deadline
-    ReplicationManager.ReplicationManagerConfiguration rmConf = configuration
-        .getObject(ReplicationManager.ReplicationManagerConfiguration.class);
     long expectedDeadline = clock.millis() + rmConf.getEventTimeout() -
         rmConf.getDatanodeTimeoutOffset();
     assertEquals(expectedDeadline, command.getDeadline());
@@ -1426,25 +1306,22 @@ public class TestReplicationManager {
     DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails src = MockDatanodeDetails.randomDatanodeDetails();
 
-    ReplicationManager.ReplicationManagerConfiguration rmConf = configuration
-        .getObject(ReplicationManager.ReplicationManagerConfiguration.class);
     long scmDeadline = clock.millis() + rmConf.getEventTimeout();
     long datanodeDeadline = scmDeadline - rmConf.getDatanodeTimeoutOffset();
 
     replicationManager.sendLowPriorityReplicateContainerCommand(containerInfo,
         0, src, target, scmDeadline);
 
-    ArgumentCaptor<SCMCommand> command =
+    ArgumentCaptor<SCMCommand<?>> command =
         ArgumentCaptor.forClass(SCMCommand.class);
-    ArgumentCaptor<UUID> targetUUID =
-        ArgumentCaptor.forClass(UUID.class);
+    ArgumentCaptor<DatanodeID> targetUUID = ArgumentCaptor.forClass(DatanodeID.class);
     verify(nodeManager).addDatanodeCommand(targetUUID.capture(), command.capture());
 
     ReplicateContainerCommand sentCommand =
         (ReplicateContainerCommand)command.getValue();
     assertEquals(datanodeDeadline, sentCommand.getDeadline());
     assertEquals(LOW, sentCommand.getPriority());
-    assertEquals(src.getUuid(), targetUUID.getValue());
+    assertEquals(src.getID(), targetUUID.getValue());
     assertEquals(target, sentCommand.getTargetDatanode());
   }
 
@@ -1499,8 +1376,8 @@ public class TestReplicationManager {
         container, new ArrayList<>(sourceNodes), destination, replicaIndex);
 
     assertEquals(1, commandsSent.size());
-    Pair<UUID, SCMCommand<?>> cmdWithTarget = commandsSent.iterator().next();
-    assertEquals(expectedTarget.getUuid(), cmdWithTarget.getLeft());
+    Pair<DatanodeID, SCMCommand<?>> cmdWithTarget = commandsSent.iterator().next();
+    assertEquals(expectedTarget.getID(), cmdWithTarget.getLeft());
     assertEquals(ReplicateContainerCommand.class,
         cmdWithTarget.getRight().getClass());
     ReplicateContainerCommand cmd =
@@ -1561,8 +1438,8 @@ public class TestReplicationManager {
     replicationManager.sendThrottledReconstructionCommand(container, command);
 
     assertEquals(1, commandsSent.size());
-    Pair<UUID, SCMCommand<?>> cmd = commandsSent.iterator().next();
-    assertEquals(cmdTarget.getUuid(), cmd.getLeft());
+    Pair<DatanodeID, SCMCommand<?>> cmd = commandsSent.iterator().next();
+    assertEquals(cmdTarget.getID(), cmd.getLeft());
     assertEquals(0, replicationManager.getMetrics()
         .getEcReconstructionCmdsDeferredTotal());
   }
@@ -1609,7 +1486,7 @@ public class TestReplicationManager {
     byte[] missingIndexes = new byte[]{4, 5};
     return new ReconstructECContainersCommand(
         containerInfo.getContainerID(), sources,
-        Arrays.asList(targets), Proto2Utils.unsafeByteString(missingIndexes),
+        Arrays.asList(targets), ProtoUtils.unsafeByteString(missingIndexes),
         (ECReplicationConfig) repConfig);
   }
 
@@ -1721,25 +1598,169 @@ public class TestReplicationManager {
     when(nodeManager.getNodeCount(isNull(), eq(HddsProtos.NodeState.HEALTHY)))
         .thenReturn(healthyNodes);
 
-    config.setInflightReplicationLimitFactor(0.0);
-    configuration.setFromObject(config);
+    rmConf.setInflightReplicationLimitFactor(0.0);
     ReplicationManager rm = createReplicationManager();
     assertEquals(0, rm.getReplicationInFlightLimit());
 
-    config.setInflightReplicationLimitFactor(1);
-    configuration.setFromObject(config);
+    rmConf.setInflightReplicationLimitFactor(1);
     rm = createReplicationManager();
     assertEquals(
         healthyNodes * config.getDatanodeReplicationLimit(),
         rm.getReplicationInFlightLimit());
 
-    config.setInflightReplicationLimitFactor(0.75);
-    configuration.setFromObject(config);
+    rmConf.setInflightReplicationLimitFactor(0.75);
     rm = createReplicationManager();
     assertEquals(
         (int) Math.ceil(healthyNodes
             * config.getDatanodeReplicationLimit() * 0.75),
         rm.getReplicationInFlightLimit());
+  }
+
+  @Test
+  public void testPendingOpExpiry() throws ContainerNotFoundException {
+    when(containerManager.getContainer(any()))
+        .thenReturn(ReplicationTestUtil.createContainerInfo(repConfig, 1,
+            HddsProtos.LifeCycleState.CLOSED, 10, 20));
+    // This is just some arbitrary epoch time in the past
+    long commandDeadline = 1000;
+    SCMCommand<?> command = new DeleteContainerCommand(1L, true);
+
+    DatanodeDetails dn1 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
+
+    ContainerReplicaOp addOp = new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.ADD,
+        dn1,
+        1,
+        null,
+        Long.MAX_VALUE,
+        0);
+    ContainerReplicaOp delOp = new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.DELETE, dn2, 1, command, commandDeadline, 0);
+
+    replicationManager.opCompleted(addOp, ContainerID.valueOf(1L), false);
+    replicationManager.opCompleted(delOp, ContainerID.valueOf(1L), false);
+    // No commands should be sent for either of the above ops.
+    assertEquals(0, commandsSent.size());
+
+    replicationManager.opCompleted(delOp, ContainerID.valueOf(1L), true);
+    assertEquals(1, commandsSent.size());
+    Pair<DatanodeID, SCMCommand<?>> sentCommand = commandsSent.iterator().next();
+    // The target should be DN2 and the deadline should have been updated from the value set in commandDeadline above
+    assertEquals(dn2.getID(), sentCommand.getLeft());
+    assertNotEquals(commandDeadline, sentCommand.getRight().getDeadline());
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testNotifyNodeStateChangeWakesUpThread(boolean queueIsEmpty) 
+      throws IOException, InterruptedException, ReflectiveOperationException, TimeoutException {
+
+    AtomicBoolean processAllCalled = new AtomicBoolean(false);
+    ReplicationQueue queue = mock(ReplicationQueue.class);
+    when(queue.isEmpty()).thenReturn(queueIsEmpty);
+    final ReplicationManager customRM = new ReplicationManager(
+        configuration.getObject(ReplicationManager.ReplicationManagerConfiguration.class),
+        configuration,
+        containerManager,
+        ratisPlacementPolicy,
+        ecPlacementPolicy,
+        eventPublisher,
+        scmContext,
+        nodeManager,
+        clock,
+        containerReplicaPendingOps) {
+          @Override
+          public ReplicationQueue getQueue() {
+            return queue;
+          }
+
+          @Override
+          public synchronized void processAll() {
+            processAllCalled.set(true);
+          }
+        };
+
+    customRM.notifyStatusChanged();
+    customRM.start();
+
+    // wait for the thread become TIMED_WAITING
+    GenericTestUtils.waitFor(
+        () -> customRM.isThreadWaiting(),
+        100,
+        1000);
+
+    // The processAll method will be called when the ReplicationManager's run
+    // method is executed by the replicationMonitor thread.
+    assertTrue(processAllCalled.get());
+    processAllCalled.set(false);
+
+    assertThat(customRM.notifyNodeStateChange()).isEqualTo(queueIsEmpty);
+
+    GenericTestUtils.waitFor(
+        () -> customRM.isThreadWaiting(),
+        100,
+        1000);
+
+    // If the queue is empty, the processAll method should have been called
+    assertEquals(processAllCalled.get(), queueIsEmpty);
+
+    customRM.stop();
+  }
+
+  @Test
+  public void testReconfigureContainerSampleLimit() {
+    // Create 120 under replicated containers
+    int totalContainers = 120;
+    for (int i = 0; i < totalContainers; i++) {
+      ContainerInfo container = createContainerInfo(
+          RatisReplicationConfig.getInstance(THREE), i,
+          HddsProtos.LifeCycleState.CLOSED);
+      containerInfoSet.add(container);
+
+      Set<ContainerReplica> replicas = new HashSet<>();
+      replicas.add(createContainerReplica(container.containerID(), 0,
+          IN_SERVICE, ContainerReplicaProto.State.CLOSED));
+      replicas.add(createContainerReplica(container.containerID(), 0,
+          IN_SERVICE, ContainerReplicaProto.State.CLOSED));
+      containerReplicaMap.put(container.containerID(), replicas);
+    }
+
+    enableProcessAll();
+
+    // First report with default sample limit 100
+    replicationManager.processAll();
+
+    ReplicationManagerReport report1 = replicationManager.getContainerReport();
+    assertEquals(totalContainers, report1.getStat(
+            ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+
+    List<ContainerID> sample1 = report1.getSample(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED);
+    assertEquals(100, report1.getSampleLimit(),
+        "First report should have sample limit of 100");
+    assertEquals(100, sample1.size(),
+        "First report should have 100 samples with initial config");
+
+    // Reconfigure to new limit
+    int newLimit = 50;
+    rmConf.setContainerSampleLimit(newLimit);
+
+    assertEquals(newLimit, rmConf.getContainerSampleLimit(),
+        "Config should be updated to new limit");
+
+    replicationManager.processAll();
+
+    ReplicationManagerReport report2 = replicationManager.getContainerReport();
+    assertEquals(totalContainers, report2.getStat(
+            ReplicationManagerReport.HealthState.UNDER_REPLICATED));
+
+    List<ContainerID> sample2 = report2.getSample(
+        ReplicationManagerReport.HealthState.UNDER_REPLICATED);
+    assertEquals(newLimit, report2.getSampleLimit(),
+        "Second report should have sample limit of 50");
+    assertEquals(newLimit, sample2.size(),
+        "Second report should have 50 samples after reconfiguration");
   }
 
   @SafeVarargs

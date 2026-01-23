@@ -1,47 +1,34 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.replication;
 
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.NORMAL;
 
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
-
-import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority.NORMAL;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
 
 /**
  * Abstract class to capture common variables and methods for different types
  * of replication tasks.
  */
 public abstract class AbstractReplicationTask {
-
-  /**
-   * ENUM representing the different status values a replication task can
-   * have.
-   */
-  public enum Status {
-    QUEUED,
-    IN_PROGRESS,
-    FAILED,
-    DONE,
-    SKIPPED
-  }
 
   private volatile Status status = Status.QUEUED;
 
@@ -70,10 +57,15 @@ public abstract class AbstractReplicationTask {
     this.term = term;
     queued = Instant.now(clock);
   }
+  
+  protected abstract String getMetricName();
+
+  protected abstract String getMetricDescriptionSegment();
 
   public long getContainerId() {
     return containerId;
   }
+
   public Status getStatus() {
     return status;
   }
@@ -147,16 +139,28 @@ public abstract class AbstractReplicationTask {
    */
   protected Object getCommandForDebug() {
     return "";
-  };
+  }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder()
-        .append(getStatus()).append(" ")
+        .append(getStatus()).append(' ')
         .append(getCommandForDebug());
     if (getStatus() == Status.QUEUED) {
       sb.append(", queued at ").append(getQueued());
     }
     return sb.toString();
+  }
+
+  /**
+   * ENUM representing the different status values a replication task can
+   * have.
+   */
+  public enum Status {
+    QUEUED,
+    IN_PROGRESS,
+    FAILED,
+    DONE,
+    SKIPPED
   }
 }

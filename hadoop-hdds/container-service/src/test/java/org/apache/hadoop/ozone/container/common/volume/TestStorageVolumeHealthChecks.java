@@ -1,25 +1,34 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.common.volume;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import java.io.File;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.UUID;
+import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
+import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.DiskCheckUtil;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,15 +38,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-
-import java.io.File;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.UUID;
-import java.util.stream.Stream;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test for StorageVolume health checks using Real volume instances with
@@ -108,6 +108,52 @@ public class TestStorageVolumeHealthChecks {
     DiskCheckUtil.setTestImpl(doesNotExist);
     result = volume.check(false);
     assertEquals(VolumeCheckResult.FAILED, result);
+  }
+
+  @ParameterizedTest
+  @MethodSource("volumeBuilders")
+  public void testVolumeFullHealth(StorageVolume.Builder<?> builder) throws Exception {
+    verifyFullVolumeHealthWithDiskReadWriteStatus(builder, true, false);
+  }
+
+  public void verifyFullVolumeHealthWithDiskReadWriteStatus(StorageVolume.Builder<?> builder, boolean... checkResult)
+      throws Exception {
+
+    for (boolean result : checkResult) {
+      StorageVolume volume = builder.build();
+
+      VolumeUsage usage = volume.getVolumeUsage();
+      DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
+      int minimumDiskSpace = dnConf.getVolumeHealthCheckFileSize() * 2;
+      // Keep remaining space as just less than double of VolumeHealthCheckFileSize.
+      usage.incrementUsedSpace(usage.getCurrentUsage().getAvailable() - minimumDiskSpace + 1);
+      usage.realUsage();
+      DiskCheckUtil.DiskChecks ioFailure = new DiskCheckUtil.DiskChecks() {
+        @Override
+        public boolean checkReadWrite(File storageDir, File testFileDir,
+                                      int numBytesToWrite) {
+          return result;
+        }
+      };
+      DiskCheckUtil.setTestImpl(ioFailure);
+      // Volume will remain healthy as volume don't have enough space to check READ/WRITE
+      assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
+      // Even in second try volume will remain HEALTHY
+      assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
+
+      // Now keep enough space for read/write check to go through
+      usage.decrementUsedSpace(minimumDiskSpace + 1);
+
+      // volumeIOFailureTolerance is 1, so first time it will be HEALTHY always
+      assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
+      if (result) {
+        // Volume will remain as healthy as READ/WRITE check is fine
+        assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
+      } else {
+        // Second time volume will fail as READ/WRITE check has failed
+        assertEquals(VolumeCheckResult.FAILED, volume.check(false));
+      }
+    }
   }
 
   @ParameterizedTest

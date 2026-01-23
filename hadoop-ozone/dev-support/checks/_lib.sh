@@ -35,132 +35,63 @@ _install_tool() {
   bin="${4:-"${tool}"}"
   func="${5:-"_install_${tool}"}"
 
-  if [[ "${OZONE_PREFER_LOCAL_TOOL}" == "true" ]] && which "$bin" >& /dev/null; then
+  if [[ "${OZONE_PREFER_LOCAL_TOOL}" == "true" ]] && which "${bin}" >& /dev/null; then
     echo "Skip installing $bin, as it's already available on PATH."
     return
   fi
 
   if [[ ! -d "${dir}" ]]; then
     mkdir -pv "${dir}"
-    pushd "${dir}"
-    if eval "${func}"; then
-      echo "Installed ${tool} in ${dir}"
-    else
-      echo "Failed to install ${tool}"
-      exit 1
-    fi
-    popd
+    _do_install "${tool}" "${dir}" "${func}"
   fi
 
   if [[ -n "${bindir}" ]]; then
-    bindir="${dir}"/"${bindir}"
-    if [[ -d "${bindir}" ]]; then
-      if [[ "${OZONE_PREFER_LOCAL_TOOL}" == "true" ]]; then
-        export PATH="${PATH}:${bindir}"
-      else
-        export PATH="${bindir}:${PATH}"
-      fi
+    _add_to_path "${dir}"/"${bindir}"
+
+    if ! which "${bin}" >& /dev/null; then
+      _do_install "${tool}" "${dir}" "${func}"
+      _add_to_path "${dir}"/"${bindir}"
     fi
   fi
 }
 
-install_bats() {
-  _install_tool bats bats-core-1.2.1/bin
-}
+_do_install() {
+  local tool="$1"
+  local dir="$2"
+  local func="$3"
 
-_install_bats() {
-  curl -LSs https://github.com/bats-core/bats-core/archive/v1.2.1.tar.gz | tar -xz -f -
-}
-
-install_k3s() {
-  _install_tool k3s
-}
-
-_install_k3s() {
-  curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="v1.21.2+k3s1" sh -
-  sudo chmod a+r $KUBECONFIG
-}
-
-install_flekszible() {
-  _install_tool flekszible bin
-}
-
-_install_flekszible() {
-  mkdir bin
-
-  local os=$(uname -s)
-  local arch=$(uname -m)
-
-  curl -LSs https://github.com/elek/flekszible/releases/download/v2.3.0/flekszible_2.3.0_${os}_${arch}.tar.gz | tar -xz -f - -C bin
-
-  chmod +x bin/flekszible
-}
-
-install_hugo() {
-  _install_tool hugo bin
-}
-
-_install_hugo() {
-  : ${HUGO_VERSION:=0.83.1}
-
-  local os=$(uname -s)
-  local arch=$(uname -m)
-
-  mkdir bin
-
-  case "${os}" in
-    Darwin)
-      os=macOS
-      ;;
-  esac
-
-  case "${arch}" in
-    x86_64)
-      arch=64bit
-      ;;
-  esac
-
-  curl -LSs "https://github.com/gohugoio/hugo/releases/download/v${HUGO_VERSION}/hugo_${HUGO_VERSION}_${os}-${arch}.tar.gz" | tar -xz -f - -C bin hugo
-  chmod +x bin/hugo
-}
-
-install_virtualenv() {
-  _install_tool virtualenv
-}
-
-_install_virtualenv() {
-  sudo pip3 install virtualenv
-}
-
-install_robot() {
-  _install_tool robot venv/bin
-}
-
-_install_robot() {
-  virtualenv venv
-  source venv/bin/activate
-  pip install robotframework
-}
-
-install_spotbugs() {
-  _install_tool spotbugs spotbugs-3.1.12/bin
-}
-
-_install_spotbugs() {
-  curl -LSs https://repo.maven.apache.org/maven2/com/github/spotbugs/spotbugs/3.1.12/spotbugs-3.1.12.tgz | tar -xz -f -
-}
-
-download_hadoop_aws() {
-  local dir="$1"
-
-  if [[ -z ${dir} ]]; then
-    echo "Required argument: target directory for Hadoop AWS sources" >&2
-    return 1
+  pushd "${dir}"
+  if eval "${func}"; then
+    echo "Installed ${tool} in ${dir}"
+    popd
+  else
+    popd
+    msg="Failed to install ${tool}"
+    echo "${msg}" >&2
+    if [[ -n "${REPORT_FILE}" ]]; then
+      echo "${msg}" >> "${REPORT_FILE}"
+    fi
+    exit 1
   fi
+}
 
-  if [[ ! -e "${dir}" ]] || [[ ! -d "${dir}"/src/test/resources ]]; then
-    mkdir -p "${dir}"
-    [[ -f "${dir}.tar.gz" ]] || curl -LSs -o "${dir}.tar.gz" https://archive.apache.org/dist/hadoop/common/hadoop-${HADOOP_VERSION}/hadoop-${HADOOP_VERSION}-src.tar.gz
-    tar -x -z -C "${dir}" --strip-components=3 -f "${dir}.tar.gz" --wildcards 'hadoop-*-src/hadoop-tools/hadoop-aws' || return 1
+_add_to_path() {
+  local bindir="$1"
+
+  if [[ -d "${bindir}" ]]; then
+    if [[ "${OZONE_PREFER_LOCAL_TOOL}" == "true" ]]; then
+      export PATH="${PATH}:${bindir}"
+    else
+      export PATH="${bindir}:${PATH}"
+    fi
+  fi
+}
+
+create_aws_dir() {
+  if [[ "${CI:-}" == "true" ]]; then
+    export OZONE_VOLUME_OWNER=1000 # uid (from ozone-runner image)
+    pushd hadoop-ozone/dist/target/ozone-*
+    sudo mkdir .aws && sudo chmod 777 .aws && sudo chown ${OZONE_VOLUME_OWNER} .aws
+    popd
   fi
 }

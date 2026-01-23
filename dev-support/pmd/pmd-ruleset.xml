@@ -1,0 +1,56 @@
+<?xml version="1.0"?>
+
+<!--
+  Licensed to the Apache Software Foundation (ASF) under one or more
+  contributor license agreements.  See the NOTICE file distributed with
+  this work for additional information regarding copyright ownership.
+  The ASF licenses this file to You under the Apache License, Version 2.0
+  (the "License"); you may not use this file except in compliance with
+  the License.  You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+
+<ruleset name="Default Maven PMD Plugin Ruleset"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 http://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+  <description>
+    PMD Ruleset for Apache Ozone
+  </description>
+
+  <rule ref="category/java/bestpractices.xml/AvoidStringBufferField" />
+  <rule ref="category/java/bestpractices.xml/ForLoopCanBeForeach"/>
+  <rule ref="category/java/bestpractices.xml/MissingOverride"/>
+  <rule ref="category/java/bestpractices.xml/UnusedPrivateMethod"/>
+  <rule ref="category/java/bestpractices.xml/UnusedPrivateField"/>
+  <rule ref="category/java/bestpractices.xml/UseCollectionIsEmpty" />
+  <rule ref="category/java/bestpractices.xml/SimplifiableTestAssertion" />
+
+  <rule ref="category/java/design.xml/SingularField" />
+
+  <rule ref="category/java/performance.xml/AddEmptyString"/>
+  <rule ref="category/java/performance.xml/AppendCharacterWithChar" />
+  <rule ref="category/java/performance.xml/AvoidFileStream"/>
+  <rule ref="category/java/performance.xml/InefficientEmptyStringCheck"/>
+  <rule ref="category/java/performance.xml/InefficientStringBuffering"/>
+  <rule ref="category/java/performance.xml/StringInstantiation"/>
+  <rule ref="category/java/performance.xml/UseStringBufferLength"/>
+
+  <rule ref="category/java/codestyle.xml/FieldDeclarationsShouldBeAtStartOfClass">
+    <properties>
+      <property name="ignoreAnonymousClassDeclarations" value="false" />
+      <property name="ignoreEnumDeclarations" value="false" />
+    </properties>
+  </rule>
+
+  <exclude-pattern>.*/generated-sources/.*</exclude-pattern>
+  <exclude-pattern>.*/org/apache/hadoop/.*_/.*</exclude-pattern>
+</ruleset>

@@ -1,30 +1,31 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p/>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p/>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm.container;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
-
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -103,16 +104,33 @@ public interface ContainerStateManager {
   boolean contains(ContainerID containerID);
 
   /**
-   * Returns the ID of all the managed containers.
+   * Get {@link ContainerInfo}s.
    *
-   * @return Set of {@link ContainerID}
+   * @param start the start {@link ContainerID} (inclusive)
+   * @param count the size limit
+   * @return a list of {@link ContainerInfo};
    */
-  Set<ContainerID> getContainerIDs();
+  List<ContainerInfo> getContainerInfos(ContainerID start, int count);
 
   /**
+   * Get {@link ContainerInfo}s for the given state.
    *
+   * @param start the start {@link ContainerID} (inclusive)
+   * @param count the size limit
+   * @return a list of {@link ContainerInfo};
    */
-  Set<ContainerID> getContainerIDs(LifeCycleState state);
+  List<ContainerInfo> getContainerInfos(LifeCycleState state, ContainerID start, int count);
+
+  /** @return all {@link ContainerInfo}s for the given state. */
+  List<ContainerInfo> getContainerInfos(LifeCycleState state);
+
+  /**
+   * @return number of containers for the given state.
+   */
+  int getContainerCount(LifeCycleState state);
+
+  /** @return all {@link ContainerInfo}s for the given type. */
+  List<ContainerInfo> getContainerInfos(ReplicationType type);
 
   /**
    *
@@ -127,14 +145,12 @@ public interface ContainerStateManager {
   /**
    *
    */
-  void updateContainerReplica(ContainerID id,
-                              ContainerReplica replica);
+  void updateContainerReplica(ContainerReplica replica);
 
   /**
    *
    */
-  void removeContainerReplica(ContainerID id,
-                              ContainerReplica replica);
+  void removeContainerReplica(ContainerReplica replica);
 
   /**
    *
@@ -144,12 +160,27 @@ public interface ContainerStateManager {
       throws IOException;
 
   /**
-   *
+   * Updates container state with sequenceId synchronization for HA consistency.
+   * This method ensures that all SCM nodes have the same sequenceId when 
+   * state transitions occur.
    */
   @Replicate
-  void updateContainerState(HddsProtos.ContainerID id,
-                            HddsProtos.LifeCycleEvent event)
+  void updateContainerStateWithSequenceId(HddsProtos.ContainerID id,
+                                          HddsProtos.LifeCycleEvent event,
+                                          Long sequenceId)
       throws IOException, InvalidStateTransitionException;
+
+
+  /**
+   * Bypasses the container state machine to change a container's state from DELETING or DELETED to CLOSED. This API was
+   * introduced to fix a bug (HDDS-11136), and should be used with care otherwise.
+   *
+   * @see <a href="https://issues.apache.org/jira/browse/HDDS-11136">HDDS-11136</a>
+   * @param id id of the container to transition
+   * @throws IOException
+   */
+  @Replicate
+  void transitionDeletingOrDeletedToClosedState(HddsProtos.ContainerID id) throws IOException;
 
   /**
    *
@@ -179,9 +210,4 @@ public interface ContainerStateManager {
    */
   void reinitialize(Table<ContainerID, ContainerInfo> containerStore)
       throws IOException;
-
-  /**
-   *
-   */
-  void close() throws IOException;
 }

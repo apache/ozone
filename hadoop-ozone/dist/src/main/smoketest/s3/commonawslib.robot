@@ -24,7 +24,7 @@ ${OZONE_S3_HEADER_VERSION}     v4
 ${OZONE_S3_SET_CREDENTIALS}    true
 ${BUCKET}                      generated
 ${BUCKET_LAYOUT}               OBJECT_STORE
-${KEY_NAME}                    key1
+${ENCRYPTION_KEY}              key1
 ${OZONE_S3_TESTS_SET_UP}       ${FALSE}
 ${OZONE_AWS_ACCESS_KEY_ID}     ${EMPTY}
 ${OZONE_S3_ADDRESS_STYLE}      path
@@ -75,6 +75,7 @@ Setup v2 headers
                         Set Environment Variable   AWS_SECRET_ACCESS_KEY   ANYKEY
 
 Setup v4 headers
+    Get Security Enabled From Config
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit test user    testuser    testuser.keytab
     Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Setup secure v4 headers
     Run Keyword if      '${SECURITY_ENABLED}' == 'false'    Setup dummy credentials for S3
@@ -129,17 +130,11 @@ Create bucket with name
                          Should contain              ${result}         Location
                          Should contain              ${result}         ${bucket}
 
-Create bucket with layout
-    [Arguments]          ${layout}
-    ${postfix} =         Generate Ozone String
-    ${bucket} =          Set Variable    bucket-${postfix}
-    ${result} =          Execute         ozone sh bucket create --layout ${layout} s3v/${bucket}
-    [Return]             ${bucket}
-
 Setup s3 tests
     Return From Keyword if    ${OZONE_S3_TESTS_SET_UP}
     Run Keyword        Generate random prefix
     Run Keyword        Install aws cli
+    Run Keyword        Get Security Enabled From Config
     Run Keyword if    '${OZONE_S3_SET_CREDENTIALS}' == 'true'    Setup v4 headers
     Run Keyword if    '${BUCKET}' == 'generated'            Create generated bucket    ${BUCKET_LAYOUT}
     Run Keyword if    '${BUCKET}' == 'link'                 Setup links for S3 tests
@@ -156,14 +151,14 @@ Setup links for S3 tests
 
 Create generated bucket
     [Arguments]          ${layout}=OBJECT_STORE
-    ${BUCKET} =          Create bucket with layout    ${layout}
+    ${BUCKET} =          Create bucket with layout    s3v    ${layout}
     Set Global Variable   ${BUCKET}
 
 Create encrypted bucket
     Return From Keyword if    '${SECURITY_ENABLED}' == 'false'
     ${exists} =        Bucket Exists    o3://${OM_SERVICE_ID}/s3v/encrypted
     Return From Keyword If    ${exists}
-    Execute            ozone sh bucket create -k ${KEY_NAME} --layout ${BUCKET_LAYOUT} o3://${OM_SERVICE_ID}/s3v/encrypted
+    Execute            ozone sh bucket create -k ${ENCRYPTION_KEY} --layout ${BUCKET_LAYOUT} o3://${OM_SERVICE_ID}/s3v/encrypted
 
 Create link
     [arguments]       ${bucket}
@@ -179,35 +174,50 @@ Generate random prefix
     ${random} =          Generate Ozone String
                          Set Global Variable  ${PREFIX}  ${random}
 
-Perform Multipart Upload
-    [arguments]    ${bucket}    ${key}    @{files}
+# Verify object put by listing and getting it
+Put object to bucket
+    [arguments]    ${bucket}    ${key}    ${path}
 
-    ${result} =         Execute AWSS3APICli     create-multipart-upload --bucket ${bucket} --key ${key}
-    ${upload_id} =      Execute and checkrc     echo '${result}' | jq -r '.UploadId'    0
+    Execute AWSS3ApiCli    put-object --bucket ${bucket} --key ${key} --body ${path}
 
-    @{etags} =    Create List
-    FOR    ${i}    ${file}    IN ENUMERATE    @{files}
-        ${part} =    Evaluate    ${i} + 1
-        ${result} =   Execute AWSS3APICli     upload-part --bucket ${bucket} --key ${key} --part-number ${part} --body ${file} --upload-id ${upload_id}
-        ${etag} =     Execute                 echo '${result}' | jq -r '.ETag'
-        Append To List    ${etags}    {ETag=${etag},PartNumber=${part}}
-    END
+    ${result} =    Execute AWSS3ApiCli    list-objects --bucket ${bucket}
+    Should contain    ${result}    ${key}
 
-    ${parts} =    Catenate    SEPARATOR=,    @{etags}
-    Execute AWSS3APICli     complete-multipart-upload --bucket ${bucket} --key ${key} --upload-id ${upload_id} --multipart-upload 'Parts=[${parts}]'
+    Execute AWSS3ApiCli    get-object --bucket ${bucket} --key ${key} ${path}.verify
+    Compare files          ${path}    ${path}.verify
 
-Verify Multipart Upload
-    [arguments]    ${bucket}    ${key}    @{files}
-
-    ${random} =    Generate Ozone String
-
-    Execute AWSS3APICli     get-object --bucket ${bucket} --key ${key} /tmp/verify${random}
-    ${tmp} =    Catenate    @{files}
-    Execute    cat ${tmp} > /tmp/original${random}
-    Compare files    /tmp/original${random}    /tmp/verify${random}
+    [teardown]    Remove File    ${path}.verify
 
 Revoke S3 secrets
     Execute and Ignore Error             ozone s3 revokesecret -y
     Execute and Ignore Error             ozone s3 revokesecret -y -u testuser
     Execute and Ignore Error             ozone s3 revokesecret -y -u testuser2
 
+Get bucket owner
+    [arguments]    ${bucket}
+    ${owner} =     Execute    aws s3api --endpoint-url ${ENDPOINT_URL} get-bucket-acl --bucket ${bucket} | jq -r .Owner.DisplayName
+    [return]       ${owner}
+
+Execute AWSS3APICli using bucket ownership verification
+    [arguments]    ${command}    ${expected_bucket_owner}    ${expected_source_bucket_owner}=${EMPTY}
+    ${cmd} =       Set Variable           ${command} --expected-bucket-owner ${expected_bucket_owner}
+    ${cmd} =       Set Variable If        '${expected_source_bucket_owner}' != '${EMPTY}'    ${cmd} --expected-source-bucket-owner ${expected_source_bucket_owner}    ${cmd}
+    ${result} =    Execute AWSS3APICli    ${cmd}
+    Should Not Contain    ${result}    Access Denied
+    [return]              ${result}
+
+Execute AWSS3APICli and failed bucket ownership verification
+    [arguments]    ${command}    ${wrong_bucket_owner}    ${wrong_source_bucket_owner}=${EMPTY}
+    ${cmd} =       Set Variable           ${command} --expected-bucket-owner ${wrong_bucket_owner}
+    ${cmd} =       Set Variable If        '${wrong_source_bucket_owner}' != '${EMPTY}'    ${cmd} --expected-source-bucket-owner ${wrong_source_bucket_owner}    ${cmd}
+    ${result} =    Execute AWSS3APICli and ignore error    ${cmd}
+    Should contain      ${result}         Access Denied
+
+Execute AWSS3APICli with bucket owner check
+    [arguments]    ${command}    ${bucket_owner}    ${source_bucket_owner}=${EMPTY}
+
+    Run Keyword If    '${source_bucket_owner}' != '${EMPTY}'    Execute AWSS3APICli and failed bucket ownership verification    ${command}    wrong-${bucket_owner}    ${source_bucket_owner}
+    Run Keyword If    '${source_bucket_owner}' != '${EMPTY}'    Execute AWSS3APICli and failed bucket ownership verification    ${command}    ${bucket_owner}    wrong-${source_bucket_owner}
+    Run Keyword If    '${source_bucket_owner}' == '${EMPTY}'    Execute AWSS3APICli and failed bucket ownership verification    ${command}    wrong-${bucket_owner}
+    ${result} =    Execute AWSS3APICli using bucket ownership verification    ${command}    ${bucket_owner}    ${source_bucket_owner}
+    [return]              ${result}

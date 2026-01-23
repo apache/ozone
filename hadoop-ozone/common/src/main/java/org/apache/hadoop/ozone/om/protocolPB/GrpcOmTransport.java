@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,26 +14,35 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.protocolPB;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH_DEFAULT;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SSL_CONNECTION_FAILURE;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.net.HostAndPort;
+import io.grpc.Context;
+import io.grpc.ManagedChannel;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
+import io.grpc.netty.GrpcSslContexts;
+import io.grpc.netty.NettyChannelBuilder;
+import io.netty.handler.ssl.SslContextBuilder;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.net.InetAddress;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.HashMap;
-import java.util.Map;
-
-import com.google.common.net.HostAndPort;
-import io.grpc.Context;
-import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
-import org.apache.hadoop.ipc.RemoteException;
-
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
@@ -42,66 +50,52 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.ipc_.RemoteException;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
+import org.apache.hadoop.ozone.om.ha.GrpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.protocolPB.grpc.ClientAddressClientInterceptor;
 import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcClientConstants;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.security.UserGroupInformation;
-
-import org.apache.hadoop.ozone.om.ha.GrpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerServiceGrpc;
-import io.grpc.ManagedChannel;
-import io.grpc.netty.GrpcSslContexts;
-import io.grpc.netty.NettyChannelBuilder;
-import io.netty.handler.ssl.SslContextBuilder;
-
-import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.hadoop.ozone.om.OMConfigKeys
-    .OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH;
-import static org.apache.hadoop.ozone.om.OMConfigKeys
-    .OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH_DEFAULT;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SSL_CONNECTION_FAILURE;
 
 /**
  * Grpc transport for grpc between s3g and om.
  */
 public class GrpcOmTransport implements OmTransport {
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(GrpcOmTransport.class);
 
   private static final String CLIENT_NAME = "GrpcOmTransport";
+  private static final int SHUTDOWN_WAIT_INTERVAL = 100;
+  private static final int SHUTDOWN_MAX_WAIT_SECONDS = 5;
   private final AtomicBoolean isRunning = new AtomicBoolean(false);
 
   // gRPC specific
   private static List<X509Certificate> caCerts = null;
 
-  private OzoneManagerServiceGrpc.OzoneManagerServiceBlockingStub client;
-  private Map<String,
+  private final Map<String,
       OzoneManagerServiceGrpc.OzoneManagerServiceBlockingStub> clients;
-  private Map<String, ManagedChannel> channels;
-  private int lastVisited = -1;
-  private ConfigurationSource conf;
+  private final Map<String, ManagedChannel> channels;
+  private final ConfigurationSource conf;
 
-  private AtomicReference<String> host;
-  private AtomicInteger syncFailoverCount;
+  private final AtomicReference<String> host;
+  private AtomicInteger globalFailoverCount;
   private final int maxSize;
-  private SecurityConfig secConfig;
+  private final SecurityConfig secConfig;
+
+  private RetryPolicy retryPolicy;
+  private final GrpcOMFailoverProxyProvider<OzoneManagerProtocolPB>
+      omFailoverProxyProvider;
 
   public static void setCaCerts(List<X509Certificate> x509Certificates) {
     caCerts = x509Certificates;
   }
-
-  private List<String> oms;
-  private RetryPolicy retryPolicy;
-  private int failoverCount = 0;
-  private GrpcOMFailoverProxyProvider<OzoneManagerProtocolPB>
-      omFailoverProxyProvider;
 
   public GrpcOmTransport(ConfigurationSource conf,
                           UserGroupInformation ugi, String omServiceId)
@@ -110,17 +104,16 @@ public class GrpcOmTransport implements OmTransport {
     this.channels = new HashMap<>();
     this.clients = new HashMap<>();
     this.conf = conf;
-    this.host = new AtomicReference();
-    this.failoverCount = 0;
-    this.syncFailoverCount = new AtomicInteger();
-
+    this.host = new AtomicReference<>();
+    this.globalFailoverCount = new AtomicInteger();
 
     secConfig =  new SecurityConfig(conf);
     maxSize = conf.getInt(OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH,
         OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH_DEFAULT);
 
-    omFailoverProxyProvider = new GrpcOMFailoverProxyProvider(
+    omFailoverProxyProvider = new GrpcOMFailoverProxyProvider<>(
         conf,
+        ugi,
         omServiceId,
         OzoneManagerProtocolPB.class);
 
@@ -145,6 +138,7 @@ public class GrpcOmTransport implements OmTransport {
       NettyChannelBuilder channelBuilder =
           NettyChannelBuilder.forAddress(hp.getHost(), hp.getPort())
               .usePlaintext()
+              .proxyDetector(uri -> null)
               .maxInboundMessageSize(maxSize);
 
       if (secConfig.isSecurityEnabled() && secConfig.isGrpcTlsEnabled()) {
@@ -182,12 +176,13 @@ public class GrpcOmTransport implements OmTransport {
   @Override
   public OMResponse submitRequest(OMRequest payload) throws IOException {
     AtomicReference<OMResponse> resp = new AtomicReference<>();
+    int requestFailoverCount = 0;
     boolean tryOtherHost = true;
     int expectedFailoverCount = 0;
     ResultCodes resultCode = ResultCodes.INTERNAL_ERROR;
     while (tryOtherHost) {
       tryOtherHost = false;
-      expectedFailoverCount = syncFailoverCount.get();
+      expectedFailoverCount = globalFailoverCount.get();
       try {
         InetAddress inetAddress = InetAddress.getLocalHost();
         Context.current()
@@ -208,7 +203,7 @@ public class GrpcOmTransport implements OmTransport {
         }
         Exception exp = new Exception(e);
         tryOtherHost = shouldRetry(unwrapException(exp),
-            expectedFailoverCount);
+            expectedFailoverCount, ++requestFailoverCount);
         if (!tryOtherHost) {
           throw new OMException(resultCode);
         }
@@ -258,14 +253,13 @@ public class GrpcOmTransport implements OmTransport {
     return grpcException;
   }
 
-  private boolean shouldRetry(Exception ex, int expectedFailoverCount) {
+  private boolean shouldRetry(Exception ex, int expectedFailoverCount, int requestFailoverCount) {
     boolean retry = false;
     RetryPolicy.RetryAction action = null;
     try {
-      action = retryPolicy.shouldRetry((Exception)ex, 0, failoverCount++, true);
+      action = retryPolicy.shouldRetry(ex, 0, requestFailoverCount, true);
       LOG.debug("grpc failover retry action {}", action.action);
       if (action.action == RetryPolicy.RetryAction.RetryDecision.FAIL) {
-        retry = false;
         LOG.error("Retry request failed. Action : {}, {}",
             action.action, ex.toString());
       } else {
@@ -280,9 +274,9 @@ public class GrpcOmTransport implements OmTransport {
             }
           }
           // switch om host to current proxy OMNodeId
-          if (syncFailoverCount.get() == expectedFailoverCount) {
+          if (globalFailoverCount.get() == expectedFailoverCount) {
             omFailoverProxyProvider.performFailover(null);
-            syncFailoverCount.getAndIncrement();
+            globalFailoverCount.getAndIncrement();
           } else {
             LOG.warn("A failover has occurred since the start of current" +
                 " thread retry, NOT failover using current proxy");
@@ -306,16 +300,36 @@ public class GrpcOmTransport implements OmTransport {
   }
 
   public void shutdown() {
-    for (Map.Entry<String, ManagedChannel> entry : channels.entrySet()) {
-      ManagedChannel channel = entry.getValue();
+    for (ManagedChannel channel : channels.values()) {
       channel.shutdown();
+    }
+
+    final long maxWaitNanos = TimeUnit.SECONDS.toNanos(SHUTDOWN_MAX_WAIT_SECONDS);
+    long deadline = System.nanoTime() + maxWaitNanos;
+    List<ManagedChannel> nonTerminated = new ArrayList<>(channels.values());
+
+    while (!nonTerminated.isEmpty() && System.nanoTime() < deadline) {
+      nonTerminated.removeIf(ManagedChannel::isTerminated);
+      if (nonTerminated.isEmpty()) {
+        break;
+      }
       try {
-        channel.awaitTermination(5, TimeUnit.SECONDS);
-      } catch (Exception e) {
-        LOG.error("failed to shutdown OzoneManagerServiceGrpc channel {} : {}",
-            entry.getKey(), e);
+        Thread.sleep(SHUTDOWN_WAIT_INTERVAL);
+      } catch (InterruptedException e) {
+        LOG.error("Interrupted while waiting for channels to terminate", e);
+        Thread.currentThread().interrupt();
+        break;
       }
     }
+
+    if (!nonTerminated.isEmpty()) {
+      List<String> failedChannels = channels.entrySet().stream()
+          .filter(e -> !e.getValue().isTerminated())
+          .map(Map.Entry::getKey)
+          .collect(Collectors.toList());
+      LOG.warn("Channels {} did not terminate within timeout.", failedChannels);
+    }
+
     LOG.info("{}: stopped", CLIENT_NAME);
   }
 
@@ -329,7 +343,7 @@ public class GrpcOmTransport implements OmTransport {
    */
   @ConfigGroup(prefix = "ozone.om.grpc")
   public static final class GrpcOmTransportConfig {
-    @Config(key = "port", defaultValue = "8981",
+    @Config(key = "ozone.om.grpc.port", defaultValue = "8981",
         description = "Port used for"
             + " the GrpcOmTransport OzoneManagerServiceGrpc server",
         tags = {ConfigTag.MANAGEMENT})

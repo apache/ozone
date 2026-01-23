@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +14,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
+import java.util.EnumMap;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
@@ -24,12 +25,10 @@ import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.metrics2.lib.MutableRate;
-import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.ratis.protocol.RaftGroupId;
-
-import java.util.EnumMap;
 
 /**
  * This class is for maintaining Container State Machine statistics.
@@ -39,6 +38,7 @@ import java.util.EnumMap;
 public class CSMMetrics {
   public static final String SOURCE_NAME =
       CSMMetrics.class.getSimpleName();
+  private RaftGroupId gid;
 
   // ratis op metrics metrics
   private @Metric MutableCounterLong numWriteStateMachineOps;
@@ -50,7 +50,11 @@ public class CSMMetrics {
 
   private @Metric MutableRate transactionLatencyMs;
   private final EnumMap<Type, MutableRate> opsLatencyMs;
-  private MetricsRegistry registry = null;
+  private final EnumMap<Type, MutableRate> opsQueueingDelay;
+
+  // TODO: https://issues.apache.org/jira/browse/HDDS-13555
+  @SuppressWarnings("PMD.SingularField")
+  private MetricsRegistry registry;
 
   // Failure Metrics
   private @Metric MutableCounterLong numWriteStateMachineFails;
@@ -64,15 +68,22 @@ public class CSMMetrics {
   private @Metric MutableCounterLong numDataCacheMiss;
   private @Metric MutableCounterLong numDataCacheHit;
   private @Metric MutableCounterLong numEvictedCacheCount;
+  private @Metric MutableCounterLong pendingApplyTransactions;
 
   private @Metric MutableRate applyTransactionNs;
   private @Metric MutableRate writeStateMachineDataNs;
+  private @Metric MutableRate writeStateMachineQueueingLatencyNs;
+  private @Metric MutableRate untilApplyTransactionNs;
+  private @Metric MutableRate startTransactionCompleteNs;
 
-  public CSMMetrics() {
+  public CSMMetrics(RaftGroupId gid) {
+    this.gid = gid;
     this.opsLatencyMs = new EnumMap<>(ContainerProtos.Type.class);
+    this.opsQueueingDelay = new EnumMap<>(ContainerProtos.Type.class);
     this.registry = new MetricsRegistry(CSMMetrics.class.getSimpleName());
     for (ContainerProtos.Type type : ContainerProtos.Type.values()) {
       opsLatencyMs.put(type, registry.newRate(type.toString() + "Ms", type + " op"));
+      opsQueueingDelay.put(type, registry.newRate("queueingDelay" + type.toString() + "Ns", type + " op"));
     }
   }
 
@@ -80,7 +91,12 @@ public class CSMMetrics {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     return ms.register(SOURCE_NAME + gid.toString(),
         "Container State Machine",
-        new CSMMetrics());
+        new CSMMetrics(gid));
+  }
+
+  @Metric
+  public String getRaftGroupId() {
+    return gid.toString();
   }
 
   public void incNumWriteStateMachineOps() {
@@ -189,6 +205,11 @@ public class CSMMetrics {
     transactionLatencyMs.add(latencyMillis);
   }
 
+  public void recordQueueingDelay(ContainerProtos.Type type,
+                                  long latencyNanos) {
+    opsQueueingDelay.get(type).add(latencyNanos);
+  }
+
   public void incNumStartTransactionVerifyFailures() {
     numStartTransactionVerifyFailures.incr();
   }
@@ -205,6 +226,18 @@ public class CSMMetrics {
     writeStateMachineDataNs.add(latencyNanos);
   }
 
+  public void recordWriteStateMachineQueueingLatencyNs(long latencyNanos) {
+    writeStateMachineQueueingLatencyNs.add(latencyNanos);
+  }
+
+  public void recordUntilApplyTransactionNs(long latencyNanos) {
+    untilApplyTransactionNs.add(latencyNanos);
+  }
+
+  public void recordStartTransactionCompleteNs(long latencyNanos) {
+    startTransactionCompleteNs.add(latencyNanos);
+  }
+
   public void incNumDataCacheMiss() {
     numDataCacheMiss.incr();
   }
@@ -212,12 +245,21 @@ public class CSMMetrics {
   public void incNumDataCacheHit() {
     numDataCacheHit.incr();
   }
+
   public void incNumEvictedCacheCount() {
     numEvictedCacheCount.incr();
   }
 
+  public void incPendingApplyTransactions() {
+    pendingApplyTransactions.incr();
+  }
+
+  public void decPendingApplyTransactions() {
+    pendingApplyTransactions.incr(-1);
+  }
+
   public void unRegister() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
+    ms.unregisterSource(SOURCE_NAME + gid.toString());
   }
 }

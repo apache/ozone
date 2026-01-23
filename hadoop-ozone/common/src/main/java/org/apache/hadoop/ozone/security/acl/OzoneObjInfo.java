@@ -1,30 +1,32 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.security.acl;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+
+import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
-
 /**
  * Class representing an ozone object.
- * It can be a volume with non-null volumeName (bucketName=null & name=null)
+ * It can be a volume with non-null volumeName {@literal (bucketName=null & name=null)}
  * or a bucket with non-null volumeName and bucketName (name=null)
  * or a key with non-null volumeName, bucketName and key name
  * (via getKeyName)
@@ -231,10 +233,27 @@ public final class OzoneObjInfo extends OzoneObj {
       return this;
     }
 
-
     public OzoneObjInfo build() {
       return new OzoneObjInfo(resType, storeType, volumeName, bucketName,
           name, ozonePrefixPath);
     }
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    } else if (!super.equals(o)) {
+      return false;
+    }
+
+    final OzoneObjInfo that = (OzoneObjInfo) o;
+    return Objects.equals(volumeName, that.volumeName) && Objects.equals(bucketName, that.bucketName) &&
+        Objects.equals(name, that.name) && Objects.equals(ozonePrefixPath, that.ozonePrefixPath);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(super.hashCode(), volumeName, bucketName, name, ozonePrefixPath);
   }
 }

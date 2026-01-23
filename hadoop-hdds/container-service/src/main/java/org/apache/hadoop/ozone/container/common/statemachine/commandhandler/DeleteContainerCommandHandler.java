@@ -1,29 +1,35 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.io.IOException;
+import java.time.Clock;
+import java.util.OptionalLong;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.SCMCommandProto;
-import org.apache.hadoop.ozone.container.common.statemachine
-    .SCMConnectionManager;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
+import org.apache.hadoop.metrics2.lib.MetricsRegistry;
+import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.ozone.container.common.statemachine.SCMConnectionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
@@ -32,15 +38,6 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.time.Clock;
-import java.util.OptionalLong;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Handler to process the DeleteContainerCommand from SCM.
@@ -52,10 +49,10 @@ public class DeleteContainerCommandHandler implements CommandHandler {
 
   private final AtomicInteger invocationCount = new AtomicInteger(0);
   private final AtomicInteger timeoutCount = new AtomicInteger(0);
-  private final AtomicLong totalTime = new AtomicLong(0);
-  private final ExecutorService executor;
+  private final ThreadPoolExecutor executor;
   private final Clock clock;
   private int maxQueueSize;
+  private final MutableRate opsLatencyMs;
 
   public DeleteContainerCommandHandler(
       int threadPoolSize, Clock clock, int queueSize, String threadNamePrefix) {
@@ -70,13 +67,17 @@ public class DeleteContainerCommandHandler implements CommandHandler {
   }
 
   protected DeleteContainerCommandHandler(Clock clock,
-      ExecutorService executor, int queueSize) {
+      ThreadPoolExecutor executor, int queueSize) {
     this.executor = executor;
     this.clock = clock;
     maxQueueSize = queueSize;
+    MetricsRegistry registry = new MetricsRegistry(
+        DeleteContainerCommandHandler.class.getSimpleName());
+    this.opsLatencyMs = registry.newRate(SCMCommandProto.Type.deleteContainerCommand + "Ms");
   }
+
   @Override
-  public void handle(final SCMCommand command,
+  public void handle(final SCMCommand<?> command,
                      final OzoneContainer ozoneContainer,
                      final StateContext context,
                      final SCMConnectionManager connectionManager) {
@@ -93,7 +94,7 @@ public class DeleteContainerCommandHandler implements CommandHandler {
     }
   }
 
-  private void handleInternal(SCMCommand command, StateContext context,
+  private void handleInternal(SCMCommand<?> command, StateContext context,
       DeleteContainerCommand deleteContainerCommand,
       ContainerController controller) {
     final long startTime = Time.monotonicNow();
@@ -125,13 +126,13 @@ public class DeleteContainerCommandHandler implements CommandHandler {
     } catch (IOException e) {
       LOG.error("Exception occurred while deleting the container.", e);
     } finally {
-      totalTime.getAndAdd(Time.monotonicNow() - startTime);
+      this.opsLatencyMs.add(Time.monotonicNow() - startTime);
     }
   }
 
   @Override
   public int getQueuedCount() {
-    return ((ThreadPoolExecutor)executor).getQueue().size();
+    return executor.getQueue().size();
   }
 
   @Override
@@ -150,14 +151,22 @@ public class DeleteContainerCommandHandler implements CommandHandler {
 
   @Override
   public long getAverageRunTime() {
-    final int invocations = invocationCount.get();
-    return invocations == 0 ?
-        0 : totalTime.get() / invocations;
+    return (long) this.opsLatencyMs.lastStat().mean();
   }
 
   @Override
   public long getTotalRunTime() {
-    return totalTime.get();
+    return (long) this.opsLatencyMs.lastStat().total();
+  }
+
+  @Override
+  public int getThreadPoolMaxPoolSize() {
+    return executor.getMaximumPoolSize();
+  }
+
+  @Override
+  public int getThreadPoolActivePoolSize() {
+    return executor.getActiveCount();
   }
 
   @Override

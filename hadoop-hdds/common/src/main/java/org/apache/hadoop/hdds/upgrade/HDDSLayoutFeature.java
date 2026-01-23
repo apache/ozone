@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,7 +19,6 @@ package org.apache.hadoop.hdds.upgrade;
 
 import java.util.EnumMap;
 import java.util.Optional;
-
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 
 /**
@@ -41,7 +39,11 @@ public enum HDDSLayoutFeature implements LayoutFeature {
   WEBUI_PORTS_IN_DATANODEDETAILS(6, "Adding HTTP and HTTPS ports " +
       "to DatanodeDetails."),
   HADOOP_PRC_PORTS_IN_DATANODEDETAILS(7, "Adding Hadoop RPC ports " +
-                                     "to DatanodeDetails.");
+                                     "to DatanodeDetails."),
+  HBASE_SUPPORT(8, "Datanode RocksDB Schema Version 3 has an extra table " +
+          "for the last chunk of blocks to support HBase.)"),
+  WITNESSED_CONTAINER_DB_PROTO_VALUE(9, "ContainerID table schema to use value type as proto"),
+  STORAGE_SPACE_DISTRIBUTION(10, "Enhanced block deletion function for storage space distribution feature.");
 
   //////////////////////////////  //////////////////////////////
 

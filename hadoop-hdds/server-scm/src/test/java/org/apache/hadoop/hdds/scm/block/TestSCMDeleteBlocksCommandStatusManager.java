@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,17 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.block;
 
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.BeforeEach;
-
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-
 import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.SCMDeleteBlocksCommandStatusManager;
 import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.SCMDeleteBlocksCommandStatusManager.CmdStatus.SENT;
 import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.SCMDeleteBlocksCommandStatusManager.CmdStatus.TO_BE_SENT;
@@ -36,6 +24,18 @@ import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusM
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.Mockito.mock;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 /**
  * A test for SCMDeleteBlocksCommandStatusManager.
@@ -43,8 +43,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 public class TestSCMDeleteBlocksCommandStatusManager {
 
   private SCMDeleteBlocksCommandStatusManager manager;
-  private UUID dnId1;
-  private UUID dnId2;
+  private DatanodeID dnId1;
+  private DatanodeID dnId2;
   private long scmCmdId1;
   private long scmCmdId2;
   private long scmCmdId3;
@@ -56,10 +56,11 @@ public class TestSCMDeleteBlocksCommandStatusManager {
 
   @BeforeEach
   public void setup() throws Exception {
-    manager = new SCMDeleteBlocksCommandStatusManager();
+    ScmBlockDeletingServiceMetrics metrics = mock(ScmBlockDeletingServiceMetrics.class);
+    manager = new SCMDeleteBlocksCommandStatusManager(metrics);
     // Create test data
-    dnId1 = UUID.randomUUID();
-    dnId2 = UUID.randomUUID();
+    dnId1 = DatanodeID.randomID();
+    dnId2 = DatanodeID.randomID();
     scmCmdId1 = 1L;
     scmCmdId2 = 2L;
     scmCmdId3 = 3L;
@@ -210,10 +211,10 @@ public class TestSCMDeleteBlocksCommandStatusManager {
     // Transactions in states EXECUTED and NEED_RESEND will be cleaned up
     // directly, while transactions in states PENDING_EXECUTED and SENT
     // will be cleaned up after timeout
-    recordAndSentCommand(manager, dnId1, Arrays.asList(scmCmdId1),
-        Arrays.asList(deletedBlocksTxIds1));
-    recordAndSentCommand(manager, dnId2, Arrays.asList(scmCmdId2),
-        Arrays.asList(deletedBlocksTxIds2));
+    recordAndSentCommand(manager, dnId1, Collections.singletonList(scmCmdId1),
+        Collections.singletonList(deletedBlocksTxIds1));
+    recordAndSentCommand(manager, dnId2, Collections.singletonList(scmCmdId2),
+        Collections.singletonList(deletedBlocksTxIds2));
 
     Map<Long, CmdStatusData> dn1StatusRecord =
         manager.getScmCmdStatusRecord().get(dnId1);
@@ -240,7 +241,7 @@ public class TestSCMDeleteBlocksCommandStatusManager {
 
   private void recordAndSentCommand(
       SCMDeleteBlocksCommandStatusManager statusManager,
-      UUID dnId, List<Long> scmCmdIds, List<Set<Long>> txIds) {
+      DatanodeID dnId, List<Long> scmCmdIds, List<Set<Long>> txIds) {
     assertEquals(scmCmdIds.size(), txIds.size());
     for (int i = 0; i < scmCmdIds.size(); i++) {
       long scmCmdId = scmCmdIds.get(i);

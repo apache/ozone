@@ -31,17 +31,17 @@ Put object s3a simulation
                         Execute                    echo "Randomtext" > /tmp/testfile
     ${result} =         Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET} --key ${PREFIX}/word.txt    255
     ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix ${PREFIX}/word.txt/
-                        Should Not contain         ${result}   word.txt
+                        Should Not Match Regexp    ${result}   "Key".*word.txt
 
     ${result} =         Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET} --key ${PREFIX}/word.txt._COPYING_    255
     ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix ${PREFIX}/word.txt._COPYING_/
-                        Should Not contain         ${result}  word.txt._COPYING_
+                        Should Not Match Regexp    ${result}   "Key".*word.txt._COPYING_
 
     ${result} =         Execute AWSS3ApiCli        put-object --bucket ${BUCKET} --key ${PREFIX}/word.txt._COPYING_ --body /tmp/testfile
                         Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET} --key ${PREFIX}/word.txt._COPYING_    0
                         Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET} --key ${PREFIX}/word.txt    255
     ${result} =         Execute AWSS3ApiCli        list-objects --bucket ${BUCKET} --prefix ${PREFIX}/word.txt/
-                        Should Not contain         ${result}  word.txt._COPYING_
+                        Should Not Match Regexp    ${result}   "Key".*word.txt._COPYING_
 
     ${result} =         Execute AWSS3ApiCli        copy-object --bucket ${BUCKET} --key ${PREFIX}/word.txt --copy-source ${BUCKET}/${PREFIX}/word.txt._COPYING_
                         Execute AWSS3APICli and checkrc    head-object --bucket ${BUCKET} --key ${PREFIX}/word.txt    0

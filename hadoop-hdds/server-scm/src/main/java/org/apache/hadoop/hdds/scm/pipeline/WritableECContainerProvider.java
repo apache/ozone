@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,6 +17,14 @@
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
+import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
+import static org.apache.hadoop.hdds.scm.node.NodeStatus.inServiceHealthy;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.NavigableSet;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.Config;
@@ -37,15 +44,6 @@ import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.NavigableSet;
-
-import static org.apache.hadoop.hdds.conf.ConfigTag.SCM;
-import static org.apache.hadoop.hdds.scm.node.NodeStatus.inServiceHealthy;
 
 /**
  * Writable Container provider to obtain a writable container for EC pipelines.
@@ -124,7 +122,7 @@ public class WritableECContainerProvider
         PipelineRequestInformation.Builder.getBuilder()
             .setSize(size)
             .build();
-    while (existingPipelines.size() > 0) {
+    while (!existingPipelines.isEmpty()) {
       int pipelineIndex =
           pipelineChoosePolicy.choosePipelineIndex(existingPipelines, pri);
       if (pipelineIndex < 0) {
@@ -139,7 +137,7 @@ public class WritableECContainerProvider
           if (containerInfo == null
               || !containerHasSpace(containerInfo, size)) {
             existingPipelines.remove(pipelineIndex);
-            pipelineManager.closePipeline(pipeline, true);
+            pipelineManager.closePipeline(pipeline.getId());
             openPipelineCount--;
           } else {
             if (pipelineIsExcluded(pipeline, containerInfo, excludeList)) {
@@ -153,7 +151,7 @@ public class WritableECContainerProvider
           LOG.warn("Pipeline or container not found when selecting a writable "
               + "container", e);
           existingPipelines.remove(pipelineIndex);
-          pipelineManager.closePipeline(pipeline, true);
+          pipelineManager.closePipeline(pipeline.getId());
           openPipelineCount--;
         }
       }
@@ -199,14 +197,20 @@ public class WritableECContainerProvider
       throws IOException {
 
     List<DatanodeDetails> excludedNodes = Collections.emptyList();
-    if (excludeList.getDatanodes().size() > 0) {
+    if (!excludeList.getDatanodes().isEmpty()) {
       excludedNodes = new ArrayList<>(excludeList.getDatanodes());
     }
 
     Pipeline newPipeline = pipelineManager.createPipeline(repConfig,
         excludedNodes, Collections.emptyList());
+    // the returned ContainerInfo should not be null (due to not enough space in the Datanodes specifically) because
+    // this is a new pipeline and pipeline creation checks for sufficient space in the Datanodes
     ContainerInfo container =
         containerManager.getMatchingContainer(size, owner, newPipeline);
+    if (container == null) {
+      // defensive null handling
+      throw new IOException("Could not allocate a new container");
+    }
     pipelineManager.openPipeline(newPipeline.getId());
     LOG.info("Created and opened new pipeline {}", newPipeline);
     return container;
@@ -250,7 +254,7 @@ public class WritableECContainerProvider
     NavigableSet<ContainerID> containers =
         pipelineManager.getContainersInPipeline(pipeline.getId());
     // Assume 1 container per pipeline for EC
-    if (containers.size() == 0) {
+    if (containers.isEmpty()) {
       return null;
     }
     ContainerID containerID = containers.first();
@@ -273,7 +277,7 @@ public class WritableECContainerProvider
 
     private static final String PREFIX = "ozone.scm.ec";
 
-    @Config(key = "pipeline.minimum",
+    @Config(key = "ozone.scm.ec.pipeline.minimum",
         defaultValue = "5",
         reconfigurable = true,
         type = ConfigType.INT,
@@ -282,14 +286,6 @@ public class WritableECContainerProvider
         tags = ConfigTag.STORAGE)
     private int minimumPipelines = 5;
 
-    public int getMinimumPipelines() {
-      return minimumPipelines;
-    }
-
-    public void setMinimumPipelines(int minPipelines) {
-      this.minimumPipelines = minPipelines;
-    }
-
     private static final String PIPELINE_PER_VOLUME_FACTOR_KEY =
         "pipeline.per.volume.factor";
     private static final double PIPELINE_PER_VOLUME_FACTOR_DEFAULT = 1;
@@ -297,7 +293,7 @@ public class WritableECContainerProvider
     private static final String EC_PIPELINE_PER_VOLUME_FACTOR_KEY =
         PREFIX + "." + PIPELINE_PER_VOLUME_FACTOR_KEY;
 
-    @Config(key = PIPELINE_PER_VOLUME_FACTOR_KEY,
+    @Config(key = "ozone.scm.ec.pipeline.per.volume.factor",
         type = ConfigType.DOUBLE,
         defaultValue = PIPELINE_PER_VOLUME_FACTOR_DEFAULT_VALUE,
         reconfigurable = true,
@@ -305,6 +301,14 @@ public class WritableECContainerProvider
         description = "TODO"
     )
     private double pipelinePerVolumeFactor = PIPELINE_PER_VOLUME_FACTOR_DEFAULT;
+
+    public int getMinimumPipelines() {
+      return minimumPipelines;
+    }
+
+    public void setMinimumPipelines(int minPipelines) {
+      this.minimumPipelines = minPipelines;
+    }
 
     public double getPipelinePerVolumeFactor() {
       return pipelinePerVolumeFactor;

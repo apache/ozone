@@ -12,37 +12,52 @@
   See the License for the specific language governing permissions and
   limitations under the License. See accompanying LICENSE file.
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-  <parent>
-    <artifactId>hdds</artifactId>
-    <groupId>org.apache.ozone</groupId>
-    <version>1.5.0-SNAPSHOT</version>
-  </parent>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <name>Apache Ozone HDDS RocksDB Tools</name>
+  <parent>
+    <groupId>org.apache.ozone</groupId>
+    <artifactId>hdds</artifactId>
+    <version>2.2.0-SNAPSHOT</version>
+  </parent>
   <artifactId>hdds-rocks-native</artifactId>
+  <name>Apache Ozone HDDS RocksDB Tools</name>
 
   <dependencies>
+    <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-common</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-managed-rocksdb</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.eclipse.jetty</groupId>
-      <artifactId>jetty-io</artifactId>
+      <groupId>org.rocksdb</groupId>
+      <artifactId>rocksdbjni</artifactId>
+      <!-- <scope>test</scope> but transitive via hdds-managed-rocksdb -->
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
     </dependency>
 
     <!-- Test dependencies -->
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-hadoop-dependency-test</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-test-utils</artifactId>
+      <type>test-jar</type>
       <scope>test</scope>
     </dependency>
   </dependencies>
@@ -54,6 +69,13 @@
         <artifactId>spotbugs-maven-plugin</artifactId>
         <configuration>
           <excludeFilterFile>${basedir}/dev-support/findbugsExcludeFile.xml</excludeFilterFile>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <proc>none</proc>
         </configuration>
       </plugin>
     </plugins>
@@ -74,10 +96,10 @@
             <executions>
               <execution>
                 <id>get-cpu-count</id>
-                <phase>generate-sources</phase>
                 <goals>
                   <goal>cpu-count</goal>
                 </goals>
+                <phase>generate-sources</phase>
                 <configuration>
                   <cpuCount>system.numCores</cpuCount>
                 </configuration>
@@ -106,10 +128,10 @@
             <executions>
               <execution>
                 <id>set-property</id>
-                <phase>initialize</phase>
                 <goals>
                   <goal>java</goal>
                 </goals>
+                <phase>initialize</phase>
                 <configuration>
                   <mainClass>org.apache.hadoop.hdds.utils.db.managed.JniLibNamePropertyWriter</mainClass>
                   <arguments>
@@ -125,10 +147,10 @@
             <executions>
               <execution>
                 <id>read-property-from-file</id>
-                <phase>initialize</phase>
                 <goals>
                   <goal>read-project-properties</goal>
                 </goals>
+                <phase>initialize</phase>
                 <configuration>
                   <files>
                     <file>${project.build.directory}/propertyFile.txt</file>
@@ -143,10 +165,10 @@
             <executions>
               <execution>
                 <id>unpack-dependency</id>
-                <phase>initialize</phase>
                 <goals>
                   <goal>unpack</goal>
                 </goals>
+                <phase>initialize</phase>
                 <configuration>
                   <artifactItems>
                     <artifactItem>
@@ -167,10 +189,10 @@
             <executions>
               <execution>
                 <id>rocksdb source download</id>
-                <phase>generate-sources</phase>
                 <goals>
                   <goal>wget</goal>
                 </goals>
+                <phase>generate-sources</phase>
                 <configuration>
                   <url>https://github.com/facebook/rocksdb/archive/refs/tags/v${rocksdb.version}.tar.gz</url>
                   <outputFileName>rocksdb-v${rocksdb.version}.tar.gz</outputFileName>
@@ -182,7 +204,6 @@
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-patch-plugin</artifactId>
-            <version>1.1.1</version>
             <configuration>
               <patchFile>${basedir}/src/main/patches/rocks-native.patch</patchFile>
               <strip>1</strip>
@@ -191,83 +212,84 @@
             <executions>
               <execution>
                 <id>patch</id>
-                <phase>process-sources</phase>
                 <goals>
                   <goal>apply</goal>
                 </goals>
+                <phase>process-sources</phase>
               </execution>
             </executions>
           </plugin>
           <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-antrun-plugin</artifactId>
-            <version>${maven-antrun-plugin.version}</version>
             <executions>
               <execution>
                 <id>unzip-artifact</id>
-                <phase>generate-sources</phase>
-                <configuration>
-                  <target>
-                    <untar src="${project.build.directory}/rocksdb/rocksdb-v${rocksdb.version}.tar.gz" compression="gzip" dest="${project.build.directory}/rocksdb/" />
-                  </target>
-                </configuration>
                 <goals>
                   <goal>run</goal>
                 </goals>
+                <phase>generate-sources</phase>
+                <configuration>
+                  <target>
+                    <untar compression="gzip" dest="${project.build.directory}/rocksdb/" src="${project.build.directory}/rocksdb/rocksdb-v${rocksdb.version}.tar.gz" />
+                  </target>
+                </configuration>
               </execution>
               <execution>
                 <id>build-rocksjava</id>
+                <goals>
+                  <goal>run</goal>
+                </goals>
                 <phase>generate-resources</phase>
                 <configuration>
                   <target>
                     <exec executable="chmod" failonerror="true">
-                      <arg line="-R"/>
-                      <arg line="775"/>
-                      <arg line="${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}"/>
+                      <arg line="-R" />
+                      <arg line="775" />
+                      <arg line="${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}" />
                     </exec>
-                    <exec executable="make" dir="${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}" failonerror="true">
-                      <arg line="PORTABLE=1"/>
-                      <arg line="DEBUG_LEVEL=0"/>
-                      <arg line="EXTRA_CXXFLAGS='-fPIC -D_GLIBCXX_USE_CXX11_ABI=0'"/>
-                      <arg line="-j${system.numCores}"/>
-                      <arg line="tools_lib"/>
+                    <exec dir="${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}" executable="make" failonerror="true">
+                      <arg line="PORTABLE=1" />
+                      <arg line="DEBUG_LEVEL=0" />
+                      <arg line="EXTRA_CXXFLAGS='-fPIC -D_GLIBCXX_USE_CXX11_ABI=0'" />
+                      <arg line="-j${system.numCores}" />
+                      <arg line="tools_lib" />
                     </exec>
                   </target>
                 </configuration>
-                <goals>
-                  <goal>run</goal>
-                </goals>
               </execution>
               <execution>
                 <id>build-rocks-tools</id>
-                <phase>process-classes</phase>
-                <configuration>
-                  <target>
-                    <mkdir dir="${project.build.directory}/native/rocksdb"/>
-                    <copy file="${project.build.directory}/rocksdbjni/${rocksdbLibName}"
-                          tofile="${project.build.directory}/native/rocksdb/${rocksdbLibName}" />
-                    <exec executable="cmake" failonerror="true" dir="${project.build.directory}/native/rocksdb">
-                      <env key="CFLAGS" value="-fPIC"/>
-                      <env key="CXXFLAGS" value="-fPIC"/>
-                      <arg line="${basedir}/src"/>
-                      <arg line="-DGENERATED_JAVAH=${project.build.directory}/native/javah"/>
-                      <arg line="-DNATIVE_DIR=${basedir}/src/main/native"/>
-                      <arg line="-DSST_DUMP_INCLUDE=${sstDump.include}"/>
-                      <arg line="-DCMAKE_STANDARDS=${cmake.standards}"/>
-                      <arg line="-DROCKSDB_HEADERS=${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}/include"/>
-                      <arg line="-DROCKSDB_TOOLS_LIB=${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}"/>
-                      <arg line="-DROCKSDB_LIB=${project.build.directory}/native/rocksdb/${rocksdbLibName}"/>
-                    </exec>
-                    <exec executable="make" dir="${project.build.directory}/native/rocksdb" failonerror="true"/>
-                    <delete dir="${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}"
-                            includeemptydirs="true"/>
-                  </target>
-                </configuration>
                 <goals>
                   <goal>run</goal>
                 </goals>
+                <phase>process-classes</phase>
+                <configuration>
+                  <target>
+                    <mkdir dir="${project.build.directory}/native/rocksdb" />
+                    <copy file="${project.build.directory}/rocksdbjni/${rocksdbLibName}" tofile="${project.build.directory}/native/rocksdb/${rocksdbLibName}" />
+                    <exec dir="${project.build.directory}/native/rocksdb" executable="cmake" failonerror="true">
+                      <env key="CFLAGS" value="-fPIC" />
+                      <env key="CXXFLAGS" value="-fPIC" />
+                      <arg line="${basedir}/src" />
+                      <arg line="-DGENERATED_JAVAH=${project.build.directory}/native/javah" />
+                      <arg line="-DNATIVE_DIR=${basedir}/src/main/native" />
+                      <arg line="-DSST_DUMP_INCLUDE=${sstDump.include}" />
+                      <arg line="-DCMAKE_STANDARDS=${cmake.standards}" />
+                      <arg line="-DROCKSDB_HEADERS=${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}/include" />
+                      <arg line="-DROCKSDB_TOOLS_LIB=${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}" />
+                      <arg line="-DROCKSDB_LIB=${project.build.directory}/native/rocksdb/${rocksdbLibName}" />
+                    </exec>
+                    <exec dir="${project.build.directory}/native/rocksdb" executable="make" failonerror="true" />
+                    <delete dir="${project.build.directory}/rocksdb/rocksdb-${rocksdb.version}" includeemptydirs="true" />
+                  </target>
+                </configuration>
               </execution>
               <execution>
                 <id>copy-lib-file</id>
+                <goals>
+                  <goal>run</goal>
+                </goals>
                 <phase>process-classes</phase>
                 <configuration>
                   <target>
@@ -276,16 +298,31 @@
                     </copy>
                   </target>
                 </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>default-compile</id>
                 <goals>
-                  <goal>run</goal>
+                  <goal>compile</goal>
                 </goals>
+                <phase>compile</phase>
+                <configuration>
+                  <compilerArgs>
+                    <arg>-h</arg>
+                    <arg>${project.build.directory}/native/javah</arg>
+                  </compilerArgs>
+                </configuration>
               </execution>
             </executions>
           </plugin>
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-jar-plugin</artifactId>
-            <version>${maven-jar-plugin.version}</version>
             <configuration>
               <includes>
                 <include>**/*.class</include>
@@ -300,97 +337,8 @@
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-surefire-plugin</artifactId>
             <configuration>
-              <groups>native</groups>
               <argLine>${maven-surefire-plugin.argLine} @{argLine} -Djava.library.path=${project.build.directory}/native/rocksdb</argLine>
             </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
-      <id>java-8</id>
-      <activation>
-        <jdk>1.8</jdk>
-        <property>
-          <name>rocks_tools_native</name>
-        </property>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.codehaus.mojo</groupId>
-            <artifactId>native-maven-plugin</artifactId>
-            <executions>
-              <execution>
-                <phase>compile</phase>
-                <goals>
-                  <goal>javah</goal>
-                </goals>
-                <configuration>
-                  <javahPath>${env.JAVA_HOME}/bin/javah</javahPath>
-                  <javahClassNames>
-                    <javahClassName>org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader</javahClassName>
-                    <javahClassName>org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileIterator</javahClassName>
-                  </javahClassNames>
-                  <javahOutputDirectory>${project.build.directory}/native/javah</javahOutputDirectory>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
-      <id>java-11</id>
-      <activation>
-        <jdk>[11,]</jdk>
-        <property>
-          <name>rocks_tools_native</name>
-        </property>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-dependency-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>copy-jars</id>
-                <phase>process-sources</phase>
-                <goals>
-                  <goal>copy-dependencies</goal>
-                </goals>
-                <configuration>
-                  <outputDirectory>${project.build.directory}/dependency</outputDirectory>
-                  <includeScope>runtime</includeScope>
-                </configuration>
-              </execution>
-            </executions>
-          </plugin>
-
-          <plugin>
-            <groupId>org.codehaus.mojo</groupId>
-            <artifactId>exec-maven-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>javach</id>
-                <goals>
-                  <goal>exec</goal>
-                </goals>
-                <phase>compile</phase>
-                <configuration>
-                  <executable>${env.JAVA_HOME}/bin/javac</executable>
-                  <arguments>
-                    <argument>-cp</argument>
-                    <argument>${project.build.outputDirectory}:${project.build.directory}/dependency/*</argument>
-                    <argument>-h</argument>
-                    <argument>${project.build.directory}/native/javah</argument>
-                    <argument>${project.basedir}/src/main/java/org/apache/hadoop/hdds/utils/db/managed/ManagedRawSSTFileReader.java</argument>
-                    <argument>${project.basedir}/src/main/java/org/apache/hadoop/hdds/utils/db/managed/ManagedRawSSTFileIterator.java</argument>
-                  </arguments>
-                </configuration>
-              </execution>
-            </executions>
           </plugin>
         </plugins>
       </build>

@@ -12,34 +12,44 @@
   See the License for the specific language governing permissions and
   limitations under the License. See accompanying LICENSE file.
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone</artifactId>
-    <version>1.5.0-SNAPSHOT</version>
+    <version>2.2.0-SNAPSHOT</version>
   </parent>
   <artifactId>ozone-interface-client</artifactId>
-  <version>1.5.0-SNAPSHOT</version>
-  <description>Apache Ozone Client interface</description>
-  <name>Apache Ozone Client Interface</name>
+  <version>2.2.0-SNAPSHOT</version>
   <packaging>jar</packaging>
+  <name>Apache Ozone Client Interface</name>
+  <description>Apache Ozone Client interface</description>
 
   <properties>
-    <maven.test.skip>true</maven.test.skip> <!-- no tests in this module so far -->
+    <!-- no tests in this module so far -->
+    <maven.test.skip>true</maven.test.skip>
+    <!-- only generated code in this module -->
+    <spotbugs.skip>true</spotbugs.skip>
   </properties>
 
   <dependencies>
+    <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+    </dependency>
     <dependency>
       <groupId>com.google.protobuf</groupId>
       <artifactId>protobuf-java</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-interface-client</artifactId>
+      <groupId>io.grpc</groupId>
+      <artifactId>grpc-api</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>com.google.code.findbugs</groupId>
+          <artifactId>jsr305</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>io.grpc</groupId>
@@ -56,12 +66,24 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
       <artifactId>grpc-stub</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-interface-client</artifactId>
+    </dependency>
+    <dependency>
+      <!-- for generated sources, Java 11+ -->
+      <groupId>javax.annotation</groupId>
+      <artifactId>javax.annotation-api</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
       <groupId>io.netty</groupId>
       <artifactId>netty-codec-http2</artifactId>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
       <groupId>io.netty</groupId>
       <artifactId>netty-handler-proxy</artifactId>
+      <scope>runtime</scope>
     </dependency>
   </dependencies>
   <build>
@@ -71,13 +93,18 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
         <artifactId>proto-backwards-compatibility</artifactId>
       </plugin>
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <proc>none</proc>
+        </configuration>
+      </plugin>
+      <plugin>
         <groupId>org.xolstice.maven.plugins</groupId>
         <artifactId>protobuf-maven-plugin</artifactId>
-        <version>${protobuf-maven-plugin.version}</version>
-        <extensions>true</extensions>
         <executions>
           <execution>
-            <id>compile-protoc-OmGrpc</id>
+            <id>compile-proto-${protobuf.version}</id>
             <goals>
               <goal>compile</goal>
               <goal>test-compile</goal>
@@ -85,87 +112,14 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
               <goal>test-compile-custom</goal>
             </goals>
             <configuration>
-              <protocArtifact>
-                com.google.protobuf:protoc:${proto2.hadooprpc.protobuf.version}:exe:${os.detected.classifier}
-              </protocArtifact>
-              <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
-              <outputDirectory>target/generated-sources/protobuf/java</outputDirectory>
+              <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
+              <outputDirectory>target/generated-sources/proto-java-protobuf-${protobuf.version}</outputDirectory>
               <clearOutputDirectory>false</clearOutputDirectory>
               <pluginId>grpc-java</pluginId>
-              <pluginArtifact>
-                io.grpc:protoc-gen-grpc-java:${io.grpc.version}:exe:${os.detected.classifier}
-              </pluginArtifact>
-            </configuration>
-          </execution>
-          <execution>
-            <id>compile-protoc3</id>
-            <goals>
-              <goal>compile</goal>
-              <goal>test-compile</goal>
-            </goals>
-            <configuration>
-              <protoSourceRoot>${basedir}/src/main/proto/</protoSourceRoot>
-              <protocArtifact>
-                com.google.protobuf:protoc:${proto3.hadooprpc.protobuf.version}:exe:${os.detected.classifier}
-              </protocArtifact>
-              <outputDirectory>target/generated-sources/protobuf/java/proto3</outputDirectory>
-              <clearOutputDirectory>false</clearOutputDirectory>
+              <pluginArtifact>io.grpc:protoc-gen-grpc-java:${io.grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
             </configuration>
           </execution>
         </executions>
-      </plugin>
-      <plugin>
-        <artifactId>maven-antrun-plugin</artifactId>
-        <version>${maven-antrun-plugin.version}</version>
-        <executions>
-          <execution>
-            <phase>generate-sources</phase>
-            <configuration>
-              <target>
-                <replace token="com.google.protobuf"
-                         value="org.apache.hadoop.thirdparty.protobuf"
-                         dir="target/generated-sources/protobuf/java/proto3/org/apache/hadoop/ozone/protocol/proto">
-                </replace>
-                <replace token="com.google.protobuf"
-                         value="org.apache.hadoop.thirdparty.protobuf"
-                         dir="target/generated-sources/protobuf/java/proto3/org/apache/hadoop/ozone/security/proto">
-                </replace>
-                <replace token="org.apache.hadoop.ozone.protocol.proto"
-                         value="org.apache.hadoop.ozone.protocol.proto3"
-                         dir="target/generated-sources/protobuf/java/proto3/org/apache/hadoop/ozone/protocol/proto">
-                </replace>
-                <replace token="org.apache.hadoop.ozone.security.proto"
-                         value="org.apache.hadoop.ozone.security.proto3"
-                         dir="target/generated-sources/protobuf/java/proto3/org/apache/hadoop/ozone/security/proto">
-                </replace>
-                <replace token="org.apache.hadoop.hdds.protocol.proto"
-                         value="org.apache.hadoop.hdds.protocol.proto3"
-                         dir="target/generated-sources/protobuf/java/proto3/org/apache/hadoop/ozone/protocol/proto">
-                </replace>
-                <replace token="org.apache.hadoop.ozone.security.proto"
-                         value="org.apache.hadoop.ozone.security.proto3"
-                         dir="target/generated-sources/protobuf/java/proto3/org/apache/hadoop/ozone/protocol/proto">
-                </replace>
-                <move file="target/generated-sources/protobuf/java/proto3/org/apache/hadoop/ozone/protocol/proto"
-                      tofile="target/generated-sources/protobuf/java/proto3/org/apache/hadoop/ozone/protocol/proto3"/>
-                <move file="target/generated-sources/protobuf/java/proto3/org/apache/hadoop/ozone/security/proto"
-                      tofile="target/generated-sources/protobuf/java/proto3/org/apache/hadoop/ozone/security/proto3"/>
-                <move file="target/generated-sources/protobuf/java/proto3"
-                      tofile="target/generated-sources/protobuf/java/"/>
-              </target>
-            </configuration>
-            <goals>
-              <goal>run</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <groupId>com.github.spotbugs</groupId>
-        <artifactId>spotbugs-maven-plugin</artifactId>
-        <configuration>
-          <excludeFilterFile>${basedir}/dev-support/findbugsExcludeFile.xml</excludeFilterFile>
-        </configuration>
       </plugin>
     </plugins>
   </build>

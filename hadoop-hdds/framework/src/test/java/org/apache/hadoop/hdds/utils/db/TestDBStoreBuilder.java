@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,11 +13,22 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
 package org.apache.hadoop.hdds.utils.db;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Collection;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -29,20 +39,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-
-import java.io.File;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
-import java.util.Arrays;
-import java.util.Collection;
-
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests RDBStore creation.
@@ -100,15 +96,12 @@ public class TestDBStoreBuilder {
         .build();
     // Building should succeed without error.
 
-    try (Table<byte[], byte[]> firstTable = dbStore.getTable("FIRST")) {
-      byte[] key =
-          RandomStringUtils.random(9).getBytes(StandardCharsets.UTF_8);
-      byte[] value =
-          RandomStringUtils.random(9).getBytes(StandardCharsets.UTF_8);
-      firstTable.put(key, value);
-      byte[] temp = firstTable.get(key);
-      assertArrayEquals(value, temp);
-    }
+    final Table<byte[], byte[]> firstTable = dbStore.getTable("FIRST");
+    byte[] key = RandomStringUtils.secure().next(9).getBytes(StandardCharsets.UTF_8);
+    byte[] value = RandomStringUtils.secure().next(9).getBytes(StandardCharsets.UTF_8);
+    firstTable.put(key, value);
+    byte[] temp = firstTable.get(key);
+    assertArrayEquals(value, temp);
 
     dbStore.close();
   }
@@ -122,19 +115,16 @@ public class TestDBStoreBuilder {
         .addTable("First")
         .addTable("Second")
         .build()) {
-      try (Table<byte[], byte[]> firstTable = dbStore.getTable("First")) {
-        byte[] key =
-            RandomStringUtils.random(9).getBytes(StandardCharsets.UTF_8);
-        byte[] value =
-            RandomStringUtils.random(9).getBytes(StandardCharsets.UTF_8);
-        firstTable.put(key, value);
-        byte[] temp = firstTable.get(key);
-        assertArrayEquals(value, temp);
-      }
+      final Table<byte[], byte[]> firstTable = dbStore.getTable("First");
+      byte[] key = RandomStringUtils.secure().next(9).getBytes(StandardCharsets.UTF_8);
+      byte[] value = RandomStringUtils.secure().next(9).getBytes(StandardCharsets.UTF_8);
+      firstTable.put(key, value);
+      byte[] temp = firstTable.get(key);
+      assertArrayEquals(value, temp);
 
-      try (Table secondTable = dbStore.getTable("Second")) {
-        assertTrue(secondTable.isEmpty());
-      }
+
+      final Table<byte[], byte[]> secondTable = dbStore.getTable("Second");
+      assertTrue(secondTable.isEmpty());
     }
   }
 
@@ -149,19 +139,15 @@ public class TestDBStoreBuilder {
         .addTable("Second")
         .setProfile(DBProfile.DISK)
         .build()) {
-      try (Table<byte[], byte[]> firstTable = dbStore.getTable("First")) {
-        byte[] key =
-            RandomStringUtils.random(9).getBytes(StandardCharsets.UTF_8);
-        byte[] value =
-            RandomStringUtils.random(9).getBytes(StandardCharsets.UTF_8);
-        firstTable.put(key, value);
-        byte[] temp = firstTable.get(key);
-        assertArrayEquals(value, temp);
-      }
+      Table<byte[], byte[]> firstTable = dbStore.getTable("First");
+      byte[] key = RandomStringUtils.secure().next(9).getBytes(StandardCharsets.UTF_8);
+      byte[] value = RandomStringUtils.secure().next(9).getBytes(StandardCharsets.UTF_8);
+      firstTable.put(key, value);
+      byte[] temp = firstTable.get(key);
+      assertArrayEquals(value, temp);
 
-      try (Table secondTable = dbStore.getTable("Second")) {
-        assertTrue(secondTable.isEmpty());
-      }
+      Table<byte[], byte[]> secondTable = dbStore.getTable("Second");
+      assertTrue(secondTable.isEmpty());
     }
   }
 
@@ -179,7 +165,7 @@ public class TestDBStoreBuilder {
     String sampleTableName = "sampleTable";
     final DBColumnFamilyDefinition<String, Long> sampleTable =
         new DBColumnFamilyDefinition<>(sampleTableName,
-            String.class, StringCodec.get(), Long.class, LongCodec.get());
+            StringCodec.get(), LongCodec.get());
     final DBDefinition sampleDB = new DBDefinition.WithMap(
         DBColumnFamilyDefinition.newUnmodifiableMap(sampleTable)) {
       {
@@ -206,11 +192,7 @@ public class TestDBStoreBuilder {
       }
     };
 
-    try (DBStore dbStore = DBStoreBuilder.newBuilder(conf, sampleDB)
-        .setName("SampleStore").setPath(newFolder.toPath()).build()) {
-      assertInstanceOf(RDBStore.class, dbStore);
-
-      RDBStore rdbStore = (RDBStore) dbStore;
+    try (RDBStore rdbStore = DBStoreBuilder.newBuilder(conf, sampleDB, "SampleStore", newFolder.toPath()).build()) {
       Collection<RocksDatabase.ColumnFamily> cfFamilies =
           rdbStore.getColumnFamilies();
 
@@ -250,8 +232,8 @@ public class TestDBStoreBuilder {
 
     String sampleTableName = "sampleTable";
     final DBColumnFamilyDefinition<String, Long> sampleTable =
-        new DBColumnFamilyDefinition<>(sampleTableName, String.class,
-            StringCodec.get(), Long.class, LongCodec.get());
+        new DBColumnFamilyDefinition<>(sampleTableName,
+            StringCodec.get(), LongCodec.get());
     final DBDefinition sampleDB = new DBDefinition.WithMap(
         DBColumnFamilyDefinition.newUnmodifiableMap(sampleTable)) {
       @Override
@@ -270,13 +252,9 @@ public class TestDBStoreBuilder {
       }
     };
 
-    try (DBStore dbStore = DBStoreBuilder.newBuilder(conf, sampleDB)
-            .setName("SampleStore")
-            .disableDefaultCFAutoCompaction(disableAutoCompaction)
-            .setPath(newFolder.toPath()).build()) {
-      assertInstanceOf(RDBStore.class, dbStore);
-
-      RDBStore rdbStore = (RDBStore) dbStore;
+    try (RDBStore rdbStore = DBStoreBuilder.newBuilder(conf, sampleDB, "SampleStore", newFolder.toPath())
+        .disableDefaultCFAutoCompaction(disableAutoCompaction)
+        .build()) {
       Collection<RocksDatabase.ColumnFamily> cfFamilies =
               rdbStore.getColumnFamilies();
 

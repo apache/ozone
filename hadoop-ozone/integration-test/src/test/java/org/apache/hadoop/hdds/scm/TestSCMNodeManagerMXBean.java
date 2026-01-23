@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,64 +17,41 @@
 
 package org.apache.hadoop.hdds.scm;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
-
-import javax.management.MBeanServer;
-import javax.management.ObjectName;
-import javax.management.openmbean.CompositeData;
-import javax.management.openmbean.TabularData;
-import java.io.IOException;
-import java.lang.management.ManagementFactory;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.concurrent.TimeoutException;
-
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import java.lang.management.ManagementFactory;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import javax.management.MBeanServer;
+import javax.management.ObjectName;
+import javax.management.openmbean.CompositeData;
+import javax.management.openmbean.TabularData;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
+import org.apache.ozone.test.NonHATests;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Class which tests the SCMNodeManagerInfo Bean.
  */
-@Timeout(300)
-public class TestSCMNodeManagerMXBean {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public abstract class TestSCMNodeManagerMXBean implements NonHATests.TestCase {
 
-  public static final Logger LOG = LoggerFactory.getLogger(TestSCMMXBean.class);
-  private static int numOfDatanodes = 3;
-  private static MiniOzoneCluster cluster;
-  private static OzoneConfiguration conf;
-  private static StorageContainerManager scm;
-  private static MBeanServer mbs;
+  private static final Logger LOG = LoggerFactory.getLogger(TestSCMMXBean.class);
+  private StorageContainerManager scm;
+  private MBeanServer mbs;
 
   @BeforeAll
-  public static void init() throws IOException, TimeoutException,
-      InterruptedException {
-    conf = new OzoneConfiguration();
-    conf.set(OZONE_SCM_STALENODE_INTERVAL, "60000ms");
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(numOfDatanodes)
-        .build();
-    cluster.waitForClusterToBeReady();
-    scm = cluster.getStorageContainerManager();
+  void init() {
+    scm = cluster().getStorageContainerManager();
     mbs = ManagementFactory.getPlatformMBeanServer();
-  }
-
-  @AfterAll
-  public static void cleanup() {
-    if (cluster != null) {
-      cluster.shutdown();
-    }
   }
 
   @Test

@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,7 +17,14 @@
 
 package org.apache.hadoop.ozone.om.request.key;
 
-import org.apache.ratis.server.protocol.TermIndex;
+import static org.apache.hadoop.ozone.OmUtils.normalizeKey;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.RENAME_OPEN_FILE;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
+
+import java.io.IOException;
+import java.nio.file.InvalidPathException;
+import java.util.Map;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -29,37 +35,26 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyRenameResponseWithFSO;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .RenameKeyRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .RenameKeyResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.RenameKeyResponse;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.nio.file.InvalidPathException;
-import java.util.Map;
-
-import static org.apache.hadoop.ozone.OmUtils.normalizeKey;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.RENAME_OPEN_FILE;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
 
 /**
  * Handles rename key request - prefix layout.
@@ -76,8 +71,8 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
 
   @Override
   @SuppressWarnings("methodlength")
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
-    final long trxnLogIndex = termIndex.getIndex();
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    final long trxnLogIndex = context.getIndex();
 
     RenameKeyRequest renameKeyRequest = getOmRequest().getRenameKeyRequest();
     KeyArgs keyArgs = renameKeyRequest.getKeyArgs();
@@ -103,7 +98,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     OmKeyInfo fromKeyValue;
     Result result;
     try {
-      if (fromKeyName.length() == 0) {
+      if (fromKeyName.isEmpty()) {
         throw new OMException("Source key name is empty",
                 OMException.ResultCodes.INVALID_KEY_NAME);
       }
@@ -218,7 +213,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
       }
     }
 
-    auditLog(auditLogger, buildAuditMessage(OMAction.RENAME_KEY, auditMap,
+    markForAudit(auditLogger, buildAuditMessage(OMAction.RENAME_KEY, auditMap,
             exception, getOmRequest().getUserInfo()));
 
     switch (result) {
@@ -293,19 +288,21 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     String bucketKey = metadataMgr.getBucketKey(
         fromKeyValue.getVolumeName(), fromKeyValue.getBucketName());
 
-    fromKeyValue.setUpdateID(trxnLogIndex, ozoneManager.isRatisEnabled());
+    OmKeyInfo.Builder fromKeyBuilder = fromKeyValue.toBuilder()
+        .setUpdateID(trxnLogIndex);
     // Set toFileName
-    fromKeyValue.setKeyName(toKeyFileName);
-    fromKeyValue.setFileName(toKeyFileName);
+    fromKeyBuilder.setKeyName(toKeyFileName);
     // Set toKeyObjectId
     if (toKeyParent != null) {
-      fromKeyValue.setParentObjectID(toKeyParent.getObjectID());
+      fromKeyBuilder.setParentObjectID(toKeyParent.getObjectID());
     } else {
       omBucketInfo = metadataMgr.getBucketTable().get(bucketKey);
-      fromKeyValue.setParentObjectID(omBucketInfo.getObjectID());
+      fromKeyBuilder.setParentObjectID(omBucketInfo.getObjectID());
     }
+    fromKeyValue = fromKeyBuilder.build();
+
     // Set modification time
-    setModificationTime(ommm, omBucketInfo, toKeyParent, volumeId, bucketId,
+    omBucketInfo = setModificationTime(ommm, omBucketInfo, toKeyParent, volumeId, bucketId,
         modificationTime, dirTable, trxnLogIndex);
     fromKeyParent = OMFileRequest.getKeyParentDir(fromKeyValue.getVolumeName(),
         fromKeyValue.getBucketName(), fromKeyName, ozoneManager, metadataMgr);
@@ -313,7 +310,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
       // Get omBucketInfo only when needed to reduce unnecessary DB IO
       omBucketInfo = metadataMgr.getBucketTable().get(bucketKey);
     }
-    setModificationTime(ommm, omBucketInfo, fromKeyParent, volumeId,
+    omBucketInfo = setModificationTime(ommm, omBucketInfo, fromKeyParent, volumeId,
         bucketId, modificationTime, dirTable, trxnLogIndex);
 
     // destination dbKeyName
@@ -350,7 +347,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
-  private void setModificationTime(OMMetadataManager omMetadataManager,
+  private OmBucketInfo setModificationTime(OMMetadataManager omMetadataManager,
       OmBucketInfo bucketInfo, OmKeyInfo keyParent,
       long volumeId, long bucketId, long modificationTime,
       Table<String, OmDirectoryInfo> dirTable, long trxnLogIndex)
@@ -364,20 +361,24 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
       dirTable.addCacheEntry(new CacheKey<>(dbToKeyParent),
           CacheValue.get(trxnLogIndex,
               OMFileRequest.getDirectoryInfo(keyParent)));
-    } else {
-      // For FSO a bucket is root of the filesystem, so rename an
-      // object at the root of a bucket need change bucket's modificationTime
-      if (bucketInfo == null) {
-        throw new OMException("Bucket not found",
-            OMException.ResultCodes.BUCKET_NOT_FOUND);
-      }
-      bucketInfo.setModificationTime(modificationTime);
-      String bucketKey = omMetadataManager.getBucketKey(
-          bucketInfo.getVolumeName(), bucketInfo.getBucketName());
-      omMetadataManager.getBucketTable().addCacheEntry(
-          new CacheKey<>(bucketKey),
-          CacheValue.get(trxnLogIndex, bucketInfo));
+      return bucketInfo;
     }
+    // For FSO a bucket is root of the filesystem, so rename an
+    // object at the root of a bucket need change bucket's modificationTime
+    if (bucketInfo == null) {
+      throw new OMException("Bucket not found",
+          OMException.ResultCodes.BUCKET_NOT_FOUND);
+    }
+    OmBucketInfo newBucketInfo = bucketInfo.toBuilder()
+        .setModificationTime(modificationTime)
+        .build();
+    String bucketKey = omMetadataManager.getBucketKey(
+        newBucketInfo.getVolumeName(), newBucketInfo.getBucketName());
+    omMetadataManager.getBucketTable().addCacheEntry(
+        new CacheKey<>(bucketKey),
+        CacheValue.get(trxnLogIndex, newBucketInfo));
+
+    return newBucketInfo;
   }
 
   private Map<String, String> buildAuditMap(
@@ -395,7 +396,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
    * level, e.g. source is /vol1/buck1/dir1/key1 and dest is /vol1/buck1).
    *
    * @param request
-   * @return
+   * @return {@code String}
    * @throws OMException
    */
   @Override
@@ -410,7 +411,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
    * Returns the validated and normalized source key name.
    *
    * @param keyArgs
-   * @return
+   * @return {@code String}
    * @throws OMException
    */
   @Override

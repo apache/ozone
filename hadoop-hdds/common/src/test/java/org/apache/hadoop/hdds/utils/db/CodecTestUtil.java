@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -15,17 +14,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.utils.db;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Test {@link Codec} implementations.
@@ -99,5 +99,33 @@ public final class CodecTestUtil {
     final T fromWrappedArray = codec.fromCodecBuffer(wrapped);
     wrapped.release();
     assertEquals(original, fromWrappedArray);
+  }
+
+  public static <T> Codec<T> newCodecWithoutCodecBuffer(Codec<T> codec) {
+    assertTrue(codec.supportCodecBuffer());
+    final Codec<T> newCodec = new Codec<T>() {
+      @Override
+      public byte[] toPersistedFormat(T object) throws CodecException {
+        return codec.toPersistedFormat(object);
+      }
+
+      @Override
+      public T fromPersistedFormat(byte[] rawData) throws CodecException {
+        return codec.fromPersistedFormat(rawData);
+      }
+
+      @Override
+      public Class<T> getTypeClass() {
+        return codec.getTypeClass();
+      }
+
+      @Override
+      public T copyObject(T object) {
+        return codec.copyObject(object);
+      }
+    };
+
+    assertFalse(newCodec.supportCodecBuffer());
+    return newCodec;
   }
 }

@@ -1,31 +1,43 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.container;
 
+import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
+
+import jakarta.annotation.Nonnull;
+import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
-
+import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -35,6 +47,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.utils.UniqueId;
@@ -45,13 +58,8 @@ import org.apache.hadoop.ozone.common.OzoneChecksumException;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.security.token.Token;
-
-import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Helpers for container tests.
@@ -230,7 +238,6 @@ public final class ContainerTestHelper {
     return request.build();
   }
 
-
   public static ContainerCommandRequestProto getReadSmallFileRequest(
       Pipeline pipeline, ContainerProtos.PutBlockRequestProto putKey)
       throws Exception {
@@ -290,18 +297,30 @@ public final class ContainerTestHelper {
    */
   public static ContainerCommandRequestProto getCreateContainerRequest(
       long containerID, Pipeline pipeline) throws IOException {
+    return getCreateContainerRequest(containerID, pipeline, ContainerProtos.ContainerDataProto.State.OPEN);
+  }
+
+  /**
+   * Returns a create container command for test purposes. There are a bunch of
+   * tests where we need to just send a request and get a reply.
+   *
+   * @return ContainerCommandRequestProto.
+   */
+  public static ContainerCommandRequestProto getCreateContainerRequest(
+      long containerID, Pipeline pipeline, ContainerProtos.ContainerDataProto.State state) throws IOException {
     LOG.trace("addContainer: {}", containerID);
-    return getContainerCommandRequestBuilder(containerID, pipeline).build();
+    return getContainerCommandRequestBuilder(containerID, pipeline, state)
+        .build();
   }
 
   private static Builder getContainerCommandRequestBuilder(long containerID,
-      Pipeline pipeline) throws IOException {
+          Pipeline pipeline, ContainerProtos.ContainerDataProto.State state) throws IOException {
     Builder request =
         ContainerCommandRequestProto.newBuilder();
     request.setCmdType(ContainerProtos.Type.CreateContainer);
     request.setContainerID(containerID);
     request.setCreateContainer(
-        ContainerProtos.CreateContainerRequestProto.getDefaultInstance());
+        ContainerProtos.CreateContainerRequestProto.getDefaultInstance().toBuilder().setState(state).build());
     request.setDatanodeUuid(pipeline.getFirstNode().getUuidString());
 
     return request;
@@ -317,7 +336,8 @@ public final class ContainerTestHelper {
       long containerID, Pipeline pipeline, Token<?> token) throws IOException {
     LOG.trace("addContainer: {}", containerID);
 
-    Builder request = getContainerCommandRequestBuilder(containerID, pipeline);
+    Builder request = getContainerCommandRequestBuilder(containerID, pipeline,
+        ContainerProtos.ContainerDataProto.State.OPEN);
     if (token != null) {
       request.setEncodedToken(token.encodeToUrlString());
     }
@@ -380,11 +400,23 @@ public final class ContainerTestHelper {
   public static ContainerCommandRequestProto getPutBlockRequest(
       Pipeline pipeline, ContainerProtos.WriteChunkRequestProto writeRequest)
       throws IOException {
-    return newPutBlockRequestBuilder(pipeline, writeRequest).build();
+    return getPutBlockRequest(pipeline, writeRequest, false);
+  }
+
+  public static ContainerCommandRequestProto getPutBlockRequest(
+      Pipeline pipeline, ContainerProtos.WriteChunkRequestProto writeRequest, boolean incremental)
+      throws IOException {
+    return newPutBlockRequestBuilder(pipeline, writeRequest, incremental).build();
   }
 
   public static Builder newPutBlockRequestBuilder(Pipeline pipeline,
       ContainerProtos.WriteChunkRequestProtoOrBuilder writeRequest)
+      throws IOException {
+    return newPutBlockRequestBuilder(pipeline, writeRequest, false);
+  }
+
+  public static Builder newPutBlockRequestBuilder(Pipeline pipeline,
+      ContainerProtos.WriteChunkRequestProtoOrBuilder writeRequest, boolean incremental)
       throws IOException {
     LOG.trace("putBlock: {} to pipeline={}",
         writeRequest.getBlockID(), pipeline);
@@ -398,6 +430,9 @@ public final class ContainerTestHelper {
     newList.add(writeRequest.getChunkData());
     blockData.setChunks(newList);
     blockData.setBlockCommitSequenceId(0);
+    if (incremental) {
+      blockData.addMetadata(INCREMENTAL_CHUNK_LIST, "");
+    }
     putRequest.setBlockData(blockData.getProtoBufMessage());
 
     Builder request =
@@ -503,7 +538,7 @@ public final class ContainerTestHelper {
   public static ContainerCommandRequestProto getDeleteContainer(
       Pipeline pipeline, long containerID, boolean forceDelete)
       throws IOException {
-    Preconditions.checkNotNull(pipeline);
+    Objects.requireNonNull(pipeline, "pipeline == null");
     ContainerProtos.DeleteContainerRequestProto deleteRequest =
         ContainerProtos.DeleteContainerRequestProto.newBuilder().
             setForceDelete(forceDelete).build();
@@ -515,6 +550,25 @@ public final class ContainerTestHelper {
         .setDeleteContainer(deleteRequest)
         .setDatanodeUuid(pipeline.getFirstNode().getUuidString())
         .build();
+  }
+
+  @Nonnull
+  public static ContainerProtos.ContainerCommandRequestProto getFinalizeBlockRequest(
+      long localID, ContainerInfo container, String uuidString) {
+    final ContainerProtos.ContainerCommandRequestProto.Builder builder =
+        ContainerProtos.ContainerCommandRequestProto.newBuilder()
+            .setCmdType(ContainerProtos.Type.FinalizeBlock)
+            .setContainerID(container.getContainerID())
+            .setDatanodeUuid(uuidString);
+
+    final ContainerProtos.DatanodeBlockID blockId =
+        ContainerProtos.DatanodeBlockID.newBuilder()
+            .setContainerID(container.getContainerID()).setLocalID(localID)
+            .setBlockCommitSequenceId(0).build();
+
+    builder.setFinalizeBlock(ContainerProtos.FinalizeBlockRequestProto
+        .newBuilder().setBlockID(blockId).build());
+    return builder.build();
   }
 
   public static BlockID getTestBlockID(long containerID) {
@@ -615,11 +669,57 @@ public final class ContainerTestHelper {
                   .build())
               .build());
       break;
+    case FinalizeBlock:
+      builder
+          .setFinalizeBlock(ContainerProtos
+            .FinalizeBlockRequestProto.newBuilder()
+            .setBlockID(fakeBlockId).build());
+      break;
 
     default:
       fail("Unhandled request type " + cmdType + " in unit test");
     }
 
     return builder.build();
+  }
+
+  /**
+   * Overwrite the file with random bytes.
+   */
+  public static void corruptFile(File file) {
+    try {
+      final int length = (int) file.length();
+
+      Path path = file.toPath();
+      final byte[] original = IOUtils.readFully(Files.newInputStream(path), length);
+
+      // Corrupt the last byte and middle bytes of the block. The scanner should log this as two errors.
+      final byte[] corruptedBytes = Arrays.copyOf(original, length);
+      corruptedBytes[length - 1] = (byte) (original[length - 1] << 1);
+      corruptedBytes[length / 2] = (byte) (original[length / 2] << 1);
+
+      Files.write(path, corruptedBytes,
+          StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.SYNC);
+
+      assertThat(IOUtils.readFully(Files.newInputStream(path), length))
+          .isEqualTo(corruptedBytes)
+          .isNotEqualTo(original);
+    } catch (IOException ex) {
+      // Fail the test.
+      throw new UncheckedIOException(ex);
+    }
+  }
+
+  /**
+   * Truncate the file to 0 bytes in length.
+   */
+  public static void truncateFile(File file) {
+    try {
+      Files.write(file.toPath(), new byte[0], StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.SYNC);
+      assertEquals(0, file.length());
+    } catch (IOException ex) {
+      // Fail the test.
+      throw new UncheckedIOException(ex);
+    }
   }
 }

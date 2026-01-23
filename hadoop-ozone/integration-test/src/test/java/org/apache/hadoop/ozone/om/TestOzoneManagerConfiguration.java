@@ -1,46 +1,21 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.om;
-
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.nio.file.Path;
-import java.util.Collection;
-import java.util.List;
-import java.util.concurrent.TimeUnit;
-
-import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.OzoneIllegalArgumentException;
-import org.apache.hadoop.ozone.ha.ConfUtils;
-import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
-import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
-
-import org.apache.ratis.protocol.RaftPeer;
-import org.apache.ratis.util.LifeCycle;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.api.io.TempDir;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -50,16 +25,37 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.file.Path;
+import java.util.Collection;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.MiniOzoneClusterImpl;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.OzoneIllegalArgumentException;
+import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
+import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.protocol.RaftPeer;
+import org.apache.ratis.util.LifeCycle;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
 /**
  * Tests OM related configurations.
  */
-@Timeout(300)
 public class TestOzoneManagerConfiguration {
 
   private OzoneConfiguration conf;
   private MiniOzoneCluster cluster;
-  private OzoneManager om;
-  private OzoneManagerRatisServer omRatisServer;
 
   private static final long RATIS_RPC_TIMEOUT = 500L;
 
@@ -67,7 +63,6 @@ public class TestOzoneManagerConfiguration {
   void init(@TempDir Path metaDirPath) throws IOException {
     conf = new OzoneConfiguration();
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, metaDirPath.toString());
-    conf.setBoolean(OMConfigKeys.OZONE_OM_RATIS_ENABLE_KEY, true);
     conf.setTimeDuration(OMConfigKeys.OZONE_OM_RATIS_MINIMUM_TIMEOUT_KEY,
         RATIS_RPC_TIMEOUT, TimeUnit.MILLISECONDS);
   }
@@ -93,7 +88,7 @@ public class TestOzoneManagerConfiguration {
   @Test
   public void testNoConfiguredOMAddress() throws Exception {
     startCluster();
-    om = cluster.getOzoneManager();
+    OzoneManager om = cluster.getOzoneManager();
 
     assertTrue(NetUtils.isLocalAddress(
         om.getOmRpcServerAddr().getAddress()));
@@ -125,7 +120,7 @@ public class TestOzoneManagerConfiguration {
     conf.set(OMConfigKeys.OZONE_OM_NODE_ID_KEY, omNode1Id);
 
     startCluster();
-    om = cluster.getOzoneManager();
+    OzoneManager om = cluster.getOzoneManager();
     assertEquals("0.0.0.0",
         om.getOmRpcServerAddr().getHostName());
     assertEquals(OMConfigKeys.OZONE_OM_PORT_DEFAULT,
@@ -148,8 +143,8 @@ public class TestOzoneManagerConfiguration {
   public void testSingleNodeOMservice() throws Exception {
     // Default settings of MiniOzoneCluster start a sinle node OM service.
     startCluster();
-    om = cluster.getOzoneManager();
-    omRatisServer = om.getOmRatisServer();
+    OzoneManager om = cluster.getOzoneManager();
+    OzoneManagerRatisServer omRatisServer = om.getOmRatisServer();
 
     assertEquals(LifeCycle.State.RUNNING, om.getOmRatisServerState());
     // OM's Ratis server should have only 1 peer (itself) in its RaftGroup
@@ -199,8 +194,8 @@ public class TestOzoneManagerConfiguration {
     conf.setInt(omNode3RatisPortKey, 9898);
 
     startCluster();
-    om = cluster.getOzoneManager();
-    omRatisServer = om.getOmRatisServer();
+    OzoneManager om = cluster.getOzoneManager();
+    OzoneManagerRatisServer omRatisServer = om.getOmRatisServer();
 
     assertEquals(LifeCycle.State.RUNNING, om.getOmRatisServerState());
 
@@ -274,8 +269,8 @@ public class TestOzoneManagerConfiguration {
     conf.setInt(omNode3RatisPortKey, 9898);
 
     startCluster();
-    om = cluster.getOzoneManager();
-    omRatisServer = om.getOmRatisServer();
+    OzoneManager om = cluster.getOzoneManager();
+    OzoneManagerRatisServer omRatisServer = om.getOmRatisServer();
 
     // Verify Peer details
     List<OMNodeDetails> peerNodes = om.getPeerNodes();
@@ -345,34 +340,35 @@ public class TestOzoneManagerConfiguration {
     conf.set(omNode2RpcAddrKey, "125.0.0.2:9862");
     conf.set(omNode3RpcAddrKey, "124.0.0.124:9862");
 
-    OzoneIllegalArgumentException exception = assertThrows(OzoneIllegalArgumentException.class, this::startCluster);
-    assertThat(exception).hasMessage(
-        "Configuration has no " + OZONE_OM_ADDRESS_KEY + " address that matches local node's address.");
+    GenericTestUtils.withLogDisabled(MiniOzoneClusterImpl.class, () -> {
+      Exception exception = assertThrows(OzoneIllegalArgumentException.class, this::startCluster);
+      assertThat(exception).hasMessage(
+          "Configuration has no " + OZONE_OM_ADDRESS_KEY + " address that matches local node's address.");
+    });
   }
 
   /**
    * A configuration with an empty node list while service ID is configured.
    * Cluster should fail to start during config check.
-   * @throws Exception
    */
   @Test
-  public void testNoOMNodes() throws Exception {
+  public void testNoOMNodes() {
     String omServiceId = "service1";
     conf.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, omServiceId);
     // Deliberately skip OZONE_OM_NODES_KEY and OZONE_OM_ADDRESS_KEY config
-    OzoneIllegalArgumentException e =
-        assertThrows(OzoneIllegalArgumentException.class, () -> startCluster());
-    // Expect error message
-    assertTrue(e.getMessage().contains("List of OM Node ID's should be specified"));
+    GenericTestUtils.withLogDisabled(MiniOzoneClusterImpl.class, () -> {
+      Exception e = assertThrows(OzoneIllegalArgumentException.class, this::startCluster);
+      // Expect error message
+      assertThat(e).hasMessageContaining("List of OM Node ID's should be specified");
+    });
   }
 
   /**
    * A configuration with no OM addresses while service ID is configured.
    * Cluster should fail to start during config check.
-   * @throws Exception
    */
   @Test
-  public void testNoOMAddrs() throws Exception {
+  public void testNoOMAddrs() {
     String omServiceId = "service1";
 
     String omNode1Id = "omNode1";
@@ -385,9 +381,11 @@ public class TestOzoneManagerConfiguration {
     conf.set(OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY, omServiceId);
     conf.set(omNodesKey, omNodesKeyValue);
     // Deliberately skip OZONE_OM_ADDRESS_KEY config
-    OzoneIllegalArgumentException e = assertThrows(OzoneIllegalArgumentException.class, () -> startCluster());
-    // Expect error message
-    assertTrue(e.getMessage().contains("OM RPC Address should be set for all node"));
+    GenericTestUtils.withLogDisabled(MiniOzoneClusterImpl.class, () -> {
+      Exception e = assertThrows(OzoneIllegalArgumentException.class, this::startCluster);
+      // Expect error message
+      assertThat(e).hasMessageContaining("OM RPC Address should be set for all node");
+    });
   }
 
   /**
@@ -432,8 +430,8 @@ public class TestOzoneManagerConfiguration {
         "126.0.0.127:9862");
 
     startCluster();
-    om = cluster.getOzoneManager();
-    omRatisServer = om.getOmRatisServer();
+    OzoneManager om = cluster.getOzoneManager();
+    OzoneManagerRatisServer omRatisServer = om.getOmRatisServer();
 
     assertEquals(LifeCycle.State.RUNNING, om.getOmRatisServerState());
 

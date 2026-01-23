@@ -1,6 +1,6 @@
 ---
 title: "安全化 HTTP"
-date: "2020-June-17"
+date: "2020-06-17"
 summary: 安全化 Ozone 服务的 HTTP 网络控制台
 weight: 4
 menu:

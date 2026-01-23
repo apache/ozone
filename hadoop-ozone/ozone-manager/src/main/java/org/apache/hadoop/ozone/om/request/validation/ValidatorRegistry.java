@@ -1,26 +1,24 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.request.validation;
 
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.reflections.Reflections;
-import org.reflections.scanners.MethodAnnotationsScanner;
-import org.reflections.util.ClasspathHelper;
-import org.reflections.util.ConfigurationBuilder;
+import static org.apache.hadoop.ozone.request.validation.RequestProcessingPhase.POST_PROCESS;
+import static org.apache.hadoop.ozone.request.validation.RequestProcessingPhase.PRE_PROCESS;
 
 import java.lang.reflect.Method;
 import java.net.URL;
@@ -32,9 +30,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
-import static org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase.POST_PROCESS;
-import static org.apache.hadoop.ozone.om.request.validation.RequestProcessingPhase.PRE_PROCESS;
+import java.util.function.Supplier;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
+import org.reflections.Reflections;
+import org.reflections.scanners.Scanners;
+import org.reflections.util.ClasspathHelper;
+import org.reflections.util.ConfigurationBuilder;
 
 /**
  * Registry that loads and stores the request validators to be applied by
@@ -70,7 +72,7 @@ public class ValidatorRegistry {
   ValidatorRegistry(Collection<URL> searchUrls) {
     Reflections reflections = new Reflections(new ConfigurationBuilder()
         .setUrls(searchUrls)
-        .setScanners(new MethodAnnotationsScanner())
+        .setScanners(Scanners.MethodsAnnotated)
         .setParallel(true)
     );
 
@@ -157,13 +159,13 @@ public class ValidatorRegistry {
       for (ValidationCondition condition : descriptor.conditions()) {
         EnumMap<Type, EnumMap<RequestProcessingPhase, List<Method>>>
             requestTypeMap = getAndInitialize(
-                condition, newTypeMap(), validators);
+                condition, this::newTypeMap, validators);
         EnumMap<RequestProcessingPhase, List<Method>> phases = getAndInitialize(
-            descriptor.requestType(), newPhaseMap(), requestTypeMap);
+            descriptor.requestType(), this::newPhaseMap, requestTypeMap);
         if (isPreProcessValidator(descriptor)) {
-          getAndInitialize(PRE_PROCESS, new ArrayList<>(), phases).add(m);
+          getAndInitialize(PRE_PROCESS, ArrayList::new, phases).add(m);
         } else if (isPostProcessValidator(descriptor)) {
-          getAndInitialize(POST_PROCESS, new ArrayList<>(), phases).add(m);
+          getAndInitialize(POST_PROCESS, ArrayList::new, phases).add(m);
         }
       }
     }
@@ -178,13 +180,8 @@ public class ValidatorRegistry {
     return new EnumMap<>(RequestProcessingPhase.class);
   }
 
-  private <K, V> V getAndInitialize(K key, V defaultValue, Map<K, V> from) {
-    V inMapValue = from.get(key);
-    if (inMapValue == null || !from.containsKey(key)) {
-      from.put(key, defaultValue);
-      return defaultValue;
-    }
-    return inMapValue;
+  private <K, V> V getAndInitialize(K key, Supplier<V> defaultSupplier, Map<K, V> from) {
+    return from.computeIfAbsent(key, k -> defaultSupplier.get());
   }
 
   private boolean isPreProcessValidator(RequestFeatureValidator descriptor) {

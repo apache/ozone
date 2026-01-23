@@ -1,30 +1,29 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm;
-
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
 /**
  * A PlacementPolicy support choosing datanodes to build
@@ -40,6 +39,7 @@ public interface PlacementPolicy {
             favoredNodes, nodesRequired, metadataSizeRequired,
             dataSizeRequired);
   }
+
   /**
    * Given an initial set of datanodes and the size required,
    * return set of datanodes that satisfy the nodes and size requirement.
@@ -73,7 +73,7 @@ public interface PlacementPolicy {
    * Given a set of replicas of a container which are
    * neither over underreplicated nor overreplicated,
    * return a set of replicas to copy to another node to fix misreplication.
-   * @param replicas: Map of replicas with value signifying if
+   * @param replicas Map of replicas with value signifying if
    *                  replica can be copied
    */
   Set<ContainerReplica> replicasToCopyToFixMisreplication(
@@ -82,8 +82,8 @@ public interface PlacementPolicy {
   /**
    * Given a set of replicas of a container which are overreplicated,
    * return a set of replicas to delete to fix overreplication.
-   * @param replicas: Set of existing replicas of the container
-   * @param expectedCountPerUniqueReplica: Replication factor of each
+   * @param replicas Set of existing replicas of the container
+   * @param expectedCountPerUniqueReplica Replication factor of each
    *                                     unique replica
    */
   Set<ContainerReplica> replicasToRemoveToFixOverreplication(

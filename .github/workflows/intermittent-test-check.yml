@@ -28,6 +28,10 @@ on:
         description: Test Name
         default:  ALL
         required: false
+      submodule:
+        description: Submodule
+        default: 'ozone-integration-test'
+        required: true
       iterations:
         description: Number of Iterations per split
         default: 10
@@ -48,6 +52,10 @@ on:
         description: Ratis ref (branch, tag or commit SHA)
         default: ''
         required: false
+      java-version:
+        description: Java version to use
+        default: '21'
+        required: true
 env:
   MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
   TEST_CLASS: ${{ github.event.inputs.test-class}}
@@ -56,10 +64,16 @@ env:
   FAIL_FAST: ${{ github.event.inputs.fail-fast }}
   RATIS_REPO: ${{ github.event.inputs.ratis-repo }}
   RATIS_VERSION: ${{ github.event.inputs.ratis-ref }}
-run-name: ${{ github.event_name == 'workflow_dispatch' && format('{0}#{1}[{2}]-{3}x{4}', inputs.test-class, inputs.test-name, inputs.ref, inputs.splits, inputs.iterations) || '' }}
+  JAVA_VERSION: ${{ github.event.inputs.java-version }}
+  SPLITS: ${{ github.event.inputs.splits }}
+  SUBMODULE: ${{ github.event.inputs.submodule }}
+  # Surefire 3.0.0-M4 is used because newer versions do not reliably kill the fork on timeout
+  # SUREFIRE-1722, SUREFIRE-1815
+  SUREFIRE_VERSION: 3.0.0-M4
+run-name: ${{ github.event_name == 'workflow_dispatch' && format('{0}#{1}[{2}]-{3}x{4}-java{5}', inputs.test-class, inputs.test-name, inputs.ref, inputs.splits, inputs.iterations, inputs.java-version) || '' }}
 jobs:
   prepare-job:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     outputs:
       matrix: ${{steps.generate.outputs.matrix}}
     steps:
@@ -70,7 +84,7 @@ jobs:
         name: Generate test matrix
         run: |
           splits=()
-          for ((i = 1; i <= ${{ github.event.inputs.splits }}; i++)); do
+          for ((i = 1; i <= $SPLITS; i++)); do
             splits+=("$i")
           done
           printf -v x "%s," "${splits[@]}"
@@ -83,15 +97,17 @@ jobs:
       repo: ${{ github.event.inputs.ratis-repo || format('{0}/ratis', github.repository_owner) }}
       ref: ${{ github.event.inputs.ratis-ref }}
   build:
-    if: ${{ always() }}
+    if: ${{ !cancelled() }}
     needs:
       - prepare-job
       - ratis
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref }}
       - name: Cache for maven dependencies
         uses: actions/cache/restore@v4
         with:
@@ -112,17 +128,19 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: 8
+          java-version: ${{ github.event.inputs.java-version }}
       - name: Build (most) of Ozone
         run: |
-          args="-Dskip.npx -Dskip.installnpx -DskipShade"
-          if [[ "${{ github.event.inputs.ratis-ref }}" != "" ]]; then
+          args="-DskipRecon -DskipShade -Dmaven.javadoc.skip=true -Drocks_tools_native"
+          if [[ "$RATIS_VERSION" != "" ]]; then
             args="$args -Dratis.version=${{ needs.ratis.outputs.ratis-version }}"
             args="$args -Dratis.thirdparty.version=${{ needs.ratis.outputs.thirdparty-version }}"
             args="$args -Dio.grpc.version=${{ needs.ratis.outputs.grpc-version }}"
             args="$args -Dnetty.version=${{ needs.ratis.outputs.netty-version }}"
             args="$args -Dgrpc.protobuf-compile.version=${{ needs.ratis.outputs.protobuf-version }}"
           fi
+
+          args="$args -am -pl :$SUBMODULE"
 
           hadoop-ozone/dev-support/checks/build.sh $args
       - name: Store Maven repo for tests
@@ -133,13 +151,13 @@ jobs:
             ~/.m2/repository/org/apache/ozone
           retention-days: 1
   run-test:
-    if: ${{ always() }}
+    if: ${{ !cancelled() }}
     needs:
       - prepare-job
       - ratis
       - build
     name: Run-Split
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         split: ${{fromJson(needs.prepare-job.outputs.matrix)}}  # Define  splits
@@ -176,21 +194,23 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: 8
+          java-version: ${{ github.event.inputs.java-version }}
       - name: Execute tests
         run: |
           if [[ -e "${{ steps.download-ozone-repo.outputs.download-path }}" ]]; then
             export OZONE_REPO_CACHED=true
           fi
 
-          args="-DexcludedGroups=native|slow|unhealthy"
-          if [[ "${{ github.event.inputs.ratis-ref }}" != "" ]]; then
+          args="-DexcludedGroups=slow|unhealthy -DskipShade -Drocks_tools_native"
+          if [[ "$RATIS_VERSION" != "" ]]; then
             args="$args -Dratis.version=${{ needs.ratis.outputs.ratis-version }}"
             args="$args -Dratis.thirdparty.version=${{ needs.ratis.outputs.thirdparty-version }}"
             args="$args -Dio.grpc.version=${{ needs.ratis.outputs.grpc-version }}"
             args="$args -Dnetty.version=${{ needs.ratis.outputs.netty-version }}"
             args="$args -Dgrpc.protobuf-compile.version=${{ needs.ratis.outputs.protobuf-version }}"
           fi
+
+          args="$args -pl :$SUBMODULE"
 
           if [ "$TEST_METHOD" = "ALL" ]; then
             echo "Running all tests from $TEST_CLASS"
@@ -203,7 +223,7 @@ jobs:
           fi
         continue-on-error: true
         env:
-          DEVELOCITY_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
       - name: Summary of failures
         run: hadoop-ozone/dev-support/checks/_summary.sh target/unit/summary.txt
         if: ${{ !cancelled() }}
@@ -216,18 +236,18 @@ jobs:
   count-failures:
     if: ${{ failure() }}
     needs: run-test
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Download build results
         uses: actions/download-artifact@v4
       - name: Count failures
         run: |
-          failures=$(find . -name 'summary.txt' | grep -v 'iteration' | xargs grep -v 'exit code: 0' | wc -l)
+          failures=$(find . -name 'summary.txt' | grep --text -v 'iteration' | xargs grep --text -v 'exit code: 0' | wc -l)
           echo "Total failures: $failures"
           if [[ $failures -gt 0 ]]; then
             echo ""
             echo "Failed runs:"
-            grep 'exit code: 1' */summary.txt | grep -o 'split.*teration [0-9]*' | sed -e 's/.summary.txt:/ /' -e 's/-/ /' | sort -g -k2 -k4
+            grep --text 'exit code: 1' */summary.txt | grep --text -o 'split.*teration [0-9]*' | sed -e 's/.summary.txt:/ /' -e 's/-/ /' | sort -g -k2 -k4
             echo ""
             exit 1
           fi

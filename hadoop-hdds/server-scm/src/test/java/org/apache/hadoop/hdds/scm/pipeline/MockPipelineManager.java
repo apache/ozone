@@ -1,36 +1,23 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p/>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p/>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import com.google.common.collect.ImmutableList;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
-import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.utils.db.DBStore;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.ClientVersion;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -42,6 +29,20 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
+import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.utils.db.CodecException;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.ClientVersion;
 
 /**
  * Mock PipelineManager implementation for testing.
@@ -50,8 +51,8 @@ public class MockPipelineManager implements PipelineManager {
 
   private final PipelineStateManager stateManager;
 
-  public MockPipelineManager(DBStore dbStore, SCMHAManager scmhaManager,
-                             NodeManager nodeManager) throws IOException {
+  public MockPipelineManager(DBStore dbStore, SCMHAManager scmhaManager, NodeManager nodeManager)
+      throws RocksDatabaseException, CodecException, DuplicatedPipelineIdException {
     stateManager = PipelineStateManagerImpl
         .newBuilder().setNodeManager(nodeManager)
         .setRatisServer(scmhaManager.getRatisServer())
@@ -90,8 +91,7 @@ public class MockPipelineManager implements PipelineManager {
 
   @Override
   public Pipeline buildECPipeline(ReplicationConfig replicationConfig,
-      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
-      throws IOException {
+      List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes) {
     final List<DatanodeDetails> nodes = Stream.generate(
             MockDatanodeDetails::randomDatanodeDetails)
         .limit(replicationConfig.getRequiredNodes())
@@ -198,34 +198,29 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public void addContainerToPipeline(final PipelineID pipelineID,
-                                     final ContainerID containerID)
-      throws IOException {
+  public void addContainerToPipeline(final PipelineID pipelineID, final ContainerID containerID)
+      throws PipelineNotFoundException, InvalidPipelineStateException {
     stateManager.addContainerToPipeline(pipelineID, containerID);
   }
 
   @Override
-  public void addContainerToPipelineSCMStart(
-          PipelineID pipelineID, ContainerID containerID) throws IOException {
+  public void addContainerToPipelineSCMStart(PipelineID pipelineID, ContainerID containerID)
+      throws PipelineNotFoundException {
     stateManager.addContainerToPipelineForce(pipelineID, containerID);
   }
 
   @Override
-  public void removeContainerFromPipeline(final PipelineID pipelineID,
-                                          final ContainerID containerID)
-      throws IOException {
+  public void removeContainerFromPipeline(PipelineID pipelineID, ContainerID containerID) {
     stateManager.removeContainerFromPipeline(pipelineID, containerID);
   }
 
   @Override
-  public NavigableSet<ContainerID> getContainersInPipeline(
-      final PipelineID pipelineID) throws IOException {
+  public NavigableSet<ContainerID> getContainersInPipeline(PipelineID pipelineID) throws PipelineNotFoundException {
     return stateManager.getContainers(pipelineID);
   }
 
   @Override
-  public int getNumberOfContainers(final PipelineID pipelineID)
-      throws IOException {
+  public int getNumberOfContainers(final PipelineID pipelineID) throws PipelineNotFoundException {
     return getContainersInPipeline(pipelineID).size();
   }
 
@@ -237,20 +232,14 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public void closePipeline(final Pipeline pipeline, final boolean onTimeout)
+  public void closePipeline(final PipelineID pipelineId)
       throws IOException {
-    stateManager.updatePipelineState(pipeline.getId().getProtobuf(),
+    stateManager.updatePipelineState(pipelineId.getProtobuf(),
         HddsProtos.PipelineState.PIPELINE_CLOSED);
   }
 
   @Override
-  public void closePipeline(PipelineID pipelineID) throws IOException {
-
-  }
-
-  @Override
-  public void deletePipeline(PipelineID pipelineID) throws IOException {
-
+  public void deletePipeline(PipelineID pipelineID) {
   }
 
   @Override
@@ -279,18 +268,7 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public int minHealthyVolumeNum(Pipeline pipeline) {
-    return 0;
-  }
-
-  @Override
-  public int minPipelineLimit(Pipeline pipeline) {
-    return 0;
-  }
-
-  @Override
-  public void activatePipeline(final PipelineID pipelineID)
-      throws IOException {
+  public void activatePipeline(final PipelineID pipelineID) {
   }
 
   @Override
@@ -306,9 +284,7 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public void reinitialize(Table<PipelineID, Pipeline> pipelineStore)
-      throws IOException {
-
+  public void reinitialize(Table<PipelineID, Pipeline> pipelineStore) {
   }
 
   @Override
@@ -322,8 +298,7 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public void close() throws IOException {
-
+  public void close() {
   }
 
   @Override
@@ -354,5 +329,21 @@ public class MockPipelineManager implements PipelineManager {
   @Override
   public boolean isPipelineCreationFrozen() {
     return false;
+  }
+
+  @Override
+  public boolean hasEnoughSpace(Pipeline pipeline, long containerSize) {
+    return false;
+  }
+
+  @Override
+  public int openContainerLimit(List<DatanodeDetails> datanodes) {
+    // For tests that do not care about this limit, return a large value.
+    return Integer.MAX_VALUE;
+  }
+
+  @Override
+  public SCMPipelineMetrics getMetrics() {
+    return null;
   }
 }

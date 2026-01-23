@@ -65,12 +65,73 @@ ozone admin datanode recommission [-hV] [-id=<scmServiceId>]
        [--scm=<scm>] [<hosts>...]
 ```
 
+### Tuning and Monitoring Decommissioning
+
+The process of decommissioning a DataNode involves replicating all its containers to other DataNodes in the cluster. The speed of this process can be tuned, and its progress can be monitored using several configuration properties and metrics.
+
+#### Configuration Properties
+
+Administrators can adjust the following properties in `ozone-site.xml` to control the container replication speed during decommissioning. They are grouped by the component where they are primarily configured.
+
+##### SCM-Side Properties
+
+*   **`hdds.scm.replication.datanode.replication.limit`**
+    *   **Purpose**: Defines the base limit for concurrent replication commands that the SCM will *send* to a single DataNode.
+    *   **Default**: `20`.
+    *   **Details**: The effective limit for a decommissioning DataNode is this value multiplied by `hdds.datanode.replication.outofservice.limit.factor`.
+
+##### DataNode-Side Properties
+
+*   **`hdds.datanode.replication.outofservice.limit.factor`**
+    *   **Purpose**: A multiplier to increase replication capacity for `DECOMMISSIONING` or `MAINTENANCE` nodes. This is a key property for tuning decommission speed.
+    *   **Default**: `2.0`.
+    *   **Details**: Although this is a DataNode property, it must also be set in the SCM's configuration. The SCM uses it to send more replication commands, and the DataNode uses it to increase its internal resources (threads and queues) to handle the increased load.
+
+*   **`hdds.datanode.replication.queue.limit`**
+    *   **Purpose**: Sets the base size of the queue for incoming replication requests on a DataNode.
+    *   **Default**: `4096`.
+    *   **Details**: For decommissioning nodes, this limit is scaled by `hdds.datanode.replication.outofservice.limit.factor`.
+
+*   **`hdds.datanode.replication.streams.limit`**
+    *   **Purpose**: Sets the base number of threads for the replication thread pool on a DataNode.
+    *   **Default**: `10`.
+    *   **Details**: For decommissioning nodes, this limit is also scaled by `hdds.datanode.replication.outofservice.limit.factor`.
+
+By tuning these properties, administrators can balance the decommissioning speed against the impact on the cluster's performance.
+
+#### Metrics
+
+The following metrics can be used to monitor the progress of DataNode decommissioning. The names in parentheses are the corresponding Prometheus metric names, which may vary slightly depending on the metrics sink configuration.
+
+##### SCM-side Metrics (`ReplicationManagerMetrics`)
+
+These metrics are available on the SCM and provide a cluster-wide view of the replication process. During decommissioning, you should see an increase in these metrics. The name in parentheses is the corresponding Prometheus metric name.
+
+*   `InflightReplication` (`replication_manager_metrics_inflight_replication`): The number of container replication requests currently in progress.
+*   `replicationCmdsSentTotal` (`replication_manager_metrics_replication_cmds_sent_total`): The total number of replication commands sent to DataNodes.
+*   `replicasCreatedTotal` (`replication_manager_metrics_replicas_created_total`): The total number of container replicas successfully created.
+*   `replicateContainerCmdsDeferredTotal` (`replication_manager_metrics_replicate_container_cmds_deferred_total`): The number of replication commands deferred because source DataNodes were overloaded. If this value is high, it might indicate that the source DataNodes (including the decommissioning one) are too busy.
+
+##### Datanode-side Metrics (`MeasuredReplicator` metrics)
+
+These metrics are available on each DataNode. For a decommissioning node, they show its activity as a source of replicas. For other nodes, they show their activity as targets. The name in parentheses is the corresponding Prometheus metric name.
+
+*   `success` (`measured_replicator_success`): The number of successful replication tasks.
+*   `successTime` (`measured_replicator_success_time`): The total time spent on successful replication tasks.
+*   `transferredBytes` (`measured_replicator_transferred_bytes`): The total bytes transferred for successful replications.
+*   `failure` (`measured_replicator_failure`): The number of failed replication tasks.
+*   `failureTime` (`measured_replicator_failure_time`): The total time spent on failed replication tasks.
+*   `failureBytes` (`measured_replicator_failure_bytes`): The total bytes that failed to be transferred.
+*   `queueTime` (`measured_replicator_queue_time`): The total time tasks spend in the replication queue. A high value might indicate the DataNode is overloaded.
+
+By monitoring these metrics, administrators can get a clear picture of the decommissioning progress and identify potential bottlenecks.
+
 # OM Decommission
 
 Ozone Manager (OM) decommissioning is the process in which you gracefully remove one of the OM from the OM HA Ring.
 
 To decommission an OM and remove the node from the OM HA ring, the following steps need to be executed.
-1. Add the _OM NodeId_ of the to be decommissioned OM node to the _ozone.om.decommissioned.nodes.<omServiceId>_ property in _ozone-site.xml_ of all
+1. Add the _OM NodeId_ of the OM Node to be decommissioned to the _ozone.om.decommissioned.nodes.<omServiceId>_ property in _ozone-site.xml_ of all
    other OMs.
 2. Run the following command to decommission an OM node.
 ```shell

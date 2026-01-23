@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,28 +17,35 @@
 
 package org.apache.hadoop.ozone.om.request.volume;
 
-import java.util.UUID;
-
-import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.om.response.volume.OMVolumeCreateResponse;
-import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
-import org.junit.jupiter.api.Test;
-
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
+
+import java.util.List;
+import java.util.UUID;
+import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.response.volume.OMVolumeCreateResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests create volume request.
@@ -55,7 +61,9 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     // Verify exception thrown on invalid volume name
     OMException omException = assertThrows(OMException.class,
         () -> doPreExecute("v1", adminName, ownerName));
-    assertEquals("Invalid volume name: v1", omException.getMessage());
+    assertEquals(
+        "volume name 'v1' is too short, valid length is 3-63 characters",
+        omException.getMessage());
   }
 
   @Test
@@ -69,7 +77,7 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     long expectedObjId = ozoneManager.getObjectIdFromTxId(txLogIndex);
 
     OMRequest originalRequest = createVolumeRequest(volumeName, adminName,
-        ownerName);
+        ownerName, "world::a");
 
     OMVolumeCreateRequest omVolumeCreateRequest =
         new OMVolumeCreateRequest(originalRequest);
@@ -95,7 +103,7 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     String ownerName = "user1";
 
     OMRequest originalRequest = createVolumeRequest(volumeName, adminName,
-        ownerName);
+        ownerName, "world::a");
 
     OMVolumeCreateRequest omVolumeCreateRequest =
         new OMVolumeCreateRequest(originalRequest);
@@ -156,7 +164,7 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
 
     // Create another volume for the user.
     originalRequest = createVolumeRequest("vol1", adminName,
-        ownerName);
+        ownerName, "world::a");
 
     omVolumeCreateRequest =
         new OMVolumeCreateRequest(originalRequest);
@@ -184,7 +192,7 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     OMRequestTestUtils.addVolumeToDB(volumeName, omMetadataManager);
 
     OMRequest originalRequest = createVolumeRequest(volumeName, adminName,
-        ownerName);
+        ownerName, "world::a");
 
     OMVolumeCreateRequest omVolumeCreateRequest =
         new OMVolumeCreateRequest(originalRequest);
@@ -205,6 +213,33 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     // Check really if we have a volume with the specified volume name.
     assertNotNull(omMetadataManager.getVolumeTable().get(
         omMetadataManager.getVolumeKey(volumeName)));
+  }
+
+  @Test
+  public void preExecutePermissionDeniedWhenAclEnabled() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String adminName = UUID.randomUUID().toString();
+    String ownerName = UUID.randomUUID().toString();
+
+    when(ozoneManager.getAclsEnabled()).thenReturn(true);
+
+    OMRequest originalRequest = createVolumeRequest(volumeName, adminName,
+        ownerName, "world::a");
+
+    OMVolumeCreateRequest req = new OMVolumeCreateRequest(originalRequest) {
+      @Override
+      public void checkAcls(OzoneManager ozoneManager,
+          OzoneObj.ResourceType resType,
+          OzoneObj.StoreType storeType, IAccessAuthorizer.ACLType aclType,
+          String vol, String bucket, String key) throws java.io.IOException {
+        throw new OMException("denied",
+            OMException.ResultCodes.PERMISSION_DENIED);
+      }
+    };
+
+    OMException e = assertThrows(OMException.class,
+        () -> req.preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, e.getResult());
   }
 
   @Test
@@ -247,11 +282,40 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testIgnoreClientACL(boolean ignoreClientACLs) throws Exception {
+    ozoneManager.getConfig().setIgnoreClientACLs(ignoreClientACLs);
+
+    String volumeName = UUID.randomUUID().toString();
+    String adminName = "user1";
+    String ownerName = "user1";
+    String acl = "user:ozone:a";
+    OMRequest originalRequest = createVolumeRequest(volumeName, adminName, ownerName, acl);
+    OMVolumeCreateRequest omVolumeCreateRequest = new OMVolumeCreateRequest(originalRequest);
+    OMRequest modifiedRequest = omVolumeCreateRequest.preExecute(ozoneManager);
+    omVolumeCreateRequest = new OMVolumeCreateRequest(modifiedRequest);
+    OMClientResponse omClientResponse =
+        omVolumeCreateRequest.validateAndUpdateCache(ozoneManager, 1);
+    OzoneManagerProtocolProtos.OMResponse omResponse = omClientResponse.getOMResponse();
+    assertNotNull(omResponse.getCreateVolumeResponse());
+    assertEquals(OzoneManagerProtocolProtos.Status.OK, omResponse.getStatus());
+
+    // Check ACLs
+    OmVolumeArgs volumeArgs = omMetadataManager.getVolumeTable().get(omMetadataManager.getVolumeKey(volumeName));
+    List<OzoneAcl> aclList = volumeArgs.getAcls();
+    if (ignoreClientACLs) {
+      assertFalse(aclList.contains(OzoneAcl.parseAcl(acl)));
+    } else {
+      assertTrue(aclList.contains(OzoneAcl.parseAcl(acl)));
+    }
+  }
+
   private void acceptVolumeCreationHelper(String volumeName, String adminName,
         String ownerName)
         throws Exception {
     OMRequest originalRequest = createVolumeRequest(volumeName, adminName,
-        ownerName);
+        ownerName, "world::a");
     OMVolumeCreateRequest omVolumeCreateRequest =
             new OMVolumeCreateRequest(originalRequest);
     OMRequest modifiedRequest = omVolumeCreateRequest.preExecute(ozoneManager);
@@ -275,7 +339,7 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     // Verify exception thrown on invalid volume name
     OMException omException = assertThrows(OMException.class,
         () -> doPreExecute(volumeName, adminName, ownerName));
-    assertEquals("Invalid volume name: " + volumeName,
+    assertEquals("volume name has an unsupported character : _",
         omException.getMessage());
   }
 
@@ -283,7 +347,7 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
       String adminName, String ownerName) throws Exception {
 
     OMRequest originalRequest = createVolumeRequest(volumeName, adminName,
-        ownerName);
+        ownerName, "world::a");
 
     OMVolumeCreateRequest omVolumeCreateRequest =
         new OMVolumeCreateRequest(originalRequest);

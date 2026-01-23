@@ -1,51 +1,44 @@
 {
-  "packageManager": "pnpm@7.33.6",
+  "packageManager": "pnpm@8.15.7",
   "name": "ozone-recon",
-  "version": "0.1.0",
+  "version": "0.2.0",
+  "keywords": [
+    "big",
+    "data",
+    "storage",
+    "distributed",
+    "apache"
+  ],
   "private": true,
   "dependencies": {
-    "@ant-design/icons": "^5.2.5",
-    "@babel/core": "^7.22.10",
+    "@ant-design/icons": "^4.6.3",
     "@fontsource/roboto": "^4.5.8",
-    "@types/classnames": "^2.3.1",
-    "@types/jest": "24.0.12",
-    "@types/node": "11.13.9",
-    "@types/react": "16.8.15",
-    "@types/react-dom": "16.8.4",
-    "@types/react-router-dom": "^4.3.5",
     "ag-charts-community": "^7.3.0",
     "ag-charts-react": "^7.3.0",
-    "antd": "^3.26.20",
-    "axios": "^0.28.0",
-    "babel-jest": "^24.9.0",
-    "babel-plugin-import": "^1.13.8",
+    "antd": "~4.10.3",
+    "axios": "~1.9.0",
     "classnames": "^2.3.2",
-    "customize-cra": "^0.2.14",
+    "echarts": "^5.5.0",
     "filesize": "^6.4.0",
     "less": "^3.13.1",
-    "less-loader": "^5.0.0",
     "moment": "^2.29.4",
-    "plotly.js": "^2.25.2",
     "pretty-ms": "^5.1.0",
     "react": "^16.8.6",
-    "react-app-rewired": "^2.2.1",
     "react-dom": "^16.14.0",
-    "react-plotly.js": "^2.6.0",
     "react-router": "^5.3.4",
     "react-router-dom": "^5.3.4",
-    "react-scripts": "^3.1.2",
     "react-select": "^3.2.0",
-    "typescript": "3.5.3"
+    "typescript": "4.9.5"
   },
   "scripts": {
-    "start": "react-app-rewired start",
-    "build": "react-app-rewired --max_old_space_size=4096 build",
-    "test": "react-app-rewired test",
-    "eject": "react-scripts eject",
+    "start": "vite --port=3000",
+    "build": "vite build",
+    "serve": "vite preview",
+    "test": "vitest",
     "mock:api": "json-server --watch api/db.json --routes api/routes.json --port 9888",
     "dev": "npm-run-all --parallel mock:api start",
-    "lint": "xo src/*",
-    "lint:fix": "xo --fix src/*"
+    "lint": "eslint src/*",
+    "lint:fix": "eslint --fix src/*"
   },
   "eslintConfig": {
     "extends": "react-app"
@@ -63,109 +56,27 @@
     ]
   },
   "devDependencies": {
-    "@types/react-plotly.js": "^2.2.4",
+    "@testing-library/jest-dom": "^6.4.8",
+    "@testing-library/react": "^12.1.5",
+    "@testing-library/user-event": "^14.5.2",
+    "@types/react": "16.8.15",
+    "@types/react-dom": "16.8.4",
+    "@types/react-router-dom": "^5.3.3",
     "@types/react-select": "^3.0.13",
-    "@typescript-eslint/eslint-plugin": "^2.31.0",
-    "@typescript-eslint/parser": "^2.31.0",
-    "eslint": "^6.6.0",
-    "eslint-config-xo": "^0.29.1",
-    "eslint-config-xo-react": "^0.23.0",
-    "eslint-config-xo-typescript": "^0.28.0",
-    "eslint-plugin-import": "^2.20.2",
-    "eslint-plugin-react": "^7.19.0",
-    "eslint-plugin-unicorn": "^19.0.1",
+    "@typescript-eslint/eslint-plugin": "^5.30.0",
+    "@typescript-eslint/parser": "^5.30.0",
+    "@vitejs/plugin-react-swc": "^3.5.0",
+    "eslint": "^7.28.0",
+    "eslint-config-prettier": "^8.10.0",
+    "eslint-plugin-prettier": "^3.4.1",
+    "jsdom": "^24.1.1",
     "json-server": "^0.15.1",
+    "msw": "1.3.3",
     "npm-run-all": "^4.1.5",
-    "xo": "^0.30.0"
-  },
-  "xo": {
-    "space": true,
-    "parser": "@typescript-eslint/parser",
-    "settings": {
-      "react": {
-        "pragma": "React",
-        "version": "16.8.6"
-      }
-    },
-    "rules": {
-      "jsx-quotes": [
-        2,
-        "prefer-single"
-      ],
-      "import/no-unassigned-import": 0,
-      "@typescript-eslint/explicit-function-return-type": "off",
-      "@typescript-eslint/prefer-readonly-parameter-types": "off",
-      "@typescript-eslint/interface-name-prefix": [
-        2,
-        "always"
-      ],
-      "import/no-extraneous-dependencies": [
-        "error",
-        {
-          "devDependencies": true,
-          "optionalDependencies": true,
-          "peerDependencies": true
-        }
-      ],
-      "camelcase": 0,
-      "react/state-in-constructor": 0,
-      "react/boolean-prop-naming": 0,
-      "promise/prefer-await-to-then": 0,
-      "react/require-default-props": 0,
-      "react/default-props-match-prop-types": 0,
-      "unicorn/prevent-abbreviations": 0,
-      "react/no-array-index-key": 0,
-      "no-return-assign": 0,
-      "indent": [
-        2,
-        2,
-        {
-          "SwitchCase": 1
-        }
-      ],
-      "unicorn/filename-case": [
-        "error",
-        {
-          "case": "camelCase",
-          "ignore": [
-            "^react-app-env"
-          ]
-        }
-      ],
-      "import/extensions": [
-        "error",
-        "ignorePackages",
-        {
-          "js": "never",
-          "ts": "never",
-          "tsx": "never"
-        }
-      ],
-      "no-unused-vars": [
-        2,
-        {
-          "argsIgnorePattern": "^_\\w*",
-          "varsIgnorePattern": "^_\\w*"
-        }
-      ],
-      "eslint-comments/disable-enable-pair": [
-        2,
-        {
-          "allowWholeFile": true
-        }
-      ]
-    },
-    "env": [
-      "node",
-      "es6",
-      "mocha",
-      "jest",
-      "browser"
-    ],
-    "extends": [
-      "xo-react/space",
-      "plugin:@typescript-eslint/recommended"
-    ]
+    "prettier": "^2.8.4",
+    "vite": "4.5.14",
+    "vite-tsconfig-paths": "^3.6.0",
+    "vitest": "^1.6.1"
   },
   "proxy": "http://localhost:9888"
 }

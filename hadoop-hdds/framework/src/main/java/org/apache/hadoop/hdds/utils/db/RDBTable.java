@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,22 +13,19 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
 package org.apache.hadoop.hdds.utils.db;
 
 import java.io.File;
-import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.List;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.List;
 import java.util.function.Supplier;
-
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,7 +36,6 @@ import org.slf4j.LoggerFactory;
  */
 @InterfaceAudience.Private
 class RDBTable implements Table<byte[], byte[]> {
-
 
   private static final Logger LOG =
       LoggerFactory.getLogger(RDBTable.class);
@@ -66,17 +61,16 @@ class RDBTable implements Table<byte[], byte[]> {
     return family;
   }
 
-  void put(ByteBuffer key, ByteBuffer value) throws IOException {
+  void put(ByteBuffer key, ByteBuffer value) throws RocksDatabaseException {
     db.put(family, key, value);
   }
 
   @Override
-  public void put(byte[] key, byte[] value) throws IOException {
+  public void put(byte[] key, byte[] value) throws RocksDatabaseException {
     db.put(family, key, value);
   }
 
-  void putWithBatch(BatchOperation batch, CodecBuffer key, CodecBuffer value)
-      throws IOException {
+  void putWithBatch(BatchOperation batch, CodecBuffer key, CodecBuffer value) {
     if (batch instanceof RDBBatchOperation) {
       ((RDBBatchOperation) batch).put(family, key, value);
     } else {
@@ -86,8 +80,7 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public void putWithBatch(BatchOperation batch, byte[] key, byte[] value)
-      throws IOException {
+  public void putWithBatch(BatchOperation batch, byte[] key, byte[] value) {
     if (batch instanceof RDBBatchOperation) {
       ((RDBBatchOperation) batch).put(family, key, value);
     } else {
@@ -95,17 +88,16 @@ class RDBTable implements Table<byte[], byte[]> {
     }
   }
 
-
   @Override
-  public boolean isEmpty() throws IOException {
-    try (TableIterator<byte[], KeyValue<byte[], byte[]>> keyIter = iterator()) {
+  public boolean isEmpty() throws RocksDatabaseException {
+    try (KeyValueIterator<byte[], byte[]> keyIter = iterator((byte[])null, IteratorType.NEITHER)) {
       keyIter.seekToFirst();
       return !keyIter.hasNext();
     }
   }
 
   @Override
-  public boolean isExist(byte[] key) throws IOException {
+  public boolean isExist(byte[] key) throws RocksDatabaseException {
     rdbMetrics.incNumDBKeyMayExistChecks();
     final Supplier<byte[]> holder = db.keyMayExist(family, key);
     if (holder == null) {
@@ -125,12 +117,12 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public byte[] get(byte[] key) throws IOException {
+  public byte[] get(byte[] key) throws RocksDatabaseException {
     rdbMetrics.incNumDBKeyGets();
     return db.get(family, key);
   }
 
-  Integer get(ByteBuffer key, ByteBuffer outValue) throws IOException {
+  Integer get(ByteBuffer key, ByteBuffer outValue) throws RocksDatabaseException {
     return db.get(family, key, outValue);
   }
 
@@ -140,15 +132,14 @@ class RDBTable implements Table<byte[], byte[]> {
    *
    * @param bytes metadata key
    * @return value in byte array or null if the key is not found.
-   * @throws IOException on Failure
    */
   @Override
-  public byte[] getSkipCache(byte[] bytes) throws IOException {
+  public byte[] getSkipCache(byte[] bytes) throws RocksDatabaseException {
     return get(bytes);
   }
 
   @Override
-  public byte[] getIfExist(byte[] key) throws IOException {
+  public byte[] getIfExist(byte[] key) throws RocksDatabaseException {
     rdbMetrics.incNumDBKeyGetIfExistChecks();
     final Supplier<byte[]> value = db.keyMayExist(family, key);
     if (value == null) {
@@ -167,7 +158,7 @@ class RDBTable implements Table<byte[], byte[]> {
     return val;
   }
 
-  Integer getIfExist(ByteBuffer key, ByteBuffer outValue) throws IOException {
+  Integer getIfExist(ByteBuffer key, ByteBuffer outValue) throws RocksDatabaseException {
     rdbMetrics.incNumDBKeyGetIfExistChecks();
     final Supplier<Integer> value = db.keyMayExist(
         family, key, outValue.duplicate());
@@ -189,23 +180,29 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public void delete(byte[] key) throws IOException {
+  public void delete(byte[] key) throws RocksDatabaseException {
     db.delete(family, key);
   }
 
-  public void delete(ByteBuffer key) throws IOException {
+  public void delete(ByteBuffer key) throws RocksDatabaseException {
     db.delete(family, key);
   }
-
 
   @Override
-  public void deleteRange(byte[] beginKey, byte[] endKey) throws IOException {
+  public void deleteRange(byte[] beginKey, byte[] endKey) throws RocksDatabaseException {
     db.deleteRange(family, beginKey, endKey);
   }
 
+  void deleteWithBatch(BatchOperation batch, CodecBuffer key) {
+    if (batch instanceof RDBBatchOperation) {
+      ((RDBBatchOperation) batch).delete(family, key);
+    } else {
+      throw new IllegalArgumentException("Unexpected batch class: " + batch.getClass().getSimpleName());
+    }
+  }
+
   @Override
-  public void deleteWithBatch(BatchOperation batch, byte[] key)
-      throws IOException {
+  public void deleteWithBatch(BatchOperation batch, byte[] key) {
     if (batch instanceof RDBBatchOperation) {
       ((RDBBatchOperation) batch).delete(family, key);
     } else {
@@ -215,22 +212,16 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public TableIterator<byte[], KeyValue<byte[], byte[]>> iterator()
-      throws IOException {
-    return iterator((byte[])null);
-  }
-
-  @Override
-  public TableIterator<byte[], KeyValue<byte[], byte[]>> iterator(byte[] prefix)
-      throws IOException {
+  public KeyValueIterator<byte[], byte[]> iterator(byte[] prefix, IteratorType type)
+      throws RocksDatabaseException {
     return new RDBStoreByteArrayIterator(db.newIterator(family, false), this,
-        prefix);
+        prefix, type);
   }
 
-  TableIterator<CodecBuffer, KeyValue<CodecBuffer, CodecBuffer>> iterator(
-      CodecBuffer prefix) throws IOException {
+  KeyValueIterator<CodecBuffer, CodecBuffer> iterator(
+      CodecBuffer prefix, IteratorType type) throws RocksDatabaseException {
     return new RDBStoreCodecBufferIterator(db.newIterator(family, false),
-        this, prefix);
+        this, prefix, type);
   }
 
   @Override
@@ -239,36 +230,14 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public void close() throws Exception {
-    // Nothing do for a Column Family.
-  }
-
-  @Override
-  public long getEstimatedKeyCount() throws IOException {
+  public long getEstimatedKeyCount() throws RocksDatabaseException {
     return db.estimateNumKeys(family);
   }
 
   @Override
-  public List<KeyValue<byte[], byte[]>> getRangeKVs(byte[] startKey,
-      int count, byte[] prefix,
-      MetadataKeyFilters.MetadataKeyFilter... filters)
-      throws IOException, IllegalArgumentException {
-    return getRangeKVs(startKey, count, false, prefix, filters);
-  }
-
-  @Override
-  public List<KeyValue<byte[], byte[]>> getSequentialRangeKVs(byte[] startKey,
-      int count, byte[] prefix,
-      MetadataKeyFilters.MetadataKeyFilter... filters)
-      throws IOException, IllegalArgumentException {
-    return getRangeKVs(startKey, count, true, prefix, filters);
-  }
-
-  @Override
   public void deleteBatchWithPrefix(BatchOperation batch, byte[] prefix)
-      throws IOException {
-    try (TableIterator<byte[], KeyValue<byte[], byte[]>> iter
-             = iterator(prefix)) {
+      throws RocksDatabaseException, CodecException {
+    try (KeyValueIterator<byte[], byte[]> iter = iterator(prefix)) {
       while (iter.hasNext()) {
         deleteWithBatch(batch, iter.next().getKey());
       }
@@ -277,38 +246,45 @@ class RDBTable implements Table<byte[], byte[]> {
 
   @Override
   public void dumpToFileWithPrefix(File externalFile, byte[] prefix)
-      throws IOException {
-    try (TableIterator<byte[], KeyValue<byte[], byte[]>> iter
-             = iterator(prefix);
-         DumpFileWriter fileWriter = new RDBSstFileWriter()) {
-      fileWriter.open(externalFile);
+      throws RocksDatabaseException, CodecException {
+    CodecBuffer prefixBuffer = prefix == null || prefix.length == 0 ? null :
+        CodecBufferCodec.get(true).fromPersistedFormat(prefix);
+    KeyValueIterator<CodecBuffer, CodecBuffer> iter;
+    try {
+      iter = iterator(prefixBuffer, IteratorType.KEY_AND_VALUE);
+    } catch (RocksDatabaseException e) {
+      if (prefixBuffer != null) {
+        prefixBuffer.close();
+      }
+      throw e;
+    }
+    try (RDBSstFileWriter fileWriter = new RDBSstFileWriter(externalFile)) {
       while (iter.hasNext()) {
-        final KeyValue<byte[], byte[]> entry = iter.next();
+        final KeyValue<CodecBuffer, CodecBuffer> entry = iter.next();
         fileWriter.put(entry.getKey(), entry.getValue());
       }
+    } finally {
+      iter.close();
     }
   }
 
   @Override
-  public void loadFromFile(File externalFile) throws IOException {
-    try (DumpFileLoader fileLoader = new RDBSstFileLoader(db, family)) {
-      fileLoader.load(externalFile);
-    }
+  public void loadFromFile(File externalFile) throws RocksDatabaseException {
+    RDBSstFileLoader.load(db, family, externalFile);
   }
 
-  private List<KeyValue<byte[], byte[]>> getRangeKVs(byte[] startKey,
-      int count, boolean sequential, byte[] prefix,
-      MetadataKeyFilters.MetadataKeyFilter... filters)
-      throws IOException, IllegalArgumentException {
-    long start = System.currentTimeMillis();
+  @Override
+  public List<KeyValue<byte[], byte[]>> getRangeKVs(
+      byte[] startKey, int count, byte[] prefix, KeyPrefixFilter filter, boolean sequential)
+      throws RocksDatabaseException, CodecException {
+    long start = Time.monotonicNow();
 
     if (count < 0) {
       throw new IllegalArgumentException(
             "Invalid count given " + count + ", count must be greater than 0");
     }
     final List<KeyValue<byte[], byte[]>> result = new ArrayList<>();
-    try (TableIterator<byte[], KeyValue<byte[], byte[]>> it
-             = iterator(prefix)) {
+    try (KeyValueIterator<byte[], byte[]> it = iterator(prefix)) {
       if (startKey == null) {
         it.seekToFirst();
       } else {
@@ -322,46 +298,28 @@ class RDBTable implements Table<byte[], byte[]> {
 
       while (it.hasNext() && result.size() < count) {
         final KeyValue<byte[], byte[]> currentEntry = it.next();
-        byte[] currentKey = currentEntry.getKey();
-
-        if (filters == null) {
+        if (filter == null || filter.filterKey(currentEntry.getKey())) {
           result.add(currentEntry);
-        } else {
-          // NOTE: the preKey and nextKey are never checked
-          // in all existing underlying filters, so they could
-          // be safely as null here.
-          if (Arrays.stream(filters)
-                  .allMatch(entry -> entry.filterKey(null,
-                          currentKey, null))) {
-            result.add(currentEntry);
-          } else {
-            if (result.size() > 0 && sequential) {
-              // if the caller asks for a sequential range of results,
-              // and we met a dis-match, abort iteration from here.
-              // if result is empty, we continue to look for the first match.
-              break;
-            }
-          }
+        } else if (!result.isEmpty() && sequential) {
+          // if the caller asks for a sequential range of results,
+          // and we met a dis-match, abort iteration from here.
+          // if result is empty, we continue to look for the first match.
+          break;
         }
       }
     } finally {
-      long end = System.currentTimeMillis();
+      long end = Time.monotonicNow();
       long timeConsumed = end - start;
       if (LOG.isDebugEnabled()) {
-        if (filters != null) {
-          for (MetadataKeyFilters.MetadataKeyFilter filter : filters) {
-            int scanned = filter.getKeysScannedNum();
-            int hinted = filter.getKeysHintedNum();
-            if (scanned > 0 || hinted > 0) {
-              LOG.debug(
-                  "getRangeKVs ({}) numOfKeysScanned={}, numOfKeysHinted={}",
-                  filter.getClass().getSimpleName(), filter.getKeysScannedNum(),
-                  filter.getKeysHintedNum());
-            }
+        if (filter != null) {
+          final int scanned = filter.getKeysScannedNum();
+          final int hinted = filter.getKeysHintedNum();
+          if (scanned > 0 || hinted > 0) {
+            LOG.debug("getRangeKVs ({}) numOfKeysScanned={}, numOfKeysHinted={}",
+                filter.getClass().getSimpleName(), scanned, hinted);
           }
         }
-        LOG.debug("Time consumed for getRangeKVs() is {}ms,"
-                + " result length is {}.", timeConsumed, result.size());
+        LOG.debug("Time consumed for getRangeKVs() is {}ms, result length is {}.", timeConsumed, result.size());
       }
     }
     return result;

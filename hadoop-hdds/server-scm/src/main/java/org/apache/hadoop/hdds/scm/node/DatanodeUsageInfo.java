@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,11 +17,11 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
+import java.util.Comparator;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeUsageInfoProto;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
-
-import java.util.Comparator;
 
 /**
  * Bundles datanode details with usage statistics.
@@ -32,6 +31,8 @@ public class DatanodeUsageInfo {
   private DatanodeDetails datanodeDetails;
   private SCMNodeStat scmNodeStat;
   private int containerCount;
+  private int pipelineCount;
+  private long reserved;
 
   /**
    * Constructs a DatanodeUsageInfo with DatanodeDetails and SCMNodeStat.
@@ -45,6 +46,7 @@ public class DatanodeUsageInfo {
     this.datanodeDetails = datanodeDetails;
     this.scmNodeStat = scmNodeStat;
     this.containerCount = -1;
+    this.pipelineCount = -1;
   }
 
   /**
@@ -128,6 +130,10 @@ public class DatanodeUsageInfo {
     return datanodeDetails;
   }
 
+  public DatanodeID getDatanodeID() {
+    return datanodeDetails.getID();
+  }
+
   /**
    * Gets SCMNodeStat of this DatanodeUsageInfo.
    *
@@ -143,6 +149,22 @@ public class DatanodeUsageInfo {
 
   public void setContainerCount(int containerCount) {
     this.containerCount = containerCount;
+  }
+
+  public int getPipelineCount() {
+    return pipelineCount;
+  }
+
+  public long getReserved() { 
+    return reserved; 
+  }
+
+  public void setPipelineCount(int pipelineCount) {
+    this.pipelineCount = pipelineCount;
+  }
+
+  public void setReserved(long reserved) { 
+    this.reserved = reserved; 
   }
 
   /**
@@ -210,6 +232,8 @@ public class DatanodeUsageInfo {
     }
 
     builder.setContainerCount(containerCount);
+    builder.setPipelineCount(pipelineCount);
+    builder.setReserved(reserved);
     return builder;
   }
 }

@@ -12,230 +12,44 @@
   See the License for the specific language governing permissions and
   limitations under the License. See accompanying LICENSE file.
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-https://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone-main</artifactId>
-    <version>1.5.0-SNAPSHOT</version>
+    <version>2.2.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>hdds</artifactId>
-  <version>1.5.0-SNAPSHOT</version>
-  <description>Apache Ozone Distributed Data Store Project</description>
-  <name>Apache Ozone HDDS</name>
+  <version>2.2.0-SNAPSHOT</version>
   <packaging>pom</packaging>
+  <name>Apache Ozone HDDS</name>
+  <description>Apache Ozone Distributed Data Store Project</description>
 
   <modules>
     <module>annotations</module>
-    <module>hadoop-dependency-client</module>
-    <module>hadoop-dependency-test</module>
-    <module>hadoop-dependency-server</module>
-    <module>interface-client</module>
-    <module>interface-admin</module>
-    <module>interface-server</module>
     <module>client</module>
     <module>common</module>
+    <module>config</module>
+    <module>container-service</module>
     <module>crypto-api</module>
     <module>crypto-default</module>
-    <module>framework</module>
-    <module>managed-rocksdb</module>
-    <module>rocksdb-checkpoint-differ</module>
-    <module>container-service</module>
-    <module>server-scm</module>
-    <module>tools</module>
     <module>docs</module>
-    <module>config</module>
-    <module>test-utils</module>
     <module>erasurecode</module>
+    <module>framework</module>
+    <module>hadoop-dependency-client</module>
+    <module>interface-admin</module>
+    <module>interface-client</module>
+    <module>interface-server</module>
+    <module>managed-rocksdb</module>
     <module>rocks-native</module>
+    <module>rocksdb-checkpoint-differ</module>
+    <module>server-scm</module>
+    <module>test-utils</module>
   </modules>
 
-  <repositories>
-    <repository>
-      <id>apache.snapshots.https</id>
-      <url>https://repository.apache.org/content/repositories/snapshots</url>
-    </repository>
-  </repositories>
-  <pluginRepositories>
-    <pluginRepository>
-      <id>apache.snapshots.https</id>
-      <url>https://repository.apache.org/content/repositories/snapshots</url>
-    </pluginRepository>
-  </pluginRepositories>
-  <dependencyManagement>
-    <dependencies>
-
-
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-common</artifactId>
-        <version>${hdds.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-managed-rocksdb</artifactId>
-        <version>${hdds.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-hadoop-dependency-client</artifactId>
-        <version>${hdds.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-hadoop-dependency-server</artifactId>
-        <version>${hdds.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-hadoop-dependency-test</artifactId>
-        <version>${hdds.version}</version>
-        <scope>test</scope>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-interface-server</artifactId>
-        <version>${hdds.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-interface-client</artifactId>
-        <version>${hdds.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-interface-admin</artifactId>
-        <version>${hdds.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-erasurecode</artifactId>
-        <version>${hdds.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-client</artifactId>
-        <version>${hdds.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-tools</artifactId>
-        <version>${hdds.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-server-framework</artifactId>
-        <version>${hdds.version}</version>
-      </dependency>
-
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>rocksdb-checkpoint-differ</artifactId>
-      <version>${hdds.version}</version>
-    </dependency>
-
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-server-scm</artifactId>
-        <version>${hdds.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-container-service</artifactId>
-        <version>${hdds.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-docs</artifactId>
-        <version>${hdds.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-config</artifactId>
-        <version>${hdds.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-annotation-processing</artifactId>
-        <version>${hdds.version}</version>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-test-utils</artifactId>
-        <version>${hdds.version}</version>
-        <scope>test</scope>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-common</artifactId>
-        <version>${hdds.version}</version>
-        <type>test-jar</type>
-        <scope>test</scope>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-container-service</artifactId>
-        <version>${hdds.version}</version>
-        <type>test-jar</type>
-        <scope>test</scope>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-server-scm</artifactId>
-        <type>test-jar</type>
-        <version>${hdds.version}</version>
-        <scope>test</scope>
-      </dependency>
-
-      <dependency>
-        <groupId>org.apache.ozone</groupId>
-        <artifactId>hdds-rocks-native</artifactId>
-        <version>${hdds.rocks.native.version}</version>
-      </dependency>
-    </dependencies>
-  </dependencyManagement>
   <build>
     <plugins>
-
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-enforcer-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>depcheck</id>
-            <configuration>
-              <rules>
-                <DependencyConvergence>
-                  <uniqueVersions>false</uniqueVersions>
-                </DependencyConvergence>
-              </rules>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
@@ -243,6 +57,30 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
           <execution>
             <goals>
               <goal>test-jar</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-remote-resources-plugin</artifactId>
+        <configuration>
+          <resourceBundles>
+            <resourceBundle>org.apache.ozone:ozone-dev-support:${ozone.version}</resourceBundle>
+          </resourceBundles>
+        </configuration>
+        <dependencies>
+          <dependency>
+            <groupId>org.apache.ozone</groupId>
+            <artifactId>ozone-dev-support</artifactId>
+            <version>${ozone.version}</version>
+          </dependency>
+        </dependencies>
+        <executions>
+          <execution>
+            <goals>
+              <goal>process</goal>
             </goals>
           </execution>
         </executions>
@@ -294,37 +132,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
                 <test.unique.fork.id>fork-${surefire.forkNumber}</test.unique.fork.id>
               </systemPropertyVariables>
             </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
-      <id>add-classpath-descriptor</id>
-      <activation>
-        <file>
-          <exists>src/main/java</exists>
-        </file>
-      </activation>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-dependency-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>add-classpath-descriptor</id>
-                <phase>prepare-package</phase>
-                <goals>
-                  <goal>build-classpath</goal>
-                </goals>
-                <configuration>
-                  <outputFile>${project.build.outputDirectory}/${project.artifactId}.classpath</outputFile>
-                  <prefix>$HDDS_LIB_JARS_DIR</prefix>
-                  <outputFilterFile>true</outputFilterFile>
-                  <includeScope>runtime</includeScope>
-                </configuration>
-              </execution>
-            </executions>
           </plugin>
         </plugins>
       </build>

@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,23 +13,26 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
 package org.apache.hadoop.hdds.security.x509.certificate.utils;
 
+import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CERTIFICATE_ERROR;
+import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CSR_ERROR;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.net.InetAddress;
 import java.security.KeyPair;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-
+import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.validator.routines.DomainValidator;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -38,9 +40,6 @@ import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.util.Time;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import org.bouncycastle.asn1.ASN1EncodableVector;
 import org.bouncycastle.asn1.ASN1Object;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
@@ -63,9 +62,6 @@ import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CERTIFICATE_ERROR;
-import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CSR_ERROR;
-
 /**
  * A Self Signed Certificate with CertificateServer basic constraint can be used
  * to bootstrap a certificate infrastructure, if no external certificate is
@@ -75,8 +71,8 @@ public final class SelfSignedCertificate {
   private String subject;
   private String clusterID;
   private String scmID;
-  private LocalDateTime beginDate;
-  private LocalDateTime endDate;
+  private ZonedDateTime beginDate;
+  private ZonedDateTime endDate;
   private KeyPair key;
   private SecurityConfig config;
   private List<GeneralName> altNames;
@@ -132,12 +128,10 @@ public final class SelfSignedCertificate {
     X500Name name = new X500Name(dnName);
 
     // Valid from the Start of the day when we generate this Certificate.
-    Date validFrom =
-        Date.from(beginDate.atZone(ZoneId.systemDefault()).toInstant());
+    Date validFrom = Date.from(beginDate.toInstant());
 
     // Valid till end day finishes.
-    Date validTill =
-        Date.from(endDate.atZone(ZoneId.systemDefault()).toInstant());
+    Date validTill = Date.from(endDate.toInstant());
 
     X509v3CertificateBuilder builder = new X509v3CertificateBuilder(name,
         serial, validFrom, validTill, name, publicKeyInfo);
@@ -148,7 +142,7 @@ public final class SelfSignedCertificate {
       int keyUsageFlag = KeyUsage.keyCertSign | KeyUsage.cRLSign;
       KeyUsage keyUsage = new KeyUsage(keyUsageFlag);
       builder.addExtension(Extension.keyUsage, true, keyUsage);
-      if (altNames != null && altNames.size() >= 1) {
+      if (altNames != null && !altNames.isEmpty()) {
         builder.addExtension(new Extension(Extension.subjectAlternativeName,
             false, new GeneralNames(altNames.toArray(
                 new GeneralName[altNames.size()])).getEncoded()));
@@ -172,8 +166,8 @@ public final class SelfSignedCertificate {
     private String subject;
     private String clusterID;
     private String scmID;
-    private LocalDateTime beginDate;
-    private LocalDateTime endDate;
+    private ZonedDateTime beginDate;
+    private ZonedDateTime endDate;
     private KeyPair key;
     private SecurityConfig config;
     private BigInteger caCertSerialId;
@@ -204,12 +198,12 @@ public final class SelfSignedCertificate {
       return this;
     }
 
-    public Builder setBeginDate(LocalDateTime date) {
+    public Builder setBeginDate(ZonedDateTime date) {
       this.beginDate = date;
       return this;
     }
 
-    public Builder setEndDate(LocalDateTime date) {
+    public Builder setEndDate(ZonedDateTime date) {
       this.endDate = date;
       return this;
     }
@@ -254,14 +248,14 @@ public final class SelfSignedCertificate {
     // Support SAN extension with DNS and RFC822 Name
     // other name type will be added as needed.
     public Builder addDnsName(String dnsName) {
-      Preconditions.checkNotNull(dnsName, "dnsName cannot be null");
+      Objects.requireNonNull(dnsName, "dnsName cannot be null");
       this.addAltName(GeneralName.dNSName, dnsName);
       return this;
     }
 
     // IP address is subject to change which is optional for now.
     public Builder addIpAddress(String ip) {
-      Preconditions.checkNotNull(ip, "Ip address cannot be null");
+      Objects.requireNonNull(ip, "Ip address cannot be null");
       this.addAltName(GeneralName.iPAddress, ip);
       return this;
     }
@@ -300,7 +294,7 @@ public final class SelfSignedCertificate {
 
     public X509Certificate build()
         throws SCMSecurityException, IOException {
-      Preconditions.checkNotNull(key, "Key cannot be null");
+      Objects.requireNonNull(key, "Key cannot be null");
       Preconditions.checkArgument(StringUtils.isNotBlank(subject),
           "Subject " + "cannot be blank");
       Preconditions.checkArgument(StringUtils.isNotBlank(clusterID),

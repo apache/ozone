@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,44 +17,38 @@
 
 package org.apache.hadoop.ozone.om.request.volume;
 
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
+
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.List;
 import java.util.Map;
-
-import com.google.common.base.Preconditions;
-import org.apache.ratis.server.protocol.TermIndex;
+import java.util.Objects;
+import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
+import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.OMAction;
+import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.om.response.OMClientResponse;
+import org.apache.hadoop.ozone.om.response.volume.OMVolumeSetQuotaResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetVolumePropertyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetVolumePropertyResponse;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import org.apache.hadoop.ozone.audit.AuditLogger;
-import org.apache.hadoop.ozone.audit.OMAction;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.om.OMMetadataManager;
-import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.OMMetrics;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.om.response.volume.OMVolumeSetQuotaResponse;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .SetVolumePropertyRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .SetVolumePropertyResponse;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.VOLUME_LOCK;
 
 /**
  * Handles set Quota request for volume.
@@ -83,13 +76,13 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
-    final long transactionLogIndex = termIndex.getIndex();
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
+    final long transactionLogIndex = context.getIndex();
 
     SetVolumePropertyRequest setVolumePropertyRequest =
         getOmRequest().getSetVolumePropertyRequest();
 
-    Preconditions.checkNotNull(setVolumePropertyRequest);
+    Objects.requireNonNull(setVolumePropertyRequest, "setVolumePropertyRequest == null");
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
@@ -127,26 +120,22 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
           VOLUME_LOCK, volume));
       acquireVolumeLock = getOmLockDetails().isLockAcquired();
 
-      OmVolumeArgs omVolumeArgs = getVolumeInfo(omMetadataManager, volume);
+      OmVolumeArgs.Builder builder = getVolumeInfo(omMetadataManager, volume).toBuilder();
       if (checkQuotaBytesValid(omMetadataManager,
           setVolumePropertyRequest.getQuotaInBytes(), volume)) {
-        omVolumeArgs.setQuotaInBytes(
+        builder.setQuotaInBytes(
             setVolumePropertyRequest.getQuotaInBytes());
-      } else {
-        omVolumeArgs.setQuotaInBytes(omVolumeArgs.getQuotaInBytes());
       }
       if (checkQuotaNamespaceValid(omMetadataManager,
           setVolumePropertyRequest.getQuotaInNamespace(), volume)) {
-        omVolumeArgs.setQuotaInNamespace(
+        builder.setQuotaInNamespace(
             setVolumePropertyRequest.getQuotaInNamespace());
-      } else {
-        omVolumeArgs.setQuotaInNamespace(omVolumeArgs.getQuotaInNamespace());
       }
 
-      omVolumeArgs.setUpdateID(transactionLogIndex,
-          ozoneManager.isRatisEnabled());
-      omVolumeArgs.setModificationTime(
-          setVolumePropertyRequest.getModificationTime());
+      OmVolumeArgs omVolumeArgs = builder
+          .setModificationTime(setVolumePropertyRequest.getModificationTime())
+          .setUpdateID(transactionLogIndex)
+          .build();
 
       // update cache.
       omMetadataManager.getVolumeTable().addCacheEntry(
@@ -172,7 +161,7 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
     }
 
     // Performing audit logging outside of the lock.
-    auditLog(auditLogger, buildAuditMessage(OMAction.SET_QUOTA, auditMap,
+    markForAudit(auditLogger, buildAuditMessage(OMAction.SET_QUOTA, auditMap,
         exception, userInfo));
 
     // return response after releasing lock.

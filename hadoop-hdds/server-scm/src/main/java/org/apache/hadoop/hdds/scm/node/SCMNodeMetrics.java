@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.node;
 
 import java.util.Map;
-
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
@@ -33,7 +31,6 @@ import org.apache.hadoop.metrics2.lib.Interns;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.ozone.OzoneConsts;
-
 import org.apache.hadoop.util.StringUtils;
 
 /**
@@ -135,6 +132,7 @@ public final class SCMNodeMetrics implements MetricsSource {
   public void getMetrics(MetricsCollector collector, boolean all) {
     Map<String, Map<String, Integer>> nodeCount = managerMXBean.getNodeCount();
     Map<String, Long> nodeInfo = managerMXBean.getNodeInfo();
+    Map<String, String> nodeStatistics = managerMXBean.getNodeStatistics();
     int totalNodeCount = 0;
     /**
      * Loop over the Node map and create a metric for the cross product of all
@@ -158,6 +156,15 @@ public final class SCMNodeMetrics implements MetricsSource {
     }
     metrics.addGauge(
         Interns.info("AllNodes", "Number of datanodes"), totalNodeCount);
+
+    String nonWritableNodes = nodeStatistics.get("NonWritableNodes");
+    if (nonWritableNodes != null) {
+      metrics.addGauge(
+          Interns.info("NonWritableNodes", "Number of datanodes that cannot accept new writes because " +
+              "they are either not in IN_SERVICE and HEALTHY state, cannot allocate new containers or " +
+              "cannot write to existing containers."),
+          Integer.parseInt(nonWritableNodes));
+    }
 
     for (Map.Entry<String, Long> e : nodeInfo.entrySet()) {
       metrics.addGauge(

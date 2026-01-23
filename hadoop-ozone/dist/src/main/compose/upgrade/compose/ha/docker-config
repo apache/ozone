@@ -23,22 +23,26 @@ OZONE-SITE.XML_ozone.om.nodes.omservice=om1,om2,om3
 OZONE-SITE.XML_ozone.om.address.omservice.om1=om1
 OZONE-SITE.XML_ozone.om.address.omservice.om2=om2
 OZONE-SITE.XML_ozone.om.address.omservice.om3=om3
-OZONE-SITE.XML_ozone.om.ratis.enable=true
 
 OZONE-SITE.XML_ozone.scm.service.ids=scmservice
 OZONE-SITE.XML_ozone.scm.nodes.scmservice=scm1,scm2,scm3
 OZONE-SITE.XML_ozone.scm.address.scmservice.scm1=scm1.org
 OZONE-SITE.XML_ozone.scm.address.scmservice.scm2=scm2.org
 OZONE-SITE.XML_ozone.scm.address.scmservice.scm3=scm3.org
-OZONE-SITE.XML_ozone.scm.ratis.enable=true
 OZONE-SITE.XML_ozone.scm.primordial.node.id=scm1
 
 OZONE-SITE.XML_ozone.scm.pipeline.creation.interval=30s
 OZONE-SITE.XML_ozone.scm.pipeline.owner.container.count=1
-OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data
+OZONE-SITE.XML_ozone.scm.ec.pipeline.minimum=1
+OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data/metadata
 OZONE-SITE.XML_ozone.scm.container.size=1GB
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 OZONE-SITE.XML_hdds.datanode.volume.min.free.space=100MB
+OZONE-SITE.XML_hdds.datanode.volume.min.free.space.percent=0
+OZONE-SITE.XML_ozone.http.basedir=/tmp/ozone_http
+OZONE-SITE.XML_ozone.client.hbase.enhancements.allowed=true
+OZONE-SITE.XML_ozone.fs.hsync.enabled=true
+OZONE-SITE.XML_ozone.hbase.enhancements.allowed=true
 
 # If SCM sends container close commands as part of upgrade finalization while
 # datanodes are doing a leader election, all 3 replicas may end up in the

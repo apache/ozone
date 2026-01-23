@@ -97,8 +97,9 @@ enum Type {
 
   ListMultipartUploads = 82;
 
-  ListTrash = 91;
-  RecoverTrash = 92;
+  // Not used anymore due to HDDS-11251
+  ListTrash = 91; // [deprecated = true]
+  RecoverTrash = 92; // [deprecated = true]
 
   RevokeS3Secret = 93;
 
@@ -140,13 +141,21 @@ enum Type {
   ListSnapshotDiffJobs = 122;
   CancelSnapshotDiff = 123;
   SetSafeMode = 124;
-  PrintCompactionLogDag = 125;
+  PrintCompactionLogDag = 125; // [deprecated = true] by HDDS-12053
   ListKeysLight = 126;
   AbortExpiredMultiPartUploads = 127;
   SetSnapshotProperty = 128;
   ListStatusLight = 129;
   GetSnapshotInfo = 130;
   RenameSnapshot = 131;
+  ListOpenFiles = 132;
+  QuotaRepair = 133;
+  GetQuotaRepairStatus = 135;
+  StartQuotaRepair = 136;
+  SnapshotMoveTableKeys = 137;
+  PutObjectTagging = 140;
+  GetObjectTagging = 141;
+  DeleteObjectTagging = 142;
 }
 
 enum SafeMode {
@@ -230,8 +239,9 @@ message OMRequest {
   optional UpdateGetS3SecretRequest         updateGetS3SecretRequest       = 82;
   optional ListMultipartUploadsRequest      listMultipartUploadsRequest    = 83;
 
-  optional ListTrashRequest                 listTrashRequest               = 91;
-  optional RecoverTrashRequest              RecoverTrashRequest            = 92;
+  // Not used anymore due to HDDS-11251
+  optional ListTrashRequest                 listTrashRequest               = 91 [deprecated = true];
+  optional RecoverTrashRequest              RecoverTrashRequest            = 92 [deprecated = true];
 
   optional RevokeS3SecretRequest            RevokeS3SecretRequest          = 93;
 
@@ -277,12 +287,23 @@ message OMRequest {
   optional ListSnapshotDiffJobRequest       ListSnapshotDiffJobRequest     = 122;
   optional CancelSnapshotDiffRequest        CancelSnapshotDiffRequest      = 123;
   optional SetSafeModeRequest               SetSafeModeRequest             = 124;
-  optional PrintCompactionLogDagRequest     PrintCompactionLogDagRequest   = 125;
+  optional PrintCompactionLogDagRequest     PrintCompactionLogDagRequest   = 125 [deprecated = true];
 
   optional MultipartUploadsExpiredAbortRequest multipartUploadsExpiredAbortRequest = 126;
   optional SetSnapshotPropertyRequest       SetSnapshotPropertyRequest     = 127;
   optional SnapshotInfoRequest              SnapshotInfoRequest            = 128;
   optional RenameSnapshotRequest            RenameSnapshotRequest          = 129;
+  optional ListOpenFilesRequest             ListOpenFilesRequest           = 130;
+  optional QuotaRepairRequest               QuotaRepairRequest             = 131;
+
+  optional GetQuotaRepairStatusRequest      GetQuotaRepairStatusRequest    = 133;
+  optional StartQuotaRepairRequest          StartQuotaRepairRequest        = 134;
+  optional SnapshotMoveTableKeysRequest     SnapshotMoveTableKeysRequest   = 135;
+
+  optional GetObjectTaggingRequest          getObjectTaggingRequest        = 140;
+  optional PutObjectTaggingRequest          putObjectTaggingRequest        = 141;
+  optional DeleteObjectTaggingRequest       deleteObjectTaggingRequest     = 142;
+  repeated SetSnapshotPropertyRequest       SetSnapshotPropertyRequests    = 143;
 }
 
 message OMResponse {
@@ -356,8 +377,10 @@ message OMResponse {
 
   optional ListMultipartUploadsResponse listMultipartUploadsResponse = 82;
 
-  optional ListTrashResponse                  listTrashResponse            = 91;
-  optional RecoverTrashResponse               RecoverTrashResponse         = 92;
+  // Not used anymore due to HDDS-11251
+  optional ListTrashResponse                  listTrashResponse            = 91 [deprecated = true];
+  optional RecoverTrashResponse               RecoverTrashResponse         = 92 [deprecated = true];
+
   optional PurgePathsResponse                 purgePathsResponse           = 93 [deprecated = true];
   optional PurgeDirectoriesResponse           purgeDirectoriesResponse     = 108;
 
@@ -398,7 +421,7 @@ message OMResponse {
   optional ListSnapshotDiffJobResponse       ListSnapshotDiffJobResponse   = 122;
   optional CancelSnapshotDiffResponse        cancelSnapshotDiffResponse    = 123;
   optional SetSafeModeResponse               SetSafeModeResponse           = 124;
-  optional PrintCompactionLogDagResponse     PrintCompactionLogDagResponse = 125;
+  optional PrintCompactionLogDagResponse     PrintCompactionLogDagResponse = 125 [deprecated = true];
   optional ListKeysLightResponse             listKeysLightResponse         = 126;
   optional MultipartUploadsExpiredAbortResponse multipartUploadsExpiredAbortResponse = 127;
   optional SetSnapshotPropertyResponse       SetSnapshotPropertyResponse   = 128;
@@ -406,6 +429,14 @@ message OMResponse {
   optional SnapshotInfoResponse              SnapshotInfoResponse          = 130;
   optional OMLockDetailsProto                omLockDetails                 = 131;
   optional RenameSnapshotResponse            RenameSnapshotResponse        = 132;
+  optional ListOpenFilesResponse             ListOpenFilesResponse         = 133;
+  optional QuotaRepairResponse            QuotaRepairResponse        = 134;
+  optional GetQuotaRepairStatusResponse      GetQuotaRepairStatusResponse   = 136;
+  optional StartQuotaRepairResponse          StartQuotaRepairResponse       = 137;
+
+  optional GetObjectTaggingResponse          getObjectTaggingResponse      = 140;
+  optional PutObjectTaggingResponse          putObjectTaggingResponse      = 141;
+  optional DeleteObjectTaggingResponse       deleteObjectTaggingResponse   = 142;
 }
 
 enum Status {
@@ -529,38 +560,50 @@ enum Status {
     INVALID_PATH = 93;
 
     TOO_MANY_BUCKETS = 94;
+
+    KEY_UNDER_LEASE_RECOVERY = 95;
+    KEY_ALREADY_CLOSED = 96;
+    KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD = 97;
+
+    TOO_MANY_SNAPSHOTS = 98;
 }
 
 /**
     This command acts as a list command for deleted keys that are still present
     in the deleted table on Ozone Manager.
+    Not used anymore due to HDDS-11251
 */
 message ListTrashRequest {
-  required string volumeName = 1;
-  required string bucketName = 2;
-  optional string startKeyName = 3;
-  optional string keyPrefix = 4;
-  optional int32 maxKeys = 5;
+  // option deprecated = true;
+  required string volumeName = 1 [deprecated = true];
+  required string bucketName = 2 [deprecated = true];
+  optional string startKeyName = 3 [deprecated = true];
+  optional string keyPrefix = 4 [deprecated = true];
+  optional int32 maxKeys = 5 [deprecated = true];
 }
 
 message ListTrashResponse {
-  repeated RepeatedKeyInfo deletedKeys = 1;
+  // option deprecated = true;
+  repeated RepeatedKeyInfo deletedKeys = 1 [deprecated = true];
 }
 
 /**
     This command acts as a recover command for deleted keys that are still
     in deleted table on Ozone Manager.
+    Not used anymore due to HDDS-11251
 */
 
 message RecoverTrashRequest {
-    required string volumeName = 1;
-    required string bucketName = 2;
-    required string keyName = 3;
-    required string destinationBucket = 4;
+    // option deprecated = true;
+    required string volumeName = 1 [deprecated = true];
+    required string bucketName = 2 [deprecated = true];
+    required string keyName = 3 [deprecated = true];
+    required string destinationBucket = 4 [deprecated = true];
 }
 
 message RecoverTrashResponse {
-    required bool response = 1;
+    // option deprecated = true;
+    required bool response = 1 [deprecated = true];
 }
 
 message VolumeInfo {
@@ -713,7 +756,7 @@ message BucketInfo {
     required string bucketName = 2;
     repeated OzoneAclInfo acls = 3;
     required bool isVersionEnabled = 4 [default = false];
-    required StorageTypeProto storageType = 5 [default = DISK];
+    required hadoop.hdds.StorageTypeProto storageType = 5 [default = DISK];
     optional uint64 creationTime = 6;
     repeated hadoop.hdds.KeyValue metadata = 7;
     optional BucketEncryptionInfoProto beinfo = 8;
@@ -729,13 +772,8 @@ message BucketInfo {
     optional BucketLayoutProto bucketLayout = 18;
     optional string owner = 19;
     optional hadoop.hdds.DefaultReplicationConfig defaultReplicationConfig = 20;
-}
-
-enum StorageTypeProto {
-    DISK = 1;
-    SSD = 2;
-    ARCHIVE = 3;
-    RAM_DISK = 4;
+    optional uint64 snapshotUsedBytes = 21;
+    optional uint64 snapshotUsedNamespace = 22;
 }
 
 enum BucketLayoutProto {
@@ -802,7 +840,7 @@ message BucketArgs {
     required string volumeName = 1;
     required string bucketName = 2;
     optional bool isVersionEnabled = 5;
-    optional StorageTypeProto storageType = 6;
+    optional hadoop.hdds.StorageTypeProto storageType = 6;
     repeated hadoop.hdds.KeyValue metadata = 7;
     optional uint64 quotaInBytes = 8;
     optional uint64 quotaInNamespace = 9;
@@ -842,8 +880,8 @@ message SnapshotInfo {
   optional hadoop.hdds.UUID pathPreviousSnapshotID = 8;
   optional hadoop.hdds.UUID globalPreviousSnapshotID = 9;
   optional string snapshotPath = 10;
-  optional string checkpointDir = 11;
-  optional int64 dbTxSequenceNumber = 12;
+  optional string checkpointDir = 11 [deprecated = true];
+  optional int64 dbTxSequenceNumber = 12 [deprecated = true];
   optional bool deepClean = 13;
   optional bool sstFiltered = 14;
   // snapshot reference size before any key replication or EC
@@ -856,6 +894,11 @@ message SnapshotInfo {
   optional uint64 exclusiveReplicatedSize = 18;
   // note: shared sizes can be calculated from: referenced - exclusive
   optional bool deepCleanedDeletedDir = 19;
+  optional bytes lastTransactionInfo = 20;
+  optional uint64 exclusiveSizeDeltaFromDirDeepCleaning = 21;
+  // snapshot exclusive size after replication
+  optional uint64 exclusiveReplicatedSizeDeltaFromDirDeepCleaning = 22;
+  optional bytes createTransactionInfo = 23;
 }
 
 message SnapshotDiffJobProto {
@@ -870,6 +913,8 @@ message SnapshotDiffJobProto {
   optional uint64 totalDiffEntries = 9;
   optional string message = 10;
   optional bool disableNativeDiff = 11;
+  optional SnapshotDiffResponse.SubStatus subStatus = 12;
+  optional double keysProcessedPct = 13;
 }
 
 message OzoneObj {
@@ -1029,6 +1074,14 @@ message KeyArgs {
 
     // S3 object tags support
     repeated hadoop.hdds.KeyValue tags = 22;
+
+    // expectedDataGeneration, when used in key creation indicates that a
+    // key with the same keyName should exist with the given generation.
+    // For a key commit to succeed, the original key should still be present with the
+    // generation unchanged.
+    // This allows a key to be created an committed atomically if the original has not
+    // been modified.
+    optional uint64 expectedDataGeneration = 23;
 }
 
 message KeyLocation {
@@ -1113,6 +1166,32 @@ message KeyInfo {
     optional bool isFile = 19;
     optional string ownerName = 20;
     repeated hadoop.hdds.KeyValue tags = 21;
+  // expectedDataGeneration, when used in key creation indicates that a
+  // key with the same keyName should exist with the given generation.
+  // For a key commit to succeed, the original key should still be present with the
+  // generation unchanged.
+  // This allows a key to be created an committed atomically if the original has not
+  // been modified.
+    optional uint64 expectedDataGeneration = 22;
+}
+
+// KeyInfoProtoLight is a lightweight subset of KeyInfo message containing
+// selected fields only, while maintaining the same field indices as KeyInfo
+// for compatibility and consistency.
+message KeyInfoProtoLight {
+  required string volumeName = 1;
+  required string bucketName = 2;
+  required string keyName = 3;
+  required uint64 dataSize = 4;
+  required hadoop.hdds.ReplicationType type = 5;
+  optional hadoop.hdds.ReplicationFactor factor = 6;
+  required uint64 creationTime = 8;
+  required uint64 modificationTime = 9;
+  optional uint64 objectID = 14;
+  optional uint64 updateID = 15;
+  optional uint64 parentID = 16;
+  optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 17;
+  optional bool isFile = 19;
 }
 
 message BasicKeyInfo {
@@ -1125,6 +1204,8 @@ message BasicKeyInfo {
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 7;
     optional string eTag = 8;
     optional string ownerName = 9;
+    optional bool isEncrypted = 10;
+    optional bool isFile = 11;
 }
 
 message DirectoryInfo {
@@ -1141,6 +1222,7 @@ message DirectoryInfo {
 
 message RepeatedKeyInfo {
     repeated KeyInfo keyInfo = 1;
+    optional uint64 bucketId = 2;
 }
 
 message OzoneFileStatusProto {
@@ -1323,8 +1405,8 @@ message DeleteKeyResponse {
 }
 
 message DeletedKeys {
-    required string volumeName = 1;
-    required string bucketName = 2;
+    required string volumeName = 1 [deprecated = true];
+    required string bucketName = 2 [deprecated = true];
     repeated string keys = 3;
 }
 
@@ -1333,6 +1415,16 @@ message PurgeKeysRequest {
     // if set, will purge keys in a snapshot DB instead of active DB
     optional string snapshotTableKey = 2;
     repeated SnapshotMoveKeyInfos keysToUpdate = 3;
+    // previous snapshotID can also be null & this field would be absent in older requests.
+    optional NullableUUID expectedPreviousSnapshotID = 4;
+    repeated string renamedKeys = 5;
+    repeated BucketPurgeKeysSize bucketPurgeKeysSize = 6;
+}
+
+message BucketPurgeKeysSize {
+  optional BucketNameInfo bucketNameInfo = 1;
+  optional uint64 purgedBytes = 2;
+  optional uint64 purgedNamespace = 3;
 }
 
 message PurgeKeysResponse {
@@ -1355,6 +1447,20 @@ message PurgePathsResponse {
 message PurgeDirectoriesRequest {
   repeated PurgePathRequest deletedPath = 1;
   optional string snapshotTableKey = 2;
+  // previous snapshotID can also be null & this field would be absent in older requests.
+  optional NullableUUID expectedPreviousSnapshotID = 3;
+  repeated BucketNameInfo bucketNameInfos = 4;
+}
+
+message BucketNameInfo {
+  optional uint64 volumeId = 1;
+  optional uint64 bucketId = 2;
+  optional string volumeName = 3;
+  optional string bucketName = 4;
+}
+
+message NullableUUID {
+  optional hadoop.hdds.UUID uuid = 1;
 }
 
 message PurgeDirectoriesResponse {
@@ -1404,7 +1510,8 @@ message OMTokenProto {
     optional string accessKeyId    = 12;
     optional string signature      = 13;
     optional string strToSign      = 14;
-    optional string omServiceId    = 15;
+    optional string omServiceId    = 15 [deprecated = true];
+    optional string secretKeyId    = 16;
 }
 
 message SecretKeyProto {
@@ -1436,6 +1543,7 @@ message CommitKeyRequest {
     required KeyArgs keyArgs = 1;
     required uint64 clientID = 2;
     optional bool hsync = 3;
+    optional bool recovery = 4;
 }
 
 message CommitKeyResponse {
@@ -1543,6 +1651,24 @@ message CancelPrepareResponse {
 
 }
 
+message ListOpenFilesRequest {
+  optional string path = 1;
+  optional uint32 count = 2;
+  optional string token = 3;
+}
+
+message ListOpenFilesResponse {
+  // size of openKeyTable and openFileTable combined
+  optional uint64 totalOpenKeyCount = 1;
+  // indicates if there are more entries to be retrieved under the given path
+  optional bool hasMore = 2;
+  // continuation token should match a dbKey in openKeyTable or openFileTable
+  optional string continuationToken = 3;
+  // result
+  repeated uint64 clientID = 4;
+  repeated KeyInfo keyInfo = 5;
+}
+
 message ServicePort {
     enum Type {
         RPC = 1;
@@ -1565,6 +1691,7 @@ message ServiceInfo {
     repeated ServicePort servicePorts = 3;
     optional OMRoleInfo omRole = 4;
     optional int32 OMVersion = 5 [default = 0];
+    optional FsServerDefaultsProto serverDefaults = 6;
 }
 
 message MultipartInfoInitiateRequest {
@@ -1673,11 +1800,17 @@ message ListMultipartUploadsRequest {
     required string volume = 1;
     required string bucket = 2;
     required string prefix = 3;
+    optional string keyMarker = 4;
+    optional string uploadIdMarker = 5;
+    optional int32 maxUploads = 6;
+    optional bool withPagination = 7; // for backward compatibility
 }
 
 message ListMultipartUploadsResponse {
     optional bool isTruncated = 1;
     repeated MultipartUploadInfo uploadsList = 2;
+    optional string nextKeyMarker = 3;
+    optional string nextUploadIdMarker = 4;
 }
 
 message MultipartUploadInfo {
@@ -1887,7 +2020,9 @@ message ListSnapshotDiffJobRequest {
   required string volumeName = 1;
   required string bucketName = 2;
   optional string jobStatus = 3;
-  optional bool listAll = 4;
+  optional bool listAll = 4; // Option to specify whether to list all jobs regardless of status
+  optional string prevSnapshotDiffJob = 5;
+  optional uint32 maxListResult = 6;
 }
 
 message DeleteSnapshotRequest {
@@ -1916,9 +2051,17 @@ message SnapshotMoveDeletedKeysRequest {
   repeated string deletedDirsToMove = 5;
 }
 
+message SnapshotMoveTableKeysRequest {
+  optional hadoop.hdds.UUID fromSnapshotID = 1;
+  repeated SnapshotMoveKeyInfos deletedKeys = 2;
+  repeated SnapshotMoveKeyInfos deletedDirs = 3;
+  repeated hadoop.hdds.KeyValue renamedKeys = 4;
+}
+
 message SnapshotMoveKeyInfos {
   optional string key = 1;
   repeated KeyInfo keyInfos = 2;
+  optional uint64 bucketId = 3;
 }
 
 message SnapshotPurgeRequest {
@@ -1932,6 +2075,7 @@ message SetSnapshotPropertyRequest {
   optional SnapshotSize snapshotSize = 3;
   optional bool deepCleanedDeletedDir = 4;
   optional bool deepCleanedDeletedKey = 5;
+  optional SnapshotSize snapshotSizeDeltaFromDirDeepCleaning = 6;
 }
 
 // SnapshotProperty in entirely deprecated, Keeping it here for proto.lock compatibility
@@ -2002,10 +2146,19 @@ message SnapshotDiffResponse {
     CANCELLED = 6;
   }
 
+  enum SubStatus {
+      SST_FILE_DELTA_DAG_WALK = 1;
+      SST_FILE_DELTA_FULL_DIFF = 2;
+      OBJECT_ID_MAP_GEN_OBS = 3;
+      OBJECT_ID_MAP_GEN_FSO = 4;
+      DIFF_REPORT_GEN = 5;
+  }
+
   optional SnapshotDiffReportProto snapshotDiffReport = 1;
   optional JobStatusProto jobStatus = 2;
   optional int64 waitTimeInMs = 3;
   optional string reason = 4;
+  optional SubStatus subStatus = 5;
 }
 
 message CancelSnapshotDiffResponse {
@@ -2014,6 +2167,7 @@ message CancelSnapshotDiffResponse {
 
 message ListSnapshotDiffJobResponse {
   repeated SnapshotDiffJobProto snapshotDiffJob = 1;
+  optional string lastSnapshotDiffJob = 2;
 }
 
 message DeleteSnapshotResponse {
@@ -2116,10 +2270,13 @@ message RecoverLeaseRequest {
   optional string volumeName = 1;
   optional string bucketName = 2;
   optional string keyName = 3;
+  optional bool force = 4;
 }
 
 message RecoverLeaseResponse {
-  optional bool response = 1;
+  optional bool response = 1 [deprecated=true];
+  optional KeyInfo keyInfo = 2;
+  optional KeyInfo openKeyInfo = 3;
 }
 
 message SetTimesRequest {
@@ -2139,11 +2296,63 @@ message SetSafeModeResponse {
   optional bool response = 1;
 }
 
+message QuotaRepairRequest {
+    repeated BucketQuotaCount bucketCount = 1;
+    required bool supportVolumeOldQuota = 2 [default=false];
+}
+message BucketQuotaCount {
+    required string volName = 1;
+    required string bucketName = 2;
+    required int64 diffUsedBytes = 3;
+    required int64 diffUsedNamespace = 4;
+    required bool supportOldQuota = 5 [default=false];
+}
+
+message QuotaRepairResponse {
+}
+
+message FsServerDefaultsProto {
+  optional string keyProviderUri = 1;
+}
+
+message GetQuotaRepairStatusRequest {
+}
+message GetQuotaRepairStatusResponse {
+    optional string status = 1;
+}
+message StartQuotaRepairRequest {
+    repeated string buckets = 1;
+}
+message StartQuotaRepairResponse {
+}
+
 message OMLockDetailsProto {
   optional bool isLockAcquired = 1;
   optional uint64 waitLockNanos    = 2;
   optional uint64 readLockNanos    = 3;
   optional uint64 writeLockNanos   = 4;
+}
+
+message PutObjectTaggingRequest {
+  required KeyArgs keyArgs = 1;
+}
+
+message PutObjectTaggingResponse {
+}
+
+message GetObjectTaggingRequest {
+  required KeyArgs keyArgs = 1;
+}
+
+message GetObjectTaggingResponse {
+  repeated hadoop.hdds.KeyValue tags = 1;
+}
+
+message DeleteObjectTaggingRequest {
+  required KeyArgs keyArgs = 1;
+}
+
+message DeleteObjectTaggingResponse {
 }
 
 /**

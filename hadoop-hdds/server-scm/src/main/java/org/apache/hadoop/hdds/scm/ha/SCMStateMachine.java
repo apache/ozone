@@ -1,39 +1,41 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements. See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership. The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * <p>http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * <p>Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import static java.util.Objects.requireNonNull;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
+import java.util.Collection;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Collection;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import com.google.protobuf.InvalidProtocolBufferException;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLogImpl;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -42,9 +44,9 @@ import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.apache.ratis.proto.RaftProtos;
-import org.apache.hadoop.util.Time;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftGroupMemberId;
@@ -56,16 +58,12 @@ import org.apache.ratis.statemachine.SnapshotInfo;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.statemachine.TransactionContext;
 import org.apache.ratis.statemachine.impl.BaseStateMachine;
-
-import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.JavaUtils;
 import org.apache.ratis.util.LifeCycle;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static java.util.Objects.requireNonNull;
 
 /**
  * The SCMStateMachine is the state machine for SCMRatisServer. It is
@@ -84,9 +82,6 @@ public class SCMStateMachine extends BaseStateMachine {
   private final boolean isInitialized;
   private ExecutorService installSnapshotExecutor;
 
-  // The atomic variable RaftServerImpl#inProgressInstallSnapshotRequest
-  // ensures serializable between notifyInstallSnapshotFromLeader()
-  // and reinitialize().
   private DBCheckpoint installingDBCheckpoint = null;
   private List<ManagedSecretKey> installingSecretKeys = null;
 
@@ -137,6 +132,7 @@ public class SCMStateMachine extends BaseStateMachine {
     getLifeCycle().startAndTransition(() -> {
       super.initialize(server, id, raftStorage);
       storage.init(raftStorage);
+      LOG.info("{}: initialize {}", server.getId(), id);
     });
   }
 
@@ -149,6 +145,9 @@ public class SCMStateMachine extends BaseStateMachine {
       final SCMRatisRequest request = SCMRatisRequest.decode(
           Message.valueOf(trx.getStateMachineLogEntry().getLogData()));
 
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("{}: applyTransaction {}", getId(), TermIndex.valueOf(trx.getLogEntry()));
+      }
       try {
         applyTransactionFuture.complete(process(request));
       } catch (SCMException ex) {
@@ -168,7 +167,9 @@ public class SCMStateMachine extends BaseStateMachine {
       if (scm.isInSafeMode() && refreshedAfterLeaderReady.get()) {
         scm.getScmSafeModeManager().refreshAndValidate();
       }
-      transactionBuffer.updateLatestTrxInfo(TransactionInfo.valueOf(TermIndex.valueOf(trx.getLogEntry())));
+      final TermIndex appliedTermIndex = TermIndex.valueOf(trx.getLogEntry());
+      transactionBuffer.updateLatestTrxInfo(TransactionInfo.valueOf(appliedTermIndex));
+      updateLastAppliedTermIndex(appliedTermIndex);
     } catch (Exception ex) {
       applyTransactionFuture.completeExceptionally(ex);
       ExitUtils.terminate(1, ex.getMessage(), ex, StateMachine.LOG);
@@ -360,13 +361,15 @@ public class SCMStateMachine extends BaseStateMachine {
       // 1. Refresh Safemode rules state.
       // 2. Start DN Rpc server.
       if (!refreshedAfterLeaderReady.get()) {
-        scm.getScmSafeModeManager().refresh();
-        scm.getDatanodeProtocolServer().start();
-
         refreshedAfterLeaderReady.set(true);
+        scm.getScmSafeModeManager().refreshAndValidate();
       }
       currentLeaderTerm.set(-1L);
     }
+  }
+
+  public boolean isRefreshedAfterLeaderReady() {
+    return refreshedAfterLeaderReady.get();
   }
 
   @Override
@@ -389,6 +392,7 @@ public class SCMStateMachine extends BaseStateMachine {
   @Override
   public void pause() {
     final LifeCycle lc = getLifeCycle();
+    LOG.info("{}: Try to pause from current LifeCycle state {}", getId(), lc);
     if (lc.getCurrentState() != LifeCycle.State.NEW) {
       lc.transition(LifeCycle.State.PAUSING);
       lc.transition(LifeCycle.State.PAUSED);
@@ -397,7 +401,7 @@ public class SCMStateMachine extends BaseStateMachine {
 
   @Override
   public void reinitialize() throws IOException {
-    Preconditions.checkNotNull(installingDBCheckpoint);
+    requireNonNull(installingDBCheckpoint, "installingDBCheckpoint == null");
     DBCheckpoint checkpoint = installingDBCheckpoint;
     List<ManagedSecretKey> secretKeys = installingSecretKeys;
 
@@ -413,6 +417,8 @@ public class SCMStateMachine extends BaseStateMachine {
       LOG.error("Failed to reinitialize SCMStateMachine.", e);
       throw new IOException(e);
     }
+
+    LOG.info("{}: SCMStateMachine is reinitializing. newTermIndex = {}", getId(), termIndex);
 
     // re-initialize the DBTransactionBuffer and update the lastAppliedIndex.
     try {

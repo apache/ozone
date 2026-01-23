@@ -1,21 +1,25 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.om.snapshot;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -30,11 +34,6 @@ import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * Integration test to verify that if snapshot feature is disabled, OM start up
@@ -48,7 +47,6 @@ public class TestOmSnapshotDisabledRestart {
   private static ObjectStore store;
 
   @BeforeAll
-  @Timeout(60)
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
 
@@ -78,9 +76,9 @@ public class TestOmSnapshotDisabledRestart {
     // Verify that OM start up will indeed fail when there are still snapshots
     // while snapshot feature is disabled.
 
-    String volumeName = "vol-" + RandomStringUtils.randomNumeric(5);
-    String bucketName = "buck-" + RandomStringUtils.randomNumeric(5);
-    String snapshotName = "snap-" + RandomStringUtils.randomNumeric(5);
+    String volumeName = "vol-" + RandomStringUtils.secure().nextNumeric(5);
+    String bucketName = "buck-" + RandomStringUtils.secure().nextNumeric(5);
+    String snapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(5);
 
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);

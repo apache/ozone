@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,24 +19,24 @@ package org.apache.hadoop.hdds.scm.pipeline;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Pipeline placement policy that choose datanodes based on load balancing
@@ -55,8 +54,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       LoggerFactory.getLogger(PipelinePlacementPolicy.class);
   private final NodeManager nodeManager;
   private final PipelineStateManager stateManager;
-  private final ConfigurationSource conf;
-  private final int heavyNodeCriteria;
+  private final int datanodePipelineLimit;
   private static final int REQUIRED_RACKS = 2;
 
   public static final String MULTIPLE_RACK_PIPELINE_MSG =
@@ -77,13 +75,13 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
                                  final ConfigurationSource conf) {
     super(nodeManager, conf);
     this.nodeManager = nodeManager;
-    this.conf = conf;
     this.stateManager = stateManager;
-    String dnLimit = conf.get(ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT);
-    this.heavyNodeCriteria = dnLimit == null ? 0 : Integer.parseInt(dnLimit);
+    this.datanodePipelineLimit = conf.getInt(
+        ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT,
+        ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT_DEFAULT);
   }
 
-  public static int currentRatisThreePipelineCount(
+  static int currentRatisThreePipelineCount(
       NodeManager nodeManager,
       PipelineStateManager stateManager,
       DatanodeDetails datanodeDetails) {
@@ -100,6 +98,18 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
         })
         .filter(PipelinePlacementPolicy::isNonClosedRatisThreePipeline)
         .count();
+  }
+
+  /** Filter the given datanodes within its pipeline limit. */
+  List<DatanodeDetails> filterPipelineLimit(Iterable<DatanodeDetails> datanodes) {
+    final SortedList<DatanodeDetails> sorted = new SortedList<>(DatanodeDetails.class);
+    for (DatanodeDetails d : datanodes) {
+      final int count = currentRatisThreePipelineCount(nodeManager, stateManager, d);
+      if (count < nodeManager.pipelineLimit(d)) {
+        sorted.add(d, count);
+      }
+    }
+    return sorted;
   }
 
   private static boolean isNonClosedRatisThreePipeline(Pipeline p) {
@@ -138,7 +148,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     List<DatanodeDetails> healthyNodes =
         nodeManager.getNodes(NodeStatus.inServiceHealthy());
     String msg;
-    if (healthyNodes.size() == 0) {
+    if (healthyNodes.isEmpty()) {
       msg = "No healthy node found to allocate container.";
       LOG.error(msg);
       throw new SCMException(msg, SCMException.ResultCodes
@@ -171,21 +181,12 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     // filter nodes that meet the size and pipeline engagement criteria.
     // Pipeline placement doesn't take node space left into account.
     // Sort the DNs by pipeline load.
-    // TODO check if sorting could cause performance issue: HDDS-3466.
-    List<DatanodeDetails> healthyList = healthyNodes.stream()
-        .map(d ->
-            new DnWithPipelines(d, currentRatisThreePipelineCount(nodeManager,
-                stateManager, d)))
-        .filter(d ->
-            (d.getPipelines() < nodeManager.pipelineLimit(d.getDn())))
-        .sorted(Comparator.comparingInt(DnWithPipelines::getPipelines))
-        .map(d -> d.getDn())
-        .collect(Collectors.toList());
+    final List<DatanodeDetails> healthyList = filterPipelineLimit(healthyNodes);
 
     if (healthyList.size() < nodesRequired) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Unable to find enough nodes that meet the criteria that" +
-            " cannot engage in more than" + heavyNodeCriteria +
+            " cannot engage in more than" + datanodePipelineLimit +
             " pipelines. Nodes required: " + nodesRequired + " Excluded: " +
             excludedNodesSize + " Found:" +
             healthyList.size() + " healthy nodes count in NodeManager: " +
@@ -194,7 +195,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       msg = String.format("Pipeline creation failed because nodes are engaged" +
               " in other pipelines and every node can only be engaged in" +
               " max %d pipelines. Required %d. Found %d. Excluded: %d.",
-          heavyNodeCriteria, nodesRequired, healthyList.size(),
+          datanodePipelineLimit, nodesRequired, healthyList.size(),
           excludedNodesSize);
       throw new SCMException(msg,
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
@@ -219,12 +220,13 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
    * @return True if there are multiple racks, false otherwise
    */
   private boolean multipleRacksAvailable(List<DatanodeDetails> dns) {
-    if (dns.size() <= 1) {
+    final Iterator<DatanodeDetails> i = dns.iterator();
+    if (!i.hasNext()) {
       return false;
     }
-    String initialRack = dns.get(0).getNetworkLocation();
-    for (DatanodeDetails dn : dns) {
-      if (!dn.getNetworkLocation().equals(initialRack)) {
+    final String initialRack = i.next().getNetworkLocation();
+    while (i.hasNext()) {
+      if (!i.next().getNetworkLocation().equals(initialRack)) {
         return true;
       }
     }
@@ -296,8 +298,8 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
       int nodesRequired, List<DatanodeDetails> healthyNodes,
       List<DatanodeDetails> usedNodes)
       throws SCMException {
-    Preconditions.checkNotNull(usedNodes);
-    Preconditions.checkNotNull(healthyNodes);
+    Objects.requireNonNull(usedNodes, "usedNodes == null");
+    Objects.requireNonNull(healthyNodes, "healthyNodes == null");
     Preconditions.checkState(nodesRequired >= 1);
 
     if (nodesRequired + usedNodes.size() !=
@@ -311,7 +313,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     List<DatanodeDetails> mutableExclude = new ArrayList<>();
     boolean rackAwareness = getAnchorAndNextNode(healthyNodes,
         usedNodes, results, mutableLstNodes, mutableExclude);
-    if (mutableLstNodes.size() == 0) {
+    if (mutableLstNodes.isEmpty()) {
       LOG.warn("Unable to find healthy node for anchor(first) node.");
       throw new SCMException("Unable to find anchor node.",
           SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
@@ -405,7 +407,7 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
     DatanodeDetails anchor;
     DatanodeDetails nextNode = null;
     // First choose an anchor node.
-    if (usedNodes.size() == 0) {
+    if (usedNodes.isEmpty()) {
       // No usedNode, choose anchor based on healthyNodes
       anchor = chooseFirstNode(healthyNodes);
       if (anchor != null) {
@@ -576,27 +578,4 @@ public final class PipelinePlacementPolicy extends SCMCommonPlacementPolicy {
   protected int getRequiredRackCount(int numReplicas, int excludedRackCount) {
     return REQUIRED_RACKS;
   }
-
-  /**
-   * static inner utility class for datanodes with pipeline, used for
-   * pipeline engagement checking.
-   */
-  public static class DnWithPipelines {
-    private DatanodeDetails dn;
-    private int pipelines;
-
-    DnWithPipelines(DatanodeDetails dn, int pipelines) {
-      this.dn = dn;
-      this.pipelines = pipelines;
-    }
-
-    public int getPipelines() {
-      return pipelines;
-    }
-
-    public DatanodeDetails getDn() {
-      return dn;
-    }
-  }
-
 }

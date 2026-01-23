@@ -17,16 +17,18 @@
  */
 
 import React from 'react';
-import {Icon, Progress} from 'antd';
-import {withRouter} from 'react-router-dom';
-import {RouteComponentProps} from 'react-router';
-import {FilledIcon} from 'utils/themeIcons';
+import { Progress } from 'antd';
+import Icon from '@ant-design/icons';
+import { withRouter } from 'react-router-dom';
+import { RouteComponentProps } from 'react-router';
 import Tooltip from 'antd/lib/tooltip';
-import {getCapacityPercent} from 'utils/common';
 import filesize from 'filesize';
+
+import { FilledIcon } from '@/utils/themeIcons';
+import { getCapacityPercent } from '@/utils/common';
 import './quotaBar.less';
 
-const size = filesize.partial({standard: 'iec'});
+const size = filesize.partial({ standard: 'iec' });
 
 interface IQuotaBarProps extends RouteComponentProps<object> {
   quota: number;
@@ -46,7 +48,7 @@ class QuotaBar extends React.Component<IQuotaBarProps> {
   static defaultProps = defaultProps;
 
   render() {
-    const {quota, used, quotaType, showMeta} = this.props;
+    const { quota, used, quotaType, showMeta } = this.props;
     const remaining = quota - used;
 
     const renderQuota = (quota: number) => {

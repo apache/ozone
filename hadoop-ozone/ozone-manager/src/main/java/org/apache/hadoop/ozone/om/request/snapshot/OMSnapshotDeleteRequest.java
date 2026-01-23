@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,7 +17,14 @@
 
 package org.apache.hadoop.ozone.om.request.snapshot;
 
-import org.apache.ratis.server.protocol.TermIndex;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.SNAPSHOT_LOCK;
+import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAPSHOT;
+
+import java.io.IOException;
+import java.nio.file.InvalidPathException;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OmUtils;
@@ -27,7 +33,9 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -46,14 +54,6 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.nio.file.InvalidPathException;
-
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.BUCKET_LOCK;
-import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.Resource.SNAPSHOT_LOCK;
-import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAPSHOT;
 
 /**
  * Handles DeleteSnapshot Request.
@@ -82,6 +82,11 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
 
     String volumeName = deleteSnapshotRequest.getVolumeName();
     String bucketName = deleteSnapshotRequest.getBucketName();
+    // Updating the volumeName & bucketName in case the bucket is a linked bucket. We need to do this before a
+    // permission check, since linked bucket permissions and source bucket permissions could be different.
+    ResolvedBucket resolvedBucket = ozoneManager.resolveBucketLink(Pair.of(volumeName, bucketName), this);
+    volumeName = resolvedBucket.realVolume();
+    bucketName = resolvedBucket.realBucket();
 
     // Permission check
     UserGroupInformation ugi = createUGIForApi();
@@ -108,7 +113,7 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumSnapshotDeletes();
@@ -178,7 +183,7 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
       // Update table cache first
       omMetadataManager.getSnapshotInfoTable().addCacheEntry(
           new CacheKey<>(tableKey),
-          CacheValue.get(termIndex.getIndex(), snapshotInfo));
+          CacheValue.get(context.getIndex(), snapshotInfo));
 
       omResponse.setDeleteSnapshotResponse(
           DeleteSnapshotResponse.newBuilder());
@@ -214,7 +219,7 @@ public class OMSnapshotDeleteRequest extends OMClientRequest {
     }
 
     // Perform audit logging outside the lock
-    auditLog(auditLogger, buildAuditMessage(OMAction.DELETE_SNAPSHOT,
+    markForAudit(auditLogger, buildAuditMessage(OMAction.DELETE_SNAPSHOT,
         snapshotInfo.toAuditMap(), exception, userInfo));
 
     final String snapshotPath = snapshotInfo.getSnapshotPath();

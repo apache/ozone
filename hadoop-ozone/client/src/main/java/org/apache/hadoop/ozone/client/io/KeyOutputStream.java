@@ -1,34 +1,41 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.client.io;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-
 import org.apache.hadoop.fs.FSExceptionMessages;
 import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -46,16 +53,16 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 import org.apache.hadoop.ozone.om.helpers.OpenKeySession;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
+import org.apache.hadoop.ozone.util.MetricUtil;
 import org.apache.ratis.protocol.exceptions.AlreadyClosedException;
 import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
+import org.apache.ratis.util.function.CheckedRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,17 +78,10 @@ import org.slf4j.LoggerFactory;
 public class KeyOutputStream extends OutputStream
     implements Syncable, KeyMetadataAware {
 
-  private final ReplicationConfig replication;
-
-  /**
-   * Defines stream action while calling handleFlushOrClose.
-   */
-  enum StreamAction {
-    FLUSH, HSYNC, CLOSE, FULL
-  }
-
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(KeyOutputStream.class);
+
+  private final ReplicationConfig replication;
 
   private boolean closed;
   private final Map<Class<? extends Throwable>, RetryPolicy> retryPolicyMap;
@@ -89,7 +89,7 @@ public class KeyOutputStream extends OutputStream
   // how much of data is actually written yet to underlying stream
   private long offset;
   // how much data has been ingested into the stream
-  private long writeOffset;
+  private volatile long writeOffset;
   // whether an exception is encountered while write and whole write could
   // not succeed
   private boolean isException;
@@ -105,6 +105,34 @@ public class KeyOutputStream extends OutputStream
    * This is essential for operations like S3 put to ensure atomicity.
    */
   private boolean atomicKeyCreation;
+  private ContainerClientMetrics clientMetrics;
+  private OzoneManagerVersion ozoneManagerVersion;
+  private final Lock writeLock = new ReentrantLock();
+  private final Condition retryHandlingCondition = writeLock.newCondition();
+
+  private final int maxConcurrentWritePerKey;
+  private final KeyOutputStreamSemaphore keyOutputStreamSemaphore;
+  private List<CheckedRunnable<IOException>> preCommits = Collections.emptyList();
+
+  public void setPreCommits(@Nonnull List<CheckedRunnable<IOException>> preCommits) {
+    this.preCommits = preCommits;
+  }
+
+  @VisibleForTesting
+  KeyOutputStreamSemaphore getRequestSemaphore() {
+    return keyOutputStreamSemaphore;
+  }
+
+  /** Required to spy the object in testing. */
+  @VisibleForTesting
+  @SuppressWarnings("unused")
+  KeyOutputStream() {
+    maxConcurrentWritePerKey = 0;
+    keyOutputStreamSemaphore = null;
+    blockOutputStreamEntryPool = null;
+    retryPolicyMap = null;
+    replication = null;
+  }
 
   public KeyOutputStream(ReplicationConfig replicationConfig, BlockOutputStreamEntryPool blockOutputStreamEntryPool) {
     this.replication = replicationConfig;
@@ -116,6 +144,10 @@ public class KeyOutputStream extends OutputStream
     retryCount = 0;
     offset = 0;
     this.blockOutputStreamEntryPool = blockOutputStreamEntryPool;
+    // Force write concurrency to 1 per key when using this constructor.
+    // At the moment, this constructor is only used by ECKeyOutputStream.
+    this.maxConcurrentWritePerKey = 1;
+    this.keyOutputStreamSemaphore = new KeyOutputStreamSemaphore(maxConcurrentWritePerKey);
   }
 
   protected BlockOutputStreamEntryPool getBlockOutputStreamEntryPool() {
@@ -146,6 +178,8 @@ public class KeyOutputStream extends OutputStream
     this.replication = b.replicationConfig;
     this.blockOutputStreamEntryPool = new BlockOutputStreamEntryPool(b);
     final OzoneClientConfig config = b.getClientConfig();
+    this.maxConcurrentWritePerKey = config.getMaxConcurrentWritePerKey();
+    this.keyOutputStreamSemaphore = new KeyOutputStreamSemaphore(maxConcurrentWritePerKey);
     this.retryPolicyMap = HddsClientUtils.getRetryPolicyByException(
         config.getMaxRetryCount(), config.getRetryInterval());
     this.retryCount = 0;
@@ -154,6 +188,8 @@ public class KeyOutputStream extends OutputStream
     this.clientID = b.getOpenHandler().getId();
     this.atomicKeyCreation = b.getAtomicKeyCreation();
     this.streamBufferArgs = b.getStreamBufferArgs();
+    this.clientMetrics = b.getClientMetrics();
+    this.ozoneManagerVersion = b.ozoneManagerVersion;
   }
 
   /**
@@ -168,12 +204,12 @@ public class KeyOutputStream extends OutputStream
    * @param version the set of blocks that are pre-allocated.
    * @param openVersion the version corresponding to the pre-allocation.
    */
-  public synchronized void addPreallocateBlocks(OmKeyLocationInfoGroup version, long openVersion) {
+  public void addPreallocateBlocks(OmKeyLocationInfoGroup version, long openVersion) {
     blockOutputStreamEntryPool.addPreallocateBlocks(version, openVersion);
   }
 
   @Override
-  public synchronized void write(int b) throws IOException {
+  public void write(int b) throws IOException {
     byte[] buf = new byte[1];
     buf[0] = (byte) b;
     write(buf, 0, 1);
@@ -192,29 +228,47 @@ public class KeyOutputStream extends OutputStream
    * @throws IOException
    */
   @Override
-  public synchronized void write(byte[] b, int off, int len)
+  public void write(byte[] b, int off, int len)
       throws IOException {
-    checkNotClosed();
-    if (b == null) {
-      throw new NullPointerException();
+    try {
+      getRequestSemaphore().acquire();
+      checkNotClosed();
+      if (b == null) {
+        throw new NullPointerException();
+      }
+      if ((off < 0) || (off > b.length) || (len < 0) || ((off + len) > b.length)
+          || ((off + len) < 0)) {
+        throw new IndexOutOfBoundsException();
+      }
+      if (len == 0) {
+        return;
+      }
+
+      doInWriteLock(() -> {
+        handleWrite(b, off, len, false);
+        writeOffset += len;
+      });
+    } finally {
+      getRequestSemaphore().release();
     }
-    if ((off < 0) || (off > b.length) || (len < 0) || ((off + len) > b.length)
-        || ((off + len) < 0)) {
-      throw new IndexOutOfBoundsException();
-    }
-    if (len == 0) {
-      return;
-    }
-    handleWrite(b, off, len, false);
-    writeOffset += len;
   }
 
-  private void handleWrite(byte[] b, int off, long len, boolean retry)
+  private <E extends Throwable> void doInWriteLock(CheckedRunnable<E> block) throws E {
+    writeLock.lock();
+    try {
+      block.run();
+    } finally {
+      writeLock.unlock();
+    }
+  }
+
+  @VisibleForTesting
+  void handleWrite(byte[] b, int off, long len, boolean retry)
       throws IOException {
     while (len > 0) {
       try {
         BlockOutputStreamEntry current =
-            blockOutputStreamEntryPool.allocateBlockIfNeeded();
+            blockOutputStreamEntryPool.allocateBlockIfNeeded(retry);
         // length(len) will be in int range if the call is happening through
         // write API of blockOutputStream. Length can be in long range if it
         // comes via Exception path.
@@ -244,12 +298,18 @@ public class KeyOutputStream extends OutputStream
       boolean retry, long len, byte[] b, int writeLen, int off, long currentPos)
       throws IOException {
     try {
+      current.registerCallReceived();
       if (retry) {
         current.writeOnRetry(len);
       } else {
+        current.waitForRetryHandling(retryHandlingCondition);
         current.write(b, off, writeLen);
         offset += writeLen;
       }
+      current.registerCallFinished();
+    } catch (InterruptedException e) {
+      current.registerCallFinished();
+      throw new InterruptedIOException();
     } catch (IOException ioe) {
       // for the current iteration, totalDataWritten - currentPos gives the
       // amount of data already written to the buffer
@@ -267,9 +327,22 @@ public class KeyOutputStream extends OutputStream
         offset += writeLen;
       }
       LOG.debug("writeLen {}, total len {}", writeLen, len);
-      handleException(current, ioe);
+      handleException(current, ioe, retry);
     }
     return writeLen;
+  }
+
+  private void handleException(BlockOutputStreamEntry entry, IOException exception, boolean fromRetry)
+      throws IOException {
+    doInWriteLock(() -> {
+      handleExceptionInternal(entry, exception);
+      BlockOutputStreamEntry current = blockOutputStreamEntryPool.getCurrentStreamEntry();
+      if (!fromRetry && entry.registerCallFinished()) {
+        // When the faulty block finishes handling all its pending call, the current block can exit retry
+        // handling mode and unblock normal calls.
+        current.finishRetryHandling(retryHandlingCondition);
+      }
+    });
   }
 
   /**
@@ -282,10 +355,17 @@ public class KeyOutputStream extends OutputStream
    * @param exception   actual exception that occurred
    * @throws IOException Throws IOException if Write fails
    */
-  private void handleException(BlockOutputStreamEntry streamEntry,
-      IOException exception) throws IOException {
+  private void handleExceptionInternal(BlockOutputStreamEntry streamEntry, IOException exception) throws IOException {
+    try {
+      // Wait for all pending flushes in the faulty stream. It's possible that a prior write is pending completion
+      // successfully. Errors are ignored here and will be handled by the individual flush call. We just want to ensure
+      // all the pending are complete before handling exception.
+      streamEntry.waitForAllPendingFlushes();
+    } catch (IOException ignored) {
+    }
+
     Throwable t = HddsClientUtils.checkForException(exception);
-    Preconditions.checkNotNull(t);
+    Objects.requireNonNull(t, "t == null");
     boolean retryFailure = checkForRetryFailure(t);
     boolean containerExclusionException = false;
     if (!retryFailure) {
@@ -310,11 +390,9 @@ public class KeyOutputStream extends OutputStream
     }
     Preconditions.checkArgument(
         bufferedDataLen <= streamBufferArgs.getStreamBufferMaxSize());
-    Preconditions.checkArgument(
-        offset - blockOutputStreamEntryPool.getKeyLength() == bufferedDataLen);
     long containerId = streamEntry.getBlockID().getContainerID();
     Collection<DatanodeDetails> failedServers = streamEntry.getFailedServers();
-    Preconditions.checkNotNull(failedServers);
+    Objects.requireNonNull(failedServers, "failedServers == null");
     ExcludeList excludeList = blockOutputStreamEntryPool.getExcludeList();
     if (!failedServers.isEmpty()) {
       excludeList.addDatanodes(failedServers);
@@ -358,7 +436,7 @@ public class KeyOutputStream extends OutputStream
     }
   }
 
-  private void markStreamClosed() {
+  private synchronized void markStreamClosed() {
     blockOutputStreamEntryPool.cleanup();
     closed = true;
   }
@@ -432,32 +510,53 @@ public class KeyOutputStream extends OutputStream
   }
 
   @Override
-  public synchronized void flush() throws IOException {
-    checkNotClosed();
-    handleFlushOrClose(StreamAction.FLUSH);
+  public void flush() throws IOException {
+    try {
+      getRequestSemaphore().acquire();
+      checkNotClosed();
+      handleFlushOrClose(StreamAction.FLUSH);
+    } finally {
+      getRequestSemaphore().release();
+    }
   }
 
   @Override
   public void hflush() throws IOException {
+    // Note: Semaphore acquired and released inside hsync().
     hsync();
   }
 
   @Override
-  public synchronized void hsync() throws IOException {
-    if (replication.getReplicationType() != ReplicationType.RATIS) {
-      throw new UnsupportedOperationException(
-          "Replication type is not " + ReplicationType.RATIS);
+  public void hsync() throws IOException {
+    try {
+      getRequestSemaphore().acquire();
+
+      if (replication.getReplicationType() != ReplicationType.RATIS) {
+        throw new UnsupportedOperationException(
+            "Replication type is not " + ReplicationType.RATIS);
+      }
+      if (replication.getRequiredNodes() <= 1) {
+        throw new UnsupportedOperationException("The replication factor = "
+            + replication.getRequiredNodes() + " <= 1");
+      }
+      if (ozoneManagerVersion.compareTo(OzoneManagerVersion.HBASE_SUPPORT) < 0) {
+        throw new UnsupportedOperationException("Hsync API requires OM version "
+            + OzoneManagerVersion.HBASE_SUPPORT + " or later. Current OM version "
+            + ozoneManagerVersion);
+      }
+      checkNotClosed();
+      final long hsyncPos = writeOffset;
+      handleFlushOrClose(StreamAction.HSYNC);
+
+      doInWriteLock(() -> {
+        Preconditions.checkState(offset >= hsyncPos,
+            "offset = %s < hsyncPos = %s", offset, hsyncPos);
+        MetricUtil.captureLatencyNs(clientMetrics::addHsyncLatency,
+            () -> blockOutputStreamEntryPool.hsyncKey(hsyncPos));
+      });
+    } finally {
+      getRequestSemaphore().release();
     }
-    if (replication.getRequiredNodes() <= 1) {
-      throw new UnsupportedOperationException("The replication factor = "
-          + replication.getRequiredNodes() + " <= 1");
-    }
-    checkNotClosed();
-    final long hsyncPos = writeOffset;
-    handleFlushOrClose(StreamAction.HSYNC);
-    Preconditions.checkState(offset >= hsyncPos,
-        "offset = %s < hsyncPos = %s", offset, hsyncPos);
-    blockOutputStreamEntryPool.hsyncKey(hsyncPos);
   }
 
   /**
@@ -483,14 +582,23 @@ public class KeyOutputStream extends OutputStream
           BlockOutputStreamEntry entry =
               blockOutputStreamEntryPool.getCurrentStreamEntry();
           if (entry != null) {
+            // If the current block is to handle retries, wait until all the retries are done.
+            doInWriteLock(() -> entry.waitForRetryHandling(retryHandlingCondition));
+            entry.registerCallReceived();
             try {
               handleStreamAction(entry, op);
+              entry.registerCallFinished();
             } catch (IOException ioe) {
-              handleException(entry, ioe);
+              handleException(entry, ioe, false);
               continue;
+            } catch (Exception e) {
+              entry.registerCallFinished();
+              throw e;
             }
           }
           return;
+        } catch (InterruptedException e) {
+          throw new InterruptedIOException();
         } catch (Exception e) {
           markStreamClosed();
           throw e;
@@ -534,7 +642,11 @@ public class KeyOutputStream extends OutputStream
    * @throws IOException
    */
   @Override
-  public synchronized void close() throws IOException {
+  public void close() throws IOException {
+    doInWriteLock(this::closeInternal);
+  }
+
+  private void closeInternal() throws IOException {
     if (closed) {
       return;
     }
@@ -549,6 +661,9 @@ public class KeyOutputStream extends OutputStream
         Preconditions.checkState(expectedSize == offset,
             String.format("Expected: %d and actual %d write sizes do not match",
                 expectedSize, offset));
+      }
+      for (CheckedRunnable<IOException> preCommit : preCommits) {
+        preCommit.run();
       }
       blockOutputStreamEntryPool.commitKey(offset);
     } finally {
@@ -589,6 +704,7 @@ public class KeyOutputStream extends OutputStream
     private boolean atomicKeyCreation = false;
     private StreamBufferArgs streamBufferArgs;
     private Supplier<ExecutorService> executorServiceSupplier;
+    private OzoneManagerVersion ozoneManagerVersion;
 
     public String getMultipartUploadID() {
       return multipartUploadID;
@@ -711,6 +827,15 @@ public class KeyOutputStream extends OutputStream
       return executorServiceSupplier;
     }
 
+    public Builder setOmVersion(OzoneManagerVersion omVersion) {
+      this.ozoneManagerVersion = omVersion;
+      return this;
+    }
+
+    public OzoneManagerVersion getOmVersion() {
+      return ozoneManagerVersion;
+    }
+
     public KeyOutputStream build() {
       return new KeyOutputStream(this);
     }
@@ -728,5 +853,12 @@ public class KeyOutputStream extends OutputStream
           ": " + FSExceptionMessages.STREAM_IS_CLOSED + " Key: "
               + blockOutputStreamEntryPool.getKeyName());
     }
+  }
+
+  /**
+   * Defines stream action while calling handleFlushOrClose.
+   */
+  enum StreamAction {
+    FLUSH, HSYNC, CLOSE, FULL
   }
 }

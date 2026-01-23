@@ -1,35 +1,36 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.helpers;
+
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
+import jakarta.annotation.Nonnull;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.Auditable;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.security.GDPRSymmetricKey;
-import jakarta.annotation.Nonnull;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 
 /**
  * Args for key. Client use this to specify key's attributes on  key creation
@@ -48,12 +49,19 @@ public final class OmKeyArgs implements Auditable {
   private final int multipartUploadPartNumber;
   private final Map<String, String> metadata;
   private final boolean sortDatanodesInPipeline;
-  private final List<OzoneAcl> acls;
+  private final ImmutableList<OzoneAcl> acls;
   private final boolean latestVersionLocation;
   private final boolean recursive;
   private final boolean headOp;
   private final boolean forceUpdateContainerCacheFromSCM;
   private final Map<String, String> tags;
+  // expectedDataGeneration, when used in key creation indicates that a
+  // key with the same keyName should exist with the given generation.
+  // For a key commit to succeed, the original key should still be present with the
+  // generation unchanged.
+  // This allows a key to be created an committed atomically if the original has not
+  // been modified.
+  private Long expectedDataGeneration = null;
 
   private OmKeyArgs(Builder b) {
     this.volumeName = b.volumeName;
@@ -66,7 +74,7 @@ public final class OmKeyArgs implements Auditable {
     this.multipartUploadID = b.multipartUploadID;
     this.multipartUploadPartNumber = b.multipartUploadPartNumber;
     this.metadata = b.metadata;
-    this.acls = b.acls;
+    this.acls = b.acls.build();
     this.sortDatanodesInPipeline = b.sortDatanodesInPipeline;
     this.latestVersionLocation = b.latestVersionLocation;
     this.recursive = b.recursive;
@@ -74,6 +82,7 @@ public final class OmKeyArgs implements Auditable {
     this.forceUpdateContainerCacheFromSCM = b.forceUpdateContainerCacheFromSCM;
     this.ownerName = b.ownerName;
     this.tags = b.tags;
+    this.expectedDataGeneration = b.expectedDataGeneration;
   }
 
   public boolean getIsMultipartKey() {
@@ -156,6 +165,10 @@ public final class OmKeyArgs implements Auditable {
     return tags;
   }
 
+  public Long getExpectedDataGeneration() {
+    return expectedDataGeneration;
+  }
+
   @Override
   public Map<String, String> toAuditMap() {
     Map<String, String> auditMap = new LinkedHashMap<>();
@@ -179,29 +192,12 @@ public final class OmKeyArgs implements Auditable {
   }
 
   public OmKeyArgs.Builder toBuilder() {
-    return new OmKeyArgs.Builder()
-        .setVolumeName(volumeName)
-        .setBucketName(bucketName)
-        .setKeyName(keyName)
-        .setOwnerName(ownerName)
-        .setDataSize(dataSize)
-        .setReplicationConfig(replicationConfig)
-        .setLocationInfoList(locationInfoList)
-        .setIsMultipartKey(isMultipartKey)
-        .setMultipartUploadID(multipartUploadID)
-        .setMultipartUploadPartNumber(multipartUploadPartNumber)
-        .addAllMetadata(metadata)
-        .setSortDatanodesInPipeline(sortDatanodesInPipeline)
-        .setHeadOp(headOp)
-        .setLatestVersionLocation(latestVersionLocation)
-        .setAcls(acls)
-        .setForceUpdateContainerCacheFromSCM(forceUpdateContainerCacheFromSCM)
-        .addAllTags(tags);
+    return new Builder(this);
   }
 
   @Nonnull
   public KeyArgs toProtobuf() {
-    return KeyArgs.newBuilder()
+    KeyArgs.Builder builder = KeyArgs.newBuilder()
         .setVolumeName(getVolumeName())
         .setBucketName(getBucketName())
         .setKeyName(getKeyName())
@@ -210,8 +206,15 @@ public final class OmKeyArgs implements Auditable {
         .setLatestVersionLocation(getLatestVersionLocation())
         .setHeadOp(isHeadOp())
         .setForceUpdateContainerCacheFromSCM(
-            isForceUpdateContainerCacheFromSCM())
-        .build();
+            isForceUpdateContainerCacheFromSCM()
+        );
+    if (multipartUploadPartNumber != 0) {
+      builder.setMultipartNumber(multipartUploadPartNumber);
+    }
+    if (expectedDataGeneration != null) {
+      builder.setExpectedDataGeneration(expectedDataGeneration);
+    }
+    return builder.build();
   }
 
   /**
@@ -231,11 +234,43 @@ public final class OmKeyArgs implements Auditable {
     private final Map<String, String> metadata = new HashMap<>();
     private boolean sortDatanodesInPipeline;
     private boolean latestVersionLocation;
-    private List<OzoneAcl> acls;
+    private final AclListBuilder acls;
     private boolean recursive;
     private boolean headOp;
     private boolean forceUpdateContainerCacheFromSCM;
     private final Map<String, String> tags = new HashMap<>();
+    private Long expectedDataGeneration = null;
+
+    public Builder() {
+      this(AclListBuilder.empty());
+    }
+
+    private Builder(AclListBuilder acls) {
+      this.acls = acls;
+    }
+
+    public Builder(OmKeyArgs obj) {
+      this.volumeName = obj.volumeName;
+      this.bucketName = obj.bucketName;
+      this.keyName = obj.keyName;
+      this.ownerName = obj.ownerName;
+      this.dataSize = obj.dataSize;
+      this.replicationConfig = obj.replicationConfig;
+      this.locationInfoList = obj.locationInfoList;
+      this.isMultipartKey = obj.isMultipartKey;
+      this.multipartUploadID = obj.multipartUploadID;
+      this.multipartUploadPartNumber = obj.multipartUploadPartNumber;
+      this.sortDatanodesInPipeline = obj.sortDatanodesInPipeline;
+      this.latestVersionLocation = obj.latestVersionLocation;
+      this.recursive = obj.recursive;
+      this.headOp = obj.headOp;
+      this.forceUpdateContainerCacheFromSCM =
+          obj.forceUpdateContainerCacheFromSCM;
+      this.expectedDataGeneration = obj.expectedDataGeneration;
+      this.metadata.putAll(obj.metadata);
+      this.tags.putAll(obj.tags);
+      this.acls = AclListBuilder.of(obj.acls);
+    }
 
     public Builder setVolumeName(String volume) {
       this.volumeName = volume;
@@ -273,7 +308,7 @@ public final class OmKeyArgs implements Auditable {
     }
 
     public Builder setAcls(List<OzoneAcl> listOfAcls) {
-      this.acls = listOfAcls;
+      this.acls.addAll(listOfAcls);
       return this;
     }
 
@@ -287,8 +322,8 @@ public final class OmKeyArgs implements Auditable {
       return this;
     }
 
-    public Builder setMultipartUploadPartNumber(int partNumber) {
-      this.multipartUploadPartNumber = partNumber;
+    public Builder setMultipartUploadPartNumber(int multipartUploadPartNumber) {
+      this.multipartUploadPartNumber = multipartUploadPartNumber;
       return this;
     }
 
@@ -342,6 +377,11 @@ public final class OmKeyArgs implements Auditable {
 
     public Builder setForceUpdateContainerCacheFromSCM(boolean value) {
       this.forceUpdateContainerCacheFromSCM = value;
+      return this;
+    }
+
+    public Builder setExpectedDataGeneration(long generation) {
+      this.expectedDataGeneration = generation;
       return this;
     }
 

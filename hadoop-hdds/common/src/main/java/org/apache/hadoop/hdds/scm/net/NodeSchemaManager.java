@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,20 +14,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.net;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaLoader.NodeSchemaLoadResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 
 /** The class manages all network topology schemas. */
 
@@ -126,7 +124,7 @@ public final class NodeSchemaManager {
     int i, j;
     for (i = 1, j = 1; i < subPath.length && j < (allSchema.size() - 1);) {
       if (allSchema.get(j).matchPrefix(subPath[i])) {
-        newPath.append(NetConstants.PATH_SEPARATOR_STR + subPath[i]);
+        newPath.append(NetConstants.PATH_SEPARATOR_STR).append(subPath[i]);
         i++;
         j++;
       } else {
@@ -135,7 +133,7 @@ public final class NodeSchemaManager {
       }
     }
     if (i == (subPath.length - 1)) {
-      newPath.append(NetConstants.PATH_SEPARATOR_STR + subPath[i]);
+      newPath.append(NetConstants.PATH_SEPARATOR_STR).append(subPath[i]);
       return newPath.toString();
     }
     return null;

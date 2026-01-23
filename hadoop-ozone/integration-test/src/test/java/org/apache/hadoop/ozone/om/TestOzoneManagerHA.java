@@ -1,58 +1,21 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om;
-
-import org.apache.commons.lang3.RandomStringUtils;
-import org.apache.hadoop.hdds.client.ReplicationFactor;
-import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.ipc.RemoteException;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.client.BucketArgs;
-import org.apache.hadoop.ozone.client.ObjectStore;
-import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneKey;
-import org.apache.hadoop.ozone.client.OzoneKeyDetails;
-import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.VolumeArgs;
-import org.apache.hadoop.ozone.client.OzoneClientFactory;
-
-import org.apache.hadoop.ozone.client.io.OzoneInputStream;
-import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.client.rpc.RpcClient;
-import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
-import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
-import org.apache.hadoop.ozone.security.acl.OzoneObj;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Timeout;
-
-import java.io.IOException;
-import java.net.ConnectException;
-import java.time.Duration;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.UUID;
-import java.util.HashMap;
-import java.util.concurrent.TimeoutException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.IPC_CLIENT_CONNECT_MAX_RETRIES_KEY;
@@ -61,21 +24,52 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS_WILDCARD;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
-
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import java.io.IOException;
+import java.net.ConnectException;
+import java.time.Duration;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.UUID;
+import java.util.concurrent.TimeoutException;
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.hdds.client.ReplicationFactor;
+import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ipc_.RemoteException;
+import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.client.BucketArgs;
+import org.apache.hadoop.ozone.client.ObjectStore;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.OzoneKey;
+import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.VolumeArgs;
+import org.apache.hadoop.ozone.client.io.OzoneInputStream;
+import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 
 /**
  * Base class for Ozone Manager HA tests.
  */
-@Timeout(300)
 public abstract class TestOzoneManagerHA {
 
   private static MiniOzoneHAClusterImpl cluster = null;
@@ -90,7 +84,6 @@ public abstract class TestOzoneManagerHA {
   private static final long SNAPSHOT_THRESHOLD = 50;
   private static final Duration RETRY_CACHE_DURATION = Duration.ofSeconds(30);
   private static OzoneClient client;
-
 
   public MiniOzoneHAClusterImpl getCluster() {
     return cluster;
@@ -132,13 +125,6 @@ public abstract class TestOzoneManagerHA {
     return RETRY_CACHE_DURATION;
   }
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   @BeforeAll
   public static void init() throws Exception {
     conf = new OzoneConfiguration();
@@ -185,9 +171,6 @@ public abstract class TestOzoneManagerHA {
     objectStore = client.getObjectStore();
   }
 
-  /**
-   * Shutdown MiniDFSCluster after all tests of a class have run.
-   */
   @AfterAll
   public static void shutdown() {
     IOUtils.closeQuietly(client);
@@ -202,13 +185,13 @@ public abstract class TestOzoneManagerHA {
    * @return the key name.
    */
   public static String createKey(OzoneBucket ozoneBucket) throws IOException {
-    String keyName = "key" + RandomStringUtils.randomNumeric(5);
+    String keyName = "key" + RandomStringUtils.secure().nextNumeric(5);
     createKey(ozoneBucket, keyName);
     return keyName;
   }
 
   public static void createKey(OzoneBucket ozoneBucket, String keyName) throws IOException {
-    String data = "data" + RandomStringUtils.randomNumeric(5);
+    String data = "data" + RandomStringUtils.secure().nextNumeric(5);
     OzoneOutputStream ozoneOutputStream = ozoneBucket.createKey(keyName, data.length(), ReplicationType.RATIS,
         ReplicationFactor.ONE, new HashMap<>());
     ozoneOutputStream.write(data.getBytes(UTF_8), 0, data.length());
@@ -216,7 +199,7 @@ public abstract class TestOzoneManagerHA {
   }
 
   public static String createPrefixName() {
-    return "prefix" + RandomStringUtils.randomNumeric(5) + OZONE_URI_DELIMITER;
+    return "prefix" + RandomStringUtils.secure().nextNumeric(5) + OZONE_URI_DELIMITER;
   }
 
   public static void createPrefix(OzoneObj prefixObj) throws IOException {
@@ -224,8 +207,8 @@ public abstract class TestOzoneManagerHA {
   }
 
   protected OzoneBucket setupBucket() throws Exception {
-    String userName = "user" + RandomStringUtils.randomNumeric(5);
-    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
+    String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
+    String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
     String volumeName = "volume" + UUID.randomUUID();
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
@@ -252,9 +235,9 @@ public abstract class TestOzoneManagerHA {
   }
 
   protected OzoneBucket linkBucket(OzoneBucket srcBuk) throws Exception {
-    String userName = "user" + RandomStringUtils.randomNumeric(5);
-    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
-    String linkedVolName = "volume-link-" + RandomStringUtils.randomNumeric(5);
+    String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
+    String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
+    String linkedVolName = "volume-link-" + RandomStringUtils.secure().nextNumeric(5);
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)
@@ -289,13 +272,8 @@ public abstract class TestOzoneManagerHA {
    * Stop the current leader OM.
    */
   protected void stopLeaderOM() {
-    //Stop the leader OM.
-    HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider =
-        OmFailoverProxyUtil.getFailoverProxyProvider(
-            (RpcClient) objectStore.getClientProxy());
-
     // The omFailoverProxyProvider will point to the current leader OM node.
-    String leaderOMNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
+    final String leaderOMNodeId = OmTestUtil.getCurrentOmProxyNodeId(getObjectStore());
 
     // Stop one of the ozone manager, to see when the OM leader changes
     // multipart upload is happening successfully or not.
@@ -306,9 +284,9 @@ public abstract class TestOzoneManagerHA {
    * Create a volume and test its attribute.
    */
   protected void createVolumeTest(boolean checkSuccess) throws Exception {
-    String userName = "user" + RandomStringUtils.randomNumeric(5);
-    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+    String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
+    String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)
@@ -380,7 +358,7 @@ public abstract class TestOzoneManagerHA {
 
     try (OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName)) {
       byte[] fileContent = new byte[data.getBytes(UTF_8).length];
-      ozoneInputStream.read(fileContent);
+      IOUtils.readFully(ozoneInputStream, fileContent);
       assertEquals(data, new String(fileContent, UTF_8));
     }
 
@@ -396,9 +374,9 @@ public abstract class TestOzoneManagerHA {
   }
 
   protected void createKeyTest(boolean checkSuccess) throws Exception {
-    String userName = "user" + RandomStringUtils.randomNumeric(5);
-    String adminName = "admin" + RandomStringUtils.randomNumeric(5);
-    String volumeName = "volume" + RandomStringUtils.randomNumeric(5);
+    String userName = "user" + RandomStringUtils.secure().nextNumeric(5);
+    String adminName = "admin" + RandomStringUtils.secure().nextNumeric(5);
+    String volumeName = "volume" + RandomStringUtils.secure().nextNumeric(5);
 
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
         .setOwner(userName)
@@ -432,7 +410,7 @@ public abstract class TestOzoneManagerHA {
 
       try (OzoneInputStream ozoneInputStream = ozoneBucket.readKey(keyName)) {
         byte[] fileContent = new byte[value.getBytes(UTF_8).length];
-        ozoneInputStream.read(fileContent);
+        IOUtils.readFully(ozoneInputStream, fileContent);
         assertEquals(value, new String(fileContent, UTF_8));
       }
 

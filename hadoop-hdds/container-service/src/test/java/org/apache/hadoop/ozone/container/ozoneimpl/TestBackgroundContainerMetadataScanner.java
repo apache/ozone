@@ -1,53 +1,60 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
- *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
-import org.apache.hadoop.hdfs.util.Canceler;
-import org.apache.hadoop.hdfs.util.DataTransferThrottler;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.common.interfaces.Container.ScanResult;
-import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.BeforeEach;
-import org.mockito.junit.jupiter.MockitoSettings;
-import org.mockito.quality.Strictness;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getHealthyDataScanResult;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getUnhealthyMetadataScanResult;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.atMost;
+import static org.mockito.Mockito.atMostOnce;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.UNHEALTHY;
-import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.getUnhealthyScanResult;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.atLeastOnce;
-import static org.mockito.Mockito.atMostOnce;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import org.apache.hadoop.hdfs.util.Canceler;
+import org.apache.hadoop.hdfs.util.DataTransferThrottler;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.ScanResult;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
+import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 /**
  * Unit tests for the background container metadata scanner.
@@ -58,6 +65,7 @@ public class TestBackgroundContainerMetadataScanner extends
 
   private BackgroundContainerMetadataScanner scanner;
 
+  @Override
   @BeforeEach
   public void setup() {
     super.setup();
@@ -100,7 +108,7 @@ public class TestBackgroundContainerMetadataScanner extends
     ContainerMetadataScannerMetrics metrics = scanner.getMetrics();
     assertEquals(1, metrics.getNumScanIterations());
     assertEquals(4, metrics.getNumContainersScanned());
-    assertEquals(1, metrics.getNumUnHealthyContainers());
+    assertEquals(0, metrics.getNumUnHealthyContainers());
   }
 
   @Test
@@ -129,13 +137,26 @@ public class TestBackgroundContainerMetadataScanner extends
 
   @Test
   @Override
-  public void testUnhealthyContainerNotRescanned() throws Exception {
+  public void testUnhealthyContainersTriggersVolumeScan() throws Exception {
+    when(controller.markContainerUnhealthy(anyLong(), any(ScanResult.class))).thenReturn(true);
+    try (MockedStatic<StorageVolumeUtil> mockedStatic = mockStatic(StorageVolumeUtil.class)) {
+      scanner.runIteration();
+      verifyContainerMarkedUnhealthy(openCorruptMetadata, atLeastOnce());
+      mockedStatic.verify(() ->
+          StorageVolumeUtil.onFailure(openCorruptMetadata.getContainerData().getVolume()), times(1));
+    }
+  }
+
+  @Test
+  @Override
+  public void testUnhealthyContainerRescanned() throws Exception {
     Container<?> unhealthy = mockKeyValueContainer();
-    when(unhealthy.scanMetaData()).thenReturn(getUnhealthyScanResult());
+    when(unhealthy.scanMetaData()).thenReturn(getUnhealthyMetadataScanResult());
     when(unhealthy.scanData(
         any(DataTransferThrottler.class), any(Canceler.class)))
-        .thenReturn(ScanResult.healthy());
-
+        .thenReturn(getHealthyDataScanResult());
+    when(controller.markContainerUnhealthy(eq(unhealthy.getContainerData().getContainerID()),
+        any())).thenReturn(true);
     setContainers(unhealthy, healthy);
 
     // First iteration should find the unhealthy container.
@@ -151,20 +172,31 @@ public class TestBackgroundContainerMetadataScanner extends
         .setState(UNHEALTHY);
     // Update the mock to reflect this.
     when(unhealthy.getContainerState()).thenReturn(UNHEALTHY);
-    assertFalse(unhealthy.shouldScanMetadata());
-
-    // Clear metrics to check the next run.
-    metrics.resetNumContainersScanned();
-    metrics.resetNumUnhealthyContainers();
-
+    when(controller.markContainerUnhealthy(eq(unhealthy.getContainerData().getContainerID()),
+        any())).thenReturn(false);
     scanner.runIteration();
-    // The only invocation of unhealthy on this container should have been from
-    // the previous scan.
-    verifyContainerMarkedUnhealthy(unhealthy, atMostOnce());
+    // The invocation of unhealthy on this container will also happen in the
+    // next iteration.
+    verifyContainerMarkedUnhealthy(unhealthy, atMost(2));
     // This iteration should skip the already unhealthy container.
     assertEquals(2, metrics.getNumScanIterations());
-    assertEquals(1, metrics.getNumContainersScanned());
-    assertEquals(0, metrics.getNumUnHealthyContainers());
+    assertEquals(4, metrics.getNumContainersScanned());
+    // numUnHealthyContainers metrics is not incremented in the 2nd iteration.
+    assertEquals(1, metrics.getNumUnHealthyContainers());
+  }
+
+  /**
+   * Metadata scanner should not update container checksum, so any errors that may be injected here should have no
+   * effect.
+   */
+  @Test
+  @Override
+  public void testChecksumUpdateFailure() throws Exception {
+    doThrow(new IOException("Checksum update error for testing")).when(controller)
+        .updateContainerChecksum(anyLong(), any());
+    scanner.runIteration();
+    verifyContainerMarkedUnhealthy(openCorruptMetadata, atMostOnce());
+    verify(openCorruptMetadata.getContainerData(), atMostOnce()).setState(UNHEALTHY);
   }
 
   /**
@@ -184,7 +216,8 @@ public class TestBackgroundContainerMetadataScanner extends
     GenericTestUtils.waitFor(() -> metrics.getNumScanIterations() >= 1, 1000,
         5000);
     // Volume health should have been checked.
-    verify(vol, atLeastOnce()).isFailed();
+    // TODO: remove the mock return value assertion after we upgrade to spotbugs 4.8 up
+    assertFalse(verify(vol, atLeastOnce()).isFailed());
     // Scanner should not have shutdown when it encountered the failed volume.
     assertTrue(scanner.isAlive());
 

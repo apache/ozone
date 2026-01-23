@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,22 +17,26 @@
 
 package org.apache.hadoop.ozone.om.request.file;
 
+import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR_STR;
+import static org.apache.hadoop.ozone.om.OzoneManagerUtils.getBucketLayout;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
+
+import com.google.common.base.Strings;
+import jakarta.annotation.Nonnull;
+import jakarta.annotation.Nullable;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-
-import com.google.common.base.Strings;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -44,25 +47,14 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import jakarta.annotation.Nonnull;
-import jakarta.annotation.Nullable;
-
-import static org.apache.hadoop.hdds.scm.net.NetConstants.PATH_SEPARATOR_STR;
-import static org.apache.hadoop.ozone.om.OzoneManagerUtils.getBucketLayout;
-
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.BUCKET_NOT_FOUND;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.VOLUME_NOT_FOUND;
 
 /**
  * Base class for file requests.
@@ -207,7 +199,7 @@ public final class OMFileRequest {
       String fileName = elements.next().toString();
       fullKeyPath.append(OzoneConsts.OM_KEY_PREFIX);
       fullKeyPath.append(fileName);
-      if (missing.size() > 0) {
+      if (!missing.isEmpty()) {
         // Add all the sub-dirs to the missing list except the leaf element.
         // For example, /vol1/buck1/a/b/c/d/e/f/file1.txt.
         // Assume /vol1/buck1/a/b/c exists, then add d, e, f into missing list.
@@ -467,21 +459,20 @@ public final class OMFileRequest {
    * @param omMetadataManager OM Metadata Manager
    * @param dbOpenFileName    open file name key
    * @param omFileInfo        key info
-   * @param fileName          file name
    * @param trxnLogIndex      transaction log index
    */
   public static void addOpenFileTableCacheEntry(
           OMMetadataManager omMetadataManager, String dbOpenFileName,
-          @Nullable OmKeyInfo omFileInfo, String fileName, long trxnLogIndex) {
+          @Nullable OmKeyInfo omFileInfo, String keyName, long trxnLogIndex) {
 
     final Table<String, OmKeyInfo> table = omMetadataManager.getOpenKeyTable(
         BucketLayout.FILE_SYSTEM_OPTIMIZED);
     if (omFileInfo != null) {
-      // New key format for the openFileTable.
       // For example, the user given key path is '/a/b/c/d/e/file1', then in DB
-      // keyName field stores only the leaf node name, which is 'file1'.
-      omFileInfo.setKeyName(fileName);
-      omFileInfo.setFileName(fileName);
+      // keyName field stores full path, which is '/a/b/c/d/e/file1'.
+      // This is required as in some cases like hsync, Keys inside openKeyTable is used for auto commit after expiry.
+      // (Full key path is required in commit key request)
+      omFileInfo.setKeyName(keyName);
       table.addCacheEntry(dbOpenFileName, omFileInfo, trxnLogIndex);
     } else {
       table.addCacheEntry(dbOpenFileName, trxnLogIndex);
@@ -506,7 +497,6 @@ public final class OMFileRequest {
     // For example, the user given key path is '/a/b/c/d/e/file1', then in DB
     // keyName field stores only the leaf node name, which is 'file1'.
     omFileInfo.setKeyName(fileName);
-    omFileInfo.setFileName(fileName);
 
     BucketLayout bucketLayout =
         getBucketLayout(omMetadataManager, omFileInfo.getVolumeName(),
@@ -722,6 +712,21 @@ public final class OMFileRequest {
     return null;
   }
 
+  public static OmKeyInfo getKeyInfoWithFullPath(OmKeyInfo parentInfo, OmDirectoryInfo directoryInfo) {
+    String dirName = OMFileRequest.getAbsolutePath(parentInfo.getKeyName(),
+        directoryInfo.getName());
+    return OMFileRequest.getOmKeyInfo(
+        parentInfo.getVolumeName(), parentInfo.getBucketName(), directoryInfo,
+        dirName);
+  }
+
+  public static OmKeyInfo getKeyInfoWithFullPath(OmKeyInfo parentInfo, OmKeyInfo omKeyInfo) {
+    String fullKeyPath = OMFileRequest.getAbsolutePath(
+        parentInfo.getKeyName(), omKeyInfo.getKeyName());
+    omKeyInfo.setKeyName(fullKeyPath);
+    return omKeyInfo;
+  }
+
   /**
    * Prepare OmKeyInfo from OmDirectoryInfo.
    *
@@ -735,23 +740,10 @@ public final class OMFileRequest {
   public static OmKeyInfo getOmKeyInfo(String volumeName, String bucketName,
       OmDirectoryInfo dirInfo, String keyName) {
 
-    return new OmKeyInfo.Builder()
-        .setParentObjectID(dirInfo.getParentObjectID())
-        .setKeyName(keyName)
-        .setAcls(dirInfo.getAcls())
-        .addAllMetadata(dirInfo.getMetadata())
+    return dirInfo.toKeyInfoBuilder()
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
-        .setCreationTime(dirInfo.getCreationTime())
-        .setModificationTime(dirInfo.getModificationTime())
-        .setObjectID(dirInfo.getObjectID())
-        .setUpdateID(dirInfo.getUpdateID())
-        .setFileName(dirInfo.getName())
-        .setReplicationConfig(RatisReplicationConfig
-            .getInstance(HddsProtos.ReplicationFactor.ONE))
-        .setOmKeyLocationInfos(Collections.singletonList(
-            new OmKeyLocationInfoGroup(0, new ArrayList<>())))
-        .setOwnerName(dirInfo.getOwner())
+        .setKeyName(keyName)
         .build();
   }
 
@@ -778,16 +770,7 @@ public final class OMFileRequest {
    * @return omDirectoryInfo object
    */
   public static OmDirectoryInfo getDirectoryInfo(OmKeyInfo keyInfo) {
-    return new OmDirectoryInfo.Builder()
-        .setParentObjectID(keyInfo.getParentObjectID())
-        .setAcls(keyInfo.getAcls())
-        .addAllMetadata(keyInfo.getMetadata())
-        .setCreationTime(keyInfo.getCreationTime())
-        .setModificationTime(keyInfo.getModificationTime())
-        .setObjectID(keyInfo.getObjectID())
-        .setUpdateID(keyInfo.getUpdateID())
-        .setName(OzoneFSUtils.getFileName(keyInfo.getKeyName()))
-        .build();
+    return keyInfo.toDirectoryInfoBuilder().build();
   }
 
   /**
@@ -904,9 +887,7 @@ public final class OMFileRequest {
             omKeyInfo.getObjectID(), "");
     try (TableIterator<String, ? extends
         Table.KeyValue<String, OmDirectoryInfo>>
-            iterator = dirTable.iterator()) {
-
-      iterator.seek(seekDirInDB);
+            iterator = dirTable.iterator(seekDirInDB)) {
 
       if (iterator.hasNext()) {
         Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
@@ -950,9 +931,7 @@ public final class OMFileRequest {
     String seekFileInDB = metaMgr.getOzonePathKey(volumeId, bucketId,
             omKeyInfo.getObjectID(), "");
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
-            iterator = fileTable.iterator()) {
-
-      iterator.seek(seekFileInDB);
+            iterator = fileTable.iterator(seekFileInDB)) {
 
       if (iterator.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
@@ -1048,7 +1027,7 @@ public final class OMFileRequest {
    * @param volumeName        - volume name.
    * @param bucketName        - bucket name.
    * @param keyName           - key name.
-   * @return
+   * @return {@code long}
    * @throws IOException
    */
   public static long getParentId(OMMetadataManager omMetadataManager,

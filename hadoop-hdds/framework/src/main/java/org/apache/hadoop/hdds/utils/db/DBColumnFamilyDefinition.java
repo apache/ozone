@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,18 +13,20 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
+
 package org.apache.hadoop.hdds.utils.db;
 
-import org.apache.hadoop.hdds.utils.CollectionUtils;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
+import static org.apache.ratis.util.JavaUtils.getClassSimpleName;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import org.apache.hadoop.hdds.utils.CollectionUtils;
+import org.apache.hadoop.hdds.utils.db.cache.TableCache.CacheType;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 
 /**
  * Class represents one single column table with the required codecs and types.
@@ -34,6 +35,23 @@ import java.util.Map;
  * @param <VALUE> they type of the value.
  */
 public class DBColumnFamilyDefinition<KEY, VALUE> {
+
+  private final String tableName;
+  private final Codec<KEY> keyCodec;
+  private final Codec<VALUE> valueCodec;
+  private final String name;
+
+  private volatile ManagedColumnFamilyOptions cfOptions;
+
+  public DBColumnFamilyDefinition(String tableName, Codec<KEY> keyCodec, Codec<VALUE> valueCodec) {
+    this.tableName = Objects.requireNonNull(tableName, "tableName == null");
+    this.keyCodec = Objects.requireNonNull(keyCodec, "keyCodec == null");
+    this.valueCodec = Objects.requireNonNull(valueCodec, "valueCodec == null");
+    this.name = tableName + "-def: " + getClassSimpleName(getKeyType())
+        + " -> " + getClassSimpleName(getValueType());
+    this.cfOptions = null;
+  }
+
   public static Map<String, DBColumnFamilyDefinition<?, ?>> newUnmodifiableMap(
       DBColumnFamilyDefinition<?, ?>... families) {
     return newUnmodifiableMap(Collections.emptyMap(), families);
@@ -46,40 +64,20 @@ public class DBColumnFamilyDefinition<KEY, VALUE> {
         DBColumnFamilyDefinition::getName, existing);
   }
 
-  public static Map<String, List<DBColumnFamilyDefinition<?, ?>>>
-      newUnmodifiableMultiMap(DBColumnFamilyDefinition<?, ?>... families) {
+  public static Map<String, List<DBColumnFamilyDefinition<?, ?>>> newUnmodifiableMultiMap(
+      DBColumnFamilyDefinition<?, ?>... families
+  ) {
     return CollectionUtils.newUnmodifiableMultiMap(Arrays.asList(families),
         DBColumnFamilyDefinition::getName);
   }
 
-  private final String tableName;
-
-  private final Class<KEY> keyType;
-
-  private final Codec<KEY> keyCodec;
-
-  private final Class<VALUE> valueType;
-
-  private final Codec<VALUE> valueCodec;
-
-  private ManagedColumnFamilyOptions cfOptions;
-
-  public DBColumnFamilyDefinition(
-      String tableName,
-      Class<KEY> keyType,
-      Codec<KEY> keyCodec,
-      Class<VALUE> valueType,
-      Codec<VALUE> valueCodec) {
-    this.tableName = tableName;
-    this.keyType = keyType;
-    this.keyCodec = keyCodec;
-    this.valueType = valueType;
-    this.valueCodec = valueCodec;
-    this.cfOptions = null;
+  public Table<KEY, VALUE> getTable(DBStore db) throws RocksDatabaseException, CodecException {
+    return db.getTable(tableName, keyCodec, valueCodec);
   }
 
-  public Table<KEY, VALUE> getTable(DBStore db) throws IOException {
-    return db.getTable(tableName, keyType, valueType);
+  public Table<KEY, VALUE> getTable(DBStore db, CacheType cacheType)
+      throws RocksDatabaseException, CodecException {
+    return db.getTable(tableName, keyCodec, valueCodec, cacheType);
   }
 
   public String getName() {
@@ -87,7 +85,7 @@ public class DBColumnFamilyDefinition<KEY, VALUE> {
   }
 
   public Class<KEY> getKeyType() {
-    return keyType;
+    return keyCodec.getTypeClass();
   }
 
   public Codec<KEY> getKeyCodec() {
@@ -95,7 +93,7 @@ public class DBColumnFamilyDefinition<KEY, VALUE> {
   }
 
   public Class<VALUE> getValueType() {
-    return valueType;
+    return valueCodec.getTypeClass();
   }
 
   public Codec<VALUE> getValueCodec() {
@@ -108,5 +106,10 @@ public class DBColumnFamilyDefinition<KEY, VALUE> {
 
   public void setCfOptions(ManagedColumnFamilyOptions cfOptions) {
     this.cfOptions = cfOptions;
+  }
+
+  @Override
+  public String toString() {
+    return name;
   }
 }

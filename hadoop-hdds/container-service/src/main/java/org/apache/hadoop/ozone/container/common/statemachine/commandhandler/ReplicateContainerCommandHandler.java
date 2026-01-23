@@ -1,23 +1,24 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
+import com.google.common.base.Preconditions;
 import java.util.List;
-
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -30,8 +31,6 @@ import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.container.replication.ReplicationTask;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
-
-import com.google.common.base.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,31 +42,30 @@ public class ReplicateContainerCommandHandler implements CommandHandler {
   static final Logger LOG =
       LoggerFactory.getLogger(ReplicateContainerCommandHandler.class);
 
-  private int invocationCount;
-
-  private long totalTime;
-
-  private ConfigurationSource conf;
-
   private ReplicationSupervisor supervisor;
 
   private ContainerReplicator downloadReplicator;
 
   private ContainerReplicator pushReplicator;
 
+  private static final String METRIC_NAME = ReplicationTask.METRIC_NAME;
+
   public ReplicateContainerCommandHandler(
       ConfigurationSource conf,
       ReplicationSupervisor supervisor,
       ContainerReplicator downloadReplicator,
       ContainerReplicator pushReplicator) {
-    this.conf = conf;
     this.supervisor = supervisor;
     this.downloadReplicator = downloadReplicator;
     this.pushReplicator = pushReplicator;
   }
 
+  public String getMetricsName() {
+    return METRIC_NAME;
+  }
+
   @Override
-  public void handle(SCMCommand command, OzoneContainer container,
+  public void handle(SCMCommand<?> command, OzoneContainer container,
       StateContext context, SCMConnectionManager connectionManager) {
 
     final ReplicateContainerCommand replicateCommand =
@@ -91,7 +89,7 @@ public class ReplicateContainerCommandHandler implements CommandHandler {
 
   @Override
   public int getQueuedCount() {
-    return supervisor.getInFlightReplications(ReplicationTask.class);
+    return (int) this.supervisor.getReplicationQueuedCount(METRIC_NAME);
   }
 
   @Override
@@ -101,19 +99,16 @@ public class ReplicateContainerCommandHandler implements CommandHandler {
 
   @Override
   public int getInvocationCount() {
-    return this.invocationCount;
+    return (int) this.supervisor.getReplicationRequestCount(METRIC_NAME);
   }
 
   @Override
   public long getAverageRunTime() {
-    if (invocationCount > 0) {
-      return totalTime / invocationCount;
-    }
-    return 0;
+    return this.supervisor.getReplicationRequestAvgTime(METRIC_NAME);
   }
 
   @Override
   public long getTotalRunTime() {
-    return totalTime;
+    return this.supervisor.getReplicationRequestTotalTime(METRIC_NAME);
   }
 }

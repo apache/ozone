@@ -5,8 +5,9 @@
     "healthyDatanodes": 24,
     "storageReport": {
       "capacity": 202114732032,
-      "used": 16384,
-      "remaining": 182447632384
+      "used": 4667099648,
+      "remaining": 182447632384,
+      "committed": 12000222315
     },
     "containers": 3230,
     "missingContainers": 1002,
@@ -94,7 +95,7 @@
       },
       {
         "hostname": "localhost1.storage.enterprise.com",
-        "uuid": "b5907812-a5f2-11ea-bb37-0242ac130011",
+        "uuid": "4712ba3d-4bb2-477a-9211-d9b50c013055",
         "state": "HEALTHY",
         "opState": "DECOMMISSIONING",
         "lastHeartbeat": 1574724876059,
@@ -162,7 +163,7 @@
       },
       {
         "hostname": "localhost3.storage.enterprise.com",
-        "uuid": "b5907812-a5f2-11ea-bb37-0242ac130013",
+        "uuid": "4712ba3d-4bb2-477a-9211-d9b50c013056",
         "state": "HEALTHY",
         "opState": "ENTERING_MAINTENANCE",
         "lastHeartbeat": 1574724876059,
@@ -744,55 +745,54 @@
         "leaderNode": "localhost1.storage.enterprise.com",
         "datanodes": [
           {
-          "level": 0,
-          "parent": null,
-          "cost": 0,
-          "uuid": "9e4e92da-4abd-461d-b042-dc4fe72e8727",
-          "uuidString": "9e4e92da-4abd-461d-b042-dc4fe72e8727",
-          "ipAddress": "172.22.0.5",
-          "hostName": "ozone_datanode_1.ozone_default",
-          "ports": [
-            {
-              "name": "REPLICATION",
-              "value": 9886
-            },
-            {
-              "name": "RATIS",
-              "value": 9858
-            },
-            {
-              "name": "RATIS_ADMIN",
-              "value": 9857
-            },
-            {
-              "name": "RATIS_SERVER",
-              "value": 9856
-            },
-            {
-              "name": "RATIS_DATASTREAM",
-              "value": 9855
-            },
-            {
-              "name": "STANDALONE",
-              "value": 9859
-            }
-
-          ],
-          "certSerialId": null,
-          "version": null,
-          "setupTime": 0,
-          "revision": null,
-          "buildDate": null,
-          "persistedOpState": "IN_SERVICE",
-          "persistedOpStateExpiryEpochSec": 0,
-          "initialVersion": 0,
-          "currentVersion": 1,
-          "signature": -460136136,
-          "decomissioned": false,
-          "networkName": "9e4e92da-4abd-461d-b042-dc4fe72e8727",
-          "networkLocation": "/default-rack",
-          "networkFullPath": "/default-rack/9e4e92da-4abd-461d-b042-dc4fe72e8727",
-          "numOfLeaves": 1
+            "level": 0,
+            "parent": null,
+            "cost": 0,
+            "uuid": "9e4e92da-4abd-461d-b042-dc4fe72e8727",
+            "uuidString": "9e4e92da-4abd-461d-b042-dc4fe72e8727",
+            "ipAddress": "172.22.0.5",
+            "hostName": "ozone_datanode_1.ozone_default",
+            "ports": [
+              {
+                "name": "REPLICATION",
+                "value": 9886
+              },
+              {
+                "name": "RATIS",
+                "value": 9858
+              },
+              {
+                "name": "RATIS_ADMIN",
+                "value": 9857
+              },
+              {
+                "name": "RATIS_SERVER",
+                "value": 9856
+              },
+              {
+                "name": "RATIS_DATASTREAM",
+                "value": 9855
+              },
+              {
+                "name": "STANDALONE",
+                "value": 9859
+              }
+            ],
+            "certSerialId": null,
+            "version": null,
+            "setupTime": 0,
+            "revision": null,
+            "buildDate": null,
+            "persistedOpState": "IN_SERVICE",
+            "persistedOpStateExpiryEpochSec": 0,
+            "initialVersion": 0,
+            "currentVersion": 1,
+            "signature": -460136136,
+            "decomissioned": false,
+            "networkName": "9e4e92da-4abd-461d-b042-dc4fe72e8727",
+            "networkLocation": "/default-rack",
+            "networkFullPath": "/default-rack/9e4e92da-4abd-461d-b042-dc4fe72e8727",
+            "numOfLeaves": 1
           }
         ],
         "lastLeaderElection": 1578491471528,
@@ -1480,7 +1480,7 @@
     "path": "/dummyVolume/dummyBucket",
     "size": 200000,
     "sizeWithReplica": -1,
-    "subPathCount": 5,
+    "subPathCount": 8,
     "subPaths": [
       {
         "path": "/dummyVolume/dummyBucket/dir1",
@@ -1629,11 +1629,11 @@
               "blockID": {
                 "containerBlockID": {
                   "containerID": 1,
-                  "localID": 111677748019200007
+                  "localID": 111677748019200000
                 },
                 "blockCommitSequenceId": 18,
                 "containerID": 1,
-                "localID": 111677748019200007
+                "localID": 111677748019200000
               },
               "length": 3879,
               "offset": 0,
@@ -1642,7 +1642,7 @@
               "pipeline": null,
               "partNumber": 0,
               "containerID": 1,
-              "localID": 111677748019200007,
+              "localID": 111677748019200000,
               "blockCommitSequenceId": 18
             }
           ],
@@ -1652,11 +1652,11 @@
               "blockID": {
                 "containerBlockID": {
                   "containerID": 1,
-                  "localID": 111677748019200007
+                  "localID": 111677748019200000
                 },
                 "blockCommitSequenceId": 18,
                 "containerID": 1,
-                "localID": 111677748019200007
+                "localID": 111677748019200000
               },
               "length": 3879,
               "offset": 0,
@@ -1665,7 +1665,7 @@
               "pipeline": null,
               "partNumber": 0,
               "containerID": 1,
-              "localID": 111677748019200007,
+              "localID": 111677748019200000,
               "blockCommitSequenceId": 18
             }
           ],
@@ -1675,11 +1675,11 @@
                 "blockID": {
                   "containerBlockID": {
                     "containerID": 1,
-                    "localID": 111677748019200007
+                    "localID": 111677748019200000
                   },
                   "blockCommitSequenceId": 18,
                   "containerID": 1,
-                  "localID": 111677748019200007
+                  "localID": 111677748019200000
                 },
                 "length": 3879,
                 "offset": 0,
@@ -1688,7 +1688,7 @@
                 "pipeline": null,
                 "partNumber": 0,
                 "containerID": 1,
-                "localID": 111677748019200007,
+                "localID": 111677748019200000,
                 "blockCommitSequenceId": 18
               }
             ]
@@ -1858,6 +1858,15 @@
     ],
     "sizeDirectKey": 0
   },
+  "replica": {
+    "status": "OK",
+    "path": "/s3v/fso-bucket/dir1/key1-fso",
+    "size": 17289,
+    "sizeWithReplica": 17289,
+    "subPathCount": 0,
+    "subPaths": [],
+    "sizeDirectKey": -1
+  },
   "taskStatus": [
     {
       "taskName": "ContainerKeyMapperTask",
@@ -1914,7 +1923,7 @@
         "actualReplicaCount": 2,
         "replicaDeltaCount": 1,
         "reason": null,
-        "keys": 1,
+        "keys": 4,
         "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
         "replicas": [
           {
@@ -1988,7 +1997,7 @@
         "actualReplicaCount": 2,
         "replicaDeltaCount": 2,
         "reason": null,
-        "keys": 1,
+        "keys": 3,
         "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
         "replicas": [
           {
@@ -2062,7 +2071,7 @@
         "actualReplicaCount": 2,
         "replicaDeltaCount": 2,
         "reason": null,
-        "keys": 1,
+        "keys": 2,
         "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
         "replicas": [
           {
@@ -2099,7 +2108,7 @@
         "actualReplicaCount": 2,
         "replicaDeltaCount": 2,
         "reason": null,
-        "keys": 1,
+        "keys": 5,
         "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
         "replicas": [
           {
@@ -2136,7 +2145,7 @@
         "actualReplicaCount": 2,
         "replicaDeltaCount": 2,
         "reason": null,
-        "keys": 1,
+        "keys": 3,
         "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
         "replicas": [
           {
@@ -2173,7 +2182,7 @@
         "actualReplicaCount": 2,
         "replicaDeltaCount": 2,
         "reason": null,
-        "keys": 1,
+        "keys": 6,
         "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a2",
         "replicas": [
           {
@@ -2210,7 +2219,7 @@
         "actualReplicaCount": 2,
         "replicaDeltaCount": 2,
         "reason": null,
-        "keys": 1,
+        "keys": 2,
         "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a3",
         "replicas": [
           {
@@ -2236,6 +2245,46 @@
             "firstSeenTime": 1665588176660,
             "lastSeenTime": 1665590272289,
             "lastBcsId": 0
+          }
+        ]
+      },
+      {
+        "containerID": 10,
+        "containerState": "REPLICA_MISMATCH",
+        "unhealthySince": 1665590446222,
+        "expectedReplicaCount": 3,
+        "actualReplicaCount": 3,
+        "replicaDeltaCount": 0,
+        "reason": null,
+        "keys": 1,
+        "pipelineID": "a10ffab6-8ed5-414a-aaf5-79890ff3e8a1",
+        "replicas": [
+          {
+            "containerId": 10,
+            "datanodeUuid": "15526f1b-76f2-4d8f-876c-c343c94ea476",
+            "datanodeHost": "ozone_datanode_2.ozone_overreplicated4",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590397315,
+            "lastBcsId": 2,
+            "dataChecksum": 12345678
+          },
+          {
+            "containerId": 10,
+            "datanodeUuid": "f55476ab-4687-464d-a100-1c65de4366e3",
+            "datanodeHost": "ozone_datanode_3.ozone_overreplicated4",
+            "firstSeenTime": 1665588176616,
+            "lastSeenTime": 1665590392293,
+            "lastBcsId": 2,
+            "dataChecksum": 23456789
+          },
+          {
+            "containerId": 10,
+            "datanodeUuid": "7a457bcb-d63e-49cc-b3ff-8b22bf48d130",
+            "datanodeHost": "ozone_datanode_1.ozone_overreplicated4",
+            "firstSeenTime": 1665588176660,
+            "lastSeenTime": 1665590272289,
+            "lastBcsId": 0,
+            "dataChecksum": 12345678
           }
         ]
       }
@@ -2304,8 +2353,7 @@
         "quotaInBytes": -1,
         "quotaInNamespace": -1,
         "usedNamespace": 3000,
-        "acls": [
-        ]
+        "acls": []
       },
       {
         "volume": "vol4",
@@ -2543,7 +2591,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 39202,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2558,7 +2606,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 5675,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2573,7 +2621,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 4867,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2588,7 +2636,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 4655,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2603,7 +2651,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 4606,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2618,7 +2666,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 3832,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2633,7 +2681,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 2369,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2648,7 +2696,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 2228,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2663,7 +2711,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 1984,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2678,7 +2726,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 1895,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2693,7 +2741,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 271,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2708,7 +2756,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 245,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2730,7 +2778,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 1015,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2745,7 +2793,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 839,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2760,7 +2808,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 727,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2782,7 +2830,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 271,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2797,7 +2845,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 237,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2812,7 +2860,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 213,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2834,7 +2882,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 187,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2849,7 +2897,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 185,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2864,7 +2912,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 73,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2886,7 +2934,7 @@
                 "label": "label1",
                 "size": 0,
                 "accessCount": 3,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2901,7 +2949,7 @@
                 "label": "label2",
                 "size": 256,
                 "accessCount": 2,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2923,7 +2971,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 2,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2945,7 +2993,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 2,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2967,7 +3015,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 2,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2982,7 +3030,7 @@
                 "label": "",
                 "size": 256,
                 "accessCount": 1,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 256,
@@ -2999,7 +3047,7 @@
     "minAccessCount": 1,
     "maxAccessCount": 39202
   },
-  "keyHeatmap":  {
+  "keyHeatmap": {
     "label": "root",
     "children": [
       {
@@ -3012,7 +3060,7 @@
                 "label": "demo2",
                 "size": 256,
                 "accessCount": 84,
-                "color": 1.0
+                "color": 1
               },
               {
                 "label": "demo35",
@@ -3345,7 +3393,7 @@
                 "label": "demo1",
                 "size": 256,
                 "accessCount": 65,
-                "color": 1.0
+                "color": 1
               },
               {
                 "label": "demo2",
@@ -3366,7 +3414,7 @@
                 "label": "demo2",
                 "size": 256,
                 "accessCount": 55,
-                "color": 1.0
+                "color": 1
               },
               {
                 "label": "demo3",
@@ -3411,7 +3459,7 @@
                 "label": "demo6",
                 "size": 256,
                 "accessCount": 49,
-                "color": 1.0
+                "color": 1
               },
               {
                 "label": "demo2",
@@ -3462,7 +3510,7 @@
                 "label": "demo9",
                 "size": 256,
                 "accessCount": 48,
-                "color": 1.0
+                "color": 1
               },
               {
                 "label": "demo6",
@@ -3549,7 +3597,7 @@
                 "label": "test_dir/demo1",
                 "size": 256,
                 "accessCount": 45,
-                "color": 1.0
+                "color": 1
               },
               {
                 "label": "test_dir/demo2",
@@ -3570,7 +3618,7 @@
                 "label": "demo17",
                 "size": 256,
                 "accessCount": 44,
-                "color": 1.0
+                "color": 1
               },
               {
                 "label": "demo5",
@@ -3651,7 +3699,7 @@
                 "label": "test_dir/demo2",
                 "size": 256,
                 "accessCount": 38,
-                "color": 1.0
+                "color": 1
               },
               {
                 "label": "test_dir/demo1",
@@ -3679,13 +3727,13 @@
                 "label": ".trash",
                 "size": 256,
                 "accessCount": 24,
-                "color": 1.0
+                "color": 1
               },
               {
                 "label": ".trash/om",
                 "size": 256,
                 "accessCount": 24,
-                "color": 1.0
+                "color": 1
               }
             ],
             "size": 512,
@@ -3715,7 +3763,7 @@
                 "label": "enc_path/hive_tpcds/store_sales/test1.dat",
                 "size": 1026,
                 "accessCount": 155074,
-                "color": 1.0
+                "color": 1
               },
               {
                 "label": "enc_path/hive_tpcds/catalog_sales/test2",
@@ -3743,7 +3791,7 @@
                 "label": "enc_path/hive_tpcds/store_sales/test11.dat",
                 "size": 2500,
                 "accessCount": 155074,
-                "color": 1.0
+                "color": 1
               },
               {
                 "label": "enc_path/hive_tpcds/catalog_sales/test12",
@@ -3769,18 +3817,17 @@
   "disabledFeatures": [
     "FLAG1"
   ],
-
   "keysOpenSummary": {
     "totalUnreplicatedDataSize": 10485760,
     "totalReplicatedDataSize": 31457280,
     "totalOpenKeys": 10
   },
-  "keysdeletePendingSummary":{
-      "totalUnreplicatedDataSize": 29291,
-      "totalReplicatedDataSize": 87873,
-      "totalDeletedKeys": 3
+  "keysdeletePendingSummary": {
+    "totalUnreplicatedDataSize": 29291,
+    "totalReplicatedDataSize": 87873,
+    "totalDeletedKeys": 3
   },
-  "omMismatch":{
+  "omMismatch": {
     "containerDiscrepancyInfo": [
       {
         "containerId": 1,
@@ -3790,7 +3837,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -3802,7 +3848,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-613724nn"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -3810,7 +3855,6 @@
             },
             "healthy": true
           }
-
         ],
         "existsAt": "SCM"
       },
@@ -3984,7 +4028,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -3996,7 +4039,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-613724nn"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -4004,7 +4046,6 @@
             },
             "healthy": true
           }
-
         ],
         "existsAt": "SCM"
       },
@@ -4208,7 +4249,7 @@
       }
     ]
   },
-  "scmMismatch":{
+  "scmMismatch": {
     "containerDiscrepancyInfo": [
       {
         "containerId": 1,
@@ -4218,7 +4259,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -4230,7 +4270,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-613724nn"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -4238,7 +4277,6 @@
             },
             "healthy": true
           }
-
         ],
         "existsAt": "OM"
       },
@@ -4412,7 +4450,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -4424,7 +4461,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-613724nn"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -4432,7 +4468,6 @@
             },
             "healthy": true
           }
-
         ],
         "existsAt": "OM"
       },
@@ -4606,7 +4641,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -4618,7 +4652,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-613724nn"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -4626,7 +4659,6 @@
             },
             "healthy": true
           }
-
         ],
         "existsAt": "OM"
       },
@@ -4800,7 +4832,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -4812,7 +4843,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-613724nn"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -4820,7 +4850,6 @@
             },
             "healthy": true
           }
-
         ],
         "existsAt": "OM"
       },
@@ -4994,7 +5023,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-61374b069adb"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -5006,7 +5034,6 @@
             "id": {
               "id": "1202e6bb-b7c1-4a85-8067-613724nn"
             },
-
             "replicationConfig": {
               "replicationFactor": "ONE",
               "requiredNodes": 1,
@@ -5014,7 +5041,6 @@
             },
             "healthy": true
           }
-
         ],
         "existsAt": "OM"
       },
@@ -5183,448 +5209,320 @@
     ]
   },
   "nonFSO": {
-    "keysSummary": {
-        "totalUnreplicatedDataSize": 10485760,
-        "totalReplicatedDataSize": 31457280,
-        "totalOpenKeys": 10
-    },
+    "lastKey": "/s3v/legacy/dir1/dir2/dir3/an9uf2eeox/19/113328137261088807",
+    "replicatedDataSize": 31457280,
+    "unreplicatedDataSize": 10485760,
     "nonFSO": [
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/01/110569623850191713",
-        "path": "nonfso 1",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+        "key": "/s3v/legacy/dir1/dir2/dir3/an9uf2eeox/10/113328137245098014",
+        "path": "dir1/dir2/dir3/an9uf2eeox/10",
+        "inStateSince": 1729250141069,
+        "size": 1048576,
+        "replicatedSize": 3145728,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
           "replicationType": "RATIS"
-        }
+        },
+        "creationTime": 1729250161542,
+        "modificationTime": 1729250161542,
+        "isKey": true
       },
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2439/110569623850191713",
-        "path": "nonfso 2",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+        "key": "/s3v/legacy/dir1/dir2/dir3/an9uf2eeox/11/113328137245818911",
+        "path": "dir1/dir2/dir3/an9uf2eeox/11",
+        "inStateSince": 1729250141080,
+        "size": 1048576,
+        "replicatedSize": 3145728,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
           "replicationType": "RATIS"
-        }
+        },
+        "creationTime": 1729250161543,
+        "modificationTime": 1729250161543,
+        "isKey": true
       },
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2440/110569623850191713",
-        "path": "nonfso 11",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+        "key": "/s3v/legacy/dir1/dir2/dir3/an9uf2eeox/12/113328137247195168",
+        "path": "dir1/dir2/dir3/an9uf2eeox/12",
+        "inStateSince": 1729250141091,
+        "size": 1048576,
+        "replicatedSize": 3145728,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
           "replicationType": "RATIS"
-        }
+        },
+        "creationTime": 1729250161543,
+        "modificationTime": 1729250161543,
+        "isKey": true
       },
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2441/110569623850191713",
-        "path": "nonfso 12",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+        "key": "/s3v/legacy/dir1/dir2/dir3/an9uf2eeox/13/113328137248178209",
+        "path": "dir1/dir2/dir3/an9uf2eeox/13",
+        "inStateSince": 1729250141116,
+        "size": 1048576,
+        "replicatedSize": 3145728,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
           "replicationType": "RATIS"
-        }
+        },
+        "creationTime": 1729250161543,
+        "modificationTime": 1729250161543,
+        "isKey": true
       },
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2440/110569623850191713",
-        "path": "nonfso 21",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+        "key": "/s3v/legacy/dir1/dir2/dir3/an9uf2eeox/14/113328137249685538",
+        "path": "dir1/dir2/dir3/an9uf2eeox/14",
+        "inStateSince": 1729250141139,
+        "size": 1048576,
+        "replicatedSize": 3145728,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
           "replicationType": "RATIS"
-      }
+        },
+        "creationTime": 1729250161543,
+        "modificationTime": 1729250161543,
+        "isKey": true
       },
       {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2441/110569623850191713",
-        "path": "nonfso 22",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+        "key": "/s3v/legacy/dir1/dir2/dir3/an9uf2eeox/15/113328137250930723",
+        "path": "dir1/dir2/dir3/an9uf2eeox/15",
+        "inStateSince": 1729250141158,
+        "size": 1048576,
+        "replicatedSize": 3145728,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
           "replicationType": "RATIS"
-      }
+        },
+        "creationTime": 1729250161543,
+        "modificationTime": 1729250161543,
+        "isKey": true
+      },
+      {
+        "key": "/s3v/legacy/dir1/dir2/dir3/an9uf2eeox/16/113328137252569124",
+        "path": "dir1/dir2/dir3/an9uf2eeox/16",
+        "inStateSince": 1729250141183,
+        "size": 1048576,
+        "replicatedSize": 3145728,
+        "replicationInfo": {
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
+          "replicationType": "RATIS"
+        },
+        "creationTime": 1729250161543,
+        "modificationTime": 1729250161543,
+        "isKey": true
+      },
+      {
+        "key": "/s3v/legacy/dir1/dir2/dir3/an9uf2eeox/17/113328137259778085",
+        "path": "dir1/dir2/dir3/an9uf2eeox/17",
+        "inStateSince": 1729250141293,
+        "size": 1048576,
+        "replicatedSize": 3145728,
+        "replicationInfo": {
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
+          "replicationType": "RATIS"
+        },
+        "creationTime": 1729250161543,
+        "modificationTime": 1729250161543,
+        "isKey": true
+      },
+      {
+        "key": "/s3v/legacy/dir1/dir2/dir3/an9uf2eeox/18/113328137261023270",
+        "path": "dir1/dir2/dir3/an9uf2eeox/18",
+        "inStateSince": 1729250141312,
+        "size": 1048576,
+        "replicatedSize": 3145728,
+        "replicationInfo": {
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
+          "replicationType": "RATIS"
+        },
+        "creationTime": 1729250161543,
+        "modificationTime": 1729250161543,
+        "isKey": true
+      },
+      {
+        "key": "/s3v/legacy/dir1/dir2/dir3/an9uf2eeox/19/113328137261088807",
+        "path": "dir1/dir2/dir3/an9uf2eeox/19",
+        "inStateSince": 1729250141313,
+        "size": 1048576,
+        "replicatedSize": 3145728,
+        "replicationInfo": {
+          "replicationFactor": "THREE",
+          "requiredNodes": 3,
+          "replicationType": "RATIS"
+        },
+        "creationTime": 1729250161543,
+        "modificationTime": 1729250161543,
+        "isKey": true
       }
     ],
     "status": "OK"
   },
   "fso": {
-    "fso": [
-      {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2401/110569623850191713",
-        "path": "1",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+    "lastKey": "/-9223372036854775552/-9223372036854775040/-9223372036854774524/9/113328113600626690",
+    "replicatedDataSize": 31457280,
+    "unreplicatedDataSize": 10485760,
+    "fso": [{
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774524/0/113328113600561153",
+        "path": "dir1/dir2/dir3/pnrnqh5gux/0",
+        "inStateSince": 1729249780277,
+        "size": 1048576,
+        "replicatedSize": 3145728,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2402/110569623850191713",
-        "path": "2",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+            "replicationFactor": "THREE",
+            "requiredNodes": 3,
+            "replicationType": "RATIS"
+        },
+        "creationTime": 1729249820562,
+        "modificationTime": 1729249820562,
+        "isKey": true
+    },
+    {
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774524/1/113328113600626694",
+        "path": "dir1/dir2/dir3/pnrnqh5gux/1",
+        "inStateSince": 1729249780277,
+        "size": 1048576,
+        "replicatedSize": 3145728,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-
-      },
-      {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2403/110569623850191713",
-        "path": "3",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+            "replicationFactor": "THREE",
+            "requiredNodes": 3,
+            "replicationType": "RATIS"
+        },
+        "creationTime": 1729249820562,
+        "modificationTime": 1729249820562,
+        "isKey": true
+    },
+    {
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774524/2/113328113600626691",
+        "path": "dir1/dir2/dir3/pnrnqh5gux/2",
+        "inStateSince": 1729249780277,
+        "size": 1048576,
+        "replicatedSize": 3145728,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-
-      },
-      {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2404/110569623850191713",
-        "path": "4",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+            "replicationFactor": "THREE",
+            "requiredNodes": 3,
+            "replicationType": "RATIS"
+        },
+        "creationTime": 1729249820563,
+        "modificationTime": 1729249820563,
+        "isKey": true
+    },
+    {
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774524/3/113328113600692233",
+        "path": "dir1/dir2/dir3/pnrnqh5gux/3",
+        "inStateSince": 1729249780277,
+        "size": 1048576,
+        "replicatedSize": 3145728,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2405/110569623850191713",
-        "path": "5",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+            "replicationFactor": "THREE",
+            "requiredNodes": 3,
+            "replicationType": "RATIS"
+        },
+        "creationTime": 1729249820563,
+        "modificationTime": 1729249820563,
+        "isKey": true
+    },
+    {
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774524/4/113328113600626695",
+        "path": "dir1/dir2/dir3/pnrnqh5gux/4",
+        "inStateSince": 1729249780277,
+        "size": 1048576,
+        "replicatedSize": 3145728,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-
-      },
-      {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2406/110569623850191713",
-        "path": "6",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+            "replicationFactor": "THREE",
+            "requiredNodes": 3,
+            "replicationType": "RATIS"
+        },
+        "creationTime": 1729249820563,
+        "modificationTime": 1729249820563,
+        "isKey": true
+    },
+    {
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774524/5/113328113600561152",
+        "path": "dir1/dir2/dir3/pnrnqh5gux/5",
+        "inStateSince": 1729249780277,
+        "size": 1048576,
+        "replicatedSize": 3145728,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-
-      },
-      {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2407/110569623850191713",
-        "path": "7",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+            "replicationFactor": "THREE",
+            "requiredNodes": 3,
+            "replicationType": "RATIS"
+        },
+        "creationTime": 1729249820564,
+        "modificationTime": 1729249820564,
+        "isKey": true
+    },
+    {
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774524/6/113328113600626692",
+        "path": "dir1/dir2/dir3/pnrnqh5gux/6",
+        "inStateSince": 1729249780277,
+        "size": 1048576,
+        "replicatedSize": 3145728,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-
-      },
-      {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2408/110569623850191713",
-        "path": "8",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+            "replicationFactor": "THREE",
+            "requiredNodes": 3,
+            "replicationType": "RATIS"
+        },
+        "creationTime": 1729249820564,
+        "modificationTime": 1729249820564,
+        "isKey": true
+    },
+    {
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774524/7/113328113600626696",
+        "path": "dir1/dir2/dir3/pnrnqh5gux/7",
+        "inStateSince": 1729249780277,
+        "size": 1048576,
+        "replicatedSize": 3145728,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-
-      },
-      {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2409/110569623850191713",
-        "path": "9",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+            "replicationFactor": "THREE",
+            "requiredNodes": 3,
+            "replicationType": "RATIS"
+        },
+        "creationTime": 1729249820564,
+        "modificationTime": 1729249820564,
+        "isKey": true
+    },
+    {
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774524/8/113328113600626693",
+        "path": "dir1/dir2/dir3/pnrnqh5gux/8",
+        "inStateSince": 1729249780277,
+        "size": 1048576,
+        "replicatedSize": 3145728,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-
-      },
-      {
-        "key": "fso 10",
-        "path": "10",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
+            "replicationFactor": "THREE",
+            "requiredNodes": 3,
+            "replicationType": "RATIS"
+        },
+        "creationTime": 1729249820564,
+        "modificationTime": 1729249820564,
+        "isKey": true
+    },
+    {
+        "key": "/-9223372036854775552/-9223372036854775040/-9223372036854774524/9/113328113600626690",
+        "path": "dir1/dir2/dir3/pnrnqh5gux/9",
+        "inStateSince": 1729249780277,
+        "size": 1048576,
+        "replicatedSize": 3145728,
         "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2411/110569623850191713",
-        "path": "11",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 12",
-        "path": "12",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 13",
-        "path": "13",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 14",
-        "path": "14",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 15",
-        "path": "15",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 16 key",
-        "path": "16",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 17 key",
-        "path": "17",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 18 key",
-        "path": "18",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 19 key",
-        "path": "19",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "/-9223372036854775552/-9223372036854775040/-9223372036852420095/2411/110569623850191713",
-        "path": "21",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 22",
-        "path": "22",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 23",
-        "path": "23",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 24",
-        "path": "24",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 25",
-        "path": "25",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 26 key",
-        "path": "26",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 17 key",
-        "path": "27",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 18 key",
-        "path": "28",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 19 key",
-        "path": "29",
-        "inStateSince": 1686156886632,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      },
-      {
-        "key": "fso 20 key",
-        "path": "20",
-        "inStateSince": 1686156887186,
-        "size": 268435456,
-        "replicatedSize": 268435456,
-        "replicationInfo": {
-          "replicationFactor": "ONE",
-          "requiredNodes": 1,
-          "replicationType": "RATIS"
-        }
-      }
-    ],
+            "replicationFactor": "THREE",
+            "requiredNodes": 3,
+            "replicationType": "RATIS"
+        },
+        "creationTime": 1729249820565,
+        "modificationTime": 1729249820565,
+        "isKey": true
+    }],
     "status": "OK"
   },
-  "keydeletePending":{
+  "keydeletePending": {
     "keysSummary": {
       "totalUnreplicatedDataSize": 29291,
       "totalReplicatedDataSize": 87873,
@@ -5636,9 +5534,9 @@
       {
         "omKeyInfoList": [
           {
-            "objectID": -9223372036844470271,
+            "objectID": -9223372036844470000,
             "updateID": 40429,
-            "parentObjectID": -9223372036844472575,
+            "parentObjectID": -9223372036844472000,
             "volumeName": "volume",
             "bucketName": "bucket1",
             "keyName": "List1key1",
@@ -5661,9 +5559,9 @@
             "updateIDset": true
           },
           {
-            "objectID": -9223372036844470271,
+            "objectID": -9223372036844470000,
             "updateID": 40429,
-            "parentObjectID": -9223372036844472575,
+            "parentObjectID": -9223372036844472000,
             "volumeName": "volume",
             "bucketName": "bucket1",
             "keyName": "List1key1",
@@ -5686,9 +5584,9 @@
             "updateIDset": true
           },
           {
-            "objectID": -9223372036844470271,
+            "objectID": -9223372036844470000,
             "updateID": 40429,
-            "parentObjectID": -9223372036844472575,
+            "parentObjectID": -9223372036844472000,
             "volumeName": "volume",
             "bucketName": "bucket1",
             "keyName": "List1key1",
@@ -5715,10 +5613,9 @@
       {
         "omKeyInfoList": [
           {
-
-            "objectID": -9223372036844470015,
+            "objectID": -9223372036844470000,
             "updateID": 40407,
-            "parentObjectID": -9223372036844472575,
+            "parentObjectID": -9223372036844472000,
             "volumeName": "volume",
             "bucketName": "bucket1",
             "keyName": "List2Key1",
@@ -5745,9 +5642,9 @@
       {
         "omKeyInfoList": [
           {
-            "objectID": -9223372036844432639,
+            "objectID": -9223372036844432000,
             "updateID": 40601,
-            "parentObjectID": -9223372036844472575,
+            "parentObjectID": -9223372036844472000,
             "volumeName": "volume",
             "bucketName": "bucket1",
             "keyName": "List3Key1",
@@ -5767,9 +5664,9 @@
             "replicatedSize": 30000000
           },
           {
-            "objectID": -9223372036844432639,
+            "objectID": -9223372036844432000,
             "updateID": 40601,
-            "parentObjectID": -9223372036844472575,
+            "parentObjectID": -9223372036844472000,
             "volumeName": "volume",
             "bucketName": "bucket1",
             "keyName": "List3Key1",
@@ -5793,9 +5690,9 @@
       {
         "omKeyInfoList": [
           {
-            "objectID": -9223372036843970815,
+            "objectID": -9223372036843971000,
             "updateID": 42403,
-            "parentObjectID": -9223372036844472575,
+            "parentObjectID": -9223372036844472000,
             "volumeName": "volume",
             "bucketName": "bucket1",
             "keyName": "List4Key1",
@@ -5817,9 +5714,9 @@
       {
         "omKeyInfoList": [
           {
-            "objectID": -9223372036843964159,
+            "objectID": -9223372036843964000,
             "updateID": 42443,
-            "parentObjectID": -9223372036844472575,
+            "parentObjectID": -9223372036844472000,
             "volumeName": "volume",
             "bucketName": "bucket1",
             "keyName": "List5Key1",
@@ -5841,9 +5738,9 @@
       {
         "omKeyInfoList": [
           {
-            "objectID": -9223372036843961087,
+            "objectID": -9223372036843961000,
             "updateID": 42450,
-            "parentObjectID": -9223372036844472575,
+            "parentObjectID": -9223372036844472000,
             "volumeName": "volume",
             "bucketName": "bucket1",
             "keyName": "List6Key1",
@@ -5870,9 +5767,9 @@
       {
         "omKeyInfoList": [
           {
-            "objectID": -9223372036843959807,
+            "objectID": -9223372036843959000,
             "updateID": 42449,
-            "parentObjectID": -9223372036844472575,
+            "parentObjectID": -9223372036844472000,
             "volumeName": "volume",
             "bucketName": "bucket1",
             "keyName": "List7Key1",
@@ -5899,9 +5796,9 @@
       {
         "omKeyInfoList": [
           {
-            "objectID": -9223372036843953919,
+            "objectID": -9223372036843954000,
             "updateID": 42467,
-            "parentObjectID": -9223372036844472575,
+            "parentObjectID": -9223372036844472000,
             "volumeName": "volume",
             "bucketName": "bucket1",
             "keyName": "List8Key1",
@@ -5928,9 +5825,9 @@
       {
         "omKeyInfoList": [
           {
-            "objectID": -9223372036843951359,
+            "objectID": -9223372036843951000,
             "updateID": 42483,
-            "parentObjectID": -9223372036844472575,
+            "parentObjectID": -9223372036844472000,
             "volumeName": "volume",
             "bucketName": "bucket1",
             "keyName": "List9Key1",
@@ -5957,9 +5854,9 @@
       {
         "omKeyInfoList": [
           {
-            "objectID": -9223372036843950335,
+            "objectID": -9223372036843950000,
             "updateID": 42478,
-            "parentObjectID": -9223372036844472575,
+            "parentObjectID": -9223372036844472000,
             "volumeName": "volume",
             "bucketName": "bucket1",
             "keyName": "List10Key1",
@@ -6770,9 +6667,345 @@
     ],
     "status": "OK"
   },
+  "decommissioninfo": {
+    "DatanodesDecommissionInfo":[
+      {
+        "datanodeDetails": {
+            "level": 3,
+            "parent": null,
+            "cost": 0,
+            "uuid": "4712ba3d-4bb2-477a-9211-d9b50c013055",
+            "uuidString": "4712ba3d-4bb2-477a-9211-d9b50c013055",
+            "ipAddress": "172.18.0.13",
+            "hostName": "ozone-ha-datanode-6.ozone-ha_default",
+            
+            "certSerialId": null,
+            "version": null,
+            "setupTime": 0,
+            "revision": null,
+            "buildDate": null,
+            "persistedOpState": "IN_SERVICE",
+            "persistedOpStateExpiryEpochSec": 0,
+            "initialVersion": 0,
+            "currentVersion": 1,
+            "decommissioned": false,
+            "maintenance": false,
+            "ipAddressAsByteString": {
+                "string": "172.18.0.13",
+                "bytes": {
+                    "validUtf8": true,
+                    "empty": false
+                }
+            },
+            "hostNameAsByteString": {
+                "string": "ozone-ha-datanode-6.ozone-ha_default",
+                "bytes": {
+                    "validUtf8": true,
+                    "empty": false
+                }
+            },
+            "networkName": "4712ba3d-4bb2-477a-9211-d9b50c013055",
+            "networkLocation": "/default-rack",
+            "networkFullPath": "/default-rack/4712ba3d-4bb2-477a-9211-d9b50c013055",
+            "numOfLeaves": 1,
+            "networkNameAsByteString": {
+                "string": "4712ba3d-4bb2-477a-9211-d9b50c013055",
+                "bytes": {
+                    "validUtf8": true,
+                    "empty": false
+                }
+            },
+            "networkLocationAsByteString": {
+                "string": "/default-rack",
+                "bytes": {
+                    "validUtf8": true,
+                    "empty": false
+                }
+            }
+        },
+        "metrics": null,
+        "containers": {}
+      },
+      {
+        "datanodeDetails": {
+            "level": 3,
+            "parent": null,
+            "cost": 0,
+            "uuid": "4712ba3d-4bb2-477a-9211-d9b50c013056",
+            "uuidString": "4712ba3d-4bb2-477a-9211-d9b50c013056",
+            "ipAddress": "172.18.0.13",
+            "hostName": "ozone-ha-datanode-6.ozone-ha_default",
+            "certSerialId": null,
+            "version": null,
+            "setupTime": 0,
+            "revision": null,
+            "buildDate": null,
+            "persistedOpState": "IN_SERVICE",
+            "persistedOpStateExpiryEpochSec": 0,
+            "initialVersion": 0,
+            "currentVersion": 1,
+            "decommissioned": false,
+            "maintenance": false,
+            "networkName": "4712ba3d-4bb2-477a-9211-d9b50c013055",
+            "networkLocation": "/default-rack",
+            "networkFullPath": "/default-rack/4712ba3d-4bb2-477a-9211-d9b50c013055",
+            "numOfLeaves": 1
+        },
+        "metrics": null,
+        "containers": {}
+      }
+    ]
+  },
+  "DatanodesDecommissionInfo": {
+    "DatanodesDecommissionInfo": [
+      {
+        "datanodeDetails": {
+          "level": 3,
+          "parent": null,
+          "cost": 0,
+          "uuid": "adc72ef9-0850-49d7-935d-e5a4e0d5be3c",
+          "uuidString": "adc72ef9-0850-49d7-935d-e5a4e0d5be3c",
+          "ipAddress": "172.18.0.10",
+          "hostName": "ozone-ha-datanode-2.ozone-ha_default",
+          "ports": [
+            {
+              "name": "HTTP",
+              "value": 9882
+            },
+            {
+              "name": "CLIENT_RPC",
+              "value": 19864
+            },
+            {
+              "name": "REPLICATION",
+              "value": 9886
+            },
+            {
+              "name": "RATIS",
+              "value": 9858
+            },
+            {
+              "name": "RATIS_ADMIN",
+              "value": 9857
+            },
+            {
+              "name": "RATIS_SERVER",
+              "value": 9856
+            },
+            {
+              "name": "RATIS_DATASTREAM",
+              "value": 9855
+            },
+            {
+              "name": "STANDALONE",
+              "value": 9859
+            }
+          ],
+          "certSerialId": null,
+          "version": null,
+          "setupTime": 0,
+          "revision": null,
+          "buildDate": null,
+          "persistedOpState": "DECOMMISSIONING",
+          "persistedOpStateExpiryEpochSec": 0,
+          "initialVersion": 0,
+          "currentVersion": 1,
+          "decommissioned": true,
+          "maintenance": false,
+          "ipAddressAsByteString": {
+            "string": "172.18.0.10",
+            "bytes": {
+              "validUtf8": true,
+              "empty": false
+            }
+          },
+          "hostNameAsByteString": {
+            "string": "ozone-ha-datanode-2.ozone-ha_default",
+            "bytes": {
+              "validUtf8": true,
+              "empty": false
+            }
+          },
+          "networkName": "adc72ef9-0850-49d7-935d-e5a4e0d5be3c",
+          "networkLocation": "/default-rack",
+          "networkFullPath": "/default-rack/adc72ef9-0850-49d7-935d-e5a4e0d5be3c",
+          "numOfLeaves": 1,
+          "networkNameAsByteString": {
+            "string": "adc72ef9-0850-49d7-935d-e5a4e0d5be3c",
+            "bytes": {
+              "validUtf8": true,
+              "empty": false
+            }
+          },
+          "networkLocationAsByteString": {
+            "string": "/default-rack",
+            "bytes": {
+              "validUtf8": true,
+              "empty": false
+            }
+          }
+        },
+        "metrics": {
+          "decommissionStartTime": "23/05/2024 07:28:35 UTC",
+          "numOfUnclosedPipelines": 2,
+          "numOfUnderReplicatedContainers": 0.0,
+          "numOfUnclosedContainers": 0.0
+        },
+        "containers": {
+          "UnderReplicated": [],
+          "UnClosed": [
+            "#6",
+            "#10",
+            "#17"
+          ]
+        }
+      }
+    ]
+  },
   "datanodesRemove": {
     "selectedRowKeys": [
       "b5907812-a5f2-11ea-bb37-0242ac130011"
     ]
+  },
+  "utilization": {
+    "globalStorage": {
+        "totalUsedSpace": 30679040,
+        "totalFreeSpace": 539776978944,
+        "totalCapacity": 879519597390
+    },
+    "globalNamespace": {
+        "totalUsedSpace": 12349932,
+        "totalKeys": 1576
+    },
+    "usedSpaceBreakdown": {
+        "openKeyBytes": 19255266,
+        "committedKeyBytes": 1249923,
+        "preAllocatedContainerBytes": 1022024
+    },
+    "dataNodeUsage": [
+        {
+            "datanodeUuid": "1bf314dc-3eba-4774-9dbc-6d957cc7670b",
+            "hostName": "ozone-datanode-7.ozone_default",
+            "capacity": 125645656770,
+            "used": 4382720,
+            "remaining": 77110996992,
+            "committed": 0,
+            "minimumFreeSpace": 104857600,
+            "reserved": 12565822
+        },
+        {
+            "datanodeUuid": "8adead67-85a6-4ba9-942f-cd313f1472f9",
+            "hostName": "ozone-datanode-6.ozone_default",
+            "capacity": 125645656770,
+            "used": 4382720,
+            "remaining": 77110996992,
+            "committed": 0,
+            "minimumFreeSpace": 104857600,
+            "reserved": 12565822
+        },
+        {
+            "datanodeUuid": "953b91f4-c03a-45d8-9fbe-142887531cb1",
+            "hostName": "ozone-datanode-5.ozone_default",
+            "capacity": 125645656770,
+            "used": 4382720,
+            "remaining": 77110996992,
+            "committed": 0,
+            "minimumFreeSpace": 104857600,
+            "reserved": 12565822
+        },
+        {
+            "datanodeUuid": "44617070-a300-48af-a0e3-117167b008b6",
+            "hostName": "ozone-datanode-2.ozone_default",
+            "capacity": 125645656770,
+            "used": 4382720,
+            "remaining": 77110996992,
+            "committed": 0,
+            "minimumFreeSpace": 104857600,
+            "reserved": 12565822
+        },
+        {
+            "datanodeUuid": "d3ade292-6ec1-47b2-bd9e-045c1acc2c29",
+            "hostName": "ozone-datanode-1.ozone_default",
+            "capacity": 125645656770,
+            "used": 4382720,
+            "remaining": 77110996992,
+            "committed": 0,
+            "minimumFreeSpace": 104857600,
+            "reserved": 12565822
+        },
+        {
+            "datanodeUuid": "149a1640-e600-4e98-b62d-397804059f0e",
+            "hostName": "ozone-datanode-3.ozone_default",
+            "capacity": 125645656770,
+            "used": 4382720,
+            "remaining": 77110996992,
+            "committed": 0,
+            "minimumFreeSpace": 104857600,
+            "reserved": 12565822
+        },
+        {
+            "datanodeUuid": "17e2562a-dae8-416f-a749-7d4e8a0a781e",
+            "hostName": "ozone-datanode-4.ozone_default",
+            "capacity": 125645656770,
+            "used": 4382720,
+            "remaining": 77110996992,
+            "committed": 0,
+            "minimumFreeSpace": 104857600,
+            "reserved": 12565822
+        }
+    ]
+  },
+  "pendingDeletionDN": {
+    "status": "FINISHED",
+    "totalPendingDeletionSize": 12203,
+    "pendingDeletionPerDataNode": [
+      {
+        "hostName": "ozone-datanode-5.ozone_default",
+        "datanodeUuid": "953b91f4-c03a-45d8-9fbe-142887531cb1",
+        "pendingBlockSize": 1200
+      },
+      {
+        "hostName": "ozone-datanode-3.ozone_default",
+        "datanodeUuid": "149a1640-e600-4e98-b62d-397804059f0e",
+        "pendingBlockSize": 803
+      },
+      {
+        "hostName": "ozone-datanode-4.ozone_default",
+        "datanodeUuid": "17e2562a-dae8-416f-a749-7d4e8a0a781e",
+        "pendingBlockSize": -1
+      },
+      {
+        "hostName": "ozone-datanode-7.ozone_default",
+        "datanodeUuid": "1bf314dc-3eba-4774-9dbc-6d957cc7670b",
+        "pendingBlockSize": 2200
+      },
+      {
+        "hostName": "ozone-datanode-1.ozone_default",
+        "datanodeUuid": "d3ade292-6ec1-47b2-bd9e-045c1acc2c29",
+        "pendingBlockSize": -1
+      },
+      {
+        "hostName": "ozone-datanode-2.ozone_default",
+        "datanodeUuid": "44617070-a300-48af-a0e3-117167b008b6",
+        "pendingBlockSize": 300
+      },
+      {
+        "hostName": "ozone-datanode-6.ozone_default",
+        "datanodeUuid": "8adead67-85a6-4ba9-942f-cd313f1472f9",
+        "pendingBlockSize": 2730
+      }
+    ],
+    "totalNodesQueried": 7,
+    "totalNodeQueriesFailed": 2
+  },
+  "pendingDeletionOM": {
+    "totalSize": 240430,
+    "pendingDirectorySize": 120040,
+    "pendingKeySize": 120390
+  },
+  "pendingDeletionSCM": {
+    "totalBlocksize": 24030,
+    "totalReplicatedBlockSize": 120040,
+    "totalBlocksCount": 120390
   }
 }

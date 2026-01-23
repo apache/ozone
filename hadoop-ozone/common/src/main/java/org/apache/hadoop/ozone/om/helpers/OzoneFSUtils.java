@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,23 +14,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.helpers;
 
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.util.Time;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 
 import jakarta.annotation.Nonnull;
 import java.nio.file.Paths;
 import java.util.UUID;
-
-import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.util.StringUtils;
+import org.apache.hadoop.util.Time;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Utility class for OzoneFileSystem.
  */
 public final class OzoneFSUtils {
+  static final Logger LOG = LoggerFactory.getLogger(OzoneFSUtils.class);
 
   private OzoneFSUtils() { }
 
@@ -197,7 +201,6 @@ public final class OzoneFSUtils {
     return childParent == parentParent;
   }
 
-
   /**
    * Verifies whether the childKey is an immediate path under the given
    * parentKey.
@@ -291,5 +294,32 @@ public final class OzoneFSUtils {
       res = res.getParent();
     }
     return res;
+  }
+
+  /**
+   * Helper method to return whether Hsync can be enabled.
+   * And print warning when the config is ignored.
+   */
+  public static boolean canEnableHsync(ConfigurationSource conf, boolean isClient) {
+    final String confKey = isClient ?
+        "ozone.client.hbase.enhancements.allowed" :
+        OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED;
+
+    boolean confHBaseEnhancementsAllowed = conf.getBoolean(
+        confKey, OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED_DEFAULT);
+
+    boolean confHsyncEnabled = conf.getBoolean(
+        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED_DEFAULT);
+
+    if (confHBaseEnhancementsAllowed) {
+      return confHsyncEnabled;
+    } else {
+      if (confHsyncEnabled) {
+        LOG.debug("Ignoring {} = {} because HBase enhancements are disallowed. To enable it, set {} = true as well.",
+            OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true,
+            confKey);
+      }
+      return false;
+    }
   }
 }

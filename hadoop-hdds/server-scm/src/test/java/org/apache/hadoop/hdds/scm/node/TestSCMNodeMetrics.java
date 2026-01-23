@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,10 +17,18 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
+import static java.lang.Thread.sleep;
+import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
+import static org.apache.ozone.test.MetricsAsserts.assertGauge;
+import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.UUID;
-
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -39,15 +46,6 @@ import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-
-import static java.lang.Thread.sleep;
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
-import static org.apache.ozone.test.MetricsAsserts.assertGauge;
-import static org.apache.ozone.test.MetricsAsserts.getLongCounter;
-import static org.apache.ozone.test.MetricsAsserts.getMetrics;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 /**
  * Test cases to verify the metrics exposed by SCMNodeManager.
@@ -123,7 +121,7 @@ public class TestSCMNodeMetrics {
     long nrProcessed = getCounter("NumNodeReportProcessed");
 
     StorageReportProto storageReport =
-        HddsTestUtils.createStorageReport(registeredDatanode.getUuid(), "/tmp",
+        HddsTestUtils.createStorageReport(registeredDatanode.getID(), "/tmp",
             100, 10, 90, null);
     NodeReportProto nodeReport = NodeReportProto.newBuilder()
         .addStorageReport(storageReport).build();
@@ -144,7 +142,7 @@ public class TestSCMNodeMetrics {
         MockDatanodeDetails.randomDatanodeDetails();
 
     StorageReportProto storageReport = HddsTestUtils.createStorageReport(
-        randomDatanode.getUuid(), "/tmp", 100, 10, 90, null);
+        randomDatanode.getID(), "/tmp", 100, 10, 90, null);
 
     NodeReportProto nodeReport = NodeReportProto.newBuilder()
         .addStorageReport(storageReport).build();
@@ -162,7 +160,7 @@ public class TestSCMNodeMetrics {
   public void testNodeCountAndInfoMetricsReported() throws Exception {
 
     StorageReportProto storageReport = HddsTestUtils.createStorageReport(
-        registeredDatanode.getUuid(), "/tmp", 100, 10, 90, null);
+        registeredDatanode.getID(), "/tmp", 100, 10, 90, null);
     NodeReportProto nodeReport = NodeReportProto.newBuilder()
         .addStorageReport(storageReport).build();
 
@@ -227,6 +225,9 @@ public class TestSCMNodeMetrics {
     assertGauge("DecommissionedSSDRemaining", 0L,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
     assertGauge("AllNodes", 1,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    // The DN has no metadata volumes, so hasEnoughSpace() returns false indicating the DN is out of space.
+    assertGauge("NonWritableNodes", 1,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
     assertGauge("TotalCapacity", 100L,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));

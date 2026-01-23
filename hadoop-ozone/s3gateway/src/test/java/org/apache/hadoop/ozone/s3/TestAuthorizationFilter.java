@@ -1,27 +1,40 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.s3;
 
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.container.ContainerRequestContext;
-import javax.ws.rs.core.MultivaluedHashMap;
-import javax.ws.rs.core.MultivaluedMap;
-import javax.ws.rs.core.UriInfo;
+import static java.net.HttpURLConnection.HTTP_BAD_REQUEST;
+import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
+import static org.apache.hadoop.ozone.s3.signature.AWSSignatureProcessor.DATE_FORMATTER;
+import static org.apache.hadoop.ozone.s3.signature.SignatureParser.AUTHORIZATION_HEADER;
+import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.CONTENT_MD5;
+import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.CONTENT_TYPE;
+import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.HOST_HEADER;
+import static org.apache.hadoop.ozone.s3.signature.StringToSignProducer.X_AMAZ_DATE;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
@@ -29,31 +42,15 @@ import java.security.MessageDigest;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.stream.Stream;
-
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.container.ContainerRequestContext;
+import javax.ws.rs.core.MultivaluedHashMap;
+import javax.ws.rs.core.MultivaluedMap;
+import javax.ws.rs.core.UriInfo;
 import org.apache.hadoop.ozone.s3.signature.AWSSignatureProcessor;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.apache.hadoop.ozone.s3.signature.StringToSignProducer;
 import org.apache.kerby.util.Hex;
-
-import static java.net.HttpURLConnection.HTTP_BAD_REQUEST;
-import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
-
-import static org.apache.hadoop.ozone.s3.signature.AWSSignatureProcessor.DATE_FORMATTER;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.MALFORMED_HEADER;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
-import static org.apache.hadoop.ozone.s3.signature.SignatureParser.AUTHORIZATION_HEADER;
-import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.CONTENT_MD5;
-import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.CONTENT_TYPE;
-import static org.apache.hadoop.ozone.s3.signature.SignatureProcessor.HOST_HEADER;
-import static org.apache.hadoop.ozone.s3.signature.StringToSignProducer.X_AMAZ_DATE;
-import static org.apache.hadoop.ozone.s3.signature.StringToSignProducer.X_AMZ_CONTENT_SHA256;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.params.provider.Arguments.arguments;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -64,10 +61,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 public class TestAuthorizationFilter {
 
   private AuthorizationFilter authorizationFilter = new AuthorizationFilter();
-
-  private MultivaluedMap<String, String> headerMap;
-  private MultivaluedMap<String, String> queryMap;
-  private MultivaluedMap<String, String> pathParamsMap;
 
   private static final String DATETIME = StringToSignProducer.TIME_FORMATTER.
       format(LocalDateTime.now());
@@ -207,28 +200,6 @@ public class TestAuthorizationFilter {
             DATETIME,
             "",
             "/key1"
-        ),
-        // S3 secret generation endpoint
-        arguments(
-            "POST",
-            null,
-            null,
-            "s3g:9878",
-            null,
-            null,
-            "",
-            "/secret/generate"
-        ),
-        // S3 secret generation endpoint
-        arguments(
-            "POST",
-            null,
-            null,
-            "s3g:9878",
-            null,
-            null,
-            "",
-            "/secret/revoke"
         )
     );
   }
@@ -292,9 +263,9 @@ public class TestAuthorizationFilter {
       String method, String authHeader, String contentMd5,
       String host, String amzContentSha256, String date, String contentType,
       String path) throws URISyntaxException {
-    headerMap = new MultivaluedHashMap<>();
-    queryMap = new MultivaluedHashMap<>();
-    pathParamsMap = new MultivaluedHashMap<>();
+    MultivaluedMap<String, String> headerMap = new MultivaluedHashMap<>();
+    MultivaluedMap<String, String> queryMap = new MultivaluedHashMap<>();
+    MultivaluedMap<String, String> pathParamsMap = new MultivaluedHashMap<>();
 
     System.err.println("Testing: " + authHeader);
     headerMap.putSingle(AUTHORIZATION_HEADER, authHeader);

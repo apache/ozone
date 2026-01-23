@@ -40,10 +40,6 @@
     <value>/tmp/metadata</value>
   </property>
   <property>
-    <name>ozone.scm.ratis.enable</name>
-    <value>true</value>
-  </property>
-  <property>
     <name>ozone.scm.service.ids</name>
     <value>scm-group</value>
   </property>

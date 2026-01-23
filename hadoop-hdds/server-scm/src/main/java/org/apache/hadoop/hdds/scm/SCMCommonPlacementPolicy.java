@@ -1,43 +1,26 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm;
-
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
-import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
-import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.net.NetworkTopology;
-import org.apache.hadoop.hdds.scm.net.Node;
-import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
-import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.node.NodeStatus;
-import org.apache.hadoop.ozone.container.common.volume.VolumeUsage;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -51,6 +34,22 @@ import java.util.Random;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.MetadataStorageReportProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
+import org.apache.hadoop.hdds.scm.net.Node;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
+import org.apache.hadoop.ozone.container.common.volume.VolumeUsage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This policy implements a set of invariants which are common
@@ -158,8 +157,7 @@ public abstract class SCMCommonPlacementPolicy implements
     }
     for (int i = 0; i < dns.size(); i++) {
       DatanodeDetails node = dns.get(i);
-      DatanodeDetails datanodeDetails =
-          nodeManager.getNodeByUuid(node.getUuid());
+      final DatanodeDetails datanodeDetails = nodeManager.getNode(node.getID());
       if (datanodeDetails != null) {
         dns.set(i, datanodeDetails);
       }
@@ -237,7 +235,7 @@ public abstract class SCMCommonPlacementPolicy implements
       healthyNodes.removeAll(usedNodes);
     }
     String msg;
-    if (healthyNodes.size() == 0) {
+    if (healthyNodes.isEmpty()) {
       msg = "No healthy node found to allocate container.";
       LOG.error(msg);
       throw new SCMException(msg, SCMException.ResultCodes
@@ -275,7 +273,7 @@ public abstract class SCMCommonPlacementPolicy implements
       int nodesRequired, long metadataSizeRequired, long dataSizeRequired)
       throws SCMException {
     List<DatanodeDetails> nodesWithSpace = nodes.stream().filter(d ->
-        hasEnoughSpace(d, metadataSizeRequired, dataSizeRequired, conf))
+        hasEnoughSpace(d, metadataSizeRequired, dataSizeRequired))
         .collect(Collectors.toList());
 
     if (nodesWithSpace.size() < nodesRequired) {
@@ -300,8 +298,7 @@ public abstract class SCMCommonPlacementPolicy implements
    */
   public static boolean hasEnoughSpace(DatanodeDetails datanodeDetails,
                                        long metadataSizeRequired,
-                                       long dataSizeRequired,
-                                       ConfigurationSource conf) {
+                                       long dataSizeRequired) {
     Preconditions.checkArgument(datanodeDetails instanceof DatanodeInfo);
 
     boolean enoughForData = false;
@@ -311,9 +308,7 @@ public abstract class SCMCommonPlacementPolicy implements
 
     if (dataSizeRequired > 0) {
       for (StorageReportProto reportProto : datanodeInfo.getStorageReports()) {
-        if (VolumeUsage.hasVolumeEnoughSpace(reportProto.getRemaining(),
-              reportProto.getCommitted(), dataSizeRequired,
-              reportProto.getFreeSpaceToSpare())) {
+        if (VolumeUsage.getUsableSpace(reportProto) > dataSizeRequired) {
           enoughForData = true;
           break;
         }
@@ -442,7 +437,7 @@ public abstract class SCMCommonPlacementPolicy implements
     // We have a network topology so calculate if it is satisfied or not.
     int requiredRacks = getRequiredRackCount(replicas, 0);
     if (topology == null || replicas == 1 || requiredRacks == 1) {
-      if (dns.size() > 0) {
+      if (!dns.isEmpty()) {
         // placement is always satisfied if there is at least one DN.
         return validPlacement;
       } else {
@@ -450,7 +445,27 @@ public abstract class SCMCommonPlacementPolicy implements
       }
     }
     List<Integer> currentRackCount = new ArrayList<>(dns.stream()
-        .map(this::getPlacementGroup)
+        .map(dn -> {
+          Node rack = getPlacementGroup(dn);
+          if (rack == null) {
+            try {
+              NodeStatus nodeStatus = nodeManager.getNodeStatus(dn);
+              if (nodeStatus.isDead() && nodeStatus.isMaintenance()) {
+                LOG.debug("Using rack [{}] for dead and in-maintenance dn {}.", dn.getNetworkLocation(), dn);
+                return dn.getNetworkLocation();
+              }
+              return null;
+            } catch (NodeNotFoundException e) {
+              LOG.debug("Could not get NodeStatus for dn {}.", dn, e);
+              return null;
+            }
+          }
+          /*
+          data-centre/rack1/dn1. Here, data-centre/rack1 is the network location of dn1 and data-centre/rack1 is also
+          the network full path of rack1.
+          */
+          return rack.getNetworkFullPath();
+        })
         .filter(Objects::nonNull)
         .collect(Collectors.groupingBy(
             Function.identity(),
@@ -500,16 +515,14 @@ public abstract class SCMCommonPlacementPolicy implements
   public boolean isValidNode(DatanodeDetails datanodeDetails,
       long metadataSizeRequired, long dataSizeRequired) {
     DatanodeInfo datanodeInfo = (DatanodeInfo)getNodeManager()
-        .getNodeByUuid(datanodeDetails.getUuid());
+        .getNode(datanodeDetails.getID());
     if (datanodeInfo == null) {
       LOG.error("Failed to find the DatanodeInfo for datanode {}",
           datanodeDetails);
       return false;
     }
     NodeStatus nodeStatus = datanodeInfo.getNodeStatus();
-    if (nodeStatus.isNodeWritable() &&
-        (hasEnoughSpace(datanodeInfo, metadataSizeRequired,
-            dataSizeRequired, conf))) {
+    if (nodeStatus.isNodeWritable() && (hasEnoughSpace(datanodeInfo, metadataSizeRequired, dataSizeRequired))) {
       LOG.debug("Datanode {} is chosen. Required metadata size is {} and " +
               "required data size is {} and NodeStatus is {}",
           datanodeDetails, metadataSizeRequired, dataSizeRequired, nodeStatus);
@@ -525,7 +538,7 @@ public abstract class SCMCommonPlacementPolicy implements
    * Given a set of replicas of a container which are
    * neither over underreplicated nor overreplicated,
    * return a set of replicas to copy to another node to fix misreplication.
-   * @param replicas: Map of replicas with value signifying if
+   * @param replicas Map of replicas with value signifying if
    *                  replica can be copied
    */
   @Override
@@ -558,7 +571,7 @@ public abstract class SCMCommonPlacementPolicy implements
                 .limit(numberOfReplicasToBeCopied)
                 .collect(Collectors.toList());
         if (numberOfReplicasToBeCopied > replicasToBeCopied.size()) {
-          Node rack = replicaList.size() > 0 ? this.getPlacementGroup(
+          Node rack = !replicaList.isEmpty() ? this.getPlacementGroup(
                   replicaList.get(0).getDatanodeDetails()) : null;
           LOG.warn("Not enough copyable replicas available in rack {}. " +
                   "Required number of Replicas to be copied: {}." +
@@ -582,7 +595,7 @@ public abstract class SCMCommonPlacementPolicy implements
    * replication is computed.
    * The algorithm starts with creating a replicaIdMap which contains the
    * replicas grouped by replica Index. A placementGroup Map is created which
-   * groups replicas based on their rack & the replicas within the rack
+   * groups replicas based on their rack and the replicas within the rack
    * are further grouped based on the replica Index.
    * A placement Group Count Map is created which keeps
    * track of the count of replicas in each rack.
@@ -590,13 +603,13 @@ public abstract class SCMCommonPlacementPolicy implements
    * order based on their current replication factor in a descending factor.
    * For each replica Index the replica is removed from the rack which contains
    * the most replicas, in order to achieve this the racks are put
-   * into priority queue & are based on the number of replicas they have.
-   * The replica is removed from the rack with maximum replicas & the replica
-   * to be removed is also removed from the maps created above &
+   * into priority queue and are based on the number of replicas they have.
+   * The replica is removed from the rack with maximum replicas and the replica
+   * to be removed is also removed from the maps created above and
    * the count for rack is reduced.
    * The set of replicas computed are then returned by the function.
-   * @param replicas: Set of existing replicas of the container
-   * @param expectedCountPerUniqueReplica: Replication factor of each
+   * @param replicas Set of existing replicas of the container
+   * @param expectedCountPerUniqueReplica Replication factor of each
    *    *                                     unique replica
    * @return Set of replicas to be removed are computed.
    */
@@ -643,14 +656,14 @@ public abstract class SCMCommonPlacementPolicy implements
         Node rack = pq.poll();
         Set<ContainerReplica> replicaSet =
                 placementGroupReplicaIdMap.get(rack).get(rid);
-        if (replicaSet.size() > 0) {
+        if (!replicaSet.isEmpty()) {
           ContainerReplica r = replicaSet.stream().findFirst().get();
           replicasToRemove.add(r);
           replicaSet.remove(r);
           replicaIdMap.get(rid).remove(r);
           placementGroupCntMap.compute(rack,
                   (group, cnt) -> (cnt == null ? 0 : cnt) - 1);
-          if (replicaSet.size() == 0) {
+          if (replicaSet.isEmpty()) {
             placementGroupReplicaIdMap.get(rack).remove(rid);
           } else {
             pq.add(rack);

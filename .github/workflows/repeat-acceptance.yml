@@ -48,10 +48,11 @@ env:
   OZONE_TEST_SELECTOR: ${{ github.event.inputs.test-filter }}
   FAIL_FAST: ${{ github.event.inputs.fail-fast }}
   JAVA_VERSION: 8
+  SPLITS: ${{ github.event.inputs.splits }}
 run-name: ${{ github.event_name == 'workflow_dispatch' && format('{0}[{1}]-{2}', inputs.test-suite || inputs.test-filter, inputs.ref, inputs.splits) || '' }}
 jobs:
   prepare-job:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     outputs:
       matrix: ${{steps.generate.outputs.matrix}}
     steps:
@@ -67,7 +68,7 @@ jobs:
         name: Generate test matrix
         run: |
           splits=()
-          for ((i = 1; i <= ${{ github.event.inputs.splits }}; i++)); do
+          for ((i = 1; i <= $SPLITS; i++)); do
               splits+=("$i")
           done
           printf -v x "%s," "${splits[@]}"
@@ -76,7 +77,7 @@ jobs:
   build:
     needs:
       - prepare-job
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     steps:
       - name: Checkout project
@@ -108,9 +109,9 @@ jobs:
           distribution: 'temurin'
           java-version: ${{ env.JAVA_VERSION }}
       - name: Run a full build
-        run: hadoop-ozone/dev-support/checks/build.sh -Pdist -Psrc
+        run: hadoop-ozone/dev-support/checks/build.sh -Pdist -Psrc -Dmaven.javadoc.skip=true
         env:
-          DEVELOCITY_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
       - name: Store binaries for tests
         uses: actions/upload-artifact@v4
         with:
@@ -124,7 +125,7 @@ jobs:
       - prepare-job
       - build
     name: Run-Split
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         split: ${{ fromJson(needs.prepare-job.outputs.matrix) }}
@@ -145,13 +146,9 @@ jobs:
           sudo chmod -R a+rwX hadoop-ozone/dist/target
       - name: Execute tests
         run: |
-          pushd hadoop-ozone/dist/target/ozone-*
-          sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
-          popd
           ./hadoop-ozone/dev-support/checks/acceptance.sh
         env:
           KEEP_IMAGE: false
-          OZONE_VOLUME_OWNER: 1000
         continue-on-error: true
       - name: Summary of failures
         run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt

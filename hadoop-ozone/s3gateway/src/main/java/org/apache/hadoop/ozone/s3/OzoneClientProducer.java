@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,18 +14,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.s3;
 
+import java.io.IOException;
 import javax.annotation.PreDestroy;
 import javax.enterprise.context.RequestScoped;
 import javax.enterprise.inject.Produces;
 import javax.inject.Inject;
-import javax.ws.rs.WebApplicationException;
-import javax.ws.rs.container.ContainerRequestContext;
-import javax.ws.rs.core.Context;
-import java.io.IOException;
-
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,42 +38,17 @@ public class OzoneClientProducer {
   private OzoneClient client;
 
   @Inject
-  private OzoneConfiguration ozoneConfiguration;
-
-  @Context
-  private ContainerRequestContext context;
+  private OzoneClientCache clientCache;
 
   @Produces
-  public synchronized OzoneClient createClient() throws WebApplicationException,
-      IOException {
-    ozoneConfiguration.set("ozone.om.group.rights", "NONE");
-    client = getClient(ozoneConfiguration);
+  public OzoneClient createClient() {
+    client = clientCache.getClient();
     return client;
   }
 
   @PreDestroy
   public void destroy() throws IOException {
+    LOG.debug("{}: Clearing thread-local auth", this);
     client.getObjectStore().getClientProxy().clearThreadLocalS3Auth();
-  }
-
-  private OzoneClient getClient(OzoneConfiguration config)
-      throws IOException {
-    OzoneClient ozoneClient = null;
-    try {
-      ozoneClient =
-          OzoneClientCache.getOzoneClientInstance(ozoneConfiguration);
-    } catch (Exception e) {
-      // For any other critical errors during object creation throw Internal
-      // error.
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Error during Client Creation: ", e);
-      }
-      throw e;
-    }
-    return ozoneClient;
-  }
-
-  public synchronized void setOzoneConfiguration(OzoneConfiguration config) {
-    this.ozoneConfiguration = config;
   }
 }

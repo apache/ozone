@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,14 +17,10 @@
 
 package org.apache.hadoop.hdds.utils;
 
-import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.HddsUtils;
-import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
-import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.ratisSnapshotComplete;
+import static org.apache.hadoop.ozone.OzoneConsts.SNAPSHOT_CANDIDATE_DIR;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
@@ -33,9 +28,12 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-
-import static org.apache.hadoop.hdds.utils.HddsServerUtil.ratisSnapshotComplete;
-import static org.apache.hadoop.ozone.OzoneConsts.SNAPSHOT_CANDIDATE_DIR;
+import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The RocksDB specified snapshot provider.
@@ -110,25 +108,26 @@ public abstract class RDBSnapshotProvider implements Closeable {
     LOG.info("Prepare to download the snapshot from leader OM {} and " +
         "reloading state from the snapshot.", leaderNodeID);
     checkLeaderConsistency(leaderNodeID);
+    int numParts = 0;
 
     while (true) {
       String snapshotFileName = getSnapshotFileName(leaderNodeID);
       File targetFile = new File(snapshotDir, snapshotFileName);
       downloadSnapshot(leaderNodeID, targetFile);
-      LOG.info(
-          "Successfully download the latest snapshot {} from leader OM: {}",
-          targetFile, leaderNodeID);
+      LOG.info("Successfully download the latest snapshot {} from leader OM: {}, part : {}",
+          targetFile, leaderNodeID, numParts);
+      numParts++;
 
       numDownloaded.incrementAndGet();
       injectPause();
 
-      RocksDBCheckpoint checkpoint = getCheckpointFromSnapshotFile(targetFile,
+      Path unTarredDb = untarContentsOfTarball(targetFile,
           candidateDir, true);
       LOG.info("Successfully untar the downloaded snapshot {} at {}.",
-          targetFile, checkpoint.getCheckpointLocation());
-      if (ratisSnapshotComplete(checkpoint.getCheckpointLocation())) {
+          targetFile, unTarredDb.toAbsolutePath());
+      if (ratisSnapshotComplete(unTarredDb)) {
         LOG.info("Ratis snapshot transfer is complete.");
-        return checkpoint;
+        return getCheckpointFromUntarredDb(unTarredDb);
       }
     }
   }
@@ -155,7 +154,7 @@ public abstract class RDBSnapshotProvider implements Closeable {
       return;
     }
 
-    List<String> files = HAUtils.getExistingSstFiles(candidateDir);
+    List<String> files = HAUtils.getExistingFiles(candidateDir);
     if (!files.isEmpty()) {
       LOG.warn("Candidate DB directory {} is not empty when last leader is " +
           "null.", candidateDir);
@@ -176,15 +175,25 @@ public abstract class RDBSnapshotProvider implements Closeable {
   }
 
   /**
-   * Untar the downloaded snapshot and convert to {@link RocksDBCheckpoint}.
+   * convert untarredDbDir to to {@link RocksDBCheckpoint}.
    *
-   * @param snapshot the downloaded snapshot tar file
-   * @param untarDir the directory to place the untarred files
-   * @param deleteSnapshot whether to delete the downloaded snapshot tar file
    * @return {@link RocksDBCheckpoint}
    * @throws IOException
    */
-  public RocksDBCheckpoint getCheckpointFromSnapshotFile(File snapshot,
+  public DBCheckpoint getCheckpointFromUntarredDb(Path untarredDbDir) throws IOException {
+    return new RocksDBCheckpoint(untarredDbDir);
+  }
+
+  /**
+   *
+   * Untar the downloaded snapshot.
+   * @param snapshot the downloaded snapshot tar file
+   * @param untarDir the directory to place the untarred files
+   * @param deleteSnapshot whether to delete the downloaded snapshot tar file
+   * @return  path of untarred dbDir.
+   * @throws IOException
+   */
+  private Path untarContentsOfTarball(File snapshot,
       File untarDir, boolean deleteSnapshot) throws IOException {
     // Untar the checkpoint file.
     Path untarredDbDir = untarDir.toPath();
@@ -193,7 +202,7 @@ public abstract class RDBSnapshotProvider implements Closeable {
     if (deleteSnapshot) {
       FileUtil.fullyDelete(snapshot);
     }
-    return new RocksDBCheckpoint(untarredDbDir);
+    return untarredDbDir;
   }
 
   /**

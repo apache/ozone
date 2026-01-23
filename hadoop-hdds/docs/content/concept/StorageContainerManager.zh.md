@@ -81,6 +81,6 @@ SCM 负责创建 Ozone 集群。当通过 `init` 命令启动 SCM 时，SCM 将�
 ----|---------|------------
 ozone.scm.container.size | 5GB | Ozone 使用的默认容器的大小
 ozone.scm.block.size | 256MB |  数据块的默认大小
-hdds.scm.safemode.min.datanode | 1 | 能够启动实际工作所需的最小数据节点数
+hdds.scm.safemode.min.datanode | 3 | 能够启动实际工作所需的最小数据节点数
 ozone.scm.http-address | 0.0.0.0:9876 | SCM 服务端使用的 HTTP 地址
 ozone.metadata.dirs | none | 存储持久化数据的目录（RocksDB）

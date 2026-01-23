@@ -1,22 +1,36 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.keyvalue.impl;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMBINED_STAGE;
+import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.when;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -27,19 +41,7 @@ import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.junit.jupiter.api.Test;
-
-import java.io.File;
-import java.io.IOException;
-import java.nio.ByteBuffer;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE;
-import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMBINED_STAGE;
-import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.fail;
+import org.mockito.Mockito;
 
 /**
  * Common test cases for ChunkManager implementation tests.
@@ -66,7 +68,7 @@ public abstract class CommonChunkManagerTestCases extends AbstractTestChunkManag
     ChunkManager chunkManager = createTestSubject();
     KeyValueContainer container = getKeyValueContainer();
     int tooLarge = OZONE_SCM_CHUNK_MAX_SIZE + 1;
-    byte[] array = RandomStringUtils.randomAscii(tooLarge).getBytes(UTF_8);
+    byte[] array = RandomStringUtils.secure().nextAscii(tooLarge).getBytes(UTF_8);
     assertThat(array.length).isGreaterThanOrEqualTo(tooLarge);
 
     BlockID blockID = getBlockID();
@@ -220,6 +222,28 @@ public abstract class CommonChunkManagerTestCases extends AbstractTestChunkManag
 
     // THEN
     checkReadIOStats(len * count, count);
+  }
+
+  @Test
+  public void testFinishWrite() throws Exception {
+    // GIVEN
+    ChunkManager chunkManager = createTestSubject();
+    checkChunkFileCount(0);
+    checkWriteIOStats(0, 0);
+
+    chunkManager.writeChunk(getKeyValueContainer(), getBlockID(),
+        getChunkInfo(), getData(),
+        WRITE_STAGE);
+
+    BlockData blockData = Mockito.mock(BlockData.class);
+    when(blockData.getBlockID()).thenReturn(getBlockID());
+
+    chunkManager.finishWriteChunks(getKeyValueContainer(), blockData);
+    assertTrue(checkChunkFilesClosed());
+
+    // THEN
+    checkChunkFileCount(1);
+    checkWriteIOStats(getChunkInfo().getLen(), 1);
   }
 
 }

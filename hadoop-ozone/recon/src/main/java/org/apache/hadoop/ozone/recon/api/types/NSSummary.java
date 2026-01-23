@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,51 +17,69 @@
 
 package org.apache.hadoop.ozone.recon.api.types;
 
-import org.apache.hadoop.ozone.recon.ReconConstants;
-
-import java.util.Set;
-import java.util.HashSet;
-import java.util.Arrays;
-
 import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.removeTrailingSlashIfNeeded;
+
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+import org.apache.hadoop.ozone.recon.ReconConstants;
 
 /**
  * Class to encapsulate namespace metadata summaries from OM.
+ * 
+ * IMPORTANT: As of the materialized optimization, sizeOfFiles and numOfFiles 
+ * now represent TOTAL values (including this directory and ALL subdirectories)
+ * rather than just direct files in this directory, for O(1) disk usage queries.
  */
 
 public class NSSummary {
+  // IMPORTANT: These fields now contain TOTAL values (this directory + all subdirectories)
+  // for performance optimization, not just direct files in this directory
   private int numOfFiles;
   private long sizeOfFiles;
+  private long replicatedSizeOfFiles;
   private int[] fileSizeBucket;
   private Set<Long> childDir;
   private String dirName;
   private long parentId = 0;
 
   public NSSummary() {
-    this(0, 0L, new int[ReconConstants.NUM_OF_FILE_SIZE_BINS],
+    this(0, 0L, 0L, new int[ReconConstants.NUM_OF_FILE_SIZE_BINS],
         new HashSet<>(), "", 0);
   }
 
   public NSSummary(int numOfFiles,
                    long sizeOfFiles,
+                   long replicatedSizeOfFiles,
                    int[] bucket,
                    Set<Long> childDir,
                    String dirName,
                    long parentId) {
     this.numOfFiles = numOfFiles;
     this.sizeOfFiles = sizeOfFiles;
+    this.replicatedSizeOfFiles = replicatedSizeOfFiles;
     setFileSizeBucket(bucket);
     this.childDir = childDir;
     this.dirName = dirName;
     this.parentId = parentId;
   }
 
+  /**
+   * @return Total number of files in this directory and ALL subdirectories
+   */
   public int getNumOfFiles() {
     return numOfFiles;
   }
 
+  /**
+   * @return Total size of files in this directory and ALL subdirectories
+   */
   public long getSizeOfFiles() {
     return sizeOfFiles;
+  }
+
+  public long getReplicatedSizeOfFiles() {
+    return replicatedSizeOfFiles;
   }
 
   public int[] getFileSizeBucket() {
@@ -77,12 +94,22 @@ public class NSSummary {
     return dirName;
   }
 
+  /**
+   * @param numOfFiles Total number of files in this directory and ALL subdirectories
+   */
   public void setNumOfFiles(int numOfFiles) {
     this.numOfFiles = numOfFiles;
   }
 
+  /**
+   * @param sizeOfFiles Total size of files in this directory and ALL subdirectories
+   */
   public void setSizeOfFiles(long sizeOfFiles) {
     this.sizeOfFiles = sizeOfFiles;
+  }
+
+  public void setReplicatedSizeOfFiles(long replicatedSizeOfFiles) {
+    this.replicatedSizeOfFiles = replicatedSizeOfFiles;
   }
 
   public void setFileSizeBucket(int[] fileSizeBucket) {
@@ -117,5 +144,17 @@ public class NSSummary {
 
   public void setParentId(long parentId) {
     this.parentId = parentId;
+  }
+
+  @Override
+  public String toString() {
+    return "NSSummary{dirName='" + dirName + '\'' +
+        ", parentId=" + parentId +
+        ", childDir=" + childDir +
+        ", numOfFiles=" + numOfFiles +
+        ", sizeOfFiles=" + sizeOfFiles +
+        ", replicatedSizeOfFiles=" + replicatedSizeOfFiles +
+        ", fileSizeBucket=" + Arrays.toString(fileSizeBucket) +
+        '}';
   }
 }

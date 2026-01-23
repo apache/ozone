@@ -1,0 +1,297 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This reusable workflow executes a single check from `hadoop-ozone/dev-support/checks/`.
+# Before and after the check, it performs various steps based on workflow inputs.
+
+name: ci-check
+
+on:
+  workflow_call:
+    inputs:
+      # REQUIRED
+      script:
+        type: string
+        description: "Test script to run from hadoop-ozone/dev-support/checks, without .sh extension"
+        required: true
+
+      sha:
+        type: string
+        description: "Commit SHA to test"
+        required: true
+
+      # OPTIONAL (ordered alphabetically)
+      checkout-fetch-depth:
+        type: number
+        description: "Fetch depth for checking out the repo (default: no history)"
+        default: 1
+        required: false
+
+      java-version:
+        type: string
+        description: "Java version to set up (default: none)"
+        default: ''
+        required: false
+
+      needs-maven-cache:
+        type: boolean
+        description: "Whether to restore Maven cache before run (default: yes)"
+        default: true
+        required: false
+
+      needs-npm-cache:
+        type: boolean
+        description: "Whether to restore NPM cache before run (default: no)"
+        default: false
+        required: false
+
+      needs-ozone-binary-tarball:
+        type: boolean
+        description: "Whether to download Ozone binary tarball created by build (default: no)"
+        default: false
+        required: false
+
+      needs-ozone-repo:
+        type: boolean
+        description: "Whether to download Ozone jars created by build (default: no)"
+        default: false
+        required: false
+
+      needs-ozone-source-tarball:
+        type: boolean
+        description: "Whether to download Ozone source tarball created by build (default: no)"
+        default: false
+        required: false
+
+      pre-script:
+        type: string
+        description: "Command to execute before the test script (default: none)"
+        default: ''
+        required: false
+
+      post-failure:
+        type: string
+        description: "Command to execute after the test script, if it failed (default: none)"
+        default: ''
+        required: false
+
+      post-success:
+        type: string
+        description: "Command to execute after the test script, if it succeeded (default: none)"
+        default: ''
+        required: false
+
+      ratis-args:
+        type: string
+        description: "Version overrides from custom Ratis build (default: none)"
+        default: ''
+        required: false
+
+      runner:
+        type: string
+        description: "GitHub Actions runner to use"
+        default: 'ubuntu-24.04'
+        required: false
+
+      script-args:
+        type: string
+        description: "Arguments for the test script, ratis-args are appended"
+        default: ''
+        required: false
+
+      split:
+        type: string
+        description: "Name of split for matrix jobs, only used in display name"
+        default: ''
+        required: false
+
+      timeout-minutes:
+        type: number
+        description: "Job timeout in minutes (default: 30)"
+        default: 30
+        required: false
+
+      with-coverage:
+        type: boolean
+        description: "The value of OZONE_WITH_COVERAGE to set"
+        default: true
+        required: false
+
+env:
+  HADOOP_IMAGE: ghcr.io/apache/hadoop
+  MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml
+  MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
+  OZONE_IMAGE: ghcr.io/apache/ozone
+  OZONE_RUNNER_IMAGE: ghcr.io/apache/ozone-runner
+  OZONE_VOLUME_OWNER: 1000
+  SCRIPT: ${{ inputs.script }}
+
+jobs:
+  check:
+    name: ${{ (inputs.split && format('{0} ({1})', inputs.script, inputs.split)) || inputs.script }}
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    steps:
+      - name: Checkout project
+        if: ${{ !inputs.needs-ozone-source-tarball }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
+          fetch-depth: ${{ inputs.checkout-fetch-depth }}
+
+      - name: Download Ozone source tarball
+        if: ${{ inputs.needs-ozone-source-tarball }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ozone-src
+
+      - name: Extract source tarball
+        if: ${{ inputs.needs-ozone-source-tarball }}
+        run: |
+          tar --strip-components 1 -xzvf ozone*-src.tar.gz
+
+      - name: Cache for NPM dependencies
+        if: ${{ inputs.needs-npm-cache }}
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pnpm-store
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
+      - name: Cache for Maven dependencies
+        if: ${{ inputs.needs-maven-cache }}
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.m2/repository/*/*/*
+            !~/.m2/repository/org/apache/ozone
+          key: maven-repo-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            maven-repo-
+
+      - name: Download Ozone repo
+        id: download-ozone-repo
+        if: ${{ inputs.needs-ozone-repo }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ozone-repo
+          path: |
+            ~/.m2/repository/org/apache/ozone
+
+      - name: Download Ratis repo
+        if: ${{ inputs.ratis-args != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ratis-jars
+          path: |
+            ~/.m2/repository/org/apache/ratis
+
+      - name: Download Ozone binary tarball
+        if: ${{ inputs.needs-ozone-binary-tarball }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ozone-bin
+
+      - name: Extract binary tarball
+        if: ${{ inputs.needs-ozone-binary-tarball }}
+        run: |
+          mkdir -p hadoop-ozone/dist/target
+          tar xzvf ozone*.tar.gz -C hadoop-ozone/dist/target
+          rm ozone*.tar.gz
+
+      - name: Setup java ${{ inputs.java-version }}
+        if: ${{ inputs.java-version }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ inputs.java-version }}
+
+      - name: Execute pre-test steps
+        if: ${{ inputs.pre-script }}
+        run: |
+          $COMMAND
+        env:
+          COMMAND: ${{ inputs.pre-script }}
+
+      - name: Execute tests
+        run: |
+          $COMMAND
+        env:
+          COMMAND: hadoop-ozone/dev-support/checks/${{ inputs.script }}.sh ${{ inputs.script-args }} ${{ inputs.ratis-args }}
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
+          OZONE_WITH_COVERAGE: ${{ inputs.with-coverage }}
+
+      - name: Execute post-failure steps
+        if: ${{ failure() && inputs.post-failure }}
+        run: |
+          $COMMAND
+        env:
+          COMMAND: ${{ inputs.post-failure }}
+
+      - name: Execute post-success steps
+        if: ${{ !failure() && inputs.post-success }}
+        run: |
+          $COMMAND
+        env:
+          COMMAND: ${{ inputs.post-success }}
+
+      - name: Summary of failures
+        if: ${{ failure() }}
+        run: |
+          if [[ -s "target/$SCRIPT/summary.md" ]]; then
+            cat target/$SCRIPT/summary.md >> $GITHUB_STEP_SUMMARY
+          fi
+          hadoop-ozone/dev-support/checks/_summary.sh target/$SCRIPT/summary.txt
+
+      - name: Archive build results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ (inputs.split && format('{0}-{1}', inputs.script, inputs.split)) || inputs.script }}
+          # please keep path as a single item; move to that directory all files needed in the artifact
+          path: target/${{ inputs.script }}
+        continue-on-error: true
+
+      # The following steps are hard-coded to be run only for 'build' check,
+      # to avoid the need for 3 more inputs.
+      - name: Store binaries for tests
+        if: ${{ inputs.script == 'build' && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ozone-bin
+          path: |
+            hadoop-ozone/dist/target/ozone-*.tar.gz
+            !hadoop-ozone/dist/target/ozone-*-src.tar.gz
+          retention-days: 1
+
+      - name: Store source tarball for compilation
+        if: ${{ inputs.script == 'build' && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ozone-src
+          path: |
+            hadoop-ozone/dist/target/ozone-*-src.tar.gz
+          retention-days: 1
+
+      - name: Store Maven repo for tests
+        if: ${{ inputs.script == 'build' && !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ozone-repo
+          path: |
+            ~/.m2/repository/org/apache/ozone
+          retention-days: 1

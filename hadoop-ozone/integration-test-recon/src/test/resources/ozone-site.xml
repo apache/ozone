@@ -1,0 +1,117 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<!--
+   Licensed to the Apache Software Foundation (ASF) under one or more
+   contributor license agreements.  See the NOTICE file distributed with
+   this work for additional information regarding copyright ownership.
+   The ASF licenses this file to You under the Apache License, Version 2.0
+   (the "License"); you may not use this file except in compliance with
+   the License.  You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+-->
+
+<configuration>
+  <property>
+    <name>ozone.om.transport.class</name>
+    <value>org.apache.hadoop.ozone.om.protocolPB.Hadoop3OmTransportFactory</value>
+  </property>
+  <property>
+    <name>ozone.om.s3.grpc.server_enabled</name>
+    <value>false</value>
+  </property>
+  <property>
+    <name>hdds.container.ratis.num.write.chunk.threads.per.volume</name>
+    <value>4</value>
+  </property>
+  <property>
+    <name>ozone.scm.handler.count.key</name>
+    <value>20</value>
+  </property>
+  <property>
+    <name>ozone.om.handler.count.key</name>
+    <value>20</value>
+  </property>
+  <property>
+    <name>hdds.container.ratis.datastream.enabled</name>
+    <value>true</value>
+  </property>
+  <property>
+    <name>hdds.heartbeat.interval</name>
+    <value>1s</value>
+  </property>
+  <property>
+    <name>ozone.scm.heartbeat.thread.interval</name>
+    <value>100ms</value>
+  </property>
+  <property>
+    <name>ozone.scm.ratis.pipeline.limit</name>
+    <value>3</value>
+  </property>
+  <property>
+    <name>ozone.scm.close.container.wait.duration</name>
+    <value>1s</value>
+  </property>
+  <property>
+    <name>ozone.om.snapshot.diff.job.default.wait.time</name>
+    <value>1s</value>
+  </property>
+  <property>
+    <name>hdds.container.ratis.log.appender.queue.byte-limit</name>
+    <value>32MB</value>
+  </property>
+  <property>
+    <name>ozone.om.ratis.log.appender.queue.byte-limit</name>
+    <value>4MB</value>
+  </property>
+  <property>
+    <name>ozone.scm.ha.ratis.log.appender.queue.byte-limit</name>
+    <value>4MB</value>
+  </property>
+  <property>
+    <name>ozone.scm.chunk.size</name>
+    <value>1MB</value>
+  </property>
+  <property>
+    <name>ozone.scm.block.size</name>
+    <value>4MB</value>
+  </property>
+  <property>
+    <name>ozone.scm.container.size</name>
+    <value>128MB</value>
+  </property>
+  <property>
+    <name>ozone.client.stream.buffer.flush.size</name>
+    <value>1MB</value>
+  </property>
+  <property>
+    <name>ozone.client.stream.buffer.max.size</name>
+    <value>2MB</value>
+  </property>
+  <property>
+    <name>ozone.client.stream.buffer.size</name>
+    <value>1MB</value>
+  </property>
+  <property>
+    <name>ozone.client.datastream.buffer.flush.size</name>
+    <value>4MB</value>
+  </property>
+  <property>
+    <name>ozone.client.datastream.min.packet.size</name>
+    <value>256KB</value>
+  </property>
+  <property>
+    <name>ozone.client.datastream.window.size</name>
+    <value>8MB</value>
+  </property>
+  <property>
+    <name>hdds.datanode.volume.min.free.space</name>
+    <value>5GB</value>
+  </property>
+</configuration>

@@ -17,9 +17,10 @@
  */
 
 import React from 'react';
-import {Table, Drawer, Tag} from 'antd';
-import {ACLIdentity, ACLIdentityTypeList, IAcl} from '../../types/om.types';
-import {aclRightColorMap, aclIdentityTypeColorMap} from '../../constants/aclDrawer.constants';
+import { Table, Drawer, Tag } from 'antd';
+
+import { ACLIdentity, ACLIdentityTypeList, IAcl } from '@/types/om.types';
+import { aclRightColorMap, aclIdentityTypeColorMap } from '@/constants/aclDrawer.constants';
 
 interface IAclDrawerProps extends RouteComponentProps<object> {
   visible: boolean;
@@ -29,11 +30,11 @@ interface IAclDrawerProps extends RouteComponentProps<object> {
 }
 
 export class AclPanel extends React.Component<IAclDrawerProps> {
-  state = {visible: false};
+  state = { visible: false };
 
   componentWillReceiveProps(props) {
-    const {visible} = props;
-    this.setState({visible});
+    const { visible } = props;
+    this.setState({ visible });
   }
 
   onClose = () => {
@@ -57,9 +58,9 @@ export class AclPanel extends React.Component<IAclDrawerProps> {
   }
 
   render() {
-    const {Column} = Table;
-    const {objName, objType, acls} = this.props;
-    const {visible} = this.state;
+    const { Column } = Table;
+    const { objName, objType, acls } = this.props;
+    const { visible } = this.state;
 
     return (
       <div className='site-drawer-render-in-current-wrapper'>
@@ -70,10 +71,13 @@ export class AclPanel extends React.Component<IAclDrawerProps> {
           closable={false}
           visible={visible}
           getContainer={false}
-          style={{position: 'absolute'}}
+          style={{ position: 'absolute' }}
           onClose={this.onClose}
         >
-          <Table dataSource={acls} rowKey='name' locale={{filterTitle: ""}}>
+          <Table
+            dataSource={acls}
+            rowKey={(record: IAcl) => `${record.name ?? ''}-${record.type ?? ''}-${record.scope ?? ''}`}
+            locale={{ filterTitle: "" }}>
             <Column
               key='name'
               title='Name'
@@ -85,13 +89,13 @@ export class AclPanel extends React.Component<IAclDrawerProps> {
               filterMultiple
               title='ACL Type'
               dataIndex='type'
-              filters={ACLIdentityTypeList.map(state => ({text: state, value: state}))}
+              filters={ACLIdentityTypeList.map(state => ({ text: state, value: state }))}
               sorter={(a: IAcl, b: IAcl) => a.type.localeCompare(b.type)}
               render={this.renderAclIdentityType}
               onFilter={(value: ACLIdentity, record: IAcl) => record.type === value}
             />
-            <Column key='scope' title='ACL Scope' dataIndex='scope'/>
-            <Column key='acls' title='ACLs' dataIndex='aclList' render={this.renderAclList}/>
+            <Column key='scope' title='ACL Scope' dataIndex='scope' />
+            <Column key='acls' title='ACLs' dataIndex='aclList' render={this.renderAclList} />
           </Table>
         </Drawer>
       </div>

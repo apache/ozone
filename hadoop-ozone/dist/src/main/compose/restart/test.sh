@@ -15,6 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set -u -o pipefail
+
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
@@ -26,8 +28,7 @@ export OZONE_VOLUME
 # shellcheck source=/dev/null
 source "${COMPOSE_DIR}/../testlib.sh"
 
-mkdir -p "${OZONE_VOLUME}"/{dn1,dn2,dn3,om,recon,s3g,scm}
-fix_data_dir_permissions
+create_data_dirs dn{1..3} om recon s3g scm
 
 # prepare pre-upgrade cluster
 start_docker_env

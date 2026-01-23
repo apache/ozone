@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,25 +13,26 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
 package org.apache.hadoop.hdds.utils.db.cache;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.fail;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-
+import java.util.stream.Stream;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.event.Level;
-
 
 /**
  * Class tests partial table cache.
@@ -43,19 +43,25 @@ public class TestTableCache {
 
   @BeforeAll
   public static void setLogLevel() {
-    GenericTestUtils.setLogLevel(FullTableCache.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(FullTableCache.class, Level.DEBUG);
   }
 
   private void createTableCache(TableCache.CacheType cacheType) {
     if (cacheType == TableCache.CacheType.FULL_CACHE) {
       tableCache = new FullTableCache<>("");
-    } else {
+    } else if (cacheType == TableCache.CacheType.PARTIAL_CACHE) {
       tableCache = new PartialTableCache<>("");
+    } else {
+      tableCache = TableNoCache.instance();
     }
   }
 
+  private static Stream<TableCache.CacheType> cacheTypeList() {
+    return Stream.of(TableCache.CacheType.FULL_CACHE, TableCache.CacheType.PARTIAL_CACHE);
+  }
+
   @ParameterizedTest
-  @EnumSource(TableCache.CacheType.class)
+  @MethodSource("cacheTypeList")
   public void testPartialTableCache(TableCache.CacheType cacheType) {
 
     createTableCache(cacheType);
@@ -99,7 +105,7 @@ public class TestTableCache {
   }
 
   @ParameterizedTest
-  @EnumSource(TableCache.CacheType.class)
+  @MethodSource("cacheTypeList")
   public void testTableCacheWithRenameKey(TableCache.CacheType cacheType) {
 
     createTableCache(cacheType);
@@ -115,7 +121,12 @@ public class TestTableCache {
     // Epoch entries should be like (long, (key1, key2, ...))
     // (0, (0A, 0B))  (1, (1A, 1B))  (2, (2A, 1B))
     assertEquals(3, tableCache.getEpochEntries().size());
-    assertEquals(2, tableCache.getEpochEntries().get(0L).size());
+    if (cacheType == TableCache.CacheType.FULL_CACHE) {
+      // first time cache value is null for xA cases and non-null value for xB cases, so have 1 entry
+      assertEquals(1, tableCache.getEpochEntries().get(0L).size());
+    } else {
+      assertEquals(2, tableCache.getEpochEntries().get(0L).size());
+    }
     
     // Cache should be like (key, (cacheValue, long))
     // (0A, (null, 0))   (0B, (0, 0))
@@ -150,7 +161,7 @@ public class TestTableCache {
   }
 
   @ParameterizedTest
-  @EnumSource(TableCache.CacheType.class)
+  @MethodSource("cacheTypeList")
   public void testPartialTableCacheWithNotContinuousEntries(
       TableCache.CacheType cacheType) {
 
@@ -201,7 +212,7 @@ public class TestTableCache {
   }
 
   @ParameterizedTest
-  @EnumSource(TableCache.CacheType.class)
+  @MethodSource("cacheTypeList")
   public void testPartialTableCacheWithOverrideEntries(
       TableCache.CacheType cacheType) {
 
@@ -227,9 +238,13 @@ public class TestTableCache {
 
 
     assertEquals(3, tableCache.size());
-    // It will have 2 additional entries because we have 2 override entries.
-    assertEquals(3 + 2,
-        tableCache.getEpochEntries().size());
+    if (cacheType == TableCache.CacheType.FULL_CACHE) {
+      // full table cache keep only deleted entry which is 0
+      assertEquals(0, tableCache.getEpochEntries().size());
+    } else {
+      // It will have 2 additional entries because we have 2 override entries.
+      assertEquals(3 + 2, tableCache.getEpochEntries().size());
+    }
 
     // Now remove
 
@@ -268,7 +283,7 @@ public class TestTableCache {
   }
 
   @ParameterizedTest
-  @EnumSource(TableCache.CacheType.class)
+  @MethodSource("cacheTypeList")
   public void testPartialTableCacheWithOverrideAndDelete(
       TableCache.CacheType cacheType) {
 
@@ -301,9 +316,13 @@ public class TestTableCache {
 
 
     assertEquals(3, tableCache.size());
-    // It will have 4 additional entries because we have 4 override entries.
-    assertEquals(3 + 4,
-        tableCache.getEpochEntries().size());
+    if (cacheType == TableCache.CacheType.FULL_CACHE) {
+      // It will have 2 deleted entries
+      assertEquals(2, tableCache.getEpochEntries().size());
+    } else {
+      // It will have 4 additional entries because we have 4 override entries.
+      assertEquals(3 + 4, tableCache.getEpochEntries().size());
+    }
 
     // Now remove
 
@@ -361,7 +380,7 @@ public class TestTableCache {
   }
 
   @ParameterizedTest
-  @EnumSource(TableCache.CacheType.class)
+  @MethodSource("cacheTypeList")
   public void testPartialTableCacheParallel(
       TableCache.CacheType cacheType) throws Exception {
 
@@ -445,7 +464,7 @@ public class TestTableCache {
   }
 
   @ParameterizedTest
-  @EnumSource(TableCache.CacheType.class)
+  @MethodSource("cacheTypeList")
   public void testTableCache(TableCache.CacheType cacheType) {
 
     createTableCache(cacheType);
@@ -476,9 +495,8 @@ public class TestTableCache {
     verifyStats(tableCache, 0, 0, 0);
   }
 
-
   @ParameterizedTest
-  @EnumSource(TableCache.CacheType.class)
+  @MethodSource("cacheTypeList")
   public void testTableCacheWithNonConsecutiveEpochList(
       TableCache.CacheType cacheType) {
 
@@ -506,7 +524,12 @@ public class TestTableCache {
     tableCache.evictCache(epochs);
 
     assertEquals(2, tableCache.size());
-    assertEquals(2, tableCache.getEpochEntries().size());
+    if (cacheType == TableCache.CacheType.FULL_CACHE) {
+      // no deleted entries
+      assertEquals(0, tableCache.getEpochEntries().size());
+    } else {
+      assertEquals(2, tableCache.getEpochEntries().size());
+    }
 
     assertNotNull(tableCache.get(new CacheKey<>(Long.toString(0))));
     assertEquals(2,
@@ -544,7 +567,7 @@ public class TestTableCache {
   }
 
   @ParameterizedTest
-  @EnumSource(TableCache.CacheType.class)
+  @MethodSource("cacheTypeList")
   public void testTableCacheStats(TableCache.CacheType cacheType) {
 
     createTableCache(cacheType);
@@ -564,6 +587,18 @@ public class TestTableCache {
     tableCache.iterator();
 
     verifyStats(tableCache, 3, 2, 2);
+  }
+
+  @Test
+  public void testNoCache() {
+    createTableCache(TableCache.CacheType.NO_CACHE);
+    tableCache.put(new CacheKey<>("0"), CacheValue.get(0, "0"));
+    assertNull(tableCache.get(new CacheKey<>("0")));
+    assertEquals(tableCache.getCacheType(), TableCache.CacheType.NO_CACHE);
+    assertEquals(0, tableCache.size());
+    assertEquals(0, tableCache.getEpochEntries().size());
+    assertFalse(tableCache.iterator().hasNext());
+    verifyStats(tableCache, 0, 0, 0);
   }
 
   private int writeToCache(int count, int startVal, long sleep)

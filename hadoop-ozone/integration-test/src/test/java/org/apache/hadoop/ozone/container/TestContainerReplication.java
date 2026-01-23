@@ -1,74 +1,73 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.container;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.asList;
-import static java.util.Collections.emptyMap;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType.KeyValueContainer;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_EC_IMPL_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_IMPL_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.ozone.container.TestHelper.isContainerClosed;
 import static org.apache.hadoop.ozone.container.TestHelper.waitForContainerClose;
 import static org.apache.hadoop.ozone.container.TestHelper.waitForReplicaCount;
 import static org.apache.ozone.test.GenericTestUtils.setLogLevel;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.any;
 
+import com.google.common.base.Functions;
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import java.util.function.Supplier;
-
-import com.google.common.base.Functions;
-import com.google.common.collect.ImmutableMap;
+import java.util.stream.Collectors;
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
-import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
-import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackScatter;
-import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackAware;
+import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRackScatter;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementRandom;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -81,11 +80,10 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
-
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -96,13 +94,11 @@ import org.slf4j.event.Level;
 /**
  * Tests ozone containers replication.
  */
-@Timeout(300)
 class TestContainerReplication {
 
   private static final String VOLUME = "vol1";
   private static final String BUCKET = "bucket1";
   private static final String KEY = "key1";
-
   private static final List<Class<? extends PlacementPolicy>> POLICIES = asList(
       SCMContainerPlacementCapacity.class,
       SCMContainerPlacementRackAware.class,
@@ -121,9 +117,9 @@ class TestContainerReplication {
 
   @BeforeAll
   static void setUp() {
-    setLogLevel(SCMContainerPlacementCapacity.LOG, Level.DEBUG);
-    setLogLevel(SCMContainerPlacementRackAware.LOG, Level.DEBUG);
-    setLogLevel(SCMContainerPlacementRandom.LOG, Level.DEBUG);
+    setLogLevel(SCMContainerPlacementCapacity.class, Level.DEBUG);
+    setLogLevel(SCMContainerPlacementRackAware.class, Level.DEBUG);
+    setLogLevel(SCMContainerPlacementRandom.class, Level.DEBUG);
   }
 
   @ParameterizedTest
@@ -178,7 +174,6 @@ class TestContainerReplication {
 
     ReplicationManagerConfiguration repConf =
         conf.getObject(ReplicationManagerConfiguration.class);
-    repConf.setEnableLegacy(enableLegacy);
     repConf.setInterval(Duration.ofSeconds(1));
     repConf.setUnderReplicatedInterval(Duration.ofSeconds(1));
     conf.setFromObject(repConf);
@@ -195,10 +190,9 @@ class TestContainerReplication {
 
     OzoneBucket bucket = volume.getBucket(BUCKET);
 
-    try (OutputStream out = bucket.createKey(KEY, 0,
-        RatisReplicationConfig.getInstance(THREE), emptyMap())) {
-      out.write("Hello".getBytes(UTF_8));
-    }
+    TestDataUtil.createKey(bucket, KEY,
+        RatisReplicationConfig.getInstance(THREE),
+        "Hello".getBytes(UTF_8));
   }
 
   private byte[] createTestData(OzoneClient client, int size) throws IOException {
@@ -207,14 +201,12 @@ class TestContainerReplication {
     OzoneVolume volume = objectStore.getVolume(VOLUME);
     volume.createBucket(BUCKET);
     OzoneBucket bucket = volume.getBucket(BUCKET);
-    try (OutputStream out = bucket.createKey(KEY, 0, new ECReplicationConfig("RS-3-2-1k"),
-        new HashMap<>())) {
-      byte[] b = new byte[size];
-      Random random = new Random();
-      random.nextBytes(b);
-      out.write(b);
-      return b;
-    }
+
+    byte[] b = new byte[size];
+    b = RandomUtils.secure().randomBytes(b.length);
+    TestDataUtil.createKey(bucket, KEY,
+        new ECReplicationConfig("RS-3-2-1k"), b);
+    return b;
   }
 
   private static List<OmKeyLocationInfo> lookupKey(MiniOzoneCluster cluster)
@@ -242,7 +234,6 @@ class TestContainerReplication {
     Assertions.assertNotNull(locations);
     return locations.getLocationList().get(0);
   }
-
 
   public void assertState(MiniOzoneCluster cluster, Map<Integer, DatanodeDetails> expectedReplicaMap)
       throws IOException {
@@ -275,7 +266,6 @@ class TestContainerReplication {
         });
   }
 
-
   private static void deleteContainer(MiniOzoneCluster cluster, DatanodeDetails dn, long containerId)
       throws IOException {
     OzoneContainer container = cluster.getHddsDatanode(dn).getDatanodeStateMachine().getContainer();
@@ -286,8 +276,44 @@ class TestContainerReplication {
     cluster.getHddsDatanode(dn).getDatanodeStateMachine().triggerHeartbeat();
   }
 
+  @Test
+  public void testImportedContainerIsClosed() throws Exception {
+    OzoneConfiguration conf = createConfiguration(false);
+    // create a 4 node cluster
+    try (MiniOzoneCluster cluster = MiniOzoneCluster.newBuilder(conf).setNumDatanodes(4).build()) {
+      cluster.waitForClusterToBeReady();
+
+      try (OzoneClient client = OzoneClientFactory.getRpcClient(conf)) {
+        List<DatanodeDetails> allNodes =
+            cluster.getHddsDatanodes().stream()
+                .map(HddsDatanodeService::getDatanodeDetails)
+                .collect(Collectors.toList());
+        // shutdown 4th node (node 3 is down now)
+        cluster.shutdownHddsDatanode(allNodes.get(allNodes.size() - 1));
+
+        createTestData(client);
+        final OmKeyLocationInfo keyLocation = lookupKeyFirstLocation(cluster);
+        long containerID = keyLocation.getContainerID();
+        waitForContainerClose(cluster, containerID);
+
+        // shutdown nodes 0 and 1. only node 2 is up now
+        for (int i = 0; i < 2; i++) {
+          cluster.shutdownHddsDatanode(allNodes.get(i));
+        }
+        waitForReplicaCount(containerID, 1, cluster);
+
+        // bring back up the 4th node
+        cluster.restartHddsDatanode(allNodes.get(allNodes.size() - 1), false);
+
+        // the container should have been imported on the 4th node
+        waitForReplicaCount(containerID, 2, cluster);
+        assertTrue(isContainerClosed(cluster, containerID, allNodes.get(allNodes.size() - 1)));
+      }
+    }
+  }
 
   @Test
+  @Flaky("HDDS-11087")
   public void testECContainerReplication() throws Exception {
     OzoneConfiguration conf = createConfiguration(false);
     final Map<Integer, Integer> failedReadChunkCountMap = new ConcurrentHashMap<>();
@@ -333,7 +359,7 @@ class TestContainerReplication {
           //Reading through file and comparing with input data.
           byte[] readData = new byte[size];
           try (OzoneInputStream inputStream = createInputStream(client)) {
-            inputStream.read(readData);
+            IOUtils.readFully(inputStream, readData);
             Assertions.assertArrayEquals(readData, originalData);
           }
           Assertions.assertEquals(0, failedReadChunkCountMap.size());
@@ -342,7 +368,7 @@ class TestContainerReplication {
             int firstReadLen = 1024 * 3;
             Arrays.fill(readData, (byte) 0);
             //Reading first stripe.
-            inputStream.read(readData, 0, firstReadLen);
+            IOUtils.readFully(inputStream, readData, 0, firstReadLen);
             Assertions.assertEquals(0, failedReadChunkCountMap.size());
             //Checking the initial state as per the latest location.
             assertState(cluster, ImmutableMap.of(1, replicaIndexMap.get(1), 2, replicaIndexMap.get(2),
@@ -371,7 +397,7 @@ class TestContainerReplication {
             assertState(cluster, ImmutableMap.of(1, replicaIndexMap.get(3), 2, replicaIndexMap.get(2),
                 3, replicaIndexMap.get(1), 4, replicaIndexMap.get(4), 5, replicaIndexMap.get(5)));
             // Reading the Stripe 2 from the pre initialized inputStream
-            inputStream.read(readData, firstReadLen, size - firstReadLen);
+            IOUtils.readFully(inputStream, readData, firstReadLen, size - firstReadLen);
             // Asserting there was a failure in the first read chunk.
             Assertions.assertEquals(ImmutableMap.of(1, 1, 3, 1), failedReadChunkCountMap);
             Assertions.assertArrayEquals(readData, originalData);

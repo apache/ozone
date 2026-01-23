@@ -17,21 +17,26 @@
  */
 
 import React from 'react';
-import { Table, Tabs, Menu, Dropdown, Icon, Tooltip } from 'antd';
-import { PaginationConfig } from 'antd/lib/pagination';
-import filesize from 'filesize';
 import moment from 'moment';
-import { showDataFetchError, byteToSize } from 'utils/common';
-import './om.less';
-import { ColumnSearch } from 'utils/columnSearch';
-import { AxiosGetHelper, cancelRequests } from 'utils/axiosRequestHelper';
-import {IOption} from "../../../components/multiSelect/multiSelect";
+import filesize from 'filesize';
+import {Dropdown, Menu, Table, Tabs, Tooltip} from 'antd';
+import {MenuProps} from 'antd/es/menu';
+import {TablePaginationConfig} from 'antd/es/table';
+import {FunnelPlotFilled, InfoCircleOutlined} from '@ant-design/icons';
 import {ActionMeta, ValueType} from "react-select";
 import CreatableSelect from "react-select/creatable";
 
+import {ColumnSearch} from '@/utils/columnSearch';
+import {byteToSize, showDataFetchError} from '@/utils/common';
+import {AxiosGetHelper, cancelRequests} from '@/utils/axiosRequestHelper';
+import {IOption} from "@/components/multiSelect/multiSelect";
+
+import './om.less';
+import { ReplicationInfo } from '@/v2/types/insights.types';
+
 
 const size = filesize.partial({ standard: 'iec' });
-const { TabPane } = Tabs;
+
 let keysPendingExpanded: any = [];
 interface IContainerResponse {
   containerId: number;
@@ -82,6 +87,7 @@ interface IKeyResponse {
   Volume: string;
   Bucket: string;
   Key: string;
+  CompletePath: string;
   DataSize: number;
   Versions: number[];
   Blocks: object;
@@ -109,6 +115,12 @@ const KEY_TABLE_COLUMNS = [
     title: 'Key',
     dataIndex: 'Key',
     key: 'Key'
+  },
+  {
+    title: 'Path',
+    dataIndex: 'CompletePath',
+    key: 'CompletePath',
+    width: '270px'
   },
   {
     title: 'Size',
@@ -172,7 +184,7 @@ const OPEN_KEY_TAB_COLUMNS = [
     title: 'Amount of data',
     dataIndex: 'size',
     key: 'size',
-    render: (size :any) => size = byteToSize(size,1)
+    render: (size: any) => size = byteToSize(size, 1)
   },
   {
     title: 'Path',
@@ -189,34 +201,29 @@ const OPEN_KEY_TAB_COLUMNS = [
     }
   },
   {
-    title: 'Replication Factor',
+    title: 'Replication Type',
     dataIndex: 'replicationInfo',
-    key: 'replicationfactor',
-    render: (replicationInfo: any) => (
+    key: 'replicationtype',
+    render: (replicationInfo: ReplicationInfo) => (
       <div>
-        {
-          <div >
-            {Object.values(replicationInfo)[0]}
-          </div>
-        }
+        {replicationInfo.replicationType}
       </div>
     )
   },
   {
-    title: 'Replication Type',
+    title: 'Replication Factor',
     dataIndex: 'replicationInfo',
-    key: 'replicationtype',
-    render: (replicationInfo: any) => (
+    key: 'replicationfactor',
+    render: (replicationInfo: ReplicationInfo) => (
       <div>
         {
-          <div >
-            {Object.values(replicationInfo)[2]}
-          </div>
+          (replicationInfo.replicationType === "RATIS")
+          ? replicationInfo.replicationFactor
+          : `${replicationInfo.codec}-${replicationInfo.data}-${replicationInfo.parity}`
         }
       </div>
     )
   }
-
 ];
 
 const PENDING_TAB_COLUMNS = [
@@ -235,7 +242,7 @@ const PENDING_TAB_COLUMNS = [
     title: 'Total Data Size',
     dataIndex: 'dataSize',
     key: 'dataSize',
-    render: (dataSize :any) => dataSize = byteToSize(dataSize,1)
+    render: (dataSize: any) => dataSize = byteToSize(dataSize, 1)
   },
   {
     title: 'Total Key Count',
@@ -264,7 +271,7 @@ const DELETED_TAB_COLUMNS = [
     key: 'pipelines',
     render: (pipelines: any) => (
       <div>
-        {pipelines && pipelines.map((pipeline:any) => (
+        {pipelines && pipelines.map((pipeline: any) => (
           <div key={pipeline.id.id}>
             {pipeline.id.id}
           </div>
@@ -277,8 +284,9 @@ const DELETED_TAB_COLUMNS = [
 const PENDINGDIR_TAB_COLUMNS = [
   {
     title: 'Directory Name',
-    dataIndex: 'path',
-    key: 'path'
+    dataIndex: 'key',
+    isSearchable: true,
+    key: 'key'
   },
   {
     title: 'In state since',
@@ -290,16 +298,15 @@ const PENDINGDIR_TAB_COLUMNS = [
   },
   {
     title: 'Path',
-    dataIndex: 'key',
-    key: 'key',
-    isSearchable: true,
+    dataIndex: 'path',
+    key: 'path',
     width: '450px'
   },
   {
     title: 'Data Size',
     dataIndex: 'size',
     key: 'size',
-    render: (dataSize :any) => dataSize = byteToSize(dataSize,1)
+    render: (dataSize: any) => dataSize = byteToSize(dataSize, 1)
   }
 ];
 
@@ -330,10 +337,22 @@ interface IOmdbInsightsState {
 }
 
 const LIMIT_OPTIONS: IOption[] = [
-  {label: "1000", value: "1000"},
-  {label: "5000", value: "5000"},
-  {label: "10000", value: "10000"},
-  {label: "20000", value: "20000"}
+  {
+    label: '1000',
+    value: '1000'
+  },
+  {
+    label: '5000',
+    value: '5000'
+  },
+  {
+    label: '10000',
+    value: '10000'
+  },
+  {
+    label: '20000',
+    value: '20000'
+  }
 ]
 
 const INITIAL_LIMIT_OPTION = LIMIT_OPTIONS[0]
@@ -357,7 +376,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       openKeysDataSource: [],
       pendingDeleteKeyDataSource: [],
       deletedContainerKeysDataSource: [],
-      pendingDeleteDirDataSource:[],
+      pendingDeleteDirDataSource: [],
       mismatchMissingState: 'SCM',
       expandedRowData: {},
       activeTab: props.location.state ? props.location.state.activeTab : '1',
@@ -371,17 +390,26 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     // Inside the class component to access the React internal state
     const existsAtColumn = {
       title: <span>
-        <Dropdown overlay={this.existAtScmOmMenu} >
-            <label> Exists at&nbsp;&nbsp;
-              <Icon type="funnel-plot" theme="filled" />&nbsp;&nbsp;&nbsp;&nbsp;
-            </label>
+        <Dropdown
+          overlay={
+            <Menu onClick={this.handleExistsAtChange}>
+              <Menu.Item key='OM'>
+                OM
+              </Menu.Item>
+              <Menu.Item key='SCM'>
+                SCM
+              </Menu.Item>
+            </Menu>} >
+          <label> Exists at&nbsp;&nbsp;
+            <FunnelPlotFilled />&nbsp;&nbsp;&nbsp;&nbsp;
+          </label>
         </Dropdown>&nbsp;&nbsp;
         <label>
           <Tooltip placement='top' title={<span>{'SCM: Container exist at SCM but missing at OM.'}<br />
             {'OM: Container exist at OM but missing at SCM.'}</span>}>
-          <Icon type='info-circle' />
+            <InfoCircleOutlined />
           </Tooltip>
-       </label>
+        </label>
       </span>,
       dataIndex: 'existsAt',
       key: 'existsAt',
@@ -400,21 +428,9 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     }
   };
 
-  existAtScmOmMenu = () => (
-    <Menu
-      onClick={e => this.handleExistsAtChange(e)}>
-      <Menu.Item key='OM'>
-        OM
-      </Menu.Item>
-      <Menu.Item key='SCM'>
-        SCM
-      </Menu.Item>
-    </Menu>
-  );
-
-  handleExistsAtChange = (e: any) => {
-    console.log("handleExistsAtChange", e.key);
-    if (e.key === 'OM') {
+  handleExistsAtChange: MenuProps["onClick"] = ({ key }) => {
+    console.log('handleExistsAtChange', key);
+    if (key === 'OM') {
       this.fetchMismatchContainers('SCM');
     }
     else {
@@ -426,9 +442,20 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     // Inside the class component to access the React internal state
     const fsoNonfsoColumn = {
       title: <span>
-        <Dropdown overlay={this.fsoNonfsoMenu} >
+        <Dropdown overlay={
+          <Menu
+            defaultSelectedKeys={['OM']}
+            onClick={this.handlefsoNonfsoMenuChange}>
+            <Menu.Item key='fso'>
+              FSO
+            </Menu.Item>
+            <Menu.Item key='nonFso'>
+              Non FSO
+            </Menu.Item>
+          </Menu>
+        }>
           <label> Type&nbsp;&nbsp;
-            <Icon type="funnel-plot" theme="filled" />
+            <FunnelPlotFilled />
           </label>
         </Dropdown></span>,
       dataIndex: 'type',
@@ -448,20 +475,8 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     }
   };
 
-  fsoNonfsoMenu = () => (
-    <Menu
-      defaultSelectedKeys={['OM']}
-      onClick={e => this.handlefsoNonfsoMenuChange(e)}>
-      <Menu.Item key='fso'>
-        FSO
-      </Menu.Item>
-      <Menu.Item key='nonFso'>
-        Non FSO
-      </Menu.Item>
-    </Menu>
-  );
 
-  handlefsoNonfsoMenuChange = (e: any) => {
+  handlefsoNonfsoMenuChange: MenuProps["onClick"] = (e) => {
     if (e.key === 'fso') {
       this.fetchOpenKeys(true, false);
     }
@@ -471,16 +486,16 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
   };
 
   _loadData = () => {
-    if (this.state.activeTab  === '1') {
+    if (this.state.activeTab === '1') {
       this.fetchMismatchContainers(this.state.mismatchMissingState);
     } else if (this.state.activeTab === '2') {
       this.fetchOpenKeys(this.state.includeFso, this.state.includeNonFso);
-    } else if (this.state.activeTab  === '3') {
-      keysPendingExpanded =[];
+    } else if (this.state.activeTab === '3') {
+      keysPendingExpanded = [];
       this.fetchDeletePendingKeys();
-    } else if (this.state.activeTab  === '4') {
+    } else if (this.state.activeTab === '4') {
       this.fetchDeletedKeys();
-    } else if (this.state.activeTab  === '5') {
+    } else if (this.state.activeTab === '5') {
       this.fetchDeletePendingDir();
     }
   }
@@ -518,7 +533,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     const { request, controller } = AxiosGetHelper(mismatchEndpoint, cancelMismatchedEndpointSignal)
     cancelMismatchedEndpointSignal = controller;
     request.then(mismatchContainersResponse => {
-      const mismatchContainers: IContainerResponse[] = mismatchContainersResponse && mismatchContainersResponse.data && mismatchContainersResponse.data.containerDiscrepancyInfo;
+      const mismatchContainers: IContainerResponse[] = mismatchContainersResponse?.data?.containerDiscrepancyInfo && [];
 
       this.setState({
         loading: false,
@@ -529,7 +544,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       this.setState({
         loading: false,
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   };
 
@@ -555,11 +570,15 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
     const { request, controller } = AxiosGetHelper(openKeysEndpoint, cancelOpenKeysSignal)
     cancelOpenKeysSignal = controller
     request.then(openKeysResponse => {
-      const openKeys = openKeysResponse && openKeysResponse.data;
+      const openKeys = openKeysResponse?.data ?? {"fso": []};
       let allopenKeysResponse: any[] = [];
       for (let key in openKeys) {
         if (Array.isArray(openKeys[key])) {
-          openKeys[key] && openKeys[key].map((item: any) => (allopenKeysResponse.push({ ...item, type: key })));
+          openKeys[key] && openKeys[key].map((item: any) => (
+            allopenKeysResponse.push({
+              ...item,
+              type: key
+            })));
         }
       }
       this.setState({
@@ -571,7 +590,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       this.setState({
         loading: false
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
 
   };
@@ -581,43 +600,43 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       loading: true
     });
 
-     //Cancel any previous pending request
-     cancelRequests([
+    //Cancel any previous pending request
+    cancelRequests([
       cancelMismatchedEndpointSignal,
       cancelOpenKeysSignal,
       cancelDeletePendingSignal,
       cancelDeletedKeysSignal,
-       cancelRowExpandSignal,
-       cancelDeletedPendingDirSignal
+      cancelRowExpandSignal,
+      cancelDeletedPendingDirSignal
     ]);
 
-    keysPendingExpanded =[];
+    keysPendingExpanded = [];
     let deletePendingKeysEndpoint = `/api/v1/keys/deletePending?limit=${this.state.selectedLimit.value}`;
 
     const { request, controller } = AxiosGetHelper(deletePendingKeysEndpoint, cancelDeletePendingSignal);
     cancelDeletePendingSignal = controller;
 
     request.then(deletePendingKeysResponse => {
-      const deletePendingKeys = deletePendingKeysResponse && deletePendingKeysResponse.data && deletePendingKeysResponse.data.deletedKeyInfo;
+      const deletePendingKeys = deletePendingKeysResponse?.data?.deletedKeyInfo ?? [];
       //Use Summation Logic iterate through all object and find sum of all datasize
       let deletedKeyInfoData = [];
-      deletedKeyInfoData = deletePendingKeys && deletePendingKeys.flatMap((infoObject:any) => {
+      deletedKeyInfoData = deletePendingKeys && deletePendingKeys.flatMap((infoObject: any) => {
         const { omKeyInfoList } = infoObject;
         keysPendingExpanded.push(infoObject);
         let count = 0;
-        let item = omKeyInfoList && omKeyInfoList.reduce((obj:any, item:any) => {
+        let item = omKeyInfoList && omKeyInfoList.reduce((obj: any, item: any) => {
           const { dataSize } = item;
           const newDataSize = obj.dataSize + dataSize;
           count = count + 1;
           return { ...item, dataSize: newDataSize };
-        }, { "dataSize": 0 });
-      
+        }, { 'dataSize': 0 });
+
         return {
-          "dataSize": item.dataSize,
-          "fileName":item.fileName,
-          "keyName": item.keyName,
-          "path": item.path,
-          "keyCount": count
+          'dataSize': item.dataSize,
+          'fileName': item.fileName,
+          'keyName': item.keyName,
+          'path': item.path,
+          'keyCount': count
         }
       });
 
@@ -630,25 +649,25 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       this.setState({
         loading: false,
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   };
 
-  expandedKey =  ( record:any)=> {
-    const filteredData = keysPendingExpanded && keysPendingExpanded.flatMap((info:any) =>
-    info.omKeyInfoList && info.omKeyInfoList.filter((item: any) => item.keyName === record.keyName)
+  expandedKey = (record: any) => {
+    const filteredData = keysPendingExpanded && keysPendingExpanded.flatMap((info: any) =>
+      info.omKeyInfoList && info.omKeyInfoList.filter((item: any) => item.keyName === record.keyName)
     )
-    const columns= [{
+    const columns = [{
       title: 'Data Size',
       dataIndex: 'dataSize',
       key: 'dataSize',
-      render: (dataSize :any) => dataSize = dataSize > 0 ? byteToSize(dataSize,1) : dataSize
+      render: (dataSize: any) => dataSize = dataSize > 0 ? byteToSize(dataSize, 1) : dataSize
     },
     {
       title: 'Replicated Data Size',
       dataIndex: 'replicatedSize',
       key: 'replicatedSize',
-      render: (replicatedSize :any) => replicatedSize = replicatedSize > 0 ? byteToSize(replicatedSize,1) : replicatedSize
+      render: (replicatedSize: any) => replicatedSize = replicatedSize > 0 ? byteToSize(replicatedSize, 1) : replicatedSize
     },
     {
       title: 'Creation Time',
@@ -666,15 +685,15 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
         return modificationTime > 0 ? moment(modificationTime).format('ll LTS') : 'NA';
       }
     }
-  ]
+    ]
     return (
       <Table
-      columns={columns}
-      dataSource={filteredData}
+        columns={columns}
+        dataSource={filteredData}
         pagination={true}
         rowKey='dataSize'
-      locale={{filterTitle: ""}}
-    />
+        locale={{ filterTitle: '' }}
+      />
     );
   }
 
@@ -695,10 +714,10 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
 
     const deletedKeysEndpoint = `/api/v1/containers/mismatch/deleted?limit=${this.state.selectedLimit.value}`;
     const { request, controller } = AxiosGetHelper(deletedKeysEndpoint, cancelDeletedKeysSignal);
-    cancelDeletedKeysSignal = controller 
+    cancelDeletedKeysSignal = controller
     request.then(deletedKeysResponse => {
       let deletedContainerKeys = [];
-      deletedContainerKeys = deletedKeysResponse && deletedKeysResponse.data && deletedKeysResponse.data.containers;
+      deletedContainerKeys = deletedKeysResponse?.data?.containers ?? [];
       this.setState({
         loading: false,
         deletedContainerKeysDataSource: deletedContainerKeys
@@ -707,12 +726,12 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       this.setState({
         loading: false
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   };
 
-   // Pending Delete Directories
-   fetchDeletePendingDir = () => {
+  // Pending Delete Directories
+  fetchDeletePendingDir = () => {
     this.setState({
       loading: true
     });
@@ -726,22 +745,22 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       cancelRowExpandSignal,
       cancelDeletedPendingDirSignal
     ]);
-    
+
     const DELETE_PENDING_DIR_ENDPOINT = `/api/v1/keys/deletePending/dirs?limit=${this.state.selectedLimit.value}`;
     const { request, controller } = AxiosGetHelper(DELETE_PENDING_DIR_ENDPOINT, cancelDeletedPendingDirSignal);
-    cancelDeletedPendingDirSignal = controller 
-     request.then(deletePendingDirResponse => {
-      let deletedDirInfo  = [];
-       deletedDirInfo = deletePendingDirResponse && deletePendingDirResponse.data && deletePendingDirResponse.data.deletedDirInfo;
-        this.setState({
-          loading: false,
-          pendingDeleteDirDataSource: deletedDirInfo
-        });
+    cancelDeletedPendingDirSignal = controller
+    request.then(deletePendingDirResponse => {
+      let deletedDirInfo = [];
+      deletedDirInfo = deletePendingDirResponse?.data?.deletedDirInfo ?? [];
+      this.setState({
+        loading: false,
+        pendingDeleteDirDataSource: deletedDirInfo
+      });
     }).catch(error => {
       this.setState({
         loading: false,
       });
-      showDataFetchError(error.toString());
+      showDataFetchError(error);
     });
   };
 
@@ -762,12 +781,12 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       if (activeKey === '2') {
         this.fetchOpenKeys(this.state.includeFso, this.state.includeNonFso);
       } else if (activeKey === '3') {
-        keysPendingExpanded =[];
+        keysPendingExpanded = [];
         this.fetchDeletePendingKeys();
       } else if (activeKey === '4') {
         this.fetchDeletedKeys();
       } else if (activeKey === '5') {
-        this.fetchDeletePendingDir ();
+        this.fetchDeletePendingDir();
       }
       else {
         this.fetchMismatchContainers(this.state.mismatchMissingState);
@@ -812,13 +831,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
             expandedRowData: Object.assign({}, expandedRowData, { [record.containerId]: expandedRowState })
           };
         });
-        if (error.name === "CanceledError") {
-          showDataFetchError(cancelRowExpandSignal.signal.reason)
-        }
-        else {
-          console.log(error);
-          showDataFetchError(error.toString());
-        }
+        showDataFetchError(error);
       });
     }
     else {
@@ -834,7 +847,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
       const dataSource = containerKeys && containerKeys.dataSource && containerKeys.dataSource.map(record => (
         { ...record, uid: `${record.Volume}/${record.Bucket}/${record.Key}` }
       ));
-      const paginationConfig: PaginationConfig = {
+      const paginationConfig: TablePaginationConfig = {
         showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total} keys`
       };
       return (
@@ -842,7 +855,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
           loading={containerKeys.loading} dataSource={dataSource}
           columns={KEY_TABLE_COLUMNS} pagination={paginationConfig}
           rowKey='uid'
-          locale={{filterTitle: ""}}/>
+          locale={{ filterTitle: "" }} />
       );
     }
     return <div>Loading...</div>;
@@ -951,7 +964,7 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
   render() {
     const { mismatchDataSource, loading, openKeysDataSource, pendingDeleteKeyDataSource, deletedContainerKeysDataSource, pendingDeleteDirDataSource, selectedLimit } = this.state;
 
-    const paginationConfig: PaginationConfig = {
+    const paginationConfig: TablePaginationConfig = {
       showTotal: (total: number, range) => `${range[0]}-${range[1]} of ${total}`,
       showSizeChanger: true,
       onShowSizeChange: this.onShowSizeChange,
@@ -959,51 +972,67 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
 
     const generateMismatchTable = (dataSource: any) => {
       return <Table
-        expandRowByClick dataSource={dataSource}
+        expandable={{
+          expandRowByClick: true,
+          expandedRowRender: this.expandedRowRender,
+          onExpand: this.onRowExpandClick
+        }}
+        dataSource={dataSource}
         columns={this.searchMismatchColumn()}
         loading={loading}
         pagination={paginationConfig} rowKey='containerId'
-        expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}
-        locale={{filterTitle: ""}}/>
+        locale={{ filterTitle: "" }} />
     }
 
     const generateOpenKeyTable = (dataSource: any) => {
       return <Table
-        expandRowByClick dataSource={dataSource}
+        expandable={{
+          expandRowByClick: true,
+        }}
+        dataSource={dataSource}
         columns={this.searchOpenKeyColumn()}
         loading={loading} rowKey='key'
         pagination={paginationConfig}
-        locale={{filterTitle: ""}} />
+        locale={{ filterTitle: "" }} />
     }
 
     const generateKeysPendingTable = (dataSource: any) => {
       return <Table
-        expandRowByClick dataSource={dataSource}
+        expandable={{
+          expandRowByClick: true,
+          expandedRowRender: this.expandedKey
+        }}
+        dataSource={dataSource}
         columns={this.searchKeysPendingColumn()}
         loading={loading}
-        pagination={paginationConfig} rowKey='keyName'
-        expandedRowRender={this.expandedKey} />
+        pagination={paginationConfig}
+        rowKey='keyName' />
     }
 
     const generateDeletedKeysTable = (dataSource: any) => {
       return <Table
-        expandRowByClick dataSource={dataSource}
+        expandable={{
+          expandRowByClick: true,
+          expandedRowRender: this.expandedRowRender,
+          onExpand: this.onRowExpandClick
+        }}
+        dataSource={dataSource}
         columns={this.searchDeletedKeyColumn()}
         loading={loading}
         pagination={paginationConfig} rowKey='containerId'
-        expandedRowRender={this.expandedRowRender} onExpand={this.onRowExpandClick}
-        locale={{filterTitle: ""}}
+        locale={{ filterTitle: "" }}
       />
     }
 
     const generateDirPendingTable = (dataSource: any) => {
       return <Table
-        expandRowByClick dataSource={dataSource}
+        expandable={{ expandRowByClick: true }}
+        dataSource={dataSource}
         columns={this.searchDirPendingColumn()}
         loading={loading}
         pagination={paginationConfig}
         rowKey='key'
-        />
+      />
     }
 
     return (
@@ -1014,59 +1043,59 @@ export class Om extends React.Component<Record<string, object>, IOmdbInsightsSta
         <div className='content-div'>
           <div className='limit-block'>
             <CreatableSelect
-                className='multi-select-container'
-                isClearable={false}
-                isDisabled={loading}
-                isLoading={loading}
-                onChange={this._handleLimitChange}
-                onCreateOption={this._onCreateOption}
-                isValidNewOption={(input, value, _option) => {
-                  // Only number will be accepted
-                  return !isNaN(parseInt(input))
-                }}
-                options={LIMIT_OPTIONS}
-                hideSelectedOptions={false}
-                value={selectedLimit}
-                createOptionPosition='last'
-                formatCreateLabel={(input) => {
-                  return `new limit... ${input}`
-                }}
+              className='multi-select-container'
+              isClearable={false}
+              isDisabled={loading}
+              isLoading={loading}
+              onChange={this._handleLimitChange}
+              onCreateOption={this._onCreateOption}
+              isValidNewOption={(input, value, _option) => {
+                // Only number will be accepted
+                return !isNaN(parseInt(input))
+              }}
+              options={LIMIT_OPTIONS}
+              hideSelectedOptions={false}
+              value={selectedLimit}
+              createOptionPosition='last'
+              formatCreateLabel={(input) => {
+                return `new limit... ${input}`
+              }}
             /> Limit
           </div>
           <Tabs defaultActiveKey={this.state.activeTab} onChange={this.changeTab}>
-            <TabPane key='1' tab={`Container Mismatch Info`}>
+            <Tabs.TabPane key='1' tab='Container Mismatch Info'>
               {generateMismatchTable(mismatchDataSource)}
-            </TabPane>
-            <TabPane key='2' tab={`Open Keys`}>
+            </Tabs.TabPane>
+            <Tabs.TabPane key='2' tab='Open Keys'>
               {generateOpenKeyTable(openKeysDataSource)}
-            </TabPane>
-            <TabPane key='3'
-              tab={<label>Keys Pending for Deletion&nbsp;&nbsp;
+            </Tabs.TabPane>
+            <Tabs.TabPane key='3' tab={(
+              <label>Keys Pending for Deletion&nbsp;&nbsp;
                 <Tooltip placement='top' title="Keys that are pending for deletion.">
-                  <Icon type='info-circle' />
+                  <InfoCircleOutlined />
                 </Tooltip>
               </label>
-              }>
+            )}>
               {generateKeysPendingTable(pendingDeleteKeyDataSource)}
-            </TabPane>
-            <TabPane key='4'
-              tab={<label>Deleted Container Keys&nbsp;&nbsp;
-                <Tooltip placement='top' title={"Keys mapped to Containers in DELETED state SCM."}>
-                  <Icon type='info-circle' />
+            </Tabs.TabPane>
+            <Tabs.TabPane key='4' tab={(
+              <label>Deleted Container Keys&nbsp;&nbsp;
+                <Tooltip placement='top' title={'Keys mapped to Containers in DELETED state SCM.'}>
+                  <InfoCircleOutlined />
                 </Tooltip>
               </label>
-              }>
+            )}>
               {generateDeletedKeysTable(deletedContainerKeysDataSource)}
-            </TabPane>
-            <TabPane key='5'
-              tab={<label>Directories Pending for Deletion&nbsp;&nbsp;
+            </Tabs.TabPane>
+            <Tabs.TabPane key='5' tab={(
+              <label>Directories Pending for Deletion&nbsp;&nbsp;
                 <Tooltip placement='top' title="Directories that are pending for deletion.">
-                  <Icon type='info-circle' />
+                  <InfoCircleOutlined />
                 </Tooltip>
               </label>
-              }>
+            )}>
               {generateDirPendingTable(pendingDeleteDirDataSource)}
-            </TabPane>
+            </Tabs.TabPane>
           </Tabs>
         </div>
       </div>

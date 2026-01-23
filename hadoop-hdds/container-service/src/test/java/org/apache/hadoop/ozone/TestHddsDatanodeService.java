@@ -1,21 +1,33 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone;
+
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -23,11 +35,12 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.server.http.HttpConfig;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -39,20 +52,10 @@ import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
 import org.apache.hadoop.util.ServicePlugin;
-
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_BLOCK_TOKEN_ENABLED;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_TOKEN_ENABLED;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,7 +63,6 @@ import org.slf4j.LoggerFactory;
 /**
  * Test class for {@link HddsDatanodeService}.
  */
-
 public class TestHddsDatanodeService {
 
   @TempDir
@@ -101,7 +103,7 @@ public class TestHddsDatanodeService {
     conf.setBoolean(HDDS_CONTAINER_TOKEN_ENABLED, true);
 
     String volumeDir = testDir + OZONE_URI_DELIMITER + "disk1";
-    conf.set(DFSConfigKeysLegacy.DFS_DATANODE_DATA_DIR_KEY, volumeDir);
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, volumeDir);
   }
 
   @ParameterizedTest
@@ -148,11 +150,39 @@ public class TestHddsDatanodeService {
     service.stop();
     service.join();
     service.close();
+    DefaultMetricsSystem.shutdown();
 
     deletedContainersAfterShutdown =
         hddsVolume.getDeletedContainerDir().listFiles();
     assertNotNull(deletedContainersAfterShutdown);
     assertEquals(0, deletedContainersAfterShutdown.length);
+  }
+
+  @ParameterizedTest
+  @EnumSource
+  void testHttpPorts(HttpConfig.Policy policy) {
+    try {
+      conf.setEnum(OzoneConfigKeys.OZONE_HTTP_POLICY_KEY, policy);
+      service.start(conf);
+
+      DatanodeDetails dn = service.getDatanodeDetails();
+      DatanodeDetails.Port httpPort = dn.getPort(DatanodeDetails.Port.Name.HTTP);
+      DatanodeDetails.Port httpsPort = dn.getPort(DatanodeDetails.Port.Name.HTTPS);
+      if (policy.isHttpEnabled()) {
+        assertNotNull(httpPort);
+      }
+      if (policy.isHttpsEnabled()) {
+        assertNotNull(httpsPort);
+      }
+      if (policy.isHttpEnabled() && policy.isHttpsEnabled()) {
+        assertNotEquals(httpPort.getValue(), httpsPort.getValue());
+      }
+    } finally {
+      service.stop();
+      service.join();
+      service.close();
+      DefaultMetricsSystem.shutdown();
+    }
   }
 
   static class MockService implements ServicePlugin {

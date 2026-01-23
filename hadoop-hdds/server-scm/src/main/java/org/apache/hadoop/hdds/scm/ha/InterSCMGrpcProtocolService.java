@@ -1,32 +1,32 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import static org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder.forServer;
+
 import java.io.IOException;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
-import org.apache.hadoop.hdds.security.ssl.KeyStoresFactory;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.ratis.thirdparty.io.grpc.Server;
@@ -37,8 +37,6 @@ import org.apache.ratis.thirdparty.io.netty.handler.ssl.ClientAuth;
 import org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import static org.apache.ratis.thirdparty.io.netty.handler.ssl.SslContextBuilder.forServer;
 
 /**
  * Service to serve SCM DB checkpoints available for SCM HA.
@@ -54,7 +52,7 @@ public class InterSCMGrpcProtocolService {
 
   InterSCMGrpcProtocolService(final ConfigurationSource conf,
       final StorageContainerManager scm) throws IOException {
-    Preconditions.checkNotNull(conf);
+    Objects.requireNonNull(conf, "conf == null");
     this.port = conf.getInt(ScmConfigKeys.OZONE_SCM_GRPC_PORT_KEY,
         ScmConfigKeys.OZONE_SCM_GRPC_PORT_DEFAULT);
 
@@ -70,10 +68,9 @@ public class InterSCMGrpcProtocolService {
         && securityConfig.isGrpcTlsEnabled()) {
       try {
         CertificateClient certClient = scm.getScmCertificateClient();
-        KeyStoresFactory keyStores = certClient.getServerKeyStoresFactory();
         SslContextBuilder sslServerContextBuilder =
-            forServer(keyStores.getKeyManagers()[0])
-                .trustManager(keyStores.getTrustManagers()[0]);
+            forServer(certClient.getKeyManager())
+                .trustManager(certClient.getTrustManager());
         SslContextBuilder sslContextBuilder = GrpcSslContexts.configure(
             sslServerContextBuilder, securityConfig.getGrpcSslProvider());
         sslContextBuilder.clientAuth(ClientAuth.REQUIRE);
@@ -85,7 +82,7 @@ public class InterSCMGrpcProtocolService {
             "InterSCMGrpcProtocolService GRPC endpoint.");
       }
     }
-    Preconditions.checkNotNull(b);
+    Objects.requireNonNull(b, "b == null");
     server = nettyServerBuilder.build();
   }
 

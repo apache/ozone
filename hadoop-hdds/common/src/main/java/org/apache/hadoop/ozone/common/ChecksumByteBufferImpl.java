@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,11 +14,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.ozone.common;
 
-import org.apache.hadoop.hdds.JavaUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+package org.apache.hadoop.ozone.common;
 
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
@@ -27,6 +23,9 @@ import java.lang.invoke.MethodType;
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.util.zip.Checksum;
+import org.apache.hadoop.hdds.JavaUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * {@link ChecksumByteBuffer} implementation based on {@link Checksum}.
@@ -44,12 +43,14 @@ public class ChecksumByteBufferImpl implements ChecksumByteBuffer {
 
   static {
     Field f = null;
-    try {
-      f = ByteBuffer.class
-          .getDeclaredField("isReadOnly");
-      f.setAccessible(true);
-    } catch (NoSuchFieldException e) {
-      LOG.error("No isReadOnly field in ByteBuffer", e);
+    if (JavaUtils.isJavaVersionAtMost(8)) {
+      try {
+        f = ByteBuffer.class
+            .getDeclaredField("isReadOnly");
+        f.setAccessible(true);
+      } catch (NoSuchFieldException e) {
+        LOG.error("No isReadOnly field in ByteBuffer", e);
+      }
     }
     IS_READY_ONLY_FIELD = f;
 

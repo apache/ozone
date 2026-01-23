@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -22,37 +21,41 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.argThat;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
-
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.ozone.audit.OMSystemAction;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
-import org.apache.hadoop.ozone.om.helpers.WithObjectID;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .Status;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .DeleteOpenKeysRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OpenKey;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OpenKeyBucket;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos
-    .OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.DeleteOpenKeysRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKey;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OpenKeyBucket;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
@@ -199,7 +202,7 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
    * Tests removing keys from the open key table cache that have higher
    * updateID than the transactionID. Those keys should be ignored.
    * It is OK if updateID equals to or less than transactionID.
-   * See {@link WithObjectID#setUpdateID(long, boolean)}.
+   * See {@link #setUpdateID(long)}.
    *
    * @throws Exception
    */
@@ -231,14 +234,12 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
     List<Pair<Long, OmKeyInfo>> keysWithHigherUpdateID = new ArrayList<>(1);
     keysWithHigherUpdateID.add(Pair.of(clientID,
         builder.setKeyName("key")
-            .setFileName("key")
             .setUpdateID(updateId)
             .build()));
 
     List<Pair<Long, OmKeyInfo>> keysWithSameUpdateID = new ArrayList<>(1);
     keysWithSameUpdateID.add(Pair.of(clientID,
         builder.setKeyName("key2")
-            .setFileName("key2")
             .setUpdateID(transactionId)
             .build()));
 
@@ -251,7 +252,6 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
     OMRequest omRequest = doPreExecute(createDeleteOpenKeyRequest(allKeys));
     OMOpenKeysDeleteRequest openKeyDeleteRequest =
         new OMOpenKeysDeleteRequest(omRequest, getBucketLayout());
-
     OMClientResponse omClientResponse =
         openKeyDeleteRequest.validateAndUpdateCache(ozoneManager, transactionId);
 
@@ -306,6 +306,59 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
   }
 
   /**
+   * Test OPEN_KEY_CLEANUP audit logging for both success and failure cases when open keys are deleted.
+   */
+  @ParameterizedTest
+  @MethodSource("bucketLayouts")
+  public void testOpenKeyCleanupAuditLogging(BucketLayout buckLayout) throws Exception {
+    this.bucketLayout = buckLayout;
+    final String volume = UUID.randomUUID().toString();
+    final String bucket = UUID.randomUUID().toString();
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volume, bucket,
+        omMetadataManager, getBucketLayout());
+
+    List<Pair<Long, OmKeyInfo>> openKeys = makeOpenKeys(volume, bucket, 3);
+    addToOpenKeyTableDB(openKeys);
+
+    OMRequest omRequest = doPreExecute(createDeleteOpenKeyRequest(openKeys));
+    OMOpenKeysDeleteRequest openKeyDeleteRequest = spy(new OMOpenKeysDeleteRequest(omRequest, getBucketLayout()));
+
+    OMClientResponse omClientResponse =
+        openKeyDeleteRequest.validateAndUpdateCache(ozoneManager, 100L);
+
+    assertEquals(Status.OK, omClientResponse.getOMResponse().getStatus());
+
+    verify(ozoneManager, times(1))
+        .buildAuditMessageForSuccess(eq(OMSystemAction.OPEN_KEY_CLEANUP),
+            argThat(params -> {
+              assertEquals("3", params.get("numOpenKeysDeleted"));
+              assertTrue(params.containsKey("openKeysDeleted"));
+              return true;
+            }));
+
+    assertNotInOpenKeyTable(openKeys);
+
+    // Simulate failure by mocking updateOpenKeyTableCache to throw an IOException, and verify the failure audit log.
+    doThrow(new IOException())
+        .when(openKeyDeleteRequest)
+        .updateOpenKeyTableCache(
+            any(OzoneManager.class),
+            anyLong(),
+            any(OpenKeyBucket.class),
+            anyMap());
+
+    omClientResponse = openKeyDeleteRequest.validateAndUpdateCache(ozoneManager, 100L);
+
+    assertEquals(Status.INTERNAL_ERROR, omClientResponse.getOMResponse().getStatus());
+
+    verify(ozoneManager, times(1))
+        .buildAuditMessageForFailure(eq(OMSystemAction.OPEN_KEY_CLEANUP),
+            argThat(Map::isEmpty),
+            any(Throwable.class));
+  }
+
+  /**
    * Runs the validate and update cache step of
    * {@link OMOpenKeysDeleteRequest} to mark the keys in {@code openKeys}
    * as deleted in the open key table cache.
@@ -331,9 +384,14 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
 
     OMClientResponse omClientResponse =
         openKeyDeleteRequest.validateAndUpdateCache(ozoneManager, 100L);
-
     assertEquals(Status.OK,
         omClientResponse.getOMResponse().getStatus());
+    for (OmKeyInfo openKey : openKeys.stream().map(Pair::getRight).collect(Collectors.toList())) {
+      assertEquals(0, omMetadataManager.getBucketTable().get(
+          omMetadataManager.getBucketKey(openKey.getVolumeName(), openKey.getBucketName())).getSnapshotUsedBytes());
+      assertEquals(0, omMetadataManager.getBucketTable().get(
+          omMetadataManager.getBucketKey(openKey.getVolumeName(), openKey.getBucketName())).getSnapshotUsedNamespace());
+    }
   }
 
   /**
@@ -400,9 +458,6 @@ public class TestOMOpenKeysDeleteRequest extends TestOMKeyRequest {
     for (int i = 0; i < count; i++) {
       final String name = key != null ? key : UUID.randomUUID().toString();
       builder.setKeyName(name);
-      if (getBucketLayout().isFileSystemOptimized()) {
-        builder.setFileName(OzoneFSUtils.getFileName(name));
-      }
       long clientID = random.nextLong();
       keys.add(Pair.of(clientID, builder.build()));
     }

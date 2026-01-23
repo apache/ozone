@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -21,6 +20,7 @@ package org.apache.hadoop.ozone.recon.scm;
 import static java.util.Comparator.comparingLong;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent.FINALIZE;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -29,12 +29,12 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
-
 import org.apache.hadoop.conf.Configuration;
-import com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.scm.container.ContainerChecksums;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
@@ -50,11 +50,10 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
-import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,7 +68,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
   private final PipelineManager pipelineManager;
   private final ContainerHealthSchemaManager containerHealthSchemaManager;
   private final ReconContainerMetadataManager cdbServiceProvider;
-  private final Table<UUID, DatanodeDetails> nodeDB;
+  private final Table<DatanodeID, DatanodeDetails> nodeDB;
   // Container ID -> Datanode UUID -> Timestamp
   private final Map<Long, Map<UUID, ContainerReplicaHistory>> replicaHistoryMap;
   // Pipeline -> # of open containers
@@ -280,6 +279,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
     boolean flushToDB = false;
     long bcsId = replica.getSequenceId() != null ? replica.getSequenceId() : -1;
     String state = replica.getState().toString();
+    ContainerChecksums checksums = replica.getChecksums();
 
     // If replica doesn't exist in in-memory map, add to DB and add to map
     if (replicaLastSeenMap == null) {
@@ -287,7 +287,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
       replicaHistoryMap.putIfAbsent(id,
           new ConcurrentHashMap<UUID, ContainerReplicaHistory>() {{
             put(uuid, new ContainerReplicaHistory(uuid, currTime, currTime,
-                bcsId, state));
+                bcsId, state, checksums));
           }});
       flushToDB = true;
     } else {
@@ -297,18 +297,19 @@ public class ReconContainerManager extends ContainerManagerImpl {
         // New Datanode
         replicaLastSeenMap.put(uuid,
             new ContainerReplicaHistory(uuid, currTime, currTime, bcsId,
-                state));
+                state, checksums));
         flushToDB = true;
       } else {
         // if the object exists, only update the last seen time & bcsId fields
         ts.setLastSeenTime(currTime);
         ts.setBcsId(bcsId);
         ts.setState(state);
+        ts.setChecksums(checksums);
       }
     }
 
     if (flushToDB) {
-      upsertContainerHistory(id, uuid, currTime, bcsId, state);
+      upsertContainerHistory(id, uuid, currTime, bcsId, state, checksums);
     }
   }
 
@@ -333,7 +334,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
       if (ts != null) {
         // Flush to DB, then remove from in-memory map
         upsertContainerHistory(id, uuid, ts.getLastSeenTime(), ts.getBcsId(),
-            state);
+            state, ts.getChecksums());
         replicaLastSeenMap.remove(uuid);
       }
     }
@@ -379,7 +380,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
       // Attempt to retrieve hostname from NODES table
       if (nodeDB != null) {
         try {
-          DatanodeDetails dnDetails = nodeDB.get(uuid);
+          final DatanodeDetails dnDetails = nodeDB.get(DatanodeID.of(uuid));
           if (dnDetails != null) {
             hostname = dnDetails.getHostName();
           }
@@ -392,9 +393,10 @@ public class ReconContainerManager extends ContainerManagerImpl {
       final long lastSeenTime = entry.getValue().getLastSeenTime();
       long bcsId = entry.getValue().getBcsId();
       String state = entry.getValue().getState();
+      long dataChecksum = entry.getValue().getDataChecksum();
 
       resList.add(new ContainerHistory(containerID, uuid.toString(), hostname,
-          firstSeenTime, lastSeenTime, bcsId, state));
+          firstSeenTime, lastSeenTime, bcsId, state, dataChecksum));
     }
     return resList;
   }
@@ -429,7 +431,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
   }
 
   public void upsertContainerHistory(long containerID, UUID uuid, long time,
-                                     long bcsId, String state) {
+                                     long bcsId, String state, ContainerChecksums checksums) {
     Map<UUID, ContainerReplicaHistory> tsMap;
     try {
       tsMap = cdbServiceProvider.getContainerReplicaHistory(containerID);
@@ -437,11 +439,12 @@ public class ReconContainerManager extends ContainerManagerImpl {
       if (ts == null) {
         // New entry
         tsMap.put(uuid, new ContainerReplicaHistory(uuid, time, time, bcsId,
-            state));
+            state, checksums));
       } else {
         // Entry exists, update last seen time and put it back to DB.
         ts.setLastSeenTime(time);
         ts.setState(state);
+        ts.setChecksums(checksums);
       }
       cdbServiceProvider.storeContainerReplicaHistory(containerID, tsMap);
     } catch (IOException e) {
@@ -449,7 +452,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
     }
   }
 
-  public Table<UUID, DatanodeDetails> getNodeDB() {
+  public Table<DatanodeID, DatanodeDetails> getNodeDB() {
     return nodeDB;
   }
 

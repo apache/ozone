@@ -1,26 +1,35 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.container.keyvalue.helpers;
 
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.EXPORT_CONTAINER_METADATA_FAILED;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.IMPORT_CONTAINER_METADATA_FAILED;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_BLOCK;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_READ_METADATA_DB;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNKNOWN_BCSID;
+import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
+import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
+
+import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
-
+import java.util.Objects;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -35,21 +44,10 @@ import org.apache.hadoop.ozone.container.common.utils.DatanodeStoreCache;
 import org.apache.hadoop.ozone.container.common.utils.RawDB;
 import org.apache.hadoop.ozone.container.common.utils.ReferenceCountedDB;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-
-import com.google.common.base.Preconditions;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStore;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaOneImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
-
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_NOT_FOUND;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.EXPORT_CONTAINER_METADATA_FAILED;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.IMPORT_CONTAINER_METADATA_FAILED;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.NO_SUCH_BLOCK;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNABLE_TO_READ_METADATA_DB;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.UNKNOWN_BCSID;
-import static org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil.onFailure;
-import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 
 /**
  * Utils functions to help block functions.
@@ -99,7 +97,6 @@ public final class BlockUtils {
    * opened by this thread, the other thread will get a RocksDB exception.
    * @param containerData The container data
    * @param conf Configuration
-   * @return
    * @throws IOException
    */
   public static DatanodeStore getUncachedDatanodeStore(
@@ -123,18 +120,17 @@ public final class BlockUtils {
    */
   public static DBHandle getDB(KeyValueContainerData containerData,
       ConfigurationSource conf) throws StorageContainerException {
-    Preconditions.checkNotNull(containerData);
-    Preconditions.checkNotNull(containerData.getDbFile());
-
-    String containerDBPath = containerData.getDbFile().getAbsolutePath();
+    Objects.requireNonNull(containerData, "containerData == null");
+    final File dbFile = Objects.requireNonNull(containerData.getDbFile(), "dbFile == null");
+    final String containerDBPath = dbFile.getAbsolutePath();
     try {
       if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
         DatanodeStoreCache cache = DatanodeStoreCache.getInstance();
-        Preconditions.checkNotNull(cache);
+        Objects.requireNonNull(cache, "cache == null");
         return cache.getDB(containerDBPath, conf);
       } else {
         ContainerCache cache = ContainerCache.getInstance(conf);
-        Preconditions.checkNotNull(cache);
+        Objects.requireNonNull(cache, "cache == null");
         return cache.getDB(containerData.getContainerID(), containerData
                 .getContainerDBType(), containerDBPath,
             containerData.getSchemaVersion(), conf);
@@ -147,6 +143,7 @@ public final class BlockUtils {
       throw new StorageContainerException(message, UNABLE_TO_READ_METADATA_DB);
     }
   }
+
   /**
    * Remove a DB handler from cache.
    *
@@ -155,12 +152,12 @@ public final class BlockUtils {
    */
   public static void removeDB(KeyValueContainerData container,
       ConfigurationSource conf) {
-    Preconditions.checkNotNull(container);
-    Preconditions.checkNotNull(container.getDbFile());
+    Objects.requireNonNull(container, "container == null");
+    Objects.requireNonNull(container.getDbFile(), "dbFile == null");
     Preconditions.checkState(!container.hasSchema(OzoneConsts.SCHEMA_V3));
 
     ContainerCache cache = ContainerCache.getInstance(conf);
-    Preconditions.checkNotNull(cache);
+    Objects.requireNonNull(cache, "cache == null");
     cache.removeDB(container.getDbFile().getAbsolutePath());
   }
 
@@ -186,11 +183,11 @@ public final class BlockUtils {
       ConfigurationSource conf, String schemaVersion) {
     if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3)) {
       DatanodeStoreCache cache = DatanodeStoreCache.getInstance();
-      Preconditions.checkNotNull(cache);
+      Objects.requireNonNull(cache, "cache == null");
       cache.addDB(containerDBPath, new RawDB(store, containerDBPath));
     } else {
       ContainerCache cache = ContainerCache.getInstance(conf);
-      Preconditions.checkNotNull(cache);
+      Objects.requireNonNull(cache, "cache == null");
       cache.addDB(containerDBPath,
           new ReferenceCountedDB(store, containerDBPath));
     }
@@ -224,10 +221,8 @@ public final class BlockUtils {
   public static void verifyBCSId(Container container, BlockID blockID)
       throws IOException {
     long bcsId = blockID.getBlockCommitSequenceId();
-    Preconditions.checkNotNull(blockID,
-        "BlockID cannot be null");
-    Preconditions.checkNotNull(container,
-        "Container cannot be null");
+    Objects.requireNonNull(blockID, "blockID == null");
+    Objects.requireNonNull(container, "container == null");
 
     long containerBCSId = container.getBlockCommitSequenceId();
     if (containerBCSId < bcsId) {
@@ -248,7 +243,9 @@ public final class BlockUtils {
   public static void verifyReplicaIdx(Container container, BlockID blockID)
       throws IOException {
     Integer containerReplicaIndex = container.getContainerData().getReplicaIndex();
-    if (containerReplicaIndex > 0 && !containerReplicaIndex.equals(blockID.getReplicaIndex())) {
+    Integer blockReplicaIndex = blockID.getReplicaIndex();
+    if (containerReplicaIndex > 0 && blockReplicaIndex != null && blockReplicaIndex != 0 &&
+        !containerReplicaIndex.equals(blockReplicaIndex)) {
       throw new StorageContainerException(
           "Unable to find the Container with replicaIdx " + blockID.getReplicaIndex() + ". Container "
               + container.getContainerData().getContainerID() + " replicaIdx is "

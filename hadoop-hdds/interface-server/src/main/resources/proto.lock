@@ -806,31 +806,6 @@
             ]
           },
           {
-            "name": "StorageTypeProto",
-            "enum_fields": [
-              {
-                "name": "DISK",
-                "integer": 1
-              },
-              {
-                "name": "SSD",
-                "integer": 2
-              },
-              {
-                "name": "ARCHIVE",
-                "integer": 3
-              },
-              {
-                "name": "RAM_DISK",
-                "integer": 4
-              },
-              {
-                "name": "PROVIDED",
-                "integer": 5
-              }
-            ]
-          },
-          {
             "name": "ContainerReplicaProto.State",
             "enum_fields": [
               {
@@ -977,6 +952,10 @@
               {
                 "name": "reconstructECContainersCommand",
                 "integer": 11
+              },
+              {
+                "name": "reconcileContainerCommand",
+                "integer": 12
               }
             ]
           },
@@ -1427,6 +1406,30 @@
                     "value": "false"
                   }
                 ]
+              },
+              {
+                "id": 8,
+                "name": "committed",
+                "type": "uint64",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "0"
+                  }
+                ]
+              },
+              {
+                "id": 9,
+                "name": "freeSpaceToSpare",
+                "type": "uint64",
+                "optional": true,
+                "options": [
+                  {
+                    "name": "default",
+                    "value": "0"
+                  }
+                ]
               }
             ]
           },
@@ -1584,7 +1587,13 @@
                 "id": 10,
                 "name": "finalhash",
                 "type": "string",
-                "optional": true
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               },
               {
                 "id": 11,
@@ -1621,6 +1630,12 @@
                     "value": "false"
                   }
                 ]
+              },
+              {
+                "id": 16,
+                "name": "dataChecksum",
+                "type": "int64",
+                "optional": true
               }
             ]
           },
@@ -1729,7 +1744,13 @@
                 "id": 3,
                 "name": "bytesWritten",
                 "type": "uint64",
-                "optional": true
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               }
             ]
           },
@@ -1871,6 +1892,12 @@
                 "optional": true
               },
               {
+                "id": 13,
+                "name": "reconcileContainerCommandProto",
+                "type": "ReconcileContainerCommandProto",
+                "optional": true
+              },
+              {
                 "id": 15,
                 "name": "term",
                 "type": "int64",
@@ -1935,7 +1962,13 @@
                 "id": 4,
                 "name": "count",
                 "type": "int32",
-                "required": true
+                "optional": true,
+                "options": [
+                  {
+                    "name": "deprecated",
+                    "value": "true"
+                  }
+                ]
               }
             ]
           },
@@ -2304,6 +2337,23 @@
                 "required": true
               }
             ]
+          },
+          {
+            "name": "ReconcileContainerCommandProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "containerID",
+                "type": "int64",
+                "required": true
+              },
+              {
+                "id": 2,
+                "name": "peers",
+                "type": "DatanodeDetailsProto",
+                "is_repeated": true
+              }
+            ]
           }
         ],
         "services": [
@@ -2372,6 +2422,10 @@
               {
                 "name": "AddScm",
                 "integer": 15
+              },
+              {
+                "name": "GetClusterTree",
+                "integer": 16
               }
             ]
           },
@@ -2557,6 +2611,10 @@
               {
                 "name": "CONTAINER_ALREADY_CLOSING",
                 "integer": 46
+              },
+              {
+                "name": "UNSUPPORTED_OPERATION",
+                "integer": 47
               }
             ]
           },
@@ -2638,6 +2696,12 @@
                 "id": 15,
                 "name": "addScmRequestProto",
                 "type": "hadoop.hdds.AddScmRequestProto",
+                "optional": true
+              },
+              {
+                "id": 16,
+                "name": "getClusterTreeRequest",
+                "type": "GetClusterTreeRequestProto",
                 "optional": true
               }
             ]
@@ -2721,6 +2785,12 @@
                 "id": 15,
                 "name": "addScmResponse",
                 "type": "hadoop.hdds.AddScmResponseProto",
+                "optional": true
+              },
+              {
+                "id": 16,
+                "name": "getClusterTreeResponse",
+                "type": "GetClusterTreeResponseProto",
                 "optional": true
               }
             ]
@@ -2921,6 +2991,20 @@
                 "name": "node",
                 "type": "DatanodeDetailsProto",
                 "is_repeated": true
+              }
+            ]
+          },
+          {
+            "name": "GetClusterTreeRequestProto"
+          },
+          {
+            "name": "GetClusterTreeResponseProto",
+            "fields": [
+              {
+                "id": 1,
+                "name": "clusterTree",
+                "type": "InnerNode",
+                "required": true
               }
             ]
           }

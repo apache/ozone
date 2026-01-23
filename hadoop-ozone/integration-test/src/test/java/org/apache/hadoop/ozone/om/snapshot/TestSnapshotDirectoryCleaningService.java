@@ -1,68 +1,76 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.snapshot;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED;
+import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.DONE;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
+import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport.DiffReportEntry;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.service.SnapshotDirectoryCleaningService;
+import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
+import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicLong;
-
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Test Snapshot Directory Service.
  */
-@Timeout(300)
 public class TestSnapshotDirectoryCleaningService {
 
   private static final Logger LOG =
@@ -73,11 +81,13 @@ public class TestSnapshotDirectoryCleaningService {
   private static String volumeName;
   private static String bucketName;
   private static OzoneClient client;
+  private static AtomicLong counter = new AtomicLong(0L);
 
   @BeforeAll
   public static void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setInt(OMConfigKeys.OZONE_SNAPSHOT_DIRECTORY_SERVICE_INTERVAL, 2500);
+    conf.setInt(OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL, 2500);
+    conf.setBoolean(OZONE_SNAPSHOT_DEEP_CLEANING_ENABLED, true);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 2500,
         TimeUnit.MILLISECONDS);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
@@ -126,6 +136,7 @@ public class TestSnapshotDirectoryCleaningService {
 
   @SuppressWarnings("checkstyle:LineLength")
   @Test
+  @Flaky("HDDS-11129")
   public void testExclusiveSizeWithDirectoryDeepClean() throws Exception {
 
     Table<String, OmKeyInfo> deletedDirTable =
@@ -139,8 +150,10 @@ public class TestSnapshotDirectoryCleaningService {
         cluster.getOzoneManager().getMetadataManager().getDeletedTable();
     Table<String, SnapshotInfo> snapshotInfoTable =
         cluster.getOzoneManager().getMetadataManager().getSnapshotInfoTable();
-    SnapshotDirectoryCleaningService snapshotDirectoryCleaningService =
-        cluster.getOzoneManager().getKeyManager().getSnapshotDirectoryService();
+    DirectoryDeletingService directoryDeletingService =
+        cluster.getOzoneManager().getKeyManager().getDirDeletingService();
+    SnapshotChainManager snapshotChainManager = ((OmMetadataManagerImpl)cluster.getOzoneManager().getMetadataManager())
+        .getSnapshotChainManager();
 
     /*    DirTable
     /v/b/snapDir
@@ -219,11 +232,9 @@ public class TestSnapshotDirectoryCleaningService {
     fs.delete(root, true);
     assertTableRowCount(deletedKeyTable, 10);
     client.getObjectStore().createSnapshot(volumeName, bucketName, "snap3");
-    long prevRunCount = snapshotDirectoryCleaningService.getRunCount().get();
-    GenericTestUtils.waitFor(() -> snapshotDirectoryCleaningService.getRunCount().get()
+    long prevRunCount = directoryDeletingService.getRunCount().get();
+    GenericTestUtils.waitFor(() -> directoryDeletingService.getRunCount().get()
         > prevRunCount + 1, 100, 10000);
-
-    Thread.sleep(2000);
     Map<String, Long> expectedSize = new HashMap<String, Long>() {{
       // /v/b/snapDir/appRoot0/parentDir0-2/childFile contribute
       // exclusive size, /v/b/snapDir/appRoot0/parentDir0-2/childFile0-4
@@ -233,20 +244,94 @@ public class TestSnapshotDirectoryCleaningService {
         put("snap2", 5L);
         put("snap3", 0L);
       }};
-    Thread.sleep(500);
-    try (TableIterator<String, ? extends Table.KeyValue<String, SnapshotInfo>>
+
+    try (Table.KeyValueIterator<String, SnapshotInfo>
         iterator = snapshotInfoTable.iterator()) {
       while (iterator.hasNext()) {
         Table.KeyValue<String, SnapshotInfo> snapshotEntry = iterator.next();
         String snapshotName = snapshotEntry.getValue().getName();
-        assertEquals(expectedSize.get(snapshotName), snapshotEntry.getValue().
-            getExclusiveSize());
+
+        GenericTestUtils.waitFor(() -> {
+          try {
+            SnapshotInfo nextSnapshot = SnapshotUtils.getNextSnapshot(cluster.getOzoneManager(), snapshotChainManager,
+                snapshotEntry.getValue());
+            return nextSnapshot == null || (nextSnapshot.isDeepCleanedDeletedDir() && nextSnapshot.isDeepCleaned());
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        }, 1000, 10000);
+        SnapshotInfo snapshotInfo = snapshotInfoTable.get(snapshotEntry.getKey());
+        assertEquals(expectedSize.get(snapshotName),
+            snapshotInfo.getExclusiveSize() + snapshotInfo.getExclusiveSizeDeltaFromDirDeepCleaning());
         // Since for the test we are using RATIS/THREE
         assertEquals(expectedSize.get(snapshotName) * 3,
-            snapshotEntry.getValue().getExclusiveReplicatedSize());
-
+            snapshotInfo.getExclusiveReplicatedSize() + snapshotInfo.getExclusiveReplicatedSizeDeltaFromDirDeepCleaning());
       }
     }
+  }
+
+  private SnapshotDiffReportOzone getSnapDiffReport(String volume,
+      String bucket,
+      String fromSnapshot,
+      String toSnapshot)
+      throws InterruptedException, IOException {
+    SnapshotDiffResponse response;
+    do {
+      response = client.getObjectStore().snapshotDiff(volume, bucket, fromSnapshot,
+          toSnapshot, null, 0, true, true);
+      Thread.sleep(response.getWaitTimeInMs());
+    } while (response.getJobStatus() != DONE);
+    assertEquals(DONE, response.getJobStatus());
+    return response.getSnapshotDiffReport();
+  }
+
+  /**
+   * Testing Scenario:
+   * 1) Create dir1/dir2/dir3/dir4
+   * 2) Suspend KeyDeletingService & DirectoryDeletingService
+   * 3) Delete dir1/dir2
+   * 4) Create snapshot snap1
+   * 5) Create dir1/dir3/dir6
+   * 6) Create snapshot snap2
+   * 7) Resume KeyDeletingService & DirectoryDeletingService
+   * 8) Wait for snap1 to get Deep cleaned completely.
+   * 9) Create dir1/dir4/dir5
+   * 9) Create snapshot snap3
+   * 10) Perform SnapshotDiff b/w snap2 & snap3
+   * @throws Exception
+   */
+  @Test
+  public void testSnapshotDiffBeforeAndAfterDeepCleaning() throws Exception {
+    String volume = "vol-" + counter.incrementAndGet();
+    String bucket = "buc-" + counter.incrementAndGet();
+    // create a volume and a bucket to be used by OzoneFileSystem
+    OzoneBucket volBucket = TestDataUtil.createVolumeAndBucket(client, volume, bucket,
+        BucketLayout.FILE_SYSTEM_OPTIMIZED);
+    volBucket.createDirectory("dir1/dir2/dir3/dir4");
+    cluster.getOzoneManager().getKeyManager().getDirDeletingService().suspend();
+    cluster.getOzoneManager().getKeyManager().getDeletingService().suspend();
+    volBucket.deleteDirectory("dir1/dir2", true);
+    client.getObjectStore().createSnapshot(volume, bucket, "snap1");
+    volBucket.createDirectory("dir1/dir3/dir6");
+    client.getObjectStore().createSnapshot(volume, bucket, "snap2");
+    volBucket.createDirectory("dir1/dir4/dir5");
+    cluster.getOzoneManager().getKeyManager().getDirDeletingService().resume();
+    cluster.getOzoneManager().getKeyManager().getDeletingService().resume();
+    GenericTestUtils.waitFor(() -> {
+      try {
+        SnapshotInfo snapshotInfo = cluster.getOzoneManager().getSnapshotInfo(volume, bucket, "snap1");
+        return snapshotInfo.isDeepCleaned() && snapshotInfo.isDeepCleanedDeletedDir();
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }, 1000, 10000);
+    client.getObjectStore().createSnapshot(volume, bucket, "snap3");
+    SnapshotDiffReportOzone diff = getSnapDiffReport(volume, bucket, "snap2", "snap3");
+    assertEquals(2, diff.getDiffList().size());
+    assertEquals(Arrays.asList(
+        new DiffReportEntry(SnapshotDiffReport.DiffType.CREATE, StringUtils.string2Bytes("dir1/dir4")),
+        new DiffReportEntry(SnapshotDiffReport.DiffType.CREATE, StringUtils.string2Bytes("dir1/dir4/dir5"))),
+        diff.getDiffList());
   }
 
   private void assertTableRowCount(Table<String, ?> table, int count)

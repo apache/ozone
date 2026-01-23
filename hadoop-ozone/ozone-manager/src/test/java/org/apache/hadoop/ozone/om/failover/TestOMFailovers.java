@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,13 +17,14 @@
 
 package org.apache.hadoop.ozone.om.failover;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
-
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
@@ -38,11 +38,9 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.Test;
 import org.slf4j.event.Level;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Tests OM failover protocols using a Mock Failover provider and a Mock OM
@@ -54,13 +52,12 @@ public class TestOMFailovers {
   private Exception testException;
 
   @Test
-  public void testAccessContorlExceptionFailovers() throws Exception {
+  public void testAccessControlExceptionFailovers() throws Exception {
 
     testException = new AccessControlException();
 
-    GenericTestUtils.setLogLevel(OMFailoverProxyProviderBase.LOG, Level.DEBUG);
-    GenericTestUtils.LogCapturer logCapturer = GenericTestUtils.LogCapturer
-        .captureLogs(OMFailoverProxyProviderBase.LOG);
+    GenericTestUtils.setLogLevel(OMFailoverProxyProviderBase.class, Level.DEBUG);
+    LogCapturer logCapturer = LogCapturer.captureLogs(OMFailoverProxyProviderBase.class);
 
     MockFailoverProxyProvider failoverProxyProvider =
         new MockFailoverProxyProvider(conf);
@@ -76,7 +73,7 @@ public class TestOMFailovers {
     // Request should try all OMs one be one and fail when the last OM also
     // throws AccessControlException.
     assertThat(serviceException).hasCauseInstanceOf(AccessControlException.class)
-        .hasMessage("ServiceException of type class org.apache.hadoop.security.AccessControlException for om3");
+        .hasMessageStartingWith("ServiceException of type class org.apache.hadoop.security.AccessControlException");
     assertThat(logCapturer.getOutput()).contains(getRetryProxyDebugMsg("om1"));
     assertThat(logCapturer.getOutput()).contains(getRetryProxyDebugMsg("om2"));
     assertThat(logCapturer.getOutput()).contains(getRetryProxyDebugMsg("om3"));
@@ -107,8 +104,7 @@ public class TestOMFailovers {
     }
   }
 
-  private final class MockFailoverProxyProvider
-      extends HadoopRpcOMFailoverProxyProvider {
+  private final class MockFailoverProxyProvider extends HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> {
 
     private MockFailoverProxyProvider(ConfigurationSource configuration)
         throws IOException {
@@ -116,31 +112,28 @@ public class TestOMFailovers {
     }
 
     @Override
-    protected ProxyInfo createOMProxy(String nodeId) {
-      ProxyInfo proxyInfo = new ProxyInfo<>(new MockOzoneManagerProtocol(nodeId,
-          testException), nodeId);
-      getOMProxyMap().put(nodeId, proxyInfo);
-      return proxyInfo;
+    protected ProxyInfo<OzoneManagerProtocolPB> createOMProxyIfNeeded(
+        OMProxyInfo<OzoneManagerProtocolPB> omProxyInfo) {
+      if (omProxyInfo.proxy == null) {
+        omProxyInfo.proxy = new MockOzoneManagerProtocol(omProxyInfo.getNodeId(), testException);
+      }
+      return omProxyInfo;
     }
 
     @Override
-    protected void loadOMClientConfigs(ConfigurationSource config,
+    protected void initOmProxiesFromConfigs(ConfigurationSource config,
         String omSvcId) {
-      HashMap<String, ProxyInfo<OzoneManagerProtocolPB>> omProxies =
-          new HashMap<>();
-      HashMap<String, OMProxyInfo> omProxyInfos = new HashMap<>();
-      HashMap<String, InetSocketAddress> omNodeAddressMap = new HashMap<>();
+      HashMap<String, OMProxyInfo<OzoneManagerProtocolPB>> omProxyInfos = new HashMap<>();
       ArrayList<String> omNodeIDList = new ArrayList<>();
 
       for (int i = 1; i <= 3; i++) {
         String nodeId = "om" + i;
-        omProxies.put(nodeId, null);
-        omProxyInfos.put(nodeId, null);
+        OMProxyInfo<OzoneManagerProtocolPB> omProxyInfo = new OMProxyInfo<>(omSvcId, nodeId,
+            "127.0.0.1:9862");
+        omProxyInfos.put(nodeId, omProxyInfo);
         omNodeIDList.add(nodeId);
-        omNodeAddressMap.put(nodeId, null);
       }
-      setProxiesForTesting(omProxies, omProxyInfos, omNodeIDList,
-          omNodeAddressMap);
+      initOmProxies(omProxyInfos, omNodeIDList);
     }
 
     @Override

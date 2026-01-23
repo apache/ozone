@@ -1,24 +1,28 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.s3.signature;
 
-import javax.ws.rs.container.ContainerRequestContext;
-import javax.ws.rs.core.MultivaluedMap;
+import static java.time.temporal.ChronoUnit.SECONDS;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.UNSIGNED_PAYLOAD;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
+
+import com.google.common.annotations.VisibleForTesting;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -36,15 +40,12 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-
+import javax.ws.rs.container.ContainerRequestContext;
+import javax.ws.rs.core.MultivaluedMap;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.signature.AWSSignatureProcessor.LowerCaseKeyStringMap;
 import org.apache.hadoop.ozone.s3.util.S3Utils;
-import org.apache.hadoop.util.StringUtils;
-
-import com.google.common.annotations.VisibleForTesting;
-import static java.time.temporal.ChronoUnit.SECONDS;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.S3_AUTHINFO_CREATION_ERROR;
 import org.apache.kerby.util.Hex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,14 +55,12 @@ import org.slf4j.LoggerFactory;
  */
 public final class StringToSignProducer {
 
-  public static final String X_AMZ_CONTENT_SHA256 = "x-amz-content-sha256";
   public static final String X_AMAZ_DATE = "x-amz-date";
   private static final Logger LOG =
       LoggerFactory.getLogger(StringToSignProducer.class);
   private static final Charset UTF_8 = StandardCharsets.UTF_8;
   private static final String NEWLINE = "\n";
   public static final String HOST = "host";
-  private static final String UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
   /**
    * Seconds in a week, which is the max expiration time Sig-v4 accepts.
    */
@@ -110,15 +109,15 @@ public final class StringToSignProducer {
 
     // If the absolute path is empty, use a forward slash (/)
     String uri = signatureInfo.getUnfilteredURI();
-    uri = (uri.trim().length() > 0) ? uri : "/";
+    uri = StringUtils.isNotBlank(uri) ? uri : "/";
     // Encode URI and preserve forward slashes
-    strToSign.append(signatureInfo.getAlgorithm() + NEWLINE);
+    strToSign.append(signatureInfo.getAlgorithm()).append(NEWLINE);
     if (signatureInfo.getDateTime() == null) {
       LOG.error("DateTime Header not found.");
       throw S3_AUTHINFO_CREATION_ERROR;
     }
-    strToSign.append(signatureInfo.getDateTime() + NEWLINE);
-    strToSign.append(credentialScope + NEWLINE);
+    strToSign.append(signatureInfo.getDateTime()).append(NEWLINE);
+    strToSign.append(credentialScope).append(NEWLINE);
 
     String canonicalRequest = buildCanonicalRequest(
         scheme,
@@ -175,9 +174,9 @@ public final class StringToSignProducer {
 
     StringBuilder canonicalHeaders = new StringBuilder();
 
-    for (String header : StringUtils.getStringCollection(signedHeaders, ";")) {
+    for (String header : StringUtils.split(signedHeaders, ';')) {
       canonicalHeaders.append(header.toLowerCase());
-      canonicalHeaders.append(":");
+      canonicalHeaders.append(':');
       if (headers.containsKey(header)) {
         String headerValue = headers.get(header);
         canonicalHeaders.append(headerValue);
@@ -201,30 +200,45 @@ public final class StringToSignProducer {
     validateCanonicalHeaders(canonicalHeaders.toString(), headers,
         unsignedPayload);
 
-    String payloadHash;
-    if (UNSIGNED_PAYLOAD.equals(
-        headers.get(X_AMZ_CONTENT_SHA256)) || unsignedPayload) {
-      payloadHash = UNSIGNED_PAYLOAD;
-    } else {
-      // According to AWS Sig V4 documentation
-      // https://docs.aws.amazon.com/AmazonS3/latest/API/
-      // sig-v4-header-based-auth.html
-      // Note: The x-amz-content-sha256 header is required
-      // for all AWS Signature Version 4 requests.(using Authorization header)
-      if (!headers.containsKey(X_AMZ_CONTENT_SHA256)) {
-        LOG.error("The request must include " + X_AMZ_CONTENT_SHA256
-            + " header for signed payload");
-        throw S3_AUTHINFO_CREATION_ERROR;
-      }
-      payloadHash = headers.get(X_AMZ_CONTENT_SHA256);
-    }
-    String canonicalRequest = method + NEWLINE
+    String payloadHash = getPayloadHash(headers, unsignedPayload);
+
+    return method + NEWLINE
         + canonicalUri + NEWLINE
         + canonicalQueryStr + NEWLINE
         + canonicalHeaders + NEWLINE
         + signedHeaders + NEWLINE
         + payloadHash;
-    return canonicalRequest;
+  }
+
+  private static String getPayloadHash(Map<String, String> headers, boolean isUsingQueryParameter)
+      throws OS3Exception {
+    if (isUsingQueryParameter) {
+      // According to AWS Signature V4 documentation using Query Parameters
+      // https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-query-string-auth.html
+      return UNSIGNED_PAYLOAD;
+    }
+    String contentSignatureHeaderValue = headers.get(X_AMZ_CONTENT_SHA256);
+    // According to AWS Signature V4 documentation using Authorization Header
+    // https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html
+    // The x-amz-content-sha256 header is required
+    // for all AWS Signature Version 4 requests using Authorization header.
+    if (contentSignatureHeaderValue == null) {
+      LOG.error("The request must include " + X_AMZ_CONTENT_SHA256
+          + " header for signed payload");
+      throw S3_AUTHINFO_CREATION_ERROR;
+    }
+    // Simply return the header value of x-amz-content-sha256 as the payload hash
+    // These are the possible cases:
+    // 1. Actual payload checksum for single chunk upload
+    // 2. Unsigned payloads for multiple chunks upload
+    //    - UNSIGNED-PAYLOAD
+    //    - STREAMING-UNSIGNED-PAYLOAD-TRAILER
+    // 3. Signed payloads for multiple chunks upload
+    //    - STREAMING-AWS4-HMAC-SHA256-PAYLOAD
+    //    - STREAMING-AWS4-HMAC-SHA256-PAYLOAD-TRAILER
+    //    - STREAMING-AWS4-ECDSA-P256-SHA256-PAYLOAD
+    //    - STREAMING-AWS4-ECDSA-P256-SHA256-PAYLOAD-TRAILER
+    return contentSignatureHeaderValue;
   }
 
   /**
@@ -290,7 +304,7 @@ public final class StringToSignProducer {
     for (String p : params) {
       if (!p.equals("X-Amz-Signature")) {
         if (result.length() > 0) {
-          result.append("&");
+          result.append('&');
         }
         result.append(urlEncode(p));
         result.append('=');
@@ -323,7 +337,7 @@ public final class StringToSignProducer {
       }
       break;
     case X_AMZ_CONTENT_SHA256:
-      // TODO: Construct request payload and match HEX(SHA256(requestPayload))
+      // Validate x-amz-content-sha256 during upload, before committing the key.
       break;
     default:
       break;
@@ -354,6 +368,12 @@ public final class StringToSignProducer {
         .filter(s -> s.startsWith("x-amz-"))
         .collect(Collectors.toSet())) {
       if (!(canonicalHeaders.contains(header + ":"))) {
+        // According to AWS Signature V4 documentation using Authorization Header
+        // https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html
+        // The x-amz-content-sha256 header is not required for CanonicalHeaders
+        if (X_AMZ_CONTENT_SHA256.equals(header)) {
+          continue;
+        }
         LOG.error("The SignedHeaders list must include all "
             + "x-amz-* headers in the request");
         throw S3_AUTHINFO_CREATION_ERROR;

@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,13 +14,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.multitenant;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_ENABLED;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.isDone;
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.isStarting;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+
 import com.google.protobuf.ServiceException;
-import org.apache.hadoop.hdds.utils.IOUtils;
+import java.io.IOException;
+import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -30,31 +42,18 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.rpc.RpcClient;
 import org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl;
+import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
-import org.apache.hadoop.ozone.upgrade.UpgradeFinalizer;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils.VoidCallable;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-
-import java.io.IOException;
-import java.util.UUID;
-import java.util.concurrent.TimeoutException;
-
-import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isDone;
-import static org.apache.hadoop.ozone.admin.scm.FinalizeUpgradeCommandUtil.isStarting;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_ENABLED;
-import static org.apache.hadoop.ozone.om.OmUpgradeConfig.ConfigStrings.OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.fail;
+import org.junit.jupiter.api.Test;
 
 /**
  * Tests that S3 requests for a tenant are directed to that tenant's volume,
@@ -77,7 +76,7 @@ public class TestMultiTenantVolume {
     conf.setBoolean(
         OMMultiTenantManagerImpl.OZONE_OM_TENANT_DEV_SKIP_RANGER, true);
     conf.setBoolean(OZONE_OM_MULTITENANCY_ENABLED, true);
-    conf.setInt(OZONE_OM_INIT_DEFAULT_LAYOUT_VERSION, OMLayoutFeature.INITIAL_VERSION.layoutVersion());
+    conf.setInt(OMStorage.TESTING_INIT_LAYOUT_VERSION_KEY, OMLayoutFeature.INITIAL_VERSION.layoutVersion());
     MiniOzoneCluster.Builder builder = MiniOzoneCluster.newBuilder(conf)
         .withoutDatanodes();
     cluster = builder.build();
@@ -148,7 +147,7 @@ public class TestMultiTenantVolume {
     final OzoneManagerProtocol omClient = client.getObjectStore()
         .getClientProxy().getOzoneManagerClient();
     final String upgradeClientID = "Test-Upgrade-Client-" + UUID.randomUUID();
-    UpgradeFinalizer.StatusAndMessages finalizationResponse =
+    UpgradeFinalization.StatusAndMessages finalizationResponse =
         omClient.finalizeUpgrade(upgradeClientID);
 
     // The status should transition as soon as the client call above returns
@@ -158,7 +157,7 @@ public class TestMultiTenantVolume {
     // 10s timeout should be plenty.
     GenericTestUtils.waitFor(() -> {
       try {
-        final UpgradeFinalizer.StatusAndMessages progress =
+        final UpgradeFinalization.StatusAndMessages progress =
             omClient.queryUpgradeFinalizationProgress(
                 upgradeClientID, false, false);
         return isDone(progress.status());
@@ -312,7 +311,9 @@ public class TestMultiTenantVolume {
           OMException.class,
           () -> store.createTenant(tenantId));
 
-      assertThat(e.getMessage()).contains("Invalid volume name: " + tenantId);
+      assertThat(e.getMessage())
+          .contains("unsupported character")
+          .contains("_");
     }
   }
 }

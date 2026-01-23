@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,6 +17,18 @@
 
 package org.apache.hadoop.ozone.genconf;
 
+import java.io.File;
+import java.io.IOException;
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.Callable;
+import javax.xml.bind.JAXBContext;
+import javax.xml.bind.JAXBException;
+import javax.xml.bind.Marshaller;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -28,19 +39,7 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
-import picocli.CommandLine.PicocliException;
 
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.JAXBException;
-import javax.xml.bind.Marshaller;
-import java.io.File;
-import java.io.IOException;
-import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.InvalidPathException;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
 /**
  * GenerateOzoneRequiredConfigurations - A tool to generate ozone-site.xml<br>
  * This tool generates an ozone-site.xml with minimally required configs.
@@ -56,7 +55,7 @@ import java.util.List;
     description = "Tool to generate template ozone-site.xml",
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true)
-public final class GenerateOzoneRequiredConfigurations extends GenericCli {
+public final class GenerateOzoneRequiredConfigurations extends GenericCli implements Callable<Void> {
 
   @Parameters(arity = "1..1",
       description = "Directory path where ozone-site file should be generated.")
@@ -66,50 +65,25 @@ public final class GenerateOzoneRequiredConfigurations extends GenericCli {
       "template, update Kerberos principal and keytab file before use.")
   private boolean genSecurityConf;
 
-  /**
-   * Entry point for using genconf tool.
-   *
-   * @param args
-   *
-   */
   public static void main(String[] args) throws Exception {
     new GenerateOzoneRequiredConfigurations().run(args);
   }
 
   @Override
   public Void call() throws Exception {
-    generateConfigurations(path, genSecurityConf);
+    generateConfigurations();
     return null;
   }
 
-  /**
-   * Generate ozone-site.xml at specified path.
-   * @param path
-   * @throws PicocliException
-   * @throws JAXBException
-   */
-  public static void generateConfigurations(String path) throws
-      PicocliException, JAXBException, IOException {
-    generateConfigurations(path, false);
-  }
-
-  /**
-   * Generate ozone-site.xml at specified path.
-   * @param path
-   * @param genSecurityConf
-   * @throws PicocliException
-   * @throws JAXBException
-   */
-  public static void generateConfigurations(String path,
-      boolean genSecurityConf) throws
-      PicocliException, JAXBException, IOException {
+  private void generateConfigurations() throws
+      JAXBException, IOException {
 
     if (!isValidPath(path)) {
-      throw new PicocliException("Invalid directory path.");
+      throw new IllegalArgumentException("Invalid directory path.");
     }
 
     if (!canWrite(path)) {
-      throw new PicocliException("Insufficient permission.");
+      throw new IllegalArgumentException("Insufficient permission.");
     }
 
     OzoneConfiguration oc = new OzoneConfiguration();
@@ -169,9 +143,9 @@ public final class GenerateOzoneRequiredConfigurations extends GenericCli {
       m.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
       m.marshal(generatedConfig, output);
 
-      System.out.println("ozone-site.xml has been generated at " + path);
+      out().println("ozone-site.xml has been generated at " + path);
     } else {
-      System.out.printf("ozone-site.xml already exists at %s and " +
+      out().printf("ozone-site.xml already exists at %s and " +
           "will not be overwritten%n", path);
     }
 
@@ -180,21 +154,19 @@ public final class GenerateOzoneRequiredConfigurations extends GenericCli {
   /**
    * Check if the path is valid directory.
    *
-   * @param path
    * @return true, if path is valid directory, else return false
    */
   public static boolean isValidPath(String path) {
     try {
       return Files.isDirectory(Paths.get(path));
     } catch (InvalidPathException | NullPointerException ex) {
-      return Boolean.FALSE;
+      return false;
     }
   }
 
   /**
    * Check if user has permission to write in the specified path.
    *
-   * @param path
    * @return true, if the user has permission to write, else returns false
    */
   public static boolean canWrite(String path) {

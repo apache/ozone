@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,16 +14,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.hadoop.hdds.scm.container.placement.algorithms;
-import java.lang.reflect.Constructor;
 
+package org.apache.hadoop.hdds.scm.container.placement.algorithms;
+
+import java.lang.reflect.Constructor;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,14 +38,13 @@ public final class ContainerPlacementPolicyFactory {
 
   private static final Class<? extends PlacementPolicy>
       OZONE_SCM_CONTAINER_PLACEMENT_IMPL_DEFAULT =
-      SCMContainerPlacementRandom.class;
+      SCMContainerPlacementRackAware.class;
   private static final Class<? extends PlacementPolicy>
       OZONE_SCM_CONTAINER_PLACEMENT_EC_IMPL_DEFAULT =
       SCMContainerPlacementRackScatter.class;
 
   private ContainerPlacementPolicyFactory() {
   }
-
 
   public static PlacementPolicy getPolicy(
       ConfigurationSource conf, final NodeManager nodeManager,
@@ -64,7 +62,6 @@ public final class ContainerPlacementPolicyFactory {
       ConfigurationSource conf, final NodeManager nodeManager,
       NetworkTopology clusterMap, final boolean fallback,
       SCMContainerPlacementMetrics metrics) throws SCMException {
-    // TODO: Change default placement policy for EC
     final Class<? extends PlacementPolicy> placementClass = conf
         .getClass(ScmConfigKeys.OZONE_SCM_CONTAINER_PLACEMENT_EC_IMPL_KEY,
             OZONE_SCM_CONTAINER_PLACEMENT_EC_IMPL_DEFAULT,

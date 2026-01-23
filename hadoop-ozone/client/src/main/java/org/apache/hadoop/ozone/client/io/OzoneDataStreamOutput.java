@@ -1,29 +1,32 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
-package org.apache.hadoop.ozone.client.io;
 
-import org.apache.hadoop.crypto.CryptoOutputStream;
-import org.apache.hadoop.hdds.scm.storage.ByteBufferStreamOutput;
-import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
+package org.apache.hadoop.ozone.client.io;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import org.apache.hadoop.crypto.CryptoOutputStream;
+import org.apache.hadoop.fs.Syncable;
+import org.apache.hadoop.hdds.scm.storage.ByteBufferStreamOutput;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartCommitUploadPartInfo;
 
 /**
  * OzoneDataStreamOutput is used to write data into Ozone.
@@ -32,14 +35,52 @@ public class OzoneDataStreamOutput extends ByteBufferOutputStream
     implements  KeyMetadataAware {
 
   private final ByteBufferStreamOutput byteBufferStreamOutput;
+  private boolean enableHsync;
+  private final Syncable syncable;
 
   /**
-   * Constructs OzoneDataStreamOutput with KeyDataStreamOutput.
+   * Constructs an instance with a {@link Syncable} {@link OutputStream}.
    *
-   * @param byteBufferStreamOutput the underlying ByteBufferStreamOutput
+   * @param outputStream an {@link OutputStream} which is {@link Syncable}.
+   * @param enableHsync if false, hsync() executes flush() instead.
    */
-  public OzoneDataStreamOutput(ByteBufferStreamOutput byteBufferStreamOutput) {
-    this.byteBufferStreamOutput = byteBufferStreamOutput;
+  public OzoneDataStreamOutput(Syncable outputStream, boolean enableHsync) {
+    this(Optional.of(Objects.requireNonNull(outputStream,
+                "outputStream == null"))
+            .filter(s -> s instanceof OzoneDataStreamOutput)
+            .map(s -> (OzoneDataStreamOutput)s)
+            .orElseThrow(() -> new IllegalArgumentException(
+                "The parameter syncable is not an OutputStream")),
+        outputStream, enableHsync);
+  }
+
+  /**
+   * Constructs an instance with a (non-{@link Syncable}) {@link ByteBufferStreamOutput}
+   * with an optional {@link Syncable} object.
+   *
+   * @param byteBufferStreamOutput for writing data.
+   * @param syncable an optional parameter
+   *                 for accessing the {@link Syncable} feature.
+   */
+  public OzoneDataStreamOutput(ByteBufferStreamOutput byteBufferStreamOutput, Syncable syncable) {
+    this(byteBufferStreamOutput, syncable, false);
+  }
+
+  /**
+   * Constructs an instance with a (non-{@link Syncable}) {@link ByteBufferStreamOutput}
+   * with an optional {@link Syncable} object.
+   *
+   * @param byteBufferStreamOutput for writing data.
+   * @param syncable an optional parameter
+   *                 for accessing the {@link Syncable} feature.
+   * @param enableHsync if false, hsync() executes flush() instead.
+   */
+  public OzoneDataStreamOutput(ByteBufferStreamOutput byteBufferStreamOutput, Syncable syncable,
+                               boolean enableHsync) {
+    this.byteBufferStreamOutput = Objects.requireNonNull(byteBufferStreamOutput,
+        "byteBufferStreamOutput == null");
+    this.syncable = syncable != null ? syncable : byteBufferStreamOutput;
+    this.enableHsync = enableHsync;
   }
 
   @Override
@@ -91,6 +132,29 @@ public class OzoneDataStreamOutput extends ByteBufferOutputStream
     }
     // Otherwise return null.
     return null;
+  }
+
+  @Override
+  public void hflush() throws IOException {
+    hsync();
+  }
+
+  @Override
+  public void hsync() throws IOException {
+    // Disable the feature flag restores the prior behavior.
+    if (!enableHsync) {
+      byteBufferStreamOutput.flush();
+      return;
+    }
+    if (syncable != null) {
+      if (byteBufferStreamOutput != syncable) {
+        byteBufferStreamOutput.flush();
+      }
+      syncable.hsync();
+    } else {
+      throw new UnsupportedOperationException(byteBufferStreamOutput.getClass()
+          + " is not " + Syncable.class.getSimpleName());
+    }
   }
 
   public ByteBufferStreamOutput getByteBufStreamOutput() {

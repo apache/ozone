@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -22,30 +21,33 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_OM_SNAPSHOT_DB;
 import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_OM_SNAPSHOT_DB_DIR;
 
+import com.google.common.base.Strings;
 import java.io.File;
 import java.io.IOException;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-
 import javax.inject.Inject;
 import javax.inject.Singleton;
-
-import com.google.common.base.Strings;
 import org.apache.commons.compress.utils.Lists;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
+import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.cache.TableCache;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.hdds.utils.db.DBStore;
-import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.recon.ReconUtils;
-import org.eclipse.jetty.util.StringUtil;
+import org.apache.hadoop.ozone.recon.api.types.ReconBasicOmKeyInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,9 +74,29 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
     this.ozoneConfiguration = configuration;
   }
 
+  private ReconOmMetadataManagerImpl(OzoneConfiguration configuration, File dir, String name, ReconUtils reconUtils)
+      throws IOException {
+    super(configuration, dir, name);
+    this.reconUtils = reconUtils;
+    this.ozoneConfiguration = configuration;
+  }
+
   @Override
-  public ReentrantReadWriteLock getTableLock(String tableName) {
-    return super.getTableLock(tableName);
+  public ReconOMMetadataManager createCheckpointReconMetadataManager(
+      OzoneConfiguration conf, DBCheckpoint checkpoint) throws IOException {
+    Path path = checkpoint.getCheckpointLocation();
+    Path parent = path.getParent();
+    if (parent == null) {
+      throw new IOException("DB checkpoint parent path should not "
+          + "have been null. Checkpoint path is " + path);
+    }
+    File dir = parent.toFile();
+    Path name = path.getFileName();
+    if (name == null) {
+      throw new IOException("DB checkpoint dir name should not "
+          + "have been null. Checkpoint path is " + path);
+    }
+    return new ReconOmMetadataManagerImpl(conf, dir, name.toString(), new ReconUtils());
   }
 
   @Override
@@ -87,36 +109,38 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
     if (lastKnownOMSnapshot != null) {
       LOG.info("Last known snapshot for OM : {}",
           lastKnownOMSnapshot.getAbsolutePath());
-      initializeNewRdbStore(lastKnownOMSnapshot);
+      initializeNewRdbStore(lastKnownOMSnapshot, true);
     }
   }
 
   /**
    * Replace existing DB instance with new one.
    *
-   * @param dbFile new DB file location.
+   * @param dbFile          new DB file location.
+   * @param addCacheMetrics
    */
-  private void initializeNewRdbStore(File dbFile) throws IOException {
+  private void initializeNewRdbStore(File dbFile, boolean addCacheMetrics) throws IOException {
     try {
-      DBStoreBuilder dbStoreBuilder =
-          DBStoreBuilder.newBuilder(ozoneConfiguration)
-          .setName(dbFile.getName())
-          .setPath(dbFile.toPath().getParent());
-      addOMTablesAndCodecs(dbStoreBuilder);
-      setStore(dbStoreBuilder.build());
+      setStore(DBStoreBuilder.newBuilder(ozoneConfiguration, OMDBDefinition.get(), dbFile).build());
       LOG.info("Created OM DB handle from snapshot at {}.",
           dbFile.getAbsolutePath());
     } catch (IOException ioEx) {
       LOG.error("Unable to initialize Recon OM DB snapshot store.", ioEx);
     }
     if (getStore() != null) {
-      initializeOmTables(TableCache.CacheType.FULL_CACHE, true);
+      initializeOmTables(TableCache.CacheType.FULL_CACHE, addCacheMetrics);
       omTablesInitialized = true;
     }
   }
 
   @Override
-  public void updateOmDB(File newDbLocation) throws IOException {
+  public Table<String, ReconBasicOmKeyInfo> getKeyTableBasic(BucketLayout bucketLayout) throws IOException {
+    String tableName = bucketLayout.isFileSystemOptimized() ? OMDBDefinition.FILE_TABLE : OMDBDefinition.KEY_TABLE;
+    return getStore().getTable(tableName, StringCodec.get(), ReconBasicOmKeyInfo.getCodec());
+  }
+
+  @Override
+  public void updateOmDB(File newDbLocation, boolean addCacheMetrics) throws IOException {
     if (getStore() != null) {
       File oldDBLocation = getStore().getDbLocation();
       if (oldDBLocation.exists()) {
@@ -127,7 +151,7 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
     }
     DBStore current = getStore();
     try {
-      initializeNewRdbStore(newDbLocation);
+      initializeNewRdbStore(newDbLocation, addCacheMetrics);
     } finally {
       // Always close DBStore if it's replaced.
       if (current != null && current != getStore()) {
@@ -175,8 +199,16 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
     // Unlike in {@link OmMetadataManagerImpl}, the volumes are queried directly
     // from the volume table (not through cache) since Recon does not use
     // Table cache.
+    Table<String, OmVolumeArgs>  volumeTable = getVolumeTable();
+
+    // If the table is not yet initialized, i.e. it is null
+    // Return empty list as response
+    if (volumeTable == null) {
+      return result;
+    }
+
     try (TableIterator<String, ? extends Table.KeyValue<String, OmVolumeArgs>>
-             iterator = getVolumeTable().iterator()) {
+                 iterator = volumeTable.iterator()) {
 
       while (iterator.hasNext() && result.size() < maxKeys) {
         Table.KeyValue<String, OmVolumeArgs> kv = iterator.next();
@@ -237,7 +269,7 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
 
     String startKey;
     boolean skipStartKey = false;
-    if (StringUtil.isNotBlank(startBucket)) {
+    if (StringUtils.isNotBlank(startBucket)) {
       startKey = getBucketKey(volumeName, startBucket);
       skipStartKey = true;
     } else {
@@ -285,6 +317,7 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
    * @return buckets under volume or all buckets if volume is null
    * @throws IOException IOE
    */
+  @Override
   public List<OmBucketInfo> listBucketsUnderVolume(final String volumeName)
       throws IOException {
     return listBucketsUnderVolume(volumeName, null,
@@ -302,6 +335,11 @@ public class ReconOmMetadataManagerImpl extends OmMetadataManagerImpl
 
     int currentCount = 0;
     Table<String, OmBucketInfo> bucketTable = getBucketTable();
+    // If the table is not yet initialized, i.e. it is null
+    // Return empty list as response
+    if (bucketTable == null) {
+      return result;
+    }
 
     try (TableIterator<String, ? extends Table.KeyValue<String, OmBucketInfo>>
              iterator = bucketTable.iterator()) {

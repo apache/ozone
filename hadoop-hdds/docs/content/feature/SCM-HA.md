@@ -33,21 +33,13 @@ This document explains the HA setup of Storage Container Manager (SCM), please c
 
 ## Configuration
 
-HA mode of Storage Container Manager can be enabled with the following settings in `ozone-site.xml`:
-
-```XML
-<property>
-   <name>ozone.scm.ratis.enable</name>
-   <value>true</value>
-</property>
-```
 One Ozone configuration (`ozone-site.xml`) can support multiple SCM HA node set, multiple Ozone clusters. To select between the available SCM nodes a logical name is required for each of the clusters which can be resolved to the IP addresses (and domain names) of the Storage Container Managers.
 
 This logical name is called `serviceId` and can be configured in the `ozone-site.xml`
 
 Most of the time you need to set only the values of your current cluster:
 
- ```XML
+ ```xml
 <property>
    <name>ozone.scm.service.ids</name>
    <value>cluster1</value>
@@ -56,7 +48,7 @@ Most of the time you need to set only the values of your current cluster:
 
 For each of the defined `serviceId` a logical configuration name should be defined for each of the servers
 
-```XML
+```xml
 <property>
    <name>ozone.scm.nodes.cluster1</name>
    <value>scm1,scm2,scm3</value>
@@ -65,7 +57,7 @@ For each of the defined `serviceId` a logical configuration name should be defin
 
 The defined prefixes can be used to define the address of each of the SCM services:
 
-```XML
+```xml
 <property>
    <name>ozone.scm.address.cluster1.scm1</name>
    <value>host1</value>
@@ -96,7 +88,86 @@ Second and third nodes should be *bootstrapped* instead of init. These clusters 
 ozone scm --bootstrap
 ```
 
-Note: both commands perform one-time initialization.  SCM still needs to be started by running `ozone scm --daemon start`.
+Note: both commands perform one-time initialization.  SCM still needs to be started by running `ozone --daemon start scm`.
+
+## SCM Leader Transfer
+
+The `ozone admin scm transfer` command allows you to manually transfer the leadership of the Storage Container Manager (SCM) Raft group to a specific SCM node or to a randomly chosen follower.
+
+Be aware of the node's status(eg. Safemode, Operational status), ozone currently has no ability to check the target node's status before transfering the leadership.
+
+### Usage
+
+```bash
+ozone admin scm transfer -id <SCM_SERVICE_ID> -n <NEW_LEADER_ID>
+ozone admin scm transfer -id <SCM_SERVICE_ID> -r
+```
+
+*   `-id, --service-id`: Specifies the SCM Service ID.
+*   `-n, --newLeaderId, --new-leader-id`: The SCM UUID (Raft peer ID) of the SCM to which leadership will be transferred (e.g., `e6877ce5-56cd-4f0b-ad60-4c8ef9000882`).
+*   `-r, --random`: Randomly chooses a follower to transfer leadership to.
+
+### Example
+
+To transfer leadership to a specific SCM in a cluster with service ID `cluster1`:
+
+```bash
+ozone admin scm transfer -id cluster1 -n e6877ce5-56cd-4f0b-ad60-4c8ef9000882
+```
+
+To transfer leadership to a random follower:
+
+```bash
+ozone admin scm transfer -id cluster1 -r
+```
+
+## SCM Service Roles Listing
+
+The `ozone admin scm roles` command lists all Storage Container Managers and their respective Raft server roles (leader, follower, or candidate).
+
+### Usage
+
+```bash
+ozone admin scm roles [--json | --table]
+```
+
+*   `--json`: (Optional) Formats the output as JSON.
+*   `--table`: (Optional) Formats the output as a table.
+
+### Example
+
+To list SCM roles:
+
+```bash
+ozone admin scm roles
+```
+
+Example output:
+
+```
+host1:9876:LEADER:e6877ce5-56cd-4f0b-ad60-4c8ef9000882:192.168.1.1
+host2:9876:FOLLOWER:f2ba1c28-486a-4192-9a5f-b3752fe27d6b:192.168.1.2
+host3:9876:FOLLOWER:9c8d2b3a-e4f5-6789-0123-456789abcdef:192.168.1.3
+```
+
+To list SCM roles as a table:
+
+```bash
+ozone admin scm roles --table
+```
+
+Example table output:
+
+```
+Storage Container Manager Roles
+------------------------------------------------------------------------------------
+Host Name | Ratis Port | Role     | Node ID                                  | Host Address
+------------------------------------------------------------------------------------
+host1     | 9876       | LEADER   | e6877ce5-56cd-4f0b-ad60-4c8ef9000882     | 192.168.1.1
+host2     | 9876       | FOLLOWER | f2ba1c28-486a-4192-9a5f-b3752fe27d6b     | 192.168.1.2
+host3     | 9876       | FOLLOWER | 9c8d2b3a-e4f5-6789-0123-456789abcdef     | 192.168.1.3
+------------------------------------------------------------------------------------
+```
 
 ## Auto-bootstrap
 
@@ -107,7 +178,7 @@ In some environments (e.g. Kubernetes) we need to have a common, unified way to 
 
 This can be improved: primordial SCM can be configured by setting `ozone.scm.primordial.node.id` in the config to one of the nodes.
 
-```XML
+```xml
 <property>
    <name>ozone.scm.primordial.node.id</name>
    <value>scm1</value>
@@ -121,7 +192,7 @@ Note: SCM still needs to be started after the init/bootstrap process.
 ```
 ozone scm --init
 ozone scm --bootstrap
-ozone scm --daemon start
+ozone --daemon start scm
 ```
 
 For Docker/Kubernetes, use `ozone scm` to start it in the foreground.
@@ -144,14 +215,14 @@ Sub-CA on the SCM’s are used to issue signed certificates for OM/DN in the clu
 
 ### How to enable security:
 
-```XML
+```xml
 <property>
-<config>ozone.security.enable</config>
+<name>ozone.security.enable</name>
 <value>true</value>
 </property>
 
 <property>
-<config>hdds.grpc.tls.enabled</config>
+<name>hdds.grpc.tls.enabled</name>
 <value>true</value>
 </property>
 ```
@@ -185,9 +256,7 @@ signed certificate for sub-CA from root CA.
 primordial SCM is not defined. Bring up other SCM's using **--bootstrap**. 
 
 ### Current SCM HA Security limitation:
-1. When primordial SCM is down, new SCM’s cannot be bootstrapped and join the 
-quorum.
-2. Secure cluster upgrade to ratis-enable secure cluster is not supported.
+* Unsecure HA cluster upgrade to secure HA cluster is not supported.
 
 
 ## Implementation details
@@ -196,7 +265,7 @@ SCM HA uses Apache Ratis to replicate state between the members of the SCM HA qu
 
 This replication process is a simpler version of OM HA replication process as it doesn't use any double buffer (as the overall db thourghput of SCM requests are lower)
 
-Datanodes are sending all the reports (Container reports, Pipeline reports...) to *all* the Datanodes parallel. Only the leader node can assign/create new containers, and only the leader node sends command back to the Datanodes.
+Datanodes are sending all the reports (Container reports, Pipeline reports...) to *all* SCM nodes in parallel. Only the leader node can assign/create new containers, and only the leader node sends commands back to the Datanodes.
 
 ## Verify SCM HA setup
 
@@ -232,10 +301,8 @@ bin/ozone debug ldb --db=/tmp/metadata/scm.db ls
 bin/ozone debug ldb --db=/tmp/metadata/scm.db scan --column-family=containers
 ```
 
-## Migrating from existing SCM
+## Migrating from Non-HA to HA SCM
 
-SCM HA can be turned on on any Ozone cluster. First enable Ratis (`ozone.scm.ratis.enable`) and configure only one node for the Ratis ring (`ozone.scm.nodes.serviceId` should have one element).
-
-Start the cluster and test if it works well.
-
-If everything is fine, you can extend the cluster configuration with multiple nodes, restart SCM node, and initialize the additional nodes with `scm --bootstrap` command.
+Add additional SCM nodes and extend the cluster configuration to reflect the newly added nodes. 
+Bootstrap the newly added SCM nodes with `scm --bootstrap` command and start the SCM service.
+Note: Make sure that the `ozone.scm.primordial.node.id` property is pointed to the existing SCM before you run the `bootstrap` command on the newly added SCM nodes.

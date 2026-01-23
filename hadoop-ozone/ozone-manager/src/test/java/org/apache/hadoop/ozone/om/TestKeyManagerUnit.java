@@ -1,11 +1,10 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
@@ -14,10 +13,23 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *
  */
 
 package org.apache.hadoop.ozone.om;
+
+import static com.google.common.collect.Sets.newHashSet;
+import static java.util.Collections.singletonList;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.anySet;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -30,7 +42,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
-
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -40,8 +51,8 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.net.InnerNode;
 import org.apache.hadoop.hdds.scm.net.InnerNodeImpl;
 import org.apache.hadoop.hdds.scm.net.NetConstants;
@@ -49,9 +60,9 @@ import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
-import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -71,7 +82,6 @@ import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.security.UserGroupInformation;
-
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.OzoneTestBase;
 import org.apache.ratis.util.ExitUtils;
@@ -79,21 +89,8 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.TestInstance;
-
-import static com.google.common.collect.Sets.newHashSet;
-import static java.util.Collections.singletonList;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.Mockito.anySet;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.reset;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Unit test key manager.
@@ -103,7 +100,6 @@ class TestKeyManagerUnit extends OzoneTestBase {
 
   private static final AtomicLong CONTAINER_ID = new AtomicLong();
 
-  private OzoneConfiguration configuration;
   private OMMetadataManager metadataManager;
   private StorageContainerLocationProtocol containerClient;
   private KeyManagerImpl keyManager;
@@ -117,7 +113,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
   @BeforeAll
   void setup(@TempDir Path testDir) throws Exception {
     ExitUtils.disableSystemExit();
-    configuration = new OzoneConfiguration();
+    OzoneConfiguration configuration = new OzoneConfiguration();
     configuration.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.toString());
     containerClient = mock(StorageContainerLocationProtocol.class);
     blockClient = mock(ScmBlockLocationProtocol.class);
@@ -235,7 +231,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
 
     //WHEN
     OmMultipartUploadList omMultipartUploadList =
-        keyManager.listMultipartUploads(volume, "bucket1", "");
+        keyManager.listMultipartUploads(volume, "bucket1", "", "", "", 10, false);
 
     //THEN
     List<OmMultipartUpload> uploads = omMultipartUploadList.getUploads();
@@ -256,10 +252,9 @@ class TestKeyManagerUnit extends OzoneTestBase {
     String volume = volumeName();
     String bucket = "bucket";
 
-    //GIVEN
+    // GIVEN
     createBucket(metadataManager, volume, bucket);
     createBucket(metadataManager, volume, bucket);
-
 
     // Add few to cache and few to DB.
     addinitMultipartUploadToCache(volume, bucket, "dir/key1");
@@ -270,11 +265,11 @@ class TestKeyManagerUnit extends OzoneTestBase {
 
     initMultipartUpload(writeClient, volume, bucket, "dir/key4");
 
-    //WHEN
-    OmMultipartUploadList omMultipartUploadList =
-        keyManager.listMultipartUploads(volume, bucket, "");
+    // WHEN
+    OmMultipartUploadList omMultipartUploadList = keyManager.listMultipartUploads(volume, bucket, "", "", "", 10,
+        false);
 
-    //THEN
+    // THEN
     List<OmMultipartUpload> uploads = omMultipartUploadList.getUploads();
     assertEquals(4, uploads.size());
     assertEquals("dir/key1", uploads.get(0).getKeyName());
@@ -295,10 +290,9 @@ class TestKeyManagerUnit extends OzoneTestBase {
     OmMultipartInfo omMultipartInfo4 = initMultipartUpload(writeClient,
         volume, bucket, "dir/ozonekey4");
 
-    omMultipartUploadList =
-        keyManager.listMultipartUploads(volume, bucket, "dir/ozone");
+    omMultipartUploadList = keyManager.listMultipartUploads(volume, bucket, "dir/ozone", "", "", 10, false);
 
-    //THEN
+    // THEN
     uploads = omMultipartUploadList.getUploads();
     assertEquals(4, uploads.size());
     assertEquals("dir/ozonekey1", uploads.get(0).getKeyName());
@@ -311,10 +305,9 @@ class TestKeyManagerUnit extends OzoneTestBase {
         omMultipartInfo4.getUploadID());
 
     // Now list.
-    omMultipartUploadList =
-        keyManager.listMultipartUploads(volume, bucket, "dir/ozone");
+    omMultipartUploadList = keyManager.listMultipartUploads(volume, bucket, "dir/ozone", "", "", 10, false);
 
-    //THEN
+    // THEN
     uploads = omMultipartUploadList.getUploads();
     assertEquals(3, uploads.size());
     assertEquals("dir/ozonekey1", uploads.get(0).getKeyName());
@@ -326,10 +319,9 @@ class TestKeyManagerUnit extends OzoneTestBase {
         omMultipartInfo3.getUploadID());
 
     // Now list.
-    omMultipartUploadList =
-        keyManager.listMultipartUploads(volume, bucket, "dir/ozone");
+    omMultipartUploadList = keyManager.listMultipartUploads(volume, bucket, "dir/ozone", "", "", 10, false);
 
-    //THEN
+    // THEN
     uploads = omMultipartUploadList.getUploads();
     assertEquals(2, uploads.size());
     assertEquals("dir/ozonekey1", uploads.get(0).getKeyName());
@@ -340,7 +332,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
   @Test
   public void listMultipartUploadsWithPrefix() throws IOException {
 
-    //GIVEN
+    // GIVEN
     final String volumeName = volumeName();
     createBucket(metadataManager, volumeName, "bucket1");
     createBucket(metadataManager, volumeName, "bucket2");
@@ -353,15 +345,88 @@ class TestKeyManagerUnit extends OzoneTestBase {
 
     initMultipartUpload(writeClient, volumeName, "bucket2", "dir/key1");
 
-    //WHEN
-    OmMultipartUploadList omMultipartUploadList =
-        keyManager.listMultipartUploads(volumeName, "bucket1", "dir");
+    // WHEN
+    OmMultipartUploadList omMultipartUploadList = keyManager.listMultipartUploads(volumeName, "bucket1", "dir", "",
+        "", 10, false);
 
-    //THEN
+    // THEN
     List<OmMultipartUpload> uploads = omMultipartUploadList.getUploads();
     assertEquals(2, uploads.size());
     assertEquals("dir/key1", uploads.get(0).getKeyName());
     assertEquals("dir/key2", uploads.get(1).getKeyName());
+  }
+
+  @Test
+  public void testListMultipartUploadsWithPagination() throws IOException {
+    // GIVEN
+    final String volumeName = volumeName();
+    final String bucketName = "bucket1";
+    createBucket(metadataManager, volumeName, bucketName);
+
+    // Create 25 multipart uploads to test pagination
+    for (int i = 0; i < 25; i++) {
+      String key = String.format("key-%03d", i); // pad with zeros for proper sorting
+      initMultipartUpload(writeClient, volumeName, bucketName, key);
+    }
+
+    // WHEN - First page (10 entries)
+    OmMultipartUploadList firstPage = keyManager.listMultipartUploads(
+        volumeName, bucketName, "", "", "", 10, true);
+
+    // THEN
+    assertEquals(10, firstPage.getUploads().size());
+    assertTrue(firstPage.isTruncated());
+    assertNotNull(firstPage.getNextKeyMarker());
+    assertNotNull(firstPage.getNextUploadIdMarker());
+
+    // Verify first page content
+    for (int i = 0; i < 10; i++) {
+      assertEquals(String.format("key-%03d", i),
+          firstPage.getUploads().get(i).getKeyName());
+    }
+
+    // WHEN - Second page using markers from first page
+    OmMultipartUploadList secondPage = keyManager.listMultipartUploads(
+        volumeName, bucketName, "",
+        firstPage.getNextKeyMarker(),
+        firstPage.getNextUploadIdMarker(),
+        10, true);
+
+    // THEN
+    assertEquals(10, secondPage.getUploads().size());
+    assertTrue(secondPage.isTruncated());
+
+    // Verify second page content
+    for (int i = 0; i < 10; i++) {
+      assertEquals(String.format("key-%03d", i + 10),
+          secondPage.getUploads().get(i).getKeyName());
+    }
+
+    // WHEN - Last page
+    OmMultipartUploadList lastPage = keyManager.listMultipartUploads(
+        volumeName, bucketName, "",
+        secondPage.getNextKeyMarker(),
+        secondPage.getNextUploadIdMarker(),
+        10, true);
+
+    // THEN
+    assertEquals(5, lastPage.getUploads().size());
+    assertFalse(lastPage.isTruncated());
+    assertEquals("", lastPage.getNextKeyMarker());
+    assertEquals("", lastPage.getNextUploadIdMarker());
+
+    // Verify last page content
+    for (int i = 0; i < 5; i++) {
+      assertEquals(String.format("key-%03d", i + 20),
+          lastPage.getUploads().get(i).getKeyName());
+    }
+
+    // Test with no pagination
+    OmMultipartUploadList noPagination = keyManager.listMultipartUploads(
+        volumeName, bucketName, "", "", "", 10, false);
+
+    assertEquals(25, noPagination.getUploads().size());
+    assertFalse(noPagination.isTruncated());
   }
 
   private void createBucket(OMMetadataManager omMetadataManager,
@@ -372,7 +437,6 @@ class TestKeyManagerUnit extends OzoneTestBase {
         .setBucketName(bucket)
         .setStorageType(StorageType.DISK)
         .setIsVersionEnabled(false)
-        .setAcls(new ArrayList<>())
         .build();
     OMRequestTestUtils.addBucketToOM(omMetadataManager, omBucketInfo);
   }
@@ -406,7 +470,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
     metadataManager.getMultipartInfoTable().addCacheEntry(
         new CacheKey<>(metadataManager.getMultipartKey(volume, bucket, key,
             uploadID)),
-        CacheValue.get(RandomUtils.nextInt(), multipartKeyInfo));
+        CacheValue.get(RandomUtils.secure().randomInt(), multipartKeyInfo));
     return new OmMultipartInfo(volume, bucket, key, uploadID);
   }
 
@@ -414,7 +478,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
       String volume, String bucket, String key, String uploadID) {
     metadataManager.getMultipartInfoTable().addCacheEntry(
         new CacheKey<>(metadataManager.getMultipartKey(volume, bucket, key,
-            uploadID)), CacheValue.get(RandomUtils.nextInt()));
+            uploadID)), CacheValue.get(RandomUtils.secure().randomInt()));
   }
 
   @Test
@@ -432,7 +496,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
         .setReplicationConfig(
             RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setState(Pipeline.PipelineState.OPEN)
-        .setLeaderId(dn1.getUuid())
+        .setLeaderId(dn1.getID())
         .setNodes(Arrays.asList(dn1, dn2, dn3))
         .build();
 
@@ -441,7 +505,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
         .setReplicationConfig(
             RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setState(Pipeline.PipelineState.OPEN)
-        .setLeaderId(dn1.getUuid())
+        .setLeaderId(dn1.getID())
         .setNodes(Arrays.asList(dn2, dn3, dn4))
         .build();
 
@@ -536,7 +600,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
         .setReplicationConfig(
             RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setState(Pipeline.PipelineState.OPEN)
-        .setLeaderId(dnOne.getUuid())
+        .setLeaderId(dnOne.getID())
         .setNodes(Arrays.asList(dnOne, dnTwo, dnThree))
         .build();
 
@@ -545,7 +609,7 @@ class TestKeyManagerUnit extends OzoneTestBase {
         .setReplicationConfig(
             RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .setState(Pipeline.PipelineState.OPEN)
-        .setLeaderId(dnFour.getUuid())
+        .setLeaderId(dnFour.getID())
         .setNodes(Arrays.asList(dnFour, dnFive, dnSix))
         .build();
 

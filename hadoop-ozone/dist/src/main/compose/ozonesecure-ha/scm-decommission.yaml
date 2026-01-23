@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-version: "3.8"
 services:
   scm4.org:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
@@ -34,15 +33,15 @@ services:
       OZONE_OPTS:
     command: [ "/opt/hadoop/bin/ozone","scm" ]
     extra_hosts:
-      - "om1: 172.25.0.111"
-      - "om2: 172.25.0.112"
-      - "om3: 172.25.0.113"
-      - "scm1.org: 172.25.0.116"
-      - "scm2.org: 172.25.0.117"
-      - "scm3.org: 172.25.0.118"
+      - "om1=172.25.0.111"
+      - "om2=172.25.0.112"
+      - "om3=172.25.0.113"
+      - "scm1.org=172.25.0.116"
+      - "scm2.org=172.25.0.117"
+      - "scm3.org=172.25.0.118"
     networks:
       ozone_net:
-        ipv4_address: 172.25.0.120
+        ipv4_address: 172.25.0.220
     profiles: ["scm4.org"]
   datanode4:
     image: ${OZONE_RUNNER_IMAGE}:${OZONE_RUNNER_VERSION}
@@ -54,11 +53,11 @@ services:
       - 10008:9999
     command: [ "/opt/hadoop/bin/ozone","datanode" ]
     extra_hosts:
-      - "scm1.org: 172.25.0.116"
-      - "scm2.org: 172.25.0.117"
-      - "scm3.org: 172.25.0.118"
-      - "scm4.org: 172.25.0.120"
-      - "recon: 172.25.0.115"
+      - "scm1.org=172.25.0.116"
+      - "scm2.org=172.25.0.117"
+      - "scm3.org=172.25.0.118"
+      - "scm4.org=172.25.0.220"
+      - "recon=172.25.0.115"
     env_file:
       - docker-config
       - docker-config-scm4
@@ -66,7 +65,7 @@ services:
       OZONE_OPTS:
     networks:
       ozone_net:
-        ipv4_address: 172.25.0.121
+        ipv4_address: 172.25.0.221
     profiles: [ "datanode4" ]
 networks:
   ozone_net:

@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,54 +16,6 @@
  */
 
 package org.apache.hadoop.ozone.container.upgrade;
-
-import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
-import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
-import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.container.ContainerTestHelper;
-import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
-import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
-import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.apache.hadoop.ozone.container.common.ScmTestMock;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
-import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
-import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
-import org.apache.hadoop.ozone.container.common.states.endpoint.VersionEndpointTask;
-import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
-import org.apache.hadoop.ozone.container.common.volume.DbVolume;
-import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
-import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.io.TempDir;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
-
-import java.io.File;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.UUID;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -76,6 +27,43 @@ import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+
+import java.io.File;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.file.Path;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
+import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
+import org.apache.hadoop.ozone.container.common.SCMTestUtils;
+import org.apache.hadoop.ozone.container.common.ScmTestMock;
+import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
+import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
+import org.apache.hadoop.ozone.container.common.volume.DbVolume;
+import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests upgrading a single datanode from container Schema V2 to Schema V3.
@@ -91,8 +79,6 @@ public class TestDatanodeUpgradeToSchemaV3 {
   private RPC.Server scmRpcServer;
   private InetSocketAddress address;
 
-  private Random random;
-
   private void initTests(Boolean enable) throws Exception {
     boolean schemaV3Enabled = enable;
     conf = new OzoneConfiguration();
@@ -106,8 +92,6 @@ public class TestDatanodeUpgradeToSchemaV3 {
   }
 
   private void setup() throws Exception {
-    random = new Random();
-
     address = SCMTestUtils.getReuseableAddress();
     conf.setSocketAddr(ScmConfigKeys.OZONE_SCM_NAMES, address);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
@@ -135,10 +119,12 @@ public class TestDatanodeUpgradeToSchemaV3 {
   public void testDBOnHddsVolume(boolean schemaV3Enabled) throws Exception {
     initTests(schemaV3Enabled);
     // start DN and SCM
-    startScmServer();
-    addHddsVolume();
+    scmRpcServer = SCMTestUtils.startScmRpcServer(conf,
+        new ScmTestMock(CLUSTER_ID), address, 10);
+    UpgradeTestHelper.addHddsVolume(conf, tempFolder);
 
-    startPreFinalizedDatanode();
+    dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
+        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
     HddsVolume dataVolume = (HddsVolume) dsm.getContainer().getVolumeSet()
         .getVolumesList().get(0);
     assertNull(dataVolume.getDbVolume());
@@ -170,11 +156,13 @@ public class TestDatanodeUpgradeToSchemaV3 {
   public void testDBOnDbVolume(boolean schemaV3Enabled) throws Exception {
     initTests(schemaV3Enabled);
     // start DN and SCM
-    startScmServer();
-    addHddsVolume();
-    addDbVolume();
+    scmRpcServer = SCMTestUtils.startScmRpcServer(conf,
+        new ScmTestMock(CLUSTER_ID), address, 10);
+    UpgradeTestHelper.addHddsVolume(conf, tempFolder);
+    UpgradeTestHelper.addDbVolume(conf, tempFolder);
 
-    startPreFinalizedDatanode();
+    dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
+        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
     HddsVolume dataVolume = (HddsVolume) dsm.getContainer().getVolumeSet()
         .getVolumesList().get(0);
     assertNull(dataVolume.getDbParentDir());
@@ -209,9 +197,10 @@ public class TestDatanodeUpgradeToSchemaV3 {
       throws Exception {
     initTests(schemaV3Enabled);
     // start DN and SCM
-    startScmServer();
+    scmRpcServer = SCMTestUtils.startScmRpcServer(conf,
+        new ScmTestMock(CLUSTER_ID), address, 10);
     // add one HddsVolume
-    addHddsVolume();
+    UpgradeTestHelper.addHddsVolume(conf, tempFolder);
 
     // Set layout version.
     DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
@@ -232,7 +221,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     assertNull(dataVolume.getDbParentDir());
 
     // Restart DN and finalize upgrade
-    restartDatanode(
+    dsm = UpgradeTestHelper.restartDatanode(conf, dsm, false, tempFolder, address,
         HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion(), true);
     dsm.finalizeUpgrade();
 
@@ -255,13 +244,15 @@ public class TestDatanodeUpgradeToSchemaV3 {
   public void testFinalizeTwice(boolean schemaV3Enabled) throws Exception {
     initTests(schemaV3Enabled);
     // start DN and SCM
-    startScmServer();
+    scmRpcServer = SCMTestUtils.startScmRpcServer(conf,
+        new ScmTestMock(CLUSTER_ID), address, 10);
     // add one HddsVolume and two DbVolume
-    addHddsVolume();
-    addDbVolume();
-    addDbVolume();
+    UpgradeTestHelper.addHddsVolume(conf, tempFolder);
+    UpgradeTestHelper.addDbVolume(conf, tempFolder);
+    UpgradeTestHelper.addDbVolume(conf, tempFolder);
 
-    startPreFinalizedDatanode();
+    dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
+        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
     dsm.finalizeUpgrade();
 
     DbVolume dbVolume = ((HddsVolume) dsm.getContainer().getVolumeSet()
@@ -283,15 +274,18 @@ public class TestDatanodeUpgradeToSchemaV3 {
       throws Exception {
     initTests(schemaV3Enabled);
     // start DN and SCM
-    startScmServer();
-    addHddsVolume();
+    scmRpcServer = SCMTestUtils.startScmRpcServer(conf,
+        new ScmTestMock(CLUSTER_ID), address, 10);
+    UpgradeTestHelper.addHddsVolume(conf, tempFolder);
 
-    startPreFinalizedDatanode();
+    dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
+        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
     dsm.finalizeUpgrade();
 
     // Add a new HddsVolume. It should have DB created after DN restart.
-    addHddsVolume();
-    restartDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(),
+    UpgradeTestHelper.addHddsVolume(conf, tempFolder);
+    dsm = UpgradeTestHelper.restartDatanode(conf, dsm, false, tempFolder, address,
+        HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(),
         false);
     for (StorageVolume vol:
         dsm.getContainer().getVolumeSet().getVolumesList()) {
@@ -314,10 +308,12 @@ public class TestDatanodeUpgradeToSchemaV3 {
   public void testAddDbVolumeAfterFinalize(boolean schemaV3Enabled)
       throws Exception {
     initTests(schemaV3Enabled);
-    startScmServer();
-    addHddsVolume();
+    scmRpcServer = SCMTestUtils.startScmRpcServer(conf,
+        new ScmTestMock(CLUSTER_ID), address, 10);
+    UpgradeTestHelper.addHddsVolume(conf, tempFolder);
 
-    startPreFinalizedDatanode();
+    dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
+        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
     HddsVolume hddsVolume = (HddsVolume) dsm.getContainer().getVolumeSet()
         .getVolumesList().get(0);
     assertNull(hddsVolume.getDbParentDir());
@@ -328,8 +324,9 @@ public class TestDatanodeUpgradeToSchemaV3 {
         hddsVolume.getStorageDir().getAbsolutePath()));
 
     // Add a new DbVolume
-    addDbVolume();
-    restartDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(),
+    UpgradeTestHelper.addDbVolume(conf, tempFolder);
+    dsm = UpgradeTestHelper.restartDatanode(conf, dsm, false, tempFolder, address,
+        HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(),
         false);
 
     // HddsVolume should still use the rocksDB under it's volume
@@ -354,15 +351,18 @@ public class TestDatanodeUpgradeToSchemaV3 {
       throws Exception {
     initTests(schemaV3Enabled);
     // start DN and SCM
-    startScmServer();
-    addHddsVolume();
+    scmRpcServer = SCMTestUtils.startScmRpcServer(conf,
+        new ScmTestMock(CLUSTER_ID), address, 10);
+    UpgradeTestHelper.addHddsVolume(conf, tempFolder);
 
-    startPreFinalizedDatanode();
+    dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
+        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
     dsm.finalizeUpgrade();
 
-    addDbVolume();
-    File newDataVolume = addHddsVolume();
-    restartDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(),
+    UpgradeTestHelper.addDbVolume(conf, tempFolder);
+    File newDataVolume = UpgradeTestHelper.addHddsVolume(conf, tempFolder);
+    dsm = UpgradeTestHelper.restartDatanode(conf, dsm, false, tempFolder, address,
+        HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(),
         false);
 
     DbVolume dbVolume = (DbVolume) dsm.getContainer().getDbVolumeSet()
@@ -419,18 +419,22 @@ public class TestDatanodeUpgradeToSchemaV3 {
   public void testWrite(boolean enable, String expectedVersion)
       throws Exception {
     // start DN and SCM
-    startScmServer();
-    addHddsVolume();
+    scmRpcServer = SCMTestUtils.startScmRpcServer(conf,
+        new ScmTestMock(CLUSTER_ID), address, 10);
+    UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     // Disable Schema V3
     conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED, false);
-    startPreFinalizedDatanode();
+    dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
+        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
+    ContainerDispatcher dispatcher = dsm.getContainer().getDispatcher();
     dsm.finalizeUpgrade();
 
-    final Pipeline pipeline = getPipeline();
+    final Pipeline pipeline = MockPipeline.createPipeline(
+        Collections.singletonList(dsm.getDatanodeDetails()));
     // Create a container to write data.
-    final long containerID1 = addContainer(pipeline);
-    putBlock(containerID1, pipeline);
-    closeContainer(containerID1, pipeline);
+    final long containerID1 = UpgradeTestHelper.addContainer(dispatcher, pipeline);
+    UpgradeTestHelper.putBlock(dispatcher, containerID1, pipeline);
+    UpgradeTestHelper.closeContainer(dispatcher, containerID1, pipeline);
     KeyValueContainer container = (KeyValueContainer)
         dsm.getContainer().getContainerSet().getContainer(containerID1);
     // When SchemaV3 is disabled, new data should be saved as SchemaV2.
@@ -440,13 +444,15 @@ public class TestDatanodeUpgradeToSchemaV3 {
     // Set SchemaV3 enable status
     conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED,
         enable);
-    restartDatanode(HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(),
+    dsm = UpgradeTestHelper.restartDatanode(conf, dsm, false, tempFolder, address,
+        HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion(),
         false);
+    dispatcher = dsm.getContainer().getDispatcher();
 
     // Write new data
-    final long containerID2 = addContainer(pipeline);
-    putBlock(containerID2, pipeline);
-    closeContainer(containerID2, pipeline);
+    final long containerID2 = UpgradeTestHelper.addContainer(dispatcher, pipeline);
+    UpgradeTestHelper.putBlock(dispatcher, containerID2, pipeline);
+    UpgradeTestHelper.closeContainer(dispatcher, containerID2, pipeline);
     container = (KeyValueContainer)
         dsm.getContainer().getContainerSet().getContainer(containerID2);
     // If SchemaV3 is enabled, new data should be saved as SchemaV3
@@ -464,16 +470,20 @@ public class TestDatanodeUpgradeToSchemaV3 {
       throws Exception {
     initTests(schemaV3Enabled);
     // start DN and SCM
-    startScmServer();
-    addHddsVolume();
-    startPreFinalizedDatanode();
-    final Pipeline pipeline = getPipeline();
+    scmRpcServer = SCMTestUtils.startScmRpcServer(conf,
+        new ScmTestMock(CLUSTER_ID), address, 10);
+    UpgradeTestHelper.addHddsVolume(conf, tempFolder);
+    dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
+        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
+    ContainerDispatcher dispatcher = dsm.getContainer().getDispatcher();
+    final Pipeline pipeline = MockPipeline.createPipeline(
+        Collections.singletonList(dsm.getDatanodeDetails()));
 
     // Add data to read.
-    final long containerID = addContainer(pipeline);
-    ContainerProtos.WriteChunkRequestProto writeChunk = putBlock(containerID,
-        pipeline);
-    closeContainer(containerID, pipeline);
+    final long containerID = UpgradeTestHelper.addContainer(dispatcher, pipeline);
+    ContainerProtos.WriteChunkRequestProto writeChunk =
+        UpgradeTestHelper.putBlock(dispatcher, containerID, pipeline);
+    UpgradeTestHelper.closeContainer(dispatcher, containerID, pipeline);
 
     // Create thread to keep reading during finalization.
     ExecutorService executor = Executors.newFixedThreadPool(1);
@@ -481,10 +491,10 @@ public class TestDatanodeUpgradeToSchemaV3 {
       // Layout version check should be thread safe.
       while (!dsm.getLayoutVersionManager()
           .isAllowed(HDDSLayoutFeature.DATANODE_SCHEMA_V3)) {
-        readChunk(writeChunk, pipeline);
+        UpgradeTestHelper.readChunk(dispatcher, writeChunk, pipeline);
       }
       // Make sure we can read after finalizing too.
-      readChunk(writeChunk, pipeline);
+      UpgradeTestHelper.readChunk(dispatcher, writeChunk, pipeline);
       return null;
     });
 
@@ -502,8 +512,9 @@ public class TestDatanodeUpgradeToSchemaV3 {
   public void testFinalizeFailure(boolean schemaV3Enabled) throws Exception {
     initTests(schemaV3Enabled);
     // start DN and SCM
-    startScmServer();
-    addHddsVolume();
+    scmRpcServer = SCMTestUtils.startScmRpcServer(conf,
+        new ScmTestMock(CLUSTER_ID), address, 10);
+    UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     // Let HddsVolume be formatted to mimic the real cluster upgrade
     // Set layout version.
     DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
@@ -523,15 +534,17 @@ public class TestDatanodeUpgradeToSchemaV3 {
     assertNull(dataVolume.getDbParentDir());
 
     // Restart DN
-    restartDatanode(
+    dsm = UpgradeTestHelper.restartDatanode(conf, dsm, false, tempFolder, address,
         HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion(), true);
+    ContainerDispatcher dispatcher = dsm.getContainer().getDispatcher();
 
     // Write some data.
-    final Pipeline pipeline = getPipeline();
-    final long containerID = addContainer(pipeline);
-    ContainerProtos.WriteChunkRequestProto writeChunk = putBlock(containerID,
-        pipeline);
-    closeContainer(containerID, pipeline);
+    final Pipeline pipeline = MockPipeline.createPipeline(
+        Collections.singletonList(dsm.getDatanodeDetails()));
+    final long containerID = UpgradeTestHelper.addContainer(dispatcher, pipeline);
+    ContainerProtos.WriteChunkRequestProto writeChunk =
+        UpgradeTestHelper.putBlock(dispatcher, containerID, pipeline);
+    UpgradeTestHelper.closeContainer(dispatcher, containerID, pipeline);
     KeyValueContainer container = (KeyValueContainer)
         dsm.getContainer().getContainerSet().getContainer(containerID);
     assertEquals(OzoneConsts.SCHEMA_V2,
@@ -543,7 +556,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
         createDbStore(any());
     Map volumeMap = new HashMap<String, StorageVolume>();
     volumeMap.put(dataVolume.getStorageID(), volume);
-    dsm.getContainer().getVolumeSet().setVolumeMap(volumeMap);
+    dsm.getContainer().getVolumeSet().setVolumeMapForTesting(volumeMap);
 
     // Finalize will fail because of DB creation failure
     try {
@@ -558,227 +571,18 @@ public class TestDatanodeUpgradeToSchemaV3 {
         dsm.getContainer().getContainerSet().getContainer(containerID);
     assertEquals(OzoneConsts.SCHEMA_V2,
         container.getContainerData().getSchemaVersion());
-    readChunk(writeChunk, pipeline);
+    UpgradeTestHelper.readChunk(dispatcher, writeChunk, pipeline);
 
     // SchemaV3 is not finalized, so still ERASURE_CODED_STORAGE_SUPPORT
-    restartDatanode(
+    dsm = UpgradeTestHelper.restartDatanode(conf, dsm, false, tempFolder, address,
         HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion(), true);
+    dispatcher = dsm.getContainer().getDispatcher();
 
     // Old data is readable after DN restart
     container = (KeyValueContainer)
         dsm.getContainer().getContainerSet().getContainer(containerID);
     assertEquals(OzoneConsts.SCHEMA_V2,
         container.getContainerData().getSchemaVersion());
-    readChunk(writeChunk, pipeline);
-  }
-
-  public void checkContainerPathID(long containerID, String expectedID) {
-    KeyValueContainerData data =
-        (KeyValueContainerData) dsm.getContainer().getContainerSet()
-            .getContainer(containerID).getContainerData();
-    assertThat(data.getChunksPath()).contains(expectedID);
-    assertThat(data.getMetadataPath()).contains(expectedID);
-  }
-
-  public List<File> getHddsSubdirs(File volume) {
-    File[] subdirsArray = getHddsRoot(volume).listFiles(File::isDirectory);
-    assertNotNull(subdirsArray);
-    return Arrays.asList(subdirsArray);
-  }
-
-  public File getHddsRoot(File volume) {
-    return new File(HddsVolumeUtil.getHddsRoot(volume.getAbsolutePath()));
-  }
-
-  /**
-   * Starts the datanode with the fore layout version, and calls the version
-   * endpoint task to get cluster ID and SCM ID.
-   *
-   * The daemon for the datanode state machine is not started in this test.
-   * This greatly speeds up execution time.
-   * It means we do not have heartbeat functionality or pre-finalize
-   * upgrade actions, but neither of those things are needed for these tests.
-   */
-  public void startPreFinalizedDatanode() throws Exception {
-    // Set layout version.
-    conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, tempFolder.toString());
-    DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(conf,
-        UUID.randomUUID().toString(),
-        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
-    layoutStorage.initialize();
-
-    // Build and start the datanode.
-    DatanodeDetails dd = ContainerTestUtils.createDatanodeDetails();
-    DatanodeStateMachine newDsm = new DatanodeStateMachine(dd, conf);
-    int actualMlv = newDsm.getLayoutVersionManager().getMetadataLayoutVersion();
-    assertEquals(
-        HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion(),
-        actualMlv);
-    if (dsm != null) {
-      dsm.close();
-    }
-    dsm = newDsm;
-
-    callVersionEndpointTask();
-  }
-
-  public void restartDatanode(int expectedMlv, boolean exactMatch)
-      throws Exception {
-    // Stop existing datanode.
-    DatanodeDetails dd = dsm.getDatanodeDetails();
-    dsm.close();
-
-    // Start new datanode with the same configuration.
-    dsm = new DatanodeStateMachine(dd, conf);
-    int mlv = dsm.getLayoutVersionManager().getMetadataLayoutVersion();
-    if (exactMatch) {
-      assertEquals(expectedMlv, mlv);
-    } else {
-      assertThat(expectedMlv).isLessThanOrEqualTo(mlv);
-    }
-
-    callVersionEndpointTask();
-  }
-
-  /**
-   * Get the cluster ID and SCM ID from SCM to the datanode.
-   */
-  public void callVersionEndpointTask() throws Exception {
-    try (EndpointStateMachine esm = ContainerTestUtils.createEndpoint(conf,
-        address, 1000)) {
-      VersionEndpointTask vet = new VersionEndpointTask(esm, conf,
-          dsm.getContainer());
-      esm.setState(EndpointStateMachine.EndPointStates.GETVERSION);
-      vet.call();
-    }
-  }
-
-  public String startScmServer() throws IOException {
-    String scmID = UUID.randomUUID().toString();
-    ScmTestMock scmServerImpl = new ScmTestMock(CLUSTER_ID, scmID);
-    scmRpcServer = SCMTestUtils.startScmRpcServer(conf,
-        scmServerImpl, address, 10);
-    return scmID;
-  }
-
-  /// CONTAINER OPERATIONS ///
-  public void readChunk(ContainerProtos.WriteChunkRequestProto writeChunk,
-      Pipeline pipeline)  throws Exception {
-    ContainerProtos.ContainerCommandRequestProto readChunkRequest =
-        ContainerTestHelper.getReadChunkRequest(pipeline, writeChunk);
-
-    dispatchRequest(readChunkRequest);
-  }
-
-  public ContainerProtos.WriteChunkRequestProto putBlock(long containerID,
-      Pipeline pipeline) throws Exception {
-    ContainerProtos.ContainerCommandRequestProto writeChunkRequest =
-        getWriteChunk(containerID, pipeline);
-    dispatchRequest(writeChunkRequest);
-
-    ContainerProtos.ContainerCommandRequestProto putBlockRequest =
-        ContainerTestHelper.getPutBlockRequest(pipeline,
-            writeChunkRequest.getWriteChunk());
-    dispatchRequest(putBlockRequest);
-
-    return writeChunkRequest.getWriteChunk();
-  }
-
-  public ContainerProtos.ContainerCommandRequestProto getWriteChunk(
-      long containerID, Pipeline pipeline) throws Exception {
-    return ContainerTestHelper.getWriteChunkRequest(pipeline,
-            ContainerTestHelper.getTestBlockID(containerID), 100);
-  }
-
-  public Pipeline getPipeline() {
-    return MockPipeline.createPipeline(
-        Collections.singletonList(dsm.getDatanodeDetails()));
-  }
-
-  public long addContainer(Pipeline pipeline)
-      throws Exception {
-    long containerID = random.nextInt(Integer.MAX_VALUE);
-    ContainerProtos.ContainerCommandRequestProto createContainerRequest =
-        ContainerTestHelper.getCreateContainerRequest(containerID, pipeline);
-    dispatchRequest(createContainerRequest);
-
-    return containerID;
-  }
-
-  public void deleteContainer(long containerID, Pipeline pipeline)
-      throws Exception {
-    ContainerProtos.ContainerCommandRequestProto deleteContainerRequest =
-        ContainerTestHelper.getDeleteContainer(pipeline, containerID, true);
-    dispatchRequest(deleteContainerRequest);
-  }
-
-  public void closeContainer(long containerID, Pipeline pipeline)
-      throws Exception {
-    closeContainer(containerID, pipeline, ContainerProtos.Result.SUCCESS);
-  }
-
-  public void closeContainer(long containerID, Pipeline pipeline,
-      ContainerProtos.Result expectedResult) throws Exception {
-    ContainerProtos.ContainerCommandRequestProto closeContainerRequest =
-        ContainerTestHelper.getCloseContainer(pipeline, containerID);
-    dispatchRequest(closeContainerRequest, expectedResult);
-  }
-
-  public void dispatchRequest(
-      ContainerProtos.ContainerCommandRequestProto request) {
-    dispatchRequest(request, ContainerProtos.Result.SUCCESS);
-  }
-
-  public void dispatchRequest(
-      ContainerProtos.ContainerCommandRequestProto request,
-      ContainerProtos.Result expectedResult) {
-    ContainerProtos.ContainerCommandResponseProto response =
-        dsm.getContainer().getDispatcher().dispatch(request, null);
-    assertEquals(expectedResult, response.getResult());
-  }
-
-  /// VOLUME OPERATIONS ///
-
-  /**
-   * Append a datanode volume to the existing volumes in the configuration.
-   * @return The root directory for the new volume.
-   */
-  public File addHddsVolume() throws IOException {
-
-    File vol = Files.createDirectory(tempFolder.resolve(UUID.randomUUID()
-        .toString())).toFile();
-    String[] existingVolumes =
-        conf.getStrings(ScmConfigKeys.HDDS_DATANODE_DIR_KEY);
-    List<String> allVolumes = new ArrayList<>();
-    if (existingVolumes != null) {
-      allVolumes.addAll(Arrays.asList(existingVolumes));
-    }
-
-    allVolumes.add(vol.getAbsolutePath());
-    conf.setStrings(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
-        allVolumes.toArray(new String[0]));
-
-    return vol;
-  }
-
-  /**
-   * Append a db volume to the existing volumes in the configuration.
-   * @return The root directory for the new volume.
-   */
-  public File addDbVolume() throws Exception {
-    File vol = Files.createDirectory(tempFolder.resolve(UUID.randomUUID()
-        .toString())).toFile();
-    String[] existingVolumes =
-        conf.getStrings(OzoneConfigKeys.HDDS_DATANODE_CONTAINER_DB_DIR);
-    List<String> allVolumes = new ArrayList<>();
-    if (existingVolumes != null) {
-      allVolumes.addAll(Arrays.asList(existingVolumes));
-    }
-
-    allVolumes.add(vol.getAbsolutePath());
-    conf.setStrings(OzoneConfigKeys.HDDS_DATANODE_CONTAINER_DB_DIR,
-        allVolumes.toArray(new String[0]));
-
-    return vol;
+    UpgradeTestHelper.readChunk(dispatcher, writeChunk, pipeline);
   }
 }

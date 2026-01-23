@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,21 +17,22 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlAttribute;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 
 /**
  * Bucket ACL.
  */
 @XmlAccessorType(XmlAccessType.FIELD)
 @XmlRootElement(name = "AccessControlPolicy",
-    namespace = "http://s3.amazonaws.com/doc/2006-03-01/")
+    namespace = S3Consts.S3_XML_NAMESPACE)
 public class S3BucketAcl {
 
   @XmlElement(name = "Owner")
@@ -66,7 +66,11 @@ public class S3BucketAcl {
   }
 
   /**
-   * TODO: javadoc.
+   * Represents an S3 Access Control List containing a collection of permission grants.
+   *
+   * This class models the AccessControlList XML element in S3 ACL responses and requests.
+   * It contains a list of Grant objects that define specific permissions granted to
+   * particular grantees (users, groups, etc.).
    */
   @XmlAccessorType(XmlAccessType.FIELD)
   @XmlRootElement(name = "AccessControlList")
@@ -100,7 +104,12 @@ public class S3BucketAcl {
   }
 
   /**
-   * TODO: javadoc.
+   * Represents a single permission grant within an S3 Access Control List.
+   *
+   * This class models the Grant XML element in S3 ACL responses and requests,
+   * associating a specific permission with a grantee (the recipient of the permission).
+   * Each Grant consists of a Grantee (which identifies a user, group, or other entity)
+   * and a Permission string that specifies what access level is being granted.
    */
   @XmlAccessorType(XmlAccessType.FIELD)
   @XmlRootElement(name = "Grant")

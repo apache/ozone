@@ -16,19 +16,19 @@
  * limitations under the License.
  */
 
-import {Overview} from './views/overview/overview';
-import {Datanodes} from './views/datanodes/datanodes';
-import {Pipelines} from './views/pipelines/pipelines';
-import {NotFound} from './views/notFound/notFound';
-import {IRoute} from './types/routes.types';
-import {MissingContainers} from './views/missingContainers/missingContainers';
-import {Insights} from './views/insights/insights';
-import {Om} from './views/insights/om/om';
+import { Overview } from './views/overview/overview';
+import { Datanodes } from './views/datanodes/datanodes';
+import { Pipelines } from './views/pipelines/pipelines';
+import { NotFound } from './views/notFound/notFound';
+import { IRoute } from './types/routes.types';
+import { MissingContainers } from './views/missingContainers/missingContainers';
+import { Insights } from './views/insights/insights';
+import { Om } from './views/insights/om/om';
 
-import {DiskUsage} from './views/diskUsage/diskUsage';
-import {Heatmap} from './views/heatMap/heatmap';
-import {Volumes} from './views/volumes/volumes';
-import {Buckets} from './views/buckets/buckets';
+import { DiskUsage } from './views/diskUsage/diskUsage';
+import { Heatmap } from './views/heatMap/heatmap';
+import { Volumes } from './views/volumes/volumes';
+import { Buckets } from './views/buckets/buckets';
 
 export const routes: IRoute[] = [
   {
@@ -64,12 +64,8 @@ export const routes: IRoute[] = [
     component: MissingContainers
   },
   {
-    path: '/DiskUsage',
+    path: '/NamespaceUsage',
     component: DiskUsage
-  },
-  {
-    path: '/Buckets',
-    component: DiskUsage,
   },
   {
     path: '/Containers',

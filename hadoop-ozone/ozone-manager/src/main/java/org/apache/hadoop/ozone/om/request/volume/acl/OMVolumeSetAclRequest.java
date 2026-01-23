@@ -1,29 +1,34 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.request.volume.acl;
 
-import com.google.common.base.Preconditions;
-import org.apache.ratis.server.protocol.TermIndex;
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.request.util.AclOp;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.volume.OMVolumeAclOpResponse;
@@ -36,11 +41,6 @@ import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-
 /**
  * Handles volume set acl request.
  */
@@ -48,8 +48,12 @@ public class OMVolumeSetAclRequest extends OMVolumeAclRequest {
   private static final Logger LOG =
       LoggerFactory.getLogger(OMVolumeSetAclRequest.class);
 
-  private static final VolumeAclOp VOLUME_SET_ACL_OP =
-      (acls, volArgs) -> volArgs.setAcls(acls);
+  private static final AclOp VOLUME_SET_ACL_OP =
+      (acls, builder) -> builder.set(acls);
+
+  private final List<OzoneAcl> ozoneAcls;
+  private final String volumeName;
+  private final OzoneObj obj;
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
@@ -64,18 +68,14 @@ public class OMVolumeSetAclRequest extends OMVolumeAclRequest {
         .build();
   }
 
-  private final List<OzoneAcl> ozoneAcls;
-  private final String volumeName;
-  private final OzoneObj obj;
-
   public OMVolumeSetAclRequest(OMRequest omRequest) {
     super(omRequest, VOLUME_SET_ACL_OP);
     OzoneManagerProtocolProtos.SetAclRequest setAclRequest =
         getOmRequest().getSetAclRequest();
-    Preconditions.checkNotNull(setAclRequest);
-    ozoneAcls = new ArrayList<>();
-    setAclRequest.getAclList().forEach(oai ->
-        ozoneAcls.add(OzoneAcl.fromProtobuf(oai)));
+    Objects.requireNonNull(setAclRequest, "setAclRequest == null");
+    ozoneAcls = setAclRequest.getAclList().stream()
+        .map(OzoneAcl::fromProtobuf)
+        .collect(Collectors.toList());
     obj = OzoneObjInfo.fromProtobuf(setAclRequest.getObj());
     volumeName = obj.getPath().substring(1);
   }
@@ -133,13 +133,13 @@ public class OMVolumeSetAclRequest extends OMVolumeAclRequest {
           getOmRequest());
     }
 
-    auditLog(auditLogger, buildAuditMessage(OMAction.SET_ACL, auditMap,
+    markForAudit(auditLogger, buildAuditMessage(OMAction.SET_ACL, auditMap,
         ex, getOmRequest().getUserInfo()));
   }
 
   @Override
-  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, TermIndex termIndex) {
+  public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     ozoneManager.getMetrics().incNumSetAcl();
-    return super.validateAndUpdateCache(ozoneManager, termIndex);
+    return super.validateAndUpdateCache(ozoneManager, context);
   }
 }

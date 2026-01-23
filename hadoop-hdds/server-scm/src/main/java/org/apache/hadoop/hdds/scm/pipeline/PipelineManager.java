@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -24,11 +23,12 @@ import java.util.Collection;
 import java.util.List;
 import java.util.NavigableSet;
 import java.util.Set;
-
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.utils.db.CodecException;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 
 /**
@@ -50,7 +50,6 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
       throws IOException;
 
   void addEcPipeline(Pipeline pipeline) throws IOException;
-
 
   Pipeline createPipeline(
       ReplicationConfig replicationConfig,
@@ -93,7 +92,7 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
   );
 
   void addContainerToPipeline(PipelineID pipelineID, ContainerID containerID)
-      throws IOException;
+      throws PipelineNotFoundException, InvalidPipelineStateException;
 
   /**
    * Add container to pipeline during SCM Start.
@@ -102,22 +101,15 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
    * @param containerID ID of the container which is added to the pipeline.
    * @throws IOException in case of any Exception
    */
-  void addContainerToPipelineSCMStart(PipelineID pipelineID,
-      ContainerID containerID) throws IOException;
+  void addContainerToPipelineSCMStart(PipelineID pipelineID, ContainerID containerID) throws PipelineNotFoundException;
 
-  void removeContainerFromPipeline(PipelineID pipelineID,
-      ContainerID containerID) throws IOException;
+  void removeContainerFromPipeline(PipelineID pipelineID, ContainerID containerID);
 
-  NavigableSet<ContainerID> getContainersInPipeline(PipelineID pipelineID)
-      throws IOException;
+  NavigableSet<ContainerID> getContainersInPipeline(PipelineID pipelineID) throws PipelineNotFoundException;
 
-  int getNumberOfContainers(PipelineID pipelineID) throws IOException;
+  int getNumberOfContainers(PipelineID pipelineID) throws PipelineNotFoundException;
 
   void openPipeline(PipelineID pipelineId) throws IOException;
-
-  @Deprecated
-  void closePipeline(Pipeline pipeline, boolean onTimeout)
-      throws IOException;
 
   void closePipeline(PipelineID pipelineID) throws IOException;
 
@@ -132,10 +124,6 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
   void triggerPipelineCreation();
 
   void incNumBlocksAllocatedMetric(PipelineID id);
-
-  int minHealthyVolumeNum(Pipeline pipeline);
-
-  int minPipelineLimit(Pipeline pipeline);
 
   /**
    * Activates a dormant pipeline.
@@ -190,7 +178,7 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
    * during SCM reload.
    */
   void reinitialize(Table<PipelineID, Pipeline> pipelineStore)
-      throws IOException;
+      throws RocksDatabaseException, DuplicatedPipelineIdException, CodecException;
 
   /**
    * Ask pipeline manager to not create any new pipelines.
@@ -223,4 +211,20 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
    * Release write lock.
    */
   void releaseWriteLock();
+
+  /**
+   * Checks whether all Datanodes in the specified pipeline have greater than the specified space, containerSize.
+   * @param pipeline pipeline to check
+   * @param containerSize the required amount of space
+   * @return false if all the volumes on any Datanode in the pipeline have space less than equal to the specified
+   * containerSize, otherwise true
+   */
+  boolean hasEnoughSpace(Pipeline pipeline, long containerSize);
+
+  int openContainerLimit(List<DatanodeDetails> datanodes);
+
+  /**
+   * Get the pipeline metrics.
+   */
+  SCMPipelineMetrics getMetrics();
 }

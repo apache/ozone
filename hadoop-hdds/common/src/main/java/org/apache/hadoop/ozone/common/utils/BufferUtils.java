@@ -1,33 +1,39 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.common.utils;
 
 import com.google.common.base.Preconditions;
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.GatheringByteChannel;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Utilities for buffers.
  */
 public final class BufferUtils {
+  private static final Logger LOG = LoggerFactory.getLogger(BufferUtils.class);
+
+  private static final ByteBuffer[] EMPTY_BYTE_BUFFER_ARRAY = {};
 
   /** Utility classes should not be constructed. **/
   private BufferUtils() {
@@ -135,5 +141,47 @@ public final class BufferUtils {
           + ", maxElementsPerBin = " + maxElementsPerBin);
     }
     return Math.toIntExact(n);
+  }
+
+  /**
+   * Write all remaining bytes in buffer to the given channel.
+   */
+  public static long writeFully(GatheringByteChannel ch, ByteBuffer bb) throws IOException {
+    long written = 0;
+    while (bb.remaining() > 0) {
+      int n = ch.write(bb);
+      if (n < 0) {
+        throw new IllegalStateException("GatheringByteChannel.write returns " + n + " < 0 for " + ch);
+      }
+      written += n;
+    }
+    return written;
+  }
+
+  public static long writeFully(GatheringByteChannel ch, List<ByteBuffer> buffers) throws IOException {
+    return BufferUtils.writeFully(ch, buffers.toArray(EMPTY_BYTE_BUFFER_ARRAY));
+  }
+
+  public static long writeFully(GatheringByteChannel ch, ByteBuffer[] buffers) throws IOException {
+    if (LOG.isDebugEnabled()) {
+      for (int i = 0; i < buffers.length; i++) {
+        LOG.debug("buffer[{}]: remaining={}", i, buffers[i].remaining());
+      }
+    }
+
+    long written = 0;
+    for (int i = 0; i < buffers.length; i++) {
+      while (buffers[i].remaining() > 0) {
+        final long n = ch.write(buffers, i, buffers.length - i);
+        if (LOG.isDebugEnabled()) {
+          LOG.debug("buffer[{}]: remaining={}, written={}", i, buffers[i].remaining(), n);
+        }
+        if (n < 0) {
+          throw new IllegalStateException("GatheringByteChannel.write returns " + n + " < 0 for " + ch);
+        }
+        written += n;
+      }
+    }
+    return written;
   }
 }

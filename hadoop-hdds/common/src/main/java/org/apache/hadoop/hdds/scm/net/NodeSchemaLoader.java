@@ -1,23 +1,39 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hdds.scm.net;
 
+import static org.apache.commons.collections4.EnumerationUtils.toList;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import javax.xml.XMLConstants;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 import org.apache.commons.io.FilenameUtils;
+import org.apache.hadoop.hdds.scm.net.NodeSchema.LayerType;
 import org.apache.hadoop.hdds.server.YamlUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,24 +43,6 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.w3c.dom.Text;
 import org.xml.sax.SAXException;
-
-import javax.xml.XMLConstants;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import  org.apache.hadoop.hdds.scm.net.NodeSchema.LayerType;
-
-import static org.apache.commons.collections.EnumerationUtils.toList;
 
 /**
  * A Network topology layer schema loading tool that loads user defined network
@@ -68,6 +66,7 @@ public final class NodeSchemaLoader {
 
   private static final int LAYOUT_VERSION = 1;
   private static volatile NodeSchemaLoader instance = null;
+
   private NodeSchemaLoader() { }
 
   public static NodeSchemaLoader getInstance() {
@@ -111,7 +110,7 @@ public final class NodeSchemaLoader {
       if (schemaFile.exists()) {
         LOG.info("Load network topology schema file {}",
                 schemaFile.getAbsolutePath());
-        try (FileInputStream inputStream = new FileInputStream(schemaFile)) {
+        try (InputStream inputStream = Files.newInputStream(schemaFile.toPath())) {
           return loadSchemaFromStream(schemaFilePath, inputStream);
         }
       } else {
@@ -392,12 +391,13 @@ public final class NodeSchemaLoader {
             throw new IllegalArgumentException("Topology path depth doesn't "
                 + "match layer element numbers");
           }
-          for (int j = 0; j < layerIDs.length; j++) {
-            if (schemas.get(layerIDs[j]) == null) {
-              throw new IllegalArgumentException("No layer found for id " +
-                  layerIDs[j]);
+
+          for (String layerID : layerIDs) {
+            if (schemas.get(layerID) == null) {
+              throw new IllegalArgumentException("No layer found for id " + layerID);
             }
           }
+
           if (schemas.get(layerIDs[0]).getType() != LayerType.ROOT) {
             throw new IllegalArgumentException("Topology path doesn't start "
                 + "with ROOT layer");
@@ -407,8 +407,9 @@ public final class NodeSchemaLoader {
             throw new IllegalArgumentException("Topology path doesn't end "
                 + "with LEAF layer");
           }
-          for (int j = 0; j < layerIDs.length; j++) {
-            schemaList.add(schemas.get(layerIDs[j]));
+
+          for (String layerID : layerIDs) {
+            schemaList.add(schemas.get(layerID));
           }
         } else if (TOPOLOGY_ENFORCE_PREFIX.equalsIgnoreCase(tagName)) {
           enforcePrefix = Boolean.parseBoolean(value);

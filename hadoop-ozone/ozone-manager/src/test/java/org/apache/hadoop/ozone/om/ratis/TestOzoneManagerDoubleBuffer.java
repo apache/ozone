@@ -1,20 +1,36 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations
- * under the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.ratis;
+
+import static org.apache.hadoop.security.authentication.util.KerberosName.DEFAULT_MECHANISM;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
@@ -36,17 +52,17 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.S3SecretManagerImpl;
 import org.apache.hadoop.ozone.om.S3SecretCache;
 import org.apache.hadoop.ozone.om.S3SecretLockedManager;
+import org.apache.hadoop.ozone.om.S3SecretManagerImpl;
 import org.apache.hadoop.ozone.om.request.s3.security.S3GetSecretRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.bucket.OMBucketCreateResponse;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotCreateResponse;
+import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotPurgeResponse;
 import org.apache.hadoop.ozone.om.s3.S3SecretCacheProvider;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateSnapshotResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.util.KerberosName;
@@ -58,21 +74,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import static org.apache.hadoop.security.authentication.util.KerberosName.DEFAULT_MECHANISM;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.when;
-
 /**
  * This class tests snapshot aware OzoneManagerDoubleBuffer flushing logic.
  */
@@ -81,12 +82,12 @@ class TestOzoneManagerDoubleBuffer {
   private OzoneManagerDoubleBuffer doubleBuffer;
   private OzoneManager ozoneManager;
   private S3SecretLockedManager secretManager;
-  private final CreateSnapshotResponse snapshotResponse1 = mock(CreateSnapshotResponse.class);
-  private final CreateSnapshotResponse snapshotResponse2 = mock(CreateSnapshotResponse.class);
   private final OMResponse omKeyResponse = mock(OMResponse.class);
   private final OMResponse omBucketResponse = mock(OMResponse.class);
   private final OMResponse omSnapshotResponse1 = mock(OMResponse.class);
   private final OMResponse omSnapshotResponse2 = mock(OMResponse.class);
+  private final OMResponse omSnapshotPurgeResponseProto1 = mock(OMResponse.class);
+  private final OMResponse omSnapshotPurgeResponseProto2 = mock(OMResponse.class);
   private static OMClientResponse omKeyCreateResponse =
       mock(OMKeyCreateResponse.class);
   private static OMClientResponse omBucketCreateResponse =
@@ -95,6 +96,9 @@ class TestOzoneManagerDoubleBuffer {
       mock(OMSnapshotCreateResponse.class);
   private static OMClientResponse omSnapshotCreateResponse2 =
       mock(OMSnapshotCreateResponse.class);
+  private static OMClientResponse omSnapshotPurgeResponse1 = mock(OMSnapshotPurgeResponse.class);
+  private static OMClientResponse omSnapshotPurgeResponse2 = mock(OMSnapshotPurgeResponse.class);
+
   @TempDir
   private File tempDir;
   private OzoneManagerDoubleBuffer.FlushNotifier flushNotifier;
@@ -134,7 +138,6 @@ class TestOzoneManagerDoubleBuffer {
         .setOmMetadataManager(omMetadataManager)
         .setS3SecretManager(secretManager)
         .setMaxUnFlushedTransactionCount(1000)
-        .enableRatis(true)
         .setFlushNotifier(spyFlushNotifier)
         .build()
         .start();
@@ -143,19 +146,22 @@ class TestOzoneManagerDoubleBuffer {
     doNothing().when(omBucketCreateResponse).checkAndUpdateDB(any(), any());
     doNothing().when(omSnapshotCreateResponse1).checkAndUpdateDB(any(), any());
     doNothing().when(omSnapshotCreateResponse2).checkAndUpdateDB(any(), any());
+    doNothing().when(omSnapshotPurgeResponse1).checkAndUpdateDB(any(), any());
+    doNothing().when(omSnapshotPurgeResponse2).checkAndUpdateDB(any(), any());
 
     when(omKeyResponse.getTraceID()).thenReturn("keyTraceId");
     when(omBucketResponse.getTraceID()).thenReturn("bucketTraceId");
     when(omSnapshotResponse1.getTraceID()).thenReturn("snapshotTraceId-1");
     when(omSnapshotResponse2.getTraceID()).thenReturn("snapshotTraceId-2");
-    when(omSnapshotResponse1.hasCreateSnapshotResponse())
-        .thenReturn(true);
-    when(omSnapshotResponse2.hasCreateSnapshotResponse())
-        .thenReturn(true);
-    when(omSnapshotResponse1.getCreateSnapshotResponse())
-        .thenReturn(snapshotResponse1);
-    when(omSnapshotResponse2.getCreateSnapshotResponse())
-        .thenReturn(snapshotResponse2);
+    when(omSnapshotPurgeResponseProto1.getTraceID()).thenReturn("snapshotPurgeTraceId-1");
+    when(omSnapshotPurgeResponseProto2.getTraceID()).thenReturn("snapshotPurgeTraceId-2");
+
+    when(omKeyResponse.getCmdType()).thenReturn(OzoneManagerProtocolProtos.Type.CreateKey);
+    when(omBucketResponse.getCmdType()).thenReturn(OzoneManagerProtocolProtos.Type.CreateBucket);
+    when(omSnapshotPurgeResponseProto1.getCmdType()).thenReturn(OzoneManagerProtocolProtos.Type.SnapshotPurge);
+    when(omSnapshotPurgeResponseProto2.getCmdType()).thenReturn(OzoneManagerProtocolProtos.Type.SnapshotPurge);
+    when(omSnapshotResponse1.getCmdType()).thenReturn(OzoneManagerProtocolProtos.Type.SnapshotPurge);
+    when(omSnapshotResponse2.getCmdType()).thenReturn(OzoneManagerProtocolProtos.Type.SnapshotPurge);
 
     when(omKeyCreateResponse.getOMResponse()).thenReturn(omKeyResponse);
     when(omBucketCreateResponse.getOMResponse()).thenReturn(omBucketResponse);
@@ -163,6 +169,10 @@ class TestOzoneManagerDoubleBuffer {
         .thenReturn(omSnapshotResponse1);
     when(omSnapshotCreateResponse2.getOMResponse())
         .thenReturn(omSnapshotResponse2);
+    when(omSnapshotPurgeResponse1.getOMResponse())
+        .thenReturn(omSnapshotPurgeResponseProto1);
+    when(omSnapshotPurgeResponse2.getOMResponse())
+        .thenReturn(omSnapshotPurgeResponseProto2);
   }
 
   @AfterEach
@@ -194,8 +204,35 @@ class TestOzoneManagerDoubleBuffer {
                 omSnapshotCreateResponse1,
                 omSnapshotCreateResponse2,
                 omBucketCreateResponse),
-            4L, 4L, 14L, 16L, 1L, 1.142F)
-    );
+            4L, 4L, 14L, 16L, 1L, 1.142F),
+        Arguments.of(Arrays.asList(omSnapshotPurgeResponse1,
+                omSnapshotPurgeResponse2),
+            2L, 2L, 16L, 18L, 1L, 1.125F),
+        Arguments.of(Arrays.asList(omKeyCreateResponse,
+                omBucketCreateResponse,
+                omSnapshotPurgeResponse1,
+                omSnapshotPurgeResponse2),
+            3L, 4L, 19L, 22L, 2L, 1.157F),
+        Arguments.of(Arrays.asList(omKeyCreateResponse,
+                omSnapshotPurgeResponse1,
+                omBucketCreateResponse,
+                omSnapshotPurgeResponse2),
+            4L, 4L, 23L, 26L, 1L, 1.1300F),
+        Arguments.of(Arrays.asList(omKeyCreateResponse,
+                omSnapshotPurgeResponse1,
+                omSnapshotPurgeResponse2,
+                omBucketCreateResponse),
+            4L, 4L, 27L, 30L, 1L, 1.111F),
+        Arguments.of(Arrays.asList(omKeyCreateResponse,
+                omBucketCreateResponse,
+                omSnapshotPurgeResponse1,
+                omSnapshotCreateResponse1,
+                omSnapshotPurgeResponse2,
+                omBucketCreateResponse,
+                omSnapshotCreateResponse2),
+            6L, 7L, 33L, 37L, 2L, 1.121F)
+
+        );
   }
 
   /**

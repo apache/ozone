@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,50 +14,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.shell;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.base.Strings;
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.fs.FileUtil;
-import org.apache.hadoop.hdds.cli.GenericCli;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.io.retry.RetryInvocationHandler;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.ha.ConfUtils;
-import org.apache.hadoop.ozone.om.multitenant.AuthorizerLockImpl;
-import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
-import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantAssignUserAccessIdRequest;
-import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantCreateRequest;
-import org.apache.hadoop.ozone.shell.tenant.TenantShell;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.ozone.test.GenericTestUtils;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.AfterEach;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.slf4j.event.Level;
-import picocli.CommandLine;
-
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.PrintStream;
-import java.io.UnsupportedEncodingException;
-import java.security.PrivilegedExceptionAction;
-import java.util.Arrays;
-import java.util.List;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTITENANCY_ENABLED;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_PASSWD;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RANGER_HTTPS_ADMIN_API_USER;
@@ -67,7 +25,44 @@ import static org.apache.hadoop.ozone.om.OMMultiTenantManagerImpl.OZONE_OM_TENAN
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.File;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.io.UnsupportedEncodingException;
+import java.nio.file.Path;
+import java.security.PrivilegedExceptionAction;
+import java.util.Arrays;
+import java.util.List;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.cli.GenericCli;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.io.retry.RetryInvocationHandler;
+import org.apache.hadoop.ozone.MiniOzoneCluster;
+import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.om.multitenant.AuthorizerLockImpl;
+import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantAssignUserAccessIdRequest;
+import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantCreateRequest;
+import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
+import org.apache.hadoop.ozone.shell.tenant.TenantShell;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
+import picocli.CommandLine;
 
 /**
  * Integration test for Ozone tenant shell command. HA enabled.
@@ -75,7 +70,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * TODO: HDDS-6338. Add a Kerberized version of this
  * TODO: HDDS-6336. Add a mock Ranger server to test Ranger HTTP endpoint calls
  */
-@Timeout(300)
 public class TestOzoneTenantShell {
 
   private static final Logger LOG =
@@ -85,14 +79,12 @@ public class TestOzoneTenantShell {
     System.setProperty("log4j.configurationFile", "auditlog.properties");
   }
 
-  private static final String DEFAULT_ENCODING = UTF_8.name();
-
   /**
    * Set the timeout for every test.
    */
 
-  private static File baseDir;
-  private static File testFile;
+  @TempDir
+  private static Path path;
   private static final File AUDIT_LOG_FILE = new File("audit.log");
 
   private static OzoneConfiguration conf = null;
@@ -100,28 +92,18 @@ public class TestOzoneTenantShell {
   private static OzoneShell ozoneSh = null;
   private static TenantShell tenantShell = null;
 
-  private final ByteArrayOutputStream out = new ByteArrayOutputStream();
-  private final ByteArrayOutputStream err = new ByteArrayOutputStream();
-  private static final PrintStream OLD_OUT = System.out;
-  private static final PrintStream OLD_ERR = System.err;
+  private final StringWriter out = new StringWriter();
+  private final StringWriter err = new StringWriter();
 
   private static String omServiceId;
   private static int numOfOMs;
 
   private static final boolean USE_ACTUAL_RANGER = false;
 
-  /**
-   * Create a MiniOzoneCluster for testing with using distributed Ozone
-   * handler type.
-   *
-   * @throws Exception
-   */
   @BeforeAll
   public static void init() throws Exception {
     // Remove audit log output if it exists
-    if (AUDIT_LOG_FILE.exists()) {
-      AUDIT_LOG_FILE.delete();
-    }
+    FileUtils.deleteQuietly(AUDIT_LOG_FILE);
 
     conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_OM_TENANT_DEV_SKIP_RANGER, true);
@@ -137,14 +119,8 @@ public class TestOzoneTenantShell {
       conf.setBoolean(OZONE_OM_TENANT_DEV_SKIP_RANGER, true);
     }
 
-    String path = GenericTestUtils.getTempPath(
-        TestOzoneTenantShell.class.getSimpleName());
-    baseDir = new File(path);
-    baseDir.mkdirs();
-
-    testFile = new File(path + OzoneConsts.OZONE_URI_DELIMITER + "testFile");
-    testFile.getParentFile().mkdirs();
-    testFile.createNewFile();
+    File testFile = new File(path + OzoneConsts.OZONE_URI_DELIMITER + "testFile");
+    FileUtils.touch(testFile);
 
     ozoneSh = new OzoneShell();
     tenantShell = new TenantShell();
@@ -169,40 +145,24 @@ public class TestOzoneTenantShell {
       cluster.shutdown();
     }
 
-    if (baseDir != null) {
-      FileUtil.fullyDelete(baseDir, true);
-    }
-
-    if (AUDIT_LOG_FILE.exists()) {
-      AUDIT_LOG_FILE.delete();
-    }
+    FileUtils.deleteQuietly(AUDIT_LOG_FILE);
   }
 
   @BeforeEach
   public void setup() throws UnsupportedEncodingException {
-    System.setOut(new PrintStream(out, false, UTF_8.name()));
-    System.setErr(new PrintStream(err, false, UTF_8.name()));
-
+    tenantShell.getCmd().setOut(new PrintWriter(out));
+    tenantShell.getCmd().setErr(new PrintWriter(err));
+    ozoneSh.getCmd().setOut(new PrintWriter(out));
+    ozoneSh.getCmd().setErr(new PrintWriter(err));
     // Suppress OMNotLeaderException in the log
-    GenericTestUtils.setLogLevel(RetryInvocationHandler.LOG, Level.WARN);
+    GenericTestUtils.setLogLevel(RetryInvocationHandler.class, Level.WARN);
     // Enable debug logging for interested classes
-    GenericTestUtils.setLogLevel(OMTenantCreateRequest.LOG, Level.DEBUG);
+    GenericTestUtils.setLogLevel(OMTenantCreateRequest.class, Level.DEBUG);
     GenericTestUtils.setLogLevel(
-        OMTenantAssignUserAccessIdRequest.LOG, Level.DEBUG);
-    GenericTestUtils.setLogLevel(AuthorizerLockImpl.LOG, Level.DEBUG);
+        OMTenantAssignUserAccessIdRequest.class, Level.DEBUG);
+    GenericTestUtils.setLogLevel(AuthorizerLockImpl.class, Level.DEBUG);
 
-    GenericTestUtils.setLogLevel(OMRangerBGSyncService.LOG, Level.DEBUG);
-  }
-
-  @AfterEach
-  public void reset() {
-    // reset stream after each unit test
-    out.reset();
-    err.reset();
-
-    // restore system streams
-    System.setOut(OLD_OUT);
-    System.setErr(OLD_ERR);
+    GenericTestUtils.setLogLevel(OMRangerBGSyncService.class, Level.DEBUG);
   }
 
   /**
@@ -211,10 +171,9 @@ public class TestOzoneTenantShell {
   private int execute(GenericCli shell, String[] args) {
     LOG.info("Executing shell command with args {}", Arrays.asList(args));
     CommandLine cmd = shell.getCmd();
-
     CommandLine.IExecutionExceptionHandler exceptionHandler =
         (ex, commandLine, parseResult) -> {
-          new PrintStream(err, true, DEFAULT_ENCODING).println(ex.getMessage());
+          commandLine.getErr().println(ex.getMessage());
           return commandLine.getCommandSpec().exitCodeOnExecutionException();
         };
 
@@ -234,26 +193,6 @@ public class TestOzoneTenantShell {
     System.arraycopy(args, 0, newArgs, 0, args.length);
     newArgs[args.length] = "--om-service-id=" + omServiceId;
     return execute(shell, newArgs);
-  }
-
-  /**
-   * Execute command, assert exception message and returns true if error
-   * was thrown.
-   */
-  private void executeWithError(OzoneShell shell, String[] args,
-                                String expectedError) {
-    if (Strings.isNullOrEmpty(expectedError)) {
-      execute(shell, args);
-    } else {
-      Exception ex = assertThrows(Exception.class, () -> execute(shell, args));
-      if (!Strings.isNullOrEmpty(expectedError)) {
-        Throwable exceptionToCheck = ex;
-        if (exceptionToCheck.getCause() != null) {
-          exceptionToCheck = exceptionToCheck.getCause();
-        }
-        assertThat(exceptionToCheck.getMessage()).contains(expectedError);
-      }
-    }
   }
 
   private String getSetConfStringFromConf(String key) {
@@ -317,25 +256,25 @@ public class TestOzoneTenantShell {
   /**
    * Helper function that checks command output AND clears it.
    */
-  private void checkOutput(ByteArrayOutputStream stream, String stringToMatch,
+  private void checkOutput(StringWriter writer, String stringToMatch,
                            boolean exactMatch) throws IOException {
-    stream.flush();
-    final String str = stream.toString(DEFAULT_ENCODING);
+    writer.flush();
+    final String str = writer.toString();
     checkOutput(str, stringToMatch, exactMatch);
-    stream.reset();
+    writer.getBuffer().setLength(0);
   }
 
-  private void checkOutput(ByteArrayOutputStream stream, String stringToMatch,
+  private void checkOutput(StringWriter writer, String stringToMatch,
       boolean exactMatch, boolean expectValidJSON) throws IOException {
-    stream.flush();
-    final String str = stream.toString(DEFAULT_ENCODING);
+    writer.flush();
+    final String str = writer.toString();
     if (expectValidJSON) {
       // Verify if the String can be parsed as a valid JSON
       final ObjectMapper objectMapper = new ObjectMapper();
       objectMapper.readTree(str);
     }
     checkOutput(str, stringToMatch, exactMatch);
-    stream.reset();
+    writer.getBuffer().setLength(0);
   }
 
   private void checkOutput(String str, String stringToMatch,
@@ -436,7 +375,7 @@ public class TestOzoneTenantShell {
     checkOutput(lines.get(lines.size() - 1), "ret=SUCCESS", false);
 
     // Check volume creation
-    OmVolumeArgs volArgs = cluster.getOzoneManager().getVolumeInfo("finance");
+    OmVolumeArgs volArgs = cluster.getOMLeader().getVolumeInfo("finance");
     assertEquals("finance", volArgs.getVolume());
 
     // Creating the tenant with the same name again should fail

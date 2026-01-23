@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,33 +17,39 @@
 
 package org.apache.hadoop.ozone.om.lock;
 
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.EnumMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.util.concurrent.Striped;
-import org.apache.hadoop.hdds.utils.SimpleStriped;
-import org.apache.hadoop.ipc.ProcessingDetails.Timing;
-import org.apache.hadoop.ipc.Server;
-import org.apache.hadoop.util.Time;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-
+import static org.apache.hadoop.hdds.utils.CompositeKey.combineKeys;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_FAIR_LOCK;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_FAIR_LOCK_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_STRIPED_LOCK_SIZE_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_MANAGER_STRIPED_LOCK_SIZE_PREFIX;
-import static org.apache.hadoop.hdds.utils.CompositeKey.combineKeys;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.util.concurrent.Striped;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+import java.util.stream.StreamSupport;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.utils.CompositeKey;
+import org.apache.hadoop.hdds.utils.SimpleStriped;
+import org.apache.hadoop.ipc_.ProcessingDetails.Timing;
+import org.apache.hadoop.ipc_.Server;
+import org.apache.hadoop.util.Time;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Provides different locks to handle concurrency in OzoneMaster.
@@ -92,14 +97,10 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneManagerLock.class);
 
-  private final Map<Resource, Striped<ReadWriteLock>> stripedLockByResource;
+  private final Map<Class<? extends Resource>,
+      Pair<Map<Resource, Striped<ReadWriteLock>>, ResourceLockTracker>> resourcelockMap;
 
   private OMLockMetrics omLockMetrics;
-  private final ThreadLocal<Short> lockSet = ThreadLocal.withInitial(
-      () -> Short.valueOf((short)0));
-
-  private ThreadLocal<OMLockDetails> omLockDetails =
-      ThreadLocal.withInitial(OMLockDetails::new);
 
   /**
    * Creates new OzoneManagerLock instance.
@@ -107,12 +108,26 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    */
   public OzoneManagerLock(ConfigurationSource conf) {
     omLockMetrics = OMLockMetrics.create();
-    Map<Resource, Striped<ReadWriteLock>> stripedLockMap =
-        new EnumMap<>(Resource.class);
-    for (Resource r : Resource.values()) {
+    this.resourcelockMap = ImmutableMap.of(LeveledResource.class, getLeveledLocks(conf), DAGLeveledResource.class,
+        getFlatLocks(conf));
+  }
+
+  private Pair<Map<Resource, Striped<ReadWriteLock>>, ResourceLockTracker> getLeveledLocks(
+      ConfigurationSource conf) {
+    Map<LeveledResource, Striped<ReadWriteLock>> stripedLockMap = new EnumMap<>(LeveledResource.class);
+    for (LeveledResource r : LeveledResource.values()) {
       stripedLockMap.put(r, createStripeLock(r, conf));
     }
-    this.stripedLockByResource = Collections.unmodifiableMap(stripedLockMap);
+    return Pair.of(Collections.unmodifiableMap(stripedLockMap), LeveledResourceLockTracker.get());
+  }
+
+  private Pair<Map<Resource, Striped<ReadWriteLock>>, ResourceLockTracker> getFlatLocks(
+      ConfigurationSource conf) {
+    Map<DAGLeveledResource, Striped<ReadWriteLock>> stripedLockMap = new EnumMap<>(DAGLeveledResource.class);
+    for (DAGLeveledResource r : DAGLeveledResource.values()) {
+      stripedLockMap.put(r, createStripeLock(r, conf));
+    }
+    return Pair.of(Collections.unmodifiableMap(stripedLockMap), DAGResourceLockTracker.get());
   }
 
   private Striped<ReadWriteLock> createStripeLock(Resource r,
@@ -126,8 +141,23 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     return SimpleStriped.readWriteLock(size, fair);
   }
 
-  private ReentrantReadWriteLock getLock(Resource resource, String... keys) {
-    Striped<ReadWriteLock> striped = stripedLockByResource.get(resource);
+  private Iterable<ReadWriteLock> getAllLocks(Striped<ReadWriteLock> striped) {
+    return IntStream.range(0, striped.size()).mapToObj(striped::getAt).collect(Collectors.toList());
+  }
+
+  private Iterable<ReadWriteLock> bulkGetLock(Striped<ReadWriteLock> striped, Collection<String[]> keys) {
+    List<Object> lockKeys = new ArrayList<>(keys.size());
+    for (String[] key : keys) {
+      if (Objects.nonNull(key)) {
+        lockKeys.add(CompositeKey.combineKeys(key));
+      }
+    }
+    return striped.bulkGet(lockKeys);
+  }
+
+  private ReentrantReadWriteLock getLock(Map<Resource, Striped<ReadWriteLock>> lockMap, Resource resource,
+      String... keys) {
+    Striped<ReadWriteLock> striped = lockMap.get(resource);
     Object key = combineKeys(keys);
     return (ReentrantReadWriteLock) striped.get(key);
   }
@@ -155,6 +185,28 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   }
 
   /**
+   * Acquire read locks on a list of resources.
+   *
+   * For S3_BUCKET_LOCK, VOLUME_LOCK, BUCKET_LOCK type resource, same
+   * thread acquiring lock again is allowed.
+   *
+   * For USER_LOCK, PREFIX_LOCK, S3_SECRET_LOCK type resource, same thread
+   * acquiring lock again is not allowed.
+   *
+   * Special Note for USER_LOCK: Single thread can acquire single user lock/
+   * multi user lock. But not both at the same time.
+   * @param resource - Type of the resource.
+   * @param keys - A list of Resource names on which user want to acquire locks.
+   * For Resource type BUCKET_LOCK, first param should be volume, second param
+   * should be bucket name. For remaining all resource only one param should
+   * be passed.
+   */
+  @Override
+  public OMLockDetails acquireReadLocks(Resource resource, Collection<String[]> keys) {
+    return acquireLocks(resource, true, striped -> bulkGetLock(striped, keys));
+  }
+
+  /**
    * Acquire write lock on resource.
    *
    * For S3_BUCKET_LOCK, VOLUME_LOCK, BUCKET_LOCK type resource, same
@@ -176,10 +228,56 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     return acquireLock(resource, false, keys);
   }
 
-  private OMLockDetails acquireLock(Resource resource, boolean isReadLock,
-      String... keys) {
-    omLockDetails.get().clear();
-    if (!resource.canLock(lockSet.get())) {
+  /**
+   * Acquire write locks on a list of resources.
+   *
+   * For S3_BUCKET_LOCK, VOLUME_LOCK, BUCKET_LOCK type resource, same
+   * thread acquiring lock again is allowed.
+   *
+   * For USER_LOCK, PREFIX_LOCK, S3_SECRET_LOCK type resource, same thread
+   * acquiring lock again is not allowed.
+   *
+   * Special Note for USER_LOCK: Single thread can acquire single user lock/
+   * multi user lock. But not both at the same time.
+   * @param resource - Type of the resource.
+   * @param keys - A list of Resource names on which user want to acquire lock.
+   * For Resource type BUCKET_LOCK, first param should be volume, second param
+   * should be bucket name. For remaining all resource only one param should
+   * be passed.
+   */
+  @Override
+  public OMLockDetails acquireWriteLocks(Resource resource, Collection<String[]> keys) {
+    return acquireLocks(resource, false, striped -> bulkGetLock(striped, keys));
+  }
+
+  /**
+   * Acquires all write locks for a specified resource.
+   *
+   * @param resource The resource for which the write lock is to be acquired.
+   */
+  @Override
+  public OMLockDetails acquireResourceWriteLock(Resource resource) {
+    return acquireLocks(resource, false, this::getAllLocks);
+  }
+
+  private void acquireLock(Resource resource, boolean isReadLock, ReadWriteLock lock,
+                           long startWaitingTimeNanos) {
+    if (isReadLock) {
+      lock.readLock().lock();
+      updateReadLockMetrics(resource, (ReentrantReadWriteLock) lock, startWaitingTimeNanos);
+    } else {
+      lock.writeLock().lock();
+      updateWriteLockMetrics(resource, (ReentrantReadWriteLock) lock, startWaitingTimeNanos);
+    }
+  }
+
+  private OMLockDetails acquireLocks(Resource resource, boolean isReadLock,
+      Function<Striped<ReadWriteLock>, Iterable<ReadWriteLock>> lockListProvider) {
+    Pair<Map<Resource, Striped<ReadWriteLock>>, ResourceLockTracker> resourceLockPair =
+        resourcelockMap.get(resource.getClass());
+    ResourceLockTracker<Resource> resourceLockTracker = resourceLockPair.getRight();
+    resourceLockTracker.clearLockDetails();
+    if (!resourceLockTracker.canLockResource(resource)) {
       String errorMessage = getErrorMessage(resource);
       LOG.error(errorMessage);
       throw new RuntimeException(errorMessage);
@@ -187,18 +285,28 @@ public class OzoneManagerLock implements IOzoneManagerLock {
 
     long startWaitingTimeNanos = Time.monotonicNowNanos();
 
-    ReentrantReadWriteLock lock = getLock(resource, keys);
-    if (isReadLock) {
-      lock.readLock().lock();
-      updateReadLockMetrics(resource, lock, startWaitingTimeNanos);
-    } else {
-      lock.writeLock().lock();
-      updateWriteLockMetrics(resource, lock, startWaitingTimeNanos);
+    for (ReadWriteLock lock : lockListProvider.apply(resourceLockPair.getKey().get(resource))) {
+      acquireLock(resource, isReadLock, lock, startWaitingTimeNanos);
+    }
+    return resourceLockTracker.lockResource(resource);
+  }
+
+  private OMLockDetails acquireLock(Resource resource, boolean isReadLock, String... keys) {
+    Pair<Map<Resource, Striped<ReadWriteLock>>, ResourceLockTracker> resourceLockPair =
+        resourcelockMap.get(resource.getClass());
+    ResourceLockTracker<Resource> resourceLockTracker = resourceLockPair.getRight();
+    resourceLockTracker.clearLockDetails();
+    if (!resourceLockTracker.canLockResource(resource)) {
+      String errorMessage = getErrorMessage(resource);
+      LOG.error(errorMessage);
+      throw new RuntimeException(errorMessage);
     }
 
-    lockSet.set(resource.setLock(lockSet.get()));
-    omLockDetails.get().setLockAcquired(true);
-    return omLockDetails.get();
+    long startWaitingTimeNanos = Time.monotonicNowNanos();
+
+    ReentrantReadWriteLock lock = getLock(resourceLockPair.getKey(), resource, keys);
+    acquireLock(resource, isReadLock, lock, startWaitingTimeNanos);
+    return resourceLockTracker.lockResource(resource);
   }
 
   private void updateReadLockMetrics(Resource resource,
@@ -215,9 +323,10 @@ public class OzoneManagerLock implements IOzoneManagerLock {
       // Adds a snapshot to the metric readLockWaitingTimeMsStat.
       omLockMetrics.setReadLockWaitingTimeMsStat(
           TimeUnit.NANOSECONDS.toMillis(readLockWaitingTimeNanos));
-      updateProcessingDetails(Timing.LOCKWAIT, readLockWaitingTimeNanos);
+      updateProcessingDetails(resourcelockMap.get(resource.getClass()).getValue(),
+          Timing.LOCKWAIT, readLockWaitingTimeNanos);
 
-      resource.setStartReadHeldTimeNanos(Time.monotonicNowNanos());
+      resource.getResourceManager().setStartReadHeldTimeNanos(Time.monotonicNowNanos());
     }
   }
 
@@ -236,29 +345,25 @@ public class OzoneManagerLock implements IOzoneManagerLock {
       // Adds a snapshot to the metric writeLockWaitingTimeMsStat.
       omLockMetrics.setWriteLockWaitingTimeMsStat(
           TimeUnit.NANOSECONDS.toMillis(writeLockWaitingTimeNanos));
-      updateProcessingDetails(Timing.LOCKWAIT, writeLockWaitingTimeNanos);
+      updateProcessingDetails(resourcelockMap.get(resource.getClass()).getValue(), Timing.LOCKWAIT,
+          writeLockWaitingTimeNanos);
 
-      resource.setStartWriteHeldTimeNanos(Time.monotonicNowNanos());
+      resource.getResourceManager().setStartWriteHeldTimeNanos(Time.monotonicNowNanos());
     }
   }
 
   private String getErrorMessage(Resource resource) {
     return "Thread '" + Thread.currentThread().getName() + "' cannot " +
-        "acquire " + resource.name + " lock while holding " +
+        "acquire " + resource.getName() + " lock while holding " +
         getCurrentLocks().toString() + " lock(s).";
-
   }
 
   @VisibleForTesting
   List<String> getCurrentLocks() {
-    List<String> currentLocks = new ArrayList<>();
-    short lockSetVal = lockSet.get();
-    for (Resource value : Resource.values()) {
-      if (value.isLevelLocked(lockSetVal)) {
-        currentLocks.add(value.getName());
-      }
-    }
-    return currentLocks;
+    return resourcelockMap.values().stream().map(Pair::getValue)
+        .flatMap(rlm -> ((ResourceLockTracker<? extends Resource>)rlm).getCurrentLockedResources())
+        .map(Resource::getName)
+        .collect(Collectors.toList());
   }
 
   /**
@@ -266,28 +371,9 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    */
   @Override
   public boolean acquireMultiUserLock(String firstUser, String secondUser) {
-    Resource resource = Resource.USER_LOCK;
-
-    if (!resource.canLock(lockSet.get())) {
-      String errorMessage = getErrorMessage(resource);
-      LOG.error(errorMessage);
-      throw new RuntimeException(errorMessage);
-    } else {
-      Striped<ReadWriteLock> striped =
-          stripedLockByResource.get(Resource.USER_LOCK);
-      // The result of bulkGet is always sorted in a consistent order.
-      // This prevents deadlocks.
-      Iterable<ReadWriteLock> locks =
-          striped.bulkGet(Arrays.asList(firstUser, secondUser));
-      for (ReadWriteLock lock : locks) {
-        lock.writeLock().lock();
-      }
-
-      lockSet.set(resource.setLock(lockSet.get()));
-      return true;
-    }
+    return acquireWriteLocks(LeveledResource.USER_LOCK,
+        Arrays.asList(new String[] {firstUser}, new String[] {secondUser})).isLockAcquired();
   }
-
 
   /**
    * Release lock on multiple users.
@@ -296,15 +382,8 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    */
   @Override
   public void releaseMultiUserLock(String firstUser, String secondUser) {
-    Striped<ReadWriteLock> striped =
-        stripedLockByResource.get(Resource.USER_LOCK);
-    Iterable<ReadWriteLock> locks =
-        striped.bulkGet(Arrays.asList(firstUser, secondUser));
-    for (ReadWriteLock lock : locks) {
-      lock.writeLock().unlock();
-    }
-
-    lockSet.set(Resource.USER_LOCK.clearLock(lockSet.get()));
+    releaseWriteLocks(LeveledResource.USER_LOCK,
+        Arrays.asList(new String[] {firstUser}, new String[] {secondUser}));
   }
 
 
@@ -322,6 +401,29 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   }
 
   /**
+   * Release write lock on multiple resources.
+   * @param resource - Type of the resource.
+   * @param keys - List of resource names on which user want to acquire lock.
+   * For Resource type BUCKET_LOCK, first param should be volume, second param
+   * should be bucket name. For remaining all resource only one param should
+   * be passed.
+   */
+  @Override
+  public OMLockDetails releaseWriteLocks(Resource resource, Collection<String[]> keys) {
+    return releaseLocks(resource, false, striped -> bulkGetLock(striped, keys));
+  }
+
+  /**
+   * Releases a write lock acquired on the entire Stripe for a specified resource.
+   *
+   * @param resource The resource for which the write lock is to be acquired.
+   */
+  @Override
+  public OMLockDetails releaseResourceWriteLock(Resource resource) {
+    return releaseLocks(resource, false, this::getAllLocks);
+  }
+
+  /**
    * Release read lock on resource.
    * @param resource - Type of the resource.
    * @param keys - Resource names on which user want to acquire lock.
@@ -334,10 +436,26 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     return releaseLock(resource, true, keys);
   }
 
+  /**
+   * Release read locks on a list of resources.
+   * @param resource - Type of the resource.
+   * @param keys - Resource names on which user want to acquire lock.
+   * For Resource type BUCKET_LOCK, first param should be volume, second param
+   * should be bucket name. For remaining all resource only one param should
+   * be passed.
+   */
+  @Override
+  public OMLockDetails releaseReadLocks(Resource resource, Collection<String[]> keys) {
+    return releaseLocks(resource, true, striped -> bulkGetLock(striped, keys));
+  }
+
   private OMLockDetails releaseLock(Resource resource, boolean isReadLock,
       String... keys) {
-    omLockDetails.get().clear();
-    ReentrantReadWriteLock lock = getLock(resource, keys);
+    Pair<Map<Resource, Striped<ReadWriteLock>>, ResourceLockTracker> resourceLockPair =
+        resourcelockMap.get(resource.getClass());
+    ResourceLockTracker<Resource> resourceLockTracker = resourceLockPair.getRight();
+    resourceLockTracker.clearLockDetails();
+    ReentrantReadWriteLock lock = getLock(resourceLockPair.getKey(), resource, keys);
     if (isReadLock) {
       lock.readLock().unlock();
       updateReadUnlockMetrics(resource, lock);
@@ -346,9 +464,30 @@ public class OzoneManagerLock implements IOzoneManagerLock {
       lock.writeLock().unlock();
       updateWriteUnlockMetrics(resource, lock, isWriteLocked);
     }
+    return resourceLockTracker.unlockResource(resource);
+  }
 
-    lockSet.set(resource.clearLock(lockSet.get()));
-    return omLockDetails.get();
+  private OMLockDetails releaseLocks(Resource resource, boolean isReadLock,
+      Function<Striped<ReadWriteLock>, Iterable<ReadWriteLock>> lockListProvider) {
+    Pair<Map<Resource, Striped<ReadWriteLock>>, ResourceLockTracker> resourceLockPair =
+        resourcelockMap.get(resource.getClass());
+    ResourceLockTracker<Resource> resourceLockTracker = resourceLockPair.getRight();
+    resourceLockTracker.clearLockDetails();
+    List<ReadWriteLock> locks = StreamSupport.stream(lockListProvider.apply(resourceLockPair.getKey().get(resource))
+            .spliterator(), false).collect(Collectors.toList());
+    // Release locks in reverse order.
+    Collections.reverse(locks);
+    for (ReadWriteLock lock : locks) {
+      if (isReadLock) {
+        lock.readLock().unlock();
+        updateReadUnlockMetrics(resource, (ReentrantReadWriteLock) lock);
+      } else {
+        boolean isWriteLocked = ((ReentrantReadWriteLock)lock).isWriteLockedByCurrentThread();
+        lock.writeLock().unlock();
+        updateWriteUnlockMetrics(resource, (ReentrantReadWriteLock) lock, isWriteLocked);
+      }
+    }
+    return resourceLockTracker.unlockResource(resource);
   }
 
   private void updateReadUnlockMetrics(Resource resource,
@@ -359,12 +498,13 @@ public class OzoneManagerLock implements IOzoneManagerLock {
      */
     if (lock.getReadHoldCount() == 0) {
       long readLockHeldTimeNanos =
-          Time.monotonicNowNanos() - resource.getStartReadHeldTimeNanos();
+          Time.monotonicNowNanos() - resource.getResourceManager().getStartReadHeldTimeNanos();
 
       // Adds a snapshot to the metric readLockHeldTimeMsStat.
       omLockMetrics.setReadLockHeldTimeMsStat(
           TimeUnit.NANOSECONDS.toMillis(readLockHeldTimeNanos));
-      updateProcessingDetails(Timing.LOCKSHARED, readLockHeldTimeNanos);
+      updateProcessingDetails(resourcelockMap.get(resource.getClass()).getValue(), Timing.LOCKSHARED,
+          readLockHeldTimeNanos);
     }
   }
 
@@ -377,12 +517,13 @@ public class OzoneManagerLock implements IOzoneManagerLock {
      */
     if ((lock.getWriteHoldCount() == 0) && isWriteLocked) {
       long writeLockHeldTimeNanos =
-          Time.monotonicNowNanos() - resource.getStartWriteHeldTimeNanos();
+          Time.monotonicNowNanos() - resource.getResourceManager().getStartWriteHeldTimeNanos();
 
       // Adds a snapshot to the metric writeLockHeldTimeMsStat.
       omLockMetrics.setWriteLockHeldTimeMsStat(
           TimeUnit.NANOSECONDS.toMillis(writeLockHeldTimeNanos));
-      updateProcessingDetails(Timing.LOCKEXCLUSIVE, writeLockHeldTimeNanos);
+      updateProcessingDetails(resourcelockMap.get(resource.getClass()).getValue(), Timing.LOCKEXCLUSIVE,
+          writeLockHeldTimeNanos);
     }
   }
 
@@ -394,7 +535,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   @Override
   @VisibleForTesting
   public int getReadHoldCount(Resource resource, String... keys) {
-    return getLock(resource, keys).getReadHoldCount();
+    return getLock(resourcelockMap.get(resource.getClass()).getKey(), resource, keys).getReadHoldCount();
   }
 
 
@@ -406,7 +547,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   @Override
   @VisibleForTesting
   public int getWriteHoldCount(Resource resource, String... keys) {
-    return getLock(resource, keys).getWriteHoldCount();
+    return getLock(resourcelockMap.get(resource.getClass()).getKey(), resource, keys).getWriteHoldCount();
   }
 
   /**
@@ -420,7 +561,7 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   @VisibleForTesting
   public boolean isWriteLockedByCurrentThread(Resource resource,
       String... keys) {
-    return getLock(resource, keys).isWriteLockedByCurrentThread();
+    return getLock(resourcelockMap.get(resource.getClass()).getKey(), resource, keys).isWriteLockedByCurrentThread();
   }
 
   /**
@@ -437,9 +578,11 @@ public class OzoneManagerLock implements IOzoneManagerLock {
   }
 
   /**
-   * Resource defined in Ozone.
+   * Leveled Resource defined in Ozone.
+   * Enforces lock acquisition ordering based on the resource level. A resource at lower level cannot be acquired
+   * after a higher level lock is already acquired.
    */
-  public enum Resource {
+  public enum LeveledResource implements Resource {
     // For S3 Bucket need to allow only for S3, that should be means only 1.
     S3_BUCKET_LOCK((byte) 0, "S3_BUCKET_LOCK"), // = 1
 
@@ -459,9 +602,6 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     PREFIX_LOCK((byte) 6, "PREFIX_LOCK"), //127
     SNAPSHOT_LOCK((byte) 7, "SNAPSHOT_LOCK"); // = 255
 
-    // level of the resource
-    private byte lockLevel;
-
     // This will tell the value, till which we can allow locking.
     private short mask;
 
@@ -472,69 +612,14 @@ public class OzoneManagerLock implements IOzoneManagerLock {
     // Name of the resource.
     private String name;
 
-    // This helps in maintaining read lock related variables locally confined
-    // to a given thread.
-    private final ThreadLocal<LockUsageInfo> readLockTimeStampNanos =
-        ThreadLocal.withInitial(LockUsageInfo::new);
+    private ResourceManager resourceManager;
 
-    // This helps in maintaining write lock related variables locally confined
-    // to a given thread.
-    private final ThreadLocal<LockUsageInfo> writeLockTimeStampNanos =
-        ThreadLocal.withInitial(LockUsageInfo::new);
-
-    /**
-     * Sets the time (ns) when the read lock holding period begins specific to a
-     * thread.
-     *
-     * @param startReadHeldTimeNanos read lock held start time (ns)
-     */
-    void setStartReadHeldTimeNanos(long startReadHeldTimeNanos) {
-      readLockTimeStampNanos.get()
-          .setStartReadHeldTimeNanos(startReadHeldTimeNanos);
-    }
-
-    /**
-     * Sets the time (ns) when the write lock holding period begins specific to
-     * a thread.
-     *
-     * @param startWriteHeldTimeNanos write lock held start time (ns)
-     */
-    void setStartWriteHeldTimeNanos(long startWriteHeldTimeNanos) {
-      writeLockTimeStampNanos.get()
-          .setStartWriteHeldTimeNanos(startWriteHeldTimeNanos);
-    }
-
-    /**
-     * Returns the time (ns) when the read lock holding period began specific to
-     * a thread.
-     *
-     * @return read lock held start time (ns)
-     */
-    long getStartReadHeldTimeNanos() {
-      long startReadHeldTimeNanos =
-          readLockTimeStampNanos.get().getStartReadHeldTimeNanos();
-      readLockTimeStampNanos.remove();
-      return startReadHeldTimeNanos;
-    }
-
-    /**
-     * Returns the time (ns) when the write lock holding period began specific
-     * to a thread.
-     *
-     * @return write lock held start time (ns)
-     */
-    long getStartWriteHeldTimeNanos() {
-      long startWriteHeldTimeNanos =
-          writeLockTimeStampNanos.get().getStartWriteHeldTimeNanos();
-      writeLockTimeStampNanos.remove();
-      return startWriteHeldTimeNanos;
-    }
-
-    Resource(byte pos, String name) {
-      this.lockLevel = pos;
-      this.mask = (short) (Math.pow(2, lockLevel + 1) - 1);
-      this.setMask = (short) Math.pow(2, lockLevel);
+    LeveledResource(byte pos, String name) {
+      // level of the resource
+      this.mask = (short) (Math.pow(2, pos + 1) - 1);
+      this.setMask = (short) Math.pow(2, pos);
       this.name = name;
+      this.resourceManager = new ResourceManager();
     }
 
     boolean canLock(short lockSetVal) {
@@ -590,15 +675,20 @@ public class OzoneManagerLock implements IOzoneManagerLock {
       return (lockSetVal & setMask) == setMask;
     }
 
-    String getName() {
+    @Override
+    public String getName() {
       return name;
+    }
+
+    @Override
+    public ResourceManager getResourceManager() {
+      return resourceManager;
     }
 
     short getMask() {
       return mask;
     }
   }
-
 
   /**
    * Update the processing details.
@@ -610,20 +700,21 @@ public class OzoneManagerLock implements IOzoneManagerLock {
    * @param type IPC Timing types
    * @param deltaNanos consumed time
    */
-  private void updateProcessingDetails(Timing type, long deltaNanos) {
+  private void updateProcessingDetails(ResourceLockTracker<? extends Resource> resourceLockTracker, Timing type,
+      long deltaNanos) {
     Server.Call call = Server.getCurCall().get();
     if (call != null) {
       call.getProcessingDetails().add(type, deltaNanos, TimeUnit.NANOSECONDS);
     } else {
       switch (type) {
       case LOCKWAIT:
-        omLockDetails.get().add(deltaNanos, OMLockDetails.LockOpType.WAIT);
+        resourceLockTracker.getOmLockDetails().add(deltaNanos, OMLockDetails.LockOpType.WAIT);
         break;
       case LOCKSHARED:
-        omLockDetails.get().add(deltaNanos, OMLockDetails.LockOpType.READ);
+        resourceLockTracker.getOmLockDetails().add(deltaNanos, OMLockDetails.LockOpType.READ);
         break;
       case LOCKEXCLUSIVE:
-        omLockDetails.get().add(deltaNanos, OMLockDetails.LockOpType.WRITE);
+        resourceLockTracker.getOmLockDetails().add(deltaNanos, OMLockDetails.LockOpType.WRITE);
         break;
       default:
         LOG.error("Unsupported Timing type {}", type);

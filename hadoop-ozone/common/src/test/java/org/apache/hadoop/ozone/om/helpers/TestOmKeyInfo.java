@@ -1,22 +1,37 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.helpers;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
+import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -34,21 +49,6 @@ import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.EC;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType.RATIS;
-import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-
 /**
  * Test OmKeyInfo.
  */
@@ -62,11 +62,15 @@ public class TestOmKeyInfo {
     OmKeyInfo keyAfterSerialization = OmKeyInfo.getFromProtobuf(
         key.getProtobuf(ClientVersion.CURRENT_VERSION));
 
+    assertNotNull(keyAfterSerialization);
     assertEquals(key, keyAfterSerialization);
+    assertEquals(key.getFileName(), keyAfterSerialization.getFileName());
 
     assertFalse(key.isHsync());
-    key.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID, "clientid");
+    key = key.withMetadataMutations(
+        metadata -> metadata.put(OzoneConsts.HSYNC_CLIENT_ID, "clientid"));
     assertTrue(key.isHsync());
+    assertEquals(5678L, key.getExpectedDataGeneration());
   }
 
   @Test
@@ -123,6 +127,9 @@ public class TestOmKeyInfo {
         .setReplicationConfig(replicationConfig)
         .addMetadata("key1", "value1")
         .addMetadata("key2", "value2")
+        .addTag("tagKey1", "tagValue1")
+        .addTag("tagKey2", "tagValue2")
+        .setExpectedDataGeneration(5678L)
         .build();
   }
 
@@ -148,6 +155,8 @@ public class TestOmKeyInfo {
             RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
         .addMetadata("key1", "value1")
         .addMetadata("key2", "value2")
+        .addTag("tagKey1", "tagValue1")
+        .addTag("tagKey2", "tagValue2")
         .setOmKeyLocationInfos(
             Collections.singletonList(createOmKeyLocationInfoGroup(isMPU)))
         .build();
@@ -180,9 +189,11 @@ public class TestOmKeyInfo {
       }
     }
 
-    key.setAcls(Arrays.asList(new OzoneAcl(
-        IAccessAuthorizer.ACLIdentityType.USER, "user1",
-        ACCESS, IAccessAuthorizer.ACLType.WRITE)));
+    key = key.toBuilder()
+        .setAcls(Arrays.asList(OzoneAcl.of(
+            IAccessAuthorizer.ACLIdentityType.USER, "user1",
+            ACCESS, IAccessAuthorizer.ACLType.WRITE)))
+        .build();
 
     // Change acls and check.
     assertNotEquals(key, cloneKey);
@@ -193,8 +204,14 @@ public class TestOmKeyInfo {
     cloneKey = key.copyObject();
 
     assertEquals(key.getAcls(), cloneKey.getAcls());
-  }
 
+    // Change object tags and check
+    key = key.toBuilder()
+        .setTags(Collections.singletonMap("tagKey3", "tagValue3"))
+        .build();
+
+    assertNotEquals(key, cloneKey);
+  }
 
   private OmKeyLocationInfoGroup createOmKeyLocationInfoGroup(boolean isMPU) {
     List<OmKeyLocationInfo> omKeyLocationInfos = new ArrayList<>();

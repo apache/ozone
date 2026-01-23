@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,22 +14,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.s3.exception;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.function.Function;
 
 import static java.net.HttpURLConnection.HTTP_BAD_REQUEST;
 import static java.net.HttpURLConnection.HTTP_CONFLICT;
 import static java.net.HttpURLConnection.HTTP_FORBIDDEN;
-import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
-import static java.net.HttpURLConnection.HTTP_PRECON_FAILED;
-import static java.net.HttpURLConnection.HTTP_NOT_IMPLEMENTED;
 import static java.net.HttpURLConnection.HTTP_INTERNAL_ERROR;
+import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
+import static java.net.HttpURLConnection.HTTP_NOT_IMPLEMENTED;
+import static java.net.HttpURLConnection.HTTP_PRECON_FAILED;
 import static org.apache.hadoop.ozone.OzoneConsts.S3_REQUEST_HEADER_METADATA_SIZE_LIMIT_KB;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.RANGE_NOT_SATISFIABLE;
+
+import java.util.function.Function;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class represents errors from Ozone S3 service.
@@ -40,10 +39,6 @@ public final class S3ErrorTable {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       S3ErrorTable.class);
-
-  private S3ErrorTable() {
-    //No one should construct this object.
-  }
 
   public static final OS3Exception INVALID_URI = new OS3Exception("InvalidURI",
       "Couldn't parse the specified URI.", HTTP_BAD_REQUEST);
@@ -145,6 +140,41 @@ public final class S3ErrorTable {
   public static final OS3Exception NO_SUCH_TAG_SET = new OS3Exception(
       "NoSuchTagSet", "The specified tag does not exist.", HTTP_NOT_FOUND);
 
+  public static final OS3Exception MALFORMED_XML = new OS3Exception(
+      "MalformedXML", "The XML you provided was not well-formed or did not " +
+      "validate against our published schema", HTTP_BAD_REQUEST);
+
+  public static final OS3Exception QUOTA_EXCEEDED = new OS3Exception(
+      "QuotaExceeded", "The quota has been exceeded. " +
+      "Please review your disk space or namespace usage and adjust accordingly.",
+      HTTP_FORBIDDEN
+  );
+
+  public static final OS3Exception INVALID_STORAGE_CLASS = new OS3Exception(
+      "InvalidStorageClass", "The storage class that you specified is not valid. " +
+      "Provide a supported storage class[STANDARD|REDUCED_REDUNDANCY|STANDARD_IA] or " +
+      "a valid custom EC storage config for if using STANDARD_IA.",
+      HTTP_BAD_REQUEST);
+
+  public static final OS3Exception BUCKET_OWNER_MISMATCH = new OS3Exception(
+      "Access Denied", "User doesn't have permission to access this resource due to a " +
+      "bucket ownership mismatch.", HTTP_FORBIDDEN);
+
+  public static final OS3Exception X_AMZ_CONTENT_SHA256_MISMATCH = new OS3Exception(
+      "XAmzContentSHA256Mismatch", "The provided 'x-amz-content-sha256' header does " +
+      "not match the computed hash.", HTTP_BAD_REQUEST);
+
+  public static final OS3Exception BAD_DIGEST = new OS3Exception(
+      "BadDigest", "The Content-MD5 or checksum value that you specified did not match what the server received.",
+      HTTP_BAD_REQUEST);
+
+  private static Function<Exception, OS3Exception> generateInternalError =
+      e -> new OS3Exception("InternalError", e.getMessage(), HTTP_INTERNAL_ERROR);
+
+  private S3ErrorTable() {
+    //No one should construct this object.
+  }
+
   public static OS3Exception newError(OS3Exception e, String resource) {
     return newError(e, resource, null);
   }
@@ -168,9 +198,6 @@ public final class S3ErrorTable {
     }
     return err;
   }
-
-  private static Function<Exception, OS3Exception> generateInternalError = e ->
-      new OS3Exception("InternalError", e.getMessage(), HTTP_INTERNAL_ERROR);
 
   public static OS3Exception getInternalError(Exception e) {
     return generateInternalError.apply(e);

@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,8 +16,9 @@
  */
 
 package org.apache.hadoop.ozone.recon.api.types;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.base.Preconditions;
+import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 
 /**
@@ -49,8 +49,8 @@ public class NamespaceSummaryResponse {
    *
    * @return Builder
    */
-  public static NamespaceSummaryResponse.Builder newBuilder() {
-    return new NamespaceSummaryResponse.Builder();
+  public static Builder newBuilder() {
+    return new Builder();
   }
 
   public NamespaceSummaryResponse(Builder b) {
@@ -104,7 +104,6 @@ public class NamespaceSummaryResponse {
   /**
    * Builder for NamespaceSummaryResponse.
    */
-  @SuppressWarnings("checkstyle:hiddenfield")
   public static final class Builder {
     private String path;
     private EntityType entityType;
@@ -112,46 +111,45 @@ public class NamespaceSummaryResponse {
     private ObjectDBInfo objectDBInfo;
     private ResponseStatus status;
 
-
     public Builder() {
       // Default values
       this.path = StringUtils.EMPTY;
       this.entityType = EntityType.ROOT;
     }
 
-    public NamespaceSummaryResponse.Builder setPath(String path) {
+    public Builder setPath(String path) {
       this.path = path;
       return this;
     }
 
-    public NamespaceSummaryResponse.Builder setEntityType(
+    public Builder setEntityType(
         EntityType entityType) {
       this.entityType = entityType;
       return this;
     }
 
-    public NamespaceSummaryResponse.Builder setCountStats(
+    public Builder setCountStats(
         CountStats countStats) {
       this.countStats = countStats;
       return this;
     }
 
-    public NamespaceSummaryResponse.Builder setObjectDBInfo(
+    public Builder setObjectDBInfo(
         ObjectDBInfo objectDBInfo) {
       this.objectDBInfo = objectDBInfo;
       return this;
     }
 
-    public NamespaceSummaryResponse.Builder setStatus(
+    public Builder setStatus(
         ResponseStatus status) {
       this.status = status;
       return this;
     }
 
     public NamespaceSummaryResponse build() {
-      Preconditions.checkNotNull(this.path);
-      Preconditions.checkNotNull(this.entityType);
-      Preconditions.checkNotNull(this.status);
+      Objects.requireNonNull(path, "path == null");
+      Objects.requireNonNull(entityType, "entityType == null");
+      Objects.requireNonNull(status, "status == null");
 
       return new NamespaceSummaryResponse(this);
     }

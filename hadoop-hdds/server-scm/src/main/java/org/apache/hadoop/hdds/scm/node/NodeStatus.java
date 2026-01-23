@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,102 +17,154 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
-import com.google.common.collect.ImmutableSet;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONED;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.DECOMMISSIONING;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
 
+import java.util.Collections;
+import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
 
 /**
- * This class is used to capture the current status of a datanode. This
- * includes its health (healthy, stale or dead) and its operation status (
- * in_service, decommissioned and maintenance mode) along with the expiry time
- * for the operational state (used with maintenance mode).
+ * The status of a datanode including {@link NodeState}, {@link NodeOperationalState}
+ * and the expiry time for the operational state,
+ * where the expiry time is used in maintenance mode.
+ * <p>
+ * This class is value-based.
  */
-public class NodeStatus implements Comparable<NodeStatus> {
+public final class NodeStatus {
+  /** For the {@link NodeStatus} objects with {@link #opStateExpiryEpochSeconds} == 0. */
+  private static final Map<NodeOperationalState, Map<NodeState, NodeStatus>> CONSTANTS;
 
-  private static final Set<HddsProtos.NodeOperationalState>
-      MAINTENANCE_STATES = ImmutableSet.copyOf(EnumSet.of(
-          HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
-          HddsProtos.NodeOperationalState.IN_MAINTENANCE
-      ));
+  static {
+    final Map<NodeOperationalState, Map<NodeState, NodeStatus>> map = new EnumMap<>(NodeOperationalState.class);
+    for (NodeOperationalState op : NodeOperationalState.values()) {
+      final EnumMap<NodeState, NodeStatus> healthMap = new EnumMap<>(NodeState.class);
+      for (NodeState health : NodeState.values()) {
+        healthMap.put(health, new NodeStatus(health, op, 0));
+      }
+      map.put(op, Collections.unmodifiableMap(healthMap));
+    }
+    CONSTANTS = Collections.unmodifiableMap(map);
+  }
 
-  private static final Set<HddsProtos.NodeOperationalState>
-      DECOMMISSION_STATES = ImmutableSet.copyOf(EnumSet.of(
-          HddsProtos.NodeOperationalState.DECOMMISSIONING,
-          HddsProtos.NodeOperationalState.DECOMMISSIONED
-      ));
+  private static final Set<NodeOperationalState> OUT_OF_SERVICE_STATES = Collections.unmodifiableSet(
+      EnumSet.of(DECOMMISSIONING, DECOMMISSIONED, ENTERING_MAINTENANCE, IN_MAINTENANCE));
 
-  private static final Set<HddsProtos.NodeOperationalState>
-      OUT_OF_SERVICE_STATES = ImmutableSet.copyOf(EnumSet.of(
-          HddsProtos.NodeOperationalState.DECOMMISSIONING,
-          HddsProtos.NodeOperationalState.DECOMMISSIONED,
-          HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE,
-          HddsProtos.NodeOperationalState.IN_MAINTENANCE
-      ));
+  private static final NodeStatus IN_SERVICE_HEALTHY = valueOf(IN_SERVICE, HEALTHY);
 
-  public static Set<HddsProtos.NodeOperationalState> maintenanceStates() {
+  private static final NodeStatus IN_SERVICE_HEALTHY_READONLY = valueOf(IN_SERVICE, HEALTHY_READONLY);
+
+  private static final Set<NodeOperationalState> MAINTENANCE_STATES = Collections.unmodifiableSet(
+      EnumSet.of(ENTERING_MAINTENANCE, IN_MAINTENANCE));
+
+  private static final Set<NodeOperationalState> DECOMMISSION_STATES = Collections.unmodifiableSet(
+      EnumSet.of(DECOMMISSIONING, DECOMMISSIONED));
+
+  private static final NodeStatus IN_SERVICE_STALE = NodeStatus.valueOf(IN_SERVICE, STALE);
+
+  private static final NodeStatus IN_SERVICE_DEAD = NodeStatus.valueOf(IN_SERVICE, DEAD);
+
+  private final NodeState health;
+  private final NodeOperationalState operationalState;
+  private final long opStateExpiryEpochSeconds;
+
+  /** @return a {@link NodeStatus} object with {@link #opStateExpiryEpochSeconds} == 0. */
+  public static NodeStatus valueOf(NodeOperationalState op, NodeState health) {
+    return valueOf(op, health, 0);
+  }
+
+  /** @return a {@link NodeStatus} object. */
+  public static NodeStatus valueOf(NodeOperationalState op, NodeState health, long opExpiryEpochSeconds) {
+    Objects.requireNonNull(op, "op == null");
+    Objects.requireNonNull(health, "health == null");
+    return opExpiryEpochSeconds == 0 ? CONSTANTS.get(op).get(health)
+        : new NodeStatus(health, op, opExpiryEpochSeconds);
+  }
+
+  /**
+   * @return the set consists of {@link NodeOperationalState#ENTERING_MAINTENANCE}
+   *                         and {@link NodeOperationalState#IN_MAINTENANCE}.
+   */
+  public static Set<NodeOperationalState> maintenanceStates() {
     return MAINTENANCE_STATES;
   }
 
-  public static Set<HddsProtos.NodeOperationalState> decommissionStates() {
+  /**
+   * @return the set consists of {@link NodeOperationalState#DECOMMISSIONING}
+   *                         and {@link NodeOperationalState#DECOMMISSIONED}.
+   */
+  public static Set<NodeOperationalState> decommissionStates() {
     return DECOMMISSION_STATES;
   }
 
-  public static Set<HddsProtos.NodeOperationalState> outOfServiceStates() {
+  /**
+   * @return the set consists of {@link NodeOperationalState#DECOMMISSIONING},
+   *                             {@link NodeOperationalState#DECOMMISSIONED},
+   *                             {@link NodeOperationalState#ENTERING_MAINTENANCE}
+   *                         and {@link NodeOperationalState#IN_MAINTENANCE}.
+   */
+  public static Set<NodeOperationalState> outOfServiceStates() {
     return OUT_OF_SERVICE_STATES;
   }
 
-  private HddsProtos.NodeOperationalState operationalState;
-  private HddsProtos.NodeState health;
-  private long opStateExpiryEpochSeconds;
-
-  public NodeStatus(HddsProtos.NodeOperationalState operationalState,
-                    HddsProtos.NodeState health) {
-    this.operationalState = operationalState;
-    this.health = health;
-    this.opStateExpiryEpochSeconds = 0;
-  }
-
-  public NodeStatus(HddsProtos.NodeOperationalState operationalState,
-                    HddsProtos.NodeState health,
-                    long opStateExpireEpocSeconds) {
-    this.operationalState = operationalState;
-    this.health = health;
-    this.opStateExpiryEpochSeconds = opStateExpireEpocSeconds;
-  }
-
+  /** @return the status of {@link NodeOperationalState#IN_SERVICE} and {@link NodeState#HEALTHY}. */
   public static NodeStatus inServiceHealthy() {
-    return new NodeStatus(HddsProtos.NodeOperationalState.IN_SERVICE,
-        HddsProtos.NodeState.HEALTHY);
+    return IN_SERVICE_HEALTHY;
   }
 
+  /** @return the status of {@link NodeOperationalState#IN_SERVICE} and {@link NodeState#HEALTHY_READONLY}. */
   public static NodeStatus inServiceHealthyReadOnly() {
-    return new NodeStatus(HddsProtos.NodeOperationalState.IN_SERVICE,
-        HddsProtos.NodeState.HEALTHY_READONLY);
+    return IN_SERVICE_HEALTHY_READONLY;
   }
 
+  /** @return the status of {@link NodeOperationalState#IN_SERVICE} and {@link NodeState#STALE}. */
   public static NodeStatus inServiceStale() {
-    return new NodeStatus(HddsProtos.NodeOperationalState.IN_SERVICE,
-        HddsProtos.NodeState.STALE);
+    return IN_SERVICE_STALE;
   }
 
+  /** @return the status of {@link NodeOperationalState#IN_SERVICE} and {@link NodeState#DEAD}. */
   public static NodeStatus inServiceDead() {
-    return new NodeStatus(HddsProtos.NodeOperationalState.IN_SERVICE,
-        HddsProtos.NodeState.DEAD);
+    return IN_SERVICE_DEAD;
   }
 
+  private NodeStatus(NodeState health, NodeOperationalState op, long opExpiryEpochSeconds) {
+    this.health = health;
+    this.operationalState = op;
+    this.opStateExpiryEpochSeconds = opExpiryEpochSeconds;
+  }
+
+  /** @return the status with the new health. */
+  public NodeStatus newNodeState(NodeState newHealth) {
+    return NodeStatus.valueOf(operationalState, newHealth, opStateExpiryEpochSeconds);
+  }
+
+  /** @return the status with the new op state and expiry epoch seconds. */
+  public NodeStatus newOperationalState(NodeOperationalState op, long opExpiryEpochSeconds) {
+    return NodeStatus.valueOf(op, health, opExpiryEpochSeconds);
+  }
+
+  /** Is this node writeable ({@link NodeState#HEALTHY} and {@link NodeOperationalState#IN_SERVICE}) ? */
   public boolean isNodeWritable() {
-    return health == HddsProtos.NodeState.HEALTHY &&
-        operationalState == HddsProtos.NodeOperationalState.IN_SERVICE;
+    return health == HEALTHY && operationalState == IN_SERVICE;
   }
 
-  public HddsProtos.NodeState getHealth() {
+  public NodeState getHealth() {
     return health;
   }
 
-  public HddsProtos.NodeOperationalState getOperationalState() {
+  public NodeOperationalState getOperationalState() {
     return operationalState;
   }
 
@@ -121,102 +172,68 @@ public class NodeStatus implements Comparable<NodeStatus> {
     return opStateExpiryEpochSeconds;
   }
 
+  /** Is the op expired? */
   public boolean operationalStateExpired() {
-    if (0 == opStateExpiryEpochSeconds) {
-      return false;
-    }
-    return System.currentTimeMillis() / 1000 >= opStateExpiryEpochSeconds;
+    return opStateExpiryEpochSeconds != 0
+        && System.currentTimeMillis() >= 1000 * opStateExpiryEpochSeconds;
   }
 
+  /** @return true iff the node is {@link NodeOperationalState#IN_SERVICE}. */
   public boolean isInService() {
-    return operationalState == HddsProtos.NodeOperationalState.IN_SERVICE;
+    return operationalState == IN_SERVICE;
   }
 
   /**
-   * Returns true if the nodeStatus indicates the node is in any decommission
-   * state.
-   *
-   * @return True if the node is in any decommission state, false otherwise
+   * @return true iff the node is {@link NodeOperationalState#DECOMMISSIONING}
+   *                           or {@link NodeOperationalState#DECOMMISSIONED}.
    */
   public boolean isDecommission() {
     return DECOMMISSION_STATES.contains(operationalState);
   }
 
-  /**
-   * Returns true if the node is currently decommissioning.
-   *
-   * @return True if the node is decommissioning, false otherwise
-   */
+  /** @return true iff the node is {@link NodeOperationalState#DECOMMISSIONING}. */
   public boolean isDecommissioning() {
-    return operationalState == HddsProtos.NodeOperationalState.DECOMMISSIONING;
+    return operationalState == DECOMMISSIONING;
   }
 
-  /**
-   * Returns true if the node is decommissioned.
-   *
-   * @return True if the node is decommissioned, false otherwise
-   */
+  /** @return true iff the node is {@link NodeOperationalState#DECOMMISSIONED}. */
   public boolean isDecommissioned() {
-    return operationalState == HddsProtos.NodeOperationalState.DECOMMISSIONED;
+    return operationalState == DECOMMISSIONED;
   }
 
   /**
-   * Returns true if the node is in any maintenance state.
-   *
-   * @return True if the node is in any maintenance state, false otherwise
+   * @return true iff the node is {@link NodeOperationalState#ENTERING_MAINTENANCE}
+   *                           or {@link NodeOperationalState#IN_MAINTENANCE}.
    */
   public boolean isMaintenance() {
-    return MAINTENANCE_STATES.contains(operationalState);
+    return maintenanceStates().contains(operationalState);
   }
 
-  /**
-   * Returns true if the node is currently entering maintenance.
-   *
-   * @return True if the node is entering maintenance, false otherwise
-   */
+  /** @return true iff the node is {@link NodeOperationalState#ENTERING_MAINTENANCE}. */
   public boolean isEnteringMaintenance() {
-    return operationalState
-        == HddsProtos.NodeOperationalState.ENTERING_MAINTENANCE;
+    return operationalState == ENTERING_MAINTENANCE;
   }
 
-  /**
-   * Returns true if the node is currently in maintenance.
-   *
-   * @return True if the node is in maintenance, false otherwise.
-   */
+  /** @return true iff the node is {@link NodeOperationalState#IN_MAINTENANCE}. */
   public boolean isInMaintenance() {
-    return operationalState == HddsProtos.NodeOperationalState.IN_MAINTENANCE;
+    return operationalState == IN_MAINTENANCE;
   }
 
-  /**
-   * Returns true if the nodeStatus is healthy or healthy_readonly (ie not stale
-   * or dead) and false otherwise.
-   *
-   * @return True if the node is healthy or healthy_readonly, false otherwise.
-   */
+  /** @return true iff this node is {@link NodeState#HEALTHY} or {@link NodeState#HEALTHY_READONLY}. */
   public boolean isHealthy() {
-    return health == HddsProtos.NodeState.HEALTHY
-        || health == HddsProtos.NodeState.HEALTHY_READONLY;
+    return health == HEALTHY
+        || health == HEALTHY_READONLY;
   }
 
-  /**
-   * Returns true if the nodeStatus is either healthy or stale and false
-   * otherwise.
-   *
-   * @return True is the node is Healthy or Stale, false otherwise.
-   */
+  /** @return true iff this node is {@link NodeState#HEALTHY} or {@link NodeState#STALE}. */
   public boolean isAlive() {
-    return health == HddsProtos.NodeState.HEALTHY
-        || health == HddsProtos.NodeState.STALE;
+    return health == HEALTHY
+        || health == STALE;
   }
 
-  /**
-   * Returns true if the nodeStatus is dead and false otherwise.
-   *
-   * @return True is the node is Dead, false otherwise.
-   */
+  /** @return true iff the node is {@link NodeState#DEAD}. */
   public boolean isDead() {
-    return health == HddsProtos.NodeState.DEAD;
+    return health == DEAD;
   }
 
   @Override
@@ -230,13 +247,10 @@ public class NodeStatus implements Comparable<NodeStatus> {
     if (getClass() != obj.getClass()) {
       return false;
     }
-    NodeStatus other = (NodeStatus) obj;
-    if (this.operationalState == other.operationalState &&
-        this.health == other.health
-        && this.opStateExpiryEpochSeconds == other.opStateExpiryEpochSeconds) {
-      return true;
-    }
-    return false;
+    final NodeStatus that = (NodeStatus) obj;
+    return this.operationalState == that.operationalState
+        && this.health == that.health
+        && this.opStateExpiryEpochSeconds == that.opStateExpiryEpochSeconds;
   }
 
   @Override
@@ -246,19 +260,8 @@ public class NodeStatus implements Comparable<NodeStatus> {
 
   @Override
   public String toString() {
-    return "OperationalState: " + operationalState + " Health: " + health +
-        " OperationStateExpiry: " + opStateExpiryEpochSeconds;
-  }
-
-  @Override
-  public int compareTo(NodeStatus o) {
-    int order = Boolean.compare(o.isHealthy(), isHealthy());
-    if (order == 0) {
-      order = Boolean.compare(isDead(), o.isDead());
-    }
-    if (order == 0) {
-      order = operationalState.compareTo(o.operationalState);
-    }
-    return order;
+    final String expiry = opStateExpiryEpochSeconds == 0 ? "no expiry"
+        : "expiry: " + opStateExpiryEpochSeconds + "s";
+    return operationalState + "(" + expiry + ")-" + health;
   }
 }

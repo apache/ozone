@@ -1,50 +1,25 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.server.http;
 
-import java.util.Map;
-import javax.servlet.http.HttpServlet;
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.URI;
-import java.util.Optional;
-import java.util.OptionalInt;
-
-import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.DFSConfigKeysLegacy;
-import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.HddsConfServlet;
-import org.apache.hadoop.hdds.conf.HddsPrometheusConfig;
-import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
-import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
-import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.OzoneSecurityUtil;
-import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.authorize.AccessControlList;
-
-import org.apache.commons.lang3.StringUtils;
+import static org.apache.hadoop.hdds.HddsUtils.createDir;
 import static org.apache.hadoop.hdds.HddsUtils.getHostNameFromConfigKeys;
 import static org.apache.hadoop.hdds.HddsUtils.getPortNumberFromConfigKeys;
-import static org.apache.hadoop.hdds.HddsUtils.createDir;
 import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
 import static org.apache.hadoop.hdds.server.http.HttpConfig.getHttpPolicy;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
@@ -59,6 +34,28 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SERVER_HTTPS_KEYPASS
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SERVER_HTTPS_KEYSTORE_PASSWORD_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SERVER_HTTPS_TRUSTSTORE_PASSWORD_KEY;
 
+import com.google.common.annotations.VisibleForTesting;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalInt;
+import javax.servlet.http.HttpServlet;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.HddsConfServlet;
+import org.apache.hadoop.hdds.conf.HddsPrometheusConfig;
+import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
+import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.OzoneSecurityUtil;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.authorize.AccessControlList;
 import org.eclipse.jetty.webapp.WebAppContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -87,8 +84,6 @@ public abstract class BaseHttpServer {
   private PrometheusMetricsSink prometheusMetricsSink;
 
   private boolean prometheusSupport;
-
-  private boolean profilerSupport;
 
   public BaseHttpServer(MutableConfigurationSource conf, String name)
       throws IOException {
@@ -130,24 +125,33 @@ public abstract class BaseHttpServer {
       }
 
       final boolean xFrameEnabled = conf.getBoolean(
-          DFSConfigKeysLegacy.DFS_XFRAME_OPTION_ENABLED,
-          DFSConfigKeysLegacy.DFS_XFRAME_OPTION_ENABLED_DEFAULT);
+          HddsConfigKeys.HDDS_XFRAME_OPTION_ENABLED,
+          HddsConfigKeys.HDDS_XFRAME_OPTION_ENABLED_DEFAULT);
 
       final String xFrameOptionValue = conf.getTrimmed(
-          DFSConfigKeysLegacy.DFS_XFRAME_OPTION_VALUE,
-          DFSConfigKeysLegacy.DFS_XFRAME_OPTION_VALUE_DEFAULT);
+          HddsConfigKeys.HDDS_XFRAME_OPTION_VALUE,
+          HddsConfigKeys.HDDS_XFRAME_OPTION_VALUE_DEFAULT);
 
       builder.configureXFrame(xFrameEnabled).setXFrameOption(xFrameOptionValue);
 
-      httpServer = builder.build();
-      httpServer.addServlet("conf", "/conf", HddsConfServlet.class);
+      boolean addDefaultApps = shouldAddDefaultApps();
+      if (!addDefaultApps) {
+        builder.withoutDefaultApps();
+      }
 
-      httpServer.addServlet("logstream", "/logstream", LogStreamServlet.class);
-      prometheusSupport =
+      httpServer = builder.build();
+
+      // TODO move these to HttpServer2.addDefaultApps
+      if (addDefaultApps) {
+        httpServer.addServlet("conf", "/conf", HddsConfServlet.class);
+        httpServer.addServlet("logstream", "/logstream", LogStreamServlet.class);
+      }
+
+      prometheusSupport = addDefaultApps &&
           conf.getBoolean(HddsConfigKeys.HDDS_PROMETHEUS_ENABLED, true);
 
-      profilerSupport =
-          conf.getBoolean(HddsConfigKeys.HDDS_PROFILER_ENABLED, false);
+      boolean profilerSupport = addDefaultApps &&
+                                    conf.getBoolean(HddsConfigKeys.HDDS_PROFILER_ENABLED, false);
 
       if (prometheusSupport) {
         prometheusMetricsSink = new PrometheusMetricsSink(name);
@@ -237,7 +241,6 @@ public abstract class BaseHttpServer {
     }
     return builder;
   }
-
 
   /**
    * Add a servlet to BaseHttpServer.
@@ -349,19 +352,18 @@ public abstract class BaseHttpServer {
     int connIdx = 0;
     if (policy.isHttpEnabled()) {
       httpAddress = httpServer.getConnectorAddress(connIdx++);
-      String realAddress = NetUtils.getHostPortString(httpAddress);
+      String realAddress = NetUtils.getHostPortString(NetUtils.getConnectAddress(httpAddress));
       conf.set(getHttpAddressKey(), realAddress);
       LOG.info("HTTP server of {} listening at http://{}", name, realAddress);
     }
 
     if (policy.isHttpsEnabled()) {
       httpsAddress = httpServer.getConnectorAddress(connIdx);
-      String realAddress = NetUtils.getHostPortString(httpsAddress);
+      String realAddress = NetUtils.getHostPortString(NetUtils.getConnectAddress(httpsAddress));
       conf.set(getHttpsAddressKey(), realAddress);
       LOG.info("HTTPS server of {} listening at https://{}", name, realAddress);
     }
   }
-
 
   public static HttpServer2.Builder loadSslConfToHttpServerBuilder(
       HttpServer2.Builder builder, ConfigurationSource sslConf) {
@@ -406,6 +408,7 @@ public abstract class BaseHttpServer {
     }
     return password;
   }
+
   /**
    * Load HTTPS-related configuration.
    */
@@ -476,5 +479,10 @@ public abstract class BaseHttpServer {
   protected abstract String getHttpAuthType();
 
   protected abstract String getHttpAuthConfigPrefix();
+
+  /** Override to disable the default servlets. */
+  protected boolean shouldAddDefaultApps() {
+    return true;
+  }
 
 }

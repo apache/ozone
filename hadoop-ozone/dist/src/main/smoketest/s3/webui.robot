@@ -24,15 +24,12 @@ Suite Setup         Setup s3 tests
 Default Tags        no-bucket-type
 
 *** Variables ***
-${ENDPOINT_URL}       http://s3g:9878
-${BUCKET}             generated
+
+${S3G_WEB_UI}       http://s3g:19878
+
 
 *** Test Cases ***
 
-S3 Gateway Web UI
-    Run Keyword if      '${SECURITY_ENABLED}' == 'true'     Kinit HTTP user
-    ${result} =         Execute                             curl --negotiate -u : -v ${ENDPOINT_URL}
-                        Should contain      ${result}       Location:    ignore_case=True
-                        Should contain      ${result}       /static/
-    ${result} =         Execute                             curl --negotiate -u : -v ${ENDPOINT_URL}/static/index.html
+Check web UI
+    ${result} =         Execute                             curl --negotiate -u : -v ${S3G_WEB_UI}
                         Should contain      ${result}       Apache Ozone S3

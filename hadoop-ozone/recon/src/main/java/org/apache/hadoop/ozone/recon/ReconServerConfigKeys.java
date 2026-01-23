@@ -1,20 +1,20 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.recon;
 
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -85,7 +85,7 @@ public final class  ReconServerConfigKeys {
   public static final String OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY =
       "ozone.recon.om.snapshot.task.interval.delay";
   public static final String OZONE_RECON_OM_SNAPSHOT_TASK_INTERVAL_DEFAULT
-      = "10m";
+      = "5s";
   @Deprecated
   public static final String RECON_OM_SNAPSHOT_TASK_INTERVAL_DELAY =
       "recon.om.snapshot.task.interval.delay";
@@ -98,14 +98,19 @@ public final class  ReconServerConfigKeys {
 
   public static final String RECON_OM_DELTA_UPDATE_LIMIT =
       "recon.om.delta.update.limit";
-  public static final long RECON_OM_DELTA_UPDATE_LIMIT_DEFUALT = 2000;
-  public static final String RECON_OM_DELTA_UPDATE_LOOP_LIMIT =
-      "recon.om.delta.update.loop.limit";
-  public static final int RECON_OM_DELTA_UPDATE_LOOP_LIMIT_DEFUALT = 10;
+  public static final long RECON_OM_DELTA_UPDATE_LIMIT_DEFAULT = 50000;
+
+  public static final String RECON_OM_DELTA_UPDATE_LAG_THRESHOLD =
+      "recon.om.delta.update.lag.threshold";
+  public static final long RECON_OM_DELTA_UPDATE_LAG_THRESHOLD_DEFAULT = 0;
 
   public static final String OZONE_RECON_TASK_THREAD_COUNT_KEY =
       "ozone.recon.task.thread.count";
-  public static final int OZONE_RECON_TASK_THREAD_COUNT_DEFAULT = 5;
+  public static final int OZONE_RECON_TASK_THREAD_COUNT_DEFAULT = 8;
+
+  public static final String OZONE_RECON_OM_EVENT_BUFFER_CAPACITY =
+      "ozone.recon.om.event.buffer.capacity";
+  public static final int OZONE_RECON_OM_EVENT_BUFFER_CAPACITY_DEFAULT = 20000;
 
   public static final String OZONE_RECON_HTTP_AUTH_CONFIG_PREFIX =
       "ozone.recon.http.auth.";
@@ -118,14 +123,14 @@ public final class  ReconServerConfigKeys {
 
   public static final String
       OZONE_RECON_METRICS_HTTP_CONNECTION_TIMEOUT_DEFAULT =
-      "10s";
+      "30s";
 
   public static final String
       OZONE_RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT =
       "ozone.recon.metrics.http.connection.request.timeout";
 
   public static final String
-      OZONE_RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT_DEFAULT = "10s";
+      OZONE_RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT_DEFAULT = "60s";
 
   public static final String OZONE_RECON_SCM_CONTAINER_THRESHOLD =
       "ozone.recon.scm.container.threshold";
@@ -148,7 +153,7 @@ public final class  ReconServerConfigKeys {
       "ozone.recon.nssummary.flush.db.max.threshold";
 
   public static final long
-      OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT = 150 * 1000L;
+      OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT = 150 * 1000L * 2;
 
   public static final String
       OZONE_RECON_CONTAINER_KEY_FLUSH_TO_DB_MAX_THRESHOLD =
@@ -156,6 +161,28 @@ public final class  ReconServerConfigKeys {
 
   public static final long
       OZONE_RECON_CONTAINER_KEY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT = 150 * 1000L;
+
+  public static final String
+      OZONE_RECON_FILESIZECOUNT_FLUSH_TO_DB_MAX_THRESHOLD =
+      "ozone.recon.filesizecount.flush.db.max.threshold";
+
+  public static final long
+      OZONE_RECON_FILESIZECOUNT_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT = 200 * 1000L;
+
+  public static final String
+      OZONE_RECON_TASK_REPROCESS_MAX_ITERATORS = "ozone.recon.task.reprocess.max.iterators";
+
+  public static final int OZONE_RECON_TASK_REPROCESS_MAX_ITERATORS_DEFAULT = 5;
+
+  public static final String
+      OZONE_RECON_TASK_REPROCESS_MAX_WORKERS = "ozone.recon.task.reprocess.max.workers";
+
+  public static final int OZONE_RECON_TASK_REPROCESS_MAX_WORKERS_DEFAULT = 20;
+
+  public static final String
+      OZONE_RECON_TASK_REPROCESS_MAX_KEYS_IN_MEMORY = "ozone.recon.task.reprocess.max.keys.in.memory";
+
+  public static final int OZONE_RECON_TASK_REPROCESS_MAX_KEYS_IN_MEMORY_DEFAULT = 2000;
 
   public static final String OZONE_RECON_SCM_SNAPSHOT_TASK_INTERVAL_DELAY =
       "ozone.recon.scm.snapshot.task.interval.delay";
@@ -185,6 +212,14 @@ public final class  ReconServerConfigKeys {
 
   public static final int
       OZONE_RECON_SCM_CLIENT_FAILOVER_MAX_RETRY_DEFAULT = 3;
+
+  public static final String OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY =
+      "ozone.recon.dn.metrics.collection.minimum.api.delay";
+  public static final String OZONE_RECON_DN_METRICS_COLLECTION_MINIMUM_API_DELAY_DEFAULT = "30s";
+
+  public static final String OZONE_RECON_DN_METRICS_COLLECTION_TIMEOUT =
+      "ozone.recon.dn.metrics.collection.timeout";
+  public static final String OZONE_RECON_DN_METRICS_COLLECTION_TIMEOUT_DEFAULT = "10m";
 
   /**
    * Private constructor for utility class.

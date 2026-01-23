@@ -25,15 +25,15 @@ summary: Introduction to Ozone Datanode Container Schema V3
 
 In Ozone, user data are separated into blocks and stored in HDDS Containers. Containers are the fundamental replication unit of Ozone/HDDS. Each Container has its metadata and data. Data are saved as files on disk. Metadata is saved in RocksDB.
 
-Currently there will be one RocksDB for each Container on datanode. With user data continously grow, there will be hundreds of thousands of RocksDB instances on one datanode. It's a big challenge to manage this amount of RocksDB instances in one JVM. 
+Earlier, there was one RocksDB for each Container on datanode. With user data continously growing, there will be hundreds of thousands of RocksDB instances on one datanode. It's a big challenge to manage this amount of RocksDB instances in one JVM. 
 
-Unlike the current approach, this "Merge Container RocksDB in DN" feature will use only one RocksDB for each data volume, holding all metadata of Containers in this RocksDB. 
+Unlike the previous approach, this "Merge Container RocksDB in DN" feature will use only one RocksDB for each data volume, holding all metadata of Containers in this RocksDB. 
   
 ## Configuration
 
-This is mainly a DN feature, which doesn't require much configuration.
+This is mainly a DN feature, which doesn't require much configuration. By default, it is enabled.
 
-Here is a configuration which disable this feature if the current one RocksDB for each container mode is more preferred. Please be noted that once the feature is enabled, it's strongly suggested not to disable it in later. 
+Here is a configuration which disables this feature if the "one RocksDB for each container" mode is more preferred. Please be noted that once the feature is enabled, it's strongly suggested not to disable it in later. 
   
 ```XML
 <property>

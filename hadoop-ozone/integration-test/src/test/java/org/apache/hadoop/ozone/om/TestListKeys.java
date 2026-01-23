@@ -1,88 +1,82 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om;
 
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.utils.IOUtils;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.TestDataUtil;
-import org.apache.hadoop.ozone.client.OzoneBucket;
-import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneKey;
-import org.apache.hadoop.ozone.client.io.OzoneInputStream;
-import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Timeout;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
+import static com.google.common.collect.Lists.newLinkedList;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LIST_CACHE_SIZE;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.params.provider.Arguments.of;
 
-import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.ArrayList;
 import java.util.Optional;
 import java.util.stream.Stream;
-
-import static com.google.common.collect.Lists.newLinkedList;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LIST_CACHE_SIZE;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
-import static org.junit.jupiter.params.provider.Arguments.of;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.client.OzoneBucket;
+import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientFactory;
+import org.apache.hadoop.ozone.client.OzoneKey;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.ozone.test.NonHATests;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Test covers listKeys(keyPrefix, startKey, shallow) combinations
  * in a legacy/OBS bucket layout type.
  */
-@Timeout(1200)
-public class TestListKeys {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public abstract class TestListKeys implements NonHATests.TestCase {
 
-  private static MiniOzoneCluster cluster = null;
+  private OzoneBucket legacyOzoneBucket;
+  private OzoneBucket obsOzoneBucket;
+  private OzoneClient client;
+  private boolean originalFileSystemPathEnabled;
+  private long originalMaxListSize;
 
-  private static OzoneConfiguration conf;
-
-  private static OzoneBucket legacyOzoneBucket;
-
-  private static OzoneBucket obsOzoneBucket;
-  private static OzoneClient client;
-
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   *
-   * @throws IOException
-   */
   @BeforeAll
-  public static void init() throws Exception {
-    conf = new OzoneConfiguration();
-    conf.setBoolean(OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS, true);
+  void init() throws Exception {
+    OmConfig omConfig = cluster().getOzoneManager().getConfig();
+    originalFileSystemPathEnabled = omConfig.isFileSystemPathEnabled();
+    omConfig.setFileSystemPathEnabled(true);
+    originalMaxListSize = omConfig.getMaxListSize();
+    omConfig.setMaxListSize(2);
+
+    OzoneConfiguration conf = new OzoneConfiguration(cluster().getConf());
     // Set the number of keys to be processed during batch operate.
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 3);
     conf.setInt(OZONE_CLIENT_LIST_CACHE_SIZE, 3);
-    cluster = MiniOzoneCluster.newBuilder(conf).build();
-    cluster.waitForClusterToBeReady();
-    client = cluster.newClient();
+
+    client = OzoneClientFactory.getRpcClient(conf);
 
     // create a volume and a LEGACY bucket
     legacyOzoneBucket = TestDataUtil
@@ -96,14 +90,14 @@ public class TestListKeys {
   }
 
   @AfterAll
-  public static void teardownClass() {
+  void cleanup() {
     IOUtils.closeQuietly(client);
-    if (cluster != null) {
-      cluster.shutdown();
-    }
+    OmConfig omConfig = cluster().getOzoneManager().getConfig();
+    omConfig.setFileSystemPathEnabled(originalFileSystemPathEnabled);
+    omConfig.setMaxListSize(originalMaxListSize);
   }
 
-  private static void initFSNameSpace() throws Exception {
+  private void initFSNameSpace() throws Exception {
     buildNameSpaceTree(legacyOzoneBucket);
     buildNameSpaceTree(obsOzoneBucket);
   }
@@ -150,7 +144,7 @@ public class TestListKeys {
     keys.add("a1/b3/e2/e21.tx");
     keys.add("a1/b3/e3/e31.tx");
 
-    createKeys(ozoneBucket, keys);
+    createAndAssertKeys(ozoneBucket, keys);
 
     ozoneBucket.createDirectory("a1/b4/");
   }
@@ -353,7 +347,7 @@ public class TestListKeys {
         bucket.listKeys(keyPrefix, startKey, true);
     ReplicationConfig expectedReplication =
         Optional.ofNullable(bucket.getReplicationConfig())
-            .orElse(cluster.getOzoneManager().getDefaultReplicationConfig());
+            .orElse(cluster().getOzoneManager().getDefaultReplicationConfig());
 
     List <String> keyLists = new ArrayList<>();
     while (ozoneKeyIterator.hasNext()) {
@@ -372,31 +366,21 @@ public class TestListKeys {
     assertEquals(keys, outputKeysList);
   }
 
-  private static void createKeys(OzoneBucket ozoneBucket, List<String> keys)
+  private static void createAndAssertKeys(OzoneBucket ozoneBucket, List<String> keys)
       throws Exception {
-    int length = 10;
-    byte[] input = new byte[length];
-    Arrays.fill(input, (byte) 96);
     for (String key : keys) {
-      createKey(ozoneBucket, key, 10, input);
+      byte[] input = TestDataUtil.createStringKey(ozoneBucket, key, 10);
+      // Read the key with given key name.
+      readkey(ozoneBucket, key, 10, input);
     }
   }
 
-  private static void createKey(OzoneBucket ozoneBucket, String key, int length,
-      byte[] input) throws Exception {
-
-    OzoneOutputStream ozoneOutputStream =
-        ozoneBucket.createKey(key, length);
-
-    ozoneOutputStream.write(input);
-    ozoneOutputStream.write(input, 0, 10);
-    ozoneOutputStream.close();
-
-    // Read the key with given key name.
-    OzoneInputStream ozoneInputStream = ozoneBucket.readKey(key);
+  private static void readkey(OzoneBucket ozoneBucket, String key, int length, byte[] input)
+      throws Exception {
     byte[] read = new byte[length];
-    ozoneInputStream.read(read, 0, length);
-    ozoneInputStream.close();
+    try (InputStream in = ozoneBucket.readKey(key)) {
+      IOUtils.readFully(in, read);
+    }
 
     assertEquals(new String(input, StandardCharsets.UTF_8), new String(read, StandardCharsets.UTF_8));
   }

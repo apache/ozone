@@ -1,42 +1,40 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.fs.ozone;
-
-import org.apache.hadoop.fs.FSDataOutputStream;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.LeaseRecoverable;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.contract.ContractTestUtils;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
-
-import org.apache.hadoop.ozone.om.helpers.BucketLayout;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import org.apache.hadoop.fs.FSDataOutputStream;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.LeaseRecoverable;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.contract.ContractTestUtils;
+import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Tests to verify ofs with prefix enabled cases.
@@ -47,8 +45,8 @@ abstract class AbstractRootedOzoneFileSystemTestWithFSO extends AbstractRootedOz
   private static final Logger LOG =
       LoggerFactory.getLogger(AbstractRootedOzoneFileSystemTestWithFSO.class);
 
-  AbstractRootedOzoneFileSystemTestWithFSO(boolean enableOMRatis, boolean isAclEnabled, boolean noFlush) {
-    super(BucketLayout.FILE_SYSTEM_OPTIMIZED, true, enableOMRatis, isAclEnabled, noFlush);
+  AbstractRootedOzoneFileSystemTestWithFSO(boolean isAclEnabled) {
+    super(BucketLayout.FILE_SYSTEM_OPTIMIZED, true, isAclEnabled);
   }
 
   /**
@@ -112,6 +110,7 @@ abstract class AbstractRootedOzoneFileSystemTestWithFSO extends AbstractRootedOz
     // cleanup
     getFs().delete(dest, true);
   }
+
   /**
    *  Cannot rename a directory to its own subdirectory.
    */
@@ -217,7 +216,7 @@ abstract class AbstractRootedOzoneFileSystemTestWithFSO extends AbstractRootedOz
     LeaseRecoverable fs = (LeaseRecoverable)getFs();
     FSDataOutputStream stream = getFs().create(source);
     try {
-      assertThrows(OMException.class, () -> fs.isFileClosed(source));
+      assertThrows(FileNotFoundException.class, () -> fs.isFileClosed(source));
       stream.write(1);
       stream.hsync();
       assertFalse(fs.isFileClosed(source));
@@ -227,5 +226,4 @@ abstract class AbstractRootedOzoneFileSystemTestWithFSO extends AbstractRootedOz
       TestLeaseRecovery.closeIgnoringKeyNotFound(stream);
     }
   }
-
 }

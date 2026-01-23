@@ -1,30 +1,37 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.scm.storage;
+
+import static java.util.Collections.singletonList;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.ozone.OzoneConsts.MB;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -54,15 +61,6 @@ import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
-
-import static java.util.Collections.singletonList;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 import org.apache.ratis.protocol.exceptions.AlreadyClosedException;
 import org.apache.ratis.protocol.exceptions.NotReplicatedException;
 import org.apache.ratis.protocol.exceptions.RaftRetryFailureException;
@@ -70,41 +68,25 @@ import org.apache.ratis.protocol.exceptions.TimeoutIOException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 
 /**
  * Class to test CommitWatcher functionality.
  */
-@Timeout(value = 300, unit = TimeUnit.SECONDS)
 public class TestCommitWatcher {
+  private static final int CHUNK_SIZE = (int)(1 * MB);
+  private static final long FLUSH_SIZE = (long) 2 * CHUNK_SIZE;
+  private static final long MAX_FLUSH_SIZE = 2 * FLUSH_SIZE;
+  private static final long BLOCK_SIZE = 2 * MAX_FLUSH_SIZE;
+  private static final String VOLUME_NAME = "testblockoutputstream";
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf = new OzoneConfiguration();
   private OzoneClient client;
-  private ObjectStore objectStore;
-  private int chunkSize;
-  private long flushSize;
-  private long maxFlushSize;
-  private long blockSize;
-  private String volumeName;
-  private String bucketName;
-  private String keyString;
   private StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   @BeforeEach
   public void init() throws Exception {
-    chunkSize = (int)(1 * OzoneConsts.MB);
-    flushSize = (long) 2 * chunkSize;
-    maxFlushSize = 2 * flushSize;
-    blockSize = 2 * maxFlushSize;
     // Make sure the pipeline does not get destroyed quickly
     conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL,
             10, TimeUnit.SECONDS);
@@ -133,10 +115,10 @@ public class TestCommitWatcher {
     conf.setFromObject(clientConfig);
 
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
-        .setBlockSize(blockSize)
-        .setChunkSize(chunkSize)
-        .setStreamBufferFlushSize(flushSize)
-        .setStreamBufferMaxSize(maxFlushSize)
+        .setBlockSize(BLOCK_SIZE)
+        .setChunkSize(CHUNK_SIZE)
+        .setStreamBufferFlushSize(FLUSH_SIZE)
+        .setStreamBufferMaxSize(MAX_FLUSH_SIZE)
         .applyTo(conf);
 
     conf.setQuietMode(false);
@@ -148,19 +130,13 @@ public class TestCommitWatcher {
     cluster.waitForClusterToBeReady();
     //the easiest way to create an open container is creating a key
     client = OzoneClientFactory.getRpcClient(conf);
-    objectStore = client.getObjectStore();
-    keyString = UUID.randomUUID().toString();
-    volumeName = "testblockoutputstream";
-    bucketName = volumeName;
-    objectStore.createVolume(volumeName);
-    objectStore.getVolume(volumeName).createBucket(bucketName);
+    ObjectStore objectStore = client.getObjectStore();
+    objectStore.createVolume(VOLUME_NAME);
+    objectStore.getVolume(VOLUME_NAME).createBucket(VOLUME_NAME);
     storageContainerLocationClient = cluster
         .getStorageContainerLocationClient();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);
@@ -172,7 +148,7 @@ public class TestCommitWatcher {
   @Test
   public void testReleaseBuffers() throws Exception {
     int capacity = 2;
-    BufferPool bufferPool = new BufferPool(chunkSize, capacity);
+    BufferPool bufferPool = new BufferPool(CHUNK_SIZE, capacity);
     try (XceiverClientManager mgr = new XceiverClientManager(conf)) {
       ContainerWithPipeline container = storageContainerLocationClient
           .allocateContainer(HddsProtos.ReplicationType.RATIS,
@@ -191,7 +167,7 @@ public class TestCommitWatcher {
         for (int i = 0; i < capacity; i++) {
           ContainerCommandRequestProto writeChunkRequest =
               ContainerTestHelper
-                  .getWriteChunkRequest(pipeline, blockID, chunkSize);
+                  .getWriteChunkRequest(pipeline, blockID, CHUNK_SIZE);
           // add the data to the buffer pool
           final ChunkBuffer byteBuffer = bufferPool.allocateBuffer(0);
           byteBuffer.put(writeChunkRequest.getWriteChunk().getData());
@@ -209,7 +185,6 @@ public class TestCommitWatcher {
                 return v;
               });
           futures.add(future);
-          watcher.putFlushFuture(length, future);
           replies.add(reply);
         }
 
@@ -220,21 +195,15 @@ public class TestCommitWatcher {
         CompletableFuture<ContainerCommandResponseProto> future2 =
             futures.get(1);
         future1.get();
-        assertEquals(future1, watcher.getFutureMap().get((long) chunkSize));
-        // wait on 2nd putBlock to complete
         future2.get();
-        assertEquals(future2, watcher.getFutureMap().get((long) 2 * chunkSize));
         assertEquals(2, watcher.
             getCommitIndexMap().size());
         watcher.watchOnFirstIndex();
         assertThat(watcher.getCommitIndexMap()).doesNotContainKey(replies.get(0).getLogIndex());
-        assertThat(watcher.getFutureMap()).doesNotContainKey((long) chunkSize);
-        assertThat(watcher.getTotalAckDataLength()).isGreaterThanOrEqualTo(chunkSize);
+        assertThat(watcher.getTotalAckDataLength()).isGreaterThanOrEqualTo(CHUNK_SIZE);
         watcher.watchOnLastIndex();
         assertThat(watcher.getCommitIndexMap()).doesNotContainKey(replies.get(1).getLogIndex());
-        assertThat(watcher.getFutureMap()).doesNotContainKey((long) 2 * chunkSize);
-        assertEquals(2 * chunkSize, watcher.getTotalAckDataLength());
-        assertThat(watcher.getFutureMap()).isEmpty();
+        assertEquals(2 * CHUNK_SIZE, watcher.getTotalAckDataLength());
         assertThat(watcher.getCommitIndexMap()).isEmpty();
       }
     } finally {
@@ -245,7 +214,7 @@ public class TestCommitWatcher {
   @Test
   public void testReleaseBuffersOnException() throws Exception {
     int capacity = 2;
-    BufferPool bufferPool = new BufferPool(chunkSize, capacity);
+    BufferPool bufferPool = new BufferPool(CHUNK_SIZE, capacity);
     try (XceiverClientManager mgr = new XceiverClientManager(conf)) {
       ContainerWithPipeline container = storageContainerLocationClient
           .allocateContainer(HddsProtos.ReplicationType.RATIS,
@@ -264,7 +233,7 @@ public class TestCommitWatcher {
         for (int i = 0; i < capacity; i++) {
           ContainerCommandRequestProto writeChunkRequest =
               ContainerTestHelper
-                  .getWriteChunkRequest(pipeline, blockID, chunkSize);
+                  .getWriteChunkRequest(pipeline, blockID, CHUNK_SIZE);
           // add the data to the buffer pool
           final ChunkBuffer byteBuffer = bufferPool.allocateBuffer(0);
           byteBuffer.put(writeChunkRequest.getWriteChunk().getData());
@@ -282,7 +251,6 @@ public class TestCommitWatcher {
                 return v;
               });
           futures.add(future);
-          watcher.putFlushFuture(length, future);
           replies.add(reply);
         }
 
@@ -293,15 +261,12 @@ public class TestCommitWatcher {
         CompletableFuture<ContainerCommandResponseProto> future2 =
             futures.get(1);
         future1.get();
-        assertEquals(future1, watcher.getFutureMap().get((long) chunkSize));
         // wait on 2nd putBlock to complete
         future2.get();
-        assertEquals(future2, watcher.getFutureMap().get((long) 2 * chunkSize));
         assertEquals(2, watcher.getCommitIndexMap().size());
         watcher.watchOnFirstIndex();
         assertThat(watcher.getCommitIndexMap()).doesNotContainKey(replies.get(0).getLogIndex());
-        assertThat(watcher.getFutureMap()).doesNotContainKey((long) chunkSize);
-        assertThat(watcher.getTotalAckDataLength()).isGreaterThanOrEqualTo(chunkSize);
+        assertThat(watcher.getTotalAckDataLength()).isGreaterThanOrEqualTo(CHUNK_SIZE);
         cluster.shutdownHddsDatanode(pipeline.getNodes().get(0));
         cluster.shutdownHddsDatanode(pipeline.getNodes().get(1));
         // just watch for a higher index so as to ensure, it does an actual
@@ -323,12 +288,10 @@ public class TestCommitWatcher {
             "Unexpected exception: " + t.getClass());
         if (ratisClient.getReplicatedMinCommitIndex() < replies.get(1)
             .getLogIndex()) {
-          assertEquals(chunkSize, watcher.getTotalAckDataLength());
+          assertEquals(CHUNK_SIZE, watcher.getTotalAckDataLength());
           assertEquals(1, watcher.getCommitIndexMap().size());
-          assertEquals(1, watcher.getFutureMap().size());
         } else {
-          assertEquals(2 * chunkSize, watcher.getTotalAckDataLength());
-          assertThat(watcher.getFutureMap()).isEmpty();
+          assertEquals(2 * CHUNK_SIZE, watcher.getTotalAckDataLength());
           assertThat(watcher.getCommitIndexMap()).isEmpty();
         }
       }

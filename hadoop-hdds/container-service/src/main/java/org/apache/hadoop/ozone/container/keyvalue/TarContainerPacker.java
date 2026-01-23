@@ -1,24 +1,32 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.keyvalue;
 
-import java.io.BufferedOutputStream;
-import java.io.ByteArrayOutputStream;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_ALREADY_EXISTS;
+import static org.apache.hadoop.hdds.utils.Archiver.extractEntry;
+import static org.apache.hadoop.hdds.utils.Archiver.includeFile;
+import static org.apache.hadoop.hdds.utils.Archiver.includePath;
+import static org.apache.hadoop.hdds.utils.Archiver.readEntry;
+import static org.apache.hadoop.hdds.utils.Archiver.tar;
+import static org.apache.hadoop.hdds.utils.Archiver.untar;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DATA_CHECKSUM_EXTENSION;
+import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -27,31 +35,25 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.util.stream.Stream;
-
-import com.google.common.annotations.VisibleForTesting;
-
-import org.apache.hadoop.hdds.HddsUtils;
-import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
-
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.ArchiveInputStream;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
-import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
-import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
+import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
+import org.apache.hadoop.ozone.container.common.interfaces.Container;
+import org.apache.hadoop.ozone.container.common.interfaces.ContainerPacker;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
 import org.apache.hadoop.ozone.container.replication.CopyContainerCompression;
-
-import static java.util.stream.Collectors.toList;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.CONTAINER_ALREADY_EXISTS;
-import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 
 /**
  * Compress/uncompress KeyValueContainer data to a tar archive.
@@ -66,6 +68,8 @@ public class TarContainerPacker
   static final String CONTAINER_FILE_NAME = "container.yaml";
 
   private final CopyContainerCompression compression;
+
+  private final ConfigurationSource conf = new OzoneConfiguration();
 
   public TarContainerPacker(CopyContainerCompression compression) {
     this.compression = compression;
@@ -91,13 +95,27 @@ public class TarContainerPacker
     }
 
     Path dbRoot = getDbPath(containerUntarDir, containerData);
-    Path chunksRoot = getChunkPath(containerUntarDir, containerData);
-    byte[] descriptorFileContent = innerUnpack(input, dbRoot, chunksRoot);
+    Path chunksRoot = getChunkPath(containerUntarDir);
+    Path tempContainerMetadataPath = getTempContainerMetadataPath(containerUntarDir, containerData);
+    byte[] descriptorFileContent = innerUnpack(input, dbRoot, chunksRoot, tempContainerMetadataPath);
 
     if (!Files.exists(destContainerDir)) {
       Files.createDirectories(destContainerDir);
     }
     if (FileUtils.isEmptyDirectory(destContainerDir.toFile())) {
+
+      //before state change to RECOVERING, we need to verify the checksum for untarContainerData.
+      if (descriptorFileContent != null) {
+        KeyValueContainerData untarContainerData =
+            (KeyValueContainerData) ContainerDataYaml
+                .readContainer(descriptorFileContent);
+        ContainerUtils.verifyContainerFileChecksum(untarContainerData, conf);
+      }
+
+      // Before the atomic move, the destination dir is empty and doesn't have a metadata directory.
+      // Writing the .container file will fail as the metadata dir doesn't exist.
+      // So we instead save the container file to the containerUntarDir.
+      persistCustomContainerState(container, descriptorFileContent, State.RECOVERING, tempContainerMetadataPath);
       Files.move(containerUntarDir, destContainerDir,
               StandardCopyOption.ATOMIC_MOVE,
               StandardCopyOption.REPLACE_EXISTING);
@@ -109,37 +127,6 @@ public class TarContainerPacker
           CONTAINER_ALREADY_EXISTS);
     }
     return descriptorFileContent;
-  }
-
-  private void extractEntry(ArchiveEntry entry, InputStream input, long size,
-      Path ancestor, Path path) throws IOException {
-    HddsUtils.validatePath(path, ancestor);
-
-    if (entry.isDirectory()) {
-      Files.createDirectories(path);
-    } else {
-      Path parent = path.getParent();
-      if (parent != null) {
-        Files.createDirectories(parent);
-      }
-
-      try (OutputStream fileOutput = Files.newOutputStream(path);
-           OutputStream output = new BufferedOutputStream(fileOutput)) {
-        int bufferSize = 1024;
-        byte[] buffer = new byte[bufferSize + 1];
-        long remaining = size;
-        while (remaining > 0) {
-          int len = (int) Math.min(remaining, bufferSize);
-          int read = input.read(buffer, 0, len);
-          if (read >= 0) {
-            remaining -= read;
-            output.write(buffer, 0, read);
-          } else {
-            remaining = 0;
-          }
-        }
-      }
-    }
   }
 
   /**
@@ -159,6 +146,11 @@ public class TarContainerPacker
     try (ArchiveOutputStream<TarArchiveEntry> archiveOutput = tar(compress(output))) {
       includeFile(container.getContainerFile(), CONTAINER_FILE_NAME,
           archiveOutput);
+
+      File containerChecksumFile = ContainerChecksumTreeManager.getContainerChecksumFile(containerData);
+      if (containerChecksumFile.exists()) {
+        includeFile(containerChecksumFile, containerChecksumFile.getName(), archiveOutput);
+      }
 
       includePath(getDbPath(containerData), DB_DIR_NAME,
           archiveOutput);
@@ -216,75 +208,29 @@ public class TarContainerPacker
     }
   }
 
-  public static Path getChunkPath(Path baseDir,
-      KeyValueContainerData containerData) {
+  public static Path getChunkPath(Path baseDir) {
     return KeyValueContainerLocationUtil.getChunksLocationPath(baseDir.toString()).toPath();
   }
 
-  private byte[] readEntry(InputStream input, final long size)
-      throws IOException {
-    ByteArrayOutputStream output = new ByteArrayOutputStream();
-    int bufferSize = 1024;
-    byte[] buffer = new byte[bufferSize + 1];
-    long remaining = size;
-    while (remaining > 0) {
-      int len = (int) Math.min(remaining, bufferSize);
-      int read = input.read(buffer, 0, len);
-      remaining -= read;
-      output.write(buffer, 0, read);
-    }
-    return output.toByteArray();
+  private Path getContainerMetadataPath(ContainerData containerData) {
+    return Paths.get(containerData.getMetadataPath());
   }
 
-  private void includePath(Path dir, String subdir,
-      ArchiveOutputStream<TarArchiveEntry> archiveOutput) throws IOException {
-
-    // Add a directory entry before adding files, in case the directory is
-    // empty.
-    TarArchiveEntry entry = archiveOutput.createArchiveEntry(dir.toFile(), subdir);
-    archiveOutput.putArchiveEntry(entry);
-    archiveOutput.closeArchiveEntry();
-
-    // Add files in the directory.
-    try (Stream<Path> dirEntries = Files.list(dir)) {
-      for (Path path : dirEntries.collect(toList())) {
-        String entryName = subdir + "/" + path.getFileName();
-        includeFile(path.toFile(), entryName, archiveOutput);
-      }
-    }
+  private Path getTempContainerMetadataPath(Path containerUntarDir, ContainerData containerData) {
+    Path containerMetadataPath = getContainerMetadataPath(containerData);
+    return Paths.get(containerUntarDir.toString(),
+        containerMetadataPath.getName(containerMetadataPath.getNameCount() - 1).toString());
   }
 
-  static void includeFile(File file, String entryName,
-      ArchiveOutputStream<TarArchiveEntry> archiveOutput) throws IOException {
-    TarArchiveEntry entry = archiveOutput.createArchiveEntry(file, entryName);
-    archiveOutput.putArchiveEntry(entry);
-    try (InputStream input = Files.newInputStream(file.toPath())) {
-      IOUtils.copy(input, archiveOutput);
-    }
-    archiveOutput.closeArchiveEntry();
-  }
-
-  private static ArchiveInputStream<TarArchiveEntry> untar(InputStream input) {
-    return new TarArchiveInputStream(input);
-  }
-
-  private static ArchiveOutputStream<TarArchiveEntry> tar(OutputStream output) {
-    TarArchiveOutputStream os = new TarArchiveOutputStream(output);
-    os.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
-    return os;
-  }
-
-  @VisibleForTesting
   InputStream decompress(InputStream input) throws IOException {
     return compression.wrap(input);
   }
 
-  @VisibleForTesting
   OutputStream compress(OutputStream output) throws IOException {
     return compression.wrap(output);
   }
 
-  private byte[] innerUnpack(InputStream input, Path dbRoot, Path chunksRoot)
+  private byte[] innerUnpack(InputStream input, Path dbRoot, Path chunksRoot, Path metadataRoot)
       throws IOException {
     byte[] descriptorFileContent = null;
     try (ArchiveInputStream<TarArchiveEntry> archiveInput = untar(decompress(input))) {
@@ -302,13 +248,17 @@ public class TarContainerPacker
               .resolve(name.substring(CHUNKS_DIR_NAME.length() + 1));
           extractEntry(entry, archiveInput, size, chunksRoot,
               destinationPath);
+        } else if (name.endsWith(CONTAINER_DATA_CHECKSUM_EXTENSION)) {
+          Path destinationPath = metadataRoot.resolve(name);
+          extractEntry(entry, archiveInput, size, metadataRoot,
+              destinationPath);
         } else if (CONTAINER_FILE_NAME.equals(name)) {
           //Don't do anything. Container file should be unpacked in a
           //separated step by unpackContainerDescriptor call.
           descriptorFileContent = readEntry(archiveInput, size);
         } else {
           throw new IllegalArgumentException(
-              "Unknown entry in the tar file: " + "" + name);
+              "Unknown entry in the tar file: " + name);
         }
         entry = archiveInput.getNextEntry();
       }

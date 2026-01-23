@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,53 +17,70 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
-import org.apache.hadoop.ozone.security.acl.RequestContext;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import org.apache.hadoop.security.UserGroupInformation;
-
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.GROUP;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import org.apache.hadoop.ozone.OzoneAcl;
+import org.apache.hadoop.ozone.om.OmConfig;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
+import org.apache.hadoop.ozone.security.acl.RequestContext;
+import org.apache.hadoop.security.UserGroupInformation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Helper class for ozone acls operations.
  */
 public final class OzoneAclUtil {
+  static final Logger LOG = LoggerFactory.getLogger(OzoneAclUtil.class);
 
   private OzoneAclUtil() {
   }
 
   /**
-   * Helper function to get access acl list for current user.
+   * Helper function to get default access acl list for current user.
    *
-   * @param userName
-   * @param userGroups
+   * @param ugi current login user
+   * @param conf current configuration
    * @return list of OzoneAcls
    * */
-  public static List<OzoneAcl> getAclList(String userName,
-      String[] userGroups, ACLType userRights, ACLType groupRights) {
-
+  public static List<OzoneAcl> getDefaultAclList(UserGroupInformation ugi, OmConfig conf) {
+    // Get default acl rights for user and group.
     List<OzoneAcl> listOfAcls = new ArrayList<>();
-
     // User ACL.
-    listOfAcls.add(new OzoneAcl(USER, userName, ACCESS, userRights));
-    if (userGroups != null) {
-      // Group ACLs of the User.
-      Arrays.asList(userGroups).forEach((group) -> listOfAcls.add(
-          new OzoneAcl(GROUP, group, ACCESS, groupRights)));
+    listOfAcls.add(OzoneAcl.of(USER, ugi.getShortUserName(), ACCESS, conf.getUserDefaultRights()));
+    try {
+      String groupName = ugi.getPrimaryGroupName();
+      listOfAcls.add(OzoneAcl.of(GROUP, groupName, ACCESS, conf.getGroupDefaultRights()));
+    } catch (IOException e) {
+      // do nothing, since user has the permission, user can add ACL for selected groups later.
+      LOG.warn("Failed to get primary group from user {}", ugi);
+    }
+    return listOfAcls;
+  }
+
+  public static List<OzoneAcl> getAclList(UserGroupInformation ugi, ACLType userPrivilege, ACLType groupPrivilege) {
+    List<OzoneAcl> listOfAcls = new ArrayList<>();
+    // User ACL.
+    listOfAcls.add(OzoneAcl.of(USER, ugi.getShortUserName(), ACCESS, userPrivilege));
+    try {
+      String groupName = ugi.getPrimaryGroupName();
+      listOfAcls.add(OzoneAcl.of(GROUP, groupName, ACCESS, groupPrivilege));
+    } catch (IOException e) {
+      // do nothing, since user has the permission, user can add ACL for selected groups later.
+      LOG.warn("Failed to get primary group from user {}", ugi);
     }
     return listOfAcls;
   }
@@ -135,6 +151,11 @@ public final class OzoneAclUtil {
     return false;
   }
 
+  public static boolean inheritDefaultAcls(AclListBuilder acls,
+      List<OzoneAcl> parentAcls, OzoneAcl.AclScope scope) {
+    return inheritDefaultAcls(acls::add, parentAcls, scope);
+  }
+
   /**
    * Helper function to inherit default ACL with given {@code scope} for child object.
    * @param acls child object ACL list
@@ -143,6 +164,11 @@ public final class OzoneAclUtil {
    * @return true if any ACL was inherited from parent, false otherwise
    */
   public static boolean inheritDefaultAcls(List<OzoneAcl> acls,
+      List<OzoneAcl> parentAcls, OzoneAcl.AclScope scope) {
+    return inheritDefaultAcls(acl -> addAcl(acls, acl), parentAcls, scope);
+  }
+
+  private static boolean inheritDefaultAcls(Predicate<OzoneAcl> op,
       List<OzoneAcl> parentAcls, OzoneAcl.AclScope scope) {
     if (parentAcls != null && !parentAcls.isEmpty()) {
       Stream<OzoneAcl> aclStream = parentAcls.stream()
@@ -153,10 +179,11 @@ public final class OzoneAclUtil {
       }
 
       List<OzoneAcl> inheritedAcls = aclStream.collect(Collectors.toList());
-      if (!inheritedAcls.isEmpty()) {
-        inheritedAcls.forEach(acl -> addAcl(acls, acl));
-        return true;
+      boolean changed = false;
+      for (OzoneAcl acl : inheritedAcls) {
+        changed |= op.test(acl);
       }
+      return changed;
     }
 
     return false;
@@ -213,6 +240,15 @@ public final class OzoneAclUtil {
 
     existingAcls.add(acl);
     return true;
+  }
+
+  public static boolean addAllAcl(List<OzoneAcl> existingAcls, List<OzoneAcl> acls) {
+    // TOOD optimize
+    boolean changed = false;
+    for (OzoneAcl acl : acls) {
+      changed |= addAcl(existingAcls, acl);
+    }
+    return changed;
   }
 
   /**

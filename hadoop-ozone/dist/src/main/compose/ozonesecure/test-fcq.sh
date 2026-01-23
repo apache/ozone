@@ -17,6 +17,8 @@
 
 #suite:secure
 
+set -u -o pipefail
+
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
@@ -25,6 +27,7 @@ source "$COMPOSE_DIR/../testlib.sh"
 
 export SECURITY_ENABLED=true
 export COMPOSE_FILE=docker-compose.yaml:fcq.yaml
+export OZONE_S3_OM_TRANSPORT="org.apache.hadoop.ozone.om.protocolPB.Hadoop3OmTransportFactory"
 
 start_docker_env
 

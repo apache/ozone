@@ -1,74 +1,79 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om.service;
 
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT;
+import static org.apache.hadoop.ozone.util.ProtobufUtils.computeLongSizeWithTag;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.protobuf.ServiceException;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-
-import com.google.common.base.Preconditions;
-import com.google.protobuf.ServiceException;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
-import org.apache.hadoop.hdds.utils.IOUtils;
+import org.apache.hadoop.hdds.utils.BackgroundTask;
+import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
+import org.apache.hadoop.hdds.utils.BackgroundTaskResult.EmptyTaskResult;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.hadoop.ozone.common.BlockGroup;
+import org.apache.hadoop.ozone.ClientVersion;
+import org.apache.hadoop.ozone.common.DeleteBlockGroupResult;
 import org.apache.hadoop.ozone.om.KeyManager;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
-import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
-import org.apache.hadoop.ozone.om.snapshot.ReferenceCounted;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotSize;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSnapshotPropertyRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
-import org.apache.hadoop.hdds.utils.BackgroundTask;
-import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
-import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
-import org.apache.hadoop.hdds.utils.BackgroundTaskResult.EmptyTaskResult;
-
-import com.google.common.annotations.VisibleForTesting;
-
-import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT;
-
 import org.apache.hadoop.ozone.om.PendingKeysDeletion;
+import org.apache.hadoop.ozone.om.PendingKeysDeletion.PurgedKey;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
-import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
-import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.ratis.protocol.ClientId;
-import org.apache.ratis.protocol.Message;
-import org.apache.ratis.protocol.RaftClientRequest;
+import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
+import org.apache.hadoop.ozone.om.snapshot.SnapshotUtils;
+import org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableKeyFilter;
+import org.apache.hadoop.ozone.om.snapshot.filter.ReclaimableRenameEntryFilter;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketNameInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketPurgeKeysSize;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.NullableUUID;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PurgeKeysRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSnapshotPropertyRequest;
+import org.apache.hadoop.ozone.util.ProtobufUtils;
+import org.apache.hadoop.util.Time;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -81,39 +86,42 @@ import org.slf4j.LoggerFactory;
 public class KeyDeletingService extends AbstractKeyDeletingService {
   private static final Logger LOG =
       LoggerFactory.getLogger(KeyDeletingService.class);
+  private final ScmBlockLocationProtocol scmClient;
 
-  // Use only a single thread for KeyDeletion. Multiple threads would read
-  // from the same table and can send deletion requests for same key multiple
-  // times.
-  private static final int KEY_DELETING_CORE_POOL_SIZE = 1;
-
-  private final KeyManager manager;
   private int keyLimitPerTask;
   private final AtomicLong deletedKeyCount;
-  private final AtomicBoolean suspended;
-  private final Map<String, Long> exclusiveSizeMap;
-  private final Map<String, Long> exclusiveReplicatedSizeMap;
-  private final Set<String> completedExclusiveSizeSet;
-  private final Map<String, String> snapshotSeekMap;
+  private final boolean deepCleanSnapshots;
+  private final SnapshotChainManager snapshotChainManager;
+  private int ratisByteLimit;
+  private static final double RATIS_LIMIT_FACTOR = 0.9;
+
+  // Track metrics for current task execution
+  private long latestRunTimestamp = 0L;
+  private final DeletionStats aosDeletionStats = new DeletionStats();
+  private final DeletionStats snapshotDeletionStats = new DeletionStats();
 
   public KeyDeletingService(OzoneManager ozoneManager,
-      ScmBlockLocationProtocol scmClient,
-      KeyManager manager, long serviceInterval,
-      long serviceTimeout, ConfigurationSource conf) {
+      ScmBlockLocationProtocol scmClient, long serviceInterval,
+      long serviceTimeout, ConfigurationSource conf, int keyDeletionCorePoolSize,
+      boolean deepCleanSnapshots) {
     super(KeyDeletingService.class.getSimpleName(), serviceInterval,
-        TimeUnit.MILLISECONDS, KEY_DELETING_CORE_POOL_SIZE,
-        serviceTimeout, ozoneManager, scmClient);
-    this.manager = manager;
+        TimeUnit.MILLISECONDS, keyDeletionCorePoolSize,
+        serviceTimeout, ozoneManager);
     this.keyLimitPerTask = conf.getInt(OZONE_KEY_DELETING_LIMIT_PER_TASK,
         OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
     Preconditions.checkArgument(keyLimitPerTask >= 0,
         OZONE_KEY_DELETING_LIMIT_PER_TASK + " cannot be negative.");
     this.deletedKeyCount = new AtomicLong(0);
-    this.suspended = new AtomicBoolean(false);
-    this.exclusiveSizeMap = new HashMap<>();
-    this.exclusiveReplicatedSizeMap = new HashMap<>();
-    this.completedExclusiveSizeSet = new HashSet<>();
-    this.snapshotSeekMap = new HashMap<>();
+    this.deepCleanSnapshots = deepCleanSnapshots;
+    this.snapshotChainManager = ((OmMetadataManagerImpl)ozoneManager.getMetadataManager()).getSnapshotChainManager();
+    this.scmClient = scmClient;
+    int limit = (int) ozoneManager.getConfiguration().getStorageSize(
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT,
+        OMConfigKeys.OZONE_OM_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT,
+        StorageUnit.BYTES);
+    // Use 90% of the actual Ratis limit to account for protobuf overhead and
+    // prevent accidentally exceeding the hard limit during request serialization.
+    this.ratisByteLimit = (int) Math.max(limit * RATIS_LIMIT_FACTOR, 1);
   }
 
   /**
@@ -126,35 +134,354 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     return deletedKeyCount;
   }
 
-  @Override
-  public BackgroundTaskQueue getTasks() {
-    BackgroundTaskQueue queue = new BackgroundTaskQueue();
-    queue.add(new KeyDeletingTask());
-    return queue;
-  }
-
-  private boolean shouldRun() {
-    if (getOzoneManager() == null) {
-      // OzoneManager can be null for testing
-      return true;
+  Pair<Pair<Integer, Long>, Boolean> processKeyDeletes(Map<String, PurgedKey> keyBlocksList,
+      Map<String, RepeatedOmKeyInfo> keysToModify, List<String> renameEntries,
+      String snapTableKey, UUID expectedPreviousSnapshotId) throws IOException {
+    long startTime = Time.monotonicNow();
+    Pair<Pair<Integer, Long>, Boolean> purgeResult = Pair.of(Pair.of(0, 0L), false);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Send {} key(s) to SCM: {}",
+          keyBlocksList.size(), keyBlocksList);
+    } else if (LOG.isInfoEnabled()) {
+      int logSize = 10;
+      if (keyBlocksList.size() < logSize) {
+        logSize = keyBlocksList.size();
+      }
+      LOG.info("Send {} key(s) to SCM, first {} keys: {}",
+          keyBlocksList.size(), logSize, keyBlocksList.entrySet().stream().limit(logSize)
+              .map(Map.Entry::getValue).collect(Collectors.toSet()));
     }
-    return !suspended.get() && getOzoneManager().isLeaderReady();
+    List<DeleteBlockGroupResult> blockDeletionResults =
+        scmClient.deleteKeyBlocks(keyBlocksList.values().stream()
+            .map(PurgedKey::getBlockGroup).collect(Collectors.toList()));
+    LOG.info("{} BlockGroup deletion are acked by SCM in {} ms",
+        keyBlocksList.size(), Time.monotonicNow() - startTime);
+    if (blockDeletionResults != null) {
+      long purgeStartTime = Time.monotonicNow();
+      purgeResult = submitPurgeKeysRequest(blockDeletionResults, keyBlocksList, keysToModify, renameEntries,
+          snapTableKey, expectedPreviousSnapshotId, ratisByteLimit);
+      int limit = getOzoneManager().getConfiguration().getInt(OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK,
+          OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT);
+      LOG.info("Blocks for {} (out of {}) keys are deleted from DB in {} ms. Limit per task is {}.",
+          purgeResult.getKey().getKey(), blockDeletionResults.size(), Time.monotonicNow() - purgeStartTime, limit);
+    }
+    getPerfMetrics().setKeyDeletingServiceLatencyMs(Time.monotonicNow() - startTime);
+    return purgeResult;
+  }
+
+  private static final class BucketPurgeSize {
+    private BucketNameInfo bucket;
+    private long purgedBytes;
+    private long purgedNamespace;
+
+    private BucketPurgeSize(String volume, String bucket, long bucketId) {
+      this.bucket = BucketNameInfo.newBuilder().setBucketId(bucketId).setVolumeName(volume)
+              .setBucketName(bucket).build();
+      this.purgedBytes = 0;
+      this.purgedNamespace = 0;
+    }
+
+    private BucketPurgeSize incrementPurgedBytes(long bytes) {
+      purgedBytes += bytes;
+      return this;
+    }
+
+    private BucketPurgeSize incrementPurgedNamespace(long namespace) {
+      purgedNamespace += namespace;
+      return this;
+    }
+
+    private BucketPurgeKeysSize toProtobuf() {
+      return BucketPurgeKeysSize.newBuilder()
+          .setBucketNameInfo(bucket)
+          .setPurgedBytes(purgedBytes)
+          .setPurgedNamespace(purgedNamespace)
+          .build();
+    }
+
+    private int getEstimatedSize() {
+      // Using -10 as the placeholder to get max size i.e. 10 bytes to store the long value in protobuf.
+      // Field number 2 in BucketPurgeKeysSize proto corresponds to purgedBytes.
+      return this.bucket.getSerializedSize() + computeLongSizeWithTag(2, -10)
+      // Field number 3 in BucketPurgeKeysSize proto corresponds to purgedNamespace.
+          + computeLongSizeWithTag(3, -10);
+    }
+  }
+
+  private int increaseBucketPurgeSize(Map<Long, BucketPurgeSize> bucketPurgeSizeMap, PurgedKey purgedKey) {
+    BucketPurgeSize bucketPurgeSize;
+    int estimatedSize = 0;
+    if (!bucketPurgeSizeMap.containsKey(purgedKey.getBucketId())) {
+      bucketPurgeSize = bucketPurgeSizeMap.computeIfAbsent(purgedKey.getBucketId(),
+          (bucketId) -> new BucketPurgeSize(purgedKey.getVolume(), purgedKey.getBucket(),
+              purgedKey.getBucketId()));
+      estimatedSize = bucketPurgeSize.getEstimatedSize();
+    } else {
+      bucketPurgeSize = bucketPurgeSizeMap.get(purgedKey.getBucketId());
+    }
+    bucketPurgeSize.incrementPurgedBytes(purgedKey.getPurgedBytes()).incrementPurgedNamespace(1);
+    return estimatedSize;
   }
 
   /**
-   * Suspend the service.
+   * Submits PurgeKeys request for the keys whose blocks have been deleted
+   * by SCM.
+   * @param results DeleteBlockGroups returned by SCM.
+   * @param keysToModify Updated list of RepeatedOmKeyInfo
    */
-  @VisibleForTesting
-  public void suspend() {
-    suspended.set(true);
+  @SuppressWarnings("checkstyle:MethodLength")
+  private Pair<Pair<Integer, Long>, Boolean> submitPurgeKeysRequest(
+      List<DeleteBlockGroupResult> results,
+      Map<String, PurgedKey> purgedKeys,
+      Map<String, RepeatedOmKeyInfo> keysToModify,
+      List<String> renameEntriesToBeDeleted,
+      String snapTableKey,
+      UUID expectedPreviousSnapshotId,
+      int ratisLimit) {
+
+    Set<String> completePurgedKeys = new HashSet<>();
+
+    // Put all keys to be purged in a list
+    int deletedCount = 0;
+    long deletedReplSize = 0;
+    Set<String> failedDeletedKeys = new HashSet<>();
+    boolean purgeSuccess = true;
+
+    // Step 1: Process DeleteBlockGroupResults
+    for (DeleteBlockGroupResult result : results) {
+      String deletedKeyGroup = result.getObjectKey();
+      PurgedKey purgedKey = purgedKeys.get(deletedKeyGroup);
+      if (purgedKey != null) {
+        String deletedKeyName = purgedKey.getDeleteKeyName();
+        if (result.isSuccess()) {
+          // Add key to PurgeKeys list.
+          if (keysToModify == null || !keysToModify.containsKey(deletedKeyName)) {
+            completePurgedKeys.add(deletedKeyName);
+            LOG.debug("Key {} set to be purged from OM DB", deletedKeyName);
+          } else {
+            LOG.debug("Key {} set to be updated in OM DB, Other versions " +
+                "of the key that are reclaimable are reclaimed.", deletedKeyName);
+          }
+          deletedReplSize += purgedKey.getPurgedBytes();
+          deletedCount++;
+        } else {
+          // If the block deletion failed, then the deleted keys should also not be modified and
+          // any other version of the key should also not be purged.
+          failedDeletedKeys.add(deletedKeyName);
+          purgeSuccess = false;
+          if (LOG.isDebugEnabled()) {
+            LOG.error("Failed Block Delete corresponding to Key {} with block result : {}.", deletedKeyName,
+                result.getBlockResultList());
+          } else {
+            LOG.error("Failed Block Delete corresponding to Key {}.", deletedKeyName);
+          }
+        }
+      } else {
+        LOG.error("Key {} not found in the list of keys to be purged." +
+            " Skipping purge for this entry. Result of delete blocks : {}", deletedKeyGroup, result.isSuccess());
+      }
+    }
+    // Filter out the key even if one version of the key purge has failed. This is to prevent orphan blocks, and
+    // this needs to be retried.
+    completePurgedKeys = completePurgedKeys.stream()
+        .filter(i -> !failedDeletedKeys.contains(i)).collect(Collectors.toSet());
+    // Filter out any keys that have failed and sort the purge keys based on volume and bucket.
+    List<PurgedKey> purgedKeyList = purgedKeys.values().stream()
+        .filter(purgedKey -> !failedDeletedKeys.contains(purgedKey.getDeleteKeyName()))
+        .collect(Collectors.toList());
+
+    List<OzoneManagerProtocolProtos.SnapshotMoveKeyInfos> keysToUpdateList = new ArrayList<>();
+    if (keysToModify != null) {
+      for (Map.Entry<String, RepeatedOmKeyInfo> keyToModify : keysToModify.entrySet()) {
+        if (failedDeletedKeys.contains(keyToModify.getKey())) {
+          continue;
+        }
+        OzoneManagerProtocolProtos.SnapshotMoveKeyInfos.Builder keyToUpdate =
+            OzoneManagerProtocolProtos.SnapshotMoveKeyInfos.newBuilder();
+        keyToUpdate.setKey(keyToModify.getKey());
+        List<OzoneManagerProtocolProtos.KeyInfo> keyInfos =
+            keyToModify.getValue().getOmKeyInfoList().stream()
+                .map(k -> k.getProtobuf(ClientVersion.CURRENT_VERSION))
+                .collect(Collectors.toList());
+        keyToUpdate.addAllKeyInfos(keyInfos);
+        keyToUpdate.setBucketId(keyToModify.getValue().getBucketId());
+        keysToUpdateList.add(keyToUpdate.build());
+      }
+    }
+
+    if (purgedKeyList.isEmpty() && keysToUpdateList.isEmpty() &&
+        (renameEntriesToBeDeleted == null || renameEntriesToBeDeleted.isEmpty())) {
+      return Pair.of(Pair.of(deletedCount, deletedReplSize), purgeSuccess);
+    }
+
+    int purgeKeyIndex = 0, updateIndex = 0, renameIndex = 0;
+    PurgeKeysRequest.Builder requestBuilder = getPurgeKeysRequest(snapTableKey, expectedPreviousSnapshotId);
+    int currSize = requestBuilder.build().getSerializedSize();
+    int baseSize = currSize;
+
+    OzoneManagerProtocolProtos.DeletedKeys.Builder bucketDeleteKeys = null;
+    Map<Long, BucketPurgeSize> bucketPurgeKeysSizeMap = new HashMap<>();
+
+    Map<String, List<PurgedKey>> modifiedKeyPurgedKeys = new HashMap<>();
+    while (purgeKeyIndex < purgedKeyList.size() || updateIndex < keysToUpdateList.size() ||
+        (renameEntriesToBeDeleted != null && renameIndex < renameEntriesToBeDeleted.size())) {
+
+      // 3.1 Purge keys (one at a time)
+      if (purgeKeyIndex < purgedKeyList.size()) {
+        PurgedKey purgedKey = purgedKeyList.get(purgeKeyIndex);
+        if (bucketDeleteKeys == null) {
+          bucketDeleteKeys = OzoneManagerProtocolProtos.DeletedKeys.newBuilder().setVolumeName("").setBucketName("");
+          currSize += bucketDeleteKeys.buildPartial().getSerializedSize();
+        }
+        String deletedKey = purgedKey.getDeleteKeyName();
+        // Add to purge keys only if there are no other version of key that needs to be retained.
+        if (completePurgedKeys.contains(deletedKey)) {
+          bucketDeleteKeys.addKeys(deletedKey);
+          int estimatedKeySize = ProtobufUtils.computeRepeatedStringSize(deletedKey);
+          currSize += estimatedKeySize;
+          if (purgedKey.isCommittedKey()) {
+            currSize += increaseBucketPurgeSize(bucketPurgeKeysSizeMap, purgedKey);
+          }
+        } else if (purgedKey.isCommittedKey()) {
+          modifiedKeyPurgedKeys.computeIfAbsent(deletedKey, k -> new ArrayList<>()).add(purgedKey);
+        }
+        purgeKeyIndex++;
+      } else if (updateIndex < keysToUpdateList.size()) {
+        // 3.2 Add keysToUpdate
+        OzoneManagerProtocolProtos.SnapshotMoveKeyInfos nextUpdate = keysToUpdateList.get(updateIndex);
+
+        int estimatedSize = nextUpdate.getSerializedSize();
+
+        requestBuilder.addKeysToUpdate(nextUpdate);
+        if (modifiedKeyPurgedKeys.containsKey(nextUpdate.getKey())) {
+          for (PurgedKey purgedKey : modifiedKeyPurgedKeys.get(nextUpdate.getKey())) {
+            if (purgedKey.isCommittedKey()) {
+              currSize += increaseBucketPurgeSize(bucketPurgeKeysSizeMap, purgedKey);
+            }
+          }
+        }
+        currSize += estimatedSize;
+        updateIndex++;
+
+      } else if (renameEntriesToBeDeleted != null && renameIndex < renameEntriesToBeDeleted.size()) {
+        // 3.3 Add renamed keys
+        String nextRename = renameEntriesToBeDeleted.get(renameIndex);
+
+        int estimatedSize = ProtobufUtils.computeRepeatedStringSize(nextRename);
+
+        requestBuilder.addRenamedKeys(nextRename);
+        currSize += estimatedSize;
+        renameIndex++;
+      }
+
+      // Flush either when limit is hit, or at the very end if items remain
+      boolean allDone = purgeKeyIndex == purgedKeyList.size() && updateIndex == keysToUpdateList.size() &&
+          (renameEntriesToBeDeleted == null || renameIndex == renameEntriesToBeDeleted.size());
+
+      if (currSize >= ratisLimit || (allDone && (hasPendingItems(requestBuilder) || bucketDeleteKeys != null))) {
+        if (bucketDeleteKeys != null) {
+          requestBuilder.addDeletedKeys(bucketDeleteKeys.build());
+          bucketDeleteKeys = null;
+        }
+        bucketPurgeKeysSizeMap.values().stream().map(BucketPurgeSize::toProtobuf)
+            .forEach(requestBuilder::addBucketPurgeKeysSize);
+        bucketPurgeKeysSizeMap.clear();
+        purgeSuccess = submitPurgeRequest(purgeSuccess, requestBuilder);
+        requestBuilder = getPurgeKeysRequest(snapTableKey, expectedPreviousSnapshotId);
+        currSize = baseSize;
+      }
+    }
+
+    return Pair.of(Pair.of(deletedCount, deletedReplSize), purgeSuccess);
+  }
+
+  private boolean hasPendingItems(PurgeKeysRequest.Builder builder) {
+    return builder.getDeletedKeysCount() > 0
+        || builder.getKeysToUpdateCount() > 0
+        || builder.getRenamedKeysCount() > 0;
+  }
+
+  private static PurgeKeysRequest.Builder getPurgeKeysRequest(String snapTableKey,
+      UUID expectedPreviousSnapshotId) {
+    PurgeKeysRequest.Builder requestBuilder = PurgeKeysRequest.newBuilder();
+
+    if (snapTableKey != null) {
+      requestBuilder.setSnapshotTableKey(snapTableKey);
+    }
+
+    NullableUUID.Builder expectedPreviousSnapshotNullableUUID = NullableUUID.newBuilder();
+    if (expectedPreviousSnapshotId != null) {
+      expectedPreviousSnapshotNullableUUID.setUuid(HddsUtils.toProtobuf(expectedPreviousSnapshotId));
+    }
+    requestBuilder.setExpectedPreviousSnapshotID(expectedPreviousSnapshotNullableUUID.build());
+    return requestBuilder;
+  }
+
+  private boolean submitPurgeRequest(boolean purgeSuccess, PurgeKeysRequest.Builder requestBuilder) {
+
+    OzoneManagerProtocolProtos.OMRequest omRequest =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder().setCmdType(OzoneManagerProtocolProtos.Type.PurgeKeys)
+            .setPurgeKeysRequest(requestBuilder.build()).setClientId(getClientId().toString()).build();
+
+    try {
+      OzoneManagerProtocolProtos.OMResponse omResponse = submitRequest(omRequest);
+      if (omResponse != null) {
+        purgeSuccess = purgeSuccess && omResponse.getSuccess();
+      }
+    } catch (ServiceException e) {
+      LOG.error("PurgeKey request failed in batch. Will retry at next run.", e);
+      purgeSuccess = false;
+      // Continue to next batch instead of returning immediately
+    }
+    return purgeSuccess;
   }
 
   /**
-   * Resume the service if suspended.
+   * Updates ServiceMetrics for the last run of the service.
    */
-  @VisibleForTesting
-  public void resume() {
-    suspended.set(false);
+  @Override
+  protected void execTaskCompletion() {
+    getMetrics().updateIntervalCumulativeMetrics(
+        aosDeletionStats.reclaimedKeyCount.get() + snapshotDeletionStats.reclaimedKeyCount.get(),
+        aosDeletionStats.reclaimedKeySize.get() + snapshotDeletionStats.reclaimedKeySize.get());
+    getMetrics().updateAosLastRunMetrics(aosDeletionStats.reclaimedKeyCount.get(),
+        aosDeletionStats.reclaimedKeySize.get(), aosDeletionStats.iteratedKeyCount.get(),
+        aosDeletionStats.notReclaimableKeyCount.get());
+    getMetrics().updateSnapLastRunMetrics(snapshotDeletionStats.reclaimedKeyCount.get(),
+        snapshotDeletionStats.reclaimedKeySize.get(), snapshotDeletionStats.iteratedKeyCount.get(),
+        snapshotDeletionStats.notReclaimableKeyCount.get());
+    getMetrics().setKdsLastRunTimestamp(latestRunTimestamp);
+  }
+
+  /**
+   * Resets ServiceMetrics for the current run of the service.
+   */
+  private void resetMetrics() {
+    aosDeletionStats.reset();
+    snapshotDeletionStats.reset();
+    latestRunTimestamp = System.currentTimeMillis();
+    getMetrics().setKdsCurRunTimestamp(latestRunTimestamp);
+  }
+
+  @Override
+  public DeletingServiceTaskQueue getTasks() {
+    resetMetrics();
+    DeletingServiceTaskQueue queue = new DeletingServiceTaskQueue();
+    queue.add(new KeyDeletingTask(null));
+    if (deepCleanSnapshots) {
+      Iterator<UUID> iterator = null;
+      try {
+        iterator = snapshotChainManager.iterator(true);
+      } catch (IOException e) {
+        LOG.error("Error while initializing snapshot chain iterator. DirDeletingTask will only process AOS this run.");
+        return queue;
+      }
+      while (iterator.hasNext()) {
+        UUID snapshotId = iterator.next();
+        queue.add(new KeyDeletingTask(snapshotId));
+      }
+    }
+    return queue;
   }
 
   public int getKeyLimitPerTask() {
@@ -172,7 +499,130 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
    * the blocks info in its deletedBlockLog), it removes these keys from the
    * DB.
    */
-  private class KeyDeletingTask implements BackgroundTask {
+  @VisibleForTesting
+  final class KeyDeletingTask implements BackgroundTask {
+    private final UUID snapshotId;
+
+    KeyDeletingTask(UUID snapshotId) {
+      this.snapshotId = snapshotId;
+    }
+
+    private OzoneManagerProtocolProtos.SetSnapshotPropertyRequest getSetSnapshotRequestUpdatingExclusiveSize(
+        Map<UUID, Long> exclusiveSizeMap, Map<UUID, Long> exclusiveReplicatedSizeMap, UUID snapshotID) {
+      OzoneManagerProtocolProtos.SnapshotSize snapshotSize = OzoneManagerProtocolProtos.SnapshotSize.newBuilder()
+          .setExclusiveSize(
+              exclusiveSizeMap.getOrDefault(snapshotID, 0L))
+          .setExclusiveReplicatedSize(
+              exclusiveReplicatedSizeMap.getOrDefault(
+                  snapshotID, 0L))
+          .build();
+
+      return OzoneManagerProtocolProtos.SetSnapshotPropertyRequest.newBuilder()
+          .setSnapshotKey(snapshotChainManager.getTableKey(snapshotID))
+          .setSnapshotSize(snapshotSize)
+          .build();
+    }
+
+    /**
+     * @param currentSnapshotInfo if null, deleted directories in AOS should be processed.
+     * @param keyManager KeyManager of the underlying store.
+     */
+    private void processDeletedKeysForStore(SnapshotInfo currentSnapshotInfo, KeyManager keyManager,
+        int remainNum) throws IOException, InterruptedException {
+      String volume = null, bucket = null, snapshotTableKey = null;
+      if (currentSnapshotInfo != null) {
+        volume = currentSnapshotInfo.getVolumeName();
+        bucket = currentSnapshotInfo.getBucketName();
+        snapshotTableKey = currentSnapshotInfo.getTableKey();
+      }
+
+      boolean successStatus = true;
+      try {
+        // TODO: [SNAPSHOT] HDDS-7968. Reclaim eligible key blocks in
+        //  snapshot's deletedTable when active DB's deletedTable
+        //  doesn't have enough entries left.
+        //  OM would have to keep track of which snapshot the key is coming
+        //  from if the above would be done inside getPendingDeletionKeys().
+        OmSnapshotManager omSnapshotManager = getOzoneManager().getOmSnapshotManager();
+        // This is to avoid race condition b/w purge request and snapshot chain update. For AOS taking the global
+        // snapshotId since AOS could process multiple buckets in one iteration. While using path
+        // previous snapshotId for a snapshot since it would process only one bucket.
+        UUID expectedPreviousSnapshotId = currentSnapshotInfo == null ?
+            snapshotChainManager.getLatestGlobalSnapshotId() :
+            SnapshotUtils.getPreviousSnapshotId(currentSnapshotInfo, snapshotChainManager);
+
+        IOzoneManagerLock lock = getOzoneManager().getMetadataManager().getLock();
+
+        // Purge deleted Keys in the deletedTable && rename entries in the snapshotRenamedTable which doesn't have a
+        // reference in the previous snapshot.
+        try (ReclaimableKeyFilter reclaimableKeyFilter = new ReclaimableKeyFilter(getOzoneManager(),
+            omSnapshotManager, snapshotChainManager, currentSnapshotInfo, keyManager, lock);
+             ReclaimableRenameEntryFilter renameEntryFilter = new ReclaimableRenameEntryFilter(
+                 getOzoneManager(), omSnapshotManager, snapshotChainManager, currentSnapshotInfo,
+                 keyManager, lock)) {
+          List<String> renamedTableEntries =
+              keyManager.getRenamesKeyEntries(volume, bucket, null, renameEntryFilter, remainNum).stream()
+                  .map(Table.KeyValue::getKey)
+                  .collect(Collectors.toList());
+          remainNum -= renamedTableEntries.size();
+
+          // Get pending keys that can be deleted
+          PendingKeysDeletion pendingKeysDeletion = currentSnapshotInfo == null
+              ? keyManager.getPendingDeletionKeys(reclaimableKeyFilter, remainNum)
+              : keyManager.getPendingDeletionKeys(volume, bucket, null, reclaimableKeyFilter, remainNum);
+          Map<String, PurgedKey> purgedKeys = pendingKeysDeletion.getPurgedKeys();
+          //submit purge requests if there are renamed entries to be purged or keys to be purged.
+          if (!renamedTableEntries.isEmpty() || purgedKeys != null && !purgedKeys.isEmpty()) {
+            // Validating if the previous snapshot is still the same before purging the blocks.
+            SnapshotUtils.validatePreviousSnapshotId(currentSnapshotInfo, snapshotChainManager,
+                expectedPreviousSnapshotId);
+            Pair<Pair<Integer, Long>, Boolean> purgeResult = processKeyDeletes(purgedKeys,
+                pendingKeysDeletion.getKeysToModify(), renamedTableEntries, snapshotTableKey,
+                expectedPreviousSnapshotId);
+            remainNum -= purgeResult.getKey().getKey();
+            successStatus = purgeResult.getValue();
+            getMetrics().incrNumKeysProcessed(purgedKeys.size());
+            getMetrics().incrNumKeysSentForPurge(purgeResult.getKey().getKey());
+
+            DeletionStats statsToUpdate = currentSnapshotInfo == null ? aosDeletionStats : snapshotDeletionStats;
+            statsToUpdate.updateDeletionStats(purgeResult.getKey().getKey(), purgeResult.getKey().getValue(),
+                purgedKeys.size() + pendingKeysDeletion.getNotReclaimableKeyCount(),
+                pendingKeysDeletion.getNotReclaimableKeyCount()
+            );
+            if (successStatus) {
+              deletedKeyCount.addAndGet(purgeResult.getKey().getKey());
+            }
+          }
+
+          // Checking remainNum is greater than zero and not equal to the initial value if there were some keys to
+          // reclaim. This is to check if all keys have been iterated over and all the keys necessary have been
+          // reclaimed.
+          if (remainNum > 0 && successStatus) {
+            List<SetSnapshotPropertyRequest> setSnapshotPropertyRequests = new ArrayList<>();
+            Map<UUID, Long> exclusiveReplicatedSizeMap = reclaimableKeyFilter.getExclusiveReplicatedSizeMap();
+            Map<UUID, Long> exclusiveSizeMap = reclaimableKeyFilter.getExclusiveSizeMap();
+            List<UUID> previousPathSnapshotsInChain =
+                Stream.of(exclusiveSizeMap.keySet(), exclusiveReplicatedSizeMap.keySet())
+                .flatMap(Collection::stream).distinct().collect(Collectors.toList());
+            for (UUID snapshot : previousPathSnapshotsInChain) {
+              setSnapshotPropertyRequests.add(getSetSnapshotRequestUpdatingExclusiveSize(exclusiveSizeMap,
+                  exclusiveReplicatedSizeMap, snapshot));
+            }
+
+            // Updating directory deep clean flag of snapshot.
+            if (currentSnapshotInfo != null) {
+              setSnapshotPropertyRequests.add(OzoneManagerProtocolProtos.SetSnapshotPropertyRequest.newBuilder()
+                  .setSnapshotKey(snapshotTableKey)
+                  .setDeepCleanedDeletedKey(true)
+                  .build());
+            }
+            submitSetSnapshotRequests(setSnapshotPropertyRequests);
+          }
+        }
+      } catch (UncheckedIOException e) {
+        throw e.getCause();
+      }
+    }
 
     @Override
     public int getPriority() {
@@ -185,336 +635,75 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       // task.
       if (shouldRun()) {
         final long run = getRunCount().incrementAndGet();
-        LOG.debug("Running KeyDeletingService {}", run);
-
-        // Acquire active DB deletedTable write lock because of the
-        // deletedTable read-write here to avoid interleaving with
-        // the table range delete operation in createOmSnapshotCheckpoint()
-        // that is called from OMSnapshotCreateResponse#addToDBBatch.
-        manager.getMetadataManager().getTableLock(
-            OmMetadataManagerImpl.DELETED_TABLE).writeLock().lock();
-        int delCount = 0;
+        if (snapshotId == null) {
+          LOG.debug("Running KeyDeletingService for active object store, {}", run);
+        } else {
+          LOG.debug("Running KeyDeletingService for snapshot : {}, {}", snapshotId, run);
+        }
+        int remainNum = keyLimitPerTask;
+        OmSnapshotManager omSnapshotManager = getOzoneManager().getOmSnapshotManager();
+        SnapshotInfo snapInfo = null;
         try {
-          // TODO: [SNAPSHOT] HDDS-7968. Reclaim eligible key blocks in
-          //  snapshot's deletedTable when active DB's deletedTable
-          //  doesn't have enough entries left.
-          //  OM would have to keep track of which snapshot the key is coming
-          //  from if the above would be done inside getPendingDeletionKeys().
-
-          PendingKeysDeletion pendingKeysDeletion = manager
-              .getPendingDeletionKeys(getKeyLimitPerTask());
-          List<BlockGroup> keyBlocksList = pendingKeysDeletion
-              .getKeyBlocksList();
-          if (keyBlocksList != null && !keyBlocksList.isEmpty()) {
-            delCount = processKeyDeletes(keyBlocksList,
-                getOzoneManager().getKeyManager(),
-                pendingKeysDeletion.getKeysToModify(), null);
-            deletedKeyCount.addAndGet(delCount);
+          snapInfo = snapshotId == null ? null :
+              SnapshotUtils.getSnapshotInfo(getOzoneManager(), snapshotChainManager, snapshotId);
+          if (snapInfo != null) {
+            if (snapInfo.isDeepCleaned()) {
+              LOG.info("Snapshot '{}' ({}) has already been deep cleaned. Skipping the snapshot in this iteration.",
+                  snapInfo.getTableKey(), snapInfo.getSnapshotId());
+              return EmptyTaskResult.newResult();
+            }
+            if (!OmSnapshotManager.areSnapshotChangesFlushedToDB(getOzoneManager().getMetadataManager(), snapInfo)) {
+              LOG.info("Skipping snapshot processing since changes to snapshot {} have not been flushed to disk",
+                  snapInfo);
+              return EmptyTaskResult.newResult();
+            }
+            if (!snapInfo.isDeepCleanedDeletedDir()) {
+              LOG.debug("Snapshot {} hasn't done deleted directory deep cleaning yet. Skipping the snapshot in this" +
+                  " iteration.", snapInfo);
+              return EmptyTaskResult.newResult();
+            }
+          } else if (!isPreviousPurgeTransactionFlushed()) {
+            return EmptyTaskResult.newResult();
+          }
+          try (UncheckedAutoCloseableSupplier<OmSnapshot> omSnapshot = snapInfo == null ? null :
+              omSnapshotManager.getActiveSnapshot(snapInfo.getVolumeName(), snapInfo.getBucketName(),
+                  snapInfo.getName())) {
+            KeyManager keyManager = snapInfo == null ? getOzoneManager().getKeyManager()
+                : omSnapshot.get().getKeyManager();
+            processDeletedKeysForStore(snapInfo, keyManager, remainNum);
           }
         } catch (IOException e) {
-          LOG.error("Error while running delete keys background task. Will " +
-              "retry at next run.", e);
-        } finally {
-          // Release deletedTable write lock
-          manager.getMetadataManager().getTableLock(
-              OmMetadataManagerImpl.DELETED_TABLE).writeLock().unlock();
+          LOG.error("Error while running delete files background task for store {}. Will retry at next run.",
+              snapInfo, e);
+        } catch (InterruptedException e) {
+          LOG.error("Interruption while running delete files background task for store {}.", snapInfo, e);
+          Thread.currentThread().interrupt();
         }
-
-        try {
-          if (delCount < keyLimitPerTask) {
-            processSnapshotDeepClean(delCount);
-          }
-        } catch (Exception e) {
-          LOG.error("Error while running deep clean on snapshots. Will " +
-              "retry at next run.", e);
-        }
-
       }
       // By design, no one cares about the results of this call back.
       return EmptyTaskResult.newResult();
     }
+  }
 
-    @SuppressWarnings("checkstyle:MethodLength")
-    private void processSnapshotDeepClean(int delCount)
-        throws IOException {
-      OmSnapshotManager omSnapshotManager =
-          getOzoneManager().getOmSnapshotManager();
-      OmMetadataManagerImpl metadataManager = (OmMetadataManagerImpl)
-          getOzoneManager().getMetadataManager();
-      SnapshotChainManager snapChainManager = metadataManager
-          .getSnapshotChainManager();
-      Table<String, SnapshotInfo> snapshotInfoTable =
-          getOzoneManager().getMetadataManager().getSnapshotInfoTable();
-      List<String> deepCleanedSnapshots = new ArrayList<>();
-      try (TableIterator<String, ? extends Table.KeyValue
-          <String, SnapshotInfo>> iterator = snapshotInfoTable.iterator()) {
+  private static class DeletionStats {
+    private final AtomicLong reclaimedKeyCount = new AtomicLong(0L);
+    private final AtomicLong reclaimedKeySize = new AtomicLong(0L);
+    private final AtomicLong iteratedKeyCount = new AtomicLong(0L);
+    private final AtomicLong notReclaimableKeyCount = new AtomicLong(0L);
 
-        while (delCount < keyLimitPerTask && iterator.hasNext()) {
-          List<BlockGroup> keysToPurge = new ArrayList<>();
-          HashMap<String, RepeatedOmKeyInfo> keysToModify = new HashMap<>();
-          SnapshotInfo currSnapInfo = iterator.next().getValue();
-
-          // Deep clean only on active snapshot. Deleted Snapshots will be
-          // cleaned up by SnapshotDeletingService.
-          if (currSnapInfo.getSnapshotStatus() != SNAPSHOT_ACTIVE ||
-              currSnapInfo.getDeepClean()) {
-            continue;
-          }
-
-          try (ReferenceCounted<OmSnapshot>
-              rcCurrOmSnapshot = omSnapshotManager.getSnapshot(
-                  currSnapInfo.getVolumeName(),
-                  currSnapInfo.getBucketName(),
-                  currSnapInfo.getName())) {
-            OmSnapshot currOmSnapshot = rcCurrOmSnapshot.get();
-
-            Table<String, RepeatedOmKeyInfo> snapDeletedTable =
-                currOmSnapshot.getMetadataManager().getDeletedTable();
-            Table<String, String> snapRenamedTable =
-                currOmSnapshot.getMetadataManager().getSnapshotRenamedTable();
-
-            long volumeId = metadataManager.getVolumeId(
-                currSnapInfo.getVolumeName());
-            // Get bucketInfo for the snapshot bucket to get bucket layout.
-            String dbBucketKey = metadataManager.getBucketKey(
-                currSnapInfo.getVolumeName(), currSnapInfo.getBucketName());
-            OmBucketInfo bucketInfo = metadataManager.getBucketTable()
-                .get(dbBucketKey);
-
-            if (bucketInfo == null) {
-              throw new IllegalStateException("Bucket " + "/" + currSnapInfo
-                  .getVolumeName() + "/" + currSnapInfo.getBucketName() +
-                  " is not found. BucketInfo should not be null for" +
-                  " snapshotted bucket. The OM is in unexpected state.");
-            }
-
-            String snapshotBucketKey = dbBucketKey + OzoneConsts.OM_KEY_PREFIX;
-            SnapshotInfo previousSnapshot = getPreviousActiveSnapshot(
-                currSnapInfo, snapChainManager, omSnapshotManager);
-            SnapshotInfo previousToPrevSnapshot = null;
-
-            if (previousSnapshot != null) {
-              previousToPrevSnapshot = getPreviousActiveSnapshot(
-                  previousSnapshot, snapChainManager, omSnapshotManager);
-            }
-
-            Table<String, OmKeyInfo> previousKeyTable = null;
-            Table<String, String> prevRenamedTable = null;
-            ReferenceCounted<OmSnapshot> rcPrevOmSnapshot = null;
-
-            // Split RepeatedOmKeyInfo and update current snapshot
-            // deletedKeyTable and next snapshot deletedKeyTable.
-            if (previousSnapshot != null) {
-              rcPrevOmSnapshot = omSnapshotManager.getSnapshot(
-                  previousSnapshot.getVolumeName(),
-                  previousSnapshot.getBucketName(),
-                  previousSnapshot.getName());
-              OmSnapshot omPreviousSnapshot = rcPrevOmSnapshot.get();
-
-              previousKeyTable = omPreviousSnapshot.getMetadataManager()
-                  .getKeyTable(bucketInfo.getBucketLayout());
-              prevRenamedTable = omPreviousSnapshot
-                  .getMetadataManager().getSnapshotRenamedTable();
-            }
-
-            Table<String, OmKeyInfo> previousToPrevKeyTable = null;
-            ReferenceCounted<OmSnapshot> rcPrevToPrevOmSnapshot = null;
-            if (previousToPrevSnapshot != null) {
-              rcPrevToPrevOmSnapshot = omSnapshotManager.getSnapshot(
-                  previousToPrevSnapshot.getVolumeName(),
-                  previousToPrevSnapshot.getBucketName(),
-                  previousToPrevSnapshot.getName());
-              OmSnapshot omPreviousToPrevSnapshot = rcPrevToPrevOmSnapshot.get();
-
-              previousToPrevKeyTable = omPreviousToPrevSnapshot
-                  .getMetadataManager()
-                  .getKeyTable(bucketInfo.getBucketLayout());
-            }
-
-            try (TableIterator<String, ? extends Table.KeyValue<String,
-                RepeatedOmKeyInfo>> deletedIterator = snapDeletedTable
-                .iterator()) {
-
-              String lastKeyInCurrentRun = null;
-              String deletedTableSeek = snapshotSeekMap.getOrDefault(
-                  currSnapInfo.getTableKey(), snapshotBucketKey);
-              deletedIterator.seek(deletedTableSeek);
-              // To avoid processing the last key from the previous
-              // run again.
-              if (!deletedTableSeek.equals(snapshotBucketKey) &&
-                  deletedIterator.hasNext()) {
-                deletedIterator.next();
-              }
-
-              while (deletedIterator.hasNext() && delCount < keyLimitPerTask) {
-                Table.KeyValue<String, RepeatedOmKeyInfo>
-                    deletedKeyValue = deletedIterator.next();
-                String deletedKey = deletedKeyValue.getKey();
-                lastKeyInCurrentRun = deletedKey;
-
-                // Exit if it is out of the bucket scope.
-                if (!deletedKey.startsWith(snapshotBucketKey)) {
-                  break;
-                }
-
-                RepeatedOmKeyInfo repeatedOmKeyInfo =
-                    deletedKeyValue.getValue();
-
-                List<BlockGroup> blockGroupList = new ArrayList<>();
-                RepeatedOmKeyInfo newRepeatedOmKeyInfo =
-                    new RepeatedOmKeyInfo();
-                for (OmKeyInfo keyInfo : repeatedOmKeyInfo.getOmKeyInfoList()) {
-                  if (previousSnapshot != null) {
-                    // Calculates the exclusive size for the previous
-                    // snapshot. See Java Doc for more info.
-                    calculateExclusiveSize(previousSnapshot,
-                        previousToPrevSnapshot, keyInfo, bucketInfo, volumeId,
-                        snapRenamedTable, previousKeyTable, prevRenamedTable,
-                        previousToPrevKeyTable, exclusiveSizeMap,
-                        exclusiveReplicatedSizeMap);
-                  }
-
-                  if (isKeyReclaimable(previousKeyTable, snapRenamedTable,
-                      keyInfo, bucketInfo, volumeId, null)) {
-                    List<BlockGroup> blocksForKeyDelete = currOmSnapshot
-                        .getMetadataManager()
-                        .getBlocksForKeyDelete(deletedKey);
-                    if (blocksForKeyDelete != null) {
-                      blockGroupList.addAll(blocksForKeyDelete);
-                    }
-                    delCount++;
-                  } else {
-                    newRepeatedOmKeyInfo.addOmKeyInfo(keyInfo);
-                  }
-                }
-
-                if (newRepeatedOmKeyInfo.getOmKeyInfoList().size() > 0 &&
-                    newRepeatedOmKeyInfo.getOmKeyInfoList().size() !=
-                        repeatedOmKeyInfo.getOmKeyInfoList().size()) {
-                  keysToModify.put(deletedKey, newRepeatedOmKeyInfo);
-                }
-
-                if (newRepeatedOmKeyInfo.getOmKeyInfoList().size() !=
-                    repeatedOmKeyInfo.getOmKeyInfoList().size()) {
-                  keysToPurge.addAll(blockGroupList);
-                }
-              }
-
-              if (delCount < keyLimitPerTask) {
-                // Deep clean is completed, we can update the SnapInfo.
-                deepCleanedSnapshots.add(currSnapInfo.getTableKey());
-                // exclusiveSizeList contains check is used to prevent
-                // case where there is no entry in deletedTable, this
-                // will throw NPE when we submit request.
-                if (previousSnapshot != null && exclusiveSizeMap
-                    .containsKey(previousSnapshot.getTableKey())) {
-                  completedExclusiveSizeSet.add(
-                      previousSnapshot.getTableKey());
-                }
-
-                snapshotSeekMap.remove(currSnapInfo.getTableKey());
-              } else {
-                // There are keys that still needs processing
-                // we can continue from it in the next iteration
-                if (lastKeyInCurrentRun != null) {
-                  snapshotSeekMap.put(currSnapInfo.getTableKey(),
-                      lastKeyInCurrentRun);
-                }
-              }
-
-              if (!keysToPurge.isEmpty()) {
-                processKeyDeletes(keysToPurge, currOmSnapshot.getKeyManager(),
-                    keysToModify, currSnapInfo.getTableKey());
-              }
-            } finally {
-              IOUtils.closeQuietly(rcPrevOmSnapshot, rcPrevToPrevOmSnapshot);
-            }
-          }
-
-        }
-      }
-
-      updateDeepCleanedSnapshots(deepCleanedSnapshots);
-      updateSnapshotExclusiveSize();
+    private void updateDeletionStats(long reclaimedKeys, long reclaimedSize,
+                                       long iteratedKeys, long notReclaimableKeys) {
+      this.reclaimedKeyCount.addAndGet(reclaimedKeys);
+      this.reclaimedKeySize.addAndGet(reclaimedSize);
+      this.iteratedKeyCount.addAndGet(iteratedKeys);
+      this.notReclaimableKeyCount.addAndGet(notReclaimableKeys);
     }
 
-    private void updateSnapshotExclusiveSize() {
-
-      if (completedExclusiveSizeSet.isEmpty()) {
-        return;
-      }
-
-      Iterator<String> completedSnapshotIterator =
-          completedExclusiveSizeSet.iterator();
-      while (completedSnapshotIterator.hasNext()) {
-        ClientId clientId = ClientId.randomId();
-        String dbKey = completedSnapshotIterator.next();
-        SnapshotSize snapshotSize = SnapshotSize.newBuilder()
-                .setExclusiveSize(exclusiveSizeMap.getOrDefault(dbKey, 0L))
-                .setExclusiveReplicatedSize(
-                    exclusiveReplicatedSizeMap.getOrDefault(dbKey, 0L))
-                .build();
-        SetSnapshotPropertyRequest setSnapshotPropertyRequest =
-            SetSnapshotPropertyRequest.newBuilder()
-                .setSnapshotKey(dbKey)
-                .setSnapshotSize(snapshotSize)
-                .build();
-
-        OMRequest omRequest = OMRequest.newBuilder()
-            .setCmdType(Type.SetSnapshotProperty)
-            .setSetSnapshotPropertyRequest(setSnapshotPropertyRequest)
-            .setClientId(clientId.toString())
-            .build();
-        submitRequest(omRequest, clientId);
-        exclusiveSizeMap.remove(dbKey);
-        exclusiveReplicatedSizeMap.remove(dbKey);
-        completedSnapshotIterator.remove();
-      }
-    }
-
-    private void updateDeepCleanedSnapshots(List<String> deepCleanedSnapshots) {
-      for (String deepCleanedSnapshot: deepCleanedSnapshots) {
-        ClientId clientId = ClientId.randomId();
-        SetSnapshotPropertyRequest setSnapshotPropertyRequest =
-            SetSnapshotPropertyRequest.newBuilder()
-                .setSnapshotKey(deepCleanedSnapshot)
-                .setDeepCleanedDeletedKey(true)
-                .build();
-
-        OMRequest omRequest = OMRequest.newBuilder()
-            .setCmdType(Type.SetSnapshotProperty)
-            .setSetSnapshotPropertyRequest(setSnapshotPropertyRequest)
-            .setClientId(clientId.toString())
-            .build();
-
-        submitRequest(omRequest, clientId);
-      }
-    }
-
-    public void submitRequest(OMRequest omRequest, ClientId clientId) {
-      try {
-        if (isRatisEnabled()) {
-          OzoneManagerRatisServer server = getOzoneManager().getOmRatisServer();
-
-          RaftClientRequest raftClientRequest = RaftClientRequest.newBuilder()
-              .setClientId(clientId)
-              .setServerId(server.getRaftPeerId())
-              .setGroupId(server.getRaftGroupId())
-              .setCallId(getRunCount().get())
-              .setMessage(Message.valueOf(
-                  OMRatisHelper.convertRequestToByteString(omRequest)))
-              .setType(RaftClientRequest.writeRequestType())
-              .build();
-
-          server.submitRequest(omRequest, raftClientRequest);
-        } else {
-          getOzoneManager().getOmServerProtocol()
-              .submitRequest(null, omRequest);
-        }
-      } catch (ServiceException e) {
-        LOG.error("Snapshot deep cleaning request failed. " +
-            "Will retry at next run.", e);
-      }
+    private void reset() {
+      reclaimedKeyCount.set(0L);
+      reclaimedKeySize.set(0L);
+      iteratedKeyCount.set(0L);
+      notReclaimableKeyCount.set(0L);
     }
   }
 }

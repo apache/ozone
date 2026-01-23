@@ -1,32 +1,67 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *   http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
- *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
-import java.io.ByteArrayInputStream;
+import static org.apache.hadoop.ozone.client.OzoneClientTestUtils.assertKeyContent;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.putDir;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_TAG;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_BUCKET;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_COPY_DIRECTIVE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.STREAMING_AWS4_HMAC_SHA256_PAYLOAD;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_DIRECTIVE_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_KEY_LENGTH_LIMIT;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_NUM_LIMIT;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_VALUE_LENGTH_LIMIT;
+import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.urlEncode;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.anyLong;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
 import java.util.Map;
 import java.util.stream.Stream;
-import java.io.OutputStream;
-import java.security.MessageDigest;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.MultivaluedMap;
@@ -37,55 +72,23 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
-import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
-import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
-import org.apache.http.HttpStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.MockedStatic;
-import org.mockito.Mockito;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_TAG;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_COPY_DIRECTIVE_HEADER;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.CUSTOM_METADATA_HEADER_PREFIX;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.DECODED_CONTENT_LENGTH_HEADER;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_DIRECTIVE_HEADER;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_HEADER;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_KEY_LENGTH_LIMIT;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_NUM_LIMIT;
-import static org.apache.hadoop.ozone.s3.util.S3Consts.TAG_VALUE_LENGTH_LIMIT;
-import static org.apache.hadoop.ozone.s3.util.S3Utils.urlEncode;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 /**
  * Test put object.
@@ -97,12 +100,12 @@ class TestObjectPut {
   private static final String KEY_NAME = "key=value/1";
   private static final String DEST_BUCKET_NAME = "b2";
   private static final String DEST_KEY = "key=value/2";
-  private static final String NO_SUCH_BUCKET = "nonexist";
+  private static final String NONEXISTENT_BUCKET = "nonexist";
 
-  private OzoneClient clientStub;
   private ObjectEndpoint objectEndpoint;
   private HttpHeaders headers;
   private OzoneBucket bucket;
+  private OzoneBucket destBucket;
   private OzoneBucket fsoBucket;
 
   static Stream<Arguments> argumentsForPutObject() {
@@ -118,25 +121,17 @@ class TestObjectPut {
 
   @BeforeEach
   void setup() throws IOException {
-    OzoneConfiguration config = new OzoneConfiguration();
+    headers = newMockHttpHeaders();
+    objectEndpoint = spy(EndpointBuilder.newObjectEndpointBuilder().setHeaders(headers).build());
 
-    //Create client stub and object store stub.
-    clientStub = new OzoneClientStub();
-
-    // Create bucket
+    // Create buckets
+    OzoneClient clientStub = objectEndpoint.getClient();
     clientStub.getObjectStore().createS3Bucket(BUCKET_NAME);
     bucket = clientStub.getObjectStore().getS3Bucket(BUCKET_NAME);
     clientStub.getObjectStore().createS3Bucket(DEST_BUCKET_NAME);
+    destBucket = clientStub.getObjectStore().getS3Bucket(DEST_BUCKET_NAME);
 
-    // Create PutObject and setClient to OzoneClientStub
-    objectEndpoint = spy(new ObjectEndpoint());
-    objectEndpoint.setClient(clientStub);
-    objectEndpoint.setOzoneConfiguration(config);
-
-    headers = mock(HttpHeaders.class);
-    objectEndpoint.setHeaders(headers);
-
-    String volumeName = config.get(OzoneConfigKeys.OZONE_S3_VOLUME_NAME,
+    String volumeName = objectEndpoint.getOzoneConfiguration().get(OzoneConfigKeys.OZONE_S3_VOLUME_NAME,
         OzoneConfigKeys.OZONE_S3_VOLUME_NAME_DEFAULT);
     OzoneVolume volume = clientStub.getObjectStore().getVolume(volumeName);
     BucketArgs fsoBucketArgs = BucketArgs.newBuilder()
@@ -148,25 +143,17 @@ class TestObjectPut {
 
   @ParameterizedTest
   @MethodSource("argumentsForPutObject")
-  void testPutObject(int length, ReplicationConfig replication) throws IOException, OS3Exception {
+  void testPutObject(int length, ReplicationConfig replication) throws Exception {
     //GIVEN
-    final String content = RandomStringUtils.randomAlphanumeric(length);
-    ByteArrayInputStream body = new ByteArrayInputStream(content.getBytes(UTF_8));
+    final String content = RandomStringUtils.secure().nextAlphanumeric(length);
     bucket.setReplicationConfig(replication);
 
     //WHEN
-    Response response = objectEndpoint.put(BUCKET_NAME, KEY_NAME, length, 1, null, body);
+    assertSucceeds(() -> putObject(content));
 
     //THEN
-    assertEquals(200, response.getStatus());
-
-    String keyContent;
-    try (InputStream input = bucket.readKey(KEY_NAME)) {
-      keyContent = IOUtils.toString(input, UTF_8);
-    }
-    assertEquals(content, keyContent);
-
-    OzoneKeyDetails keyDetails = bucket.getKey(KEY_NAME);
+    OzoneKeyDetails keyDetails = assertKeyContent(bucket, KEY_NAME, content);
+    assertEquals(content.length(), keyDetails.getDataSize());
     assertEquals(replication, keyDetails.getReplicationConfig());
     assertNotNull(keyDetails.getMetadata());
     assertThat(keyDetails.getMetadata().get(OzoneConsts.ETAG)).isNotEmpty();
@@ -174,250 +161,129 @@ class TestObjectPut {
   }
 
   @Test
-  void testPutObjectContentLength() throws IOException, OS3Exception {
-    // The contentLength specified when creating the Key should be the same as
-    // the Content-Length, the key Commit will compare the Content-Length with
-    // the actual length of the data written.
-    ByteArrayInputStream body =
-        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
-    long dataSize = CONTENT.length();
+  public void testPutObjectWithTags() throws Exception {
+    when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
 
-    objectEndpoint.put(BUCKET_NAME, KEY_NAME, dataSize, 0, null, body);
-    assertEquals(dataSize, getKeyDataSize());
-  }
+    assertSucceeds(() -> putObject(CONTENT));
 
-  @Test
-  void testPutObjectContentLengthForStreaming()
-      throws IOException, OS3Exception {
-    String chunkedContent = "0a;chunk-signature=signature\r\n"
-        + "1234567890\r\n"
-        + "05;chunk-signature=signature\r\n"
-        + "abcde\r\n";
-
-    when(headers.getHeaderString("x-amz-content-sha256"))
-        .thenReturn("STREAMING-AWS4-HMAC-SHA256-PAYLOAD");
-
-    when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER))
-        .thenReturn("15");
-    objectEndpoint.put(BUCKET_NAME, KEY_NAME, chunkedContent.length(), 0, null,
-        new ByteArrayInputStream(chunkedContent.getBytes(UTF_8)));
-    assertEquals(15, getKeyDataSize());
-  }
-
-  @Test
-  public void testPutObjectWithTags() throws IOException, OS3Exception {
-    HttpHeaders headersWithTags = Mockito.mock(HttpHeaders.class);
-    when(headersWithTags.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
-
-    ByteArrayInputStream body =
-        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
-    objectEndpoint.setHeaders(headersWithTags);
-
-    Response response = objectEndpoint.put(BUCKET_NAME, KEY_NAME, CONTENT.length(),
-        1, null, body);
-
-    assertEquals(200, response.getStatus());
-
-    OzoneKeyDetails keyDetails =
-        clientStub.getObjectStore().getS3Bucket(BUCKET_NAME).getKey(KEY_NAME);
-    Map<String, String> tags = keyDetails.getTags();
+    Map<String, String> tags = bucket.getKey(KEY_NAME).getTags();
     assertEquals(2, tags.size());
     assertEquals("value1", tags.get("tag1"));
     assertEquals("value2", tags.get("tag2"));
   }
 
   @Test
-  public void testPutObjectWithOnlyTagKey() throws Exception {
-    ByteArrayInputStream body =
-        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
-    HttpHeaders headerWithOnlyTagKey = Mockito.mock(HttpHeaders.class);
+  public void testPutObjectWithOnlyTagKey() {
     // Try to send with only the key (no value)
-    when(headerWithOnlyTagKey.getHeaderString(TAG_HEADER)).thenReturn("tag1");
-    objectEndpoint.setHeaders(headerWithOnlyTagKey);
+    when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1");
 
-    try {
-      objectEndpoint.put(BUCKET_NAME, KEY_NAME, CONTENT.length(),
-          1, null, body);
-      fail("request with invalid query param should fail");
-    } catch (OS3Exception ex) {
-      assertEquals(INVALID_TAG.getCode(), ex.getCode());
-      assertThat(ex.getErrorMessage()).contains("Some tag values are not specified");
-      assertEquals(INVALID_TAG.getHttpCode(), ex.getHttpCode());
-    }
+    OS3Exception ex = assertErrorResponse(INVALID_TAG, () -> putObject(CONTENT));
+    assertThat(ex.getErrorMessage()).contains("Some tag values are not specified");
   }
 
   @Test
-  public void testPutObjectWithDuplicateTagKey() throws Exception {
-    ByteArrayInputStream body =
-        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
-    HttpHeaders headersWithDuplicateTagKey = Mockito.mock(HttpHeaders.class);
-    when(headersWithDuplicateTagKey.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag1=value2");
-    objectEndpoint.setHeaders(headersWithDuplicateTagKey);
-    try {
-      objectEndpoint.put(BUCKET_NAME, KEY_NAME, CONTENT.length(),
-          1, null, body);
-      fail("request with duplicate tag key should fail");
-    } catch (OS3Exception ex) {
-      assertEquals(INVALID_TAG.getCode(), ex.getCode());
-      assertThat(ex.getErrorMessage()).contains("There are tags with duplicate tag keys");
-      assertEquals(INVALID_TAG.getHttpCode(), ex.getHttpCode());
-    }
+  public void testPutObjectWithDuplicateTagKey() {
+    when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag1=value2");
+
+    OS3Exception ex = assertErrorResponse(INVALID_TAG, () -> putObject(CONTENT));
+    assertThat(ex.getErrorMessage()).contains("There are tags with duplicate tag keys");
   }
 
   @Test
-  public void testPutObjectWithLongTagKey() throws Exception {
-    ByteArrayInputStream body =
-        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
-    HttpHeaders headersWithLongTagKey = Mockito.mock(HttpHeaders.class);
+  public void testPutObjectWithLongTagKey() {
     String longTagKey = StringUtils.repeat('k', TAG_KEY_LENGTH_LIMIT + 1);
-    when(headersWithLongTagKey.getHeaderString(TAG_HEADER)).thenReturn(longTagKey + "=value1");
-    objectEndpoint.setHeaders(headersWithLongTagKey);
-    try {
-      objectEndpoint.put(BUCKET_NAME, KEY_NAME, CONTENT.length(),
-          1, null, body);
-      fail("request with tag key exceeding the length limit should fail");
-    } catch (OS3Exception ex) {
-      assertEquals(INVALID_TAG.getCode(), ex.getCode());
-      assertThat(ex.getErrorMessage()).contains("The tag key exceeds the maximum length");
-      assertEquals(INVALID_TAG.getHttpCode(), ex.getHttpCode());
-    }
+    when(headers.getHeaderString(TAG_HEADER)).thenReturn(longTagKey + "=value1");
+
+    OS3Exception ex = assertErrorResponse(INVALID_TAG, () -> putObject(CONTENT));
+    assertThat(ex.getErrorMessage()).contains("The tag key exceeds the maximum length");
   }
 
   @Test
-  public void testPutObjectWithLongTagValue() throws Exception {
-    ByteArrayInputStream body =
-        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
-    HttpHeaders headersWithLongTagValue = Mockito.mock(HttpHeaders.class);
-    objectEndpoint.setHeaders(headersWithLongTagValue);
+  public void testPutObjectWithLongTagValue() {
     String longTagValue = StringUtils.repeat('v', TAG_VALUE_LENGTH_LIMIT + 1);
-    when(headersWithLongTagValue.getHeaderString(TAG_HEADER)).thenReturn("tag1=" + longTagValue);
-    try {
-      objectEndpoint.put(BUCKET_NAME, KEY_NAME, CONTENT.length(),
-          1, null, body);
-      fail("request with tag value exceeding the length limit should fail");
-    } catch (OS3Exception ex) {
-      assertEquals(INVALID_TAG.getCode(), ex.getCode());
-      assertThat(ex.getErrorMessage()).contains("The tag value exceeds the maximum length");
-      assertEquals(INVALID_TAG.getHttpCode(), ex.getHttpCode());
-    }
+    when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1=" + longTagValue);
+
+    OS3Exception ex = assertErrorResponse(INVALID_TAG, () -> putObject(CONTENT));
+    assertThat(ex.getErrorMessage()).contains("The tag value exceeds the maximum length");
   }
 
   @Test
-  public void testPutObjectWithTooManyTags() throws Exception {
-    ByteArrayInputStream body =
-        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
-    HttpHeaders headersWithTooManyTags = Mockito.mock(HttpHeaders.class);
+  public void testPutObjectWithTooManyTags() {
     StringBuilder sb = new StringBuilder();
     for (int i = 0; i < TAG_NUM_LIMIT + 1; i++) {
       sb.append(String.format("tag%d=value%d", i, i));
       if (i < TAG_NUM_LIMIT) {
-        sb.append("&");
+        sb.append('&');
       }
     }
-    when(headersWithTooManyTags.getHeaderString(TAG_HEADER)).thenReturn(sb.toString());
-    objectEndpoint.setHeaders(headersWithTooManyTags);
-    try {
-      objectEndpoint.put(BUCKET_NAME, KEY_NAME, CONTENT.length(),
-          1, null, body);
-      fail("request with number of tags exceeding limit should fail");
-    } catch (OS3Exception ex) {
-      assertEquals(INVALID_TAG.getCode(), ex.getCode());
-      assertThat(ex.getErrorMessage()).contains("exceeded the maximum number of tags");
-      assertEquals(INVALID_TAG.getHttpCode(), ex.getHttpCode());
-    }
-  }
+    when(headers.getHeaderString(TAG_HEADER)).thenReturn(sb.toString());
 
-  private long getKeyDataSize() throws IOException {
-    return clientStub.getObjectStore().getS3Bucket(BUCKET_NAME)
-        .getKey(KEY_NAME).getDataSize();
+    OS3Exception ex = assertErrorResponse(INVALID_TAG, () -> putObject(CONTENT));
+    assertThat(ex.getErrorMessage()).contains("exceeded the maximum number of tags");
   }
 
   @Test
-  void testPutObjectWithSignedChunks() throws IOException, OS3Exception {
+  void testPutObjectWithSignedChunks() throws Exception {
     //GIVEN
     String chunkedContent = "0a;chunk-signature=signature\r\n"
         + "1234567890\r\n"
         + "05;chunk-signature=signature\r\n"
         + "abcde\r\n";
 
-    when(headers.getHeaderString("x-amz-content-sha256"))
-        .thenReturn("STREAMING-AWS4-HMAC-SHA256-PAYLOAD");
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
+        .thenReturn(STREAMING_AWS4_HMAC_SHA256_PAYLOAD);
     when(headers.getHeaderString(DECODED_CONTENT_LENGTH_HEADER))
         .thenReturn("15");
 
     //WHEN
-    Response response = objectEndpoint.put(BUCKET_NAME, KEY_NAME,
-        chunkedContent.length(), 1, null,
-        new ByteArrayInputStream(chunkedContent.getBytes(UTF_8)));
+    assertSucceeds(() -> putObject(chunkedContent));
 
     //THEN
-    OzoneInputStream ozoneInputStream =
-        clientStub.getObjectStore().getS3Bucket(BUCKET_NAME)
-            .readKey(KEY_NAME);
-    String keyContent = IOUtils.toString(ozoneInputStream, UTF_8);
-    OzoneKeyDetails keyDetails = clientStub.getObjectStore().getS3Bucket(BUCKET_NAME).getKey(KEY_NAME);
-
-    assertEquals(200, response.getStatus());
-    assertEquals("1234567890abcde", keyContent);
+    OzoneKeyDetails keyDetails = assertKeyContent(bucket, KEY_NAME, "1234567890abcde");
     assertNotNull(keyDetails.getMetadata());
     assertThat(keyDetails.getMetadata().get(OzoneConsts.ETAG)).isNotEmpty();
+    assertEquals(15, keyDetails.getDataSize());
   }
 
   @Test
-  public void testPutObjectMessageDigestResetDuringException() throws OS3Exception {
+  public void testPutObjectMessageDigestResetDuringException() {
     MessageDigest messageDigest = mock(MessageDigest.class);
     try (MockedStatic<IOUtils> mocked = mockStatic(IOUtils.class)) {
       // For example, EOFException during put-object due to client cancelling the operation before it completes
-      mocked.when(() -> IOUtils.copyLarge(any(InputStream.class), any(OutputStream.class)))
+      mocked.when(() -> IOUtils.copyLarge(any(InputStream.class), any(OutputStream.class), anyLong(),
+              anyLong(), any(byte[].class)))
           .thenThrow(IOException.class);
-      when(objectEndpoint.getMessageDigestInstance()).thenReturn(messageDigest);
+      when(objectEndpoint.getMD5DigestInstance()).thenReturn(messageDigest);
 
-      ByteArrayInputStream body =
-          new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
-      try {
-        objectEndpoint.put(BUCKET_NAME, KEY_NAME, CONTENT
-            .length(), 1, null, body);
-        fail("Should throw IOException");
-      } catch (IOException ignored) {
-        // Verify that the message digest is reset so that the instance can be reused for the
-        // next request in the same thread
-        verify(messageDigest, times(1)).reset();
-      }
+      assertThrows(IOException.class, () -> putObject(CONTENT).close());
+
+      // Verify that the message digest is reset so that the instance can be reused for the
+      // next request in the same thread
+      verify(messageDigest, times(1)).reset();
     }
   }
 
   @Test
-  void testCopyObject() throws IOException, OS3Exception {
+  void testCopyObject() throws Exception {
     // Put object in to source bucket
-    ByteArrayInputStream body =
-        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
 
     // Add some custom metadata
+    Map<String, String> customMetadata = ImmutableMap.of(
+        "custom-key-1", "custom-value-1",
+        "custom-key-2", "custom-value-2");
     MultivaluedMap<String, String> metadataHeaders = new MultivaluedHashMap<>();
-    metadataHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "custom-key-1", "custom-value-1");
-    metadataHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "custom-key-2", "custom-value-2");
+    customMetadata.forEach((k, v) -> metadataHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + k, v));
     when(headers.getRequestHeaders()).thenReturn(metadataHeaders);
     // Add COPY metadata directive (default)
     when(headers.getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER)).thenReturn("COPY");
 
-    Response response = objectEndpoint.put(BUCKET_NAME, KEY_NAME,
-        CONTENT.length(), 1, null, body);
+    assertSucceeds(() -> putObject(CONTENT));
 
-    OzoneInputStream ozoneInputStream = clientStub.getObjectStore()
-        .getS3Bucket(BUCKET_NAME)
-        .readKey(KEY_NAME);
-
-    String keyContent = IOUtils.toString(ozoneInputStream, UTF_8);
-    OzoneKeyDetails keyDetails = clientStub.getObjectStore().getS3Bucket(BUCKET_NAME).getKey(KEY_NAME);
-
-    assertEquals(200, response.getStatus());
-    assertEquals(CONTENT, keyContent);
+    OzoneKeyDetails keyDetails = assertKeyContent(bucket, KEY_NAME, CONTENT);
     assertNotNull(keyDetails.getMetadata());
-    assertThat(keyDetails.getMetadata().get(OzoneConsts.ETAG)).isNotEmpty();
-    assertThat(keyDetails.getMetadata().get("custom-key-1")).isEqualTo("custom-value-1");
-    assertThat(keyDetails.getMetadata().get("custom-key-2")).isEqualTo("custom-value-2");
-
     String sourceETag = keyDetails.getMetadata().get(OzoneConsts.ETAG);
+    assertThat(sourceETag).isNotEmpty();
+    assertThat(keyDetails.getMetadata()).containsAllEntriesOf(customMetadata);
 
     // This will be ignored since the copy directive is COPY
     metadataHeaders.putSingle(CUSTOM_METADATA_HEADER_PREFIX + "custom-key-3", "custom-value-3");
@@ -426,187 +292,128 @@ class TestObjectPut {
     when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
         BUCKET_NAME + "/" + urlEncode(KEY_NAME));
 
-    response = objectEndpoint.put(DEST_BUCKET_NAME, DEST_KEY, CONTENT.length(), 1,
-        null, body);
+    assertSucceeds(() -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
 
     // Check destination key and response
-    ozoneInputStream = clientStub.getObjectStore().getS3Bucket(DEST_BUCKET_NAME)
-        .readKey(DEST_KEY);
-
-    keyContent = IOUtils.toString(ozoneInputStream, UTF_8);
-    OzoneKeyDetails sourceKeyDetails = clientStub.getObjectStore()
-        .getS3Bucket(BUCKET_NAME).getKey(KEY_NAME);
-    OzoneKeyDetails destKeyDetails = clientStub.getObjectStore()
-        .getS3Bucket(DEST_BUCKET_NAME).getKey(DEST_KEY);
-
-    assertEquals(200, response.getStatus());
-    assertEquals(CONTENT, keyContent);
-    assertNotNull(keyDetails.getMetadata());
-    assertThat(keyDetails.getMetadata().get(OzoneConsts.ETAG)).isNotEmpty();
+    OzoneKeyDetails destKeyDetails = assertKeyContent(destBucket, DEST_KEY, CONTENT);
+    keyDetails = bucket.getKey(KEY_NAME);
     // Source key eTag should remain unchanged and the dest key should have
     // the same Etag since the key content is the same
-    assertEquals(sourceETag, sourceKeyDetails.getMetadata().get(OzoneConsts.ETAG));
+    assertEquals(sourceETag, keyDetails.getMetadata().get(OzoneConsts.ETAG));
     assertEquals(sourceETag, destKeyDetails.getMetadata().get(OzoneConsts.ETAG));
-    assertThat(destKeyDetails.getMetadata().get("custom-key-1")).isEqualTo("custom-value-1");
-    assertThat(destKeyDetails.getMetadata().get("custom-key-2")).isEqualTo("custom-value-2");
-    assertThat(destKeyDetails.getMetadata().containsKey("custom-key-3")).isFalse();
+    assertThat(destKeyDetails.getMetadata())
+        .containsAllEntriesOf(customMetadata)
+        .doesNotContainKey("custom-key-3");
 
     // Now use REPLACE metadata directive (default) and remove some custom metadata used in the source key
     when(headers.getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER)).thenReturn("REPLACE");
     metadataHeaders.remove(CUSTOM_METADATA_HEADER_PREFIX + "custom-key-1");
     metadataHeaders.remove(CUSTOM_METADATA_HEADER_PREFIX + "custom-key-2");
 
-    response = objectEndpoint.put(DEST_BUCKET_NAME, DEST_KEY, CONTENT.length(), 1,
-        null, body);
+    assertSucceeds(() -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
 
-    ozoneInputStream = clientStub.getObjectStore().getS3Bucket(DEST_BUCKET_NAME)
-        .readKey(DEST_KEY);
-
-    keyContent = IOUtils.toString(ozoneInputStream, UTF_8);
-    sourceKeyDetails = clientStub.getObjectStore()
-        .getS3Bucket(BUCKET_NAME).getKey(KEY_NAME);
-    destKeyDetails = clientStub.getObjectStore()
-        .getS3Bucket(DEST_BUCKET_NAME).getKey(DEST_KEY);
-
-    assertEquals(200, response.getStatus());
-    assertEquals(CONTENT, keyContent);
+    destKeyDetails = assertKeyContent(destBucket, DEST_KEY, CONTENT);
     assertNotNull(keyDetails.getMetadata());
-    assertThat(keyDetails.getMetadata().get(OzoneConsts.ETAG)).isNotEmpty();
     // Source key eTag should remain unchanged and the dest key should have
     // the same Etag since the key content is the same
-    assertEquals(sourceETag, sourceKeyDetails.getMetadata().get(OzoneConsts.ETAG));
+    assertEquals(sourceETag, keyDetails.getMetadata().get(OzoneConsts.ETAG));
     assertEquals(sourceETag, destKeyDetails.getMetadata().get(OzoneConsts.ETAG));
-    assertThat(destKeyDetails.getMetadata().containsKey("custom-key-1")).isFalse();
-    assertThat(destKeyDetails.getMetadata().containsKey("custom-key-2")).isFalse();
-    assertThat(destKeyDetails.getMetadata().get("custom-key-3")).isEqualTo("custom-value-3");
+    assertThat(destKeyDetails.getMetadata())
+        .doesNotContainKeys("custom-key-1", "custom-key-2")
+        .containsEntry("custom-key-3", "custom-value-3");
 
 
     // wrong copy metadata directive
     when(headers.getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER)).thenReturn("INVALID");
-    OS3Exception e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(
-            DEST_BUCKET_NAME, DEST_KEY, CONTENT.length(), 1, null, body),
-        "test copy object failed");
-    assertThat(e.getHttpCode()).isEqualTo(400);
-    assertThat(e.getCode()).isEqualTo("InvalidArgument");
+    OS3Exception e = assertErrorResponse(INVALID_ARGUMENT,
+        () -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
     assertThat(e.getErrorMessage()).contains("The metadata copy directive specified is invalid");
 
     when(headers.getHeaderString(CUSTOM_METADATA_COPY_DIRECTIVE_HEADER)).thenReturn("COPY");
 
     // source and dest same
-    e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(
-            BUCKET_NAME, KEY_NAME, CONTENT.length(), 1, null, body),
-        "test copy object failed");
+    e = assertErrorResponse(INVALID_REQUEST, () -> putObject(CONTENT));
     assertThat(e.getErrorMessage()).contains("This copy request is illegal");
 
     // source bucket not found
     when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
-        NO_SUCH_BUCKET + "/"  + urlEncode(KEY_NAME));
-    e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(DEST_BUCKET_NAME,
-        DEST_KEY, CONTENT.length(), 1, null, body), "test copy object failed");
-    assertThat(e.getCode()).contains("NoSuchBucket");
+        NONEXISTENT_BUCKET + "/"  + urlEncode(KEY_NAME));
+    assertErrorResponse(NO_SUCH_BUCKET,
+        () -> put(objectEndpoint, DEST_BUCKET_NAME, DEST_KEY, CONTENT));
 
     // dest bucket not found
     when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
         BUCKET_NAME + "/" + urlEncode(KEY_NAME));
-    e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(NO_SUCH_BUCKET,
-        DEST_KEY, CONTENT.length(), 1, null, body), "test copy object failed");
-    assertThat(e.getCode()).contains("NoSuchBucket");
+    assertErrorResponse(NO_SUCH_BUCKET,
+        () -> put(objectEndpoint, NONEXISTENT_BUCKET, DEST_KEY, CONTENT));
 
     //Both source and dest bucket not found
     when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
-        NO_SUCH_BUCKET + "/" + urlEncode(KEY_NAME));
-    e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(NO_SUCH_BUCKET,
-        DEST_KEY, CONTENT.length(), 1, null, body), "test copy object failed");
-    assertThat(e.getCode()).contains("NoSuchBucket");
+        NONEXISTENT_BUCKET + "/" + urlEncode(KEY_NAME));
+    assertErrorResponse(NO_SUCH_BUCKET,
+        () -> put(objectEndpoint, NONEXISTENT_BUCKET, DEST_KEY, CONTENT));
 
     // source key not found
     when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
-        BUCKET_NAME + "/" + urlEncode(NO_SUCH_BUCKET));
-    e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(
-        "nonexistent", KEY_NAME, CONTENT.length(), 1, null, body),
-        "test copy object failed");
-    assertThat(e.getCode()).contains("NoSuchBucket");
+        BUCKET_NAME + "/" + urlEncode(NONEXISTENT_BUCKET));
+    assertErrorResponse(NO_SUCH_BUCKET,
+        () -> put(objectEndpoint, "nonexistent", KEY_NAME, CONTENT));
   }
 
   @Test
-  public void testCopyObjectMessageDigestResetDuringException() throws IOException, OS3Exception {
-    // Put object in to source bucket
-    ByteArrayInputStream body =
-        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
+  public void testCopyObjectMessageDigestResetDuringException() throws Exception {
+    assertSucceeds(() -> putObject(CONTENT));
 
-    Response response = objectEndpoint.put(BUCKET_NAME, KEY_NAME,
-        CONTENT.length(), 1, null, body);
-
-    OzoneInputStream ozoneInputStream = clientStub.getObjectStore()
-        .getS3Bucket(BUCKET_NAME)
-        .readKey(KEY_NAME);
-
-    String keyContent = IOUtils.toString(ozoneInputStream, UTF_8);
-    OzoneKeyDetails keyDetails = clientStub.getObjectStore().getS3Bucket(BUCKET_NAME).getKey(KEY_NAME);
-
-    assertEquals(200, response.getStatus());
-    assertEquals(CONTENT, keyContent);
+    OzoneKeyDetails keyDetails = assertKeyContent(bucket, KEY_NAME, CONTENT);
     assertNotNull(keyDetails.getMetadata());
     assertThat(keyDetails.getMetadata().get(OzoneConsts.ETAG)).isNotEmpty();
 
     MessageDigest messageDigest = mock(MessageDigest.class);
     try (MockedStatic<IOUtils> mocked = mockStatic(IOUtils.class)) {
       // Add the mocked methods only during the copy request
-      when(objectEndpoint.getMessageDigestInstance()).thenReturn(messageDigest);
-      mocked.when(() -> IOUtils.copyLarge(any(InputStream.class), any(OutputStream.class)))
+      when(objectEndpoint.getMD5DigestInstance()).thenReturn(messageDigest);
+      mocked.when(() -> IOUtils.copyLarge(any(InputStream.class), any(OutputStream.class), anyLong(),
+              anyLong(), any(byte[].class)))
           .thenThrow(IOException.class);
 
       // Add copy header, and then call put
       when(headers.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
           BUCKET_NAME  + "/" + urlEncode(KEY_NAME));
 
-      try {
-        objectEndpoint.put(DEST_BUCKET_NAME, DEST_KEY, CONTENT.length(), 1,
-            null, body);
-        fail("Should throw IOException");
-      } catch (IOException ignored) {
-        // Verify that the message digest is reset so that the instance can be reused for the
-        // next request in the same thread
-        verify(messageDigest, times(1)).reset();
-      }
+      assertThrows(IOException.class, () -> putObject(DEST_BUCKET_NAME, DEST_KEY).close());
+      // Verify that the message digest is reset so that the instance can be reused for the
+      // next request in the same thread
+      verify(messageDigest, times(1)).reset();
     }
   }
 
   @Test
-  public void testCopyObjectWithTags() throws IOException, OS3Exception {
+  public void testCopyObjectWithTags() throws Exception {
     // Put object in to source bucket
-    HttpHeaders headersForPut = Mockito.mock(HttpHeaders.class);
+    HttpHeaders headersForPut = newMockHttpHeaders();
     when(headersForPut.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
-    ByteArrayInputStream body =
-        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     objectEndpoint.setHeaders(headersForPut);
 
     String sourceKeyName = "sourceKey";
 
-    Response putResponse = objectEndpoint.put(BUCKET_NAME, sourceKeyName,
-        CONTENT.length(), 1, null, body);
-    OzoneKeyDetails keyDetails =
-        clientStub.getObjectStore().getS3Bucket(BUCKET_NAME).getKey(sourceKeyName);
+    assertSucceeds(() -> putObject(BUCKET_NAME, sourceKeyName));
 
-    assertEquals(200, putResponse.getStatus());
-    Map<String, String> tags = keyDetails.getTags();
+    Map<String, String> tags = bucket.getKey(sourceKeyName).getTags();
     assertEquals(2, tags.size());
     assertEquals("value1", tags.get("tag1"));
     assertEquals("value2", tags.get("tag2"));
 
     // Copy object without x-amz-tagging-directive (default to COPY)
     String destKey = "key=value/2";
-    HttpHeaders headersForCopy = Mockito.mock(HttpHeaders.class);
+    HttpHeaders headersForCopy = newMockHttpHeaders();
     when(headersForCopy.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
         BUCKET_NAME  + "/" + urlEncode(sourceKeyName));
-
     objectEndpoint.setHeaders(headersForCopy);
-    Response copyResponse = objectEndpoint.put(DEST_BUCKET_NAME, destKey, CONTENT.length(), 1, null, body);
 
-    OzoneKeyDetails destKeyDetails = clientStub.getObjectStore()
-        .getS3Bucket(DEST_BUCKET_NAME).getKey(destKey);
+    assertSucceeds(() -> putObject(DEST_BUCKET_NAME, destKey));
 
-    assertEquals(200, copyResponse.getStatus());
+    OzoneKeyDetails destKeyDetails = destBucket.getKey(destKey);
+
     Map<String, String> destKeyTags = destKeyDetails.getTags();
 
     // Since the default directive is COPY, it will copy the source key's tags
@@ -620,11 +427,9 @@ class TestObjectPut {
 
     // With x-amz-tagging-directive = COPY with a different x-amz-tagging
     when(headersForCopy.getHeaderString(TAG_HEADER)).thenReturn("tag3=value3");
-    copyResponse = objectEndpoint.put(DEST_BUCKET_NAME, destKey, CONTENT.length(), 1, null, body);
-    assertEquals(200, copyResponse.getStatus());
+    assertSucceeds(() -> putObject(DEST_BUCKET_NAME, destKey));
 
-    destKeyDetails = clientStub.getObjectStore()
-        .getS3Bucket(DEST_BUCKET_NAME).getKey(destKey);
+    destKeyDetails = destBucket.getKey(destKey);
     destKeyTags = destKeyDetails.getTags();
 
     // Since the x-amz-tagging-directive is COPY, we ignore the x-amz-tagging
@@ -635,11 +440,9 @@ class TestObjectPut {
 
     // Copy object with x-amz-tagging-directive = REPLACE
     when(headersForCopy.getHeaderString(TAG_DIRECTIVE_HEADER)).thenReturn("REPLACE");
-    copyResponse = objectEndpoint.put(DEST_BUCKET_NAME, destKey, CONTENT.length(), 1, null, body);
-    assertEquals(200, copyResponse.getStatus());
+    assertSucceeds(() -> putObject(DEST_BUCKET_NAME, destKey));
 
-    destKeyDetails = clientStub.getObjectStore()
-        .getS3Bucket(DEST_BUCKET_NAME).getKey(destKey);
+    destKeyDetails = destBucket.getKey(destKey);
     destKeyTags = destKeyDetails.getTags();
 
     // Since the x-amz-tagging-directive is REPLACE, we replace the source key
@@ -647,66 +450,41 @@ class TestObjectPut {
     assertEquals(1, destKeyTags.size());
     assertEquals("value3", destKeyTags.get("tag3"));
     assertThat(destKeyTags).doesNotContainKeys("tag1", "tag2");
-  }
 
-  @Test
-  public void testCopyObjectWithInvalidTagCopyDirective() throws Exception {
-    ByteArrayInputStream body =
-        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     // Copy object with invalid x-amz-tagging-directive
-    HttpHeaders headersForCopy = Mockito.mock(HttpHeaders.class);
     when(headersForCopy.getHeaderString(TAG_DIRECTIVE_HEADER)).thenReturn("INVALID");
-    try {
-      objectEndpoint.put(DEST_BUCKET_NAME, "somekey", CONTENT.length(), 1, null, body);
-    } catch (OS3Exception ex) {
-      assertEquals(INVALID_ARGUMENT.getCode(), ex.getCode());
-      assertThat(ex.getErrorMessage()).contains("The tagging copy directive specified is invalid");
-      assertEquals(INVALID_ARGUMENT.getHttpCode(), ex.getHttpCode());
-    }
+    OS3Exception e = assertErrorResponse(INVALID_ARGUMENT,
+        () -> put(objectEndpoint, DEST_BUCKET_NAME, "somekey", CONTENT));
+    assertThat(e.getErrorMessage()).contains("The tagging copy directive specified is invalid");
   }
 
   @Test
   void testInvalidStorageType() {
-    ByteArrayInputStream body =
-        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("random");
 
-    OS3Exception e = assertThrows(OS3Exception.class, () -> objectEndpoint.put(
-        BUCKET_NAME, KEY_NAME, CONTENT.length(), 1, null, body));
-    assertEquals(S3ErrorTable.INVALID_ARGUMENT.getErrorMessage(),
-        e.getErrorMessage());
+    OS3Exception e = assertErrorResponse(S3ErrorTable.INVALID_STORAGE_CLASS, () -> putObject(CONTENT));
     assertEquals("random", e.getResource());
   }
 
   @Test
-  void testEmptyStorageType() throws IOException, OS3Exception {
-    ByteArrayInputStream body =
-        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
+  void testEmptyStorageType() throws Exception {
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("");
 
-    objectEndpoint.put(BUCKET_NAME, KEY_NAME, CONTENT
-            .length(), 1, null, body);
-    OzoneKeyDetails key =
-        clientStub.getObjectStore().getS3Bucket(BUCKET_NAME)
-            .getKey(KEY_NAME);
+    assertSucceeds(() -> putObject(CONTENT));
 
     //default type is set
     assertEquals(
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
-        key.getReplicationConfig());
+        bucket.getKey(KEY_NAME).getReplicationConfig());
   }
 
   @Test
-  void testDirectoryCreation() throws IOException,
-      OS3Exception {
+  void testDirectoryCreation() throws Exception {
     // GIVEN
     final String path = "dir/";
 
     // WHEN
-    try (Response response = objectEndpoint.put(fsoBucket.getName(), path,
-        0L, 0, "", null)) {
-      assertEquals(HttpStatus.SC_OK, response.getStatus());
-    }
+    assertSucceeds(() -> putDir(objectEndpoint, fsoBucket.getName(), path));
 
     // THEN
     OzoneKeyDetails key = fsoBucket.getKey(path);
@@ -714,21 +492,75 @@ class TestObjectPut {
   }
 
   @Test
-  void testDirectoryCreationOverFile() throws IOException, OS3Exception {
+  void testDirectoryCreationOverFile() throws Exception {
     // GIVEN
     final String path = "key";
-    final ByteArrayInputStream body =
-        new ByteArrayInputStream(CONTENT.getBytes(UTF_8));
-    objectEndpoint.put(FSO_BUCKET_NAME, path, CONTENT.length(), 0, "", body);
+    assertSucceeds(() -> putObject(FSO_BUCKET_NAME, path));
+
+    assertErrorResponse(S3ErrorTable.NO_OVERWRITE,
+        () -> putDir(objectEndpoint, FSO_BUCKET_NAME, path + "/"));
+  }
+
+  @Test
+  public void testPutEmptyObject() throws Exception {
+    assertSucceeds(() -> putObject(""));
+    assertEquals(0, bucket.getKey(KEY_NAME).getDataSize());
+  }
+
+  @Test
+  public void testPutObjectWithContentMD5() throws Exception {
+    // GIVEN
+    byte[] contentBytes = CONTENT.getBytes(StandardCharsets.UTF_8);
+    byte[] md5Bytes = MessageDigest.getInstance("MD5").digest(contentBytes);
+    String md5Base64 = Base64.getEncoder().encodeToString(md5Bytes);
+
+    when(headers.getHeaderString("Content-MD5")).thenReturn(md5Base64);
 
     // WHEN
-    final OS3Exception exception = assertThrows(OS3Exception.class,
-        () -> objectEndpoint
-            .put(FSO_BUCKET_NAME, path + "/", 0, 0, "", null)
-            .close());
+    assertSucceeds(() -> putObject(CONTENT));
 
     // THEN
-    assertEquals(S3ErrorTable.NO_OVERWRITE.getCode(), exception.getCode());
-    assertEquals(S3ErrorTable.NO_OVERWRITE.getHttpCode(), exception.getHttpCode());
+    OzoneKeyDetails keyDetails = assertKeyContent(bucket, KEY_NAME, CONTENT);
+    assertEquals(CONTENT.length(), keyDetails.getDataSize());
+    assertNotNull(keyDetails.getMetadata());
+    assertThat(keyDetails.getMetadata().get(OzoneConsts.ETAG)).isNotEmpty();
+  }
+
+  public static Stream<Arguments> wrongContentMD5Provider() throws NoSuchAlgorithmException {
+    byte[] wrongContentBytes = "wrong".getBytes(StandardCharsets.UTF_8);
+    byte[] wrongMd5Bytes = MessageDigest.getInstance("MD5").digest(wrongContentBytes);
+    String wrongMd5Base64 = Base64.getEncoder().encodeToString(wrongMd5Bytes);
+    return Stream.of(
+        Arguments.arguments(wrongMd5Base64),
+        Arguments.arguments("invalid-base64")
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("wrongContentMD5Provider")
+  public void testPutObjectWithWrongContentMD5(String wrongContentMD5) throws Exception {
+
+    // WHEN
+    when(headers.getHeaderString("Content-MD5")).thenReturn(wrongContentMD5);
+
+    // WHEN/THEN
+    OS3Exception ex = assertErrorResponse(S3ErrorTable.BAD_DIGEST, () -> putObject(CONTENT));
+    assertThat(ex.getErrorMessage()).contains(S3ErrorTable.BAD_DIGEST.getErrorMessage());
+  }
+
+  private HttpHeaders newMockHttpHeaders() {
+    HttpHeaders httpHeaders = mock(HttpHeaders.class);
+    when(httpHeaders.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("UNSIGNED-PAYLOAD");
+    return httpHeaders;
+  }
+
+  /** Put object at {@code bucketName}/{@code keyName} with pre-defined {@link #CONTENT}. */
+  private Response putObject(String bucketName, String keyName) throws IOException, OS3Exception {
+    return put(objectEndpoint, bucketName, keyName, CONTENT);
+  }
+
+  /** Put object at {@link #BUCKET_NAME}/{@link #KEY_NAME} with the specified content. */
+  private Response putObject(String content) throws IOException, OS3Exception {
+    return put(objectEndpoint, BUCKET_NAME, KEY_NAME, content);
   }
 }

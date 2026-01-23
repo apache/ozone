@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,6 +17,21 @@
 
 package org.apache.hadoop.hdds.scm.client;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.net.InetSocketAddress;
@@ -25,7 +39,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -34,29 +48,13 @@ import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.ha.ConfUtils;
-
-import org.apache.commons.lang3.StringUtils;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
-
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This test class verifies the parsing of SCM endpoint config settings. The
  * parsing logic is in
  * {@link org.apache.hadoop.hdds.scm.client.HddsClientUtils}.
  */
-@Timeout(300)
 public class TestHddsClientUtils {
 
   /**
@@ -194,6 +192,10 @@ public class TestHddsClientUtils {
     assertEquals(OZONE_SCM_BLOCK_CLIENT_PORT_DEFAULT, address.getPort());
   }
 
+  private String getInvalidNameMessage(String invalidString) {
+    return "Did not reject invalid string [" + invalidString + "] as a name";
+  }
+
   @Test
   public void testVerifyResourceName() {
     final String validName = "my-bucket.01";
@@ -212,8 +214,7 @@ public class TestHddsClientUtils {
     final String endDot = "notaname.";
     final String startDot = ".notaname";
     final String unicodeCharacters = "ｚｚｚ";
-    final String tooShort = StringUtils.repeat("a",
-        OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH - 1);
+    // Other tests cover the "too short" case.
 
     List<String> invalidNames = new ArrayList<>();
     invalidNames.add(ipaddr);
@@ -224,12 +225,97 @@ public class TestHddsClientUtils {
     invalidNames.add(endDot);
     invalidNames.add(startDot);
     invalidNames.add(unicodeCharacters);
-    invalidNames.add(tooShort);
 
     for (String name : invalidNames) {
       assertThrows(IllegalArgumentException.class, () -> HddsClientUtils.verifyResourceName(name),
-          "Did not reject invalid string [" + name + "] as a name");
+          getInvalidNameMessage(name));
     }
+  }
+
+  private void doTestBadResourceNameLengthReported(String name, String reason) {
+    // The message should include the name, resource type, range for acceptable
+    // length, and expected reason for rejecting the name.
+    List<String> resourceTypes = ImmutableList.of("bucket", "volume");
+    for (int i = 0; i < 2; i++) {
+      String resType = resourceTypes.get(i);
+      String otherResType = resourceTypes.get(1 - i);
+      Throwable thrown = assertThrows(
+          IllegalArgumentException.class,
+          () -> HddsClientUtils.verifyResourceName(name, resType, true),
+          getInvalidNameMessage(name));
+
+      String message = thrown.getMessage();
+      assertNotNull(message);
+      assertThat(message).contains(resType);
+      assertThat(message).doesNotContain(otherResType);
+      assertThat(message).contains(name);
+      assertThat(message).contains(reason);
+      assertThat(message).contains(
+          Integer.toString(OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH));
+      assertThat(message).contains(
+          Integer.toString(OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH));
+    }
+  }
+
+  @Test
+  public void testNameTooShort() {
+    final String tooShort = StringUtils.repeat("a",
+        OzoneConsts.OZONE_MIN_BUCKET_NAME_LENGTH - 1);
+
+    doTestBadResourceNameLengthReported(tooShort, "too short");
+  }
+
+  @Test
+  public void testNameTooLong() {
+    // Too long, but within the limit for logging (no truncation).
+    final String tooLong = StringUtils.repeat("a",
+        OzoneConsts.OZONE_MAX_BUCKET_NAME_LENGTH + 1);
+
+    doTestBadResourceNameLengthReported(tooLong, "too long");
+  }
+
+  @Test
+  public void testNameTooLongCapped() {
+    // Logging arbitrarily long names is a readability concern and possibly a
+    // vulnerability. Report a prefix with a truncation marker instead if the
+    // maximum length is exceeded by a large margin.
+
+    final String exceedsLogLimit = "x" + StringUtils.repeat(
+        "a", HddsClientUtils.MAX_BUCKET_NAME_LENGTH_IN_LOG);
+    final String truncationMarker = "...";
+
+    Throwable thrown = assertThrows(
+        IllegalArgumentException.class,
+        () -> HddsClientUtils.verifyResourceName(exceedsLogLimit),
+        getInvalidNameMessage(exceedsLogLimit));
+
+    String message = thrown.getMessage();
+    assertNotNull(message);
+
+    String truncatedName = exceedsLogLimit.substring(
+        0,
+        HddsClientUtils.MAX_BUCKET_NAME_LENGTH_IN_LOG);
+    String expectedInMessage = truncatedName + truncationMarker;
+
+    assertThat(message).contains(expectedInMessage);
+    assertThat(message).doesNotContain(exceedsLogLimit);
+  }
+
+  @Test
+  public void testInvalidCharactersNotReported() {
+    // Names of illegal length may appear in logs through the exception
+    // message. If they also contain invalid characters, they should not be
+    // included verbatim. This is to avoid vulnerabilities like Log4Shell.
+
+    final String tooShortInvalidChar = "$a";
+    Throwable thrown = assertThrows(
+        IllegalArgumentException.class,
+        () -> HddsClientUtils.verifyResourceName(tooShortInvalidChar),
+        getInvalidNameMessage(tooShortInvalidChar));
+
+    String message = thrown.getMessage();
+    assertNotNull(message);
+    assertThat(message).doesNotContain(tooShortInvalidChar);
   }
 
   @Test
@@ -253,7 +339,7 @@ public class TestHddsClientUtils {
 
     for (String name : invalidNames) {
       assertThrows(IllegalArgumentException.class, () -> HddsClientUtils.verifyKeyName(name),
-          "Did not reject invalid string [" + name + "] as a name");
+          getInvalidNameMessage(name));
     }
 
     List<String> validNames = new ArrayList<>();
@@ -276,6 +362,7 @@ public class TestHddsClientUtils {
 
     for (String name : validNames) {
       HddsClientUtils.verifyKeyName(name);
+      HddsClientUtils.verifyKeyName(name + OzoneConsts.FS_FILE_COPYING_TEMP_SUFFIX);
     }
   }
 

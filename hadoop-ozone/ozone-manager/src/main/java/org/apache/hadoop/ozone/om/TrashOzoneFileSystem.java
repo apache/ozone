@@ -1,67 +1,63 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_O3TRASH_URI_SCHEME;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.addTrailingSlashIfNeeded;
+import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.pathToKey;
+
 import com.google.common.base.Preconditions;
-import com.google.protobuf.RpcController;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.hadoop.fs.permission.FsPermission;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathIsNotEmptyDirectoryException;
+import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OFSPath;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
-import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Progressable;
 import org.apache.ratis.protocol.ClientId;
-import org.apache.ratis.protocol.Message;
-import org.apache.ratis.protocol.RaftClientRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.net.InetAddress;
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.Iterator;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
-
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_O3TRASH_URI_SCHEME;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
-import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.addTrailingSlashIfNeeded;
-import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.pathToKey;
 
 /**
  * FileSystem to be used by the Trash Emptier.
@@ -69,15 +65,11 @@ import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.pathToKey;
  */
 public class TrashOzoneFileSystem extends FileSystem {
 
-  private static final RpcController NULL_RPC_CONTROLLER = null;
-
   private static final int OZONE_FS_ITERATE_BATCH_SIZE = 100;
 
   private static final int OZONE_MAX_LIST_KEYS_SIZE = 10000;
 
   private final OzoneManager ozoneManager;
-
-  private final String userName;
 
   private final AtomicLong runCount;
 
@@ -90,41 +82,18 @@ public class TrashOzoneFileSystem extends FileSystem {
 
   public TrashOzoneFileSystem(OzoneManager ozoneManager) throws IOException {
     this.ozoneManager = ozoneManager;
-    this.userName =
-          UserGroupInformation.getCurrentUser().getShortUserName();
     this.runCount = new AtomicLong(0);
     setConf(ozoneManager.getConfiguration());
     ozoneConfiguration = OzoneConfiguration.of(getConf());
   }
 
-  private RaftClientRequest getRatisRequest(
-      OzoneManagerProtocolProtos.OMRequest omRequest) {
-    return RaftClientRequest.newBuilder()
-        .setClientId(CLIENT_ID)
-        .setServerId(ozoneManager.getOmRatisServer().getRaftPeerId())
-        .setGroupId(ozoneManager.getOmRatisServer().getRaftGroupId())
-        .setCallId(runCount.getAndIncrement())
-        .setMessage(
-            Message.valueOf(
-                OMRatisHelper.convertRequestToByteString(omRequest)))
-        .setType(RaftClientRequest.writeRequestType())
-        .build();
-
-  }
-
   private void submitRequest(OzoneManagerProtocolProtos.OMRequest omRequest)
       throws Exception {
     ozoneManager.getMetrics().incNumTrashWriteRequests();
-    if (ozoneManager.isRatisEnabled()) {
-      OMClientRequest omClientRequest =
-          OzoneManagerRatisUtils.createClientRequest(omRequest, ozoneManager);
-      omRequest = omClientRequest.preExecute(ozoneManager);
-      RaftClientRequest req = getRatisRequest(omRequest);
-      ozoneManager.getOmRatisServer().submitRequest(omRequest, req);
-    } else {
-      ozoneManager.getOmServerProtocol().
-          submitRequest(NULL_RPC_CONTROLLER, omRequest);
-    }
+    // perform preExecute as ratis submit do no perform preExecute
+    OMClientRequest omClientRequest = OzoneManagerRatisUtils.createClientRequest(omRequest, ozoneManager);
+    omRequest = omClientRequest.preExecute(ozoneManager);
+    OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, CLIENT_ID, runCount.getAndIncrement());
   }
 
   @Override
@@ -235,7 +204,6 @@ public class TrashOzoneFileSystem extends FileSystem {
     return fileStatuses.toArray(new FileStatus[0]);
   }
 
-
   /**
    * converts OzoneFileStatus object to FileStatus.
    */
@@ -274,7 +242,6 @@ public class TrashOzoneFileSystem extends FileSystem {
     throw new UnsupportedOperationException(
         "fs.mkdirs() not implemented in TrashOzoneFileSystem");
   }
-
 
   @Override
   public FileStatus getFileStatus(Path path) throws IOException {
@@ -430,7 +397,7 @@ public class TrashOzoneFileSystem extends FileSystem {
             }
           }
         }
-        if (keyPathList.size() > 0) {
+        if (!keyPathList.isEmpty()) {
           if (!processKeyPath(keyPathList)) {
             return false;
           }
@@ -570,7 +537,6 @@ public class TrashOzoneFileSystem extends FileSystem {
     private final boolean recursive;
     private List<String> keysList;
 
-
     DeleteIterator(Path f, boolean recursive)
         throws IOException {
       super(f);
@@ -648,7 +614,4 @@ public class TrashOzoneFileSystem extends FileSystem {
 
     return userInfo.build();
   }
-
-
-
 }

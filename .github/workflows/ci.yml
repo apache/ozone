@@ -27,26 +27,34 @@ on:
         default: ''
         required: false
 env:
-  FAIL_FAST: ${{ github.event_name == 'pull_request' }}
+  BUILD_ARGS: "-Pdist -Psrc -Dmaven.javadoc.skip=true -Drocks_tools_native"
+  # Minimum required Java version for running Ozone is defined in pom.xml (javac.version).
+  TEST_JAVA_VERSION: 21 # JDK version used by CI build and tests; should match the JDK version in apache/ozone-runner image
+  # MAVEN_ARGS and MAVEN_OPTS are duplicated in check.yml, please keep in sync
+  MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml
   MAVEN_OPTS: -Dhttp.keepAlive=false -Dmaven.wagon.http.pool=false -Dmaven.wagon.http.retryHandler.class=standard -Dmaven.wagon.http.retryHandler.count=3
-  OZONE_WITH_COVERAGE: ${{ github.repository == 'apache/ozone' && github.event_name == 'push' }}
+  OZONE_WITH_COVERAGE: ${{ github.event_name == 'push' }}
+
 jobs:
   build-info:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     env:
       GITHUB_CONTEXT: ${{ toJson(github) }}
     outputs:
       acceptance-suites: ${{ steps.acceptance-suites.outputs.suites }}
+      integration-suites: ${{ steps.integration-suites.outputs.suites }}
       needs-basic-check: ${{ steps.categorize-basic-checks.outputs.needs-basic-check }}
-      needs-native-check: ${{ steps.categorize-basic-checks.outputs.needs-native-check }}
       basic-checks: ${{ steps.categorize-basic-checks.outputs.basic-checks }}
       needs-build: ${{ steps.selective-checks.outputs.needs-build }}
       needs-compile: ${{ steps.selective-checks.outputs.needs-compile }}
       needs-compose-tests: ${{ steps.selective-checks.outputs.needs-compose-tests }}
-      needs-dependency-check: ${{ steps.selective-checks.outputs.needs-dependency-check }}
       needs-integration-tests: ${{ steps.selective-checks.outputs.needs-integration-tests }}
       needs-kubernetes-tests: ${{ steps.selective-checks.outputs.needs-kubernetes-tests }}
       sha: ${{ steps.get-sha.outputs.sha }}
+      # `env` context cannot be used when calling reusable workflow, so we need to convert these to `outputs`
+      build-args: ${{ env.BUILD_ARGS }}
+      java-version: ${{ env.TEST_JAVA_VERSION }}
+      with-coverage: ${{ env.OZONE_WITH_COVERAGE }}
     steps:
       - name: "Checkout ${{ github.ref }} / ${{ github.sha }} (push)"
         uses: actions/checkout@v4
@@ -91,603 +99,216 @@ jobs:
       - name: Acceptance suites
         id: acceptance-suites
         run: dev-support/ci/acceptance_suites.sh
+      - name: Integration suites
+        id: integration-suites
+        run: dev-support/ci/integration_suites.sh
       - name: Categorize Basic Checks
         id: categorize-basic-checks
         env:
           ALL_BASIC_CHECKS: "${{ steps.selective-checks.outputs.basic-checks }}"
         run: dev-support/ci/categorize_basic_checks.sh
+
   build:
     needs:
       - build-info
-    runs-on: ubuntu-20.04
-    timeout-minutes: 60
-    if: needs.build-info.outputs.needs-build == 'true'
-    strategy:
-      matrix:
-        java: [ 8 ]
-      fail-fast: false
-    steps:
-      - name: Checkout project
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.build-info.outputs.sha }}
-      - name: Cache for npm dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.pnpm-store
-            **/node_modules
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-
-      - name: Cache for maven dependencies
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ~/.m2/repository/*/*/*
-            !~/.m2/repository/org/apache/ozone
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            maven-repo-
-      - name: Download Ratis repo
-        if: ${{ inputs.ratis_args != '' }}
-        uses: actions/download-artifact@v4
-        with:
-          name: ratis-jars
-          path: |
-            ~/.m2/repository/org/apache/ratis
-      - name: Setup java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: ${{ matrix.java }}
-      - name: Run a full build
-        run: hadoop-ozone/dev-support/checks/build.sh -Pdist -Psrc ${{ inputs.ratis_args }}
-        env:
-          DEVELOCITY_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
-      - name: Store binaries for tests
-        uses: actions/upload-artifact@v4
-        with:
-          name: ozone-bin
-          path: |
-            hadoop-ozone/dist/target/ozone-*.tar.gz
-            !hadoop-ozone/dist/target/ozone-*-src.tar.gz
-          retention-days: 1
-      - name: Store source tarball for compilation
-        uses: actions/upload-artifact@v4
-        with:
-          name: ozone-src
-          path: hadoop-ozone/dist/target/ozone-*-src.tar.gz
-          retention-days: 1
-      - name: Store Maven repo for tests
-        uses: actions/upload-artifact@v4
-        with:
-          name: ozone-repo
-          path: |
-            ~/.m2/repository/org/apache/ozone
-          retention-days: 1
-  build-config-doc:
-    needs:
-      - build
-    if: ${{ github.repository == 'apache/ozone' && github.event_name == 'push' && github.ref_name == 'master' }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout project
-        uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.x'
-      - name: Download the source artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: ozone-bin
-          path: ozone-bin
-      - name: Extract the source tarball
-        run: |
-          mkdir -p ozone-bin/extracted
-          tar -xzf ozone-bin/ozone-*.tar.gz -C ozone-bin/extracted
-      - name: Run the Python script to convert XML properties into Markdown
-        run: python3 dev-support/ci/xml_to_md.py ozone-bin/extracted > hadoop-hdds/docs/content/tools/Configurations.md
-      - name: Check if Configurations.md file has changed
-        id: hash-check
-        run: |
-          HASH_FILES="${{ hashFiles('hadoop-hdds/docs/content/tools/Configurations.md') }}"
-          PREV_HASH="${{ hashFiles('hadoop-hdds/docs/content/tools/Configurations.md@{previous-commit}') }}"
-          if [ "$HASH_FILES" != "$PREV_HASH" ]; then
-            echo "Configurations.md has changed, proceeding to commit and create PRs."
-            echo "hashes_differ=true" >> $GITHUB_ENV
-          else
-            echo "Configurations.md is unchanged, skipping commit and PR creation."
-            echo "hashes_differ=false" >> $GITHUB_ENV
-          fi
-      - name: Commit and push changes to apache/ozone
-        if: env.hashes_differ == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.OZONE_WEBSITE_BUILD }}
-        run: |
-          git config --global user.name 'Github Actions'
-          git config --global user.email 'noreply@github.com'
-          git checkout -b config-doc-update-from-$GITHUB_SHA
-          git add hadoop-hdds/docs/content/tools/Configurations.md
-          git commit -m "[Auto] Update Configurations.md from $GITHUB_SHA"
-          git push origin config-doc-update-from-$GITHUB_SHA
-      - name: Extract JIRA ID from the first commit of the branch
-        id: extract-jira
-        env:
-          BRANCH_NAME: ${{ github.ref_name }}
-        run: |
-          REMOTE=$(git remote -v | grep -E 'github.com[:/]apache/ozone' | awk '{print $1}' | head -1)
-          git fetch $REMOTE
-          JIRA_ID=$(git log ${REMOTE}/master..${REMOTE}/$(git rev-parse --abbrev-ref HEAD) --oneline | tail -1 | sed -E 's/.*(HDDS-[[:digit:]]+).*/\1/')
-          echo "jira_id=$JIRA_ID" >> $GITHUB_ENV
-      - name: Create Pull Request in apache/ozone
-        if: env.hashes_differ == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.OZONE_WEBSITE_BUILD }}
-          WORKFLOW_NAME: ${{ github.workflow }}
-          WORKFLOW_RUN_ID: ${{ github.run_id }}
-          BRANCH_NAME: ${{ github.ref_name }}
-          JIRA_ID: ${{ env.jira_id }}
-        run: |
-          echo "## What changes were proposed in this pull request?" > pr_body.txt
-          echo "This is an automated pull request triggered by the [$WORKFLOW_NAME](https://github.com/apache/ozone/actions/runs/$WORKFLOW_RUN_ID) workflow run from [$BRANCH_NAME](https://github.com/apache/ozone/tree/$BRANCH_NAME). Please delete the [config-doc-update-from-$GITHUB_SHA](https://github.com/apache/ozone/tree/config-doc-update-from-$GITHUB_SHA) branch after this PR is merged or closed." >> pr_body.txt
-          echo "" >> pr_body.txt
-          echo "## What is the link to the Apache JIRA?" >> pr_body.txt
-          echo "[$JIRA_ID](https://issues.apache.org/jira/browse/$JIRA_ID)" >> pr_body.txt
-          echo "" >> pr_body.txt
-          echo "## How was this patch tested?" >> pr_body.txt
-          echo "Reviewers should manually verify the correctness of this change." >> pr_body.txt
+    if: needs.build-info.outputs.needs-build == 'true' || needs.build-info.outputs.needs-integration-tests == 'true'
+    uses: ./.github/workflows/check.yml
+    with:
+      java-version: ${{ needs.build-info.outputs.java-version }}
+      needs-npm-cache: true
+      ratis-args: ${{ inputs.ratis_args }}
+      script: build
+      script-args: ${{ needs.build-info.outputs.build-args }}
+      sha: ${{ needs.build-info.outputs.sha }}
+      timeout-minutes: 60
+      with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
+    secrets: inherit
 
-          gh pr create --base master --head config-doc-update-from-$GITHUB_SHA \
-          --title "$JIRA_ID. Update Configurations.md page with changes from $JIRA_ID" \
-          --body-file pr_body.txt
-      - name: Checkout ozone-site repository
-        if: env.hashes_differ == 'true'
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.OZONE_WEBSITE_BUILD }}
-          repository: apache/ozone-site
-          ref: 'HDDS-9225-website-v2'
-          path: ozone-site
-      - name: Copy MD file to ozone-site repository
-        if: env.hashes_differ == 'true'
-        run: |
-          TARGET_DIR=$(ls -d ozone-site/docs/*-administrator-guide/*-configuration)
-          echo "TARGET_DIR=${TARGET_DIR#ozone-site/}" >> $GITHUB_ENV
-          cp hadoop-hdds/docs/content/tools/Configurations.md "$TARGET_DIR/99-appendix.md"
-      - name: Commit and push changes to apache/ozone-site
-        if: env.hashes_differ == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.OZONE_WEBSITE_BUILD }}
-        run: |
-          cd ozone-site
-          git config --global user.name 'Github Actions'
-          git config --global user.email 'noreply@github.com'
-          git add "$TARGET_DIR/99-appendix.md"
-          git commit -m "[Auto] Update configurations.md page from ozone $GITHUB_SHA"
-          git push origin config-doc-update-from-$GITHUB_SHA
-      - name: Create Pull Request in apache/ozone-site
-        if: env.hashes_differ == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.OZONE_WEBSITE_BUILD }}
-          WORKFLOW_NAME: ${{ github.workflow }}
-          WORKFLOW_RUN_ID: ${{ github.run_id }}
-          BRANCH_NAME: ${{ github.ref_name }}
-          JIRA_ID: ${{ env.jira_id }}
-        run: |
-          cd ozone-site
-          echo "## What changes were proposed in this pull request?" > pr_body1.txt
-          echo "This is an automated pull request triggered by the [$WORKFLOW_NAME](https://github.com/apache/ozone/actions/runs/$WORKFLOW_RUN_ID) workflow run from [$BRANCH_NAME](https://github.com/apache/ozone/tree/$BRANCH_NAME). Please delete the [config-doc-update-from-$GITHUB_SHA](https://github.com/apache/ozone/tree/config-doc-update-from-$GITHUB_SHA) branch after this PR is merged or closed." >> pr_body1.txt
-          echo "" >> pr_body1.txt
-          echo "## What is the link to the Apache JIRA?" >> pr_body1.txt
-          echo "[$JIRA_ID](https://issues.apache.org/jira/browse/$JIRA_ID)" >> pr_body1.txt
-          echo "" >> pr_body1.txt
-          echo "## How was this patch tested?" >> pr_body1.txt
-          echo "Reviewers should manually verify the correctness of this change." >> pr_body1.txt
-          
-          gh pr create --base HDDS-9225-website-v2 --head config-doc-update-from-$GITHUB_SHA \
-          --title "$JIRA_ID. Update Configurations.md page with changes from $JIRA_ID" \
-          --body-file pr_body1.txt
   compile:
     needs:
       - build-info
       - build
       - basic
-    timeout-minutes: 45
+      - dependency
+      - license
     if: needs.build-info.outputs.needs-compile == 'true'
     strategy:
       matrix:
-        java: [ 11, 17, 21 ]
+        java: [ 8, 11, 17 ]
         include:
-          - os: ubuntu-20.04
-          - java: 8
-            os: macos-12
+          - os: ubuntu-24.04
+          - java: 21
+            os: macos-15
       fail-fast: false
-    runs-on: ${{ matrix.os }}
-    steps:
-      - name: Download Ozone source tarball
-        uses: actions/download-artifact@v4
-        with:
-          name: ozone-src
-      - name: Untar sources
-        run: |
-          tar --strip-components 1 -xzvf ozone*-src.tar.gz
-      - name: Workaround for HADOOP-19011
-        run: |
-          git init
-          git config user.name 'Github Actions'
-          git config user.email 'noreply@github.com'
-          git commit --allow-empty -a -m 'workaround for HADOOP-19011'
-      - name: Cache for maven dependencies
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ~/.m2/repository/*/*/*
-            !~/.m2/repository/org/apache/ozone
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            maven-repo-
-      - name: Download Ratis repo
-        if: ${{ inputs.ratis_args != '' }}
-        uses: actions/download-artifact@v4
-        with:
-          name: ratis-jars
-          path: |
-            ~/.m2/repository/org/apache/ratis
-      - name: Setup java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: ${{ matrix.java }}
-      - name: Compile Ozone using Java ${{ matrix.java }}
-        run: hadoop-ozone/dev-support/checks/build.sh -Dskip.npx -Dskip.installnpx -Djavac.version=${{ matrix.java }} ${{ inputs.ratis_args }}
-        env:
-          OZONE_WITH_COVERAGE: false
-          DEVELOCITY_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
+    uses: ./.github/workflows/check.yml
+    with:
+      java-version: ${{ matrix.java }}
+      needs-ozone-source-tarball: true
+      ratis-args: ${{ inputs.ratis_args }}
+      runner: ${{ matrix.os }}
+      script: compile
+      script-args: "-Pdist -DskipRecon -Dmaven.javadoc.failOnWarnings=${{ matrix.java != 8 }} -Djavac.version=${{ matrix.java }}"
+      sha: ${{ needs.build-info.outputs.sha }}
+      split: ${{ matrix.java }}
+      timeout-minutes: 45
+      with-coverage: false
+    secrets: inherit
+
   basic:
     needs:
       - build-info
-    runs-on: ubuntu-20.04
-    timeout-minutes: 30
     if: needs.build-info.outputs.needs-basic-check == 'true'
+    uses: ./.github/workflows/check.yml
+    with:
+      checkout-fetch-depth: ${{ matrix.check != 'bats' && 1 || 0 }}
+      java-version: 8 # HDDS-10150
+      needs-maven-cache: ${{ !contains('author,bats', matrix.check) }}
+      ratis-args: ${{ inputs.ratis_args }}
+      script: ${{ matrix.check }}
+      sha: ${{ needs.build-info.outputs.sha }}
+      timeout-minutes: 30
+    secrets: inherit
     strategy:
       matrix:
         check: ${{ fromJson(needs.build-info.outputs.basic-checks) }}
       fail-fast: false
-    steps:
-      - name: Checkout project
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.build-info.outputs.sha }}
-        if: matrix.check != 'bats'
-      - name: Checkout project with history
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ needs.build-info.outputs.sha }}
-        if: matrix.check == 'bats'
-      - name: Cache for maven dependencies
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ~/.m2/repository/*/*/*
-            !~/.m2/repository/org/apache/ozone
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            maven-repo-
-        if: ${{ !contains('author,bats,docs', matrix.check) }}
-      - name: Download Ratis repo
-        if: ${{ inputs.ratis_args != '' }}
-        uses: actions/download-artifact@v4
-        with:
-          name: ratis-jars
-          path: |
-            ~/.m2/repository/org/apache/ratis
-      - name: Setup java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: 8
-      - name: Execute tests
-        run: hadoop-ozone/dev-support/checks/${{ matrix.check }}.sh ${{ inputs.ratis_args }}
-        continue-on-error: true
-        env:
-          DEVELOCITY_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
-      - name: Summary of failures
-        run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ matrix.check }}/summary.txt
-        if: ${{ !cancelled() }}
-      - name: Archive build results
-        uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
-        with:
-          name: ${{ matrix.check }}
-          path: target/${{ matrix.check }}
-        continue-on-error: true
-  native:
-    needs:
-      - build-info
-      - basic
-    runs-on: ubuntu-20.04
-    timeout-minutes: 150
-    if: needs.build-info.outputs.needs-native-check == 'true'
-    steps:
-      - name: Checkout project
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.build-info.outputs.sha }}
-      - name: Cache for maven dependencies
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ~/.m2/repository/*/*/*
-            !~/.m2/repository/org/apache/ozone
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            maven-repo-
-      - name: Download Ratis repo
-        if: ${{ inputs.ratis_args != '' }}
-        uses: actions/download-artifact@v4
-        with:
-          name: ratis-jars
-          path: |
-            ~/.m2/repository/org/apache/ratis
-      - name: Setup java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: 8
-      - name: Execute tests
-        run: hadoop-ozone/dev-support/checks/${{ github.job }}.sh ${{ inputs.ratis_args }}
-        continue-on-error: true
-        env:
-          DEVELOCITY_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
-      - name: Summary of failures
-        run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
-        if: ${{ !cancelled() }}
-      - name: Archive build results
-        uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
-        with:
-          name: ${{ github.job }}
-          path: target/${{ github.job }}
-        continue-on-error: true
+
   dependency:
     needs:
       - build-info
       - build
-    runs-on: ubuntu-20.04
-    timeout-minutes: 5
-    if: needs.build-info.outputs.needs-dependency-check == 'true'
-    steps:
-      - name: Checkout project
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.build-info.outputs.sha }}
-      - name: Download compiled Ozone binaries
-        uses: actions/download-artifact@v4
-        with:
-          name: ozone-bin
-      - name: Untar binaries
-        run: |
-          mkdir dist
-          tar  -C dist --strip-components 1 -xzf ozone*.tar.gz
-      - name: Execute tests
-        run: |
-          export OZONE_DIST_DIR=`pwd`/dist
-          ./hadoop-ozone/dev-support/checks/dependency.sh
-      - name: Archive build results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: dependency
-          path: target/dependency
-        continue-on-error: true
+    uses: ./.github/workflows/check.yml
+    secrets: inherit
+    with:
+      java-version: ${{ needs.build-info.outputs.java-version }}
+      needs-ozone-binary-tarball: true
+      script: dependency
+      sha: ${{ needs.build-info.outputs.sha }}
+      timeout-minutes: 5
+
   license:
     needs:
       - build-info
       - build
-    runs-on: ubuntu-20.04
-    timeout-minutes: 15
-    if: needs.build-info.outputs.needs-dependency-check == 'true'
-    steps:
-      - name: Checkout project
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.build-info.outputs.sha }}
-      - name: Cache for maven dependencies
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ~/.m2/repository/*/*/*
-            !~/.m2/repository/org/apache/ozone
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            maven-repo-
-      - name: Download Ozone repo
-        id: download-ozone-repo
-        uses: actions/download-artifact@v4
-        with:
-          name: ozone-repo
-          path: |
-            ~/.m2/repository/org/apache/ozone
-      - name: Execute tests
-        run: |
-          hadoop-ozone/dev-support/checks/${{ github.job }}.sh
-        continue-on-error: true
-      - name: Summary of failures
-        run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
-        if: ${{ !cancelled() }}
-      - name: Archive build results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: ${{ github.job }}
-          path: target/${{ github.job }}
-        continue-on-error: true
+    uses: ./.github/workflows/check.yml
+    secrets: inherit
+    with:
+      java-version: ${{ needs.build-info.outputs.java-version }}
+      needs-ozone-repo: true
+      script: license
+      sha: ${{ needs.build-info.outputs.sha }}
+      timeout-minutes: 15
+
+  javadoc:
+    needs:
+      - build-info
+      - build
+    if: needs.build-info.outputs.needs-compile == 'true'
+    uses: ./.github/workflows/check.yml
+    secrets: inherit
+    with:
+      java-version: ${{ needs.build-info.outputs.java-version }}
+      needs-ozone-repo: true
+      script: javadoc
+      sha: ${{ needs.build-info.outputs.sha }}
+      timeout-minutes: 30
+
+  repro:
+    needs:
+      - build-info
+      - build
+      - basic
+      - dependency
+      - license
+    uses: ./.github/workflows/check.yml
+    secrets: inherit
+    with:
+      java-version: ${{ needs.build-info.outputs.java-version }}
+      needs-ozone-repo: true
+      ratis-args: ${{ inputs.ratis_args }}
+      script: repro
+      script-args: ${{ needs.build-info.outputs.build-args }}
+      post-failure: hadoop-ozone/dev-support/checks/_diffoscope.sh
+      sha: ${{ needs.build-info.outputs.sha }}
+      timeout-minutes: 30
+      with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
+
   acceptance:
     needs:
       - build-info
       - build
       - basic
-    runs-on: ubuntu-20.04
-    timeout-minutes: 150
+      - dependency
+      - license
     if: needs.build-info.outputs.needs-compose-tests == 'true'
+    uses: ./.github/workflows/check.yml
+    secrets: inherit
+    with:
+      java-version: 11 # Hadoop may not work with newer Java
+      needs-ozone-binary-tarball: true
+      ratis-args: ${{ inputs.ratis_args }}
+      script: acceptance
+      script-args: ${{ matrix.suite }}
+      sha: ${{ needs.build-info.outputs.sha }}
+      split: ${{ matrix.suite }}
+      timeout-minutes: 150
+      with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
     strategy:
       matrix:
         suite: ${{ fromJson(needs.build-info.outputs.acceptance-suites) }}
       fail-fast: false
-    steps:
-      - name: Checkout project
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.build-info.outputs.sha }}
-      - name: Download compiled Ozone binaries
-        uses: actions/download-artifact@v4
-        with:
-          name: ozone-bin
-      - name: Untar binaries
-        run: |
-          mkdir -p hadoop-ozone/dist/target
-          tar xzvf ozone*.tar.gz -C hadoop-ozone/dist/target
-          rm ozone*.tar.gz
-          sudo chmod -R a+rwX hadoop-ozone/dist/target
-      - name: Execute tests
-        run: |
-          pushd hadoop-ozone/dist/target/ozone-*
-          sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
-          popd
-          ./hadoop-ozone/dev-support/checks/acceptance.sh
-        env:
-          KEEP_IMAGE: false
-          OZONE_ACCEPTANCE_SUITE: ${{ matrix.suite }}
-          OZONE_VOLUME_OWNER: 1000
-        continue-on-error: true
-      - name: Summary of failures
-        run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
-        if: ${{ !cancelled() }}
-      - name: Archive build results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: acceptance-${{ matrix.suite }}
-          path: target/acceptance
-        continue-on-error: true
+
   kubernetes:
     needs:
       - build-info
       - build
       - basic
-    runs-on: ubuntu-20.04
-    timeout-minutes: 60
+      - dependency
+      - license
     if: needs.build-info.outputs.needs-kubernetes-tests == 'true'
-    steps:
-      - name: Checkout project
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.build-info.outputs.sha }}
-      - name: Download compiled Ozone binaries
-        uses: actions/download-artifact@v4
-        with:
-          name: ozone-bin
-      - name: Untar binaries
-        run: |
-          mkdir -p hadoop-ozone/dist/target
-          tar xzvf ozone*.tar.gz -C hadoop-ozone/dist/target
-      - name: Execute tests
-        run: |
-          pushd hadoop-ozone/dist/target/ozone-*
-          sudo mkdir .aws && sudo chmod 777 .aws && sudo chown 1000 .aws
-          popd
-          ./hadoop-ozone/dev-support/checks/kubernetes.sh
-        continue-on-error: true
-      - name: Summary of failures
-        run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
-        if: ${{ !cancelled() }}
-      - name: Archive build results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: kubernetes
-          path: target/kubernetes
-        continue-on-error: true
+    uses: ./.github/workflows/check.yml
+    secrets: inherit
+    with:
+      needs-ozone-binary-tarball: true
+      ratis-args: ${{ inputs.ratis_args }}
+      script: kubernetes
+      sha: ${{ needs.build-info.outputs.sha }}
+      timeout-minutes: 60
+      with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
+
   integration:
     needs:
       - build-info
+      - build
       - basic
-    runs-on: ubuntu-20.04
-    timeout-minutes: 150
+      - dependency
+      - license
     if: needs.build-info.outputs.needs-integration-tests == 'true'
+    uses: ./.github/workflows/check.yml
+    secrets: inherit
+    with:
+      java-version: ${{ needs.build-info.outputs.java-version }}
+      pre-script: sudo hostname localhost
+      ratis-args: ${{ inputs.ratis_args }}
+      script: integration
+      script-args: -Ptest-${{ matrix.profile }} -Drocks_tools_native
+      sha: ${{ needs.build-info.outputs.sha }}
+      split: ${{ matrix.profile }}
+      timeout-minutes: 90
+      with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
     strategy:
       matrix:
-        profile:
-          - client
-          - container
-          - filesystem
-          - hdds
-          - om
-          - ozone
-          - recon
-          - shell
-          - snapshot
-          - flaky
+        profile: ${{ fromJson(needs.build-info.outputs.integration-suites) }}
       fail-fast: false
-    steps:
-      - name: Checkout project
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.build-info.outputs.sha }}
-      - name: Cache for maven dependencies
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ~/.m2/repository/*/*/*
-            !~/.m2/repository/org/apache/ozone
-          key: maven-repo-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            maven-repo-
-      - name: Download Ratis repo
-        if: ${{ inputs.ratis_args != '' }}
-        uses: actions/download-artifact@v4
-        with:
-          name: ratis-jars
-          path: |
-            ~/.m2/repository/org/apache/ratis
-      - name: Setup java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: 17
-      - name: Execute tests
-        continue-on-error: true
-        run: |
-          args="${{ inputs.ratis_args }}"
-          if [[ "${{ matrix.profile }}" == "flaky" ]]; then
-            args="$args -Dsurefire.rerunFailingTestsCount=5 -Dsurefire.fork.timeout=3600"
-          fi
 
-          hadoop-ozone/dev-support/checks/integration.sh -P${{ matrix.profile }} ${args}
-        env:
-          DEVELOCITY_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
-      - name: Summary of failures
-        run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
-        if: ${{ !cancelled() }}
-      - name: Archive build results
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: it-${{ matrix.profile }}
-          path: target/integration
-        continue-on-error: true
   coverage:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
-    if: github.repository == 'apache/ozone' && github.event_name == 'push'
+    if: github.event_name == 'push'
     needs:
       - build-info
       - acceptance
       - integration
-      - native
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
@@ -711,19 +332,20 @@ jobs:
         run: |
           mkdir -p hadoop-ozone/dist/target
           tar xzvf target/artifacts/ozone-bin/ozone*.tar.gz -C hadoop-ozone/dist/target
-      - name: Calculate combined coverage
-        run: ./hadoop-ozone/dev-support/checks/coverage.sh
-      - name: Setup java 17
+      - name: Setup java ${{ env.TEST_JAVA_VERSION }}
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: 17
+          java-version: ${{ env.TEST_JAVA_VERSION }}
+      - name: Calculate combined coverage
+        run: ./hadoop-ozone/dev-support/checks/coverage.sh
       - name: Upload coverage to Sonar
         run: ./hadoop-ozone/dev-support/checks/sonar.sh
+        if: github.repository == 'apache/ozone'
         env:
           SONAR_TOKEN: ${{ secrets.SONARCLOUD_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DEVELOCITY_ACCESS_KEY: ${{ secrets.GE_ACCESS_TOKEN }}
+          DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
       - name: Archive build results
         uses: actions/upload-artifact@v4
         with:

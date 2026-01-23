@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,7 +25,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
+import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -44,8 +43,6 @@ import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ozone.test.GenericTestUtils;
-
-import org.apache.commons.lang3.RandomUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,45 +66,13 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
   private final Set<StorageContainerManager> failedScmSet;
   private final Set<DatanodeDetails> failedDnSet;
 
-  // The service on which chaos will be unleashed.
-  enum FailureService {
-    DATANODE,
-    OZONE_MANAGER,
-    STORAGE_CONTAINER_MANAGER;
-
-    public String toString() {
-      switch (this) {
-      case DATANODE:
-        return "Datanode";
-      case OZONE_MANAGER:
-        return "OzoneManager";
-      case STORAGE_CONTAINER_MANAGER:
-        return "StorageContainerManager";
-      default:
-        return "";
-      }
-    }
-
-    public static FailureService of(String serviceName) {
-      if (serviceName.equalsIgnoreCase("Datanode")) {
-        return DATANODE;
-      } else if (serviceName.equalsIgnoreCase("OzoneManager")) {
-        return OZONE_MANAGER;
-      } else if (serviceName.equalsIgnoreCase("StorageContainerManager")) {
-        return STORAGE_CONTAINER_MANAGER;
-      }
-      throw new IllegalArgumentException("Unrecognized value for " +
-          "FailureService enum: " + serviceName);
-    }
-  }
-
   @SuppressWarnings("parameternumber")
   public MiniOzoneChaosCluster(OzoneConfiguration conf,
       OMHAService omService, SCMHAService scmService,
       List<HddsDatanodeService> hddsDatanodes, String clusterPath,
       Set<Class<? extends Failures>> clazzes) {
     super(conf, new SCMConfigurator(), omService, scmService, hddsDatanodes,
-        clusterPath, null);
+        clusterPath, Collections.emptyList());
     this.numDatanodes = getHddsDatanodes().size();
     this.numOzoneManagers = omService.getServices().size();
     this.numStorageContainerManagers = scmService.getServices().size();
@@ -134,12 +99,12 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
   public void shutdown() {
     try {
       failureManager.stop();
-      //this should be called after stopChaos to be sure that the
-      //datanode collection is not modified during the shutdown
-      super.shutdown();
     } catch (Exception e) {
-      LOG.error("failed to shutdown MiniOzoneChaosCluster", e);
+      LOG.error("failed to stop FailureManager", e);
     }
+    //this should be called after failureManager.stop to be sure that the
+    //datanode collection is not modified during the shutdown
+    super.shutdown();
   }
 
   /**
@@ -352,12 +317,12 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     if (failedOmSet.size() >= numOzoneManagers / 2) {
       return false;
     }
-    return RandomUtils.nextBoolean();
+    return RandomUtils.secure().randomBoolean();
   }
 
   // Datanode specific
   private int getNumberOfDnToFail() {
-    return RandomUtils.nextBoolean() ? 1 : 2;
+    return RandomUtils.secure().randomBoolean() ? 1 : 2;
   }
 
   public Set<DatanodeDetails> dnToFail() {
@@ -410,11 +375,13 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     return scms;
   }
 
+  @Override
   public void shutdownStorageContainerManager(StorageContainerManager scm) {
     super.shutdownStorageContainerManager(scm);
     failedScmSet.add(scm);
   }
 
+  @Override
   public StorageContainerManager restartStorageContainerManager(
       StorageContainerManager scm, boolean waitForScm)
       throws IOException, TimeoutException, InterruptedException,
@@ -428,7 +395,7 @@ public class MiniOzoneChaosCluster extends MiniOzoneHAClusterImpl {
     if (failedScmSet.size() >= numStorageContainerManagers / 2) {
       return false;
     }
-    return RandomUtils.nextBoolean();
+    return RandomUtils.secure().randomBoolean();
   }
 
 }

@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,26 +17,50 @@
 
 package org.apache.hadoop.ozone.om.request.s3.security;
 
+import static org.apache.hadoop.security.authentication.util.KerberosName.DEFAULT_MECHANISM;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.framework;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
+
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Optional;
+import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.ipc.Server;
-import org.apache.hadoop.ipc.Server.Call;
+import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.ipc_.Server;
+import org.apache.hadoop.ipc_.Server.Call;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
-import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.S3SecretLockedManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OMMultiTenantManager;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.S3SecretCache;
+import org.apache.hadoop.ozone.om.S3SecretFunction;
+import org.apache.hadoop.ozone.om.S3SecretLockedManager;
+import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.S3SecretManagerImpl;
 import org.apache.hadoop.ozone.om.TenantOp;
-import org.apache.hadoop.ozone.om.S3SecretCache;
-import org.apache.hadoop.ozone.om.multitenant.AuthorizerLockImpl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
+import org.apache.hadoop.ozone.om.multitenant.AuthorizerLockImpl;
 import org.apache.hadoop.ozone.om.multitenant.Tenant;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.s3.tenant.OMTenantAssignUserAccessIdRequest;
@@ -64,27 +87,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Optional;
-import java.util.UUID;
-
-import static org.apache.hadoop.security.authentication.util.KerberosName.DEFAULT_MECHANISM;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.framework;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.when;
-
 /**
  * Test S3GetSecretRequest.
  */
@@ -95,7 +97,6 @@ public class TestS3GetSecretRequest {
 
   private OzoneManager ozoneManager;
   private OMMetrics omMetrics;
-  private AuditLogger auditLogger;
   private OmMetadataManagerImpl omMetadataManager;
 
   // Multi-tenant related vars
@@ -110,7 +111,6 @@ public class TestS3GetSecretRequest {
   private UserGroupInformation ugiCarol;
 
   private OMMultiTenantManager omMultiTenantManager;
-  private Tenant tenant;
 
   @BeforeEach
   public void setUp() throws Exception {
@@ -143,7 +143,6 @@ public class TestS3GetSecretRequest {
         ozoneManager);
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
-    when(ozoneManager.isRatisEnabled()).thenReturn(true);
     S3SecretLockedManager secretManager = new S3SecretLockedManager(
             new S3SecretManagerImpl(
                     omMetadataManager,
@@ -153,13 +152,13 @@ public class TestS3GetSecretRequest {
     );
     when(ozoneManager.getS3SecretManager()).thenReturn(secretManager);
 
-    auditLogger = mock(AuditLogger.class);
+    AuditLogger auditLogger = mock(AuditLogger.class);
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
     doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
 
     // Multi-tenant related initializations
     omMultiTenantManager = mock(OMMultiTenantManager.class);
-    tenant = mock(Tenant.class);
+    Tenant tenant = mock(Tenant.class);
     when(ozoneManager.getMultiTenantManager()).thenReturn(omMultiTenantManager);
 
     when(tenant.getTenantAccessPolicies()).thenReturn(new ArrayList<>());
@@ -224,7 +223,6 @@ public class TestS3GetSecretRequest {
                 .build()
         ).build();
   }
-
 
   @Test
   public void testS3CacheRecordsTransactionIndex() throws IOException {
@@ -317,6 +315,30 @@ public class TestS3GetSecretRequest {
     when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(true);
 
     processSuccessSecretRequest(USER_CAROL, 1, true);
+  }
+
+  @Test
+  public void testFailSecretManagerOnGetSecret() throws IOException {
+
+    // This effectively makes alice an S3 admin.
+    when(ozoneManager.isS3Admin(ugiAlice)).thenReturn(true);
+
+    S3SecretManager failingS3Secret = mock(S3SecretManager.class);
+    doThrow(new IOException("Test Exception: Failed to store secret"))
+        .when(failingS3Secret).storeSecret(any(), any());
+    when(failingS3Secret.doUnderLock(any(), any()))
+        .thenAnswer(invocationOnMock -> {
+          S3SecretFunction<Boolean> action =
+              invocationOnMock.getArgument(1, S3SecretFunction.class);
+
+          return action.accept(failingS3Secret);
+        });
+
+    when(ozoneManager.getS3SecretManager()).thenReturn(failingS3Secret);
+
+    assertThrows(Exception.class, () ->
+        processSuccessSecretRequest(USER_ALICE, 1, true)
+    );
   }
 
   @Test
@@ -519,7 +541,6 @@ public class TestS3GetSecretRequest {
      */
     assertNull(s3GetSecretResponse.getS3SecretValue());
   }
-
 
   private S3Secret processSuccessSecretRequest(
       String userPrincipalId,

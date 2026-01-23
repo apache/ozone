@@ -48,8 +48,14 @@
   });
   angular.module('ozone').component('jvmParameters', {
     templateUrl: 'static/templates/jvm.html',
-    controller: function($http) {
+    controller: function($http, $scope) {
       var ctrl = this;
+
+      $scope.contentVisible = false;
+      $scope.toggleContent = function() {
+        $scope.contentVisible = !$scope.contentVisible;
+      };
+
       $http.get("jmx?qry=java.lang:type=Runtime")
         .then(function(result) {
           ctrl.jmx = result.data.beans[0];
@@ -245,7 +251,11 @@
 
   angular.module('ozone').component('navmenu', {
     bindings: {
-      metrics: '<'
+      metrics: '<',
+      iostatus: '<',
+      ioLinkHref: '@',
+      scanner: '<',
+      scannerLinkHref: '@',
     },
     templateUrl: 'static/templates/menu.html',
     controller: function($http) {
@@ -286,13 +296,15 @@
         for (var idx in srcObj) {
           //console.log("Adding keys for "+idx)
           for (var key in srcObj[idx]) {
-
+            var propMetadata = srcObj[idx][key];
+            
             if (ctrl.keyTagMap.hasOwnProperty(key)) {
               ctrl.keyTagMap[key]['tag'].push(idx);
             } else {
               var newProp = {};
-              newProp['name'] = key;
-              newProp['value'] = srcObj[idx][key];
+              newProp['name'] = propMetadata.name || key;
+              newProp['value'] = propMetadata.value;
+              newProp['description'] = propMetadata.description || '';
               newProp['tag'] = [];
               newProp['tag'].push(idx);
               ctrl.keyTagMap[key] = newProp;

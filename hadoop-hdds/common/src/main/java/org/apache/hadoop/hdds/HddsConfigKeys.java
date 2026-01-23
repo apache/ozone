@@ -1,19 +1,20 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.hdds;
 
 /**
@@ -26,10 +27,18 @@ public final class HddsConfigKeys {
       "hdds.heartbeat.interval";
   public static final String HDDS_HEARTBEAT_INTERVAL_DEFAULT =
       "30s";
+  public static final String HDDS_INITIAL_HEARTBEAT_INTERVAL =
+      "hdds.heartbeat.initial-interval";
+  public static final String HDDS_INITIAL_HEARTBEAT_INTERVAL_DEFAULT =
+      "2s";
   public static final String HDDS_RECON_HEARTBEAT_INTERVAL =
-      "hdds.recon.heartbeat.interval";
+      "hdds.heartbeat.recon.interval";
   public static final String HDDS_RECON_HEARTBEAT_INTERVAL_DEFAULT =
       "60s";
+  public static final String HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL =
+      "hdds.heartbeat.recon.initial-interval";
+  public static final String HDDS_RECON_INITIAL_HEARTBEAT_INTERVAL_DEFAULT =
+      "2s";
   public static final String HDDS_NODE_REPORT_INTERVAL =
       "hdds.node.report.interval";
   public static final String HDDS_NODE_REPORT_INTERVAL_DEFAULT =
@@ -58,14 +67,6 @@ public final class HddsConfigKeys {
   public static final String HDDS_DATANODE_VOLUME_CHOOSING_POLICY =
       "hdds.datanode.volume.choosing.policy";
 
-  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE =
-      "hdds.datanode.volume.min.free.space";
-  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_DEFAULT =
-      "5GB";
-
-  public static final String HDDS_DATANODE_VOLUME_MIN_FREE_SPACE_PERCENT =
-      "hdds.datanode.volume.min.free.space.percent";
-
   public static final String HDDS_DB_PROFILE = "hdds.db.profile";
 
   // Once a container usage crosses this threshold, it is eligible for
@@ -79,7 +80,7 @@ public final class HddsConfigKeys {
   public static final boolean HDDS_SCM_SAFEMODE_ENABLED_DEFAULT = true;
   public static final String HDDS_SCM_SAFEMODE_MIN_DATANODE =
       "hdds.scm.safemode.min.datanode";
-  public static final int HDDS_SCM_SAFEMODE_MIN_DATANODE_DEFAULT = 1;
+  public static final int HDDS_SCM_SAFEMODE_MIN_DATANODE_DEFAULT = 3;
 
   public static final String
       HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT =
@@ -87,11 +88,6 @@ public final class HddsConfigKeys {
 
   public static final String
       HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT_DEFAULT = "5m";
-
-  public static final String HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK =
-      "hdds.scm.safemode.pipeline-availability.check";
-  public static final boolean
-      HDDS_SCM_SAFEMODE_PIPELINE_AVAILABILITY_CHECK_DEFAULT = true;
 
   public static final String HDDS_SCM_SAFEMODE_PIPELINE_CREATION =
       "hdds.scm.safemode.pipeline.creation";
@@ -116,6 +112,10 @@ public final class HddsConfigKeys {
   public static final double
       HDDS_SCM_SAFEMODE_ONE_NODE_REPORTED_PIPELINE_PCT_DEFAULT = 0.90;
 
+  public static final String HDDS_SCM_SAFEMODE_LOG_INTERVAL =
+      "hdds.scm.safemode.log.interval";
+  public static final String HDDS_SCM_SAFEMODE_LOG_INTERVAL_DEFAULT = "1m";
+
   // This configuration setting is used as a fallback location by all
   // Ozone/HDDS services for their metadata. It is useful as a single
   // config point for test/PoC clusters.
@@ -123,6 +123,9 @@ public final class HddsConfigKeys {
   // In any real cluster where performance matters, the SCM, OM and DN
   // metadata locations must be configured explicitly.
   public static final String OZONE_METADATA_DIRS = "ozone.metadata.dirs";
+
+  public static final String DATANODE_DB_CONFIG_PATH = "hdds.datanode.db.config.path";
+  public static final String DATANODE_DB_CONFIG_PATH_DEFAULT = "";
 
   public static final String HDDS_PROMETHEUS_ENABLED =
       "hdds.prometheus.endpoint.enabled";
@@ -259,7 +262,7 @@ public final class HddsConfigKeys {
 
   public static final String HDDS_SECRET_KEY_EXPIRY_DURATION =
       "hdds.secret.key.expiry.duration";
-  public static final String HDDS_SECRET_KEY_EXPIRY_DURATION_DEFAULT = "7d";
+  public static final String HDDS_SECRET_KEY_EXPIRY_DURATION_DEFAULT = "9d";
 
   public static final String HDDS_SECRET_KEY_ROTATE_DURATION =
       "hdds.secret.key.rotate.duration";
@@ -274,12 +277,6 @@ public final class HddsConfigKeys {
       "hdds.secret.key.rotate.check.duration";
   public static final String HDDS_SECRET_KEY_ROTATE_CHECK_DURATION_DEFAULT
       = "10m";
-
-  /**
-   * Do not instantiate.
-   */
-  private HddsConfigKeys() {
-  }
 
   // Enable TLS for GRPC clients/server in ozone.
   public static final String HDDS_GRPC_TLS_ENABLED = "hdds.grpc.tls.enabled";
@@ -339,6 +336,9 @@ public final class HddsConfigKeys {
   public static final String OZONE_SECURITY_RECONFIGURE_PROTOCOL_ACL =
       "ozone.security.reconfigure.protocol.acl";
 
+  public static final String HDDS_SECURITY_CLIENT_DATANODE_DISK_BALANCER_PROTOCOL_ACL =
+      "hdds.security.client.datanode.disk.balancer.protocol.acl";
+
   // Determines if the Container Chunk Manager will write user data to disk
   // Set to false only for specific performance tests
   public static final String HDDS_CONTAINER_PERSISTDATA =
@@ -366,7 +366,10 @@ public final class HddsConfigKeys {
   public static final int HDDS_DATANODE_CLIENT_PORT_DEFAULT = 19864;
   public static final String HDDS_DATANODE_HANDLER_COUNT_KEY =
       "hdds.datanode.handler.count";
-  public static final int HDDS_DATANODE_HANDLER_COUNT_DEFAULT = 1;
+  public static final int HDDS_DATANODE_HANDLER_COUNT_DEFAULT = 10;
+  public static final String HDDS_DATANODE_READ_THREADPOOL_KEY =
+      "hdds.datanode.read.threadpool";
+  public static final int HDDS_DATANODE_READ_THREADPOOL_DEFAULT = 10;
   public static final String HDDS_DATANODE_HTTP_BIND_HOST_DEFAULT = "0.0.0.0";
   public static final int HDDS_DATANODE_HTTP_BIND_PORT_DEFAULT = 9882;
   public static final int HDDS_DATANODE_HTTPS_BIND_PORT_DEFAULT = 9883;
@@ -398,4 +401,40 @@ public final class HddsConfigKeys {
       "hdds.datanode.slow.op.warning.threshold";
   public static final String HDDS_DATANODE_SLOW_OP_WARNING_THRESHOLD_DEFAULT =
       "500ms";
+
+  public static final String OZONE_DATANODE_IO_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY =
+      "ozone.volume.io.percentiles.intervals.seconds";
+
+  public static final String HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY =
+      "hdds.datanode.disk.balancer.enabled";
+  public static final boolean HDDS_DATANODE_DISK_BALANCER_ENABLED_DEFAULT = false;
+
+  public static final String HDDS_DATANODE_DNS_INTERFACE_KEY =
+      "hdds.datanode.dns.interface";
+  public static final String HDDS_DATANODE_DNS_NAMESERVER_KEY =
+      "hdds.datanode.dns.nameserver";
+  public static final String HDDS_DATANODE_HOST_NAME_KEY =
+      "hdds.datanode.hostname";
+  public static final String HDDS_DATANODE_USE_DN_HOSTNAME =
+      "hdds.datanode.use.datanode.hostname";
+  public static final boolean HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT = false;
+
+  public static final String HDDS_XFRAME_OPTION_ENABLED = "hdds.xframe.enabled";
+  public static final boolean HDDS_XFRAME_OPTION_ENABLED_DEFAULT = true;
+  public static final String HDDS_XFRAME_OPTION_VALUE = "hdds.xframe.value";
+  public static final String HDDS_XFRAME_OPTION_VALUE_DEFAULT = "SAMEORIGIN";
+
+  public static final String HDDS_METRICS_SESSION_ID_KEY =
+      "hdds.metrics.session-id";
+
+  public static final String HDDS_DATANODE_KERBEROS_PRINCIPAL_KEY =
+      "hdds.datanode.kerberos.principal";
+  public static final String HDDS_DATANODE_KERBEROS_KEYTAB_FILE_KEY =
+      "hdds.datanode.kerberos.keytab.file";
+  public static final String HDDS_METRICS_PERCENTILES_INTERVALS_KEY =
+      "hdds.metrics.percentiles.intervals";
+
+  /** Do not instantiate. */
+  private HddsConfigKeys() {
+  }
 }

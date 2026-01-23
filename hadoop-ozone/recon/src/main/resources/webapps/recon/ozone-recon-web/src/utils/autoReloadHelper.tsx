@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import {AUTO_RELOAD_INTERVAL_DEFAULT} from '../constants/autoReload.constants';
+import { AUTO_RELOAD_INTERVAL_DEFAULT } from '@/constants/autoReload.constants';
 
 class AutoReloadHelper {
   loadData: () => void;
@@ -52,4 +52,4 @@ class AutoReloadHelper {
   };
 }
 
-export {AutoReloadHelper};
+export { AutoReloadHelper };

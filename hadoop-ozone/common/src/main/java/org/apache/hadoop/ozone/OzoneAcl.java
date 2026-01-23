@@ -1,48 +1,50 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
-
 package org.apache.hadoop.ozone;
+
+import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.NONE;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
-import com.google.protobuf.Proto2Utils;
-import net.jcip.annotations.Immutable;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo.OzoneAclScope;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo.OzoneAclType;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
-import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
-import org.apache.ratis.util.MemoizedSupplier;
-
+import com.google.protobuf.ProtoUtils;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
-
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.ALL;
-import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.NONE;
+import net.jcip.annotations.Immutable;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo.OzoneAclScope;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneAclInfo.OzoneAclType;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
+import org.apache.ratis.util.MemoizedSupplier;
 
 /**
  * OzoneACL classes define bucket ACLs used in OZONE.
@@ -55,9 +57,16 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.NON
  * </ul>
  */
 @Immutable
-public class OzoneAcl {
+public final class OzoneAcl {
 
   private static final String ACL_SCOPE_REGEX = ".*\\[(ACCESS|DEFAULT)\\]";
+  /**
+   * Link bucket default acl defined [world::rw]
+   * which is similar to Linux POSIX symbolic.
+   */
+  public static final OzoneAcl LINK_BUCKET_DEFAULT_ACL =
+      OzoneAcl.of(IAccessAuthorizer.ACLIdentityType.WORLD, "", ACCESS, READ, WRITE);
+
   private final ACLIdentityType type;
   private final String name;
   @JsonIgnore
@@ -69,12 +78,12 @@ public class OzoneAcl {
   @JsonIgnore
   private final Supplier<Integer> hashCodeMethod;
 
-  public OzoneAcl(ACLIdentityType type, String name, AclScope scope, ACLType... acls) {
-    this(type, name, scope, toInt(acls));
+  public static OzoneAcl of(ACLIdentityType type, String name, AclScope scope, ACLType... acls) {
+    return new OzoneAcl(type, name, scope, toInt(acls));
   }
 
-  public OzoneAcl(ACLIdentityType type, String name, AclScope scope, EnumSet<ACLType> acls) {
-    this(type, name, scope, toInt(acls));
+  public static OzoneAcl of(ACLIdentityType type, String name, AclScope scope, Set<ACLType> acls) {
+    return new OzoneAcl(type, name, scope, toInt(acls));
   }
 
   private OzoneAcl(ACLIdentityType type, String name, AclScope scope, int acls) {
@@ -88,7 +97,6 @@ public class OzoneAcl {
     this.hashCodeMethod = MemoizedSupplier.valueOf(() -> Objects.hash(getName(),
         BitSet.valueOf(getAclByteString().asReadOnlyByteBuffer()), getType().toString(), getAclScope()));
   }
-
 
   private static int toInt(int aclTypeOrdinal) {
     return 1 << aclTypeOrdinal;
@@ -126,7 +134,7 @@ public class OzoneAcl {
     if (type == ACLIdentityType.WORLD || type == ACLIdentityType.ANONYMOUS) {
       if (!name.equals(ACLIdentityType.WORLD.name()) &&
           !name.equals(ACLIdentityType.ANONYMOUS.name()) &&
-          name.length() != 0) {
+          !name.isEmpty()) {
         throw new IllegalArgumentException("Expected name " + type.name() + ", but was: " + name);
       }
       // For type WORLD and ANONYMOUS we allow only one acl to be set.
@@ -134,7 +142,7 @@ public class OzoneAcl {
     }
 
     if (((type == ACLIdentityType.USER) || (type == ACLIdentityType.GROUP))
-        && (name.length() == 0)) {
+        && (name.isEmpty())) {
       throw new IllegalArgumentException(type + " name is required");
     }
 
@@ -186,7 +194,7 @@ public class OzoneAcl {
 
     // TODO : Support sanitation of these user names by calling into
     // userAuth Interface.
-    return new OzoneAcl(aclType, parts[1], aclScope, acls);
+    return OzoneAcl.of(aclType, parts[1], aclScope, acls);
   }
 
   /**
@@ -302,7 +310,7 @@ public class OzoneAcl {
     final byte first = (byte) aclBits;
     final byte second = (byte) (aclBits >>> 8);
     final byte[] bytes = second != 0 ? new byte[]{first, second} : new byte[]{first};
-    return Proto2Utils.unsafeByteString(bytes);
+    return ProtoUtils.unsafeByteString(bytes);
   }
 
   @JsonIgnore
@@ -312,6 +320,10 @@ public class OzoneAcl {
 
   public List<ACLType> getAclList() {
     return getAclList(aclBits, Function.identity());
+  }
+
+  public Set<ACLType> getAclSet() {
+    return Collections.unmodifiableSet(EnumSet.copyOf(getAclList()));
   }
 
   private static <T> List<T> getAclList(int aclBits, Function<ACLType, T> converter) {

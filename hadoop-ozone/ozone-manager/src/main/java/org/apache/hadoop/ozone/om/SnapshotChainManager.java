@@ -1,37 +1,39 @@
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.om;
 
 import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TableIterator;
-import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class is used for creating and accessing Snapshot Chains.
@@ -56,6 +58,7 @@ public class SnapshotChainManager {
   private final ConcurrentMap<UUID, String> snapshotIdToTableKey;
   private UUID latestGlobalSnapshotId;
   private final boolean snapshotChainCorrupted;
+  private UUID oldestGlobalSnapshotId;
 
   public SnapshotChainManager(OMMetadataManager metadataManager) {
     globalSnapshotChain = Collections.synchronizedMap(new LinkedHashMap<>());
@@ -76,7 +79,7 @@ public class SnapshotChainManager {
           "Global Snapshot chain corruption. Snapshot with snapshotId: %s is " +
               "already present in the chain.", snapshotID));
     }
-    if (globalSnapshotChain.size() > 0 && prevGlobalID == null) {
+    if (!globalSnapshotChain.isEmpty() && prevGlobalID == null) {
       throw new IOException(String.format("Snapshot chain " +
           "corruption. Adding snapshot %s as head node while there are %d " +
               "snapshots in the global snapshot chain.", snapshotID,
@@ -104,6 +107,8 @@ public class SnapshotChainManager {
       // On add snapshot, set previous snapshot entry nextSnapshotID =
       // snapshotID
       globalSnapshotChain.get(prevGlobalID).setNextSnapshotId(snapshotID);
+    } else {
+      oldestGlobalSnapshotId = snapshotID;
     }
 
     globalSnapshotChain.put(snapshotID,
@@ -171,7 +176,6 @@ public class SnapshotChainManager {
       // for node removal
       UUID next = globalSnapshotChain.get(snapshotID).getNextSnapshotId();
       UUID prev = globalSnapshotChain.get(snapshotID).getPreviousSnapshotId();
-
       if (prev != null && !globalSnapshotChain.containsKey(prev)) {
         throw new IOException(String.format(
             "Global snapshot chain corruption. " +
@@ -196,6 +200,9 @@ public class SnapshotChainManager {
       // remove from latest list if necessary
       if (latestGlobalSnapshotId.equals(snapshotID)) {
         latestGlobalSnapshotId = prev;
+      }
+      if (snapshotID.equals(oldestGlobalSnapshotId)) {
+        oldestGlobalSnapshotId = next;
       }
       return true;
     } else {
@@ -362,13 +369,16 @@ public class SnapshotChainManager {
   public synchronized boolean deleteSnapshot(SnapshotInfo snapshotInfo)
       throws IOException {
     validateSnapshotChain();
-    boolean status = deleteSnapshotGlobal(snapshotInfo.getSnapshotId()) &&
-        deleteSnapshotPath(snapshotInfo.getSnapshotPath(),
-            snapshotInfo.getSnapshotId());
-    if (status) {
-      snapshotIdToTableKey.remove(snapshotInfo.getSnapshotId());
-    }
-    return status;
+    return deleteSnapshotGlobal(snapshotInfo.getSnapshotId()) &&
+        deleteSnapshotPath(snapshotInfo.getSnapshotPath(), snapshotInfo.getSnapshotId());
+  }
+
+  /**
+   * Remove the snapshot from snapshotIdToSnapshotTableKey map.
+   */
+  public synchronized void removeFromSnapshotIdToTable(UUID snapshotId) throws IOException {
+    validateSnapshotChain();
+    snapshotIdToTableKey.remove(snapshotId);
   }
 
   /**
@@ -377,6 +387,42 @@ public class SnapshotChainManager {
   public UUID getLatestGlobalSnapshotId() throws IOException {
     validateSnapshotChain();
     return latestGlobalSnapshotId;
+  }
+
+  /**
+   * Get oldest of global snapshot in snapshot chain.
+   */
+  public UUID getOldestGlobalSnapshotId() throws IOException {
+    validateSnapshotChain();
+    return oldestGlobalSnapshotId;
+  }
+
+  public Iterator<UUID> iterator(final boolean reverse) throws IOException {
+    validateSnapshotChain();
+    return new Iterator<UUID>() {
+      private UUID currentSnapshotId = reverse ? getLatestGlobalSnapshotId() : getOldestGlobalSnapshotId();
+      @Override
+      public boolean hasNext() {
+        return currentSnapshotId != null;
+      }
+
+      @Override
+      public UUID next() {
+        try {
+          UUID prevSnapshotId = currentSnapshotId;
+          if (reverse && hasPreviousGlobalSnapshot(currentSnapshotId) ||
+              !reverse && hasNextGlobalSnapshot(currentSnapshotId)) {
+            currentSnapshotId =
+                reverse ? previousGlobalSnapshot(currentSnapshotId) : nextGlobalSnapshot(currentSnapshotId);
+          } else {
+            currentSnapshotId = null;
+          }
+          return prevSnapshotId;
+        } catch (IOException e) {
+          throw new UncheckedIOException("Error while getting next snapshot for " + currentSnapshotId, e);
+        }
+      }
+    };
   }
 
   /**

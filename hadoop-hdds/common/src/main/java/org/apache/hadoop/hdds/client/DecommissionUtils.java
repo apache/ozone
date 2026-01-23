@@ -1,14 +1,13 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -24,13 +23,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Strings;
 import jakarta.annotation.Nullable;
-import org.apache.hadoop.hdds.annotation.InterfaceAudience;
-import org.apache.hadoop.hdds.annotation.InterfaceStability;
-import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -39,6 +31,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.hadoop.hdds.annotation.InterfaceAudience;
+import org.apache.hadoop.hdds.annotation.InterfaceStability;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Decommission specific stateless utility functions.
@@ -46,7 +44,6 @@ import java.util.stream.Stream;
 @InterfaceAudience.Private
 @InterfaceStability.Stable
 public final class DecommissionUtils {
-
 
   private static final Logger LOG = LoggerFactory.getLogger(DecommissionUtils.class);
 
@@ -97,7 +94,6 @@ public final class DecommissionUtils {
    * Returns the number of decommissioning nodes.
    *
    * @param jsonNode
-   * @return
    */
   public static int getNumDecomNodes(JsonNode jsonNode) {
     int numDecomNodes;
@@ -118,7 +114,6 @@ public final class DecommissionUtils {
    * @param numDecomNodes
    * @param countsMap
    * @param errMsg
-   * @return
    * @throws IOException
    */
   @Nullable
@@ -126,7 +121,9 @@ public final class DecommissionUtils {
                                                  Map<String, Object> countsMap, String errMsg)
       throws IOException {
     for (int i = 1; i <= numDecomNodes; i++) {
-      if (datanode.getHostName().equals(counts.get("tag.datanode." + i).asText())) {
+      String datanodeHostName =
+          (counts.get("tag.datanode." + i) != null) ? (counts.get("tag.datanode." + i).asText()) : "";
+      if (datanode.getHostName().equals(datanodeHostName)) {
         JsonNode pipelinesDN = counts.get("PipelinesWaitingToCloseDN." + i);
         JsonNode underReplicatedDN = counts.get("UnderReplicatedDN." + i);
         JsonNode unclosedDN = counts.get("UnclosedContainersDN." + i);

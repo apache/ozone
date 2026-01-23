@@ -1,23 +1,26 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.hdds.ratis;
 
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static org.apache.ratis.util.Preconditions.assertTrue;
+
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
@@ -27,12 +30,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
 import java.util.function.BooleanSupplier;
 import java.util.stream.Collectors;
-
-import com.google.common.annotations.VisibleForTesting;
-import org.apache.hadoop.hdds.StringUtils;
+import javax.net.ssl.TrustManager;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -42,8 +45,6 @@ import org.apache.hadoop.hdds.ratis.retrypolicy.RetryPolicyCreator;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.SecurityConfig;
-
-import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.ratis.RaftConfigKeys;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.client.RaftClientConfigKeys;
@@ -65,6 +66,7 @@ import org.apache.ratis.retry.RetryPolicies;
 import org.apache.ratis.retry.RetryPolicy;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
+import org.apache.ratis.server.RaftServerConfigKeys;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.netty.buffer.ByteBuf;
 import org.apache.ratis.util.JavaUtils;
@@ -72,11 +74,6 @@ import org.apache.ratis.util.JvmPauseMonitor;
 import org.apache.ratis.util.TimeDuration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import javax.net.ssl.TrustManager;
-
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
-import static org.apache.ratis.util.Preconditions.assertTrue;
 
 /**
  * Ratis helper methods.
@@ -367,7 +364,7 @@ public final class RatisHelper {
         getDatanodeRatisPrefixProps(ozoneConf);
     ratisClientConf.forEach((key, val) -> {
       if (isClientConfig(key) || isGrpcClientConfig(key)
-              || isNettyStreamConfig(key)) {
+              || isNettyStreamConfig(key) || isDataStreamConfig(key)) {
         raftProperties.set(key, val);
       }
     });
@@ -375,6 +372,10 @@ public final class RatisHelper {
 
   private static boolean isClientConfig(String key) {
     return key.startsWith(RaftClientConfigKeys.PREFIX);
+  }
+
+  private static boolean isDataStreamConfig(String key) {
+    return key.startsWith(RaftConfigKeys.DataStream.PREFIX);
   }
 
   private static boolean isGrpcClientConfig(String key) {
@@ -411,11 +412,9 @@ public final class RatisHelper {
     });
   }
 
-
   private static Map<String, String> getDatanodeRatisPrefixProps(
       ConfigurationSource configuration) {
-    return configuration.getPropsMatchPrefixAndTrimPrefix(
-        StringUtils.appendIfNotPresent(HDDS_DATANODE_RATIS_PREFIX_KEY, '.'));
+    return configuration.getPropsMatchPrefixAndTrimPrefix(HDDS_DATANODE_RATIS_PREFIX_KEY + '.');
   }
 
   // For External gRPC client to server with gRPC TLS.
@@ -450,8 +449,8 @@ public final class RatisHelper {
 
   private static boolean datanodeUseHostName() {
     return CONF.getBoolean(
-            DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME,
-            DFSConfigKeys.DFS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
+            HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME,
+            HddsConfigKeys.HDDS_DATANODE_USE_DN_HOSTNAME_DEFAULT);
   }
 
   private static <U> Class<? extends U> getClass(String name,
@@ -529,7 +528,6 @@ public final class RatisHelper {
     return RaftPeer.newBuilder(peer).setPriority(priority).build();
   }
 
-
   /**
    * Use raft client to send admin request, transfer the leadership.
    * 1. Set priority and send setConfiguration request
@@ -545,6 +543,12 @@ public final class RatisHelper {
       throw new IOException("Target " + targetPeerId + " not found in group "
           + group.getPeers().stream().map(RaftPeer::getId)
               .collect(Collectors.toList()) + ".");
+    }
+    if (!group.getPeer(targetPeerId).getStartupRole().equals(RaftProtos.RaftPeerRole.FOLLOWER)) {
+      throw new IOException("Target " + targetPeerId + " not in FOLLOWER role. "
+          + group.getPeers().stream()
+          .map(p -> p.getId() + ":" + p.getStartupRole())
+          .collect(Collectors.toList()) + ".");
     }
 
     LOG.info("Start transferring leadership to {}", targetPeerId);
@@ -568,13 +572,19 @@ public final class RatisHelper {
       RaftClientReply setConf = null;
       try {
         // Set priority
-        final List<RaftPeer> peersWithNewPriorities = group.getPeers().stream()
+        final List<RaftPeer> followerWithNewPriorities = group.getPeers().stream()
+            .filter(peer -> peer.getStartupRole().equals(RaftProtos.RaftPeerRole.FOLLOWER))
+            .map(peer -> newRaftPeer(peer, targetPeerId))
+            .collect(Collectors.toList());
+        final List<RaftPeer> listenerWithNewPriorities = group.getPeers().stream()
+            .filter(peer -> peer.getStartupRole().equals(RaftProtos.RaftPeerRole.LISTENER))
             .map(peer -> newRaftPeer(peer, targetPeerId))
             .collect(Collectors.toList());
         // Set new configuration
-        setConf = client.admin().setConfiguration(peersWithNewPriorities);
+        setConf = client.admin().setConfiguration(followerWithNewPriorities, listenerWithNewPriorities);
         if (setConf.isSuccess()) {
-          LOG.info("Successfully set priority: {}", peersWithNewPriorities);
+          LOG.info("Successfully set priority: Follower: {}, Listener: {}", followerWithNewPriorities,
+              listenerWithNewPriorities);
         } else {
           throw new IOException("Failed to set priority.",
               setConf.getException());
@@ -600,13 +610,19 @@ public final class RatisHelper {
   }
 
   private static void resetPriorities(RaftGroup original, RaftClient client) {
-    final List<RaftPeer> resetPeers = original.getPeers().stream()
+    final List<RaftPeer> resetFollower = original.getPeers().stream()
+        .filter(peer -> peer.getStartupRole().equals(RaftProtos.RaftPeerRole.FOLLOWER))
         .map(originalPeer -> RaftPeer.newBuilder(originalPeer)
             .setPriority(NEUTRAL_PRIORITY).build())
         .collect(Collectors.toList());
-    LOG.info("Resetting Raft peers priorities to {}", resetPeers);
+    final List<RaftPeer> resetListener = original.getPeers().stream()
+        .filter(peer -> peer.getStartupRole().equals(RaftProtos.RaftPeerRole.LISTENER))
+        .map(originalPeer -> RaftPeer.newBuilder(originalPeer)
+            .setPriority(NEUTRAL_PRIORITY).build())
+        .collect(Collectors.toList());
+    LOG.info("Resetting Raft peers priorities to Follower: {}, Listener: {}", resetFollower, resetListener);
     try {
-      RaftClientReply reply = client.admin().setConfiguration(resetPeers);
+      RaftClientReply reply = client.admin().setConfiguration(resetFollower, resetListener);
       if (reply.isSuccess()) {
         LOG.info("Successfully reset priorities: {}", original);
       } else {
@@ -643,6 +659,17 @@ public final class RatisHelper {
     final long interval = pollInterval.toMillis();
     assertTrue(max >= interval, () -> "max: " + maxDuration + " < interval:" + pollInterval);
     return (int) (max / interval);
+  }
+
+  public static void setFirstElectionTimeoutDuration(
+      ConfigurationSource conf, RaftProperties properties, String configKey) {
+    long firstElectionTimeout = conf.getTimeDuration(configKey, -1, TimeUnit.MILLISECONDS);
+    if (firstElectionTimeout > 0) {
+      RaftServerConfigKeys.Rpc.setFirstElectionTimeoutMin(
+          properties,  TimeDuration.valueOf(firstElectionTimeout, TimeUnit.MILLISECONDS));
+      RaftServerConfigKeys.Rpc.setFirstElectionTimeoutMax(
+          properties,  TimeDuration.valueOf(firstElectionTimeout + 200, TimeUnit.MILLISECONDS));
+    }
   }
 
 }

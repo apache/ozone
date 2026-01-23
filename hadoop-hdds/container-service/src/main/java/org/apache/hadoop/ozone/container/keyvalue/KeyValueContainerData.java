@@ -1,64 +1,67 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- *  with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
  *      http://www.apache.org/licenses/LICENSE-2.0
  *
- *  Unless required by applicable law or agreed to in writing, software
- *  distributed under the License is distributed on an "AS IS" BASIS,
- *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *  See the License for the specific language governing permissions and
- *  limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.container.keyvalue;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
-
-import java.io.IOException;
-import java.util.Collections;
-
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
-    .ContainerDataProto;
-import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
-import org.apache.hadoop.hdds.utils.db.BatchOperation;
-import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
-import org.apache.hadoop.ozone.container.common.impl.ContainerData;
-import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
-import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
-import org.yaml.snakeyaml.nodes.Tag;
-
-
-import java.io.File;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicLong;
-
 import static java.lang.Math.max;
+import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Result.INVALID_CONTAINER_STATE;
 import static org.apache.hadoop.ozone.OzoneConsts.BLOCK_COMMIT_SEQUENCE_ID;
-import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_ROCKSDB;
+import static org.apache.hadoop.ozone.OzoneConsts.BLOCK_COUNT;
 import static org.apache.hadoop.ozone.OzoneConsts.CHUNKS_PATH;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_BYTES_USED;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DATA_CHECKSUM;
 import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE;
+import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_DB_TYPE_ROCKSDB;
 import static org.apache.hadoop.ozone.OzoneConsts.DELETE_TRANSACTION_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.DELETING_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.METADATA_PATH;
+import static org.apache.hadoop.ozone.OzoneConsts.PENDING_DELETE_BLOCK_BYTES;
+import static org.apache.hadoop.ozone.OzoneConsts.PENDING_DELETE_BLOCK_COUNT;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V1;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_V3;
 import static org.apache.hadoop.ozone.OzoneConsts.SCHEMA_VERSION;
-import static org.apache.hadoop.ozone.OzoneConsts.CONTAINER_BYTES_USED;
-import static org.apache.hadoop.ozone.OzoneConsts.BLOCK_COUNT;
-import static org.apache.hadoop.ozone.OzoneConsts.PENDING_DELETE_BLOCK_COUNT;
 import static org.apache.hadoop.ozone.container.metadata.DatanodeSchemaThreeDBDefinition.getContainerKeyPrefix;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import java.io.File;
+import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
+import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
+import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
+import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
+import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
+import org.yaml.snakeyaml.nodes.Tag;
 
 /**
  * This class represents the KeyValueContainer metadata, which is the
@@ -83,14 +86,11 @@ public class KeyValueContainerData extends ContainerData {
 
   private String schemaVersion;
 
-  /**
-   * Number of pending deletion blocks in KeyValueContainer.
-   */
-  private final AtomicLong numPendingDeletionBlocks;
-
   private long deleteTransactionId;
 
   private long blockCommitSequenceId;
+
+  private final Set<Long> finalizedBlockSet;
 
   static {
     // Initialize YAML fields
@@ -112,17 +112,17 @@ public class KeyValueContainerData extends ContainerData {
       long size, String originPipelineId, String originNodeId) {
     super(ContainerProtos.ContainerType.KeyValueContainer, id, layoutVersion,
         size, originPipelineId, originNodeId);
-    this.numPendingDeletionBlocks = new AtomicLong(0);
     this.deleteTransactionId = 0;
+    finalizedBlockSet =  ConcurrentHashMap.newKeySet();
   }
 
   public KeyValueContainerData(KeyValueContainerData source) {
     super(source);
     Preconditions.checkArgument(source.getContainerType()
         == ContainerProtos.ContainerType.KeyValueContainer);
-    this.numPendingDeletionBlocks = new AtomicLong(0);
     this.deleteTransactionId = 0;
     this.schemaVersion = source.getSchemaVersion();
+    finalizedBlockSet = ConcurrentHashMap.newKeySet();
   }
 
   /**
@@ -181,6 +181,7 @@ public class KeyValueContainerData extends ContainerData {
    * Returns container metadata path.
    * @return - Physical path where container file and checksum is stored.
    */
+  @Override
   public String getMetadataPath() {
     return metadataPath;
   }
@@ -239,24 +240,22 @@ public class KeyValueContainerData extends ContainerData {
    *
    * @param numBlocks increment number
    */
-  public void incrPendingDeletionBlocks(long numBlocks) {
-    this.numPendingDeletionBlocks.addAndGet(numBlocks);
-  }
-
-  /**
-   * Decrease the count of pending deletion blocks.
-   *
-   * @param numBlocks decrement number
-   */
-  public void decrPendingDeletionBlocks(long numBlocks) {
-    this.numPendingDeletionBlocks.addAndGet(-1 * numBlocks);
+  public void incrPendingDeletionBlocks(long numBlocks, long bytes) {
+    getStatistics().addBlockPendingDeletion(numBlocks, bytes);
   }
 
   /**
    * Get the number of pending deletion blocks.
    */
   public long getNumPendingDeletionBlocks() {
-    return this.numPendingDeletionBlocks.get();
+    return getStatistics().getBlockPendingDeletion();
+  }
+
+  /**
+   * Get the total bytes used by pending deletion blocks.
+   */
+  public long getBlockPendingDeletionBytes() {
+    return getStatistics().getBlockPendingDeletionBytes();
   }
 
   /**
@@ -275,6 +274,68 @@ public class KeyValueContainerData extends ContainerData {
     return deleteTransactionId;
   }
 
+  ContainerReplicaProto buildContainerReplicaProto() throws StorageContainerException {
+    return getStatistics().setContainerReplicaProto(ContainerReplicaProto.newBuilder())
+        .setContainerID(getContainerID())
+        .setState(getContainerReplicaProtoState(getState()))
+        .setIsEmpty(isEmpty())
+        .setOriginNodeId(getOriginNodeId())
+        .setReplicaIndex(getReplicaIndex())
+        .setBlockCommitSequenceId(getBlockCommitSequenceId())
+        .setDeleteTransactionId(getDeleteTransactionId())
+        .setDataChecksum(getDataChecksum())
+        .build();
+  }
+
+  // TODO remove one of the State from proto
+  static ContainerReplicaProto.State getContainerReplicaProtoState(ContainerDataProto.State state)
+      throws StorageContainerException {
+    switch (state) {
+    case OPEN:
+      return ContainerReplicaProto.State.OPEN;
+    case CLOSING:
+      return ContainerReplicaProto.State.CLOSING;
+    case QUASI_CLOSED:
+      return ContainerReplicaProto.State.QUASI_CLOSED;
+    case CLOSED:
+      return ContainerReplicaProto.State.CLOSED;
+    case UNHEALTHY:
+      return ContainerReplicaProto.State.UNHEALTHY;
+    case DELETED:
+      return ContainerReplicaProto.State.DELETED;
+    default:
+      throw new StorageContainerException("Invalid container state: " + state, INVALID_CONTAINER_STATE);
+    }
+  }
+
+  /**
+   * Add the given localID of a block to the finalizedBlockSet.
+   */
+  public void addToFinalizedBlockSet(long localID) {
+    finalizedBlockSet.add(localID);
+  }
+
+  public Set<Long> getFinalizedBlockSet() {
+    return finalizedBlockSet;
+  }
+
+  public boolean isFinalizedBlockExist(long localID) {
+    return finalizedBlockSet.contains(localID);
+  }
+
+  public void clearFinalizedBlock(DBHandle db) throws IOException {
+    if (!finalizedBlockSet.isEmpty()) {
+      // delete from db and clear memory
+      // Should never fail.
+      Objects.requireNonNull(db, "db == null");
+      try (BatchOperation batch = db.getStore().getBatchHandler().initBatchOperation()) {
+        db.getStore().getFinalizeBlocksTable().deleteBatchWithPrefix(batch, containerPrefix());
+        db.getStore().getBatchHandler().commitBatchOperation(batch);
+      }
+      finalizedBlockSet.clear();
+    }
+  }
+
   /**
    * Returns a ProtoBuf Message from ContainerData.
    *
@@ -287,7 +348,6 @@ public class KeyValueContainerData extends ContainerData {
     builder.setContainerID(this.getContainerID());
     builder.setContainerPath(this.getContainerPath());
     builder.setState(this.getState());
-    builder.setBlockCount(this.getBlockCount());
 
     for (Map.Entry<String, String> entry : getMetadata().entrySet()) {
       ContainerProtos.KeyValue.Builder keyValBuilder =
@@ -296,9 +356,7 @@ public class KeyValueContainerData extends ContainerData {
           .setValue(entry.getValue()).build());
     }
 
-    if (this.getBytesUsed() >= 0) {
-      builder.setBytesUsed(this.getBytesUsed());
-    }
+    getStatistics().setContainerDataProto(builder);
 
     if (this.getContainerType() != null) {
       builder.setContainerType(ContainerProtos.ContainerType.KeyValueContainer);
@@ -325,23 +383,28 @@ public class KeyValueContainerData extends ContainerData {
     Table<String, Long> metadataTable = db.getStore().getMetadataTable();
 
     // Set Bytes used and block count key.
-    metadataTable.putWithBatch(batchOperation, getBytesUsedKey(),
-            getBytesUsed() - releasedBytes);
-    metadataTable.putWithBatch(batchOperation, getBlockCountKey(),
-            getBlockCount() - deletedBlockCount);
-    metadataTable.putWithBatch(batchOperation,
-        getPendingDeleteBlockCountKey(),
-        getNumPendingDeletionBlocks() - deletedBlockCount);
+    final BlockByteAndCounts b = getStatistics().getBlockByteAndCounts();
+    metadataTable.putWithBatch(batchOperation, getBytesUsedKey(), b.getBytes() - releasedBytes);
+    metadataTable.putWithBatch(batchOperation, getBlockCountKey(), b.getCount() - deletedBlockCount);
+    metadataTable.putWithBatch(batchOperation, getPendingDeleteBlockCountKey(),
+        b.getPendingDeletion() - deletedBlockCount);
+    if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION)) {
+      metadataTable.putWithBatch(batchOperation, getPendingDeleteBlockBytesKey(),
+          b.getPendingDeletionBytes() - releasedBytes);
+    }
 
     db.getStore().getBatchHandler().commitBatchOperation(batchOperation);
   }
 
   public void resetPendingDeleteBlockCount(DBHandle db) throws IOException {
     // Reset the in memory metadata.
-    numPendingDeletionBlocks.set(0);
+    getStatistics().resetBlockPendingDeletion();
     // Reset the metadata on disk.
     Table<String, Long> metadataTable = db.getStore().getMetadataTable();
     metadataTable.put(getPendingDeleteBlockCountKey(), 0L);
+    if (VersionedDatanodeFeatures.isFinalized(HDDSLayoutFeature.STORAGE_SPACE_DISTRIBUTION)) {
+      metadataTable.put(getPendingDeleteBlockBytesKey(), 0L);
+    }
   }
 
   // NOTE: Below are some helper functions to format keys according
@@ -380,23 +443,30 @@ public class KeyValueContainerData extends ContainerData {
     return formatKey(PENDING_DELETE_BLOCK_COUNT);
   }
 
+  public String getContainerDataChecksumKey() {
+    return formatKey(CONTAINER_DATA_CHECKSUM);
+  }
+  
+  public String getPendingDeleteBlockBytesKey() {
+    return formatKey(PENDING_DELETE_BLOCK_BYTES);
+  }
+
   public String getDeletingBlockKeyPrefix() {
     return formatKey(DELETING_KEY_PREFIX);
   }
 
   public KeyPrefixFilter getUnprefixedKeyFilter() {
     String schemaPrefix = containerPrefix();
-    return new KeyPrefixFilter().addFilter(schemaPrefix + "#", true);
+    return KeyPrefixFilter.newFilter(schemaPrefix + "#", true);
   }
 
   public KeyPrefixFilter getDeletingBlockKeyFilter() {
-    return new KeyPrefixFilter().addFilter(getDeletingBlockKeyPrefix());
+    return KeyPrefixFilter.newFilter(getDeletingBlockKeyPrefix());
   }
 
   /**
    * Schema v3 use a prefix as startKey,
    * for other schemas just return null.
-   * @return
    */
   public String startKeyEmpty() {
     if (hasSchema(SCHEMA_V3)) {
@@ -408,7 +478,6 @@ public class KeyValueContainerData extends ContainerData {
   /**
    * Schema v3 use containerID as key prefix,
    * for other schemas just return null.
-   * @return
    */
   public String containerPrefix() {
     if (hasSchema(SCHEMA_V3)) {

@@ -1,13 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,16 +18,14 @@
 package org.apache.ozone.compaction.log;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CompactionLogEntryProto;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
-import org.apache.hadoop.util.Preconditions;
-
-import java.util.List;
-import java.util.Objects;
-import java.util.stream.Collectors;
 
 /**
  * Compaction log entry Dao to write to the compaction log file.
@@ -38,11 +35,8 @@ public final class CompactionLogEntry implements
   private static final Codec<CompactionLogEntry> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(CompactionLogEntryProto.getDefaultInstance()),
       CompactionLogEntry::getFromProtobuf,
-      CompactionLogEntry::getProtobuf);
-
-  public static Codec<CompactionLogEntry> getCodec() {
-    return CODEC;
-  }
+      CompactionLogEntry::getProtobuf,
+      CompactionLogEntry.class);
 
   private final long dbSequenceNumber;
   private final long compactionTime;
@@ -61,6 +55,10 @@ public final class CompactionLogEntry implements
     this.inputFileInfoList = inputFileInfoList;
     this.outputFileInfoList = outputFileInfoList;
     this.compactionReason = compactionReason;
+  }
+
+  public static Codec<CompactionLogEntry> getCodec() {
+    return CODEC;
   }
 
   public List<CompactionFileInfo> getInputFileInfoList() {
@@ -130,31 +128,42 @@ public final class CompactionLogEntry implements
         inputFileInfoList, outputFileInfoList, compactionReason);
   }
 
+  public Builder toBuilder() {
+    Builder builder = new Builder(this.getDbSequenceNumber(), this.getCompactionTime(),
+        this.getInputFileInfoList(), this.getOutputFileInfoList());
+    String reason = this.getCompactionReason();
+    if (this.getCompactionReason() != null) {
+      builder.setCompactionReason(reason);
+    }
+    return builder;
+  }
+
   /**
    * Builder of CompactionLogEntry.
    */
   public static class Builder {
     private final long dbSequenceNumber;
     private final long compactionTime;
-    private final List<CompactionFileInfo> inputFileInfoList;
+    private List<CompactionFileInfo> inputFileInfoList;
     private final List<CompactionFileInfo> outputFileInfoList;
     private String compactionReason;
 
     public Builder(long dbSequenceNumber, long compactionTime,
                    List<CompactionFileInfo> inputFileInfoList,
                    List<CompactionFileInfo> outputFileInfoList) {
-      Preconditions.checkNotNull(inputFileInfoList,
-          "inputFileInfoList is required parameter.");
-      Preconditions.checkNotNull(outputFileInfoList,
-          "outputFileInfoList is required parameter.");
       this.dbSequenceNumber = dbSequenceNumber;
       this.compactionTime = compactionTime;
-      this.inputFileInfoList = inputFileInfoList;
-      this.outputFileInfoList = outputFileInfoList;
+      this.inputFileInfoList = Objects.requireNonNull(inputFileInfoList, "inputFileInfoList == null");
+      this.outputFileInfoList = Objects.requireNonNull(outputFileInfoList, "outputFileInfoList == null");
     }
 
     public Builder setCompactionReason(String compactionReason) {
       this.compactionReason = compactionReason;
+      return this;
+    }
+
+    public Builder updateInputFileInfoList(List<CompactionFileInfo> fileInfoList) {
+      this.inputFileInfoList = fileInfoList;
       return this;
     }
 

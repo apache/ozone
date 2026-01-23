@@ -1,27 +1,38 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.ozone.container.common.statemachine.commandhandler;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
+import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.HDDS_DATANODE_VOLUME_MIN_FREE_SPACE;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.HashMap;
+import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.fs.DUOptimized;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
@@ -32,23 +43,11 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
-
-import java.util.HashMap;
-import java.util.concurrent.TimeoutException;
-
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_RATIS_VOLUME_FREE_SPACE_MIN;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Test the behaviour of the datanode and scm when communicating
  * with refresh volume usage command.
  */
-@Timeout(300)
 public class TestRefreshVolumeUsageHandler {
 
   private MiniOzoneCluster cluster;
@@ -59,6 +58,7 @@ public class TestRefreshVolumeUsageHandler {
     //setup a cluster (1G free space is enough for a unit test)
     conf = new OzoneConfiguration();
     conf.set(OZONE_SCM_CONTAINER_SIZE, "1GB");
+    conf.set(HDDS_DATANODE_VOLUME_MIN_FREE_SPACE, "5GB");
     conf.set(HDDS_NODE_REPORT_INTERVAL, "1s");
     conf.set("hdds.datanode.du.factory.classname",
         "org.apache.hadoop.ozone.container.common.volume.HddsVolumeFactory");
@@ -87,6 +87,7 @@ public class TestRefreshVolumeUsageHandler {
         .getScmNodeManager().getUsageInfo(datanodeDetails)
         .getScmNodeStat().getScmUsed().get();
 
+    GenericTestUtils.LogCapturer logCapture = GenericTestUtils.LogCapturer.captureLogs(DUOptimized.class);
     //creating a key to take some storage space
     try (OzoneClient client = OzoneClientFactory.getRpcClient(conf)) {
       ObjectStore objectStore = client.getObjectStore();
@@ -127,6 +128,11 @@ public class TestRefreshVolumeUsageHandler {
       //waiting for the new usage info is refreshed
       GenericTestUtils.waitFor(() -> isUsageInfoRefreshed(cluster,
           datanodeDetails, currentScmUsed), 500, 5 * 1000);
+
+      // force refresh and verify used space in optimized flow
+      cluster.getHddsDatanodes().get(0).getDatanodeStateMachine().getContainer().getVolumeSet().getVolumesList().get(0)
+          .getVolumeUsage().refreshNow();
+      GenericTestUtils.waitFor(() -> logCapture.getOutput().contains("container data usages 4"), 500, 10 * 1000);
     }
   }
 

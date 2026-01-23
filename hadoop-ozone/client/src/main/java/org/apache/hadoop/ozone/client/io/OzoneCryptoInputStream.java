@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,9 +17,8 @@
 
 package org.apache.hadoop.ozone.client.io;
 
-import java.io.IOException;
-
 import com.google.common.base.Preconditions;
+import java.io.IOException;
 import org.apache.hadoop.crypto.CryptoCodec;
 import org.apache.hadoop.crypto.CryptoInputStream;
 import org.apache.hadoop.crypto.CryptoStreamUtils;
@@ -114,7 +112,7 @@ public class OzoneCryptoInputStream extends CryptoInputStream
       LOG.debug("OzoneCryptoInputStream for key: {} part: {} read {} bytes " +
               "instead of {} bytes to account for Crypto buffer boundary. " +
               "Client buffer will be copied with read data from position {}" +
-              "upto position {}, discarding the extra bytes read to " +
+              "up to position {}, discarding the extra bytes read to " +
               "maintain Crypto buffer boundary limits", keyName, partIndex,
           actualNumBytesRead, numBytesRead, readPositionAdjustedBy,
           actualNumBytesRead - readPositionAdjustedBy);

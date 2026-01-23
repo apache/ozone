@@ -14,31 +14,68 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-set -e -o pipefail
+
+set -e -u -o pipefail
 
 _testlib_this="${BASH_SOURCE[0]}"
 _testlib_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
+: "${COMPOSE_DIR:=$_testlib_dir}"
 COMPOSE_ENV_NAME=$(basename "$COMPOSE_DIR")
 RESULT_DIR=${RESULT_DIR:-"$COMPOSE_DIR/result"}
-RESULT_DIR_INSIDE="/tmp/smoketest/$(basename "$COMPOSE_ENV_NAME")/result"
-
-OM_HA_PARAM=""
-if [[ -n "${OM_SERVICE_ID}" ]] && [[ "${OM_SERVICE_ID}" != "om" ]]; then
-  OM_HA_PARAM="--om-service-id=${OM_SERVICE_ID}"
-fi
 
 source ${_testlib_dir}/compose_v2_compatibility.sh
+source "${_testlib_dir}/../smoketest/testlib.sh"
 
+: ${OZONE_COMPOSE_RUNNING:=false}
+: "${OZONE_VOLUME_OWNER:=}"
+: ${SECURITY_ENABLED:=false}
 : ${SCM:=scm}
+: ${SKIP_APACHE_VERIFY_DOWNLOAD:=${CI:-false}}
+
+# Check if running from output of Maven build or from source
+_is_build() {
+  local file=""
+  # Variable is replaced by Maven at build time,
+  # so if it empty, we are running from source, if non-empty, then running in build output (target)
+  [[ -n "${file}" ]]
+}
+
+# Avoid `bad substitution` error
+if _is_build; then
+  # version is used in bucket name, which does not allow uppercase
+  # variable is replaced by Maven at build time
+  OZONE_CURRENT_VERSION="$(echo "${ozone.version}" | sed -e 's/-SNAPSHOT//' | tr '[:upper:]' '[:lower:]')"
+else
+  OZONE_CURRENT_VERSION=src
+fi
+export OZONE_CURRENT_VERSION
+
+# create temp directory for test data; only once, even if testlib.sh is sourced again
+if [[ -z "${TEST_DATA_DIR:-}" ]] && [[ "${KEEP_RUNNING:-false}" == "false" ]]; then
+  export TEST_DATA_DIR="$(mktemp -d "${TMPDIR:-/tmp}"/robot-data-XXXXXX)"
+  chmod go+rx "${TEST_DATA_DIR}"
+  _compose_delete_test_data() {
+    rm -frv "${TEST_DATA_DIR}"
+  }
+
+  trap _compose_cleanup EXIT HUP INT TERM
+fi
+
+_compose_cleanup() {
+  if [[ "${OZONE_COMPOSE_RUNNING}" == "true" ]]; then
+    stop_docker_env || true
+  fi
+  if [[ "$(type -t _compose_delete_test_data || true)" == "function" ]]; then
+    _compose_delete_test_data
+  fi
+}
 
 ## @description create results directory, purging any prior data
 create_results_dir() {
   #delete previous results
   [[ "${OZONE_KEEP_RESULTS:-}" == "true" ]] || rm -rf "$RESULT_DIR"
   mkdir -p "$RESULT_DIR"
-  #Should be writeable from the docker containers where user is different.
-  chmod ogu+w "$RESULT_DIR"
 }
 
 ## @description find all the test*.sh scripts in the immediate child dirs
@@ -49,7 +86,7 @@ all_tests_in_immediate_child_dirs() {
 ## @description Find all test*.sh scripts in immediate child dirs,
 ## @description applying OZONE_ACCEPTANCE_SUITE or OZONE_TEST_SELECTOR filter.
 find_tests(){
-  if [[ -n "${OZONE_ACCEPTANCE_SUITE}" ]]; then
+  if [[ -n "${OZONE_ACCEPTANCE_SUITE:-}" ]]; then
     tests=$(all_tests_in_immediate_child_dirs | xargs grep -l "^#suite:${OZONE_ACCEPTANCE_SUITE}$" || echo "")
 
      # 'misc' is default suite, add untagged tests, too
@@ -64,7 +101,7 @@ find_tests(){
       echo "No tests found for suite ${OZONE_ACCEPTANCE_SUITE}"
       exit 1
     fi
-  elif [[ -n "${OZONE_TEST_SELECTOR}" ]]; then
+  elif [[ -n "${OZONE_TEST_SELECTOR:-}" ]]; then
     tests=$(all_tests_in_immediate_child_dirs | grep "${OZONE_TEST_SELECTOR}" || echo "")
 
     if [[ -z "${tests}" ]]; then
@@ -140,15 +177,15 @@ start_docker_env(){
   create_results_dir
   export OZONE_SAFEMODE_MIN_DATANODES="${datanode_count}"
 
-  docker-compose --ansi never down
-
-  trap stop_docker_env EXIT HUP INT TERM
+  docker-compose --ansi never down --remove-orphans
 
   opts=""
   if has_scalable_datanode; then
     opts="--scale datanode=${datanode_count}"
   fi
 
+  OZONE_COMPOSE_RUNNING=true
+  trap _compose_cleanup EXIT HUP INT TERM
   docker-compose --ansi never up -d $opts
 
   wait_for_safemode_exit
@@ -186,33 +223,39 @@ execute_robot_test(){
   local output_name=$(get_output_name)
 
   # find unique filename
-  declare -i i=0
-  OUTPUT_FILE="robot-${output_name}1.xml"
-  while [[ -f $RESULT_DIR/$OUTPUT_FILE ]]; do
-    let ++i
-    OUTPUT_FILE="robot-${output_name}${i}.xml"
+  for ((i=1; i<1000; i++)); do
+    OUTPUT_FILE="robot-${output_name}$(printf "%03d" ${i}).xml"
+    if [[ ! -f $RESULT_DIR/$OUTPUT_FILE ]]; then
+      break;
+    fi
   done
 
-  SMOKETEST_DIR_INSIDE="${OZONE_DIR:-/opt/hadoop}/smoketest"
+  : ${OZONE_DIR:=/opt/hadoop}
+  SMOKETEST_DIR_INSIDE="$OZONE_DIR/smoketest"
 
+  RESULT_DIR_INSIDE="/tmp/smoketest/$COMPOSE_ENV_NAME/result"
   OUTPUT_PATH="$RESULT_DIR_INSIDE/${OUTPUT_FILE}"
+
+  OM_HA_PARAM=""
+  if [[ -n "${OM_SERVICE_ID:-}" ]] && [[ "${OM_SERVICE_ID}" != "om" ]]; then
+    OM_HA_PARAM="--om-service-id=${OM_SERVICE_ID}"
+  fi
 
   set +e
 
   # shellcheck disable=SC2068
   docker-compose exec -T "$CONTAINER" mkdir -p "$RESULT_DIR_INSIDE" \
     && docker-compose exec -T "$CONTAINER" robot \
-      -v KEY_NAME:"${OZONE_BUCKET_KEY_NAME}" \
+      -v ENCRYPTION_KEY:"${OZONE_BUCKET_KEY_NAME:-}" \
       -v OM_HA_PARAM:"${OM_HA_PARAM}" \
       -v OM_SERVICE_ID:"${OM_SERVICE_ID:-om}" \
       -v OZONE_DIR:"${OZONE_DIR}" \
-      -v SECURITY_ENABLED:"${SECURITY_ENABLED}" \
       -v SCM:"${SCM}" \
-      ${ARGUMENTS[@]} --log NONE --report NONE "${OZONE_ROBOT_OPTS[@]}" --output "$OUTPUT_PATH" \
+      ${ARGUMENTS[@]} --log NONE --report NONE --output "$OUTPUT_PATH" \
       "$SMOKETEST_DIR_INSIDE/$TEST"
   local -i rc=$?
 
-  FULL_CONTAINER_NAME=$(docker-compose ps | grep "[-_]${CONTAINER}[-_]" | head -n 1 | awk '{print $1}')
+  FULL_CONTAINER_NAME=$(docker-compose ps -a | grep "[-_]${CONTAINER}[-_]" | head -n 1 | awk '{print $1}')
   docker cp "$FULL_CONTAINER_NAME:$OUTPUT_PATH" "$RESULT_DIR/"
 
   if [[ ${rc} -gt 0 ]] && [[ ${rc} -le 250 ]]; then
@@ -226,13 +269,16 @@ execute_robot_test(){
 
 ## @description Replace OM node order in config
 reorder_om_nodes() {
-  local c pid procname new_order
+  local c new_order
   local new_order="$1"
 
   if [[ -n "${new_order}" ]] && [[ "${new_order}" != "om1,om2,om3" ]]; then
-    for c in $(docker-compose ps | cut -f1 -d' ' | grep -e datanode -e recon -e s3g -e scm); do
-      docker exec "${c}" sed -i -e "s/om1,om2,om3/${new_order}/" /etc/hadoop/ozone-site.xml
-      echo "Replaced OM order with ${new_order} in ${c}"
+    for c in $(docker-compose ps | cut -f1 -d' ' | grep -v -e '^NAME$' -e '^om'); do
+      docker exec "${c}" bash -c \
+        "if [[ -f /etc/hadoop/ozone-site.xml ]]; then \
+          sed -i -e 's/om1,om2,om3/${new_order}/' /etc/hadoop/ozone-site.xml; \
+          echo 'Replaced OM order with ${new_order} in ${c}'; \
+        fi"
     done
   fi
 }
@@ -244,14 +290,14 @@ create_stack_dumps() {
     while read -r pid procname; do
       echo "jstack $pid > ${RESULT_DIR}/${c}_${procname}.stack"
       docker exec "${c}" bash -c "jstack $pid" > "${RESULT_DIR}/${c}_${procname}.stack"
-    done < <(docker exec "${c}" sh -c "jps | grep -v Jps" || true)
+    done < <(docker exec "${c}" bash -c "jps | grep -v Jps" || true)
   done
 }
 
 ## @description Copy any 'out' files for daemon processes to the result dir
 copy_daemon_logs() {
   local c f
-  for c in $(docker-compose ps | grep "^${COMPOSE_ENV_NAME}[_-]" | awk '{print $1}'); do
+  for c in $(docker-compose ps -a | grep "^${COMPOSE_ENV_NAME}[_-]" | awk '{print $1}'); do
     for f in $(docker exec "${c}" ls -1 /var/log/hadoop 2> /dev/null | grep -F -e '.out' -e audit); do
       docker cp "${c}:/var/log/hadoop/${f}" "$RESULT_DIR/"
     done
@@ -297,16 +343,17 @@ create_containers() {
 }
 
 get_output_name() {
-  if [[ -n "${OUTPUT_NAME}" ]]; then
+  if [[ -n "${OUTPUT_NAME:-}" ]]; then
     echo "${OUTPUT_NAME}-"
   fi
 }
 
 save_container_logs() {
   local output_name=$(get_output_name)
-  local c
-  for c in $(docker-compose ps "$@" | cut -f1 -d' ' | tail -n +3); do
-    docker logs "${c}" >> "$RESULT_DIR/docker-${output_name}${c}.log" 2>&1
+  local id
+  for i in $(docker-compose ps -a -q "$@"); do
+    local c=$(docker ps -a --filter "id=${i}" --format "{{ .Names }}")
+    docker logs "${i}" >> "$RESULT_DIR/docker-${output_name}${c}.log" 2>&1
   done
 }
 
@@ -368,7 +415,8 @@ stop_docker_env(){
     down_repeats=3
     for i in $(seq 1 $down_repeats)
     do
-      if docker-compose --ansi never down; then
+      if docker-compose --ansi never --profile "*" down --remove-orphans; then
+        OZONE_COMPOSE_RUNNING=false
         return
       fi
       if [[ ${i} -eq 1 ]]; then
@@ -395,16 +443,17 @@ generate_report(){
   local dir="${2:-${RESULT_DIR}}"
   local xunitdir="${3:-}"
 
-  if command -v rebot > /dev/null 2>&1; then
-     #Generate the combined output and return with the right exit code (note: robot = execute test, rebot = generate output)
-     if [ -z "${xunitdir}" ]; then
-       rebot --reporttitle "${title}" -N "${title}" -d "${dir}" "${dir}/*.xml"
-     else
-       rebot --reporttitle "${title}" -N "${title}" --xunit ${xunitdir}/TEST-ozone.xml -d "${dir}" "${dir}/*.xml"
-     fi
-  else
-     echo "Robot framework is not installed, the reports cannot be generated (sudo pip install robotframework)."
-     exit 1
+  if [[ -n "$(find "${dir}" -mindepth 1 -maxdepth 1 -name "*.xml")" ]]; then
+    xunit_args=""
+    if [[ -n "${xunitdir}" ]] && [[ -e "${xunitdir}" ]]; then
+      xunit_args="--xunit TEST-ozone.xml"
+    fi
+
+    run_rebot "$dir" "$dir" "--reporttitle '${title}' -N '${title}' ${xunit_args} *.xml"
+
+    if [[ -n "${xunit_args}" ]]; then
+      mv -v "${dir}"/TEST-ozone.xml "${xunitdir}"/ || rm -f "${dir}"/TEST-ozone.xml
+    fi
   fi
 }
 
@@ -428,8 +477,8 @@ copy_results() {
     target_dir="${target_dir}/${test_script_name}"
   fi
 
-  if command -v rebot > /dev/null 2>&1 && [[ -n "$(find "${result_dir}" -name "*.xml")" ]]; then
-    rebot --nostatusrc -N "${test_name}" -l NONE -r NONE -o "${all_result_dir}/${test_name}.xml" "${result_dir}"/*.xml \
+  if [[ -n "$(find "${result_dir}" -mindepth 1 -maxdepth 1 -name "*.xml")" ]]; then
+    run_rebot "${result_dir}" "${all_result_dir}" "-N '${test_name}' -l NONE -r NONE -o '${test_name}.xml' *.xml" \
       && rm -fv "${result_dir}"/*.xml "${result_dir}"/log.html "${result_dir}"/report.html
   fi
 
@@ -479,13 +528,27 @@ run_test_scripts() {
   return ${ret}
 }
 
+## @description Create the directory tree required for persisting data between
+##   compose cluster restarts
+create_data_dirs() {
+  if [[ -z "${OZONE_VOLUME}" ]]; then
+    return 1
+  fi
+
+  rm -fr "${OZONE_VOLUME}" 2> /dev/null || sudo rm -fr "${OZONE_VOLUME}"
+  for d in "$@"; do
+    mkdir -p "${OZONE_VOLUME}"/"${d}"
+  done
+  fix_data_dir_permissions
+}
+
 ## @description Make `OZONE_VOLUME_OWNER` the owner of the `OZONE_VOLUME`
 ##   directory tree (required in Github Actions runner environment)
 fix_data_dir_permissions() {
   if [[ -n "${OZONE_VOLUME}" ]] && [[ -n "${OZONE_VOLUME_OWNER}" ]]; then
     current_user=$(whoami)
     if [[ "${OZONE_VOLUME_OWNER}" != "${current_user}" ]]; then
-      chown -R "${OZONE_VOLUME_OWNER}" "${OZONE_VOLUME}" \
+      chown -R "${OZONE_VOLUME_OWNER}" "${OZONE_VOLUME}" 2> /dev/null \
         || sudo chown -R "${OZONE_VOLUME_OWNER}" "${OZONE_VOLUME}"
     fi
   fi
@@ -496,57 +559,21 @@ fix_data_dir_permissions() {
 ## @param `ozone` image version
 prepare_for_binary_image() {
   local v=$1
+  local default_image="${docker.ozone.image}" # set at build-time from Maven property
+  local default_flavor="${docker.ozone.image.flavor}" # set at build-time from Maven property
+  local image="${OZONE_IMAGE:-${default_image}}" # may be specified by user running the test
+  local flavor="${OZONE_IMAGE_FLAVOR:-${default_flavor}}" # may be specified by user running the test
 
   export OZONE_DIR=/opt/ozone
-  export OZONE_IMAGE="apache/ozone:${v}"
+  export OZONE_TEST_IMAGE="${image}:${v}${flavor}"
 }
 
 ## @description Define variables required for using `ozone-runner` docker image
 ##   (no binaries included)
 ## @param `ozone-runner` image version (optional)
 prepare_for_runner_image() {
-  local default_version=${docker.ozone-runner.version} # set at build-time from Maven property
-  local runner_version=${OZONE_RUNNER_VERSION:-${default_version}} # may be specified by user running the test
-  local runner_image=${OZONE_RUNNER_IMAGE:-apache/ozone-runner} # may be specified by user running the test
-  local v=${1:-${runner_version}} # prefer explicit argument
-
   export OZONE_DIR=/opt/hadoop
-  export OZONE_IMAGE="${runner_image}:${v}"
-}
-
-## @description Executing the Ozone Debug CLI related robot tests
-execute_debug_tests() {
-  local prefix=${RANDOM}
-
-  local volume="cli-debug-volume${prefix}"
-  local bucket="cli-debug-bucket"
-  local key="testfile"
-
-  execute_robot_test ${SCM} -v "PREFIX:${prefix}" debug/ozone-debug-tests.robot
-
-  # get block locations for key
-  local chunkinfo="${key}-blocks-${prefix}"
-  docker-compose exec -T ${SCM} bash -c "ozone debug chunkinfo ${volume}/${bucket}/${key}" > "$chunkinfo"
-  local host="$(jq -r '.KeyLocations[0][0]["Datanode-HostName"]' ${chunkinfo})"
-  local container="${host%%.*}"
-
-  # corrupt the first block of key on one of the datanodes
-  local datafile="$(jq -r '.KeyLocations[0][0].Locations.files[0]' ${chunkinfo})"
-  docker exec "${container}" sed -i -e '1s/^/a/' "${datafile}"
-
-  execute_robot_test ${SCM} -v "PREFIX:${prefix}" -v "CORRUPT_DATANODE:${host}" debug/ozone-debug-corrupt-block.robot
-
-  docker stop "${container}"
-
-  wait_for_datanode "${container}" STALE 60
-  execute_robot_test ${SCM} -v "PREFIX:${prefix}" -v "STALE_DATANODE:${host}" debug/ozone-debug-stale-datanode.robot
-
-  wait_for_datanode "${container}" DEAD 60
-  execute_robot_test ${SCM} -v "PREFIX:${prefix}" debug/ozone-debug-dead-datanode.robot
-
-  docker start "${container}"
-
-  wait_for_datanode "${container}" HEALTHY 60
+  export OZONE_TEST_IMAGE="$(get_runner_image_spec "$@")"
 }
 
 ## @description  Wait for datanode state
@@ -596,4 +623,31 @@ wait_for_root_certificate(){
   done
   echo "Timed out waiting on $count root certificates. Current timestamp " $(date +"%T")
   return 1
+}
+
+download_if_not_exists() {
+  local url="$1"
+  local f="$2"
+
+  if [[ -e "${f}" ]]; then
+    echo "${f} already downloaded"
+  else
+    echo "Downloading ${f} from ${url}"
+    curl --fail --location --output "${f}" --show-error --silent "${url}" || rm -fv "${f}"
+  fi
+}
+
+download_and_verify_apache_release() {
+  local remote_path="$1"
+
+  local f="$(basename "${remote_path}")"
+  local base_url="${APACHE_MIRROR_URL:-https://www.apache.org/dyn/closer.lua?action=download&filename=}"
+  local checksum_base_url="${APACHE_OFFICIAL_URL:-https://downloads.apache.org/}"
+  local download_dir="${DOWNLOAD_DIR:-/tmp}"
+
+  download_if_not_exists "${base_url}${remote_path}" "${download_dir}/${f}"
+  if [[ "${SKIP_APACHE_VERIFY_DOWNLOAD}" != "true" ]]; then
+    download_if_not_exists "${checksum_base_url}${remote_path}.asc"  "${download_dir}/${f}.asc"
+    gpg --verify "${download_dir}/${f}.asc" "${download_dir}/${f}" || exit 1
+  fi
 }

@@ -1,13 +1,12 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,25 +17,36 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
+import static org.apache.hadoop.hdds.scm.events.SCMEvents.HEALTHY_READONLY_NODE;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.Closeable;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
-
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
-import org.apache.hadoop.hdds.protocol.proto
-    .StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -55,20 +65,6 @@ import org.apache.hadoop.ozone.common.statemachine.StateMachine;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
-
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
-
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import static org.apache.hadoop.hdds.scm.events.SCMEvents.HEALTHY_READONLY_NODE;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,16 +84,8 @@ import org.slf4j.LoggerFactory;
  */
 public class NodeStateManager implements Runnable, Closeable {
 
-  /**
-   * Node's life cycle events.
-   */
-  private enum NodeLifeCycleEvent {
-    TIMEOUT, RESTORE, RESURRECT, LAYOUT_MISMATCH, LAYOUT_MATCH
-  }
-
   private static final Logger LOG = LoggerFactory
       .getLogger(NodeStateManager.class);
-
 
   /**
    * StateMachine for node lifecycle.
@@ -311,15 +299,18 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   public void addNode(DatanodeDetails datanodeDetails,
       LayoutVersionProto layoutInfo) throws NodeAlreadyExistsException {
-    NodeStatus newNodeStatus = newNodeStatus(datanodeDetails, layoutInfo);
-    nodeStateMap.addNode(datanodeDetails, newNodeStatus, layoutInfo);
-    UUID dnID = datanodeDetails.getUuid();
+    nodeStateMap.addNode(newDatanodeInfo(datanodeDetails, layoutInfo));
     try {
       updateLastKnownLayoutVersion(datanodeDetails, layoutInfo);
     } catch (NodeNotFoundException ex) {
-      LOG.error("Inconsistent NodeStateMap! Datanode with ID {} was " +
-          "added but not found in  map: {}", dnID, nodeStateMap);
+      throw new IllegalStateException("Inconsistent NodeStateMap! Datanode "
+          + datanodeDetails.getID() + " was added but not found in map: " + nodeStateMap);
     }
+  }
+
+  private DatanodeInfo newDatanodeInfo(DatanodeDetails datanode, LayoutVersionProto layout) {
+    final NodeStatus status = newNodeStatus(datanode, layout);
+    return new DatanodeInfo(datanode, status, layout);
   }
 
   /**
@@ -342,11 +333,9 @@ public class NodeStateManager implements Runnable, Closeable {
       LOG.info("Updating nodeOperationalState on registration as the " +
               "datanode has a persisted state of {} and expiry of {}",
           dnOpState, dn.getPersistedOpStateExpiryEpochSec());
-      return new NodeStatus(dnOpState, state,
-          dn.getPersistedOpStateExpiryEpochSec());
+      return NodeStatus.valueOf(dnOpState, state, dn.getPersistedOpStateExpiryEpochSec());
     } else {
-      return new NodeStatus(
-          NodeOperationalState.IN_SERVICE, state);
+      return NodeStatus.valueOf(NodeOperationalState.IN_SERVICE, state);
     }
   }
 
@@ -364,7 +353,7 @@ public class NodeStateManager implements Runnable, Closeable {
    * @return number of pipelines associated with it
    */
   public int getPipelinesCount(DatanodeDetails datanodeDetails) {
-    return node2PipelineMap.getPipelinesCount(datanodeDetails.getUuid());
+    return node2PipelineMap.getPipelinesCount(datanodeDetails.getID());
   }
 
   /**
@@ -378,12 +367,11 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   public DatanodeInfo getNode(DatanodeDetails datanodeDetails)
       throws NodeNotFoundException {
-    return getNode(datanodeDetails.getUuid());
+    return getNode(datanodeDetails.getID());
   }
 
-  public DatanodeInfo getNode(UUID uuid)
-      throws NodeNotFoundException {
-    return nodeStateMap.getNodeInfo(uuid);
+  public DatanodeInfo getNode(DatanodeID datanodeID) throws NodeNotFoundException {
+    return nodeStateMap.getNodeInfo(datanodeID);
   }
 
   /**
@@ -393,7 +381,7 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   public void updateLastHeartbeatTime(DatanodeDetails datanodeDetails)
       throws NodeNotFoundException {
-    nodeStateMap.getNodeInfo(datanodeDetails.getUuid())
+    nodeStateMap.getNodeInfo(datanodeDetails.getID())
         .updateLastHeartbeatTime();
   }
 
@@ -407,7 +395,7 @@ public class NodeStateManager implements Runnable, Closeable {
   public void updateLastKnownLayoutVersion(DatanodeDetails datanodeDetails,
                                       LayoutVersionProto layoutInfo)
       throws NodeNotFoundException {
-    nodeStateMap.getNodeInfo(datanodeDetails.getUuid())
+    nodeStateMap.getNodeInfo(datanodeDetails.getID())
         .updateLastKnownLayoutVersion(layoutInfo);
   }
 
@@ -421,15 +409,10 @@ public class NodeStateManager implements Runnable, Closeable {
   public void updateNode(DatanodeDetails datanodeDetails,
                          LayoutVersionProto layoutInfo)
           throws NodeNotFoundException {
-    DatanodeInfo datanodeInfo =
-            nodeStateMap.getNodeInfo(datanodeDetails.getUuid());
-    NodeStatus newNodeStatus = newNodeStatus(datanodeDetails, layoutInfo);
-    LOG.info("updating node {} from {} to {} with status {}",
-            datanodeDetails.getUuidString(),
-            datanodeInfo,
-            datanodeDetails,
-            newNodeStatus);
-    nodeStateMap.updateNode(datanodeDetails, newNodeStatus, layoutInfo);
+    final DatanodeInfo newInfo = newDatanodeInfo(datanodeDetails, layoutInfo);
+    final DatanodeInfo oldInfo = nodeStateMap.updateNode(newInfo);
+    LOG.info("Updated datanode {} {} to {} {}",
+        oldInfo, oldInfo.getNodeStatus(), newInfo, newInfo.getNodeStatus());
     updateLastKnownLayoutVersion(datanodeDetails, layoutInfo);
   }
 
@@ -444,7 +427,7 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   public NodeStatus getNodeStatus(DatanodeDetails datanodeDetails)
       throws NodeNotFoundException {
-    return nodeStateMap.getNodeStatus(datanodeDetails.getUuid());
+    return nodeStateMap.getNodeStatus(datanodeDetails.getID());
   }
 
   /**
@@ -478,14 +461,40 @@ public class NodeStateManager implements Runnable, Closeable {
   }
 
   /**
-   * Returns all the nodes with the specified status.
-   *
-   * @param status NodeStatus
-   *
-   * @return list of nodes
+   * Returns all nodes that are in the decommissioning state.
+   * @return list of decommissioning nodes
    */
-  public List<DatanodeInfo> getNodes(NodeStatus status) {
-    return nodeStateMap.getDatanodeInfos(status);
+  public List<DatanodeInfo> getDecommissioningNodes() {
+    return getNodes(NodeOperationalState.DECOMMISSIONING, null);
+  }
+
+  /**
+   * Returns the count of decommissioning nodes.
+   * @return decommissioning node count
+   */
+  public int getDecommissioningNodeCount() {
+    return getDecommissioningNodes().size();
+  }
+
+  /**
+   * Returns all nodes that are in the entering maintenance state.
+   * @return list of entering maintenance nodes
+   */
+  public List<DatanodeInfo> getEnteringMaintenanceNodes() {
+    return getNodes(NodeOperationalState.ENTERING_MAINTENANCE, null);
+  }
+
+  /**
+   * Returns the count of entering maintenance nodes.
+   * @return entering maintenance node count
+   */
+  public int getEnteringMaintenanceNodeCount() {
+    return getEnteringMaintenanceNodes().size();
+  }
+
+  /** @return a list of datanodes for the matching nodes matching the given status. */
+  public List<DatanodeDetails> getNodes(NodeStatus status) {
+    return nodeStateMap.getDatanodeDetails(status);
   }
 
   /**
@@ -502,12 +511,35 @@ public class NodeStateManager implements Runnable, Closeable {
   }
 
   /**
+   * Returns all nodes that contain failed volumes.
+   * @return list of nodes containing failed volumes
+   */
+  public List<DatanodeInfo> getVolumeFailuresNodes() {
+    List<DatanodeInfo> allNodes = nodeStateMap.getAllDatanodeInfos();
+    List<DatanodeInfo> failedVolumeNodes = allNodes.stream().
+        filter(dn -> dn.getFailedVolumeCount() > 0).collect(Collectors.toList());
+    return failedVolumeNodes;
+  }
+
+  /**
+   * Returns the count of nodes containing the failed volume.
+   * @return failed volume node count
+   */
+  public int getVolumeFailuresNodeCount() {
+    return getVolumeFailuresNodes().size();
+  }
+
+  /**
    * Returns all the nodes which have registered to NodeStateManager.
    *
    * @return all the managed nodes
    */
   public List<DatanodeInfo> getAllNodes() {
     return nodeStateMap.getAllDatanodeInfos();
+  }
+
+  int getAllNodeCount() {
+    return nodeStateMap.getNodeCount();
   }
 
   /**
@@ -535,12 +567,12 @@ public class NodeStateManager implements Runnable, Closeable {
   public void setNodeOperationalState(DatanodeDetails dn,
       NodeOperationalState newState,
       long stateExpiryEpochSec)  throws NodeNotFoundException {
-    DatanodeInfo dni = nodeStateMap.getNodeInfo(dn.getUuid());
+    final DatanodeID id = dn.getID();
+    final DatanodeInfo dni = nodeStateMap.getNodeInfo(id);
     NodeStatus oldStatus = dni.getNodeStatus();
     if (oldStatus.getOperationalState() != newState ||
         oldStatus.getOpStateExpiryEpochSeconds() != stateExpiryEpochSec) {
-      nodeStateMap.updateNodeOperationalState(
-          dn.getUuid(), newState, stateExpiryEpochSec);
+      nodeStateMap.updateNodeOperationalState(id, newState, stateExpiryEpochSec);
       // This will trigger an event based on the nodes health when the
       // operational state changes. Eg a node that was IN_MAINTENANCE goes
       // to IN_SERVICE + HEALTHY. This will trigger the HEALTHY node event to
@@ -560,7 +592,7 @@ public class NodeStateManager implements Runnable, Closeable {
    * @param dnId - Datanode ID
    * @return Set of PipelineID
    */
-  public Set<PipelineID> getPipelineByDnID(UUID dnId) {
+  public Set<PipelineID> getPipelineByDnID(DatanodeID dnId) {
     return node2PipelineMap.getPipelines(dnId);
   }
 
@@ -633,58 +665,50 @@ public class NodeStateManager implements Runnable, Closeable {
 
   /**
    * Adds the given container to the specified datanode.
-   *
-   * @param uuid - datanode uuid
-   * @param containerId - containerID
    * @throws NodeNotFoundException - if datanode is not known. For new datanode
    *                        use addDatanodeInContainerMap call.
    */
-  public void addContainer(final UUID uuid,
+  public void addContainer(final DatanodeID datanodeID,
                            final ContainerID containerId)
       throws NodeNotFoundException {
-    nodeStateMap.addContainer(uuid, containerId);
+    nodeStateMap.addContainer(datanodeID, containerId);
   }
 
   /**
    * Removes the given container from the specified datanode.
-   *
-   * @param uuid - datanode uuid
-   * @param containerId - containerID
    * @throws NodeNotFoundException - if datanode is not known. For new datanode
    *                        use addDatanodeInContainerMap call.
    */
-  public void removeContainer(final UUID uuid,
+  public void removeContainer(final DatanodeID datanodeID,
                            final ContainerID containerId)
       throws NodeNotFoundException {
-    nodeStateMap.removeContainer(uuid, containerId);
+    nodeStateMap.removeContainer(datanodeID, containerId);
   }
 
   /**
-   * Update set of containers available on a datanode.
-   * @param uuid - DatanodeID
-   * @param containerIds - Set of containerIDs
+   * Set the containers for the given datanode.
+   * This method is only used for testing.
    * @throws NodeNotFoundException - if datanode is not known.
    */
-  public void setContainers(UUID uuid, Set<ContainerID> containerIds)
+  void setContainersForTesting(DatanodeID datanodeID, Set<ContainerID> containerIds)
       throws NodeNotFoundException {
-    nodeStateMap.setContainers(uuid, containerIds);
+    nodeStateMap.setContainersForTesting(datanodeID, containerIds);
   }
 
   /**
    * Return set of containerIDs available on a datanode. This is a copy of the
    * set which resides inside NodeStateMap and hence can be modified without
    * synchronization or side effects.
-   * @param uuid - DatanodeID
    * @return - set of containerIDs
    */
-  public Set<ContainerID> getContainers(UUID uuid)
+  public Set<ContainerID> getContainers(DatanodeID datanodeID)
       throws NodeNotFoundException {
-    return nodeStateMap.getContainers(uuid);
+    return nodeStateMap.getContainers(datanodeID);
   }
 
-  public int getContainerCount(UUID uuid)
+  public int getContainerCount(DatanodeID datanodeID)
       throws NodeNotFoundException {
-    return nodeStateMap.getContainerCount(uuid);
+    return nodeStateMap.getContainerCount(datanodeID);
   }
 
   /**
@@ -739,13 +763,13 @@ public class NodeStateManager implements Runnable, Closeable {
    *
    * This method is synchronized to coordinate node state updates between
    * the upgrade finalization thread which calls this method, and the
-   * node health processing thread that calls {@link this#checkNodesHealth}.
+   * node health processing thread that calls {@link #checkNodesHealth}.
    */
   public synchronized void forceNodesToHealthyReadOnly() {
     try {
       List<DatanodeInfo> nodes = nodeStateMap.getDatanodeInfos(null, HEALTHY);
       for (DatanodeInfo node : nodes) {
-        nodeStateMap.updateNodeHealthState(node.getUuid(),
+        nodeStateMap.updateNodeHealthState(node.getID(),
             HEALTHY_READONLY);
         if (state2EventMap.containsKey(HEALTHY_READONLY)) {
           // At this point pipeline creation is already frozen and the node's
@@ -765,7 +789,7 @@ public class NodeStateManager implements Runnable, Closeable {
   /**
    * This method is synchronized to coordinate node state updates between
    * the upgrade finalization thread which calls
-   * {@link this#forceNodesToHealthyReadOnly}, and the node health processing
+   * {@link #forceNodesToHealthyReadOnly}, and the node health processing
    * thread that calls this method.
    */
   @VisibleForTesting
@@ -813,7 +837,7 @@ public class NodeStateManager implements Runnable, Closeable {
 
     try {
       for (DatanodeInfo node : nodeStateMap.getAllDatanodeInfos()) {
-        NodeStatus status = nodeStateMap.getNodeStatus(node.getUuid());
+        NodeStatus status = nodeStateMap.getNodeStatus(node.getID());
         switch (status.getHealth()) {
         case HEALTHY:
           updateNodeLayoutVersionState(node, layoutMisMatchCondition, status,
@@ -920,7 +944,7 @@ public class NodeStateManager implements Runnable, Closeable {
         NodeState newHealthState = nodeHealthSM.
             getNextState(status.getHealth(), lifeCycleEvent);
         NodeStatus newStatus =
-            nodeStateMap.updateNodeHealthState(node.getUuid(), newHealthState);
+            nodeStateMap.updateNodeHealthState(node.getID(), newHealthState);
         fireHealthStateEvent(newStatus.getHealth(), node);
       }
     } catch (InvalidStateTransitionException e) {
@@ -959,7 +983,7 @@ public class NodeStateManager implements Runnable, Closeable {
         NodeState newHealthState = nodeHealthSM.getNextState(status.getHealth(),
             lifeCycleEvent);
         NodeStatus newStatus =
-            nodeStateMap.updateNodeHealthState(node.getUuid(), newHealthState);
+            nodeStateMap.updateNodeHealthState(node.getID(), newHealthState);
         fireHealthStateEvent(newStatus.getHealth(), node);
       }
     } catch (InvalidStateTransitionException e) {
@@ -1039,7 +1063,14 @@ public class NodeStateManager implements Runnable, Closeable {
     return healthCheckFuture;
   }
 
-  protected void removeNode(DatanodeDetails datanodeDetails) {
-    nodeStateMap.removeNode(datanodeDetails);
+  protected void removeNode(DatanodeID datanodeID) {
+    nodeStateMap.removeNode(datanodeID);
+  }
+
+  /**
+   * Node's life cycle events.
+   */
+  private enum NodeLifeCycleEvent {
+    TIMEOUT, RESTORE, RESURRECT, LAYOUT_MISMATCH, LAYOUT_MATCH
   }
 }

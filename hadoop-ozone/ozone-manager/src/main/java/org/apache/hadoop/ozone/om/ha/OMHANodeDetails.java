@@ -1,25 +1,40 @@
-/**
+/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with this
- * work for additional information regarding copyright ownership.  The ASF
- * licenses this file to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
- * License for the specific language governing permissions and limitations under
- * the License.
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 
 package org.apache.hadoop.ozone.om.ha;
 
-import com.google.common.base.Preconditions;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODE_ID_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_PORT_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_PORT_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
+
+import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
@@ -31,22 +46,6 @@ import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_INTERNAL_SERVICE_ID;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODE_ID_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_PORT_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_PORT_KEY;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 
 /**
  * Class which maintains peer information and it's own OM node information.
@@ -62,7 +61,7 @@ public class OMHANodeDetails {
       OMConfigKeys.OZONE_OM_ADDRESS_KEY,
   };
 
-  public static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(OMHANodeDetails.class);
   private final OMNodeDetails localNodeDetails;
   private final List<OMNodeDetails> peerNodeDetails;
@@ -85,7 +84,6 @@ public class OMHANodeDetails {
     return peerNodesMap;
   }
 
-
   /**
    * Inspects and loads OM node configurations.
    *
@@ -104,6 +102,7 @@ public class OMHANodeDetails {
     String localOMServiceId = null;
     String localOMNodeId = null;
     int localRatisPort = 0;
+    boolean localIsListener = false;
 
     Collection<String> omServiceIds;
 
@@ -129,8 +128,9 @@ public class OMHANodeDetails {
     for (String serviceId : omServiceIds) {
       Collection<String> omNodeIds = OmUtils.getActiveOMNodeIds(conf,
           serviceId);
+      Collection<String> listenerOmNodeIds = OmUtils.getListenerOMNodeIds(conf, serviceId);
 
-      if (omNodeIds.size() == 0) {
+      if (omNodeIds.isEmpty()) {
         throwConfException("Configuration does not have any value set for %s " +
             "for the service %s. List of OM Node ID's should be specified " +
             "for an OM service", OZONE_OM_NODES_KEY, serviceId);
@@ -181,6 +181,7 @@ public class OMHANodeDetails {
               rpcAddrStr);
         }
 
+        boolean isListener = listenerOmNodeIds.contains(nodeId);
         if (!isPeer
                 && OzoneNetUtils
                 .isAddressLocal(flexibleFqdnResolutionEnabled, addr)) {
@@ -188,25 +189,26 @@ public class OMHANodeDetails {
           localOMServiceId = serviceId;
           localOMNodeId = nodeId;
           localRatisPort = ratisPort;
+          localIsListener = isListener;
           found++;
         } else {
           // This OMNode belongs to same OM service as the current OMNode.
           // Add it to peerNodes list.
           peerNodesList.add(getHAOMNodeDetails(conf, serviceId,
-              nodeId, addr, ratisPort));
+              nodeId, addr, ratisPort, isListener));
         }
       }
       if (found == 1) {
 
         LOG.info("Found matching OM address with OMServiceId: {}, " +
-                "OMNodeId: {}, RPC Address: {} and Ratis port: {}",
+                "OMNodeId: {}, RPC Address: {} ,Ratis port: {} and isListener: {}",
             localOMServiceId, localOMNodeId,
-            NetUtils.getHostPortString(localRpcAddress), localRatisPort);
+            NetUtils.getHostPortString(localRpcAddress), localRatisPort, localIsListener);
 
         ConfUtils.setNodeSpecificConfigs(genericConfigKeys, conf,
             localOMServiceId, localOMNodeId, LOG);
         return new OMHANodeDetails(getHAOMNodeDetails(conf, localOMServiceId,
-            localOMNodeId, localRpcAddress, localRatisPort), peerNodesList);
+            localOMNodeId, localRpcAddress, localRatisPort, localIsListener), peerNodesList);
 
       } else if (found > 1) {
         throwConfException("Configuration has multiple %s addresses that " +
@@ -247,6 +249,12 @@ public class OMHANodeDetails {
   public static OMNodeDetails getOMNodeDetailsForNonHA(OzoneConfiguration conf,
       String serviceId, String nodeId, InetSocketAddress rpcAddress,
       int ratisPort) {
+    return getOMNodeDetailsForNonHA(conf, serviceId, nodeId, rpcAddress, ratisPort, false);
+  }
+
+  public static OMNodeDetails getOMNodeDetailsForNonHA(OzoneConfiguration conf,
+      String serviceId, String nodeId, InetSocketAddress rpcAddress,
+      int ratisPort, boolean isListener) {
 
     if (serviceId == null) {
       // If no serviceId is set, take the default serviceID om-service
@@ -276,6 +284,7 @@ public class OMHANodeDetails {
         .setRatisPort(ratisPort)
         .setHttpAddress(httpAddr)
         .setHttpsAddress(httpsAddr)
+        .setIsListener(isListener)
         .build();
   }
 
@@ -290,8 +299,14 @@ public class OMHANodeDetails {
   public static OMNodeDetails getHAOMNodeDetails(OzoneConfiguration conf,
       String serviceId, String nodeId, InetSocketAddress rpcAddress,
       int ratisPort) {
-    Preconditions.checkNotNull(serviceId);
-    Preconditions.checkNotNull(nodeId);
+    return getHAOMNodeDetails(conf, serviceId, nodeId, rpcAddress, ratisPort, false);
+  }
+
+  public static OMNodeDetails getHAOMNodeDetails(OzoneConfiguration conf,
+      String serviceId, String nodeId, InetSocketAddress rpcAddress,
+      int ratisPort, boolean isListener) {
+    Objects.requireNonNull(serviceId, "serviceId == null");
+    Objects.requireNonNull(nodeId, "nodeId == null");
 
     String httpAddr = OmUtils.getHttpAddressForOMPeerNode(conf,
         serviceId, nodeId, rpcAddress.getHostName());
@@ -305,6 +320,7 @@ public class OMHANodeDetails {
         .setRatisPort(ratisPort)
         .setHttpAddress(httpAddr)
         .setHttpsAddress(httpsAddr)
+        .setIsListener(isListener)
         .build();
   }
 

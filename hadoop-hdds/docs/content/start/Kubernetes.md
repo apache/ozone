@@ -25,6 +25,7 @@ weight: 22
  * kubectl
 {{< /requirements >}}
 
+**Note:** The Kubernetes examples and scripts in this project have been tested with Kubernetes 1.34.2 (k3s v1.34.2+k3s1).
 
 As the _apache/ozone_ docker images are available from the dockerhub the deployment process is very similar to Minikube deployment. The only big difference is that we have dedicated set of k8s files for hosted clusters (for example we can use one datanode per host)
 Deploy to kubernetes
@@ -51,3 +52,34 @@ Now you can access any of the services. By default the services are not publishe
 kubectl port-forward s3g-0 9878:9878
 kubectl port-forward scm-0 9876:9876
 ```
+
+## Apache Ozone Helm Chart
+
+For a streamlined deployment of Apache Ozone on Kubernetes, consider using the [Apache Ozone Helm Chart](https://apache.github.io/ozone-helm-charts/). This Helm Chart simplifies the installation and management of an Ozone cluster by packaging best practices into a set of configurable Kubernetes resources.
+
+1. **Add the Ozone Helm Repository**
+
+   First, add the Apache Ozone Helm repository and update your local Helm repo cache:
+
+   ```bash
+   helm repo add ozone-helm https://apache.github.io/ozone-helm-charts/
+   helm repo update
+   ```
+
+2. Install the Chart
+
+   Install the Ozone Helm Chart using the following command. This command deploys a default Ozone cluster:
+
+   ```bash
+   helm install my-ozone-cluster ozone-helm/ozone
+   ```
+
+3. Customize Your Deployment
+
+   To customize the configuration, create or modify a values.yaml file with your desired settings and install the chart as follows:
+
+   ```bash
+   helm install my-ozone-cluster -f values.yaml ozone-helm/ozone
+   ```
+
+For more detailed documentation and advanced configuration options, please refer to the [Apache Ozone Helm Chart](https://apache.github.io/ozone-helm-charts/) documentation.

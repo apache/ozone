@@ -1,14 +1,13 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,24 +17,33 @@
 
 package org.apache.hadoop.ozone.lock;
 
-import java.util.concurrent.Semaphore;
+import java.util.function.Function;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 
 /** Bootstrap state handler interface. */
 public interface BootstrapStateHandler {
   Lock getBootstrapStateLock();
 
-  /** Bootstrap state handler lock implementation. */
-  class Lock implements AutoCloseable {
-    private final Semaphore semaphore = new Semaphore(1);
-    public Lock lock() throws InterruptedException {
-      semaphore.acquire();
-      return this;
+  /** Bootstrap state handler lock implementation. Should be always acquired before opening any snapshot to avoid
+   * deadlocks*/
+  class Lock {
+
+    private final Function<Boolean, UncheckedAutoCloseable> lockSupplier;
+
+    public Lock(Function<Boolean, UncheckedAutoCloseable> lockSupplier) {
+      this.lockSupplier = lockSupplier;
     }
-    public void unlock() {
-      semaphore.release();
+
+    private UncheckedAutoCloseable lock(boolean readLock) {
+      return lockSupplier.apply(readLock);
     }
-    public void close() {
-      unlock();
+
+    public UncheckedAutoCloseable acquireWriteLock() throws InterruptedException {
+      return lock(false);
+    }
+
+    public UncheckedAutoCloseable acquireReadLock() throws InterruptedException {
+      return lock(true);
     }
   }
 }
