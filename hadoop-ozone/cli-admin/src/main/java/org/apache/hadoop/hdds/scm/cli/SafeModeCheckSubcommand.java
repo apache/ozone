@@ -151,7 +151,7 @@ public class SafeModeCheckSubcommand extends ScmSubcommand {
     if (matchedNodes.isEmpty()) {
       throw new IOException("Specified --scm address " + scmAddress +
           " does not match any node in service " + serviceId +
-          ". Available nodes: " + nodes.stream()
+          ". Nodes: " + nodes.stream()
               .map(n -> n.getScmClientAddress() + " [" + n.getNodeId() + "]")
               .collect(Collectors.joining(", ")));
     }
@@ -218,10 +218,6 @@ public class SafeModeCheckSubcommand extends ScmSubcommand {
 
     } catch (Exception e) {
       // If address resolution fails, no match
-      if (isVerbose()) {
-        System.err.println("Warning: Could not resolve address during comparison: " +
-            address1 + " vs " + address2 + " - " + e.getMessage());
-      }
       return false;
     }
   }
