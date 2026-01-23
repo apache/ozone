@@ -25,6 +25,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.apache.hadoop.ozone.s3sts.S3STSConfigKeys.OZONE_S3G_STS_PAYLOAD_HASH_MAX_VALUE;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -131,15 +132,17 @@ public class AWSSignatureProcessor implements SignatureProcessor {
     if (queryParams == null) {
       return null;
     }
-    final String stsQueryParam = queryParams.getFirst("X-Amz-Security-Token");
-    if (stsQueryParam != null && !stsQueryParam.isEmpty()) {
-      return stsQueryParam;
-    }
-
-    // Check lowercase query parameter as well.
-    final String stsQueryParamLowercase = queryParams.getFirst("x-amz-security-token");
-    if (stsQueryParamLowercase != null && !stsQueryParamLowercase.isEmpty()) {
-      return stsQueryParamLowercase;
+    for (Map.Entry<String, List<String>> entry : queryParams.entrySet()) {
+      final String key = entry.getKey();
+      if (Strings.isNullOrEmpty(key)) {
+        continue;
+      }
+      if (key.compareToIgnoreCase("x-amz-security-token") == 0) {
+        final List<String> values = entry.getValue();
+        if (values != null && !values.isEmpty()) {
+          return values.get(0);
+        }
+      }
     }
     return null;
   }
