@@ -150,7 +150,6 @@ public abstract class OMFailoverProxyProviderBase<T> implements
     Configuration hadoopConf =
         LegacyHadoopConfigurationSource.asHadoopConfiguration(getConf());
 
-    // TODO: Post upgrade to Protobuf 3.x we need to use ProtobufRpcEngine2
     RPC.setProtocolEngine(hadoopConf, getInterface(), ProtobufRpcEngine.class);
 
     // Ensure we do not attempt retry on the same OM in case of exceptions

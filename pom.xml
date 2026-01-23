@@ -1724,7 +1724,7 @@
           <artifactId>maven-javadoc-plugin</artifactId>
           <version>${maven-javadoc-plugin.version}</version>
           <configuration>
-            <excludePackageNames>org.apache.hadoop.hdds.protocol.datanode.proto:org.apache.hadoop.hdds.protocol.proto:org.apache.hadoop.hdds.protocol.proto3:org.apache.hadoop.hdds.protocol.scm.proto:org.apache.hadoop.ozone.protocol.proto:org.apache.hadoop.ozone.protocol.proto3:org.apache.hadoop.ozone.security.proto:org.apache.hadoop.ozone.security.proto3:org.apache.hadoop.ozone.storage.proto:org.apache.ozone.recon.schema.generated:org.apache.ozone.recon.schema.generated.tables</excludePackageNames>
+            <excludePackageNames>org.apache.hadoop.hdds.protocol.datanode.proto:org.apache.hadoop.hdds.protocol.proto:org.apache.hadoop.hdds.protocol.scm.proto:org.apache.hadoop.ozone.protocol.proto:org.apache.hadoop.ozone.security.proto:org.apache.hadoop.ozone.storage.proto:org.apache.ozone.recon.schema.generated:org.apache.ozone.recon.schema.generated.tables</excludePackageNames>
             <sourceFileExcludes>
               <exclude>**/package-info.java</exclude>
               <exclude>**/org/apache/ozone/recon/schema/generated/tables/**/*.java</exclude>
