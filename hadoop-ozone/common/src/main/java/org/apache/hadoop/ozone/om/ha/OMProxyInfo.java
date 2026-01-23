@@ -17,30 +17,47 @@
 
 package org.apache.hadoop.ozone.om.ha;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.Collections;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.retry.FailoverProxyProvider.ProxyInfo;
 import org.apache.hadoop.net.NetUtils;
+import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.security.SecurityUtil;
+import org.apache.ratis.util.Preconditions;
+import org.apache.ratis.util.function.CheckedFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Class to store OM proxy information.
+ * {@link ProxyInfo} with additional info such as {@link #nodeId} and {@link #rpcAddr}.
  */
-public class OMProxyInfo<T> extends ProxyInfo<T> {
+public final class OMProxyInfo<T> extends ProxyInfo<T> {
+  private static final Logger LOG = LoggerFactory.getLogger(OMProxyInfo.class);
+
   private final String nodeId;
   private final String rpcAddrStr;
   private final InetSocketAddress rpcAddr;
   private final Text dtService;
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(OMProxyInfo.class);
+  public static <T> OMProxyInfo<T> newInstance(T proxy, String serviceID, String nodeID, String rpcAddress) {
+    if (nodeID == null) {
+      nodeID = OzoneConsts.OM_DEFAULT_NODE_ID;
+    }
+    final String info = "nodeId=" + nodeID + ",nodeAddress=" + rpcAddress;
+    return new OMProxyInfo<T>(proxy, serviceID, nodeID, rpcAddress, info);
+  }
 
-  public OMProxyInfo(T proxy, String serviceID, String nodeID, String rpcAddress, String proxyInfo) {
+  private OMProxyInfo(T proxy, String serviceID, String nodeID, String rpcAddress, String proxyInfo) {
     super(proxy, proxyInfo);
-    this.nodeId = nodeID;
-    this.rpcAddrStr = rpcAddress;
+    this.nodeId = Objects.requireNonNull(nodeID, "nodeID == null");
+    this.rpcAddrStr = Objects.requireNonNull(rpcAddress, "rpcAddress == null");
     this.rpcAddr = NetUtils.createSocketAddr(rpcAddrStr);
     if (rpcAddr.isUnresolved()) {
       LOG.warn("OzoneManager address {} for serviceID {} remains unresolved " +
@@ -57,20 +74,12 @@ public class OMProxyInfo<T> extends ProxyInfo<T> {
     }
   }
 
-  public OMProxyInfo(String serviceID, String nodeID, String rpcAddress) {
-    this(null, serviceID, nodeID, rpcAddress, "nodeId=" + nodeID + ",nodeAddress=" + rpcAddress);
-  }
-
   public String getNodeId() {
     return nodeId;
   }
 
-  public String getRpcAddrStr() {
+  public String getAddressString() {
     return rpcAddrStr;
-  }
-
-  public InetSocketAddress getRpcAddr() {
-    return rpcAddr;
   }
 
   public InetSocketAddress getAddress() {
@@ -79,5 +88,95 @@ public class OMProxyInfo<T> extends ProxyInfo<T> {
 
   public Text getDelegationTokenService() {
     return dtService;
+  }
+
+  public synchronized T getProxy() {
+    return proxy;
+  }
+
+  public synchronized void createProxyIfNeeded(CheckedFunction<InetSocketAddress, T, IOException> createProxy) {
+    if (proxy == null) {
+      try {
+        proxy = createProxy.apply(getAddress());
+      } catch (IOException ioe) {
+        throw new IllegalStateException("Failed to create OM proxy for " + this, ioe);
+      }
+    }
+  }
+
+  /**
+   * An {@link OMProxyInfo} map,
+   * where the underlying collections are unmodifiable.
+   */
+  public static class Map<P> {
+    /** A list of proxies in a particular order. */
+    private final List<OMProxyInfo<P>> proxies;
+    /**
+     * The ordering of the nodes.
+     * <p>
+     * Invariant 1: Given a nodeId, let Integer i = ordering.get(nodeId);
+     *              If i != null, then nodeId.equals(info.getNodeId()) == true, where info = proxies.get(i).
+     *              Otherwise, i == null, then nodeId.equals(info.getNodeId()) == false for any info in proxies.
+     * <p>
+     * Invariant 2: Given 0 <= i < proxies.size(), let nodeId = proxies.get(i).getNodeId().
+     *              Then, ordering.get(nodeId) == i.
+     */
+    private final SortedMap<String, Integer> ordering;
+
+    public Map(List<OMProxyInfo<P>> proxies) {
+      this.proxies = Collections.unmodifiableList(proxies);
+
+      final SortedMap<String, Integer> map = new TreeMap<>();
+      for (int i = 0; i < proxies.size(); i++) {
+        final String nid = proxies.get(i).getNodeId();
+        final Integer previous = map.put(nid, i);
+        Preconditions.assertNull(previous, () -> "Duplicate nodeId " + nid + " in " + proxies);
+      }
+      Preconditions.assertSame(proxies.size(), map.size(), "size");
+      this.ordering = Collections.unmodifiableSortedMap(map);
+    }
+
+    public Set<String> getNodeIds() {
+      return ordering.keySet();
+    }
+
+    List<OMProxyInfo<P>> getProxies() {
+      return proxies;
+    }
+
+    int size() {
+      return proxies.size();
+    }
+
+    OMProxyInfo<P> get(int i) {
+      return i >= 0 && i < proxies.size() ? proxies.get(i) : null;
+    }
+
+    String getNodeId(int i) {
+      final OMProxyInfo<P> proxy = get(i);
+      return proxy != null ? proxy.getNodeId() : null;
+    }
+
+    Integer indexOf(String nodeID) {
+      return ordering.get(nodeID);
+    }
+
+    public OMProxyInfo<P> get(String nodeID) {
+      final Integer i = indexOf(nodeID);
+      return i != null ? get(i) : null;
+    }
+
+    boolean contains(String nodeId, String address) {
+      if (nodeId == null || address == null) {
+        return false;
+      }
+      final OMProxyInfo<P> p = get(nodeId);
+      return p != null && address.equals(p.getAddressString());
+    }
+
+    @Override
+    public String toString() {
+      return proxies.toString();
+    }
   }
 }

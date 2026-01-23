@@ -22,7 +22,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -167,9 +168,9 @@ public class TestOMFailoverProxyProvider {
                  UserGroupInformation.getCurrentUser(), OM_SERVICE_ID,
                  OzoneManagerProtocolPB.class)) {
       // Verify listener node is not included in proxy map
-      assertTrue(providerWithListeners.getOMProxyMap().containsKey(NODE_ID_BASE_STR + 1));
-      assertTrue(providerWithListeners.getOMProxyMap().containsKey(NODE_ID_BASE_STR + 3));
-      assertFalse(providerWithListeners.getOMProxyMap().containsKey(listenerNode));
+      assertNotNull(providerWithListeners.getOMProxyMap().get(NODE_ID_BASE_STR + 1));
+      assertNotNull(providerWithListeners.getOMProxyMap().get(NODE_ID_BASE_STR + 3));
+      assertNull(providerWithListeners.getOMProxyMap().get(listenerNode));
     }
   }
 
