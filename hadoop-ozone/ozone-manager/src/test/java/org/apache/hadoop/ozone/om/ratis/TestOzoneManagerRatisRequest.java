@@ -178,7 +178,7 @@ public class TestOzoneManagerRatisRequest {
   }
 
   @Test
-  public void testAssumeRoleRejectedWhenStsEnabledAndNativeAuthorizerNotUsed() {
+  public void testAssumeRoleAllowedWhenStsEnabledAndNativeAuthorizerNotUsed() {
     ozoneManager = mock(OzoneManager.class, CALLS_REAL_METHODS);
     when(ozoneManager.isS3STSEnabled()).thenReturn(true);
 

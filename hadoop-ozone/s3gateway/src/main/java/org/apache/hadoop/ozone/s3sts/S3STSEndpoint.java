@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.s3sts;
 
+import com.google.common.base.Strings;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.time.Instant;
@@ -301,7 +302,7 @@ public class S3STSEndpoint extends S3STSEndpointBase {
     final String accountId = parts[4];
     final String resource = parts[5]; // role/<name>
 
-    if (accountId == null || accountId.isEmpty() || resource == null || !resource.startsWith("role/") ||
+    if (Strings.isNullOrEmpty(accountId) || Strings.isNullOrEmpty(resource) || !resource.startsWith("role/") ||
         resource.length() == "role/".length()) {
       throw new IllegalArgumentException(errMsg);
     }
