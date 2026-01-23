@@ -39,9 +39,14 @@ Ozone components currently define their version in two classes: ComponentVersion
 
 The existing upgrade framework uses the following terminology:
 
-**Component version**: The logical versioning system used to track incompatible changes to components that affect client/server network compatibility. Currently it is only used in communication with clients outside of Ozone, not within Ozone components itself. The component version is hardcoded in the software and does not change.
+**Component version**: The logical versioning system used to track incompatible changes to components that affect client/server network compatibility. Currently it is only used in communication with clients outside of Ozone, not within Ozone components itself. The component version is hardcoded in the software and does not change. We currently use the following component versions:
+- **OM Version**: Provided to external clients communicating with OM in case a newer external client needs to handle compatibility.
+- **Datanode Version**: Provided by Datanodes to external clients in case a newer external client needs to handle compatibility.
+- **Client Version**: Provided by external clients to internal Ozone components (OM and Datanode) in case a newer Ozone server needs to handle compatibility.
 
-**Layout Feature/Version:** The logical versioning system used to track incompatible changes to components that affect their internal disk layout. This is used to track downgrade compatibility.
+**Layout Feature/Version:** The logical versioning system used to track incompatible changes to components that affect their internal disk layout. This is used to track downgrade compatibility. We currently use the following layout features:
+- **OM Layout Feature**: Used to track disk changes within the OM
+- **HDDS Layout Feature**: Used to track disk changes within SCM and Datanodes. One shared version is required so that SCM can orchestrate Datanode finalization.
 
 **Software Layout Version (SLV):** The highest layout version within the code. When the cluster is finalized, it will use this layout version.
 
@@ -57,21 +62,34 @@ In the existing upgrade framework, OM and SCM can be finalized in any order. SCM
 
 In practice, tracking network and disk changes separately has proven difficult to reason about. Developers are often confused about whether one or both versions need to be changed for a feature, and each version’s relationship with finalization. Before adding complexity to the upgrade flow with ZDU, it will be beneficial to simplify the two versioning schemes into one version that gets incremented for any incompatible change. This gives us the following new definitions:
 
-**Component version**: The logical versioning system used to track incompatible changes to a component, regardless whether they affect disk or network compatibility between the same or different types of components. This will extend the existing component version framework.
+**Component version**: The logical versioning system used to track incompatible changes to a component, regardless whether they affect disk or network compatibility between the same or different types of components. This will extend the existing component version framework. We will use the following component versions:
+- **OM Version**: Used within the Ozone Manager ring and provided to external clients in case a newer external client needs to handle compatibility.
+- **HDDS Version**: Used within SCM and Datanodes and provided to external clients in case a newer external client needs to handle compatibility. One shared version is required so that SCM can orchestrate Datanode finalization.
+- **Client Version**: Provided by external clients to internal Ozone components in case a newer Ozone server needs to handle compatibility.
 
 **Software version:** The Component Version of the bits that are installed. This is always the highest component version contained in the code that is running.
 
-**Apparent version:** The Component Version the software is acting as, which is persisted to the disk.
+**Apparent version:** The Component Version the software is acting as, which is persisted to the disk. The apparent version determines the API that is exposed by the component and the format it uses to persist data.
 
 **Pre-finalized:** State a component enters when the apparent version on disk is less than the software version. At this time all other machines may or may not be running the new bits, new features are blocked, and downgrade is allowed.
 
 **Finalized:** State a component enters when the apparent version is equal to the software version. A component makes this transition from pre-finalized to finalized when it receives a finalize command from the admin. At this time all machines are running the new bits, and even though this component is finalized, different types of components may not be. Downgrade is not allowed after this point.
 
-This simplified version framework lets us enforce **three invariants** to reason about the upgrade process among internal components (OM, SCM, Datanode, Recon):
+This simplified version framework lets us enforce **three invariants** to reason about the upgrade process among internal components (OM, SCM, Datanode):
 
-* **Internal components of the same type will always communicate using the same apparent version.**  
+* **Internal components of the same type will always operate at the same apparent version.**  
 * **At the time of finalization, all internal components must be running the new bits.**  
 * **For internal client/server relationships, the server will always finalize before the client.**
+
+The following table demonstrates this in a Ratis group of 3 OMs who are being upgraded from software version 100 to software version 105. Each component's version is indicated using the notation `<apparent version>/<software version>`. Versions in bold are running the new software. Note that the apparent versions of the OMs always match.
+
+| OM1         | OM2         | OM3         | Status                                                                                          |
+| ----------- | ----------- | ----------- | ----------------------------------------------------------------------------------------------- |
+| 100/100     | 100/100     | 100/100     | All OMs are finalized in the old version                                                        |
+| **100/105** | 100/100     | 100/100     | OM1 is stopped and started with the new version                                                 |
+| **100/105** | **100/105** | 100/100     | OM2 is stopped and started with the new version                                                 |
+| **100/105** | **100/105** | **100/105** | New version has been deployed on all OMs, but they have not yet finalized to use new features.  |
+| **105/105** | **105/105** | **105/105** | Finalize command has been sent over Ratis. All OMs move to the new apparent version atomically. |
 
 Later sections on upgrade flow and ordering will detail how these invariants are enforced. Note that external clients can be in any version and we will support full client/server version cross compatibility between internal components and external clients.
 
@@ -140,7 +158,7 @@ After a cluster has all components started with the new software version, the cl
 
 Also note that finalization is asynchronous. Not all components can be updated simultaneously so the cluster will be finalized a short time after the command has been issued.
 
-###  SCM {#scm}
+###  SCM
 
 The first component to finalize is SCM. This will unlock any new APIs in SCM, but these will not be called until other components who are clients of SCM are also finalized. To coordinate between all SCM instances and ensure they switch to any new behaviour simultaneously, the finalize command is sent over Ratis, and hence will be replayed on the followers alongside other commands in the correct order.
 
