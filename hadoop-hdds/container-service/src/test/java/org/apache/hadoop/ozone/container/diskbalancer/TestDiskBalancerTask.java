@@ -40,6 +40,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -282,6 +283,11 @@ public class TestDiskBalancerTask {
     State originalState = container.getContainerState();
     assertEquals(initialSourceUsed + CONTAINER_SIZE, sourceVolume.getCurrentUsage().getUsedSpace());
     assertEquals(initialDestUsed, destVolume.getCurrentUsage().getUsedSpace());
+    Iterator<Long> containerIterator = sourceVolume.getContainerIterator();
+    assertTrue(containerIterator.hasNext());
+    assertEquals(CONTAINER_ID, containerIterator.next());
+    containerIterator = destVolume.getContainerIterator();
+    assertFalse(containerIterator.hasNext());
 
     String oldContainerPath = container.getContainerData().getContainerPath();
     if (containerState == State.QUASI_CLOSED) {
@@ -305,6 +311,12 @@ public class TestDiskBalancerTask {
     assertEquals(CONTAINER_SIZE, diskBalancerService.getMetrics().getSuccessBytes());
     assertEquals(initialDestCommitted, destVolume.getCommittedBytes());
     assertEquals(initialSourceDelta, diskBalancerService.getDeltaSizes().get(sourceVolume));
+
+    containerIterator = sourceVolume.getContainerIterator();
+    assertFalse(containerIterator.hasNext());
+    containerIterator = destVolume.getContainerIterator();
+    assertTrue(containerIterator.hasNext());
+    assertEquals(CONTAINER_ID, containerIterator.next());
   }
 
   @ContainerTestVersionInfo.ContainerTest
