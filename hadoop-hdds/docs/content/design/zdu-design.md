@@ -1,14 +1,16 @@
-# The Goal
+# Zero Downtime Upgrade (ZDU)
+
+## The Goal
 
 The goal of Zero Downtime Upgrade (ZDU) is to allow the software running an existing Ozone cluster to be upgraded while the cluster remains operational. There should be no gaps in service and the upgrade should be transparent to applications using the cluster.
 
 Ozone is already designed to be fault tolerant, so the rolling restart of SCM, OM and Datanodes is already possible without impacting users of the cluster. The challenge with ZDU is therefore related to wire and disk compatibility, as different components within the cluster can be running different software versions concurrently. This design will focus on how we solve the wire and disk compatibility issues.
 
-# Component Upgrade Order
+## Component Upgrade Order
 
 To simplify reasoning about components of different types running in different versions, we should reduce the number of possible version combinations allowed as much as possible. Clients are considered external to the Ozone cluster, therefore we cannot control their version. However, we already have a framework to handle client/server cross compatibility, so rolling upgrade only needs to focus on compatibility of internal components. For internal Ozone components, we can define and enforce an order that the components must be upgraded in. Consider the following Ozone service diagram:
 
-![Ozone connection diagram](hadoop-hdds/docs/content/design/zdu-image1.png)
+![Ozone connection diagram](zdu-image1.png)
 
 Here the arrows represent client to server interactions between components, with the arrow pointing from the client to the server. The red arrow is external clients interacting with Ozone. The shield means that the client needs to see a consistent API surface despite leader changes in mixed version clusters so that APIs do not seem to disappear and reappear based on the node serving the request. The orange lines represent client to server interactions for internal Ozone components. For components connected by this internal line, **we can control the order that they are upgraded such that the server is always newer and handles all compatibility issues**. This greatly reduces the matrix of possible versions we may see within Ozone and mostly eliminates the need for internal Ozone components to be aware of each other’s versions, as long as servers remain backwards compatible. This order is:
 
@@ -20,7 +22,7 @@ Here the arrows represent client to server interactions between components, with
 
 Note that in this ordering, Recon will still have a new client/old server relationship with OM for a period of time. The OM sync process in Recon is the only API that needs to account for this, and it is not on the main data read, write, delete, or recovery path. Recon should be upgraded with the SCMs because its container report processing from the datanodes shares SCM code, so we do not want Recon to handle a different version matrix among datanodes than SCM.
 
-# Software Version Framework
+## Software Version Framework
 
 The previous section defines an upgrade order to handle API compatibility between internal components of different types without the need for explicit versioning. For internal components of the same type, we need to provide stronger guarantees when they are in mixed versions:
 
@@ -93,13 +95,13 @@ This migration will be transparent in client/server interactions for network cha
 
 This migration will need some handling for disk changes. When the upgraded component starts up with software version 100 and sees a version less than that persisted to the disk, it must use the old LayoutFeature enum to look up that version until the cluster is finalized. After finalization, version 100 will be written to the disk and all versions from here on can be referenced from ComponentVersion.
 
-# Strategy To Achieve ZDU
+##  Strategy To Achieve ZDU
 
-## Prerequisites
+###  Prerequisites
 
 Before an Ozone cluster can use ZDU in an upgrade, the initial version being upgraded must also support ZDU. All software versions from 100 onward will be ZDU ready, and any Ozone changes after version 100 have to be made in a ZDU compatible way. We can say that version 100 is the minimal eligible version for ZDU. For example, a cluster would need to be upgraded from version 5 version to 105 with the existing non-rolling upgrade process. All upgrades starting from version 105 could then optionally be done with ZDU or non-rolling upgrades.
 
-## Invariants
+###  Invariants
 
 This is a summary of invariants for internal components outlined in earlier sections which will be maintained during the upgrade flow. These provide a framework for developers to reason about changes during the upgrade:
 
@@ -110,7 +112,7 @@ This is a summary of invariants for internal components outlined in earlier sect
 * At the time of finalization, all internal components must be running the new bits.  
 * Internal components of different types will always have the server side finalize before the client side.
 
-## Order of Operations During the Upgrade
+###  Order of Operations During the Upgrade
 
 1. Deploy the new software version to SCM and rolling restart the SCMs.  
 2. Deploy the new software version to Recon and restart Recon.  
@@ -132,13 +134,13 @@ Initially, this design considered pausing some background operations to remove r
 
 DIsk and datanode balancing could be safely suspended if required. For disk balancing, the process is all within the same datanode process, so mixed component versions are not a concern. Cross node balancing uses the container replication mechanism internally, and we would not gain much by pausing it during upgrades either.
 
-# The Finalization Process Per Component
+##  The Finalization Process Per Component
 
 After a cluster has all components started with the new software version, the cluster will be operating without any of the features in the new version until it is finalized. The finalization process is started when an administrator issues a “finalize” command to the cluster. This will be received by SCM, which will coordinate the process for the whole cluster. The existing OM Finalize command will be deprecated and become a no-op for compatibility. The cluster will make best effort checks that the admin has properly updated the software of all components before processing the finalization command, but if they have not done so it is user error and the result is ultimately undefined.
 
 Also note that finalization is asynchronous. Not all components can be updated simultaneously so the cluster will be finalized a short time after the command has been issued.
 
-## SCM {#scm}
+###  SCM {#scm}
 
 The first component to finalize is SCM. This will unlock any new APIs in SCM, but these will not be called until other components who are clients of SCM are also finalized. To coordinate between all SCM instances and ensure they switch to any new behaviour simultaneously, the finalize command is sent over Ratis, and hence will be replayed on the followers alongside other commands in the correct order.
 
@@ -168,7 +170,7 @@ The following table shows what would happen if finalize is incorrectly sent to S
 | Apparent ver: 100Software ver: 105 | Apparent ver: 100Software ver: 105 | Apparent ver: 100Software ver: 100 | Finalize will fail on follower 2 and it should exit. It must be upgraded to version 105 to proceed. |
 | Apparent ver: 105Software ver: 105 | Apparent ver: 105Software ver: 105 | Apparent ver: 105Software ver: 105 | Cluster is already finalized, but the command can be forwarded in case there are any lagging followers and get ignored on the followers. |
 
-## Datanodes
+###  Datanodes
 
 Unlike SCM, all datanodes are not in a Ratis ring together and therefore it is impossible to finalize all datanodes at the same time. SCM will issue the finalize command to datanodes after it has been finalized over the Datanode heartbeat. SCM will not consider the datanodes as finalized until all registered DNs have reported success.
 
@@ -199,7 +201,7 @@ SCM will not allow the finalize command to be passed to any datanode (or finaliz
 
 SCM will consider Datanode finalization complete when all healthy datanodes are reporting the correct software version and report a matching Apparent Version.
 
-### Mixed Datanode Versions During Write
+####  Mixed Datanode Versions During Write
 
 As Datanodes potentially finalize at different times, there will be a period where clients will be writing to a pipeline with a mixture of finalized and unfinalized Datanodes. Coupling the version to pipelines and/or subgroups of nodes becomes difficult to manage at scale, and the upgrade framework’s current method of closing all pipelines and containers on finalization will not work in a ZDU scenario.
 
@@ -226,7 +228,7 @@ It was considered to have SCM give clients the finalized version instead of the 
 
     Significantly, it has one security drawback: Rogue/custom clients could instruct a datanode to finalize with just a block token. Block tokens are the only way clients authenticate to the datanode. They are scoped to the current block and are not intended to permit node-wide changes like finalization. A client with permissions to write a block could use the token to create a command  with a higher version and get the datanode to finalize ahead of SCM, causing the datanode to be fenced out of the cluster. To get around this, we would need to add a new \[Access Mode\](https://github.com/apache/ozone/blob/a534ac2f38891a088bfa8c821e8c228b16864a82/hadoop-hdds/interface-client/src/main/proto/hdds.proto\#L394) to the block token to specifically permit finalization, which does not seem worth it given the marginal value this feature would provide.
 
-### Mixed Datanode Versions During Replication
+####  Mixed Datanode Versions During Replication
 
 Datanodes act in a client server relationship between themselves for replication. In general the replication process is quite simple \- commands are sent to a datanode hosting a container replica, and it is told to push the data to another node. Therefore incompatible changes are unlikely. However they can be handled in a similar way to above. 
 
@@ -234,7 +236,7 @@ The Datanode’s apparent version can be sent along with the replication request
 
 If the client is ahead of the server, this would trigger the finalize command on the receiving server Datanode, as it needs to finalize anyway. There is no initial handshake in the container replication process for the new client to learn the old server’s version and downgrade its request to match. After the datanode server finalizes, it will begin processing the request with the new version that matches the client. Note that the datanode sending the replica possesses a container token, which is internal to the cluster and therefore sufficient to permit finalization, unlike block tokens.
 
-## OM
+###  OM
 
 When OM is started in a pre-finalized state, it will poll a new SCM endpoint periodically to see if it should finalize. This will be a small metadata based RPC call that does not need to run very frequently, perhaps once a minute. SCM will only reply OK after SCM has finalized and all Datanodes have finalized. 
 
@@ -242,7 +244,7 @@ At this stage the HDDS layer of the cluster is ready for any new features or on-
 
 Upon receiving the “ok to finalize” reply from SCM, OM will finalize and send the finalize command to all followers over Ratis. This ensures that all OMs will replay the finalize request in the correct order with other commands and ensure consistency across the cluster. The software version the OMs are finalizing too will be sent with the finalize command and the same logic can be applied as in the [SCM table](#scm) to determine what to do if some OMs are not at the correct version. Once all OMs are finalized, OM will stop polling the SCM endpoint.
 
-## S3G
+###  S3G
 
 S3 Gateway can be considered a client of the Ozone cluster itself. It is stateless and interacts with the wider Ozone cluster via the usual Ozone client. Since it does not write anything to disk, it does not have a finalization framework and hence is not able to version its APIs using the same mechanism as the stateful components and will always act as its latest known software version. It also uses the Ozone client to make its calls to the cluster, which is version aware. This means S3G will be able to return clean errors if an API is used before finalization, and it cannot affect consistency inside the core Ozone cluster. 
 
@@ -250,7 +252,7 @@ Most changes to S3G will be additive in nature \- adding new APIs or fields / op
 
 If a customer has more complex requirements there are options to keep some S3G instances running at the old version and direct all traffic to them at the load balancer. This would be similar to blue-green deployments in more traditional applications.
 
-## Recon
+###  Recon
 
 Recon acts as both a client and server. It makes requests to both SCM and OM and Datanodes heartbeat to it in a similar way as to SCM. In the upgrade flow, Recon will be upgraded at the start along with SCM. This keeps things simple for the Datanodes, as they will be heartbeating to both SCM and Recon, which will both be at the same version. Similar to SCM, Recon will need to be able to handle any new and old format heartbeats from datanodes, as the datanodes will be at mixed versions as the upgrade progresses.
 
@@ -260,7 +262,7 @@ Recon currently doesn’t have a finalization framework, so it does not have the
 
 In the worst case scenario, Recon will write something to disk in a new format, and the upgrade is aborted and rolled back. Then the older software will be unable to read the new format data. In that case, if the change cannot be easily undone manually, Recon can be reconstructed from scratch using a fresh OM snapshot.
 
-# Development Practices to Ensure Compatibility
+##  Development Practices to Ensure Compatibility
 
 At any point in the upgrade flow, we can have the pre and post upgrade external client version talking to a pre and post upgrade server version. Additionally the post upgrade server version can be finalized or not.
 
@@ -270,7 +272,7 @@ Additionally a server must also be able to handle older client requests, as it i
 
 For both client and server, the onus is only on the newest version to make decisions about compatibility. Any old version has no knowledge of the new feature, and it cannot enforce decisions about future unknowns.
 
-## Client Behaviour
+###  Client Behaviour
 
 Client changes can be categorized into two areas. Adapting an existing API, or making calls to a new API. In either case, the client gets to know the current OM version when it is initialized. Using that version it can make decisions about which APIs to call, or which fields to pass in an API call.
 
@@ -282,7 +284,7 @@ As an older OM version would happily accept unknown fields in the protobuf messa
 
 These practices should already be used when making client side changes, and therefore there isn’t much change to development on the client side.
 
-## Server Behaviour
+###  Server Behaviour
 
 During an upgrade, the server processes must have the ability to “act as” the pre-upgrade version. This means that any change to an API behaviour, expected fields or resulting data persisted by the server process must be feature gated using the version framework, and the old logic retained. Only if the server’s Apparent Version is equal or greater than the feature gate version should the new behaviour be permitted.
 
@@ -290,17 +292,17 @@ In general, no attempt should be made to use a new feature by an Ozone client, a
 
 As with the clients, this is not a drastic departure from current development techniques, as the need to support older clients requires care when changing existing APIs. It may mean more frequent additions to the component versions than before, because any extension of the API will require a version so the API surface remains consistent during the rolling upgrade.
 
-### Handling Apply Transaction in Mixed OM Versions
+####  Handling Apply Transaction in Mixed OM Versions
 
 The current upgrade process requires a "prepare for upgrade” step before the OMs are stopped in the old version and started in the new version. This flushes all Ratis transactions from the log to the state machine and puts the OM in a read-only mode, which it can leave when all the OMs are restarted in the new version. This prevents OMs from applying requests from the Ratis log in different versions and potentially diverging their state machines, but the read-only requirement will not work for ZDU.
 
 The long term mitigation for this is to complete the leader execution project, which will ensure that all OMs make the same state machine changes as the leader regardless of their version. This project is going to take a while to complete and we do not want to block ZDU on its completion. Instead, we can use the unified versioning framework inside the OM apply transaction methods. Any time a change is made to a request’s apply transaction processing that changes what would be written to the state machine across versions, it needs to be behind a version flag. In the short term, this will result in more use of version flags than we currently have in the OM request processing. However, in the long term these flags can be removed for each request after it is migrated to leader execution. We can also consider adding a combination of AI and/or manual inspection protocols before releases to assess whether any apply transaction versioning was missed.
 
-## Removing Old Code
+###  Removing Old Code
 
 If we want to support rolling upgrades from any past version to any current version of Ozone, old processing code with disk or network compatibility concerns cannot be removed. This code will be required to run before its replacement while the last apparent version is being used during the upgrade. If we would like to remove old processing code, we will need to create a mandatory version that all upgrades must pass through, which would be the last one to contain such code. The next release after this version may then remove the code. See [Leader Execution](#leader-execution) for a case where this may be desirable.
 
-## Testing
+###  Testing
 
 Ozone has existing test tools that can be used for compatibility testing at both the unit, integration, and acceptance test levels. These would only require minimal extension to work with ZDU and the new versioning system.
 
@@ -308,11 +310,11 @@ Unit and integration tests are run by a single Java process in the same version 
 
 Acceptance tests currently use docker to pull past releases and orchestrate an upgrade and downgrade between those and the version under test while reading and writing data and possibly testing new features specific to a release. This framework was designed to support [pluggable methods for upgrading](https://github.com/apache/ozone/blob/de5c0a385ed873425ae94245d8b5b28040ab99ef/hadoop-ozone/dist/src/main/compose/upgrade/upgrades), so we will add a new driver that orchestrates a rolling upgrade while running the defined tests at each stage.
 
-## Examples From Past Development To Ensure Compatibility
+###  Examples From Past Development To Ensure Compatibility
 
 This section talks about some changes made to Ozone over the recent past, and how they have been handled for compatibility. This should help the reader understand the approach to developing changes compatible with ZDU. In looking at these examples, it becomes clear that the current approach to development is already performed in a mostly compatible way, so we just need to be more rigorous in reviews to ensure that remains the case.
 
-### Container Reports Adding the isEmpty flag
+####  Container Reports Adding the isEmpty flag
 
 At some point in the past a new flag was added to the Full Container Reporting from datanodes to SCM. This flag, “is Container Empty” was to counter a bug in SCM, where it marked containers as empty erroneously. Fixing the bug required a change in two places:
 
@@ -331,7 +333,7 @@ Considering this example, I don’t believe that this scenario requires a specif
 
 Each case must be considered on its own merits and there isn’t a hard rule aside from “do not change persisted data”.
 
-### Atomic Key Rewrite
+####  Atomic Key Rewrite
 
 Atomic Key Rewrite was added to OM to allow Tiering to replace keys in the cluster only if they had not been modified since some previous read of the key.
 
@@ -348,7 +350,7 @@ This problem **does need** a version gate flag from two perspectives.
 
 In this case, it is essential that OM “acts as of” its old version and rejects any requests from a client which contain the expectedDataGeneration field. A client should ideally also fail to allow the new API to be used at the client side as it can ask OM what its current version is. The client check is somewhat optional in this case provided integrity is enforced at the server level. However in other cases, the client can decide which API to call depending on the server version returned.
 
-### List Keys Light
+####  List Keys Light
 
 List Keys Light was added to combat a GC problem which caused OM to struggle when returning large file listings.
 
@@ -360,23 +362,23 @@ Therefore a OM version was added called LIGHTWEIGHT\_LIST\_STATUS. When the Ozon
 
 With the proposal in this document, we would also tag List Keys Light in OM so that it is not available until OM is “acting as” a version which is greater or equal to when List Keys Light was introduced. This is not strictly necessary from a data integrity standpoint, but it brings consistency to the availability of new APIs across OM leader changes and makes it clear to developers that all such APIs should be version gated for ZDU. It also should not be possible to call the new API from the client, because the OM version returned to the client during upgrade would be the “acting as” version, rather than the latest version of the component the software supports.
 
-## Examples From Future Development To Ensure Compatibility
+###  Examples From Future Development To Ensure Compatibility
 
 This section covers a few features that may land in Ozone after rolling upgrade support is added, and how the new framework is equipped to handle them
 
-### Leader Execution {#leader-execution}
+####  Leader Execution {#leader-execution}
 
 Leader execution makes a switch in the Ozone Manager request processing (and potentially SCM after that) to compute the changes to the Ratis state machine (RocksDB) on the leader before submitting the request to Ratis, and using Ratis to reach consensus on those changes. This differs from the current model where the request is submitted to Ratis for consensus, and while applying it to the state machine, all OMs compute the required DB changes independently.
 
 Leader execution is being designed with a switch so that requests can be migrated one by one, and flows can be switched from the old to the new at the beginning of request processing. This is the place where we would put a check for the OM’s apparent version. If our apparent version supports leader execution, we would use the leader execution flow. Until then, the old flow must be used. This supports downgrade so that older OMs can still read the entries from the Ratis log. Note that finalization itself goes through Ratis on the OMs, so they would all switch to the new flow simultaneously.
 
-### Event Notification
+####  Event Notification
 
 Event notification adds support for plugins to read a ledger of events stored in the OM and push them to various other services. The ledger is a new RocksDB column family. This will need a component version to block plugins from running until finalization, otherwise events may seem to appear and disappear as OM leader changes while the software is being upgraded. An action bound to the finalization event can start the plugins when the version is finalized.  The component version must also block writing of events to the OM DB until finalization, because before this point the OMs may be in mixed software versions and older OMs could end up with different ledgers.
 
 This is an example of a feature where rolling upgrade imposes stricter versioning requirements than non-rolling upgrade. If only non-rolling upgrade is supported, this feature would require no versioning. This is because all the OMs would gain or lose the support for writing and pushing events at the same time, and the old OM on downgrade would simply ignore the extra ledger column family.
 
-### New Container Schema
+####  New Container Schema
 
 Container schemas refer to the layout of individual container replicas stored on the datanodes. We are currently on our third container schema since Ozone’s inception, and it’s likely that there will be more in the future. Ozone’s approach has been to leave existing data in a backwards compatible format and do any migration as an optional background process after the upgrade is complete. This will not change with rolling upgrades.
 
