@@ -71,10 +71,11 @@ const getHealthIcon = (value: string): React.ReactElement => {
 }
 
 const getSummaryTableValue = (
-  value: number | string | undefined,
+  value: number | string | undefined | null,
   colType: 'value' | undefined = undefined
 ): string => {
-  if (!value) return 'N/A';
+  if (value === null || value === undefined) return 'N/A';
+  if (typeof value === 'string' && value.trim() === '') return 'N/A';
   if (colType === 'value') return String(value as string)
   return size(value as number)
 }
