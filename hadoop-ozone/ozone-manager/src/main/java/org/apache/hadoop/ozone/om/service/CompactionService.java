@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -132,6 +133,83 @@ public class CompactionService extends BackgroundService {
 
   private boolean shouldRun() {
     return !suspended.get();
+  }
+
+  /**
+   * Compact a specific table asynchronously. This method returns immediately
+   * with a CompletableFuture that completes when the compaction finishes.
+   * This is useful for on-demand compaction requests (e.g., via admin RPC)
+   * where the caller doesn't need to wait for completion.
+   *
+   * @param tableName the name of the table to compact
+   * @return CompletableFuture that completes when compaction finishes
+   */
+  public CompletableFuture<Void> compactTableAsync(String tableName) {
+    return CompletableFuture.supplyAsync(() -> {
+      try {
+        compactFully(tableName);
+        return null;
+      } catch (Exception e) {
+        LOG.warn("Failed to compact column family: {}", tableName, e);
+      }
+      return null;
+    });
+  }
+
+  /**
+   * Compact a specific table on-demand without requiring the table
+   * to be in the configured compaction list. This is useful for
+   * ad-hoc compaction requests (e.g., via admin RPC).
+   *
+   * @param ozoneManager the OzoneManager instance
+   * @param tableName the name of the table to compact
+   * @throws IOException if compaction fails or table is not found
+   */
+  public static void compactTableOnDemand(OzoneManager ozoneManager, String tableName)
+      throws IOException {
+    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
+    long startTime = Time.monotonicNow();
+    LOG.info("Compacting column family on-demand: {}", tableName);
+    try (ManagedCompactRangeOptions options = new ManagedCompactRangeOptions()) {
+      options.setBottommostLevelCompaction(ManagedCompactRangeOptions.BottommostLevelCompaction.kForce);
+      options.setExclusiveManualCompaction(true);
+      RocksDatabase rocksDatabase = ((RDBStore) omMetadataManager.getStore()).getDb();
+
+      try {
+        // Find CF Handler
+        RocksDatabase.ColumnFamily columnFamily = rocksDatabase.getColumnFamily(tableName);
+        rocksDatabase.compactRange(columnFamily, null, null, options);
+        LOG.info("Compaction of column family: {} completed in {} ms",
+            tableName, Time.monotonicNow() - startTime);
+      } catch (NullPointerException ex) {
+        LOG.error("Unable to trigger compaction for \"{}\". Column family not found ", tableName);
+        throw new IOException("Column family \"" + tableName + "\" not found.");
+      }
+    }
+  }
+
+  /**
+   * Compact a specific table on-demand asynchronously without requiring the table
+   * to be in the configured compaction list. This method returns immediately
+   * with a CompletableFuture that completes when the compaction finishes.
+   * This is useful for ad-hoc compaction requests (e.g., via admin RPC)
+   * where the caller doesn't need to wait for completion.
+   *
+   * @param ozoneManager the OzoneManager instance
+   * @param tableName the name of the table to compact
+   * @return CompletableFuture that completes when compaction finishes
+   */
+  public static CompletableFuture<Void> compactTableOnDemandAsync(
+      OzoneManager ozoneManager, String tableName) {
+    return CompletableFuture.supplyAsync(() -> {
+      try {
+        compactTableOnDemand(ozoneManager, tableName);
+        return null;
+      } catch (Exception e) {
+        LOG.warn("Failed to compact column family: {}", tableName, e);
+      }
+      return null;
+    });
   }
 
   protected void compactFully(String tableName) throws IOException {
