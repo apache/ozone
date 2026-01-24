@@ -81,15 +81,15 @@ This simplified version framework lets us enforce **three invariants** to reason
 * **At the time of finalization, all internal components must be running the new bits.**  
 * **For internal client/server relationships, the server will always finalize before the client.**
 
-The following table demonstrates this in a Ratis group of 3 OMs who are being upgraded from software version 100 to software version 105. Each component's version is indicated using the notation `<apparent version>/<software version>`. Versions in bold are running the new software. Note that the apparent versions of the OMs always match.
+This table provides a visual example of apparent and software version during a rolling upgrade of the Ozone Managers. Each component's version is indicated using the notation `<apparent version>/<software version>`, and bold versions are running the new software. This notation will be used throughout the document to refer to component versions. Note that the apparent versions of the OMs always match. See the [appendix](#Appendix%20Step%20by%20Step%20ZDU%20Process) for a complete cluster-wide example.
 
-| OM1         | OM2         | OM3         | Status                                                                                          |
-| ----------- | ----------- | ----------- | ----------------------------------------------------------------------------------------------- |
-| 100/100     | 100/100     | 100/100     | All OMs are finalized in the old version                                                        |
-| **100/105** | 100/100     | 100/100     | OM1 is stopped and started with the new version                                                 |
-| **100/105** | **100/105** | 100/100     | OM2 is stopped and started with the new version                                                 |
-| **100/105** | **100/105** | **100/105** | New version has been deployed on all OMs, but they have not yet finalized to use new features.  |
-| **105/105** | **105/105** | **105/105** | Finalize command has been sent over Ratis. All OMs move to the new apparent version atomically. |
+| Status                                          | OM1         | OM2         | OM3         |
+| ----------------------------------------------- | ----------- | ----------- | ----------- |
+| All OMs are finalized in the old version        | 100/100     | 100/100     | 100/100     |
+| OM1 is stopped and started with the new version | **100/105** | 100/100     | 100/100     |
+| OM2 is stopped and started with the new version | **100/105** | **100/105** | 100/100     |
+| All OMs are running the new version             | **100/105** | **100/105** | **100/105** |
+| All OMs are finalized atomically via Ratis      | **105/105** | **105/105** | **105/105** |
 
 Later sections on upgrade flow and ordering will detail how these invariants are enforced. Note that external clients can be in any version and we will support full client/server version cross compatibility between internal components and external clients.
 
@@ -179,45 +179,32 @@ When SCM receives a finalize command, it will perform best effort verifications 
       1. To recover, the SCM must be restarted with the new software version which will match the leader issuing the request.  
       2. We cannot no-op this request because the leader and follower would then have different apparent versions, violating one of our upgrade invariants.
 
-The following table shows what would happen if finalize is incorrectly sent to SCMs before they are all on the same software version.
+The following table shows what would happen if finalize is incorrectly sent to SCMs before they are all on the same software version and the request makes it all the way to the apply transaction phase of Ratis (case 3 above).
 
-| Leader | Follower 1 | Follower 2 | Outcome |
-| :---- | :---- | :---- | :---- |
-| Apparent ver: 100Software ver: 105 | Apparent ver: 100Software ver: 105 | Apparent ver: 100Software ver: 105 | Finalize should succeed and move all SCMs’ apparent versions move to 105 atomically |
-| Apparent ver: 100Software ver: 100 | Apparent ver: 100Software ver: 105 | Apparent ver: 100Software ver: 105 | Finalize ignored on leader. Passed to followers and ignored there too. |
-| Apparent ver: 100Software ver: 105 | Apparent ver: 100Software ver: 105 | Apparent ver: 100Software ver: 100 | Finalize will fail on follower 2 and it should exit. It must be upgraded to version 105 to proceed. |
-| Apparent ver: 105Software ver: 105 | Apparent ver: 105Software ver: 105 | Apparent ver: 105Software ver: 105 | Cluster is already finalized, but the command can be forwarded in case there are any lagging followers and get ignored on the followers. |
+| Leader      | Follower 1  | Follower 2  | Outcome in Apply Transaction                                                                                                             |
+| :---------- | :---------- | :---------- | :--------------------------------------------------------------------------------------------------------------------------------------- |
+| **100/105** | **100/105** | **100/105** | Finalize should succeed and move all SCMs’ apparent versions to 105 atomically                                                           |
+| 100/100     | **100/105** | **100/105** | Finalize ignored on leader. Passed to followers and ignored there too.                                                                   |
+| **100/105** | **100/105** | 100/100     | Finalize will fail on follower 2 and it should exit. It must be upgraded to version 105 to proceed.                                      |
+| **105/105** | **105/105** | **105/105** | Cluster is already finalized, but the command can be forwarded in case there are any lagging followers and get ignored on the followers. |
 
 ###  Datanodes
 
-Unlike SCM, all datanodes are not in a Ratis ring together and therefore it is impossible to finalize all datanodes at the same time. SCM will issue the finalize command to datanodes after it has been finalized over the Datanode heartbeat. SCM will not consider the datanodes as finalized until all registered DNs have reported success.
+Unlike SCM, all datanodes are not in a Ratis ring together and therefore it is impossible to finalize all datanodes at the same time. SCM will issue the finalize command to datanodes after it has been finalized over the Datanode heartbeat. SCM will not consider the datanodes as finalized until all registered DNs have reported success. On each heartbeat, a Datanode will report its software version and apparent version. Any Datanodes that are offline (dead) need not be considered as they will need to re-register. If the cluster is finalized and the Datanode is not finalized, its registration will be rejected and it will be instructed to finalize and register again before it can join the cluster.
 
-Any Datanodes that are offline (dead) need not be considered as they will need to re-register. If the cluster is finalized and the Datanode is not finalized, its registration will be rejected and it will be instructed to finalize and register again before it can join the cluster.
-
-If a Datanode attempts to register with a software version greater than the max DatanodeVersion known to SCM, then it will be rejected. This can only occur if the Datanode has been upgraded to a version newer than the SCM version. As the ZDU requirement is for SCM to be upgraded first, Datanodes having a higher version is invalid.
-
-If a Datanode attempts to register and its software version is less than the one known by SCM, it indicates that Datanode is still running the old software version. If SCM is unfinalized, it is expected that datanodes can register with the older version, as the DNs will be upgraded after SCM. If SCM is finalized, any Datanodes attempting to register at an older software version should be rejected permanently until the datanode is upgraded so that the versions match.
-
-The following table captures the states SCM can be in and how it will respond to different Datanode versions:
-
-| SCM State | Datanode State |  |
-| :---- | :---- | :---- |
-| Software version 100 Apparent version: 100 | Software Version: 100Apparent Version: 100 | This is the expected state of a cluster where upgrade is not ongoing. |
-| Software version 105 Apparent version: 100 | Software Version: 100Apparent Version: 100 | This is an expected state. SCM software has been upgraded and the datanode has not. It is expected the datanode will upgrade later. |
-| Software version 105 Apparent version: 105 | Software Version: 100Apparent Version: 100 | SCM is upgraded and finalized and the datanode is still at the old version. This should only happen when the datanode was offline during the upgrade. As it has an older software version, SCM will block it from registering until its software has been updated. |
-| Software version 105 Apparent version: 100 | Software Version: 105Apparent Version: 100 | SCM is upgraded and not finalized, as is the datanode. This is an expected state until all datanodes reach this condition and SCM receives a finalize command from the admin. |
-| Software version 105 Apparent version: 105 | Software Version: 105Apparent Version: 100 | SCM is upgraded and finalized and the datanode is upgraded but not finalized. This can only happen if the datanode is offline during the finalization process. SCM will instruct the Datanode to finalize upon registration and it will not be able to register until it does. |
-| Software version 105 Apparent version: 100 | Software Version: 110Apparent Version: 100 | SCM is upgraded and not finalized. The datanode is upgraded, but to a greater version than SCM.SCM should reject the datanode on registration as its version is newer than SCM. |
-| Software version 105 Apparent version: 105 | Software Version: 110Apparent Version: 100 | SCM is upgraded and finalized. The datanode is upgraded, but to a greater version than SCM.SCM should reject the datanode on registration as its version is newer than SCM. This should only happen if the datanode was offline during the SCM finalization process. |
-| Software version 105 Apparent version: 105 | Software Version: 110Apparent Version: 105 | SCM is upgraded and finalized. The datanode is upgraded, and finalized to the same version as SCM, but its software version is greater than SCM.SCM should reject the datanode on registration as its version is newer than SCM. |
-
-On each heartbeat, a Datanode will report its software version and apparent version. When the datanode software version matches the max Datanode Software version known to SCM, SCM knows that datanode is running the latest software version.
+When the datanode software version matches the max Datanode Software version known to SCM, SCM knows that datanode is running the latest software version.
 
 When a datanode is reporting the same software and apparent version, and that version matches the max datanode version known to SCM, SCM knows the datanode is running the latest version and is finalized.
+
+If a Datanode attempts to register with a software version greater than the max version known to SCM, then it will be rejected. This can only occur if the Datanode has been upgraded to a version newer than the SCM version. As the ZDU requirement is for SCM to be upgraded first, Datanodes having a higher version is invalid.
+
+If a Datanode attempts to register and its software version is less than the one known by SCM, it indicates that Datanode is still running the old software version. If SCM is pre-finalized, it is expected that datanodes can register with the older version, as the DNs will be upgraded after SCM. If SCM is finalized, any Datanodes attempting to register at an older software version should be rejected permanently until the datanode is upgraded so that the versions match.
 
 SCM will not allow the finalize command to be passed to any datanode (or finalize itself) until all DNs are running the latest version.
 
 SCM will consider Datanode finalization complete when all healthy datanodes are reporting the correct software version and report a matching Apparent Version.
+
+See the [appendix](#Appendix%20Step%20by%20Step%20ZDU%20Process) for a complete table of how SCM to Datanode version relationships.
 
 ####  Mixed Datanode Versions During Write
 
@@ -384,7 +371,7 @@ With the proposal in this document, we would also tag List Keys Light in OM so t
 
 This section covers a few features that may land in Ozone after rolling upgrade support is added, and how the new framework is equipped to handle them
 
-####  Leader Execution {#leader-execution}
+####  Leader Execution
 
 Leader execution makes a switch in the Ozone Manager request processing (and potentially SCM after that) to compute the changes to the Ratis state machine (RocksDB) on the leader before submitting the request to Ratis, and using Ratis to reach consensus on those changes. This differs from the current model where the request is submitted to Ratis for consensus, and while applying it to the state machine, all OMs compute the required DB changes independently.
 
@@ -402,3 +389,69 @@ Container schemas refer to the layout of individual container replicas stored on
 
 Datanodes will choose which container schema to use based on the Datanode component version supplied by the client at the time of write to ensure that all replicas of the container have the same schema. Once a container is created, all writes to that container will use its schema version, regardless of the version the client passes. The finalization process outlined in this design ensures that all datanodes are in an apparent version that can handle this schema version at the time it is written. Note that container schemas currently only affect storage format and are invisible to clients reading and writing data from those containers.
 
+## Appendix: Step by Step ZDU Process
+
+This section demonstrates every step of a ZDU using an upgrade from software version 100 to software version 105 as an example. Assume that the component version numbers for OM and HDDS happen to be equivalent during this upgrade. Each component's version is indicated using the notation `<apparent version>/<software version>`. Versions in bold are running the new software. There are only three valid version states a component can be in during this upgrade:
+- 100/100: The old version finalized
+- **100/105**: The new version pre-finalized
+- **105/105**: The new version finalized
+Any other version is invalid and will be rejected. Note that the apparent versions of OM and SCMs always match within their Ratis groups.
+
+### 1. SCM: Deploy New Software
+
+There is no special command required to begin the upgrade process. SCMs can be restarted with the new software one by one. This table shows SCM's version relationship between other SCMs and their acceptance of Datanodes for registration, reads, and writes. It also shows the `DN Pipeline Version`, which is the version SCM will attach to block allocations for clients to forward to Datanodes to determine the version used to write the data. Note that this version is never higher than the lowest accepted Datanode apparent version.
+
+| Status                                                                                          | SCM1        | SCM2        | SCM3        | DN Pipeline Version | Datanodes 100/100 | Datanodes 100/105 | Datanodes 105/105 |
+| ----------------------------------------------------------------------------------------------- | ----------- | ----------- | ----------- | ------------------- | ----------------- | ----------------- | ----------------- |
+| All SCMs are finalized in the old version                                                       | 100/100     | 100/100     | 100/100     | 100                 | Accepted          | Rejected          | Rejected          |
+| SCM1 is stopped and started with the new version                                                | **100/105** | 100/100     | 100/100     | 100                 | Accepted          | Rejected          | Rejected          |
+| SCM2 is stopped and started with the new version                                                | **100/105** | **100/105** | 100/100     | 100                 | Accepted          | Rejected          | Rejected          |
+| New version has been deployed on all SCMs, but they have not yet finalized to use new features. | **100/105** | **100/105** | **100/105** | 100                 | Accepted          | Accepted          | Rejected          |
+
+### 2. Recon: Deploy New Software
+
+Recon currently does not use finalization, so this step is a trivial restart in the new version.
+
+### 3. OM: Deploy New Software
+
+Unlike the current non-rolling upgrade framework, there is no need to use "prepare for upgrade" to start the OM upgrade process. OMs can be restarted with the new software version one by one.
+
+| Status                                                                                         | OM1         | OM2         | OM3         |
+| ---------------------------------------------------------------------------------------------- | ----------- | ----------- | ----------- |
+| All OMs are finalized in the old version                                                       | 100/100     | 100/100     | 100/100     |
+| OM1 is stopped and started with the new version                                                | **100/105** | 100/100     | 100/100     |
+| OM2 is stopped and started with the new version                                                | **100/105** | **100/105** | 100/100     |
+| New version has been deployed on all OMs, but they have not yet finalized to use new features. | **100/105** | **100/105** | **100/105** |
+
+After completing this step, the leader OM will begin polling SCM to learn whether HDDS has finished finalizing, and therefore it should finalize.
+
+### 4. External Clients (S3 Gateway, HTTPFS): Deploy New Software
+
+External clients are stateless and Ozone supports full external client/server cross compatibility, so no finalization is required for this step. After this point, all components are running the new software. Regression testing can be be done on the new version, and a downgrade is possible by reversing the previous steps.
+
+### 5. SCM: Receives Finalize Command From Admin
+
+The admin will send this command when they have completed regression testing in the new version and do not wish to downgrade. SCM will first verify that all live Datanodes and its peer SCMs are running the newest software version 105. If any of these components are not, the finalize command will be rejected.
+
+| Status                                                                                          | SCM1        | SCM2        | DN Pipeline Version | Datanodes 100/100 | Datanodes 100/105 | Datanodes 105/105 |
+| ----------------------------------------------------------------------------------------------- | ----------- | ----------- | ------------------- | ----------------- | ----------------- | ----------------- |
+| New version has been deployed on all SCMs, but they have not yet finalized to use new features  | **100/105** | **100/105** | 100                 | Rejected          | Accepted          | Rejected          |
+| Finalize command has been sent over Ratis. All SCMs move to the new apparent version atomically | **105/105** | **105/105** | 100                 | Rejected          | Accepted          | Accepted          |
+
+### 6. Datanodes: Receive Finalize Command From SCM
+
+After SCM has finalized, the leader will send finalize commands to all Datanodes. It will retry sending this command until all Datanodes heartbeat back that they have finalized. Once all Datanodes have finalized, SCM can increase the `DN Pipeline Version` so any new features on the Datanode write path can be used.
+
+| Status                                                                           | SCM1        | SCM2        | SCM3        | DN Pipeline Version | Datanodes 100/100 | Datanodes 100/105                                           | Datanodes 105/105 |
+| -------------------------------------------------------------------------------- | ----------- | ----------- | ----------- | ------------------- | ----------------- | ----------------------------------------------------------- | ----------------- |
+| All SCMs have finalized, and the leader begins instructing Datanodes to finalize | **105/105** | **105/105** | **105/105** | 100                 | Rejected          | Accepted                                                    | Accepted          |
+| All live datanodes have finalized                                                | **105/105** | **105/105** | **105/105** | **105**             | Rejected          | Rejected, but instructed to finalize and retry registration | Accepted          |
+
+### 7. OM: Learns to Finalize From Polling SCM 
+
+| Status                                                                                                                         | OM1         | OM2         | OM3         |
+| ------------------------------------------------------------------------------------------------------------------------------ | ----------- | ----------- | ----------- |
+| New version has been deployed on all OMs, but they have not yet finalized to use new features.                                 | **100/105** | **100/105** | **100/105** |
+| SCM finalization is detected and the finalize command is sent over Ratis. All OMs move to the new apparent version atomically. | **105/105** | **105/105** | **105/105** |
+
+Once these steps have completed, OM will stop polling SCM. The upgrade is complete.
