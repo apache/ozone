@@ -17,6 +17,11 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
+
+import java.io.IOException;
+import java.io.InputStream;
+import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
@@ -25,14 +30,20 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.util.Time;
 import org.apache.http.HttpStatus;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.core.Response;
-import java.io.IOException;
-import java.io.InputStream;
 
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.newError;
-
-public class BucketCrudHandler extends EndpointBase implements BucketOperationHandler{
+/**
+ * Handler for default bucket CRUD operations.
+ * Implements PUT (create bucket) and DELETE operations when no
+ * subresource query parameters are present.
+ *
+ * This handler processes bucket-level requests that do not target
+ * specific subresources (such as {@code ?acl}, {@code ?uploads},
+ * or {@code ?delete}), which are handled by dedicated handlers.
+ *
+ * This handler extends EndpointBase to inherit all required functionality
+ * (configuration, headers, request context, audit logging, metrics, etc.).
+ */
+public class BucketCrudHandler extends EndpointBase implements BucketOperationHandler {
 
   private boolean shouldHandlePutCreateBucket() {
     // This must be conservative to avoid swallowing subresource requests.
@@ -42,9 +53,6 @@ public class BucketCrudHandler extends EndpointBase implements BucketOperationHa
         && queryParams().get(S3Consts.QueryParams.DELETE) == null;
   }
 
-  /**
-   * Default PUT bucket operation (create bucket).
-   */
   @Override
   public Response handlePutRequest(String bucketName, InputStream body)
       throws IOException, OS3Exception {
