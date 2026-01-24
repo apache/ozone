@@ -4882,13 +4882,12 @@
 
   <property>
     <name>net.topology.node.switch.mapping.impl</name>
-    <value>org.apache.hadoop.net.TableMapping</value>
+    <value>org.apache.hadoop.net.ScriptBasedMapping</value>
     <tag>OZONE, SCM</tag>
     <description>
       The default implementation of the DNSToSwitchMapping. It
-      reads a static mapping file specified in net.topology.table.file.name to resolve
-      node names to network locations. If the value for net.topology.table.file.name
-      is not set, or if a node is not found in the mapping file, the
+      invokes a script specified in net.topology.script.file.name to resolve
+      node names. If the value for net.topology.script.file.name is not set, the
       default value of DEFAULT_RACK is returned for all node names.
     </description>
   </property>

@@ -180,7 +180,7 @@ import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.CachedDNSToSwitchMapping;
 import org.apache.hadoop.net.DNSToSwitchMapping;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.net.TableMapping;
+import org.apache.hadoop.net.ScriptBasedMapping;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
@@ -726,7 +726,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     Class<? extends DNSToSwitchMapping> dnsToSwitchMappingClass =
         conf.getClass(
             ScmConfigKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
-            TableMapping.class, DNSToSwitchMapping.class);
+            ScriptBasedMapping.class, DNSToSwitchMapping.class);
     DNSToSwitchMapping newInstance = ReflectionUtils.newInstance(
         dnsToSwitchMappingClass, conf);
     dnsToSwitchMapping =
