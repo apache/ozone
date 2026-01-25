@@ -27,7 +27,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
-import org.apache.hadoop.ozone.s3.util.S3Consts;
+import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.apache.hadoop.util.Time;
 import org.apache.http.HttpStatus;
 
@@ -46,11 +46,9 @@ import org.apache.http.HttpStatus;
 public class BucketCrudHandler extends EndpointBase implements BucketOperationHandler {
 
   private boolean shouldHandlePutCreateBucket() {
-    // This must be conservative to avoid swallowing subresource requests.
-    // Exclude the queries already handled by other handlers/endpoints.
-    return queryParams().get(S3Consts.QueryParams.ACL) == null
-        && queryParams().get(S3Consts.QueryParams.UPLOADS) == null
-        && queryParams().get(S3Consts.QueryParams.DELETE) == null;
+    return queryParams().get(QueryParams.ACL) == null
+        && queryParams().get(QueryParams.UPLOADS) == null
+        && queryParams().get(QueryParams.DELETE) == null;
   }
 
   @Override
@@ -87,9 +85,9 @@ public class BucketCrudHandler extends EndpointBase implements BucketOperationHa
   public Response handleDeleteRequest(String bucketName)
       throws IOException, OS3Exception {
 
-    if (queryParams().get(S3Consts.QueryParams.ACL) != null
-        || queryParams().get(S3Consts.QueryParams.UPLOADS) != null
-        || queryParams().get(S3Consts.QueryParams.DELETE) != null) {
+    if (queryParams().get(QueryParams.ACL) != null
+        || queryParams().get(QueryParams.UPLOADS) != null
+        || queryParams().get(QueryParams.DELETE) != null) {
       return null;
     }
 
