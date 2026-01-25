@@ -65,7 +65,7 @@ export const COLUMNS: ColumnsType<Container> = [
     sorter: (a: Container, b: Container) => a.containerID - b.containerID
   },
   {
-    title: 'No of Blocks',
+    title: 'No. of Blocks',
     dataIndex: 'keys',
     key: 'keys',
     sorter: (a: Container, b: Container) => a.keys - b.keys
