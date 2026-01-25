@@ -23,8 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.List;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
@@ -87,12 +88,12 @@ public class TestOMFailovers {
   private static final class MockOzoneManagerProtocol
       implements OzoneManagerProtocolPB {
 
-    private final String omNodeId;
+    private final InetSocketAddress omAddress;
     // Exception to throw when submitMockRequest is called
     private final Exception exception;
 
-    private MockOzoneManagerProtocol(String nodeId, Exception ex) {
-      omNodeId = nodeId;
+    private MockOzoneManagerProtocol(InetSocketAddress address, Exception ex) {
+      omAddress = address;
       exception = ex;
     }
 
@@ -100,7 +101,7 @@ public class TestOMFailovers {
     public OMResponse submitRequest(RpcController controller,
         OzoneManagerProtocolProtos.OMRequest request) throws ServiceException {
       throw new ServiceException("ServiceException of type " +
-          exception.getClass() + " for " + omNodeId, exception);
+          exception.getClass() + " for " + omAddress, exception);
     }
   }
 
@@ -112,28 +113,20 @@ public class TestOMFailovers {
     }
 
     @Override
-    protected ProxyInfo<OzoneManagerProtocolPB> createOMProxyIfNeeded(
-        OMProxyInfo<OzoneManagerProtocolPB> omProxyInfo) {
-      if (omProxyInfo.proxy == null) {
-        omProxyInfo.proxy = new MockOzoneManagerProtocol(omProxyInfo.getNodeId(), testException);
-      }
-      return omProxyInfo;
+    protected OzoneManagerProtocolPB createOMProxy(InetSocketAddress omAddress) throws IOException {
+      return new MockOzoneManagerProtocol(omAddress, testException);
     }
 
     @Override
-    protected void initOmProxiesFromConfigs(ConfigurationSource config,
+    protected List<OMProxyInfo<OzoneManagerProtocolPB>> initOmProxiesFromConfigs(ConfigurationSource config,
         String omSvcId) {
-      HashMap<String, OMProxyInfo<OzoneManagerProtocolPB>> omProxyInfos = new HashMap<>();
-      ArrayList<String> omNodeIDList = new ArrayList<>();
+      final List<OMProxyInfo<OzoneManagerProtocolPB>> omProxyInfos = new ArrayList<>();
 
       for (int i = 1; i <= 3; i++) {
         String nodeId = "om" + i;
-        OMProxyInfo<OzoneManagerProtocolPB> omProxyInfo = new OMProxyInfo<>(omSvcId, nodeId,
-            "127.0.0.1:9862");
-        omProxyInfos.put(nodeId, omProxyInfo);
-        omNodeIDList.add(nodeId);
+        omProxyInfos.add(OMProxyInfo.newInstance(null, omSvcId, nodeId, "127.0.0.1:986" + i));
       }
-      initOmProxies(omProxyInfos, omNodeIDList);
+      return omProxyInfos;
     }
 
     @Override

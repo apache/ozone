@@ -130,8 +130,7 @@ public class GrpcOmTransport implements OmTransport {
       return;
     }
 
-    List<String> nodes = omFailoverProxyProvider.getGrpcOmNodeIDList();
-    for (String nodeId : nodes) {
+    for (String nodeId : omFailoverProxyProvider.getOMProxyMap().getNodeIds()) {
       String hostaddr = omFailoverProxyProvider.getGrpcProxyAddress(nodeId);
       HostAndPort hp = HostAndPort.fromString(hostaddr);
 
@@ -361,8 +360,7 @@ public class GrpcOmTransport implements OmTransport {
 
   @VisibleForTesting
   public void startClient(ManagedChannel testChannel) throws IOException {
-    List<String> nodes = omFailoverProxyProvider.getGrpcOmNodeIDList();
-    for (String nodeId : nodes) {
+    for (String nodeId : omFailoverProxyProvider.getOMProxyMap().getNodeIds()) {
       String hostaddr = omFailoverProxyProvider.getGrpcProxyAddress(nodeId);
 
       clients.put(hostaddr,

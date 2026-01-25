@@ -86,12 +86,6 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider<T> implements Failover
    */
   private int currentIndex = -1;
 
-  /**
-   * The proxy currently being used to send the read request.
-   * Should only be accessed in synchronized methods.
-   */
-  private OMProxyInfo<T> currentProxy;
-
   /** The last proxy that has been used. Only used for testing. */
   private volatile OMProxyInfo<T> lastProxy = null;
 
@@ -209,13 +203,15 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider<T> implements Failover
    * @return The new proxy that should be used.
    */
   private synchronized OMProxyInfo<T> changeProxy(OMProxyInfo<T> initial) {
+    OMProxyInfo<T> currentProxy = failoverProxy.getOMProxyMap().get(currentIndex);
     if (currentProxy != initial) {
       // Must have been a concurrent modification; ignore the move request
       return currentProxy;
     }
-    currentIndex = (currentIndex + 1) % failoverProxy.getOmNodesInOrder().size();
-    String currentOmNodeId = failoverProxy.getOmNodesInOrder().get(currentIndex);
-    currentProxy = (OMProxyInfo<T>) failoverProxy.createOMProxyIfNeeded(currentOmNodeId);
+    final OMProxyInfo.OrderedMap<T> omProxies = failoverProxy.getOMProxyMap();
+    currentIndex = (currentIndex + 1) % omProxies.size();
+    final String currentOmNodeId = omProxies.getNodeId(currentIndex);
+    currentProxy = failoverProxy.createOMProxyIfNeeded(currentOmNodeId);
     LOG.debug("Changed current proxy from {} to {}",
         initial == null ? "none" : initial.proxyInfo,
         currentProxy.proxyInfo);
@@ -243,16 +239,15 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider<T> implements Failover
         // we should invoke the method on the current proxy
         return method.invoke(this, args);
       }
-      Object retVal = null;
       OMRequest omRequest = parseOMRequest(args);
       if (useFollowerRead && OmUtils.shouldSendToFollower(omRequest)) {
         int failedCount = 0;
-        for (int i = 0; useFollowerRead && i < failoverProxy.getOmNodesInOrder().size(); i++) {
+        for (int i = 0; useFollowerRead && i < failoverProxy.getOMProxyMap().size(); i++) {
           OMProxyInfo<T> current = getCurrentProxy();
           LOG.debug("Attempting to service {} with cmdType {} using proxy {}",
               method.getName(), omRequest.getCmdType(), current.proxyInfo);
           try {
-            retVal = method.invoke(current.proxy, args);
+            final Object retVal = method.invoke(current.getProxy(), args);
             lastProxy = current;
             LOG.debug("Invocation of {} with cmdType {} using {} was successful",
                 method.getName(), omRequest.getCmdType(), current.proxyInfo);
@@ -340,9 +335,10 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider<T> implements Failover
       // or this is a write request. In any case, forward the request to
       // the leader OM.
       LOG.debug("Using leader-based failoverProxy to service {}", method.getName());
-      OMProxyInfo<T> leaderProxy = (OMProxyInfo<T>) failoverProxy.getProxy();
+      final OMProxyInfo<T> leaderProxy = failoverProxy.getProxy();
+      Object retVal = null;
       try {
-        retVal = method.invoke(leaderProxy.proxy, args);
+        retVal = method.invoke(leaderProxy.getProxy(), args);
       } catch (InvocationTargetException e) {
         LOG.debug("Exception thrown from leader-based failoverProxy", e.getCause());
         // This exception will be handled by the OMFailoverProxyProviderBase#getRetryPolicy
@@ -361,7 +357,7 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider<T> implements Failover
     @Override
     public ConnectionId getConnectionId() {
       return RPC.getConnectionIdForProxy(useFollowerRead
-          ? getCurrentProxy().proxy : failoverProxy.getProxy().proxy);
+          ? getCurrentProxy().proxy : failoverProxy.getProxy().getProxy());
     }
   }
 
@@ -383,17 +379,18 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider<T> implements Failover
   }
 
   public synchronized void changeInitialProxyForTest(String initialOmNodeId) {
+    final OMProxyInfo<T> currentProxy = failoverProxy.getOMProxyMap().get(currentIndex);
     if (currentProxy != null && currentProxy.getNodeId().equals(initialOmNodeId)) {
       return;
     }
 
-    int indexOfTargetNodeId = failoverProxy.getOmNodesInOrder().indexOf(initialOmNodeId);
+    int indexOfTargetNodeId = failoverProxy.getOMProxyMap().indexOf(initialOmNodeId);
     if (indexOfTargetNodeId == -1) {
       return;
     }
 
     currentIndex = indexOfTargetNodeId;
-    currentProxy = (OMProxyInfo<T>) failoverProxy.createOMProxyIfNeeded(initialOmNodeId);
+    failoverProxy.createOMProxyIfNeeded(initialOmNodeId);
   }
 
   /**
