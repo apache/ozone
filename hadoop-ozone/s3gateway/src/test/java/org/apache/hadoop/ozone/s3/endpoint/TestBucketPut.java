@@ -40,10 +40,8 @@ public class TestBucketPut {
 
   @BeforeEach
   public void setup() throws Exception {
-    // Create client stub and object store stub.
     OzoneClient clientStub = new OzoneClientStub();
 
-    // Create BucketEndpoint with OzoneClientStub
     bucketEndpoint = EndpointBuilder.newBucketEndpointBuilder()
         .setClient(clientStub)
         .build();
