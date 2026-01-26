@@ -244,7 +244,6 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     assertNull(doCallRealMethod().when(omDbCheckpointServletMock).getBootstrapTempData());
     doCallRealMethod().when(omDbCheckpointServletMock).
         processMetadataSnapshotRequest(any(), any(), anyBoolean(), anyBoolean());
-    doCallRealMethod().when(omDbCheckpointServletMock).writeDbDataToStream(any(), any(), any(), any(), any());
     doCallRealMethod().when(omDbCheckpointServletMock).getCompactionLogDir();
     doCallRealMethod().when(omDbCheckpointServletMock).getSstBackupDir();
     doCallRealMethod().when(omDbCheckpointServletMock)
@@ -299,8 +298,10 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
       files.when(() -> Files.exists(dbDir)).thenReturn(true);
       files.when(() -> Files.list(dbDir)).thenReturn(stream);
 
+      OMDBArchiver archiver = new OMDBArchiver();
+      archiver.setTmpDir(folder);
       boolean result = servlet.collectFilesFromDir(new HashSet<>(), dbDir,
-          new AtomicLong(Long.MAX_VALUE), true, new OMDBArchiver());
+          new AtomicLong(Long.MAX_VALUE), true, archiver);
       assertTrue(result);
     }
 
@@ -445,16 +446,16 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     Files.write(nonSstFile, "log content".getBytes(StandardCharsets.UTF_8));
     Set<String> sstFilesToExclude = new HashSet<>();
     AtomicLong maxTotalSstSize = new AtomicLong(1000000); // Sufficient size
-    OMDBArchiver omdbArchiver = new OMDBArchiver();
+    OMDBArchiver omDbArchiver = new OMDBArchiver();
     Path tmpDir = folder.resolve("tmp");
     Files.createDirectories(tmpDir);
-    omdbArchiver.setTmpDir(tmpDir);
-    OMDBArchiver omDbArchiverSpy = spy(omdbArchiver);
+    omDbArchiver.setTmpDir(tmpDir);
+    OMDBArchiver omDbArchiverSpy = spy(omDbArchiver);
     List<String> fileNames = new ArrayList<>();
     doAnswer((invocation) -> {
       File sourceFile = invocation.getArgument(0);
       fileNames.add(sourceFile.getName());
-      omdbArchiver.recordFileEntry(sourceFile, invocation.getArgument(1));
+      omDbArchiver.recordFileEntry(sourceFile, invocation.getArgument(1));
       return null;
     }).when(omDbArchiverSpy).recordFileEntry(any(), anyString());
     boolean success =

@@ -95,10 +95,24 @@ public class OMDBArchiver {
    * Records the given file entry into the map after taking a hardlink.
    */
   public long recordFileEntry(File file, String entryName) throws IOException {
+    if (tmpDir == null) {
+      throw new IllegalStateException(
+          "Temporary directory not set. Call setTmpDir() before recordFileEntry().");
+    }
     File link = tmpDir.resolve(entryName).toFile();
     long bytes = 0;
     try {
-      Files.createLink(link.toPath(), file.toPath());
+      Path linkPath = link.toPath();
+      if (Files.exists(linkPath)) {
+        // If the existing file is already a link to the same source, just reuse it.
+        if (Files.isSameFile(linkPath, file.toPath())) {
+          filesToWriteIntoTarball.put(entryName, link);
+          return file.length();
+        }
+        // Otherwise, remove the stale link/entry so we can recreate it.
+        Files.delete(linkPath);
+      }
+      Files.createLink(linkPath, file.toPath());
       filesToWriteIntoTarball.put(entryName, link);
       bytes = file.length();
     } catch (IOException ioe) {
@@ -128,6 +142,7 @@ public class OMDBArchiver {
         File link = kv.getValue();
         try {
           bytesWritten += includeFile(link, entryName, archiveOutput);
+          filesWritten++;
           if (Time.monotonicNow() - lastLoggedTime >= 30000) {
             LOG.info("Transferred {} KB, #files {} to checkpoint tarball stream...",
                 bytesWritten / (1024), filesWritten);

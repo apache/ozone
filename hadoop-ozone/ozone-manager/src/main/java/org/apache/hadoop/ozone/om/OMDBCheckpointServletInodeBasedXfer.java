@@ -148,6 +148,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
     Set<String> receivedSstFiles = extractFilesToExclude(sstParam);
     Path tmpdir = null;
     OMDBArchiver omdbArchiver = new OMDBArchiver();
+    boolean filesCollected = false;
     try (UncheckedAutoCloseable lock = getBootstrapStateLock().acquireWriteLock()) {
       tmpdir = Files.createTempDirectory(getBootstrapTempData().toPath(),
           "bootstrap-data-");
@@ -165,19 +166,22 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
       LOG.info("Time taken to collect the DB data : {} milliseconds", duration);
       logSstFileList(receivedSstFiles,
           "Excluded {} SST files from the latest checkpoint{}: {}", 5);
+      filesCollected = true;
     } catch (Exception e) {
       LOG.error(
           "Unable to process metadata snapshot request. ", e);
       response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
     }
     try {
-      Instant start = Instant.now();
-      OutputStream outputStream = response.getOutputStream();
-      omdbArchiver.writeToArchive(getConf(), outputStream);
-      Instant end = Instant.now();
-      long duration = Duration.between(start, end).toMillis();
-      LOG.info("Time taken to write the checkpoint to response output " +
-          "stream: {} milliseconds", duration);
+      if (filesCollected) {
+        Instant start = Instant.now();
+        OutputStream outputStream = response.getOutputStream();
+        omdbArchiver.writeToArchive(getConf(), outputStream);
+        Instant end = Instant.now();
+        long duration = Duration.between(start, end).toMillis();
+        LOG.info("Time taken to write the checkpoint to response output " +
+            "stream: {} milliseconds", duration);
+      }
     } catch (IOException e) {
       LOG.error("unable to write to archive stream", e);
     } finally {
@@ -314,7 +318,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
       }
 
     } catch (IOException ioe) {
-      LOG.error("got exception while collecting files to archive " + ioe);
+      LOG.error("got exception while collecting files to archive ", ioe);
       throw ioe;
     } finally {
       cleanupCheckpoint(checkpoint);
@@ -352,14 +356,16 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
   }
 
   /**
-   * Transfers the snapshot data from the specified snapshot directories into the archive output stream,
-   * handling deduplication and managing resource locking.
+   * Collects the snapshots to be transferred from the specified snapshot directories
+   * into the archive output stream,
    *
    * @param sstFilesToExclude   Set of SST file identifiers to exclude from the archive.
    * @param snapshotPaths       Set of paths to snapshot directories to be processed.
    * @param maxTotalSstSize     AtomicLong to track the cumulative size of SST files included.
+   * @param omdbArchiver     helper to archive the OM DB.
    * @throws IOException if an I/O error occurs during processing.
    */
+  @VisibleForTesting
   void collectSnapshotData(Set<String> sstFilesToExclude, Collection<Path> snapshotPaths,
       Collection<Path> snapshotLocalPropertyFiles, AtomicLong maxTotalSstSize,
       OMDBArchiver omdbArchiver)
