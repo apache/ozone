@@ -138,19 +138,25 @@ This is a summary of invariants for internal components outlined in earlier sect
 
 ###  Order of Operations During the Upgrade
 
+This is a high level summary of all the steps that will happen during a rolling upgrade. For a more detailed view, see the [appendix](#Appendix%20Step%20by%20Step%20ZDU%20Process). Note that rolling upgrade has stricter requirements than non-rolling upgrade, so this process can also be used for a non-rolling upgrade by performing steps 1-5 at the same time.
+
 1. Deploy the new software version to SCM and rolling restart the SCMs.  
 2. Deploy the new software version to Recon and restart Recon.  
 3. Deploy the new software version to all datanodes and rolling restart the DNs.  
 4. Deploy the new software version to all OMs and rolling restart the OMs.  
 5. Deploy the new software and rolling restart all client processes like S3 Gateway, HTTPFS, Prometheus etc. These processes are all Ozone clients and sit somewhat outside of the core Ozone cluster.
-   6. At this stage, the cluster is operating with the new software version, but is still “acting as” the older apparent version. No data will be written to disk in a new format, and new features will be unavailable.
-7. The finalize command is sent to SCM by the admin \- this is what is used to switch the cluster to act as the new version. Upon receipt of the finalize command:  
-   8. SCM will finalize itself over Ratis, saving the new finalized version.
-   9. It will notify datanodes over the heartbeat to finalize.
-   10. After all healthy datanodes have been finalized, OM can be finalized. To do this, OM will have been polling SCM periodically to see if it should finalize. Only after SCM and all datanodes have been finalized will OM get a “ready to finalize” response from the poll. The OM leader will then send a finalize command over Ratis to all OMs.
-   11. As OM is the entry point to the cluster for external clients, finalizing OM unlocks any new features in the upgraded version.
+    - At this stage, the cluster is operating with the new software version, but is still “acting as” the older apparent version. No data will be written to disk in a new format, and new features will be unavailable.
+6. The finalize command is sent to SCM by the admin - this is what is used to switch the cluster to act as the new version. Upon receipt of the finalize command:  
+   7. SCM will finalize itself over Ratis, saving the new finalized version.
+   8. It will notify datanodes over the heartbeat to finalize.
+   9. After all healthy datanodes have been finalized, OM can be finalized. To do this, OM will have been polling SCM periodically to see if it should finalize. Only after SCM and all datanodes have been finalized will OM get a “ready to finalize” response from the poll. The OM leader will then send a finalize command over Ratis to all OMs.
+   10. As OM is the entry point to the cluster for external clients, finalizing OM unlocks any new features in the upgraded version.
+
+If the previous upgrade was never finalized, the cluster can still be upgraded to the next version. This is because the logical versioning system is not tied to any particular Ozone release, it is just a relationship between the number written to the disk and the one saved in the code. Any features that have never been finalized will remain unfinalized until the finalize command is given.
 
 Before the cluster is finalized, it is possible to downgrade to the previous version by stopping the cluster and restarting it with the older software version. No data in a new format will have been persisted that the older software version will not understand. The restart with the downgraded software can either be done non-rolling, or rolling by restarting components in the reverse of the order outlined above.
+
+After the cluster is finalized, it cannot be downgraded. This is identical to the current upgrade framework. If a component sees that the version number on disk is larger than the one in its code, it will fail to start.
 
 During the upgrade, the cluster’s fault tolerance will not change. As nodes are being restarted with the new versions, we still require 2 OMs and SCMs active at all times to remain available. If any nodes fail to start in the new version, our existing fault tolerance accounts for this. The node should be brought online either by resolving the issue or downgrading it before others are restarted. Note that all nodes must be running the newest software version for finalization to begin, but the cluster remains fully operational with existing features until then.
 
@@ -273,6 +279,34 @@ Recon currently doesn’t have a finalization framework, so it does not have the
 
 In the worst case scenario, Recon will write something to disk in a new format, and the upgrade is aborted and rolled back. Then the older software will be unable to read the new format data. In that case, if the change cannot be easily undone manually, Recon can be reconstructed from scratch using a fresh OM snapshot.
 
+## Changes From The Existing Non-Rolling Upgrade Framework
+
+The non-rolling upgrade problem is a subset of the rolling upgrade problem. Therefore we can continue to support non-rolling upgrades with rolling upgrades using the existing strategy outlined in this doc. In addition to the version framework migration mentioned earlier, we can also remove or amend various aspects of the existing non-rolling upgrade framework which are no longer necessary.
+
+### Prepare For Upgrade
+
+The current upgrade process requires a "prepare for upgrade” step before the OMs are stopped in the old version and started in the new version. This flushes all Ratis transactions from the log to the state machine and puts the OM in a read-only mode, which it can leave when all the OMs are restarted in the new version. This prevents OMs from applying requests from the Ratis log in different versions and potentially diverging their state machines, but the read-only requirement will not work for ZDU. For this reason, the `ozone admin om prepare` command will be hidden and become a no-op for CLI compatibility and server side code can be removed. The new unified versioning framework will be used to handle applying requests in mixed versions as outlined in [Handling Apply Transaction in Mixed OM Versions](#Handling%20Apply%20Transaction%20in%20Mixed%20OM%20Versions).
+
+### Finalization Commands
+
+There is currently no requirement in the code about whether OM or HDDS needs to be finalized first. The user is free to send the two commands in any order. For rolling upgrades, SCM will be orchestrating the finalization process to ensure that servers always finalize first, so we will only expose a single `ozone admin finalize` command which starts this process. The existing commands will be hidden and become no-ops for CLI compatibility. OM will maintain its own API to query finalization status though. This allows us to have an `ozone admin finalize --status` command that reaches out to both OM and SCM to return the finalization status for all component types.
+
+### Upgrade Actions
+
+The current upgrade framework has support for [upgrade actions](https://github.com/apache/ozone/blob/b91292576e6a13c3c0149aca06847397b6ccc5a6/hadoop-hdds/common/src/main/java/org/apache/hadoop/ozone/upgrade/LayoutFeature.java#L42), which allow arbitrary operations to be run at various points in the upgrade. These are intended to execute quickly and are not intended to do invasive on-disk reformatting, which we avoid doing as part of upgrades in general. In practice, only the `ON_FINALIZE` upgrade action type has been used. This supports running an idempotent action at least once when a layout feature is finalized. We can remove the other unused action types to simplify this framework. One example use case for an `ON_FINALIZE` upgrade action would be to enable plugins that push events as part of a new event notification feature as soon as that feature is finalized. This way notifications would go live after finalization without having to restart the OMs again. 
+
+### Finalizing Multiple Versions Over Ratis
+
+When OM or SCM receives a finalize command, it may need to finalize multiple versions that are newly introduced with the software. In the common case, finalization will just update the version number on disk and move the corresponding apparent version number in memory to match. However, there may be cases where one of the above upgrade actions also needs to run.
+
+OM and SCM currently take different approaches when one finalize command requires finalizing multiple versions over Ratis. Say we are finalizing from version 100 to 105. When OM gets the finalize request from the client, the leader will send one Ratis request to the Ratis group, and in that one request each OM will move from version 100 to 105. When SCM gets the finalize request, however, the leader will look at its unfinalized versions and send 5 ratis requests: one to finalize to 101, one for 102, one for 103 etc. Other writes can land in between. The client doesn't get an ack that finalization finished until the leader gets all its requests committed.
+
+OM's method of finalizing is much simpler to work with, because the leader does not need a separate handler thread to track multiple Ratis requests before acknowledging back to the client. This atomicity also does not need extra handling for restarts and leader changes. SCM's method of finalizing does not provide any practical advantages. Updating version numbers on disk is already a quick operation, and the time it takes to execute an upgrade action is not coupled to the number of upgrade actions there are. For example, there is no guarantee that finalizing from version 100 to version 105 in a single request will be faster than finalizing from version 105 to 106, since version 106 may have an upgrade action that takes longer than all of versions 100 to 105 combined. For these reasons, we propose to leave OM finalization as is and migrate SCM finalization to this simpler model.
+
+### Closing Pipelines on Finalization
+
+SCM currently closes all pipelines, and therefore all containers when HDDS is finalized. This can create a momentary pause in write traffic and will be removed as part of rolling upgrade. This step will no longer be necessary since the client will be instructing the datanodes which version to use for each write request.
+
 ##  Development Practices to Ensure Compatibility
 
 At any point in the upgrade flow, we can have the pre and post upgrade external client version talking to a pre and post upgrade server version. Additionally the post upgrade server version can be finalized or not.
@@ -283,7 +317,7 @@ Additionally a server must also be able to handle older client requests, as it i
 
 For both client and server, the onus is only on the newest version to make decisions about compatibility. Any old version has no knowledge of the new feature, and it cannot enforce decisions about future unknowns.
 
-###  Client Behaviour
+###  External Client Compatibility
 
 Client changes can be categorized into two areas. Adapting an existing API, or making calls to a new API. In either case, the client gets to know the current OM version when it is initialized. Using that version it can make decisions about which APIs to call, or which fields to pass in an API call.
 
@@ -295,7 +329,11 @@ As an older OM version would happily accept unknown fields in the protobuf messa
 
 These practices should already be used when making client side changes, and therefore there isn’t much change to development on the client side.
 
-###  Server Behaviour
+###  Internal Client Compatibility
+
+Clients internal to Ozone, like Datanodes heartbeating to SCM, should continue to work without modification with rolling upgrades. Because the internal servers will always be newer and finalized first, it is their responsibility to remain backwards compatible.
+
+###  Server Compatibility
 
 During an upgrade, the server processes must have the ability to “act as” the pre-upgrade version. This means that any change to an API behaviour, expected fields or resulting data persisted by the server process must be feature gated using the version framework, and the old logic retained. Only if the server’s Apparent Version is equal or greater than the feature gate version should the new behaviour be permitted.
 
@@ -305,9 +343,7 @@ As with the clients, this is not a drastic departure from current development te
 
 ####  Handling Apply Transaction in Mixed OM Versions
 
-The current upgrade process requires a "prepare for upgrade” step before the OMs are stopped in the old version and started in the new version. This flushes all Ratis transactions from the log to the state machine and puts the OM in a read-only mode, which it can leave when all the OMs are restarted in the new version. This prevents OMs from applying requests from the Ratis log in different versions and potentially diverging their state machines, but the read-only requirement will not work for ZDU.
-
-The long term mitigation for this is to complete the leader execution project, which will ensure that all OMs make the same state machine changes as the leader regardless of their version. This project is going to take a while to complete and we do not want to block ZDU on its completion. Instead, we can use the unified versioning framework inside the OM apply transaction methods. Any time a change is made to a request’s apply transaction processing that changes what would be written to the state machine across versions, it needs to be behind a version flag. In the short term, this will result in more use of version flags than we currently have in the OM request processing. However, in the long term these flags can be removed for each request after it is migrated to leader execution. We can also consider adding a combination of AI and/or manual inspection protocols before releases to assess whether any apply transaction versioning was missed.
+Without "prepare for upgrade" in the rolling upgrade framework, we will need a way to ensure that OMs in different versions make the same DB modifications when applying a write request. The long term mitigation for this is to complete the leader execution project, which will ensure that all OMs make the same state machine changes as the leader regardless of their version. This project is going to take a while to complete and we do not want to block ZDU on its completion. Instead, we can use the unified versioning framework inside the OM apply transaction methods. Any time a change is made to a request’s apply transaction processing that changes what would be written to the state machine across versions, it needs to be behind a version flag. In the short term, this will result in more use of version flags than we currently have in the OM request processing. However, in the long term these flags can be removed for each request after it is migrated to leader execution. We can also consider adding a combination of AI and/or manual inspection protocols before releases to assess whether any apply transaction versioning was missed.
 
 ###  Removing Old Code
 
@@ -317,9 +353,10 @@ If we want to support rolling upgrades from any past version to any current vers
 
 Ozone has existing test tools that can be used for compatibility testing at both the unit, integration, and acceptance test levels. These would only require minimal extension to work with ZDU and the new versioning system.
 
-Unit and integration tests are run by a single Java process in the same version as the code being tested, so it is not possible to have truly mixed versions in this environment. The current approach used for client cross compatibility and disk compatibility testing is allowing tests to inject a custom component version or layout version into the client or server to see how it responds. This will remain the approach with the new versioning framework.
+Unit and integration tests are run by a single Java process in the same version as the code being tested, so it is not possible to have truly mixed versions in this environment. The current approach used for client cross compatibility and disk compatibility testing is allowing tests to inject a custom component version or layout version into the client or server using a configuration key to see how it responds. This will remain the approach with the new versioning framework.
 
-Acceptance tests currently use docker to pull past releases and orchestrate an upgrade and downgrade between those and the version under test while reading and writing data and possibly testing new features specific to a release. This framework was designed to support [pluggable methods for upgrading](https://github.com/apache/ozone/blob/de5c0a385ed873425ae94245d8b5b28040ab99ef/hadoop-ozone/dist/src/main/compose/upgrade/upgrades), so we will add a new driver that orchestrates a rolling upgrade while running the defined tests at each stage.
+Acceptance tests currently use docker to pull past releases and orchestrate an upgrade and downgrade between those past releases and the version under test. During this process, the tests will write data, read data, and possibly test new features specific to a release. This framework was designed to support [pluggable methods for upgrading](https://github.com/apache/ozone/blob/de5c0a385ed873425ae94245d8b5b28040ab99ef/hadoop-ozone/dist/src/main/compose/upgrade/upgrades), so we will add a new driver that orchestrates a rolling upgrade while running the defined tests at each stage.
+
 
 ###  Examples From Past Development To Ensure Compatibility
 
