@@ -28,6 +28,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 import java.util.Map;
+import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleRuleAndOperator;
 import org.junit.jupiter.api.Test;
@@ -70,6 +72,36 @@ class TestOmLifecycleRuleAndOperator {
     OmLifecycleRuleAndOperator.Builder andOperator3 = getOmLCAndOperatorBuilder(null, null);
     assertOMException(() -> andOperator3.build().valid(BucketLayout.DEFAULT), INVALID_REQUEST,
         "Either 'Tags' or 'Prefix' must be specified.");
+  }
+
+  @Test
+  public void testValidation() {
+    // 1. Prefix is Trash path
+    OmLifecycleRuleAndOperator.Builder trashPrefixAndOp = getOmLCAndOperatorBuilder(
+        FileSystem.TRASH_PREFIX, Collections.singletonMap("tag1", "value1"));
+    assertOMException(() -> trashPrefixAndOp.build().valid(BucketLayout.DEFAULT), INVALID_REQUEST,
+        "Lifecycle rule prefix cannot be trash root");
+
+    // 2. Prefix too long
+    String longPrefix = RandomStringUtils.randomAlphanumeric(1025);
+    OmLifecycleRuleAndOperator.Builder longPrefixAndOp = getOmLCAndOperatorBuilder(
+        longPrefix, Collections.singletonMap("tag1", "value1"));
+    assertOMException(() -> longPrefixAndOp.build().valid(BucketLayout.DEFAULT), INVALID_REQUEST,
+        "The maximum size of a prefix is 1024");
+
+    // 3. Tag key too long
+    String longKey = RandomStringUtils.randomAlphanumeric(129);
+    OmLifecycleRuleAndOperator.Builder longKeyAndOp = getOmLCAndOperatorBuilder(
+        "prefix", Collections.singletonMap(longKey, "value"));
+    assertOMException(() -> longKeyAndOp.build().valid(BucketLayout.DEFAULT), INVALID_REQUEST,
+        "A Tag's Key must be a length between 1 and 128");
+
+    // 4. Tag value too long
+    String longValue = RandomStringUtils.randomAlphanumeric(257);
+    OmLifecycleRuleAndOperator.Builder longValueAndOp = getOmLCAndOperatorBuilder(
+        "prefix", Collections.singletonMap("key", longValue));
+    assertOMException(() -> longValueAndOp.build().valid(BucketLayout.DEFAULT), INVALID_REQUEST,
+        "A Tag's Value must be a length between 0 and 256");
   }
 
   @Test
