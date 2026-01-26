@@ -1,22 +1,3 @@
----
-jira: HDDS-3331
-author: Stephen O'Donnell, Ethan Rose, Istvan Fajth
----
-
-<!--
-  Licensed under the Apache License, Version 2.0 (the "License");
-  you may not use this file except in compliance with the License.
-  You may obtain a copy of the License at
-
-   http://www.apache.org/licenses/LICENSE-2.0
-
-  Unless required by applicable law or agreed to in writing, software
-  distributed under the License is distributed on an "AS IS" BASIS,
-  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-  See the License for the specific language governing permissions and
-  limitations under the License. See accompanying LICENSE file.
--->
-
 # Zero Downtime Upgrade (ZDU)
 
 ## The Goal
@@ -414,6 +395,7 @@ This section demonstrates every step of a ZDU using an upgrade from software ver
 - 100/100: The old version finalized
 - **100/105**: The new version pre-finalized
 - **105/105**: The new version finalized
+
 Any other version is invalid and will be rejected. Note that the apparent versions of OM and SCMs always match within their Ratis groups.
 
 ### 1. SCM: Deploy New Software
@@ -452,10 +434,10 @@ External clients are stateless and Ozone supports full external client/server cr
 
 The admin will send this command when they have completed regression testing in the new version and do not wish to downgrade. SCM will first verify that all live Datanodes and its peer SCMs are running the newest software version 105. If any of these components are not, the finalize command will be rejected.
 
-| Status                                                                                          | SCM1        | SCM2        | DN Pipeline Version | Datanodes 100/100 | Datanodes 100/105 | Datanodes 105/105 |
-| ----------------------------------------------------------------------------------------------- | ----------- | ----------- | ------------------- | ----------------- | ----------------- | ----------------- |
-| New version has been deployed on all SCMs, but they have not yet finalized to use new features  | **100/105** | **100/105** | 100                 | Rejected          | Accepted          | Rejected          |
-| Finalize command has been sent over Ratis. All SCMs move to the new apparent version atomically | **105/105** | **105/105** | 100                 | Rejected          | Accepted          | Accepted          |
+| Status                                                                                          | SCM1        | SCM2        | SCM3        | DN Pipeline Version | Datanodes 100/100 | Datanodes 100/105 | Datanodes 105/105 |
+| ----------------------------------------------------------------------------------------------- | ----------- | ----------- | ----------- | ------------------- | ----------------- | ----------------- | ----------------- |
+| New version has been deployed on all SCMs, but they have not yet finalized to use new features  | **100/105** | **100/105** | **100/105** | 100                 | Rejected          | Accepted          | Rejected          |
+| Finalize command has been sent over Ratis. All SCMs move to the new apparent version atomically | **105/105** | **105/105** | **105/105** | 100                 | Rejected          | Accepted          | Accepted          |
 
 ### 6. Datanodes: Receive Finalize Command From SCM
 
