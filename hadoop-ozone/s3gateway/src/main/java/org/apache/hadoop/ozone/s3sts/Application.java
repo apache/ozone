@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.s3sts;
 
+import org.apache.hadoop.ozone.s3.exception.OSTSExceptionMapper;
 import org.glassfish.jersey.server.ResourceConfig;
 
 /**
@@ -26,5 +27,6 @@ public class Application extends ResourceConfig {
   public Application() {
     packages("org.apache.hadoop.ozone.s3sts");
     register(org.apache.hadoop.ozone.s3.AuthorizationFilter.class);
+    register(OSTSExceptionMapper.class);
   }
 }
