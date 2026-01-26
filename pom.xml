@@ -106,6 +106,7 @@
     <httpcore.version>4.4.16</httpcore.version>
     <io.grpc.version>1.77.0</io.grpc.version>
     <jackson2-bom.version>2.21.0</jackson2-bom.version>
+    <jackson2.version>2.21.0</jackson2.version>
     <jacoco.version>0.8.14</jacoco.version>
     <jakarta.annotation.version>2.1.1</jakarta.annotation.version>
     <jakarta.inject.version>2.6.1</jakarta.inject.version>
@@ -398,6 +399,18 @@
         <groupId>com.codahale.metrics</groupId>
         <artifactId>metrics-core</artifactId>
         <version>${codahale-metrics.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.module</groupId>
+        <artifactId>jackson-module-jaxb-annotations</artifactId>
+        <version>${jackson2.version}</version>
+        <exclusions>
+          <exclusion>
+            <!-- using jakarta.xml.bind instead -->
+            <groupId>javax.xml.bind</groupId>
+            <artifactId>jaxb-api</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>com.fasterxml.woodstox</groupId>
