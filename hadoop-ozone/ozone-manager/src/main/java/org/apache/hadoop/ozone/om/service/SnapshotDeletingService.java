@@ -311,9 +311,19 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
       List<SnapshotMoveKeyInfos> currentDeletedKeys = new ArrayList<>();
       List<HddsProtos.KeyValue> currentRenamedKeys = new ArrayList<>();
       List<SnapshotMoveKeyInfos> currentDeletedDirs = new ArrayList<>();
-      long batchBytes = 0;
       int totalSubmitted = 0;
       int batchCount = 0;
+
+      SnapshotMoveTableKeysRequest emptyRequest = SnapshotMoveTableKeysRequest.newBuilder()
+          .setFromSnapshotID(toProtobuf(snapInfo.getSnapshotId()))
+          .build();
+      OMRequest baseRequest = OMRequest.newBuilder()
+          .setCmdType(Type.SnapshotMoveTableKeys)
+          .setSnapshotMoveTableKeysRequest(emptyRequest)
+          .setClientId(clientId.toString())
+          .build();
+      int baseOverhead = baseRequest.getSerializedSize();
+      long batchBytes = baseOverhead;
 
       for (SnapshotMoveKeyInfos key : deletedKeys) {
         int keySize = key.getSerializedSize();
@@ -331,7 +341,9 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
           totalSubmitted += currentDeletedKeys.size();
           currentDeletedKeys.clear();
-          batchBytes = 0;
+          currentRenamedKeys.clear();
+          currentDeletedDirs.clear();
+          batchBytes = baseOverhead;
         }
 
         currentDeletedKeys.add(key);
@@ -356,7 +368,8 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           totalSubmitted += currentDeletedKeys.size() + currentRenamedKeys.size();
           currentDeletedKeys.clear();
           currentRenamedKeys.clear();
-          batchBytes = 0;
+          currentDeletedDirs.clear();
+          batchBytes = baseOverhead;
         }
 
         currentRenamedKeys.add(renameKey);
@@ -382,7 +395,7 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
           currentDeletedKeys.clear();
           currentRenamedKeys.clear();
           currentDeletedDirs.clear();
-          batchBytes = 0;
+          batchBytes = baseOverhead;
         }
 
         currentDeletedDirs.add(dir);
