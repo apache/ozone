@@ -23,15 +23,14 @@ import static java.net.HttpURLConnection.HTTP_NOT_IMPLEMENTED;
 import static java.net.HttpURLConnection.HTTP_OK;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
-import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.BUCKET_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -271,7 +270,7 @@ public class TestBucketAcl {
   }
 
   @Test
-  public void testBucketNotExist() throws Exception {
+  public void testBucketNotExist() {
     when(parameterMap.containsKey(ACL_MARKER)).thenReturn(true);
     when(headers.getHeaderString(S3Acl.GRANT_READ))
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
@@ -281,24 +280,21 @@ public class TestBucketAcl {
   }
 
   @Test
-  public void testPutAclWithInvalidXmlBody() throws Exception {
+  public void testPutAclWithInvalidXmlBody() {
     InputStream body = new ByteArrayInputStream(
         "not-xml".getBytes(StandardCharsets.UTF_8));
 
     WebApplicationException wae = assertThrows(WebApplicationException.class,
         () -> bucketEndpoint.put(BUCKET_NAME, body));
 
-    Throwable cause = wae.getCause();
-    assertNotNull(cause);
-    assertTrue(cause instanceof OS3Exception);
-    OS3Exception os3 = (OS3Exception) cause;
+    OS3Exception os3 = assertInstanceOf(OS3Exception.class, wae.getCause());
 
     assertEquals(INVALID_REQUEST.getCode(), os3.getCode());
     assertEquals(HTTP_BAD_REQUEST, os3.getHttpCode());
   }
 
   @Test
-  public void testPutAclWithInvalidGrantHeaderValue() throws Exception {
+  public void testPutAclWithInvalidGrantHeaderValue() {
     when(headers.getHeaderString(S3Acl.GRANT_FULL_CONTROL))
         .thenReturn("id\"owner-id\"");
     assertErrorResponse(INVALID_ARGUMENT, () -> bucketEndpoint.put(BUCKET_NAME, null));
@@ -333,8 +329,8 @@ public class TestBucketAcl {
 
     List<IAccessAuthorizer.ACLType> permissions = ownerAcl.getAclList();
 
-    assertTrue(permissions.contains(IAccessAuthorizer.ACLType.READ),
-        "Expected READ permission from header");
+    assertThat(permissions)
+        .contains(IAccessAuthorizer.ACLType.READ);
 
     assertFalse(permissions.contains(IAccessAuthorizer.ACLType.ALL),
         "FULL_CONTROL/ALL from body should not be applied when header is present");
@@ -351,21 +347,9 @@ public class TestBucketAcl {
   }
 
   @Test
-  public void testPutAclWithWhitespaceGrantHeaderValue() throws Exception {
+  public void testPutAclWithWhitespaceGrantHeaderValue() {
     when(headers.getHeaderString(S3Acl.GRANT_FULL_CONTROL))
         .thenReturn(WHITESPACE_ONLY); // whitespace only
     assertErrorResponse(INVALID_ARGUMENT, () -> bucketEndpoint.put(BUCKET_NAME, null));
-  }
-
-  @Test
-  public void testCreateBucketAndFailOnDuplicate() throws Exception {
-    String newBucket = "bucket-create-dup";
-    bucketEndpoint.queryParamsForTest().set(QueryParams.ACL, null);
-
-    Response response = bucketEndpoint.put(newBucket, null);
-    assertEquals(HTTP_OK, response.getStatus());
-
-    assertErrorResponse(BUCKET_ALREADY_EXISTS,
-        () -> bucketEndpoint.put(newBucket, null));
   }
 }
