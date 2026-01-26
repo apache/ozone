@@ -45,12 +45,18 @@ import org.apache.http.HttpStatus;
  */
 public class BucketCrudHandler extends EndpointBase implements BucketOperationHandler {
 
+  /**
+   * Handle only plain PUT bucket (create bucket), not subresources.
+   */
   private boolean shouldHandlePutCreateBucket() {
     return queryParams().get(QueryParams.ACL) == null
         && queryParams().get(QueryParams.UPLOADS) == null
         && queryParams().get(QueryParams.DELETE) == null;
   }
 
+  /**
+   * Handle PUT /{bucket} for bucket creation.
+   */
   @Override
   public Response handlePutRequest(String bucketName, InputStream body)
       throws IOException, OS3Exception {
@@ -81,6 +87,9 @@ public class BucketCrudHandler extends EndpointBase implements BucketOperationHa
     }
   }
 
+  /**
+   * Handle DELETE /{bucket} for bucket deletion.
+   */
   @Override
   public Response handleDeleteRequest(String bucketName)
       throws IOException, OS3Exception {
