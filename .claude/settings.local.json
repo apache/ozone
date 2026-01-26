@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mvn install:*)",
+      "Bash(mvn compile:*)"
+    ]
+  }
+}
