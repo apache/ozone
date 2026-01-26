@@ -99,7 +99,11 @@ When a cluster is running, its version will be stored on disk as the apparent ve
 
 For external clients, the apparent version is what will be communicated from the server to provide their view of the server’s version. This differs from the current model where clients receive the static component version which is always defined by the latest version the software supports. While a client from another cluster could in theory attempt to use some of the new features, which would result in an error, this is unlikely to happen as the Ozone clients are version aware and should similarly be coded so they don’t attempt incompatible calls supported by newer versions.
 
-For internal components, the “new client old server” invariant makes version passing among internal components of different types mostly unnecessary. For example, SCM does not need to worry about whether the OM client it is communicating with has the new bits or whether the OM has been finalized. SCM’s server will always be newer and finalized before OM. Therefore it can remain backwards compatible and will work with the OM in either case. One exception is that datanodes will need to add their software and apparent versions to SCM heartbeats so SCM can instruct them to finalize if needed, or fence them out of the cluster if they are running the wrong software version at the time of finalization.
+For internal components, the “new client old server” invariant makes version passing among internal components of different types mostly unnecessary. For example, SCM does not need to worry about whether the OM client it is communicating with has the new bits or whether the OM has been finalized. SCM’s server will always be newer and finalized before OM. Therefore it can remain backwards compatible and will work with the OM in either case.
+
+Recon to OM communication will be the only case where an internal client is newer than the server, and therefore the only case where we need to do version checks between components using an internal API. The newer Recon client may need to learn the older OM's apparent version to handle compatibility during the upgrade.
+
+SCM will need to know the software and apparent versions of the Datanodes, but not for API compatibility. By using the same HDDS component version instead of separate SCM and Datanode versions, SCM can accurately track the expected apparent and software versions of Datanodes to either instruct them to finalize or fence them out of the cluster. If there was a discrepancy among versions being reported by Datanodes and SCM was using its own separate SCM version, it would have no source of truth. The HDDS versions of the Datanodes should not need to be checked for client/server compatibility during heartbeat processing because SCM's server will always be newer.
 
 ### Migrating to the New Unified Component Version Framework
 
@@ -107,11 +111,13 @@ The existing component version enum will be the basis of the new unified version
 
 To migrate to one single layout version, we will add a new software version “100” to each existing component version enum. Version 100 will universally indicate the first version that is ZDU ready, and the point from which this unified version will be used to track all changes through the existing component version enum.
 
-Note that the version number we use for this migration must be larger than both the largest existing component version and largest existing layout version to prevent either one from appearing to go back in time before the migration is finalized. 100 was chosen as an easily identifiable number that can be used across all components to indicate the epoch from which they all have migrated to the unified framework and support rolling upgrade.
+Note that the version number we use for this migration must be larger than both the largest existing component version and largest existing layout version to prevent either one from appearing to go back in time before the migrated version is finalized. 100 was chosen as an easily identifiable number that can be used across all components to indicate the epoch from which they all have migrated to the unified framework and support rolling upgrade.
 
-This migration will be transparent in client/server interactions for network changes. This will simply appear as a new larger version with all the previous versions in the existing component version enum still intact.
+This migration will be transparent in client/server interactions for network changes. It will simply appear as a new larger version with all the previous versions in the existing component version enum still intact.
 
-This migration will need some handling for disk changes. When the upgraded component starts up with software version 100 and sees a version less than that persisted to the disk, it must use the old LayoutFeature enum to look up that version until the cluster is finalized. After finalization, version 100 will be written to the disk and all versions from here on can be referenced from ComponentVersion.
+This migration will need some handling for disk changes. When the upgraded component starts up with software version 100 and sees a version less than that persisted to the disk, it must use the old `LayoutFeature` enum to look up that version until the cluster is finalized. After finalization, version 100 will be written to the disk and all versions from here on can be referenced from the `ComponentVersion` enum.
+
+In the current code, Datanodes use their own `DatanodeComponentVersion` and there is no `ScmComponentVersion`. However, Datanodes and SCM share the same `HDDSLayoutFeature` for disk versioning. We need to collapse these into a single `HDDSComponentVersion` in the new versioning framework. The existing `DatanodeComponentVersion` can simply be renamed to  `HDDSComponentVersion` , since there is no `ScmComponentVersion` to merge it with. From there, migrating from `HDDSLayoutFeature` to `HDDSComponentVersion` can be done using the same process outlined above.
 
 ##  Strategy To Achieve ZDU
 
@@ -136,13 +142,13 @@ This is a summary of invariants for internal components outlined in earlier sect
 2. Deploy the new software version to Recon and restart Recon.  
 3. Deploy the new software version to all datanodes and rolling restart the DNs.  
 4. Deploy the new software version to all OMs and rolling restart the OMs.  
-5. Deploy the new software and rolling restart all client processes like S3 Gateway, HTTPFS, Prometheus etc. These processes are all Ozone clients and sit somewhat outside of the core Ozone cluster.  
-   1. At this stage, the cluster is operating with the new software version, but is still “acting as” the older apparent version. No data will be written to disk in a new format, and new features will be unavailable.  
-6. The finalize command is sent to SCM by the admin \- this is what is used to switch the cluster to act as the new version. Upon receipt of the finalize command:  
-   1. SCM will finalize itself over Ratis, saving the new finalized version.  
-   2. It will notify datanodes over the heartbeat to finalize.  
-   3. After all healthy datanodes have been finalized, OM can be finalized. To do this, OM will have been polling SCM periodically to see if it should finalize. Only after SCM and all datanodes have been finalized will OM get a “ready to finalize” response from the poll. The OM leader will then send a finalize command over Ratis to all OMs.  
-   4. As OM is the entry point to the cluster for external clients, finalizing OM unlocks any new features in the upgraded version.
+5. Deploy the new software and rolling restart all client processes like S3 Gateway, HTTPFS, Prometheus etc. These processes are all Ozone clients and sit somewhat outside of the core Ozone cluster.
+   6. At this stage, the cluster is operating with the new software version, but is still “acting as” the older apparent version. No data will be written to disk in a new format, and new features will be unavailable.
+7. The finalize command is sent to SCM by the admin \- this is what is used to switch the cluster to act as the new version. Upon receipt of the finalize command:  
+   8. SCM will finalize itself over Ratis, saving the new finalized version.
+   9. It will notify datanodes over the heartbeat to finalize.
+   10. After all healthy datanodes have been finalized, OM can be finalized. To do this, OM will have been polling SCM periodically to see if it should finalize. Only after SCM and all datanodes have been finalized will OM get a “ready to finalize” response from the poll. The OM leader will then send a finalize command over Ratis to all OMs.
+   11. As OM is the entry point to the cluster for external clients, finalizing OM unlocks any new features in the upgraded version.
 
 Before the cluster is finalized, it is possible to downgrade to the previous version by stopping the cluster and restarting it with the older software version. No data in a new format will have been persisted that the older software version will not understand. The restart with the downgraded software can either be done non-rolling, or rolling by restarting components in the reverse of the order outlined above.
 
