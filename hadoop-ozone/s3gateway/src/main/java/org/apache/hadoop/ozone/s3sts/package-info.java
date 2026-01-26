@@ -18,4 +18,15 @@
 /**
  * This package contains the AWS STS (Security Token Service) compatible API for S3 Gateway.
  */
+@XmlSchema(
+    namespace = "https://sts.amazonaws.com/doc/2011-06-15/",
+    elementFormDefault = XmlNsForm.QUALIFIED,
+    xmlns = {
+        @XmlNs(prefix = "", namespaceURI = "https://sts.amazonaws.com/doc/2011-06-15/")
+    }
+)
 package org.apache.hadoop.ozone.s3sts;
+
+import javax.xml.bind.annotation.XmlNs;
+import javax.xml.bind.annotation.XmlNsForm;
+import javax.xml.bind.annotation.XmlSchema;

@@ -20,14 +20,17 @@ package org.apache.hadoop.ozone.s3sts;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_S3_ADMINISTRATORS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.io.StringReader;
 import java.time.Instant;
 import javax.ws.rs.container.ContainerRequestContext;
@@ -39,11 +42,14 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.s3.OzoneConfigurationHolder;
+import org.apache.hadoop.ozone.s3.exception.OSTSException;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -54,9 +60,12 @@ import org.xml.sax.InputSource;
  */
 public class TestS3STSEndpoint {
   private S3STSEndpoint endpoint;
+  private ObjectStore objectStore;
   private static final String ROLE_ARN = "arn:aws:iam::123456789012:role/test-role";
   private static final String ROLE_SESSION_NAME = "test-session";
   private static final String ROLE_USER_ARN = "arn:aws:sts::123456789012:assumed-role/test-role/" + ROLE_SESSION_NAME;
+  private static final String STS_NS = "https://sts.amazonaws.com/doc/2011-06-15/";
+  private static final String AWS_FAULT_NS = "http://webservices.amazon.com/AWSFault/2005-15-09";
 
   @Mock
   private ContainerRequestContext context;
@@ -69,7 +78,7 @@ public class TestS3STSEndpoint {
     OzoneClient clientStub = spy(new OzoneClientStub());
 
     // Stub assumeRole to return deterministic credentials.
-    ObjectStore objectStore = mock(ObjectStore.class);
+    objectStore = mock(ObjectStore.class);
     when(objectStore.assumeRole(anyString(), anyString(), anyInt(), any()))
         .thenReturn(new AssumeRoleResponseInfo(
             "ASIA1234567890123456",
@@ -91,7 +100,7 @@ public class TestS3STSEndpoint {
   }
 
   @Test
-  public void testStsAssumeRole() throws Exception {
+  public void testStsAssumeRoleValidForGetMethod() throws Exception {
     Response response = endpoint.get(
         "AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null);
 
@@ -101,13 +110,18 @@ public class TestS3STSEndpoint {
     assertNotNull(responseXml);
 
     // Parse response XML and verify values
-    final DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
-    documentBuilderFactory.setNamespaceAware(true);
-    final DocumentBuilder documentBuilder = documentBuilderFactory.newDocumentBuilder();
-    final Document doc = documentBuilder.parse(new InputSource(new StringReader(responseXml)));
+    final Document doc = parseXml(responseXml);
 
     final Element root = doc.getDocumentElement();
     assertEquals("AssumeRoleResponse", root.getLocalName());
+    assertEquals(STS_NS, root.getNamespaceURI());
+    // Ensure the response uses the default namespace (no prefix like "ns2:")
+    assertEquals("AssumeRoleResponse", root.getNodeName());
+
+    // Verify some key elements are present in the STS namespace
+    assertNotNull(doc.getElementsByTagNameNS(STS_NS, "AssumeRoleResult").item(0));
+    assertNotNull(doc.getElementsByTagNameNS(STS_NS, "Credentials").item(0));
+    assertNotNull(doc.getElementsByTagNameNS(STS_NS, "AccessKeyId").item(0));
 
     final String accessKeyId = doc.getElementsByTagName("AccessKeyId").item(0).getTextContent();
     assertEquals("ASIA1234567890123456", accessKeyId);
@@ -123,56 +137,320 @@ public class TestS3STSEndpoint {
   }
 
   @Test
+  public void testStsAssumeRoleValidForPostMethod() throws Exception {
+    final Response response = endpoint.post("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null);
+
+    assertEquals(200, response.getStatus());
+    final String responseXml = (String) response.getEntity();
+    assertNotNull(responseXml);
+
+    final Document doc = parseXml(responseXml);
+    final Element root = doc.getDocumentElement();
+    assertEquals("AssumeRoleResponse", root.getLocalName());
+    assertEquals(STS_NS, root.getNamespaceURI());
+    // Ensure the response uses the default namespace (no prefix like "ns2:")
+    assertEquals("AssumeRoleResponse", root.getNodeName());
+
+    // Verify some key elements are present in the STS namespace
+    assertNotNull(doc.getElementsByTagNameNS(STS_NS, "AssumeRoleResult").item(0));
+    assertNotNull(doc.getElementsByTagNameNS(STS_NS, "Credentials").item(0));
+    assertNotNull(doc.getElementsByTagNameNS(STS_NS, "AccessKeyId").item(0));
+
+    final String accessKeyId = doc.getElementsByTagName("AccessKeyId").item(0).getTextContent();
+    assertEquals("ASIA1234567890123456", accessKeyId);
+
+    final String secretAccessKey = doc.getElementsByTagName("SecretAccessKey").item(0).getTextContent();
+    assertEquals("mySecretAccessKey", secretAccessKey);
+
+    final String sessionToken = doc.getElementsByTagName("SessionToken").item(0).getTextContent();
+    assertEquals("session-token", sessionToken);
+
+    final String arn = doc.getElementsByTagName("Arn").item(0).getTextContent();
+    assertEquals(ROLE_USER_ARN, arn);
+  }
+
+  @Test
+  public void testStsNullAction() throws Exception {
+    final Response response = endpoint.get(null, ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null);
+
+    assertEquals(400, response.getStatus());
+    final String errorMessage = (String) response.getEntity();
+    assertEquals("<UnknownOperationException/>", errorMessage);
+
+    final Document doc = parseXml(errorMessage);
+    final Element root = doc.getDocumentElement();
+    assertEquals("UnknownOperationException", root.getLocalName());
+  }
+
+  @Test
+  public void testStsUnsupportedActionWithVersionSupplied() throws Exception {
+    final OSTSException ex = assertThrows(OSTSException.class, () ->
+        endpoint.get("UnsupportedAction", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+
+    assertEquals(400, ex.getHttpCode());
+
+    final String requestId = "test-request-id";
+    ex.setRequestId(requestId);
+    assertStsErrorXml(ex.toXml(), AWS_FAULT_NS, "Sender", "InvalidAction",
+        "Could not find operation UnsupportedAction for version 2011-06-15");
+  }
+
+  @Test
+  public void testStsUnsupportedActionWithVersionNotSupplied() throws Exception {
+    final OSTSException ex = assertThrows(OSTSException.class, () ->
+        endpoint.get("UnsupportedAction", ROLE_ARN, ROLE_SESSION_NAME, 3600, null, null));
+
+    assertEquals(400, ex.getHttpCode());
+
+    final String requestId = "test-request-id";
+    ex.setRequestId(requestId);
+    assertStsErrorXml(ex.toXml(), AWS_FAULT_NS, "Sender", "InvalidAction",
+        "Could not find operation UnsupportedAction for version NO_VERSION_SPECIFIED");
+  }
+
+  @Test
+  public void testStsAssumeRoleWithInvalidVersion() throws Exception {
+    final OSTSException ex = assertThrows(OSTSException.class, () ->
+        endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2000-01-01", null));
+
+    assertEquals(400, ex.getHttpCode());
+
+    final String requestId = "test-request-id";
+    ex.setRequestId(requestId);
+    assertStsErrorXml(ex.toXml(), AWS_FAULT_NS, "Sender", "InvalidAction",
+        "Could not find operation AssumeRole for version 2000-01-01");
+  }
+
+  @Test
   public void testStsInvalidDuration() throws Exception {
-    Response response = endpoint.get(
-        "AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, -1, "2011-06-15", null);
+    final OSTSException ex = assertThrows(OSTSException.class, () ->
+        endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, -1, "2011-06-15", null));
 
-    assertEquals(400, response.getStatus());
-    String errorMessage = (String) response.getEntity();
-    assertTrue(errorMessage.contains("Invalid Value: DurationSeconds"));
+    assertEquals(400, ex.getHttpCode());
+
+    final String requestId = "test-request-id";
+    ex.setRequestId(requestId);
+    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", "Invalid Value: DurationSeconds");
   }
 
   @Test
-  public void testStsUnsupportedAction() throws Exception {
-    Response response = endpoint.get(
-        "UnsupportedAction", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null);
+  public void testStsNullDurationUsesDefault3600() throws Exception {
+    final Response response = endpoint.get(
+        "AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, null, "2011-06-15", null);
+    assertEquals(200, response.getStatus());
 
-    assertEquals(400, response.getStatus());
-    String errorMessage = (String) response.getEntity();
-    assertTrue(errorMessage.contains("Unsupported Action"));
-  }
-
-  @Test
-  public void testStsInvalidVersion() throws Exception {
-    Response response = endpoint.get(
-        "AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2000-01-01", null);
-
-    assertEquals(400, response.getStatus());
-    String errorMessage = (String) response.getEntity();
-    assertTrue(errorMessage.contains("Invalid or missing Version parameter. Supported version is 2011-06-15."));
+    final ArgumentCaptor<Integer> durationCaptor = ArgumentCaptor.forClass(Integer.class);
+    verify(objectStore).assumeRole(anyString(), anyString(), durationCaptor.capture(), any());
+    assertEquals(3600, durationCaptor.getValue());
   }
 
   @Test
   public void testStsPolicyTooLarge() throws Exception {
     final String tooLargePolicy = RandomStringUtils.insecure().nextAlphanumeric(2049);
 
-    final Response response = endpoint.get(
-        "AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", tooLargePolicy);
+    final OSTSException ex = assertThrows(OSTSException.class, () ->
+        endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", tooLargePolicy));
 
-    assertEquals(400, response.getStatus());
-    final String errorMessage = (String) response.getEntity();
-    assertTrue(errorMessage.contains("Policy length exceeded maximum allowed length of 2048"));
+    assertEquals(400, ex.getHttpCode());
+
+    final String requestId = "test-request-id";
+    ex.setRequestId(requestId);
+    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError",
+        "Value '" + tooLargePolicy + "' at 'policy' failed to satisfy constraint: Member " +
+        "must have length less than or equal to 2048");
   }
 
   @Test
   public void testStsInvalidRoleArn() throws Exception {
     final String invalidRoleArn = "arn:awsNotValid::123456789012:role/test-role";
-    final Response response = endpoint.get(
-        "AssumeRole", invalidRoleArn, ROLE_SESSION_NAME, 3600, "2011-06-15", null);
+    final OSTSException ex = assertThrows(OSTSException.class, () ->
+        endpoint.get("AssumeRole", invalidRoleArn, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
 
-    assertEquals(400, response.getStatus());
-    final String errorMessage = (String) response.getEntity();
-    assertTrue(
-        errorMessage.contains("Invalid RoleArn: must be in the format arn:aws:iam::<account-id>:role/<role-name>"));
+    assertEquals(400, ex.getHttpCode());
+
+    final String requestId = "test-request-id";
+    ex.setRequestId(requestId);
+    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError",
+        "Invalid RoleArn: must be in the format arn:aws:iam::<account-id>:role/<role-name>");
+  }
+
+  @Test
+  public void testStsMissingRoleArn() throws Exception {
+    final OSTSException ex = assertThrows(OSTSException.class, () ->
+        endpoint.get("AssumeRole", null, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+
+    assertEquals(400, ex.getHttpCode());
+
+    final String requestId = "test-request-id";
+    ex.setRequestId(requestId);
+    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", "Value null at 'roleArn'");
+  }
+
+  @Test
+  public void testStsInvalidRoleArnMissingRoleName() throws Exception {
+    final String invalidRoleArn = "arn:aws:iam::123456789012:role/";
+    final OSTSException ex = assertThrows(OSTSException.class, () ->
+        endpoint.get("AssumeRole", invalidRoleArn, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+
+    assertEquals(400, ex.getHttpCode());
+    assertEquals("ValidationError", ex.getCode());
+
+    final String requestId = "test-request-id";
+    ex.setRequestId(requestId);
+    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", "Invalid RoleArn: must be in the format");
+  }
+
+  @Test
+  public void testStsInvalidRoleArnMissingAccountId() throws Exception {
+    final String invalidRoleArn = "arn:aws:iam:::role/test-role";
+    final OSTSException ex = assertThrows(OSTSException.class, () ->
+        endpoint.get("AssumeRole", invalidRoleArn, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+
+    assertEquals(400, ex.getHttpCode());
+    assertEquals("ValidationError", ex.getCode());
+
+    final String requestId = "test-request-id";
+    ex.setRequestId(requestId);
+    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", "Invalid RoleArn: must be in the format"
+    );
+  }
+
+  @Test
+  public void testStsWhenActionNotImplemented() throws Exception {
+    final OSTSException ex = assertThrows(OSTSException.class, () ->
+        endpoint.get("GetSessionToken", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+
+    assertEquals(501, ex.getHttpCode());
+
+    final String requestId = "test-request-id";
+    ex.setRequestId(requestId);
+    assertStsErrorXml(ex.toXml(), AWS_FAULT_NS, "Sender", "InvalidAction",
+        "Operation GetSessionToken is not supported yet.");
+  }
+
+  @Test
+  public void testStsMissingRoleSessionName() throws Exception {
+    final OSTSException ex = assertThrows(OSTSException.class, () ->
+        endpoint.get("AssumeRole", ROLE_ARN, null, 3600, "2011-06-15", null));
+
+    assertEquals(400, ex.getHttpCode());
+
+    final String requestId = "test-request-id";
+    ex.setRequestId(requestId);
+    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", "Value null at 'roleSessionName'");
+  }
+
+  @Test
+  public void testStsInvalidRoleSessionNameWithInvalidCharacter() throws Exception {
+    final String invalidSession = "test/session";
+    final OSTSException ex = assertThrows(OSTSException.class, () ->
+        endpoint.get("AssumeRole", ROLE_ARN, invalidSession, 3600, "2011-06-15", null));
+
+    assertEquals(400, ex.getHttpCode());
+
+    final String requestId = "test-request-id";
+    ex.setRequestId(requestId);
+    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", "Invalid RoleSessionName");
+  }
+
+  @Test
+  public void testStsInvalidRoleSessionNameTooShort() throws Exception {
+    final String invalidSession = "a";
+    final OSTSException ex = assertThrows(OSTSException.class, () ->
+        endpoint.get("AssumeRole", ROLE_ARN, invalidSession, 3600, "2011-06-15", null));
+
+    assertEquals(400, ex.getHttpCode());
+
+    final String requestId = "test-request-id";
+    ex.setRequestId(requestId);
+    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", "Invalid RoleSessionName");
+  }
+
+  @Test
+  public void testStsInvalidRoleArnResourceType() throws Exception {
+    // Resource type must be role, not user
+    final String invalidRoleArn = "arn:aws:iam::123456789012:user/test-user";
+    final OSTSException ex = assertThrows(OSTSException.class, () ->
+        endpoint.get("AssumeRole", invalidRoleArn, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+
+    assertEquals(400, ex.getHttpCode());
+
+    final String requestId = "test-request-id";
+    ex.setRequestId(requestId);
+    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", "Invalid RoleArn: must be in the format");
+  }
+
+  @Test
+  public void testStsInternalFailureWhenBackendThrows() throws Exception {
+    when(objectStore.assumeRole(anyString(), anyString(), anyInt(), any()))
+        .thenThrow(new RuntimeException("some unexpected error"));
+
+    final OSTSException ex = assertThrows(OSTSException.class, () ->
+        endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+
+    assertEquals(500, ex.getHttpCode());
+
+    final String requestId = "test-request-id";
+    ex.setRequestId(requestId);
+    assertStsErrorXml(ex.toXml(), STS_NS, "Receiver", "InternalFailure", "An internal error has occurred.");
+  }
+
+  @Test
+  public void testStsAccessDenied() throws Exception {
+    when(objectStore.assumeRole(anyString(), anyString(), anyInt(), any()))
+        .thenThrow(new OMException("Permission denied", OMException.ResultCodes.ACCESS_DENIED));
+
+    final OSTSException ex = assertThrows(OSTSException.class, () ->
+        endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+
+    assertEquals(403, ex.getHttpCode());
+
+    final String requestId = "test-request-id";
+    ex.setRequestId(requestId);
+    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "AccessDenied",
+        "User is not authorized to perform: sts:AssumeRole on resource: " + ROLE_ARN);
+  }
+
+  @Test
+  public void testStsIOExceptionWrappedAsInternalFailure() throws Exception {
+    when(objectStore.assumeRole(anyString(), anyString(), anyInt(), any()))
+        .thenThrow(new IOException("An IO error occurred"));
+
+    final OSTSException ex = assertThrows(OSTSException.class, () ->
+        endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+
+    assertEquals(500, ex.getHttpCode());
+
+    final String requestId = "test-request-id";
+    ex.setRequestId(requestId);
+    assertStsErrorXml(ex.toXml(), STS_NS, "Receiver", "InternalFailure", "An internal error has occurred.");
+  }
+
+  private static Document parseXml(String xml) throws Exception {
+    final DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
+    documentBuilderFactory.setNamespaceAware(true);
+    final DocumentBuilder documentBuilder = documentBuilderFactory.newDocumentBuilder();
+    return documentBuilder.parse(new InputSource(new StringReader(xml)));
+  }
+
+  private static void assertStsErrorXml(String xml, String expectedNamespace, String expectedType, String expectedCode,
+      String expectedMessageContains) throws Exception {
+    final Document doc = parseXml(xml);
+    final Element root = doc.getDocumentElement();
+    assertEquals("ErrorResponse", root.getLocalName());
+    assertEquals(expectedNamespace, root.getNamespaceURI());
+
+    final String type = doc.getElementsByTagName("Type").item(0).getTextContent();
+    assertEquals(expectedType, type);
+
+    final String code = doc.getElementsByTagName("Code").item(0).getTextContent();
+    assertEquals(expectedCode, code);
+
+    final String message = doc.getElementsByTagName("Message").item(0).getTextContent();
+    assertNotNull(message);
+    assertTrue(message.contains(expectedMessageContains), "Expected message to contain: " + expectedMessageContains);
+
+    final String requestId = doc.getElementsByTagName("RequestId").item(0).getTextContent();
+    assertEquals("test-request-id", requestId);
   }
 }
