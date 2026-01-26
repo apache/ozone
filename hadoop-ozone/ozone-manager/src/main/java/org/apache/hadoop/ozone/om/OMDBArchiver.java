@@ -87,12 +87,12 @@ public class OMDBArchiver {
   }
 
   /**
+   * Records the given file entry into the map after taking a hardlink.
+   *
    * @param file the file to create a hardlink and record into the map
    * @param entryName name of the entry corresponding to file
    * @return the file size
    * @throws IOException in case of hardlink failure
-   *
-   * Records the given file entry into the map after taking a hardlink.
    */
   public long recordFileEntry(File file, String entryName) throws IOException {
     if (tmpDir == null) {
@@ -124,17 +124,17 @@ public class OMDBArchiver {
   }
 
   /**
+   * Writes all the files captured by the map into the archive and
+   * also includes the hardlinkFile and the completion marker file.
+   *
    * @param conf the configuration object to obtain metadata paths
    * @param outputStream the tarball archive output stream
    * @throws IOException in case of write failure to the archive
-   *
-   * Writes all the files captured by the map into the archive and
-   * also includes the hardlinkFile and the completion marker file.
    */
   public void writeToArchive(OzoneConfiguration conf, OutputStream outputStream)
       throws IOException {
     long bytesWritten = 0;
-    long lastLoggedTime = Time.now();
+    long lastLoggedTime = Time.monotonicNow();
     long filesWritten = 0;
     try (ArchiveOutputStream<TarArchiveEntry> archiveOutput = tar(outputStream)) {
       for (Map.Entry<String, File> kv : filesToWriteIntoTarball.entrySet()) {
@@ -149,7 +149,7 @@ public class OMDBArchiver {
             lastLoggedTime = Time.monotonicNow();
           }
         } catch (IOException ioe) {
-          LOG.error("Couldn't create hardlink for file {} while including it in tarball.",
+          LOG.error("Failed to write file {} to checkpoint tarball archive.",
               link.getAbsolutePath(), ioe);
           throw ioe;
         } finally {
