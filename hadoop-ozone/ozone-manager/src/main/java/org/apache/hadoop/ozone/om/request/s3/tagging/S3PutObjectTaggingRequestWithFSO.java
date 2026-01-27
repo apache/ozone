@@ -61,7 +61,7 @@ public class S3PutObjectTaggingRequestWithFSO extends S3PutObjectTaggingRequest 
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getIndex();
+    final long trxnLogIndex = context.getCacheEpoch();
 
     PutObjectTaggingRequest putObjectTaggingRequest = getOmRequest().getPutObjectTaggingRequest();
 

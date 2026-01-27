@@ -19,6 +19,15 @@ package org.apache.hadoop.ozone.om.protocolPB;
 
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketRaftGroupAssignRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketRaftGroupAssignResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateBucketRaftGroupsResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetRaftGroupHealthStateResponse;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.UUID;
 
 /**
  * OzoneManagerClientProtocol defines interfaces needed on the client side
@@ -38,4 +47,20 @@ public interface OzoneManagerClientProtocol extends OzoneManagerProtocol {
   void clearThreadLocalS3Auth();
 
   ThreadLocal<S3Auth> getS3CredentialsProvider();
+
+  CreateBucketRaftGroupsResponse createRaftGroups(List<UUID> groupIds, boolean purgeExistingRaftGroups)
+      throws IOException;
+
+  GetRaftGroupHealthStateResponse getRaftGroupHealthState(
+      OzoneManagerProtocolProtos.GetRaftGroupHealthStateRequest request)
+      throws IOException;
+
+  void moveOmToSafeMode() throws IOException;
+
+  BucketRaftGroupAssignResponse assignBucketRaftGroup(BucketRaftGroupAssignRequest request) throws IOException;
+
+  void acquireBucketRaftGroupAssignmentWriteLock() throws IOException;
+
+  void releaseBucketRaftGroupAssignmentWriteLock() throws IOException;
+
 }

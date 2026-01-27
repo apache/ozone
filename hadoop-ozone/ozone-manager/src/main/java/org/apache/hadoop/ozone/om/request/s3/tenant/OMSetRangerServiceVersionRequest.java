@@ -59,7 +59,7 @@ public class OMSetRangerServiceVersionRequest extends OMClientRequest {
 
     omMetadataManager.getMetaTable().addCacheEntry(
         new CacheKey<>(OzoneConsts.RANGER_OZONE_SERVICE_VERSION_KEY),
-        CacheValue.get(context.getIndex(), proposedVersionStr));
+        CacheValue.get(context.getCacheEpoch(), proposedVersionStr));
     omResponse.setSetRangerServiceVersionResponse(
         SetRangerServiceVersionResponse.newBuilder().build());
 

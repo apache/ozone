@@ -171,7 +171,7 @@ public class OMSnapshotSetPropertyRequest extends OMClientRequest {
       for (Map.Entry<String, SnapshotInfo> snapshot : snapshotInfoMap.entrySet()) {
         metadataManager.getSnapshotInfoTable().addCacheEntry(
             new CacheKey<>(snapshot.getKey()),
-            CacheValue.get(context.getIndex(), snapshot.getValue()));
+            CacheValue.get(context.getCacheEpoch(), snapshot.getValue()));
         omSnapshotIntMetrics.incNumSnapshotSetProperties();
         AUDIT.logWriteSuccess(ozoneManager.buildAuditMessageForSuccess(OMSystemAction.SNAPSHOT_SET_PROPERTY,
             auditParamsMap.get(snapshot.getKey())));

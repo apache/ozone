@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -300,7 +301,7 @@ public class TestOzoneManagerRequestHandler {
     // handleWriteRequestImpl should throw (NPE from null getMetrics())
     // but the catch block logs the audit message first
     Assertions.assertThrows(NullPointerException.class,
-        () -> handler.handleWriteRequestImpl(omRequest, context));
+        () -> handler.handleWriteRequestImpl(omRequest, context, RaftGroupId.randomId()));
 
     // Verify auditLogger.logWrite was called with correct content
     ArgumentCaptor<AuditMessage> captor =

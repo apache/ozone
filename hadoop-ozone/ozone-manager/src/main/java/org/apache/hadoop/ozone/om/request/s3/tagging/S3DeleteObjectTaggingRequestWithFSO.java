@@ -61,7 +61,7 @@ public class S3DeleteObjectTaggingRequestWithFSO extends S3DeleteObjectTaggingRe
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getIndex();
+    final long trxnLogIndex = context.getCacheEpoch();
 
     DeleteObjectTaggingRequest deleteObjectTaggingRequest = getOmRequest().getDeleteObjectTaggingRequest();
 

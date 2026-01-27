@@ -154,7 +154,7 @@ public class S3GetSecretRequest extends OMClientRequest {
               // Not found in S3SecretTable.
               if (createIfNotExist) {
                 // Add new entry in this case
-                assignS3SecretValue = S3SecretValue.of(accessId, awsSecret.get(), context.getIndex());
+                assignS3SecretValue = S3SecretValue.of(accessId, awsSecret.get(), context.getCacheEpoch());
                 // Add cache entry first.
                 s3SecretManager.updateCache(accessId, assignS3SecretValue);
               } else {

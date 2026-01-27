@@ -77,7 +77,7 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long transactionLogIndex = context.getIndex();
+    final long transactionLogIndex = context.getCacheEpoch();
 
     SetVolumePropertyRequest setVolumePropertyRequest =
         getOmRequest().getSetVolumePropertyRequest();
@@ -134,6 +134,8 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
 
       OmVolumeArgs omVolumeArgs = builder
           .setModificationTime(setVolumePropertyRequest.getModificationTime())
+          .setMultiRaftEnabled(ozoneManager.isMultiRaftEnabled())
+          .setMultiRaftTerm(ozoneManager.getCurrentMultiRaftTerm())
           .setUpdateID(transactionLogIndex)
           .build();
 

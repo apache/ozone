@@ -667,6 +667,18 @@ public final class OmKeyInfo extends WithParentObjectId
       return this;
     }
 
+    @Override
+    public Builder setMultiRaftEnabled(boolean multiRaftEnabled) {
+      super.setMultiRaftEnabled(multiRaftEnabled);
+      return this;
+    }
+
+    @Override
+    public Builder setMultiRaftTerm(long multiRaftTerm) {
+      super.setMultiRaftTerm(multiRaftTerm);
+      return this;
+    }
+
     public Builder setFileChecksum(FileChecksum checksum) {
       this.fileChecksum = checksum;
       return this;

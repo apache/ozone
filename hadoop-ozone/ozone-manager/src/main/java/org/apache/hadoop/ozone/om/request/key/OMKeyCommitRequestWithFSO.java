@@ -76,7 +76,7 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getIndex();
+    final long trxnLogIndex = context.getCacheEpoch();
 
     CommitKeyRequest commitKeyRequest = getOmRequest().getCommitKeyRequest();
 
@@ -231,6 +231,8 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
               commitKeyArgs.getMetadataList()))
           .setDataSize(commitKeyArgs.getDataSize())
           .setUpdateID(trxnLogIndex)
+          .setMultiRaftTerm(ozoneManager.getCurrentMultiRaftTerm())
+          .setMultiRaftEnabled(ozoneManager.isMultiRaftEnabled())
           .build();
 
       List<OmKeyLocationInfo> uncommitted =
@@ -256,7 +258,8 @@ public class OMKeyCommitRequestWithFSO extends OMKeyCommitRequest {
             correctedSpace);
       } else if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
         RepeatedOmKeyInfo oldVerKeyInfo = getOldVersionsToCleanUp(
-            keyToDelete, omBucketInfo.getObjectID(), trxnLogIndex);
+            keyToDelete, omBucketInfo.getObjectID(), trxnLogIndex, ozoneManager.isMultiRaftEnabled(),
+                ozoneManager.getCurrentMultiRaftTerm());
         String delKeyName = omMetadataManager
             .getOzoneKey(volumeName, bucketName, fileName);
         // using pseudoObjId as objectId can be same in case of overwrite key

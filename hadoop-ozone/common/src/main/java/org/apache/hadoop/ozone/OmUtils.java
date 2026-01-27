@@ -261,6 +261,7 @@ public final class OmUtils {
     case GetObjectTagging:
     case GetQuotaRepairStatus:
     case StartQuotaRepair:
+    case GetRaftGroupHealthState:
       return true;
     case CreateVolume:
     case SetVolumeProperty:
@@ -323,6 +324,9 @@ public final class OmUtils {
     case PutObjectTagging:
     case DeleteObjectTagging:
     case UnknownCommand:
+    case BucketRaftGroupAssign:
+    case AcquireBucketRaftGroupAssignmentWriteLock:
+    case ReleaseBucketRaftGroupAssignmentWriteLock:
       return false;
     case EchoRPC:
       return omRequest.getEchoRPCRequest().getReadOnly();
@@ -650,11 +654,11 @@ public final class OmUtils {
    * @return {@link RepeatedOmKeyInfo}
    */
   public static RepeatedOmKeyInfo prepareKeyForDelete(long bucketId, OmKeyInfo keyInfo,
-      long trxnLogIndex) {
-    OmKeyInfo.Builder builder = keyInfo.toBuilder();
+      long trxnLogIndex, boolean multiRaftEnabled, long currentMultiRaftTerm) {
     // If this key is in a GDPR enforced bucket, then before moving
     // KeyInfo to deletedTable, remove the GDPR related metadata and
     // FileEncryptionInfo from KeyInfo.
+    OmKeyInfo.Builder builder = keyInfo.toBuilder();
     if (Boolean.parseBoolean(
             keyInfo.getMetadata().get(OzoneConsts.GDPR_FLAG))
     ) {
@@ -662,6 +666,31 @@ public final class OmUtils {
       builder.metadata().remove(OzoneConsts.GDPR_ALGORITHM);
       builder.metadata().remove(OzoneConsts.GDPR_SECRET);
     
+      builder.setFileEncryptionInfo(null);
+    }
+
+    // Set the updateID
+    builder.setUpdateID(trxnLogIndex)
+        .setMultiRaftTerm(currentMultiRaftTerm)
+        .setMultiRaftEnabled(multiRaftEnabled);
+
+    //The key doesn't exist in deletedTable, so create a new instance.
+    return new RepeatedOmKeyInfo(builder.build(), bucketId);
+  }
+
+  public static RepeatedOmKeyInfo prepareKeyForDelete(long bucketId, OmKeyInfo keyInfo,
+      long trxnLogIndex) {
+    // If this key is in a GDPR enforced bucket, then before moving
+    // KeyInfo to deletedTable, remove the GDPR related metadata and
+    // FileEncryptionInfo from KeyInfo.
+    OmKeyInfo.Builder builder = keyInfo.toBuilder();
+    if (Boolean.parseBoolean(
+            keyInfo.getMetadata().get(OzoneConsts.GDPR_FLAG))
+    ) {
+      builder.metadata().remove(OzoneConsts.GDPR_FLAG);
+      builder.metadata().remove(OzoneConsts.GDPR_ALGORITHM);
+      builder.metadata().remove(OzoneConsts.GDPR_SECRET);
+
       builder.setFileEncryptionInfo(null);
     }
 

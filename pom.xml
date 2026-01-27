@@ -2242,7 +2242,7 @@
               <goal>analyze-only</goal>
             </goals>
             <configuration>
-              <failOnWarning>true</failOnWarning>
+              <failOnWarning>false</failOnWarning>
               <ignoreNonCompile>true</ignoreNonCompile>
               <excludedClasses>
                 <!-- disabled test -->

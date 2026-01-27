@@ -62,8 +62,8 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getIndex();
     OmKeyInfo omKeyInfo = null;
+    final long trxnLogIndex = context.getCacheEpoch();
 
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse = onInit();
     OMClientResponse omClientResponse = null;
@@ -78,7 +78,11 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
     Result result = null;
     try {
       volume = getVolumeName();
-      bucket = getBucketName();
+      if (getWriteReqBucketName() != null) {
+        bucket = getWriteReqBucketName();
+      } else {
+        bucket = getBucketName();
+      }
       key = getKeyName();
 
       mergeOmLockDetails(omMetadataManager.getLock()
@@ -100,7 +104,11 @@ public class OMKeySetTimesRequestWithFSO extends OMKeySetTimesRequest {
       boolean isDirectory = keyStatus.isDirectory();
       operationResult = true;
       apply(omKeyInfo);
-      omKeyInfo = omKeyInfo.toBuilder().setUpdateID(trxnLogIndex).build();
+      omKeyInfo = omKeyInfo.toBuilder()
+          .setUpdateID(trxnLogIndex)
+          .setMultiRaftTerm(ozoneManager.getCurrentMultiRaftTerm())
+          .setMultiRaftEnabled(ozoneManager.isMultiRaftEnabled())
+          .build();
 
       // update cache.
       if (isDirectory) {

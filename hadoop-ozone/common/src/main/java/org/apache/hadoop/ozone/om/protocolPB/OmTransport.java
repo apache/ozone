@@ -32,6 +32,8 @@ public interface OmTransport {
    */
   OMResponse submitRequest(OMRequest payload) throws IOException;
 
+  OMResponse submitRequest(OMRequest payload, String omNodeId) throws IOException;
+
   /**
    * Return the addresses of the Ozone Managers, used for delegation token.
    */

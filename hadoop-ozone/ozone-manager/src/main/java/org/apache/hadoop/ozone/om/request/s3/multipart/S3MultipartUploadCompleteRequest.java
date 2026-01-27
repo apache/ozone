@@ -138,7 +138,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getIndex();
+    final long trxnLogIndex = context.getCacheEpoch();
     MultipartUploadCompleteRequest multipartUploadCompleteRequest =
         getOmRequest().getCompleteMultiPartUploadRequest();
 
@@ -294,7 +294,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         // All parts have same replication information. Here getting from last
         // part.
         OmKeyInfo omKeyInfo =
-            getOmKeyInfo(trxnLogIndex, keyArgs, volumeName,
+            getOmKeyInfo(ozoneManager, trxnLogIndex, keyArgs, volumeName,
                 bucketName, keyName, dbMultipartOpenKey, omMetadataManager,
                 dbOzoneKey, partKeyInfoMap, partLocationInfos, dataSize);
 
@@ -319,7 +319,8 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         boolean isNamespaceUpdate = false;
         if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
           RepeatedOmKeyInfo oldKeyVersionsToDelete = getOldVersionsToCleanUp(
-              keyToDelete, omBucketInfo.getObjectID(), trxnLogIndex);
+              keyToDelete, omBucketInfo.getObjectID(), trxnLogIndex, ozoneManager.isMultiRaftEnabled(),
+                  ozoneManager.getCurrentMultiRaftTerm());
           allKeyInfoToRemove.addAll(oldKeyVersionsToDelete.getOmKeyInfoList());
           usedBytesDiff -= keyToDelete.getReplicatedSize();
         } else {
@@ -453,11 +454,11 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
-  protected OmKeyInfo getOmKeyInfo(long trxnLogIndex,
-      KeyArgs keyArgs, String volumeName, String bucketName, String keyName,
-      String multipartOpenKey, OMMetadataManager omMetadataManager,
-      String ozoneKey, OmMultipartKeyInfo.PartKeyInfoMap partKeyInfoMap,
-      List<OmKeyLocationInfo> partLocationInfos, long dataSize)
+  protected OmKeyInfo getOmKeyInfo(OzoneManager ozoneManager, long trxnLogIndex,
+                                   KeyArgs keyArgs, String volumeName, String bucketName, String keyName,
+                                   String multipartOpenKey, OMMetadataManager omMetadataManager,
+                                   String ozoneKey, OmMultipartKeyInfo.PartKeyInfoMap partKeyInfoMap,
+                                   List<OmKeyLocationInfo> partLocationInfos, long dataSize)
           throws IOException {
     OzoneManagerProtocolProtos.KeyInfo partKeyInfo =
         partKeyInfoMap.lastEntry().getPartKeyInfo();
@@ -520,7 +521,10 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
         builder.setTags(dbOpenKeyInfo.getTags());
       }
     }
-    return builder.setUpdateID(trxnLogIndex).build();
+    return builder
+        .setMultiRaftEnabled(ozoneManager.isMultiRaftEnabled())
+        .setMultiRaftTerm(ozoneManager.getCurrentMultiRaftTerm())
+        .setUpdateID(trxnLogIndex).build();
   }
 
   protected String getDBOzoneKey(OMMetadataManager omMetadataManager,

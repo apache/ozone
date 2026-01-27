@@ -111,6 +111,8 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
       emptyKeys += OmKeyInfo.isKeyEmpty(omKeyInfo) ? 1 : 0;
       final OmKeyInfo updatedOmKeyInfo = omKeyInfo.toBuilder()
           .setUpdateID(trxnLogIndex)
+          .setMultiRaftTerm(ozoneManager.getCurrentMultiRaftTerm())
+          .setMultiRaftEnabled(ozoneManager.isMultiRaftEnabled())
           .build();
       quotaReleased += sumBlockLengths(updatedOmKeyInfo);
       omKeyInfoList.set(i, updatedOmKeyInfo);
@@ -152,6 +154,8 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
 
       final OmKeyInfo updatedDirInfo = dirInfo.toBuilder()
           .setUpdateID(trxnLogIndex)
+          .setMultiRaftTerm(ozoneManager.getCurrentMultiRaftTerm())
+          .setMultiRaftEnabled(ozoneManager.isMultiRaftEnabled())
           .build();
       quotaReleased += sumBlockLengths(updatedDirInfo);
       dirList.set(i, updatedDirInfo);
@@ -179,7 +183,8 @@ public class OmKeysDeleteRequestWithFSO extends OMKeysDeleteRequest {
                 .setStatus(deleteStatus).setUnDeletedKeys(unDeletedKeys).addAllErrors(deleteKeyErrors))
         .setStatus(deleteStatus ? OK : PARTIAL_DELETE).setSuccess(deleteStatus)
         .build(), omKeyInfoList, dirList,
-        omBucketInfo.copyObject(), volumeId, openKeyInfoMap);
+        omBucketInfo.copyObject(), volumeId, openKeyInfoMap, ozoneManager.isMultiRaftEnabled(),
+        ozoneManager.getCurrentMultiRaftTerm());
     return omClientResponse;
   }
 }

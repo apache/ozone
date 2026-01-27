@@ -47,8 +47,9 @@ public class S3ExpiredMultipartUploadsAbortResponse extends
 
   public S3ExpiredMultipartUploadsAbortResponse(
       @Nonnull OMResponse omResponse,
-      @Nonnull Map<OmBucketInfo, List<OmMultipartAbortInfo>> mpusToDelete) {
-    super(omResponse);
+      @Nonnull Map<OmBucketInfo, List<OmMultipartAbortInfo>> mpusToDelete,
+      boolean multiRaftEnabled, long currentMultiRaftTerm) {
+    super(omResponse, multiRaftEnabled, currentMultiRaftTerm);
     this.mpusToDelete = mpusToDelete;
   }
 

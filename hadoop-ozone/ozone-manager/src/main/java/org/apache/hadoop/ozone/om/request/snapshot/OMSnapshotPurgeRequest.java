@@ -75,7 +75,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     OmSnapshotInternalMetrics omSnapshotIntMetrics = ozoneManager.getOmSnapshotIntMetrics();
 
-    final long trxnLogIndex = context.getIndex();
+    final long trxnLogIndex = context.getCacheEpoch();
 
     OmMetadataManagerImpl omMetadataManager = (OmMetadataManagerImpl)
         ozoneManager.getMetadataManager();
@@ -126,7 +126,7 @@ public class OMSnapshotPurgeRequest extends OMClientRequest {
       for (SnapshotInfo snapshotInfo : updatedSnapshotInfos.values()) {
         snapshotInfo.setLastTransactionInfo(transactionInfo.toByteString());
         omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(snapshotInfo.getTableKey()),
-            CacheValue.get(context.getIndex(), snapshotInfo));
+            CacheValue.get(context.getCacheEpoch(), snapshotInfo));
       }
 
       omClientResponse = new OMSnapshotPurgeResponse(omResponse.build(), snapshotDbKeys, updatedSnapshotInfos,

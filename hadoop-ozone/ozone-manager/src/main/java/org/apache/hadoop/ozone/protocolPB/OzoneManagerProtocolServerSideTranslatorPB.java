@@ -19,7 +19,9 @@ package org.apache.hadoop.ozone.protocolPB;
 
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_READY;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.NOT_LEADER;
+import static org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils.createClientRequest;
 import static org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils.createErrorResponse;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.GetRaftGroupHealthState;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.PrepareStatus;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
@@ -27,6 +29,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
@@ -42,6 +45,7 @@ import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
+import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.validation.RequestValidations;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -54,6 +58,7 @@ import org.apache.hadoop.ozone.security.S3SecurityUtil;
 import org.apache.ratis.proto.RaftProtos.CommitInfoProto;
 import org.apache.ratis.proto.RaftProtos.FollowerInfoProto;
 import org.apache.ratis.proto.RaftProtos.ServerRpcProto;
+import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.server.DivisionInfo;
 import org.apache.ratis.server.RaftServer.Division;
@@ -175,16 +180,42 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
   }
 
   private OMResponse internalProcessRequest(OMRequest request) throws ServiceException {
+    OMClientRequest omClientRequest = null;
     boolean s3Auth = false;
 
     try {
+      OMRequest requestToSubmit;
+
+      RaftGroupId bucketRaftGroupId;
+
+      if (OmUtils.isReadOnly(request)) {
+        bucketRaftGroupId = ozoneManager.omRaftGroupName();
+      } else {
+        omClientRequest = createClientRequest(request, ozoneManager);
+        // check retry cache
+        String volumeName = omClientRequest.getWriteReqVolumeName();
+        String bucketName = omClientRequest.getWriteReqBucketName();
+
+        if (bucketName == null || !ozoneManager.isMultiRaftEnabled()) {
+          bucketRaftGroupId = ozoneManager.omRaftGroupName();
+        } else {
+          if (request.hasRaftGroupId()) {
+            bucketRaftGroupId = RaftGroupId.valueOf(new UUID(request.getRaftGroupId().getMostSigBits(),
+                request.getRaftGroupId().getLeastSigBits()));
+          } else {
+            bucketRaftGroupId = ozoneManager.getOmRaftGroupManager().getRaftGroupToHandleBucketWriteRequest(volumeName,
+                bucketName);
+          }
+        }
+      }
+
       if (request.hasS3Authentication()) {
         OzoneManager.setS3Auth(request.getS3Authentication());
         try {
           s3Auth = true;
           // If request has S3Authentication, validate S3 credentials.
           // If current OM is leader and then proceed with the request.
-          S3SecurityUtil.validateS3Credential(request, ozoneManager);
+          S3SecurityUtil.validateS3Credential(request, ozoneManager, bucketRaftGroupId);
         } catch (IOException ex) {
           return createErrorResponse(request, ex);
         }
@@ -197,17 +228,22 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       // To validate credentials we have already verified leader status.
       // This will skip of checking leader status again if request has S3Auth.
       if (!s3Auth) {
-        OzoneManagerRatisUtils.checkLeaderStatus(ozoneManager);
+        OzoneManagerRatisUtils.checkLeaderStatus(bucketRaftGroupId, ozoneManager);
       }
 
       // check retry cache
-      final OMResponse cached = omRatisServer.checkRetryCache();
+      final OMResponse cached = omRatisServer.checkRetryCache(bucketRaftGroupId);
       if (cached != null) {
         return cached;
       }
 
       this.lastRequestToSubmit = request;
-      return ozoneManager.getOmExecutionFlow().submit(request, true);
+      return ozoneManager.getOmExecutionFlow().submit(request, omClientRequest, bucketRaftGroupId, true);
+    } catch (IOException ex) {
+      if (omClientRequest != null) {
+        omClientRequest.handleRequestFailure(ozoneManager);
+      }
+      return createErrorResponse(request, ex);
     } finally {
       OzoneManager.setS3Auth(null);
     }
@@ -218,13 +254,23 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
     return lastRequestToSubmit;
   }
 
+  private OMRequest preExecute(OMClientRequest finalOmClientRequest)
+      throws IOException {
+    return captureLatencyNs(perfMetrics.getPreExecuteLatencyNs(),
+        () -> finalOmClientRequest.preExecute(ozoneManager));
+  }
+
   private OMResponse submitReadRequestToOM(OMRequest request)
       throws ServiceException {
-    if (request.getCmdType().equals(PrepareStatus)) {
-      // PrepareStatus is an OM request that only target a single OM node.
-      // Therefore, all PrepareStatus requests should be served immediately without failover regardless
-      // of the OM node leadership or the read consistency. See PrepareSubCommand.
-      // The implementation is not ideal, but exists for compatibility reason.
+    if (request.getCmdType().equals(PrepareStatus)
+        || request.getCmdType().equals(GetRaftGroupHealthState)) {
+      // These requests target a single OM node and should bypass the main
+      // raft group leadership check.
+      // - PrepareStatus: targets a specific OM node regardless of leadership.
+      // - GetRaftGroupHealthState: must be served by the leader of a specific
+      //   bucket raft group, not the main group leader. The bucket group
+      //   leadership is validated inside the handler itself
+      //   (OzoneManager.getRaftGroupHealthState).
       return handler.handleReadRequest(request);
     }
 
@@ -254,7 +300,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
   private OMResponse submitReadRequestToOmWithoutHint(OMRequest request) throws ServiceException {
     // Read from leader or followers using linearizable read
     if (ozoneManager.getConfig().isFollowerReadLocalLeaseEnabled() &&
-        allowFollowerReadLocalLease(omRatisServer.getServerDivision(),
+        allowFollowerReadLocalLease(omRatisServer.getServerDivision(omRatisServer.getCurrentRaftGroupId()),
             ozoneManager.getConfig().getFollowerReadLocalLeaseLogLimit(),
             ozoneManager.getConfig().getFollowerReadLocalLeaseTimeMs())) {
       ozoneManager.getMetrics().incNumFollowerReadLocalLeaseSuccess();
@@ -265,7 +311,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
     // === 1. Follower linearizable read ===
     if (raftServerStatus == NOT_LEADER && omRatisServer.isLinearizableRead()) {
       ozoneManager.getMetrics().incNumLinearizableRead();
-      return ozoneManager.getOmExecutionFlow().submit(request, false);
+      return ozoneManager.getOmExecutionFlow().submit(request, null, omRatisServer.getCurrentRaftGroupId(), false);
     }
     // === 2. Leader local read (skip ReadIndex if allowed) ===
     if (raftServerStatus == LEADER_AND_READY) {
@@ -277,13 +323,13 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       // otherwise use linearizable path when enabled
       if (omRatisServer.isLinearizableRead()) {
         ozoneManager.getMetrics().incNumLinearizableRead();
-        return ozoneManager.getOmExecutionFlow().submit(request, false);
+        return ozoneManager.getOmExecutionFlow().submit(request, null, omRatisServer.getCurrentRaftGroupId(), false);
       }
 
       // fallback to local read
       return handler.handleReadRequest(request);
     } else {
-      throw createLeaderErrorException(raftServerStatus);
+      throw createLeaderErrorException(omRatisServer.getCurrentRaftGroupId(), raftServerStatus);
     }
   }
 
@@ -294,19 +340,19 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
     case NOT_LEADER:
     case LEADER_AND_NOT_READY:
       if (!ozoneManager.getConfig().isFollowerReadLocalLeaseEnabled()) {
-        throw createLeaderErrorException(raftServerStatus);
+        throw createLeaderErrorException(omRatisServer.getCurrentRaftGroupId(), raftServerStatus);
       }
       long localLeaseLogLimit = localLeaseContext != null && localLeaseContext.hasLogLimit() ?
           localLeaseContext.getLogLimit() : ozoneManager.getConfig().getFollowerReadLocalLeaseLogLimit();
       long localLeaseLeaseTimeMs = localLeaseContext != null && localLeaseContext.hasLeaseTimeMs() ?
           localLeaseContext.getLeaseTimeMs() : ozoneManager.getConfig().getFollowerReadLocalLeaseTimeMs();
-      if (allowFollowerReadLocalLease(omRatisServer.getServerDivision(),
+      if (allowFollowerReadLocalLease(omRatisServer.getServerDivision(omRatisServer.getCurrentRaftGroupId()),
           localLeaseLogLimit, localLeaseLeaseTimeMs)) {
         ozoneManager.getMetrics().incNumFollowerReadLocalLeaseSuccess();
         return handler.handleReadRequest(request);
       }
       // The LocalLease lag is too high, trigger failover
-      throw createLeaderErrorException(raftServerStatus);
+      throw createLeaderErrorException(omRatisServer.getCurrentRaftGroupId(), raftServerStatus);
     case LEADER_AND_READY:
       // Although local lease does not apply for leader (since leader is always up-to-date)
       // We still add the local lease metrics for compatibility reasons
@@ -322,11 +368,11 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
     switch (raftServerStatus) {
     case NOT_LEADER:
     case LEADER_AND_NOT_READY:
-      throw createLeaderErrorException(raftServerStatus);
+      throw createLeaderErrorException(omRatisServer.getCurrentRaftGroupId(), raftServerStatus);
     case LEADER_AND_READY:
       if (omRatisServer.isLinearizableRead()) {
         ozoneManager.getMetrics().incNumLinearizableRead();
-        return ozoneManager.getOmExecutionFlow().submit(request, false);
+        return ozoneManager.getOmExecutionFlow().submit(request, null, omRatisServer.getCurrentRaftGroupId(), false);
       } else {
         // If linearizable read is not enabled, fallback to leader read
         return handler.handleReadRequest(request);
@@ -343,9 +389,9 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
     case NOT_LEADER:
       if (omRatisServer.isLinearizableRead()) {
         ozoneManager.getMetrics().incNumLinearizableRead();
-        return ozoneManager.getOmExecutionFlow().submit(request, false);
+        return ozoneManager.getOmExecutionFlow().submit(request, null, omRatisServer.getCurrentRaftGroupId(), false);
       } else {
-        throw createLeaderErrorException(raftServerStatus);
+        throw createLeaderErrorException(omRatisServer.getCurrentRaftGroupId(), raftServerStatus);
       }
     case LEADER_AND_READY:
       if (ozoneManager.getConfig().isAllowLeaderSkipLinearizableRead()) {
@@ -359,7 +405,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       if (omRatisServer.isLinearizableRead()) {
         ozoneManager.getMetrics().incNumLinearizableRead();
       }
-      return ozoneManager.getOmExecutionFlow().submit(request, false);
+      return ozoneManager.getOmExecutionFlow().submit(request, null, omRatisServer.getCurrentRaftGroupId(), false);
     default:
       throw createUnknownRaftServerStatusException(raftServerStatus);
     }
@@ -372,7 +418,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       return handler.handleReadRequest(request);
     case LEADER_AND_NOT_READY:
     case NOT_LEADER:
-      throw createLeaderErrorException(raftServerStatus);
+      throw createLeaderErrorException(omRatisServer.getCurrentRaftGroupId(), raftServerStatus);
     default:
       throw createUnknownRaftServerStatusException(raftServerStatus);
     }
@@ -427,9 +473,9 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
   }
 
   private ServiceException createLeaderErrorException(
-      RaftServerStatus raftServerStatus) {
+          RaftGroupId raftGroupId, RaftServerStatus raftServerStatus) {
     if (raftServerStatus == NOT_LEADER) {
-      return new ServiceException(omRatisServer.newOMNotLeaderException());
+      return new ServiceException(omRatisServer.newOMNotLeaderException(raftGroupId));
     } else {
       return createLeaderNotReadyException();
     }

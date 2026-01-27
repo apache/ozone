@@ -70,11 +70,13 @@ public class OzoneKey {
    */
   private final boolean isFile;
 
+  private final long updateId;
+
   @SuppressWarnings("parameternumber")
   public OzoneKey(String volumeName, String bucketName,
       String keyName, long size, long creationTime,
       long modificationTime, ReplicationConfig replicationConfig,
-      boolean isFile, String owner) {
+      boolean isFile, String owner, long updateId) {
     this.volumeName = volumeName;
     this.bucketName = bucketName;
     this.name = keyName;
@@ -84,6 +86,7 @@ public class OzoneKey {
     this.replicationConfig = replicationConfig;
     this.isFile = isFile;
     this.owner = owner;
+    this.updateId = updateId;
   }
 
   @SuppressWarnings("parameternumber")
@@ -91,9 +94,9 @@ public class OzoneKey {
                   String keyName, long size, long creationTime,
                   long modificationTime, ReplicationConfig replicationConfig,
                   Map<String, String> metadata, boolean isFile, String owner,
-                  Map<String, String> tags) {
+                  Map<String, String> tags, long updateId) {
     this(volumeName, bucketName, keyName, size, creationTime,
-        modificationTime, replicationConfig, isFile, owner);
+        modificationTime, replicationConfig, isFile, owner, updateId);
     this.metadata.putAll(metadata);
     this.tags.putAll(tags);
   }
@@ -213,6 +216,10 @@ public class OzoneKey {
     return isFile;
   }
 
+  public long getUpdateId() {
+    return updateId;
+  }
+
   /**
    * Constructs OzoneKey from OmKeyInfo.
    *
@@ -222,7 +229,7 @@ public class OzoneKey {
         keyInfo.getKeyName(), keyInfo.getDataSize(), keyInfo.getCreationTime(),
         keyInfo.getModificationTime(), keyInfo.getReplicationConfig(),
         keyInfo.getMetadata(), keyInfo.isFile(), keyInfo.getOwnerName(),
-        keyInfo.getTags());
+        keyInfo.getTags(), keyInfo.getUpdateID());
   }
 
 }

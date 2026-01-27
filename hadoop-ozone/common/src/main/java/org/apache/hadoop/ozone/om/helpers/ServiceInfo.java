@@ -309,4 +309,11 @@ public final class ServiceInfo {
     }
   }
 
+  @Override
+  public String toString() {
+    return String.format(
+        "ServiceInfo{nodeType= %s, hostname = %s, omVersion = %s, ports = %s, omRoleInfo = %s}",
+        nodeType, hostname, omVersion, ports, omRoleInfo
+    );
+  }
 }

@@ -35,6 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -43,6 +44,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -91,6 +93,7 @@ import org.apache.hadoop.utils.FaultInjectorImpl;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.tag.Unhealthy;
+import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.assertj.core.api.Fail;
 import org.junit.jupiter.api.AfterEach;
@@ -971,6 +974,10 @@ public class TestOMRatisSnapshots {
     writeKeysToIncreaseLogIndex(followerOM.getOmRatisServer(),
         leaderCheckpointTermIndex.getIndex() + 100);
 
+    UUID uuid = UUID.nameUUIDFromBytes(OM_SERVICE_ID.getBytes(StandardCharsets.UTF_8));
+
+    RaftGroupId raftGroupId = RaftGroupId.valueOf(uuid);
+
     // Install the old checkpoint on the follower OM. This should fail as the
     // followerOM is already ahead of that transactionLogIndex and the OM
     // state should be reloaded.
@@ -981,8 +988,8 @@ public class TestOMRatisSnapshots {
     assertTrue(omDbDir.toFile().mkdir());
     moveCheckpointContentsToOmDbDir(leaderCheckpointLocation, omDbDir);
 
-    TermIndex newTermIndex = followerOM.installCheckpoint(
-        leaderOMNodeId, leaderCheckpointLocation);
+    TermIndex newTermIndex = followerOM.installCheckpoint(raftGroupId,
+        leaderOMNodeId, leaderDbCheckpoint);
 
     String errorMsg = "Cannot proceed with InstallSnapshot as OM is at " +
         "TermIndex " + followerTermIndex + " and checkpoint has lower " +
@@ -1047,8 +1054,13 @@ public class TestOMRatisSnapshots {
     GenericTestUtils.setLogLevel(OzoneManager.class, Level.INFO);
     LogCapturer logCapture = LogCapturer.captureLogs(OzoneManager.class);
     followerOM.setExitManagerForTesting(new DummyExitManager());
+
+    UUID uuid = UUID.nameUUIDFromBytes(OM_SERVICE_ID.getBytes(StandardCharsets.UTF_8));
+
+    RaftGroupId raftGroupId = RaftGroupId.valueOf(uuid);
+
     // Install corrupted checkpoint
-    followerOM.installCheckpoint(leaderOMNodeId, leaderCheckpointLocation,
+    followerOM.installCheckpoint(raftGroupId, leaderOMNodeId, leaderCheckpointLocation,
         leaderCheckpointTrxnInfo);
 
     // Wait checkpoint installation to be finished.
@@ -1244,7 +1256,7 @@ public class TestOMRatisSnapshots {
     FileUtil.unTar(new File(snapshotDir, tarBall), tempDir.toFile());
   }
 
-  private static class DummyExitManager extends ExitManager {
+  private static final class DummyExitManager extends ExitManager {
     @Override
     public void exitSystem(int status, String message, Throwable throwable,
         Logger log) {

@@ -77,7 +77,7 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long transactionLogIndex = context.getIndex();
+    final long transactionLogIndex = context.getCacheEpoch();
     SetBucketPropertyRequest setBucketPropertyRequest =
         getOmRequest().getSetBucketPropertyRequest();
     Objects.requireNonNull(setBucketPropertyRequest, "setBucketPropertyRequest == null");
@@ -151,6 +151,8 @@ public class OMBucketSetOwnerRequest extends OMClientRequest {
           .setOwner(newOwner)
           .setModificationTime(setBucketPropertyRequest.getModificationTime())
           .setUpdateID(transactionLogIndex)
+          .setMultiRaftEnabled(ozoneManager.isMultiRaftEnabled())
+          .setMultiRaftTerm(ozoneManager.getCurrentMultiRaftTerm())
           .build();
 
       LOG.debug("Updating bucket owner to {} for bucket: {} in volume: {}",

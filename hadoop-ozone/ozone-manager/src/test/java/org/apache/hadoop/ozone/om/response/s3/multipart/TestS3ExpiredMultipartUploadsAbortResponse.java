@@ -236,7 +236,7 @@ public class TestS3ExpiredMultipartUploadsAbortResponse
         .build();
 
     S3ExpiredMultipartUploadsAbortResponse response = new
-        S3ExpiredMultipartUploadsAbortResponse(omResponse, mpusToAbort);
+        S3ExpiredMultipartUploadsAbortResponse(omResponse, mpusToAbort, ozoneManager.isMultiRaftEnabled(), 0);
 
     // Operations are only added to the batch by this method when status is OK
     response.checkAndUpdateDB(omMetadataManager, batchOperation);

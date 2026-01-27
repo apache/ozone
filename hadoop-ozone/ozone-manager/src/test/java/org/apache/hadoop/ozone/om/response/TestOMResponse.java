@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.response;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -36,6 +37,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ratis.protocol.RaftGroupId;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -74,7 +76,7 @@ public class TestOMResponse {
     when(ozoneManager.getOmExecutionFlow()).thenReturn(omExecutionFlow);
 
     OzoneManagerRatisServer ratisServer = mock(OzoneManagerRatisServer.class);
-    when(ratisServer.checkRetryCache()).thenReturn(null);
+    when(ratisServer.checkRetryCache(any(RaftGroupId.class))).thenReturn(null);
 
     ProtocolMessageMetrics<OzoneManagerProtocolProtos.Type> protocolMessageMetrics =
         mock(ProtocolMessageMetrics.class);

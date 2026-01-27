@@ -67,7 +67,7 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getIndex();
+    final long trxnLogIndex = context.getCacheEpoch();
 
     CreateFileRequest createFileRequest = getOmRequest().getCreateFileRequest();
     KeyArgs keyArgs = createFileRequest.getKeyArgs();
@@ -168,7 +168,8 @@ public class OMFileCreateRequestWithFSO extends OMFileCreateRequest {
               getFileEncryptionInfo(keyArgs), ozoneManager.getPrefixManager(),
               bucketInfo, pathInfoFSO, trxnLogIndex,
               pathInfoFSO.getLeafNodeObjectId(),
-          repConfig, ozoneManager.getConfig());
+          repConfig, ozoneManager.getConfig(), ozoneManager.isMultiRaftEnabled(),
+                  ozoneManager.getCurrentMultiRaftTerm());
       validateEncryptionKeyInfo(bucketInfo, keyArgs);
 
       long openVersion = omFileInfo.getLatestVersionLocations().getVersion();

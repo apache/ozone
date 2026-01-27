@@ -31,6 +31,8 @@ public interface OMMXBean extends ServiceRuntimeInfo {
 
   List<List<String>> getRatisRoles();
 
+  String getMainRatisRole();
+
   String getRatisLogDirectory();
 
   String getRocksDbDirectory();

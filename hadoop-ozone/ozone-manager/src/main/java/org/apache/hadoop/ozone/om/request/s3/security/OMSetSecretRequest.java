@@ -122,7 +122,7 @@ public class OMSetSecretRequest extends OMClientRequest {
 
             // Update S3SecretTable cache entry in this case
             // Set the transactionLogIndex to be used for updating.
-            final S3SecretValue newS3SecretValue = S3SecretValue.of(accessId, secretKey, context.getIndex());
+            final S3SecretValue newS3SecretValue = S3SecretValue.of(accessId, secretKey, context.getCacheEpoch());
             s3SecretManager.updateCache(accessId, newS3SecretValue);
 
             // Compose response

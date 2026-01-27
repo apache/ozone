@@ -87,14 +87,6 @@ public final class OMProxyInfo<T> extends ProxyInfo<T> {
     return rpcAddr;
   }
 
-  public Text getDelegationTokenService() {
-    return dtService;
-  }
-
-  public synchronized T getProxy() {
-    return proxy;
-  }
-
   public synchronized void createProxyIfNeeded(CheckedFunction<InetSocketAddress, T, IOException> createProxy) {
     if (proxy == null) {
       try {
@@ -103,6 +95,14 @@ public final class OMProxyInfo<T> extends ProxyInfo<T> {
         throw new IllegalStateException("Failed to create OM proxy for " + this, ioe);
       }
     }
+  }
+
+  public Text getDelegationTokenService() {
+    return dtService;
+  }
+
+  public synchronized T getProxy() {
+    return proxy;
   }
 
   /**
@@ -211,6 +211,13 @@ public final class OMProxyInfo<T> extends ProxyInfo<T> {
       }
       final OMProxyInfo<P> p = get(nodeId);
       return p != null && address.equals(p.getAddressString());
+    }
+
+    boolean containsKey(String nodeId) {
+      if (nodeId == null) {
+        return false;
+      }
+      return get(nodeId) != null;
     }
 
     @Override

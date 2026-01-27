@@ -626,7 +626,7 @@ public class TestSnapshotBackgroundServices {
 
     GenericTestUtils.waitFor(() -> {
       try {
-        followerOM.checkLeaderStatus();
+        followerOM.checkOmLeaderStatus();
         return true;
       } catch (OMNotLeaderException | OMLeaderNotReadyException e) {
         return false;

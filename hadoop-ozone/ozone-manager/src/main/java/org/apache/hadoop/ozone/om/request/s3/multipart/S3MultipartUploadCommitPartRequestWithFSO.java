@@ -76,6 +76,7 @@ public class S3MultipartUploadCommitPartRequestWithFSO
 
     return new S3MultipartUploadCommitPartResponseWithFSO(build, multipartKey,
         openKey, multipartKeyInfo, keyToDeleteMap, omKeyInfo,
-        omBucketInfo, bucketId, getBucketLayout());
+        omBucketInfo, bucketId, getBucketLayout(), ozoneManager.isMultiRaftEnabled(),
+        ozoneManager.getCurrentMultiRaftTerm());
   }
 }

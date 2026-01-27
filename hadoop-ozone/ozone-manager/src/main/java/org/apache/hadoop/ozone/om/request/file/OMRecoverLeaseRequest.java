@@ -147,7 +147,7 @@ public class OMRecoverLeaseRequest extends OMKeyRequest {
       acquiredLock = getOmLockDetails().isLockAcquired();
       validateBucketAndVolume(omMetadataManager, volumeName, bucketName);
 
-      RecoverLeaseResponse recoverLeaseResponse = doWork(ozoneManager, context.getIndex());
+      RecoverLeaseResponse recoverLeaseResponse = doWork(ozoneManager, context.getCacheEpoch());
 
       // Prepare response
       omResponse.setRecoverLeaseResponse(recoverLeaseResponse).setCmdType(RecoverLease);

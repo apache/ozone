@@ -44,13 +44,13 @@ public final class OMSnapshotMoveUtils {
         context.getTermIndex()).toByteString());
     omMetadataManager.getSnapshotInfoTable().addCacheEntry(
         new CacheKey<>(fromSnapshot.getTableKey()),
-        CacheValue.get(context.getIndex(), fromSnapshot));
+        CacheValue.get(context.getCacheEpoch(), fromSnapshot));
     if (toSnapshot != null) {
       toSnapshot.setLastTransactionInfo(TransactionInfo.valueOf(
           context.getTermIndex()).toByteString());
       omMetadataManager.getSnapshotInfoTable().addCacheEntry(
           new CacheKey<>(toSnapshot.getTableKey()),
-          CacheValue.get(context.getIndex(), toSnapshot));
+          CacheValue.get(context.getCacheEpoch(), toSnapshot));
     }
   }
 }

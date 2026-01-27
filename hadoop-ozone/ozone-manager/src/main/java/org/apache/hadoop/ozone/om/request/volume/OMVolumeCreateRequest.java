@@ -105,7 +105,7 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long transactionLogIndex = context.getIndex();
+    final long transactionLogIndex = context.getCacheEpoch();
 
     CreateVolumeRequest createVolumeRequest =
         getOmRequest().getCreateVolumeRequest();
@@ -136,7 +136,9 @@ public class OMVolumeCreateRequest extends OMVolumeRequest {
       // ID will be set to transactionID each time we update the object.
       OmVolumeArgs.Builder builder = OmVolumeArgs.builderFromProtobuf(volumeInfo)
           .setObjectID(ozoneManager.getObjectIdFromTxId(transactionLogIndex))
-          .setUpdateID(transactionLogIndex);
+          .setUpdateID(transactionLogIndex)
+          .setMultiRaftEnabled(ozoneManager.isMultiRaftEnabled())
+          .setMultiRaftTerm(ozoneManager.getCurrentMultiRaftTerm());
 
       auditMap = builder.toAuditMap();
       // acquire lock.

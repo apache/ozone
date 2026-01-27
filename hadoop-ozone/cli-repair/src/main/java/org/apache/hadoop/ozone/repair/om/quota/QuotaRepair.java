@@ -66,7 +66,7 @@ public class QuotaRepair extends AbstractSubcommand {
       OmTransport omTransport = new Hadoop3OmTransportFactory()
           .createOmTransport(conf, getUser(), omServiceID);
       return new OzoneManagerProtocolClientSideTranslatorPB(omTransport,
-          clientId);
+          clientId, conf, () -> omTransport);
     } else {
       throw new OzoneClientException("This command works only on OzoneManager" +
           " HA cluster. Service ID specified does not match" +

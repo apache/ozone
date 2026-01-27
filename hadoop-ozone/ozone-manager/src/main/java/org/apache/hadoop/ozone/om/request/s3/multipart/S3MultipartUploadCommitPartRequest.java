@@ -101,7 +101,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getIndex();
+    final long trxnLogIndex = context.getCacheEpoch();
     MultipartCommitUploadPartRequest multipartCommitUploadPartRequest =
         getOmRequest().getCommitMultiPartUploadRequest();
 
@@ -166,6 +166,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       omKeyInfo = omKeyInfo.toBuilder()
           .addAllMetadata(KeyValueUtil.getFromProtobuf(
               keyArgs.getMetadataList()))
+          .setMultiRaftEnabled(ozoneManager.isMultiRaftEnabled())
+          .setMultiRaftTerm(ozoneManager.getCurrentMultiRaftTerm())
           .setUpdateID(trxnLogIndex)
           .build();
 
@@ -209,6 +211,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
       // Set the UpdateID to current transactionLogIndex
       multipartKeyInfo = multipartKeyInfo.toBuilder()
           .setUpdateID(trxnLogIndex)
+          .setMultiRaftEnabled(ozoneManager.isMultiRaftEnabled())
+          .setMultiRaftTerm(ozoneManager.getCurrentMultiRaftTerm())
           .build();
 
       // OldPartKeyInfo will be deleted. Its updateID will be set in
@@ -241,7 +245,7 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
             OmKeyInfo.getFromProtobuf(oldPartKeyInfo.getPartKeyInfo());
         correctedSpace -= partKeyToBeDeleted.getReplicatedSize();
         RepeatedOmKeyInfo oldVerKeyInfo = getOldVersionsToCleanUp(partKeyToBeDeleted, omBucketInfo.getObjectID(),
-            trxnLogIndex);
+            trxnLogIndex, ozoneManager.isMultiRaftEnabled(), ozoneManager.getCurrentMultiRaftTerm());
         // Unlike normal key commit, we can reuse the objectID for MPU part key because MPU part key
         // always use a new object ID regardless whether there is an existing key.
         String delKeyName = omMetadataManager.getOzoneDeletePathKey(
@@ -314,7 +318,8 @@ public class S3MultipartUploadCommitPartRequest extends OMKeyRequest {
 
     return new S3MultipartUploadCommitPartResponse(build, multipartKey, openKey,
         multipartKeyInfo, keyToDeleteMap, omKeyInfo,
-        omBucketInfo, bucketId, getBucketLayout());
+        omBucketInfo, bucketId, getBucketLayout(),ozoneManager.isMultiRaftEnabled(),
+            ozoneManager.getCurrentMultiRaftTerm());
   }
 
   protected OmKeyInfo getOmKeyInfo(OMMetadataManager omMetadataManager,

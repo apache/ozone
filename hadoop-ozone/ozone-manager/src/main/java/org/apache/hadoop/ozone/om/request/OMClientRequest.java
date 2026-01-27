@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.UNAUTHORIZED;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -27,7 +28,9 @@ import java.nio.file.InvalidPathException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.OmUtils;
@@ -59,6 +62,7 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.ozone.security.acl.RequestContext;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
+import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,6 +87,9 @@ public abstract class OMClientRequest implements RequestAuditor {
     return auditBuilder;
   }
 
+  private String writeBucketName;
+  private String writeVolumeName;
+  private RaftGroupId writeRaftGroup;
   /**
    * Stores the result of request execution in
    * OMClientRequest#validateAndUpdateCache.
@@ -95,6 +102,13 @@ public abstract class OMClientRequest implements RequestAuditor {
 
   public OMClientRequest(OMRequest omRequest) {
     this.omRequest = Objects.requireNonNull(omRequest);
+    Preconditions.checkNotNull(omRequest);
+    if (omRequest.hasRaftGroupId()) {
+      HddsProtos.UUID uuid = omRequest.getRaftGroupId();
+      RaftGroupId raftGroupId = RaftGroupId.valueOf(new UUID(uuid.getMostSigBits(), uuid.getLeastSigBits()));
+      setWriteRaftGroup(raftGroupId);
+    }
+    this.omRequest = omRequest;
     this.omLockDetails.clear();
   }
 
@@ -574,5 +588,29 @@ public abstract class OMClientRequest implements RequestAuditor {
 
   public void mergeOmLockDetails(OMLockDetails details) {
     omLockDetails.merge(details);
+  }
+
+  public String getWriteReqBucketName() {
+    return writeBucketName;
+  }
+
+  public void setWriteReqBucketName(String bucketName) {
+    this.writeBucketName = bucketName;
+  }
+
+  public String getWriteReqVolumeName() {
+    return writeVolumeName;
+  }
+
+  public void setWriteReqVolumeName(String volumeName) {
+    this.writeVolumeName = volumeName;
+  }
+
+  public RaftGroupId getWriteRaftGroup() {
+    return writeRaftGroup;
+  }
+
+  public void setWriteRaftGroup(RaftGroupId writeRaftGroup) {
+    this.writeRaftGroup = writeRaftGroup;
   }
 }

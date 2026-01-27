@@ -90,7 +90,7 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
   @Override @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getIndex();
+    final long trxnLogIndex = context.getCacheEpoch();
     DeleteKeysRequest deleteKeyRequest = getOmRequest().getDeleteKeysRequest();
 
     OzoneManagerProtocolProtos.DeleteKeyArgs deleteKeyArgs =
@@ -298,7 +298,8 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
                 .setUnDeletedKeys(unDeletedKeys).addAllErrors(deleteKeyErrors))
         .setStatus(deleteStatus ? OK : PARTIAL_DELETE).setSuccess(deleteStatus)
         .build(), omKeyInfoList,
-        omBucketInfo.copyObject(), openKeyInfoMap);
+        omBucketInfo.copyObject(), openKeyInfoMap, ozoneManager.isMultiRaftEnabled(),
+        ozoneManager.getCurrentMultiRaftTerm());
     return omClientResponse;
   }
 
@@ -318,6 +319,8 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
 
       omKeyInfo = omKeyInfo.toBuilder()
           .setUpdateID(trxnLogIndex)
+          .setMultiRaftTerm(ozoneManager.getCurrentMultiRaftTerm())
+          .setMultiRaftEnabled(ozoneManager.isMultiRaftEnabled())
           .build();
       quotaReleased += sumBlockLengths(omKeyInfo);
       emptyKeys += OmKeyInfo.isKeyEmpty(omKeyInfo) ? 1 : 0;

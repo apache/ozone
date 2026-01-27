@@ -402,6 +402,13 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
     return useFollowerRead;
   }
 
+  /**
+   * Return the underlying leader-based failover proxy provider.
+   */
+  public HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> getFailoverProxy() {
+    return leaderProxy;
+  }
+
   @VisibleForTesting
   public List<OMProxyInfo<OzoneManagerProtocolPB>> getOMProxies() {
     return leaderProxy.getOMProxies();

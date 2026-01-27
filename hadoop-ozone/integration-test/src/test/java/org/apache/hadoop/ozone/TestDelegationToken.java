@@ -74,13 +74,14 @@ import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient
 import org.apache.hadoop.hdds.security.x509.keys.HDDSKeyGenerator;
 import org.apache.hadoop.hdds.security.x509.keys.KeyStorage;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.ipc_.Server;
+import org.apache.hadoop.ipc.Server;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.minikdc.MiniKdc;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ScmBlockLocationTestingClient;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -315,7 +316,7 @@ public final class TestDelegationToken {
       // Get first OM client which will authenticate via Kerberos
       omClient = new OzoneManagerProtocolClientSideTranslatorPB(
           OmTransportFactory.create(conf, ugi, null),
-          RandomStringUtils.secure().nextAscii(5));
+          RandomStringUtils.secure().nextAscii(5), conf, () -> createOmTransport(ugi));
 
       // Assert if auth was successful via Kerberos
       assertThat(logs.getOutput()).doesNotContain(
@@ -348,7 +349,7 @@ public final class TestDelegationToken {
       testUser.doAs((PrivilegedExceptionAction<Void>) () -> {
         omClient = new OzoneManagerProtocolClientSideTranslatorPB(
             OmTransportFactory.create(conf, testUser, null),
-            RandomStringUtils.secure().nextAscii(5));
+            RandomStringUtils.secure().nextAscii(5), conf, () -> createOmTransport(testUser));
         return null;
       });
 
@@ -376,7 +377,7 @@ public final class TestDelegationToken {
       UserGroupInformation.setLoginUser(ugi);
       omClient = new OzoneManagerProtocolClientSideTranslatorPB(
           OmTransportFactory.create(conf, ugi, null),
-          RandomStringUtils.secure().nextAscii(5));
+          RandomStringUtils.secure().nextAscii(5), conf, () -> createOmTransport(ugi));
 
       // Case 5: Test success of token cancellation.
       omClient.cancelDelegationToken(token);
@@ -392,7 +393,7 @@ public final class TestDelegationToken {
       // token is not in cache anymore.
       omClient = new OzoneManagerProtocolClientSideTranslatorPB(
           OmTransportFactory.create(conf, testUser, null),
-          RandomStringUtils.secure().nextAscii(5));
+          RandomStringUtils.secure().nextAscii(5), conf, () -> createOmTransport(testUser));
       ex = assertThrows(OMException.class,
           () -> omClient.cancelDelegationToken(token));
       assertEquals(TOKEN_ERROR_OTHER, ex.getResult());
@@ -401,6 +402,14 @@ public final class TestDelegationToken {
     } finally {
       om.stop();
       om.join();
+    }
+  }
+
+  private OmTransport createOmTransport(UserGroupInformation ugi) {
+    try {
+      return OmTransportFactory.create(conf, ugi, null);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     }
   }
 

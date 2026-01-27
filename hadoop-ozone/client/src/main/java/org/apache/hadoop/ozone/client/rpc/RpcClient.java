@@ -169,6 +169,11 @@ import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerClientProtocol;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketRaftGroupAssignRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketRaftGroupAssignResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetRaftGroupHealthStateRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetRaftGroupHealthStateResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.ozone.security.GDPRSymmetricKey;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
@@ -185,6 +190,41 @@ import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.util.MemoizedSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.URI;
+import java.security.InvalidKeyException;
+import java.security.PrivilegedExceptionAction;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.BitSet;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_KEY_PROVIDER_CACHE_EXPIRY_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_REQUIRED_OM_VERSION_MIN_KEY;
+import static org.apache.hadoop.ozone.OzoneConsts.MAXIMUM_NUMBER_OF_PARTS_PER_UPLOAD;
+import static org.apache.hadoop.ozone.OzoneConsts.OLD_QUOTA_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_MAXIMUM_ACCESS_ID_LENGTH;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.READ;
+import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
 
 /**
  * Ozone RPC Client Implementation, it connects to OM, SCM and DataNode
@@ -254,7 +294,13 @@ public class RpcClient implements ClientProtocol {
     OzoneManagerProtocolClientSideTranslatorPB
         ozoneManagerProtocolClientSideTranslatorPB =
         new OzoneManagerProtocolClientSideTranslatorPB(omTransport,
-        clientId.toString());
+        clientId.toString(), conf, () -> {
+          try {
+            return createOmTransport(omServiceId);
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        });
     this.ozoneManagerClient = TracingUtil.createProxy(
         ozoneManagerProtocolClientSideTranslatorPB,
         OzoneManagerClientProtocol.class, conf);
@@ -1799,7 +1845,7 @@ public class RpcClient implements ClientProtocol {
               Collections.singletonMap(ETAG, key.getETag()),
               key.isFile(),
               key.getOwnerName(),
-              Collections.emptyMap()))
+              Collections.emptyMap(), key.getUpdateId()))
           .collect(Collectors.toList());
     } else {
       List<OmKeyInfo> keys = ozoneManagerClient.listKeys(
@@ -1814,7 +1860,8 @@ public class RpcClient implements ClientProtocol {
               key.getMetadata(),
               key.isFile(),
               key.getOwnerName(),
-              key.getTags()))
+              key.getTags(),
+              key.getUpdateID()))
           .collect(Collectors.toList());
     }
   }
@@ -1848,7 +1895,7 @@ public class RpcClient implements ClientProtocol {
         keyInfo.getFileEncryptionInfo(),
         () -> getInputStreamWithRetryFunction(keyInfo), keyInfo.isFile(),
         keyInfo.getOwnerName(), keyInfo.getTags(),
-        keyInfo.getGeneration()
+        keyInfo.getGeneration(), keyInfo.getUpdateID()
     );
   }
 
@@ -2859,6 +2906,37 @@ public class RpcClient implements ClientProtocol {
         .setKeyName(keyName)
         .build();
     ozoneManagerClient.deleteObjectTagging(keyArgs);
+  }
+
+  @Override
+  public void createRaftGroups(List<UUID> raftGroupIds, boolean purgeExistingRaftGroups) throws IOException {
+    ozoneManagerClient.createRaftGroups(raftGroupIds, purgeExistingRaftGroups);
+  }
+
+  @Override
+  public GetRaftGroupHealthStateResponse getRaftGroupHealthState(GetRaftGroupHealthStateRequest request)
+      throws IOException {
+    return ozoneManagerClient.getRaftGroupHealthState(request);
+  }
+
+  @Override
+  public void moveOmToSafeMode() throws IOException {
+    ozoneManagerClient.moveOmToSafeMode();
+  }
+
+  @Override
+  public BucketRaftGroupAssignResponse assignBucketRaftGroup(BucketRaftGroupAssignRequest request) throws IOException {
+    return ozoneManagerClient.assignBucketRaftGroup(request);
+  }
+
+  @Override
+  public void acquireBucketRaftGroupAssignmentWriteLock() throws IOException {
+    ozoneManagerClient.acquireBucketRaftGroupAssignmentWriteLock();
+  }
+
+  @Override
+  public void releaseBucketRaftGroupAssignmentWriteLock() throws IOException {
+    ozoneManagerClient.releaseBucketRaftGroupAssignmentWriteLock();
   }
 
   private static ExecutorService createThreadPoolExecutor(

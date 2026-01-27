@@ -122,7 +122,7 @@ public class TestOMSnapshotMoveTableKeysResponse extends TestSnapshotRequestAndR
   public void testMoveTableKeysToNextSnapshot(boolean nextSnapshotExists) throws Exception {
     IOzoneManagerLock lock = spy(getOmMetadataManager().getLock());
     when(getOmMetadataManager().getLock()).thenReturn(lock);
-    OmBucketInfo omBucketInfo = OMKeyRequest.getBucketInfo(getOmMetadataManager(), getVolumeName(), getBucketName());
+    OmBucketInfo omBucketInfo = OMKeyRequest.getOmBucketInfo(getOmMetadataManager(), getVolumeName(), getBucketName());
     createSnapshots(nextSnapshotExists, omBucketInfo.getObjectID());
     try (UncheckedAutoCloseableSupplier<OmSnapshot> snapshot1 = getOmSnapshotManager().getSnapshot(
         getVolumeName(), getBucketName(), snapshotName1);

@@ -80,7 +80,7 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
       List<SnapshotMoveKeyInfos> reclaimKeysList = moveDeletedKeysRequest.getReclaimKeysList();
       List<HddsProtos.KeyValue> renamedKeysList = moveDeletedKeysRequest.getRenamedKeysList();
       List<String> movedDirs = moveDeletedKeysRequest.getDeletedDirsToMoveList();
-      OmBucketInfo omBucketInfo = OMKeyRequest.getBucketInfo(omMetadataManager, snapshotInfo.getVolumeName(),
+      OmBucketInfo omBucketInfo = OMKeyRequest.getOmBucketInfo(omMetadataManager, snapshotInfo.getVolumeName(),
           snapshotInfo.getBucketName());
       OMSnapshotMoveUtils.updateCache(ozoneManager, fromSnapshot, nextSnapshot, context);
       omClientResponse = new OMSnapshotMoveDeletedKeysResponse.Builder()

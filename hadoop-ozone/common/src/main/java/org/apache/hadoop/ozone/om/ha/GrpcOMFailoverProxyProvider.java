@@ -129,6 +129,11 @@ public class GrpcOMFailoverProxyProvider<T> extends
   }
 
   @Override
+  ProxyInfo<T> getProxy(String omNodeId) {
+    return getOMProxyMap().get(omNodeId);
+  }
+
+  @Override
   public synchronized void close() throws IOException { }
 
   // need to throw if nodeID not in omAddresses

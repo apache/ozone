@@ -72,7 +72,7 @@ public class OMQuotaRepairRequest extends OMClientRequest {
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long transactionLogIndex = context.getIndex();
+    final long transactionLogIndex = context.getCacheEpoch();
     OzoneManagerProtocolProtos.QuotaRepairRequest quotaRepairRequest =
         getOmRequest().getQuotaRepairRequest();
     Objects.requireNonNull(quotaRepairRequest, "quotaRepairRequest == null");

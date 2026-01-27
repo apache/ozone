@@ -36,11 +36,34 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
  */
 public abstract class AbstractOMKeyDeleteResponse extends OmKeyResponse {
 
+  private boolean isMultiRaftEnabled;
+  private long multiRaftTerm;
+
   public AbstractOMKeyDeleteResponse(
       @Nonnull OMResponse omResponse) {
     super(omResponse);
   }
 
+  public AbstractOMKeyDeleteResponse(
+      @Nonnull OMResponse omResponse, boolean multiRaftEnabled,
+      long currentMultiRaftTerm) {
+    super(omResponse);
+    this.isMultiRaftEnabled = multiRaftEnabled;
+    this.multiRaftTerm = currentMultiRaftTerm;
+  }
+
+  public AbstractOMKeyDeleteResponse(@Nonnull OMResponse omResponse, BucketLayout bucketLayout,
+                                     boolean multiRaftEnabled,
+                                     long currentMultiRaftTerm) {
+    super(omResponse, bucketLayout);
+    this.isMultiRaftEnabled = multiRaftEnabled;
+    this.multiRaftTerm = currentMultiRaftTerm;
+  }
+
+  /**
+   * For when the request is not successful.
+   * For a successful request, the other constructor should be used.
+   */
   public AbstractOMKeyDeleteResponse(@Nonnull OMResponse omResponse,
                                      @Nonnull BucketLayout bucketLayout) {
     super(omResponse, bucketLayout);
@@ -79,7 +102,7 @@ public abstract class AbstractOMKeyDeleteResponse extends OmKeyResponse {
       // instance in deletedTable.
       omKeyInfo = omKeyInfo.withCommittedKeyDeletedFlag(isCommittedKey);
       RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-          bucketId, omKeyInfo, omKeyInfo.getUpdateID()
+          bucketId, omKeyInfo, omKeyInfo.getUpdateID(), isMultiRaftEnabled, multiRaftTerm
       );
       String delKeyName = omMetadataManager.getOzoneDeletePathKey(
           omKeyInfo.getObjectID(), keyName);
@@ -126,7 +149,7 @@ public abstract class AbstractOMKeyDeleteResponse extends OmKeyResponse {
       // instance in deletedTable.
       omKeyInfo = omKeyInfo.withCommittedKeyDeletedFlag(isCommittedKey);
       RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
-          bucketId, omKeyInfo, omKeyInfo.getUpdateID()
+          bucketId, omKeyInfo, omKeyInfo.getUpdateID(), isMultiRaftEnabled, multiRaftTerm
       );
       omMetadataManager.getDeletedTable().putWithBatch(
           batchOperation, deleteKeyName, repeatedOmKeyInfo);

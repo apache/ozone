@@ -18,12 +18,17 @@
 package org.apache.hadoop.ozone.om.protocolPB;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_S3_CALLER_CONTEXT_PREFIX;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTI_RAFT_BUCKET_ENABLED;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTI_RAFT_BUCKET_ENABLED_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTI_RAFT_BUCKET_GROUPS;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_MULTI_RAFT_BUCKET_GROUPS_DEFAULT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.SCM_IN_SAFE_MODE;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.ACCESS_DENIED;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.DIRECTORY_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.OK;
+import static org.apache.hadoop.ozone.util.OzoneMultiRaftUtils.getBucketName;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -40,12 +45,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -101,13 +109,18 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AddAclR
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AddAclResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AllocateBlockResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BasicKeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketRaftGroupAssignResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelDelegationTokenResponseProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelPrepareRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelPrepareResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelSnapshotDiffRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CommitKeyRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateBucketRaftGroupsRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateBucketRaftGroupsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateBucketRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateDirectoryRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateFileRequest;
@@ -143,6 +156,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyI
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetObjectTaggingRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetObjectTaggingResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetRaftGroupHealthStateResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3SecretRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3SecretResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetS3VolumeContextRequest;
@@ -152,6 +166,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoBuc
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.InfoVolumeResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBucketsRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListBucketsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListKeysLightResponse;
@@ -161,6 +176,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListMul
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListMultipartUploadsResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListOpenFilesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListOpenFilesResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListSnapshotRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListStatusLightResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListStatusRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ListStatusResponse;
@@ -223,6 +239,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetSafe
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetTimesRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetVolumePropertyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetVolumePropertyResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotDiffRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SnapshotInfoRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAssignAdminRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.TenantAssignUserAccessIdRequest;
@@ -251,7 +268,10 @@ import org.apache.hadoop.ozone.snapshot.SubmitSnapshotDiffResponse;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.ozone.util.ProtobufUtils;
+import org.apache.hadoop.ozone.util.UsageBasedCache;
 import org.apache.hadoop.security.token.Token;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The client side implementation of OzoneManagerProtocol.
@@ -261,20 +281,33 @@ import org.apache.hadoop.security.token.Token;
 public final class OzoneManagerProtocolClientSideTranslatorPB
     implements OzoneManagerClientProtocol {
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OzoneManagerProtocolClientSideTranslatorPB.class);
+
   private final String clientID;
   private OmTransport transport;
+  private UsageBasedCache<OmTransport> customTransports;
+  private Map<String, OmTransport> bucketTransports;
   private ThreadLocal<S3Auth> threadLocalS3Auth
       = new ThreadLocal<>();
   private boolean s3AuthCheck;
 
   public static final int BLOCK_ALLOCATION_RETRY_COUNT = 90;
   public static final int BLOCK_ALLOCATION_RETRY_WAIT_TIME_MS = 1000;
-
+  private final ConfigurationSource conf;
+  private final boolean isMultiRaftEnabled;
   public OzoneManagerProtocolClientSideTranslatorPB(OmTransport omTransport,
-      String clientId) {
+                                                    String clientId,
+                                                    ConfigurationSource conf,
+                                                    Supplier<OmTransport> transportSupplier
+  ) {
     this.clientID = clientId;
     this.transport = omTransport;
     this.s3AuthCheck = false;
+    this.bucketTransports = new ConcurrentHashMap<>();
+    this.conf = conf;
+    this.isMultiRaftEnabled = isMultiRaftEnabled(conf);
+    this.customTransports = new UsageBasedCache<>(getMultiRaftGroupCount(conf), transportSupplier);
   }
 
   /**
@@ -294,6 +327,14 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   public void close() throws IOException {
     //transport is not reusable
     transport.close();
+    customTransports.forEach(v -> {
+      try {
+        v.close();
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    });
+    customTransports.clear();
   }
 
   /**
@@ -341,10 +382,36 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         CallerContext.setCurrent(callerContext);
       }
     }
-    OMResponse response =
-        transport.submitRequest(
-            builder.setTraceID(TracingUtil.exportCurrentSpan()).build());
-    return response;
+
+    return getTransport(omRequest)
+            .submitRequest(builder.setTraceID(TracingUtil.exportCurrentSpan()).build());
+  }
+
+  private OmTransport getTransport(OMRequest omRequest) {
+    String bucketName = getBucketName(omRequest);
+    if (bucketName != null && isMultiRaftEnabled) {
+
+      OmTransport omTransport = bucketTransports.computeIfAbsent(bucketName, key -> customTransports.get());
+      LOG.trace("Bucket name set for {} request {} transport {}", bucketName, omRequest.getCmdType(), omTransport);
+      return omTransport;
+    } else {
+      LOG.trace("Bucket name not set for request {}", omRequest.getCmdType());
+
+      return transport;
+    }
+  }
+
+  private static int getMultiRaftGroupCount(ConfigurationSource configuration) {
+    return configuration.getInt(
+            OZONE_OM_MULTI_RAFT_BUCKET_GROUPS,
+            OZONE_OM_MULTI_RAFT_BUCKET_GROUPS_DEFAULT);
+  }
+
+  private boolean isMultiRaftEnabled(ConfigurationSource configuration) {
+    return configuration.getBoolean(
+            OZONE_OM_MULTI_RAFT_BUCKET_ENABLED,
+            OZONE_OM_MULTI_RAFT_BUCKET_ENABLED_DEFAULT
+    );
   }
 
   /**
@@ -1026,7 +1093,6 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .build();
 
     handleError(submitRequest(omRequest));
-
   }
 
   /**
@@ -1058,13 +1124,12 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
     ListKeysResponse resp =
         handleError(submitRequest(omRequest)).getListKeysResponse();
     List<OmKeyInfo> list = new ArrayList<>();
-    for (OzoneManagerProtocolProtos.KeyInfo keyInfo : resp.getKeyInfoList()) {
+    for (KeyInfo keyInfo : resp.getKeyInfoList()) {
       OmKeyInfo fromProtobuf = OmKeyInfo.getFromProtobuf(keyInfo);
       list.add(fromProtobuf);
     }
     keys.addAll(list);
     return new ListKeysResult(keys, resp.getIsTruncated());
-
   }
 
   /**
@@ -1097,7 +1162,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     ListKeysLightResponse resp =
         handleError(submitRequest(omRequest)).getListKeysLightResponse();
-    for (OzoneManagerProtocolProtos.BasicKeyInfo
+    for (BasicKeyInfo
         basicKeyInfo : resp.getBasicKeyInfoList()) {
       BasicOmKeyInfo fromProtobuf =
           BasicOmKeyInfo.getFromProtobuf(basicKeyInfo, req);
@@ -1341,9 +1406,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   public ListSnapshotResponse listSnapshot(
       String volumeName, String bucketName, String snapshotPrefix,
       String prevSnapshot, int maxListResult) throws IOException {
-    final OzoneManagerProtocolProtos.ListSnapshotRequest.Builder
+    final ListSnapshotRequest.Builder
         requestBuilder =
-        OzoneManagerProtocolProtos.ListSnapshotRequest.newBuilder()
+        ListSnapshotRequest.newBuilder()
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
             .setMaxListResult(maxListResult);
@@ -1427,7 +1492,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
       throws IOException {
     final OzoneManagerProtocolProtos.SnapshotDiffRequest.Builder
         requestBuilder =
-        OzoneManagerProtocolProtos.SnapshotDiffRequest.newBuilder()
+        SnapshotDiffRequest.newBuilder()
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
             .setFromSnapshot(fromSnapshot)
@@ -1511,9 +1576,9 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
                                                        String fromSnapshot,
                                                        String toSnapshot)
       throws IOException {
-    final OzoneManagerProtocolProtos.CancelSnapshotDiffRequest.Builder
+    final CancelSnapshotDiffRequest.Builder
         requestBuilder =
-        OzoneManagerProtocolProtos.CancelSnapshotDiffRequest.newBuilder()
+        CancelSnapshotDiffRequest.newBuilder()
             .setVolumeName(volumeName)
             .setBucketName(bucketName)
             .setFromSnapshot(fromSnapshot)
@@ -2739,6 +2804,55 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     OMResponse omResponse = submitRequest(omRequest);
     handleError(omResponse);
+  }
+
+  @Override
+  public CreateBucketRaftGroupsResponse createRaftGroups(List<UUID> groupIds, boolean purgeExistingRaftGroups)
+      throws IOException {
+
+    CreateBucketRaftGroupsRequest createGroupsRequest = CreateBucketRaftGroupsRequest.newBuilder()
+            .addAllGroupIds(groupIds.stream().map(ProtobufUtils::toProtobuf).collect(Collectors.toList()))
+            .build();
+    OMRequest omRequest = createOMRequest(Type.CreateBucketRaftGroups)
+            .setCreateBucketRaftGroupsRequest(createGroupsRequest).build();
+    return handleError(submitRequest(omRequest)).getCreateBucketRaftGroupsResponse();
+  }
+
+  @Override
+  public GetRaftGroupHealthStateResponse getRaftGroupHealthState(
+      OzoneManagerProtocolProtos.GetRaftGroupHealthStateRequest request) throws IOException {
+    OMRequest omRequest = createOMRequest(Type.GetRaftGroupHealthState)
+        .setGetRaftGroupHealthStateRequest(request)
+        .build();
+    return handleError(submitRequest(omRequest)).getGetRaftGroupHealthStateResponse();
+  }
+
+  @Override
+  public void moveOmToSafeMode() throws IOException {
+    OMRequest omRequest = createOMRequest(Type.MoveOmToSafeMode).build();
+    handleError(submitRequest(omRequest));
+  }
+
+  @Override
+  public BucketRaftGroupAssignResponse assignBucketRaftGroup(
+      OzoneManagerProtocolProtos.BucketRaftGroupAssignRequest request) throws IOException {
+    OzoneManagerProtocolProtos.OMRequest omRequest =
+        createOMRequest(OzoneManagerProtocolProtos.Type.BucketRaftGroupAssign)
+            .setBucketRaftGroupAssignRequest(request)
+            .build();
+    return handleError(submitRequest(omRequest)).getBucketRaftGroupAssignResponse();
+  }
+
+  @Override
+  public void acquireBucketRaftGroupAssignmentWriteLock() throws IOException {
+    OMRequest omRequest = createOMRequest(Type.AcquireBucketRaftGroupAssignmentWriteLock).build();
+    handleError(submitRequest(omRequest));
+  }
+
+  @Override
+  public void releaseBucketRaftGroupAssignmentWriteLock() throws IOException {
+    OMRequest omRequest = createOMRequest(Type.ReleaseBucketRaftGroupAssignmentWriteLock).build();
+    handleError(submitRequest(omRequest));
   }
 
   private SafeMode toProtoBuf(SafeModeAction action) {

@@ -25,9 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
@@ -80,6 +78,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.Mockito;
 import org.slf4j.event.Level;
 
 /**
@@ -188,8 +187,8 @@ public class TestOzoneDelegationTokenSecretManager {
   public void testLeadershipCheckinRetrievePassword() throws Exception {
     secretManager = createSecretManager(conf, TOKEN_MAX_LIFETIME,
         expiryTime, TOKEN_REMOVER_SCAN_INTERVAL);
-    doThrow(new OMNotLeaderException(RaftPeerId.valueOf("om")))
-        .when(om).checkLeaderStatus();
+    Mockito.doThrow(new OMNotLeaderException(RaftPeerId.valueOf("om"), null))
+        .when(om).checkOmLeaderStatus();
     OzoneTokenIdentifier identifier = new OzoneTokenIdentifier();
     try {
       secretManager.retrievePassword(identifier);
@@ -199,8 +198,8 @@ public class TestOzoneDelegationTokenSecretManager {
           e.getCause().getClass());
     }
 
-    doThrow(new OMLeaderNotReadyException("Leader not ready"))
-        .when(om).checkLeaderStatus();
+    Mockito.doThrow(new OMLeaderNotReadyException("Leader not ready"))
+        .when(om).checkOmLeaderStatus();
     try {
       secretManager.retrievePassword(identifier);
     } catch (Exception e) {
@@ -209,7 +208,7 @@ public class TestOzoneDelegationTokenSecretManager {
           e.getCause().getClass());
     }
 
-    doNothing().when(om).checkLeaderStatus();
+    Mockito.doNothing().when(om).checkOmLeaderStatus();
     try {
       secretManager.retrievePassword(identifier);
     } catch (Exception e) {

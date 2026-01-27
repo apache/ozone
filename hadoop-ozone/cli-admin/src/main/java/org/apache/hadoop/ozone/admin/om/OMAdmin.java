@@ -20,8 +20,6 @@ package org.apache.hadoop.ozone.admin.om;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 
-import java.io.IOException;
-import java.util.Collection;
 import org.apache.hadoop.hdds.cli.AdminSubcommand;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -40,6 +38,11 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.protocol.ClientId;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine;
+import picocli.CommandLine.Model.CommandSpec;
+import picocli.CommandLine.Spec;
+
+import java.io.IOException;
+import java.util.Collection;
 
 /**
  * Subcommand for admin operations related to OM.
@@ -73,6 +76,21 @@ public class OMAdmin implements AdminSubcommand {
     return parent;
   }
 
+  public ClientProtocol createClient(String omServiceId) throws Exception {
+    OzoneConfiguration conf = parent.getOzoneConf();
+    if (OmUtils.isOmHAServiceId(conf, omServiceId)) {
+      return OzoneClientFactory.getRpcClient(omServiceId, conf).getObjectStore()
+          .getClientProxy();
+    } else {
+      throw new OzoneClientException("This command works only on OzoneManager" +
+            " HA cluster. Service ID specified does not match" +
+            " with " + OZONE_OM_SERVICE_IDS_KEY + " defined in the " +
+            "configuration. Configured " + OZONE_OM_SERVICE_IDS_KEY + " are " +
+            conf.getTrimmedStringCollection(OZONE_OM_SERVICE_IDS_KEY) + System.lineSeparator());
+    }
+  }
+
+
   public OzoneManagerProtocolClientSideTranslatorPB createOmClient(
       String omServiceID,
       String omHost,
@@ -100,8 +118,16 @@ public class OMAdmin implements AdminSubcommand {
     if (!forceHA || (forceHA && OmUtils.isOmHAServiceId(conf, omServiceID))) {
       OmTransport omTransport = new Hadoop3OmTransportFactory()
           .createOmTransport(conf, ugi, omServiceID);
+      String finalOmServiceID = omServiceID;
       return new OzoneManagerProtocolClientSideTranslatorPB(omTransport,
-          clientId);
+          clientId, conf, () -> {
+        try {
+          return new Hadoop3OmTransportFactory().createOmTransport(conf, UserGroupInformation.getCurrentUser(),
+              finalOmServiceID);
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      });
     } else {
       throw new OzoneClientException("This command works only on OzoneManager" +
             " HA cluster. Service ID specified does not match" +

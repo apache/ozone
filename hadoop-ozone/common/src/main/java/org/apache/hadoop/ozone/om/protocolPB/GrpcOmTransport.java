@@ -211,6 +211,46 @@ public class GrpcOmTransport implements OmTransport {
     return resp.get();
   }
 
+  @Override
+  public OMResponse submitRequest(OMRequest payload, String omNodeId) throws IOException {
+    AtomicReference<OMResponse> resp = new AtomicReference<>();
+    int requestFailoverCount = 0;
+    boolean tryOtherHost = true;
+    int expectedFailoverCount = 0;
+    ResultCodes resultCode = ResultCodes.INTERNAL_ERROR;
+    while (tryOtherHost) {
+      tryOtherHost = false;
+      expectedFailoverCount = globalFailoverCount.get();
+      try {
+        String omGrpcAddress = omFailoverProxyProvider.getGrpcProxyAddress(omNodeId);
+        InetAddress inetAddress = InetAddress.getLocalHost();
+        Context.current()
+            .withValue(GrpcClientConstants.CLIENT_IP_ADDRESS_CTX_KEY,
+                inetAddress.getHostAddress())
+            .withValue(GrpcClientConstants.CLIENT_HOSTNAME_CTX_KEY,
+                inetAddress.getHostName())
+            .run(() -> resp.set(clients.get(omGrpcAddress)
+                .submitRequest(payload)));
+      } catch (StatusRuntimeException e) {
+        LOG.error("Failed to submit request", e);
+        if (e.getStatus().getCode() == Status.Code.UNAVAILABLE) {
+          if (e.getCause() != null &&
+              e.getCause() instanceof javax.net.ssl.SSLHandshakeException) {
+            throw new OMException(SSL_CONNECTION_FAILURE);
+          }
+          resultCode = ResultCodes.TIMEOUT;
+        }
+        Exception exp = new Exception(e);
+        tryOtherHost = shouldRetry(unwrapException(exp),
+            expectedFailoverCount, ++requestFailoverCount);
+        if (!tryOtherHost) {
+          throw new OMException(resultCode);
+        }
+      }
+    }
+    return resp.get();
+  }
+
   private Exception unwrapException(Exception ex) {
     Exception grpcException = null;
     try {

@@ -60,6 +60,7 @@ import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.grpc.server.GrpcLogAppender;
+import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.protocol.RaftPeer;
 import org.apache.ratis.protocol.RaftPeerId;
 import org.apache.ratis.server.leader.FollowerInfo;
@@ -128,7 +129,8 @@ public class TestAddRemoveOzoneManager {
   }
 
   static List<String> getCurrentPeersFromRaftConf(OzoneManagerRatisServer omRatisServer) {
-    return omRatisServer.getServerDivision().getRaftConf().getCurrentPeers().stream()
+    return omRatisServer.getServerDivision(RaftGroupId.valueOf(OmRaftGroupManager.toUuid(OM_SERVICE_ID))).getRaftConf()
+        .getCurrentPeers().stream()
         .map(RaftPeer::getId)
         .map(RaftPeerId::toString)
         .collect(Collectors.toList());
@@ -183,7 +185,7 @@ public class TestAddRemoveOzoneManager {
   private File[] getRatisLogFiles(OzoneManager om) {
     OzoneManagerRatisServer newOMRatisServer = om.getOmRatisServer();
     File ratisDir = new File(newOMRatisServer.getRatisStorageDir(),
-        newOMRatisServer.getRaftGroupId().getUuid().toString());
+        newOMRatisServer.getCurrentRaftGroupId().getUuid().toString());
     File ratisLogDir = new File(ratisDir, Storage.STORAGE_DIR_CURRENT);
     return ratisLogDir.listFiles(new FileFilter() {
       @Override

@@ -200,7 +200,13 @@ public class ReconControllerModule extends AbstractModule {
       OmTransport transport =
           OmTransportFactory.create(ozoneConfiguration, ugi, serviceId);
       ozoneManagerClient = new OzoneManagerProtocolClientSideTranslatorPB(
-          transport, clientId.toString());
+          transport, clientId.toString(), ozoneConfiguration, () -> {
+        try {
+          return OmTransportFactory.create(ozoneConfiguration, ugi, serviceId);
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      });
     } catch (IOException ioEx) {
       LOG.error("Error in provisioning OzoneManagerProtocol ", ioEx);
     }

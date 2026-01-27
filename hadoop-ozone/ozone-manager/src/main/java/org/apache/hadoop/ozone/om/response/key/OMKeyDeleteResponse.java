@@ -46,9 +46,12 @@ public class OMKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
   private OmKeyInfo deletedOpenKeyInfo;
 
   public OMKeyDeleteResponse(@Nonnull OMResponse omResponse,
-      @Nonnull OmKeyInfo omKeyInfo,
-      @Nonnull OmBucketInfo omBucketInfo, OmKeyInfo deletedOpenKeyInfo) {
-    super(omResponse, omBucketInfo.getBucketLayout());
+                             @Nonnull OmKeyInfo omKeyInfo,
+                             @Nonnull OmBucketInfo omBucketInfo,
+                             OmKeyInfo deletedOpenKeyInfo,
+                             boolean multiRaftEnabled,
+                             long currentMultiRaftTerm) {
+    super(omResponse, omBucketInfo.getBucketLayout(), multiRaftEnabled, currentMultiRaftTerm);
     this.omKeyInfo = omKeyInfo;
     this.omBucketInfo = omBucketInfo;
     this.deletedOpenKeyInfo = deletedOpenKeyInfo;

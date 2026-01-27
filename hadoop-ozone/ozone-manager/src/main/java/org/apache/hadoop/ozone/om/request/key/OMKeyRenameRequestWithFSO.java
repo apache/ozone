@@ -72,7 +72,7 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getIndex();
+    final long trxnLogIndex = context.getCacheEpoch();
 
     RenameKeyRequest renameKeyRequest = getOmRequest().getRenameKeyRequest();
     KeyArgs keyArgs = renameKeyRequest.getKeyArgs();
@@ -289,6 +289,8 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
         fromKeyValue.getVolumeName(), fromKeyValue.getBucketName());
 
     OmKeyInfo.Builder fromKeyBuilder = fromKeyValue.toBuilder()
+        .setMultiRaftTerm(ozoneManager.getCurrentMultiRaftTerm())
+        .setMultiRaftEnabled(ozoneManager.isMultiRaftEnabled())
         .setUpdateID(trxnLogIndex);
     // Set toFileName
     fromKeyBuilder.setKeyName(toKeyFileName);

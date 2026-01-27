@@ -1003,14 +1003,15 @@ public final class OMRequestTestUtils {
    * @return the deletedKey name
    */
   public static String deleteKey(String ozoneKey, long bucketId, OMMetadataManager omMetadataManager,
-      long trxnLogIndex) throws IOException {
+      long trxnLogIndex, boolean isMultiRaftEnabled) throws IOException {
     // Retrieve the keyInfo
     OmKeyInfo omKeyInfo = omMetadataManager.getKeyTable(getDefaultBucketLayout()).get(ozoneKey);
 
     // Delete key from KeyTable and put in DeletedKeyTable
     omMetadataManager.getKeyTable(getDefaultBucketLayout()).delete(ozoneKey);
 
-    RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(bucketId, omKeyInfo, trxnLogIndex);
+    RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(bucketId, omKeyInfo, trxnLogIndex,
+        isMultiRaftEnabled, 0);
 
     omMetadataManager.getDeletedTable().put(ozoneKey, repeatedOmKeyInfo);
 

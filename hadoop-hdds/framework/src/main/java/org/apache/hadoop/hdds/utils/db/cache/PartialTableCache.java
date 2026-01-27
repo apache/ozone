@@ -97,8 +97,8 @@ public class PartialTableCache<KEY, VALUE> implements TableCache<KEY, VALUE> {
   @Override
   public void put(CacheKey<KEY> cacheKey, CacheValue<VALUE> value) {
     cache.put(cacheKey, value);
-    epochEntries.computeIfAbsent(value.getEpoch(), v -> new HashSet<>())
-            .add(cacheKey);
+    epochEntries.computeIfAbsent(value.getEpoch(),
+            v -> ConcurrentHashMap.newKeySet()).add(cacheKey);
   }
 
   @Override

@@ -187,7 +187,7 @@ public class OMSnapshotCreateRequest extends OMClientRequest {
       //  pre-replicated key size counter in OmBucketInfo.
       snapshotInfo.setReferencedSize(estimateBucketDataSize(omBucketInfo, ozoneManager.getDefaultReplicationConfig()));
 
-      addSnapshotInfoToSnapshotChainAndCache(ozoneManager, omMetadataManager, context.getIndex());
+      addSnapshotInfoToSnapshotChainAndCache(ozoneManager, omMetadataManager, context.getCacheEpoch());
 
       omResponse.setCreateSnapshotResponse(
           CreateSnapshotResponse.newBuilder()

@@ -84,7 +84,7 @@ public class OMCancelDelegationTokenRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long transactionLogIndex = context.getIndex();
+    final long transactionLogIndex = context.getCacheEpoch();
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     Token<OzoneTokenIdentifier> token = getToken();

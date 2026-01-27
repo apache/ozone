@@ -228,6 +228,18 @@ public final class OmVolumeArgs extends WithObjectID
       return this;
     }
 
+    @Override
+    public Builder setMultiRaftEnabled(boolean multiRaftEnabled) {
+      super.setMultiRaftEnabled(multiRaftEnabled);
+      return this;
+    }
+
+    @Override
+    public Builder setMultiRaftTerm(long multiRaftTerm) {
+      super.setMultiRaftTerm(multiRaftTerm);
+      return this;
+    }
+
     /**
      * Constructs a builder.
      */

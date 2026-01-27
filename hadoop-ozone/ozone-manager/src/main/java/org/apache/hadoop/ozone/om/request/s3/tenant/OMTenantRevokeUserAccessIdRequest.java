@@ -147,7 +147,7 @@ public class OMTenantRevokeUserAccessIdRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long transactionLogIndex = context.getIndex();
+    final long transactionLogIndex = context.getCacheEpoch();
 
     final OMMultiTenantManager multiTenantManager =
         ozoneManager.getMultiTenantManager();

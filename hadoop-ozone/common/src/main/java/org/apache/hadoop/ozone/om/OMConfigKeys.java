@@ -691,9 +691,47 @@ public final class OMConfigKeys {
       "ozone.om.snapshot.local.data.manager.service.interval";
   public static final String OZONE_OM_SNAPSHOT_LOCAL_DATA_MANAGER_SERVICE_INTERVAL_DEFAULT = "5m";
 
+  public static final String OZONE_OM_MULTI_RAFT_BUCKET_GROUPS =
+          "ozone.om.multi.raft.bucket.groups";
+  public static final int OZONE_OM_MULTI_RAFT_BUCKET_GROUPS_DEFAULT = 6;
+
+  public static final String OZONE_OM_MULTI_RAFT_BUCKET_ENABLED =
+          "ozone.om.multi.raft.bucket.enabled";
+  public static final boolean OZONE_OM_MULTI_RAFT_BUCKET_ENABLED_DEFAULT = false;
+
+  public static final String OZONE_OM_SAFE_MODE_ENABLED = "ozone.om.safemode.enabled";
+
+  public static final boolean OZONE_OM_SAFE_MODE_ENABLED_DEFAULT = true;
+
+  public static final String OZONE_OM_BUCKET_RAFT_GROUPS_RECONCILER_INTERVAL =
+      "ozone.om.bucket.raft.groups.reconciler.interval";
+
+  public static final String OZONE_OM_BUCKET_RAFT_GROUPS_RECONCILER_INTERVAL_DEFAULT = "60s";
+
+  public static final String OZONE_OM_RATIS_UNHEALTHY_PEER_TIMEOUT =
+      "ozone.om.ratis.unhealthy.peer.timeout";
+
+  public static final String OZONE_OM_RATIS_UNHEALTHY_PEER_TIMEOUT_DEFAULT = "30s";
+
+  public static final String OZONE_OM_MULTI_RAFT_BUCKET_GROUP_TRANSFER_LEADERSHIP_TIMEOUT
+          = "ozone.om.multi.raft.bucket.group.transfer.leader.timeout";
+  public static final String OZONE_OM_MULTI_RAFT_BUCKET_GROUP_TRANSFER_LEADERSHIP_TIMEOUT_DEFAULT
+          = "1s";
+
+  public static final String OZONE_OM_MULTI_RAFT_BUCKET_GROUP_TRANSFER_LEADERSHIP_SCHEDULING_INITIAL_DELAY
+          = "ozone.om.multi.raft.bucket.group.transfer.leader.initial.delay";
+  public static final String OZONE_OM_MULTI_RAFT_BUCKET_GROUP_TRANSFER_LEADERSHIP_SCHEDULING_INITIAL_DELAY_DEFAULT
+          = "30s";
+
+  public static final String OZONE_OM_MULTI_RAFT_BUCKET_GROUP_TRANSFER_LEADERSHIP_SCHEDULING_PERIOD
+          = "ozone.om.multi.raft.bucket.group.transfer.leader.period";
+  public static final String OZONE_OM_MULTI_RAFT_BUCKET_GROUP_TRANSFER_LEADERSHIP_SCHEDULING_PERIOD_DEFAULT
+          = "60s";
+
   /**
    * Never constructed.
    */
   private OMConfigKeys() {
   }
+
 }

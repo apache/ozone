@@ -32,6 +32,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.S3Authentication;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
 import org.apache.hadoop.security.token.SecretManager;
+import org.apache.ratis.protocol.RaftGroupId;
 
 /**
  * Utility class which holds methods required for parse/validation of
@@ -52,9 +53,11 @@ public final class S3SecurityUtil {
    *         ServiceException    Server is not leader or not ready
    */
   public static void validateS3Credential(OMRequest omRequest,
-      OzoneManager ozoneManager) throws ServiceException, OMException {
+                                          OzoneManager ozoneManager, RaftGroupId raftGroupId)
+      throws ServiceException, OMException {
     if (ozoneManager.isSecurityEnabled()) {
       OzoneTokenIdentifier s3Token = constructS3Token(omRequest);
+      s3Token.setRaftGroupId(raftGroupId);
       try {
         // authenticate user with signature verification through
         // delegationTokenMgr validateToken via retrievePassword

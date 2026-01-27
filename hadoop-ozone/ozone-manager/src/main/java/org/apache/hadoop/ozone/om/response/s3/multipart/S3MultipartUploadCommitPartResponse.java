@@ -55,6 +55,8 @@ public class S3MultipartUploadCommitPartResponse extends OmKeyResponse {
   private final OmKeyInfo openPartKeyInfoToBeDeleted;
   private final OmBucketInfo omBucketInfo;
   private final long bucketId;
+  private boolean isMultiRaftEnabled;
+  private long multiRaftTerm;
 
   /**
    * Regular response.
@@ -70,7 +72,9 @@ public class S3MultipartUploadCommitPartResponse extends OmKeyResponse {
       @Nullable OmKeyInfo openPartKeyInfoToBeDeleted,
       @Nonnull OmBucketInfo omBucketInfo,
       long bucketId,
-      @Nonnull BucketLayout bucketLayout) {
+      @Nonnull BucketLayout bucketLayout,
+      boolean multiRaftEnabled,
+      long currentMultiRaftTerm) {
     super(omResponse, bucketLayout);
     this.multipartKey = multipartKey;
     this.openKey = openKey;
@@ -79,6 +83,8 @@ public class S3MultipartUploadCommitPartResponse extends OmKeyResponse {
     this.openPartKeyInfoToBeDeleted = openPartKeyInfoToBeDeleted;
     this.omBucketInfo = omBucketInfo;
     this.bucketId = bucketId;
+    this.isMultiRaftEnabled = multiRaftEnabled;
+    this.multiRaftTerm = currentMultiRaftTerm;
   }
 
   @Override
@@ -90,8 +96,9 @@ public class S3MultipartUploadCommitPartResponse extends OmKeyResponse {
       // multipart upload. So, delete this part information.
 
       RepeatedOmKeyInfo repeatedOmKeyInfo =
-          OmUtils.prepareKeyForDelete(bucketId, openPartKeyInfoToBeDeleted,
-              openPartKeyInfoToBeDeleted.getUpdateID());
+          OmUtils.prepareKeyForDelete(omBucketInfo.getObjectID(), openPartKeyInfoToBeDeleted,
+              openPartKeyInfoToBeDeleted.getUpdateID(),
+              isMultiRaftEnabled, multiRaftTerm);
       // multi-part key format is volumeName/bucketName/keyName/uploadId
       String deleteKey = omMetadataManager.getOzoneDeletePathKey(
           openPartKeyInfoToBeDeleted.getObjectID(), multipartKey);

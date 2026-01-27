@@ -1,0 +1,77 @@
+<!---
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License. See accompanying LICENSE file.
+-->
+
+# Compose file with optional monitoring config
+
+This directory contains a docker-compose definition for an Ozone cluster with s3g and httpfs containers
+
+There is an optional add-ons: monitoring - adds Grafana, Jaeger and Prometheus services, and configures Ozone to work with them
+
+## How to start
+
+### Basics
+
+The cluster can be started with regular `docker-compose up` command.  Use `-d` to start the cluster in the background.
+
+### Add-ons
+
+Monitoring can be enabled via docker-compose's ability to use multiple compose files (by using the [`-f` option repeatedly](https://docs.docker.com/compose/reference/overview/#specifying-multiple-compose-files), or more easily by defining the [`COMPOSE_FILE` environment variable](https://docs.docker.com/compose/reference/envvars/#compose_file)):
+
+```
+# no COMPOSE_FILE var                                                  # => only Ozone
+export COMPOSE_FILE=docker-compose.yaml:monitoring.yaml                # => add monitoring
+```
+
+Once the variable is defined, Ozone cluster with add-ons can be started/scaled/stopped etc. using the same `docker-compose` commands as for the base cluster.
+
+### Load generator
+
+Ozone comes with a load generator called Freon.
+
+You can enter one of the containers (eg. SCM) and start a Freon test:
+
+```
+docker-compose exec httpfs bash
+ozone freon ockg -n1000
+```
+
+You can also start two flavors of Freon as separate services, which allows scaling them up.  Once all the datanodes are started, start Freon by adding its definition to `COMPOSE_FILE` and re-running the `docker-compose up` or `run.sh` command:
+
+```
+export COMPOSE_FILE="${COMPOSE_FILE}:freon-ockg.yaml"
+
+docker-compose up -d --no-recreate --scale datanode=3
+# OR
+./run.sh -d
+```
+
+## How to use
+
+You can check the ozone web ui:
+
+OzoneManager: http://localhost:9874
+SCM: http://localhost:9876
+
+### Monitoring
+
+ * Prometheus: follows a pull based approach where metrics are published on an HTTP endpoint.  Metrics can be checked on [Prometheus' web UI](http://localhost:9090/)
+ * Grafana: comes with three [dashboards](http://localhost:3000) for Ozone
+   * Ozone - Object Metrics
+   * Ozone - RPC Metrics
+   * Ozone - Overall Metrics
+ * Jaeger: collects distributed tracing information from Ozone, can be queried on the [Jaeger web UI](http://localhost:16686)
+
+### Profiling
+
+Start by hitting the `/prof` endpoint on the service to be profiled, eg. http://localhost:9876/prof for SCM.  [Detailed instructions](https://cwiki.apache.org/confluence/display/HADOOP/Java+Profiling+of+Ozone) can be found in the Hadoop wiki.

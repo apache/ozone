@@ -42,12 +42,23 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareResponse;
 import org.apache.hadoop.util.Time;
+
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.util.OzoneMultiRaftUtils;
+import org.apache.ratis.protocol.RaftGroupId;
+
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.raftlog.RaftLog;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 /**
  * OM Request used to flush all transactions to disk, take a DB snapshot, and
@@ -66,7 +77,7 @@ public class OMPrepareRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long transactionLogIndex = context.getIndex();
+    final long transactionLogIndex = context.getCacheEpoch();
 
     LOG.info("OM {} Received prepare request with log {}", ozoneManager.getOMNodeId(), context.getTermIndex());
 
@@ -98,23 +109,26 @@ public class OMPrepareRequest extends OMClientRequest {
       response = new OMPrepareResponse(responseBuilder.build(),
           transactionLogIndex);
 
+      String volumeName = OzoneMultiRaftUtils.getVolumeName(omRequest);
+      String bucketName = OzoneMultiRaftUtils.getBucketName(omRequest);
+
+      RaftGroupId raftGroupId = ozoneManager.raftGroupName(volumeName, bucketName);
+      OzoneManagerRatisServer omRatisServer = ozoneManager.getOmRatisServer();
+
       // Add response to double buffer before clearing logs.
       // This guarantees the log index of this request will be the same as
       // the snapshot index in the prepared state.
-      OzoneManagerDoubleBuffer doubleBuffer =
-          ozoneManager.getOmRatisServer().getOmStateMachine().getOzoneManagerDoubleBuffer();
+      OzoneManagerDoubleBuffer doubleBuffer = omRatisServer.getOmDoubleBuffer(raftGroupId);
       doubleBuffer.add(response, context.getTermIndex());
-
-      OzoneManagerRatisServer omRatisServer = ozoneManager.getOmRatisServer();
-      final RaftServer.Division division = omRatisServer.getServerDivision();
-      final OzoneManagerStateMachine stateMachine = (OzoneManagerStateMachine) division.getStateMachine();
+      final RaftServer.Division division = omRatisServer.getServerDivision(raftGroupId);
 
       // Wait for outstanding double buffer entries
       // - to be flushed to db, and
       // - to be notified by Ratis.
       // The log index returned, will be used as the prepare index, is the last Ratis commit index
       // which can be higher than the transactionLogIndex of this request.
-      final long prepareIndex = waitForLogIndex(transactionLogIndex, ozoneManager, stateMachine,
+      final long prepareIndex = waitForLogIndex(transactionLogIndex, ozoneManager,
+          (OzoneManagerStateMachine) division.getStateMachine(),
           flushTimeout, flushCheckInterval);
       Preconditions.assertTrue(prepareIndex >= transactionLogIndex);
       takeSnapshotAndPurgeLogs(prepareIndex, division);

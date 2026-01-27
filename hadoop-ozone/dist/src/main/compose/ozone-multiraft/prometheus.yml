@@ -1,0 +1,49 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+global:
+  scrape_interval: 15s # By default, scrape targets every 15 seconds.
+scrape_configs:
+  - job_name: ozone
+    metrics_path: /prom
+    static_configs:
+     - targets:
+        - "scm1:9876"
+        - "scm2:9876"
+        - "scm3:9876"
+       labels:
+         component: scm
+     - targets:
+        - "om1:9874"
+        - "om2:9874"
+        - "om3:9874"
+       labels:
+         component: om
+     - targets:
+        - "s3g:19878"
+       labels:
+         component: s3g
+     - targets: # During compose bring up the number of datanodes can be specific, adding 10 nodes to account for that.
+        # Duplicate datanodes are specified here to account for compose v1 vs v2 differences.
+        # compose v1
+        - "ozone_datanode1_1:9882"
+        - "ozone_datanode2_2:9882"
+        - "ozone_datanode3_3:9882"
+        # compose v2
+        - "ozone-datanode1-1:9882"
+        - "ozone-datanode2-1:9882"
+        - "ozone-datanode3-1:9882"
+       labels:
+         component: datanode

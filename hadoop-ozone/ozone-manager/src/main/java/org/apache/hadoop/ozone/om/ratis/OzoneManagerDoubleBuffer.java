@@ -106,10 +106,12 @@ public final class OzoneManagerDoubleBuffer {
   private static class Entry {
     private final TermIndex termIndex;
     private final OMClientResponse response;
+    private final long cacheEpoch;
 
-    Entry(TermIndex termIndex, OMClientResponse response) {
+    Entry(TermIndex termIndex, OMClientResponse response, long cacheEpoch) {
       this.termIndex = termIndex;
       this.response = response;
+      this.cacheEpoch = cacheEpoch;
     }
 
     TermIndex getTermIndex() {
@@ -118,6 +120,10 @@ public final class OzoneManagerDoubleBuffer {
 
     OMClientResponse getResponse() {
       return response;
+    }
+
+    long getCacheEpoch() {
+      return cacheEpoch;
     }
   }
 
@@ -486,7 +492,7 @@ public final class OzoneManagerDoubleBuffer {
       }
       for (String table : cleanupTables) {
         cleanupEpochs.computeIfAbsent(table, list -> new ArrayList<>())
-            .add(entry.getTermIndex().getIndex());
+            .add(entry.getCacheEpoch());
       }
     } else {
       // This is to catch early errors, when a new response class missed to
@@ -553,10 +559,27 @@ public final class OzoneManagerDoubleBuffer {
 
   /**
    * Add OmResponseBufferEntry to buffer.
+   * @param response  the client response
+   * @param termIndex raft term/index (used for lastAppliedIndex tracking)
+   * @param cacheEpoch globally unique epoch used for cache entry tagging and
+   *                   cleanup — must match the epoch passed to
+   *                   {@code Table.addCacheEntry} / {@code CacheValue.get}
+   *                   inside {@code validateAndUpdateCache}.
    */
-  public synchronized void add(OMClientResponse response, TermIndex termIndex) {
-    currentBuffer.add(new Entry(termIndex, response));
+  public synchronized void add(OMClientResponse response, TermIndex termIndex,
+      long cacheEpoch) {
+    currentBuffer.add(new Entry(termIndex, response, cacheEpoch));
     notify();
+  }
+
+  /**
+   * Convenience overload for error responses that have no cache entries to
+   * clean up. Uses the raft log index as the cache epoch (safe because
+   * error/dummy responses do not add cache entries).
+   */
+  public synchronized void add(OMClientResponse response,
+      TermIndex termIndex) {
+    add(response, termIndex, termIndex.getIndex());
   }
 
   /**

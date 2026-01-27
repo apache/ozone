@@ -80,7 +80,7 @@ public class OMKeysRenameRequest extends OMKeyRequest {
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getIndex();
+    final long trxnLogIndex = context.getCacheEpoch();
 
     RenameKeysRequest renameKeysRequest = getOmRequest().getRenameKeysRequest();
     RenameKeysArgs renameKeysArgs = renameKeysRequest.getRenameKeysArgs();
@@ -194,6 +194,8 @@ public class OMKeysRenameRequest extends OMKeyRequest {
 
         fromKeyValue = fromKeyValue.toBuilder()
             .setUpdateID(trxnLogIndex)
+            .setMultiRaftTerm(ozoneManager.getCurrentMultiRaftTerm())
+            .setMultiRaftEnabled(ozoneManager.isMultiRaftEnabled())
             .build();
 
         fromKeyValue.setKeyName(toKeyName);

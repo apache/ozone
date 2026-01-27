@@ -202,7 +202,7 @@ public class OMSnapshotMoveTableKeysRequest extends OMClientRequest {
     try {
       SnapshotInfo fromSnapshot = SnapshotUtils.getSnapshotInfo(ozoneManager,
           snapshotChainManager, fromProtobuf(moveTableKeysRequest.getFromSnapshotID()));
-      OmBucketInfo omBucketInfo = OMKeyRequest.getBucketInfo(omMetadataManager, fromSnapshot.getVolumeName(),
+      OmBucketInfo omBucketInfo = OMKeyRequest.getOmBucketInfo(omMetadataManager, fromSnapshot.getVolumeName(),
           fromSnapshot.getBucketName());
       // If there is no snapshot in the chain after the current snapshot move the keys to Active Object Store.
       SnapshotInfo nextSnapshot = SnapshotUtils.getNextSnapshot(ozoneManager, snapshotChainManager, fromSnapshot);

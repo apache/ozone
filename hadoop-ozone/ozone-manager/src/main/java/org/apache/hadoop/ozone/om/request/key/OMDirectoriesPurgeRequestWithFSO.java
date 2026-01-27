@@ -156,7 +156,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
                 path.getBucketId(), processed.keyInfo.getParentObjectID(),
                 processed.keyInfo.getFileName());
             omMetadataManager.getDirectoryTable().addCacheEntry(new CacheKey<>(ozoneDbKey),
-                CacheValue.get(context.getIndex()));
+                CacheValue.get(context.getCacheEpoch()));
             volBucketInfoMap.putIfAbsent(processed.volBucketPair, omBucketInfo);
           }
         }
@@ -195,7 +195,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
                 path.getBucketId(), processed.keyInfo.getParentObjectID(),
                 processed.keyInfo.getFileName());
             omMetadataManager.getFileTable().addCacheEntry(new CacheKey<>(ozoneDbKey),
-                CacheValue.get(context.getIndex()));
+                CacheValue.get(context.getCacheEpoch()));
             volBucketInfoMap.putIfAbsent(processed.volBucketPair, omBucketInfo);
           }
         }
@@ -224,7 +224,7 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
       if (fromSnapshotInfo != null) {
         fromSnapshotInfo.setLastTransactionInfo(transactionInfo.toByteString());
         omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(fromSnapshotInfo.getTableKey()),
-            CacheValue.get(context.getIndex(), fromSnapshotInfo));
+            CacheValue.get(context.getCacheEpoch(), fromSnapshotInfo));
       } else {
         // Update the deletingServiceMetrics with the transaction index to indicate the
         // last purge transaction when running for AOS
@@ -264,7 +264,9 @@ public class OMDirectoriesPurgeRequestWithFSO extends OMKeyRequest {
 
     return new OMDirectoriesPurgeResponseWithFSO(
         omResponse.build(), purgeRequests,
-        getBucketLayout(), volBucketInfoMap, fromSnapshotInfo, openKeyInfoMap);
+        getBucketLayout(), volBucketInfoMap, fromSnapshotInfo, openKeyInfoMap, ozoneManager.isMultiRaftEnabled(),
+        ozoneManager.getCurrentMultiRaftTerm()
+    );
   }
 
   /**

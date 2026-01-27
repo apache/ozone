@@ -138,7 +138,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getIndex();
+    final long trxnLogIndex = context.getCacheEpoch();
 
     CommitKeyRequest commitKeyRequest = getOmRequest().getCommitKeyRequest();
 
@@ -313,6 +313,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
           .addAllMetadata(KeyValueUtil.getFromProtobuf(
                 commitKeyArgs.getMetadataList()))
           .setUpdateID(trxnLogIndex)
+          .setMultiRaftTerm(ozoneManager.getCurrentMultiRaftTerm())
+          .setMultiRaftEnabled(ozoneManager.isMultiRaftEnabled())
           .setDataSize(commitKeyArgs.getDataSize())
           .build();
 
@@ -330,8 +332,8 @@ public class OMKeyCommitRequest extends OMKeyRequest {
         checkBucketQuotaInBytes(omMetadataManager, omBucketInfo,
             correctedSpace);
       } else if (keyToDelete != null && !omBucketInfo.getIsVersionEnabled()) {
-        RepeatedOmKeyInfo oldVerKeyInfo = getOldVersionsToCleanUp(
-            keyToDelete, omBucketInfo.getObjectID(), trxnLogIndex);
+        RepeatedOmKeyInfo oldVerKeyInfo = getOldVersionsToCleanUp(keyToDelete, omBucketInfo.getObjectID(), trxnLogIndex,
+            ozoneManager.isMultiRaftEnabled(), ozoneManager.getCurrentMultiRaftTerm());
         // using pseudoObjId as objectId can be same in case of overwrite key
         long pseudoObjId = ozoneManager.getObjectIdFromTxId(trxnLogIndex);
         String delKeyName = omMetadataManager.getOzoneDeletePathKey(

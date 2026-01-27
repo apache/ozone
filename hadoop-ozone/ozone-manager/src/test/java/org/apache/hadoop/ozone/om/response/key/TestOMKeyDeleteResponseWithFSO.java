@@ -36,7 +36,7 @@ public class TestOMKeyDeleteResponseWithFSO extends TestOMKeyDeleteResponse {
       OzoneManagerProtocolProtos.OMResponse omResponse) throws Exception {
     return new OMKeyDeleteResponseWithFSO(omResponse, omKeyInfo.getKeyName(),
         omKeyInfo, getOmBucketInfo(), false,
-        omMetadataManager.getVolumeId(volumeName), null);
+        omMetadataManager.getVolumeId(volumeName), null, ozoneManager.isMultiRaftEnabled(), 0);
   }
 
   @Override

@@ -75,6 +75,7 @@ import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.RaftClientReply;
+import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.retry.RetryPolicies;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.server.RaftServerConfigKeys;
@@ -403,7 +404,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     final RaftProperties p = getCluster()
         .getOzoneManager()
         .getOmRatisServer()
-        .getServerDivision()
+        .getServerDivision(RaftGroupId.valueOf(OmRaftGroupManager.toUuid(getOmServiceId())))
         .getRaftServer()
         .getProperties();
     final TimeDuration t = RaftServerConfigKeys.Log.Appender.waitTimeMin(p);
@@ -683,7 +684,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     // For now not making anything configurable, RaftClient  is only used
     // in SCM for DB updates of sub-ca certs go via Ratis.
     RaftClient.Builder builder = RaftClient.newBuilder()
-        .setRaftGroup(omLeader.getOmRatisServer().getRaftGroup())
+        .setRaftGroup(omLeader.getOmRatisServer().getCurrentRaftGroup())
         .setLeaderId(null)
         .setProperties(properties)
         .setRetryPolicy(

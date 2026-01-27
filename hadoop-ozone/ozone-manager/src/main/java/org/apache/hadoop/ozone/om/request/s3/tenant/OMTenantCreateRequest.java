@@ -223,7 +223,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long transactionLogIndex = context.getIndex();
+    final long transactionLogIndex = context.getCacheEpoch();
 
     final OMMultiTenantManager multiTenantManager =
         ozoneManager.getMultiTenantManager();
@@ -290,10 +290,11 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
             .setQuotaInBytes(OzoneConsts.QUOTA_RESET)
             .setQuotaInNamespace(OzoneConsts.QUOTA_RESET)
             .setObjectID(ozoneManager.getObjectIdFromTxId(transactionLogIndex))
+            .setMultiRaftEnabled(ozoneManager.isMultiRaftEnabled())
+            .setMultiRaftTerm(ozoneManager.getCurrentMultiRaftTerm())
             .setUpdateID(transactionLogIndex)
             .incRefCount();
         omVolumeArgs = volumeBuilder.build();
-
         // Remove this check when vol ref count is also used by other features
         Preconditions.checkState(omVolumeArgs.getRefCount() == 1L,
             "refCount should have been set to 1");

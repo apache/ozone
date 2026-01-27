@@ -52,12 +52,28 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Progressable;
 import org.apache.ratis.protocol.ClientId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.URI;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Iterator;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
+
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_O3TRASH_URI_SCHEME;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.addTrailingSlashIfNeeded;
+import static org.apache.hadoop.ozone.om.helpers.OzoneFSUtils.pathToKey;
 
 /**
  * FileSystem to be used by the Trash Emptier.
@@ -88,12 +104,22 @@ public class TrashOzoneFileSystem extends FileSystem {
   }
 
   private void submitRequest(OzoneManagerProtocolProtos.OMRequest omRequest)
-      throws Exception {
+          throws Exception {
     ozoneManager.getMetrics().incNumTrashWriteRequests();
-    // perform preExecute as ratis submit do no perform preExecute
-    OMClientRequest omClientRequest = OzoneManagerRatisUtils.createClientRequest(omRequest, ozoneManager);
+    OMClientRequest omClientRequest =
+            OzoneManagerRatisUtils.createClientRequest(omRequest, ozoneManager);
     omRequest = omClientRequest.preExecute(ozoneManager);
-    OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, CLIENT_ID, runCount.getAndIncrement());
+
+    OMKeyRequest omKeyRequest = (OMKeyRequest) omClientRequest;
+    String bucketName = omKeyRequest.getWriteReqBucketName();
+    String volumeName = omKeyRequest.getWriteReqVolumeName();
+    if (bucketName != null && ozoneManager.isMultiRaftEnabled()) {
+      OzoneManagerRatisUtils.submitWriteRequest(
+              ozoneManager, omRequest, CLIENT_ID, runCount.getAndIncrement(), volumeName, bucketName
+      );
+    } else {
+      OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, CLIENT_ID, runCount.getAndIncrement());
+    }
   }
 
   @Override

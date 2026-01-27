@@ -98,7 +98,7 @@ public class TestS3MultipartUploadAbortResponseWithFSO
       OzoneManagerProtocolProtos.OMResponse omResponse) {
     return new S3MultipartUploadAbortResponseWithFSO(omResponse, multipartKey,
         multipartOpenKey, omMultipartKeyInfo, omBucketInfo,
-        getBucketLayout());
+        getBucketLayout(), ozoneManager.isMultiRaftEnabled(), 0);
   }
 
   @Override

@@ -212,7 +212,14 @@ public class TestOzoneManagerListVolumesSecure {
     OzoneManagerProtocolClientSideTranslatorPB omClient =
         new OzoneManagerProtocolClientSideTranslatorPB(
             OmTransportFactory.create(conf, this.adminUGI, null),
-            RandomStringUtils.secure().nextAscii(5));
+            RandomStringUtils.secure().nextAscii(5), conf, () -> {
+              try {
+                return OmTransportFactory.create(conf, this.adminUGI, null);
+              } catch (IOException e) {
+                throw new RuntimeException(e);
+              }
+            }
+        );
 
     // Create volume with ACL
     /* r = READ, w = WRITE, c = CREATE, d = DELETE
@@ -258,7 +265,14 @@ public class TestOzoneManagerListVolumesSecure {
         new OzoneManagerProtocolClientSideTranslatorPB(
             OmTransportFactory.create(conf,
                 UserGroupInformation.getCurrentUser(), null),
-            RandomStringUtils.secure().nextAscii(5));
+            RandomStringUtils.secure().nextAscii(5), conf,  () -> {
+          try {
+            return OmTransportFactory.create(conf,
+                UserGroupInformation.getCurrentUser(), null);
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        });
 
     // `ozone sh volume list` shall return volumes with LIST permission of user.
     List<OmVolumeArgs> volumeList;

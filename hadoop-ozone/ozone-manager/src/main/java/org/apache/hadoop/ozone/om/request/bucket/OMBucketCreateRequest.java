@@ -184,7 +184,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long transactionLogIndex = context.getIndex();
+    final long transactionLogIndex = context.getCacheEpoch();
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumBucketCreates();
 
@@ -259,7 +259,9 @@ public class OMBucketCreateRequest extends OMClientRequest {
       // Add objectID and updateID
       OmBucketInfo.Builder builder = omBucketInfo.toBuilder()
           .setObjectID(ozoneManager.getObjectIdFromTxId(transactionLogIndex))
-          .setUpdateID(transactionLogIndex);
+          .setUpdateID(transactionLogIndex)
+          .setMultiRaftEnabled(ozoneManager.isMultiRaftEnabled())
+          .setMultiRaftTerm(ozoneManager.getCurrentMultiRaftTerm());
 
       addDefaultAcls(builder.acls(), omVolumeArgs, ozoneManager);
 

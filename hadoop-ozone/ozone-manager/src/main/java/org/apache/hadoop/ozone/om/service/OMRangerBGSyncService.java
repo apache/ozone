@@ -430,7 +430,7 @@ public class OMRangerBGSyncService extends BackgroundService {
     }
     if (!ozoneManager.isLeaderReady()) {
       throw new OMNotLeaderException(
-          ozoneManager.getOmRatisServer().getRaftPeerId());
+          ozoneManager.getOmRatisServer().getRaftPeerId(), ozoneManager.getOmRatisServer().getCurrentRaftGroupId());
     }
   }
 

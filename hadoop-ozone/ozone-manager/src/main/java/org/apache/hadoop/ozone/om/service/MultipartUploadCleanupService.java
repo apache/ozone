@@ -16,7 +16,6 @@
  */
 
 package org.apache.hadoop.ozone.om.service;
-
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
@@ -138,7 +137,7 @@ public class MultipartUploadCleanupService extends BackgroundService {
     return !suspended.get() && ozoneManager.isLeaderReady();
   }
 
-  private class MultipartUploadCleanupTask implements BackgroundTask {
+  private final class MultipartUploadCleanupTask implements BackgroundTask {
 
     @Override
     public int getPriority() {
@@ -201,7 +200,7 @@ public class MultipartUploadCleanupService extends BackgroundService {
         OzoneManagerRatisUtils.submitRequest(ozoneManager, omRequest, clientId, runCount.get());
       } catch (ServiceException e) {
         LOG.error("Expired multipart info delete request failed. " +
-            "Will retry at next run.", e);
+                "Will retry at next run.", e);
       }
     }
   }

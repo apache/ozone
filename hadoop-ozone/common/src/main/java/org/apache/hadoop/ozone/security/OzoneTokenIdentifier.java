@@ -38,6 +38,7 @@ import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type;
 import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenIdentifier;
+import org.apache.ratis.protocol.RaftGroupId;
 
 /**
  * The token identifier for Ozone Master.
@@ -58,6 +59,7 @@ public class OzoneTokenIdentifier extends
   private String signature;
   private String strToSign;
   private String omServiceId;
+  private RaftGroupId raftGroupId;
 
   /**
    * Create an empty delegation token identifier.
@@ -384,6 +386,14 @@ public class OzoneTokenIdentifier extends
 
   public void setStrToSign(String strToSign) {
     this.strToSign = strToSign;
+  }
+
+  public RaftGroupId getRaftGroupId() {
+    return raftGroupId;
+  }
+
+  public void setRaftGroupId(RaftGroupId raftGroupId) {
+    this.raftGroupId = raftGroupId;
   }
 
   @Override

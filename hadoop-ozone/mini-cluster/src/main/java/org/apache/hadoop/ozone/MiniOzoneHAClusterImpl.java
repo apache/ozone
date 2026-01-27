@@ -459,6 +459,11 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
       return this;
     }
 
+    public Builder setNumDatanodes(int val) {
+      super.setNumDatanodes(val);
+      return this;
+    }
+
     @Override
     public MiniOzoneHAClusterImpl build() throws IOException {
       if (numOfActiveOMs > numOfOMs) {

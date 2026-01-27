@@ -47,13 +47,16 @@ public class OMKeysDeleteResponseWithFSO extends OMKeysDeleteResponse {
   private List<OmKeyInfo> dirsList;
   private long volumeId;
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public OMKeysDeleteResponseWithFSO(
       @Nonnull OzoneManagerProtocolProtos.OMResponse omResponse,
       @Nonnull List<OmKeyInfo> keyDeleteList,
       @Nonnull List<OmKeyInfo> dirDeleteList,
       @Nonnull OmBucketInfo omBucketInfo, @Nonnull long volId,
-      @Nonnull Map<String, OmKeyInfo> openKeyInfoMap) {
-    super(omResponse, keyDeleteList, omBucketInfo, openKeyInfoMap);
+      @Nonnull Map<String, OmKeyInfo> openKeyInfoMap,
+      boolean multiRaftEnabled,
+      long currentMultiRaftTerm) {
+    super(omResponse, keyDeleteList, omBucketInfo, openKeyInfoMap, multiRaftEnabled, currentMultiRaftTerm);
     this.dirsList = dirDeleteList;
     this.volumeId = volId;
   }

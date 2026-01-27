@@ -55,6 +55,7 @@ import org.apache.ratis.statemachine.SnapshotInfo;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.LifeCycle;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -199,9 +200,9 @@ public class TestOzoneManagerRatisServer {
       Exception {
     UUID uuid = UUID.nameUUIDFromBytes(OzoneConsts.OM_SERVICE_ID_DEFAULT
         .getBytes(UTF_8));
-    RaftGroupId raftGroupId = omRatisServer.getRaftGroup().getGroupId();
-    assertEquals(uuid, raftGroupId.getUuid());
-    assertEquals(raftGroupId.toByteString().size(), 16);
+    RaftGroupId raftGroupId = omRatisServer.getCurrentRaftGroup().getGroupId();
+    Assertions.assertEquals(uuid, raftGroupId.getUuid());
+    Assertions.assertEquals(16, raftGroupId.toByteString().size());
   }
 
   @Test
@@ -230,9 +231,9 @@ public class TestOzoneManagerRatisServer {
     newOmRatisServer.start();
 
     UUID uuid = UUID.nameUUIDFromBytes(customOmServiceId.getBytes(UTF_8));
-    RaftGroupId raftGroupId = newOmRatisServer.getRaftGroup().getGroupId();
-    assertEquals(uuid, raftGroupId.getUuid());
-    assertEquals(raftGroupId.toByteString().size(), 16);
+    RaftGroupId raftGroupId = newOmRatisServer.getCurrentRaftGroup().getGroupId();
+    Assertions.assertEquals(uuid, raftGroupId.getUuid());
+    Assertions.assertEquals(raftGroupId.toByteString().size(), 16);
     newOmRatisServer.stop();
   }
 }

@@ -52,7 +52,7 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getIndex();
+    final long trxnLogIndex = context.getCacheEpoch();
 
     OmPrefixInfo omPrefixInfo = null;
 
@@ -92,6 +92,8 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
       if (omPrefixInfo != null) {
         omPrefixInfo = omPrefixInfo.toBuilder()
             .setUpdateID(trxnLogIndex)
+            .setMultiRaftEnabled(ozoneManager.isMultiRaftEnabled())
+            .setMultiRaftTerm(ozoneManager.getCurrentMultiRaftTerm())
             .build();
       }
 

@@ -66,7 +66,7 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
   @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getIndex();
+    final long trxnLogIndex = context.getCacheEpoch();
 
     OzoneManagerProtocolProtos.CreateKeyRequest createKeyRequest =
             getOmRequest().getCreateKeyRequest();
@@ -139,6 +139,9 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
       // do open key
       OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(
               omMetadataManager.getBucketKey(volumeName, bucketName));
+      if (getWriteRaftGroup() != null) {
+        bucketInfo.setRaftGroup(getWriteRaftGroup().getUuid());
+      }
 
       // add all missing parents to dir table
       missingParentInfos = getAllMissingParentDirInfo(
@@ -158,7 +161,8 @@ public class OMKeyCreateRequestWithFSO extends OMKeyCreateRequest {
               getFileEncryptionInfo(keyArgs), ozoneManager.getPrefixManager(),
               bucketInfo, pathInfoFSO, trxnLogIndex,
               pathInfoFSO.getLeafNodeObjectId(),
-              repConfig, ozoneManager.getConfig());
+              repConfig, ozoneManager.getConfig(), ozoneManager.isMultiRaftEnabled(),
+          ozoneManager.getCurrentMultiRaftTerm());
 
       validateEncryptionKeyInfo(bucketInfo, keyArgs);
 

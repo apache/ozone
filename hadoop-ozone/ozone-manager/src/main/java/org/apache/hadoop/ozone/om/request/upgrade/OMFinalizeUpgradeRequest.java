@@ -96,7 +96,7 @@ public class OMFinalizeUpgradeRequest extends OMClientRequest {
       int lV = ozoneManager.getVersionManager().getMetadataLayoutVersion();
       omMetadataManager.getMetaTable().addCacheEntry(
           new CacheKey<>(LAYOUT_VERSION_KEY),
-          CacheValue.get(context.getIndex(), String.valueOf(lV)));
+          CacheValue.get(context.getCacheEpoch(), String.valueOf(lV)));
 
       FinalizeUpgradeResponse omResponse =
           FinalizeUpgradeResponse.newBuilder()

@@ -115,8 +115,7 @@ public class TestOMKeyCommitResponse extends TestOMKeyResponse {
   @Test
   public void testAddToDBBatchOnOverwrite() throws Exception {
     OmKeyInfo omKeyInfo = getOmKeyInfo();
-    keysToDelete =
-            OmUtils.prepareKeyForDelete(omBucketInfo.getObjectID(), omKeyInfo, 100);
+    keysToDelete = OmUtils.prepareKeyForDelete(omBucketInfo.getObjectID(), omKeyInfo, 100, false, 0);
     assertNotNull(keysToDelete);
     testAddToDBBatch();
 

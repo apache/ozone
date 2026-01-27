@@ -75,7 +75,7 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long transactionLogIndex = context.getIndex();
+    final long transactionLogIndex = context.getCacheEpoch();
     SetVolumePropertyRequest setVolumePropertyRequest =
         getOmRequest().getSetVolumePropertyRequest();
     Objects.requireNonNull(setVolumePropertyRequest, "setVolumePropertyRequest == null");
@@ -155,6 +155,8 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
           .setOwnerName(newOwner)
           .setModificationTime(setVolumePropertyRequest.getModificationTime())
           .setUpdateID(transactionLogIndex)
+          .setMultiRaftTerm(ozoneManager.getCurrentMultiRaftTerm())
+          .setMultiRaftEnabled(ozoneManager.isMultiRaftEnabled())
           .build();
 
       // Update cache.

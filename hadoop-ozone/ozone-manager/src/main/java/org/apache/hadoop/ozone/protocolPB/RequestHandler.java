@@ -25,6 +25,13 @@ import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
+    OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
+    OMResponse;
+import org.apache.ratis.protocol.RaftGroupId;
+
+import java.io.IOException;
 
 /**
  * Handler to handleRequest the OmRequests.
@@ -57,11 +64,12 @@ public interface RequestHandler {
    * @param ozoneManagerDoubleBuffer for adding response
    * @return OMClientResponse
    */
-  default OMClientResponse handleWriteRequest(OMRequest omRequest, ExecutionContext context,
+  default OMClientResponse handleWriteRequest(OMRequest omRequest, ExecutionContext context, RaftGroupId raftGroupId,
       OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer) throws IOException {
-    final OMClientResponse response = handleWriteRequestImpl(omRequest, context);
+    final OMClientResponse response = handleWriteRequestImpl(omRequest, context, raftGroupId);
     if (omRequest.getCmdType() != Type.Prepare) {
-      ozoneManagerDoubleBuffer.add(response, context.getTermIndex());
+      ozoneManagerDoubleBuffer.add(response, context.getTermIndex(),
+          context.getCacheEpoch());
     }
     return response;
   }
@@ -73,5 +81,6 @@ public interface RequestHandler {
    * @param context - context containing ratis term index and index
    * @return OMClientResponse
    */
-  OMClientResponse handleWriteRequestImpl(OMRequest omRequest, ExecutionContext context) throws IOException;
+  OMClientResponse handleWriteRequestImpl(OMRequest omRequest, ExecutionContext context,
+                                          RaftGroupId raftGroupId) throws IOException;
 }

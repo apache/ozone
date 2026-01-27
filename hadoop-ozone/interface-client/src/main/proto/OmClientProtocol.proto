@@ -157,6 +157,14 @@ enum Type {
   GetObjectTagging = 141;
   DeleteObjectTagging = 142;
   SubmitSnapshotDiff = 143;
+  CreateBucketRaftGroups = 144;
+  RemoveBucketRaftGroups = 145;
+  GetRaftGroupHealthState = 146;
+  BucketRaftGroupsStateChanged = 147;
+  MoveOmToSafeMode = 148;
+  BucketRaftGroupAssign = 149;
+  AcquireBucketRaftGroupAssignmentWriteLock = 150;
+  ReleaseBucketRaftGroupAssignmentWriteLock = 151;
 }
 
 enum SafeMode {
@@ -309,6 +317,12 @@ message OMRequest {
   repeated SetSnapshotPropertyRequest       SetSnapshotPropertyRequests    = 143;
 
   optional SubmitSnapshotDiffRequest        submitSnapshotDiffRequest       = 144;
+  optional CreateBucketRaftGroupsRequest    CreateBucketRaftGroupsRequest         = 145;
+  optional RemoveBucketRaftGroupsRequest    RemoveBucketRaftGroupsRequest         = 146;
+  optional GetRaftGroupHealthStateRequest   getRaftGroupHealthStateRequest      = 147;
+  optional hadoop.hdds.UUID                 raftGroupId                    = 148; // Used for raft group that the request should be executed in
+  optional BucketRaftGroupsStateChangedRequest bucketRaftGroupsStateChangedRequest = 149; // Used to notify OM about bucket raft groups state changes
+  optional BucketRaftGroupAssignRequest     bucketRaftGroupAssignRequest    = 150;
 }
 
 message OMResponse {
@@ -444,6 +458,11 @@ message OMResponse {
   optional DeleteObjectTaggingResponse       deleteObjectTaggingResponse   = 142;
 
   optional SubmitSnapshotDiffResponse        submitSnapshotDiffResponse    = 143;
+  optional CreateBucketRaftGroupsResponse    CreateBucketRaftGroupsResponse = 144;
+  optional RemoveBucketRaftGroupsResponse    RemoveBucketRaftGroupsResponse = 145;
+  optional GetRaftGroupHealthStateResponse   getRaftGroupHealthStateResponse     = 146;
+  optional BucketRaftGroupsStateChangedResponse bucketRaftGroupsStateChangedResponse = 147;
+  optional BucketRaftGroupAssignResponse     bucketRaftGroupAssignResponse    = 148;
 }
 
 enum Status {
@@ -787,6 +806,14 @@ message BucketInfo {
     optional hadoop.hdds.DefaultReplicationConfig defaultReplicationConfig = 20;
     optional uint64 snapshotUsedBytes = 21;
     optional uint64 snapshotUsedNamespace = 22;
+    optional hadoop.hdds.UUID raftGroup = 23;
+}
+
+enum StorageTypeProto {
+    DISK = 1;
+    SSD = 2;
+    ARCHIVE = 3;
+    RAM_DISK = 4;
 }
 
 enum BucketLayoutProto {
@@ -1230,6 +1257,7 @@ message BasicKeyInfo {
     optional string ownerName = 9;
     optional bool isEncrypted = 10;
     optional bool isFile = 11;
+    optional uint64 updateID = 12;
 }
 
 message DirectoryInfo {
@@ -2303,6 +2331,19 @@ message GetS3VolumeContextResponse {
   optional string userPrincipal = 2;
 }
 
+message CreateBucketRaftGroupsRequest {
+  repeated hadoop.hdds.UUID groupIds = 1;
+  optional bool purgeExistingRaftGroups = 2 [default = false];
+}
+
+message CreateBucketRaftGroupsResponse {
+}
+
+message RemoveBucketRaftGroupsRequest {
+  repeated hadoop.hdds.UUID groupIds = 1;
+}
+message RemoveBucketRaftGroupsResponse {
+}
 /**
   This will be used internally by OM to replicate S3 Secret across quorum of
   OM's.
@@ -2471,6 +2512,37 @@ message ReadConsistencyHint {
 
   // Oneof
   optional LocalLeaseContext localLeaseContext = 2;
+}
+
+message PeerHealthInfo {
+  required string peerId = 1;
+  required bool isHealthy = 2;
+  required int64 lastRpcResponseTimeMs = 3;
+}
+
+message GetRaftGroupHealthStateRequest {
+  required hadoop.hdds.UUID groupId = 1;
+}
+
+message GetRaftGroupHealthStateResponse {
+  repeated PeerHealthInfo peerHealthInfo = 1;
+}
+
+message BucketRaftGroupsStateChangedRequest {
+  required uint64 stateChangedIndex = 1;
+}
+
+message BucketRaftGroupsStateChangedResponse {
+}
+
+message BucketRaftGroupAssignRequest {
+  required string bucketPath = 1;
+  required hdds.UUID raftGroupId = 2;
+}
+
+message BucketRaftGroupAssignResponse {
+  required string bucketPath = 1;
+  required hdds.UUID raftGroupId = 2;
 }
 
 /**

@@ -43,6 +43,7 @@ public final class BasicOmKeyInfo {
   private final String eTag;
   private String ownerName;
   private final boolean isEncrypted;
+  private final long updateId;
 
   private BasicOmKeyInfo(Builder b) {
     this.volumeName = b.volumeName;
@@ -56,6 +57,7 @@ public final class BasicOmKeyInfo {
     this.eTag = StringUtils.isNotEmpty(b.eTag) ? b.eTag : null;
     this.ownerName = b.ownerName;
     this.isEncrypted = b.isEncrypted;
+    this.updateId = b.updateId;
   }
 
   private BasicOmKeyInfo(OmKeyInfo b) {
@@ -70,6 +72,7 @@ public final class BasicOmKeyInfo {
     this.eTag = b.getMetadata().get(ETAG);
     this.ownerName = b.getOwnerName();
     this.isEncrypted = b.getFileEncryptionInfo() != null;
+    this.updateId = b.getUpdateID();
   }
 
   public String getVolumeName() {
@@ -120,6 +123,10 @@ public final class BasicOmKeyInfo {
     return QuotaUtil.getReplicatedSize(getDataSize(), replicationConfig);
   }
 
+  public long getUpdateId() {
+    return updateId;
+  }
+
   /**
    * Builder of BasicOmKeyInfo.
    */
@@ -135,6 +142,7 @@ public final class BasicOmKeyInfo {
     private String eTag;
     private String ownerName;
     private boolean isEncrypted;
+    private long updateId;
 
     public Builder setVolumeName(String volumeName) {
       this.volumeName = volumeName;
@@ -191,6 +199,11 @@ public final class BasicOmKeyInfo {
       return this;
     }
 
+    public Builder setUpdateId(long updateId) {
+      this.updateId = updateId;
+      return this;
+    }
+
     public BasicOmKeyInfo build() {
       return new BasicOmKeyInfo(this);
     }
@@ -217,6 +230,7 @@ public final class BasicOmKeyInfo {
     if (StringUtils.isNotEmpty(eTag)) {
       builder.setETag(eTag);
     }
+    builder.setUpdateID(updateId);
 
     return builder.build();
   }
@@ -243,7 +257,8 @@ public final class BasicOmKeyInfo {
             basicKeyInfo.getEcReplicationConfig()))
         .setETag(basicKeyInfo.getETag())
         .setOwnerName(basicKeyInfo.getOwnerName())
-        .setIsEncrypted(basicKeyInfo.getIsEncrypted());
+        .setIsEncrypted(basicKeyInfo.getIsEncrypted())
+        .setUpdateId(basicKeyInfo.getUpdateID());
 
     if (basicKeyInfo.hasIsFile()) {
       builder.setIsFile(basicKeyInfo.getIsFile());

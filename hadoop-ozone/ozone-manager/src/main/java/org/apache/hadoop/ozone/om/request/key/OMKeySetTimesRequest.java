@@ -192,7 +192,7 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getIndex();
+    final long trxnLogIndex = context.getCacheEpoch();
     ozoneManager.getMetrics().incNumSetTime();
     OmKeyInfo omKeyInfo;
 
@@ -230,7 +230,11 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
 
       operationResult = true;
       apply(omKeyInfo);
-      omKeyInfo = omKeyInfo.toBuilder().setUpdateID(trxnLogIndex).build();
+      omKeyInfo = omKeyInfo.toBuilder()
+          .setUpdateID(trxnLogIndex)
+          .setMultiRaftTerm(ozoneManager.getCurrentMultiRaftTerm())
+          .setMultiRaftEnabled(ozoneManager.isMultiRaftEnabled())
+          .build();
 
       // update cache.
       omMetadataManager.getKeyTable(getBucketLayout())

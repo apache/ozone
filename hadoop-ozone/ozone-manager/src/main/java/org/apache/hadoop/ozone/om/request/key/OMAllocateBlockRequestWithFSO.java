@@ -72,7 +72,7 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getIndex();
+    final long trxnLogIndex = context.getCacheEpoch();
 
     AllocateBlockRequest allocateBlockRequest =
             getOmRequest().getAllocateBlockRequest();
@@ -162,6 +162,8 @@ public class OMAllocateBlockRequestWithFSO extends OMAllocateBlockRequest {
       // Set the UpdateID to current transactionLogIndex
       openKeyInfo = openKeyInfo.toBuilder()
           .setUpdateID(trxnLogIndex)
+          .setMultiRaftTerm(ozoneManager.getCurrentMultiRaftTerm())
+          .setMultiRaftEnabled(ozoneManager.isMultiRaftEnabled())
           .build();
 
       // Add to cache.

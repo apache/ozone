@@ -58,7 +58,7 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getIndex();
+    final long trxnLogIndex = context.getCacheEpoch();
     OmKeyInfo omKeyInfo = null;
 
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse = onInit();
@@ -125,6 +125,8 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
 
       omKeyInfo = builder
           .setModificationTime(modificationTime)
+          .setMultiRaftEnabled(ozoneManager.isMultiRaftEnabled())
+          .setMultiRaftTerm(ozoneManager.getCurrentMultiRaftTerm())
           .setUpdateID(trxnLogIndex)
           .build();
 

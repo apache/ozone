@@ -191,11 +191,11 @@ public class OMSnapshotRenameRequest extends OMClientRequest {
 
       omMetadataManager.getSnapshotInfoTable().addCacheEntry(
           new CacheKey<>(snapshotOldTableKey),
-          CacheValue.get(context.getIndex()));
+          CacheValue.get(context.getCacheEpoch()));
 
       omMetadataManager.getSnapshotInfoTable().addCacheEntry(
           new CacheKey<>(snapshotNewTableKey),
-          CacheValue.get(context.getIndex(), snapshotOldInfo));
+          CacheValue.get(context.getCacheEpoch(), snapshotOldInfo));
 
       omMetadataManager.getSnapshotChainManager().updateSnapshot(snapshotOldInfo);
 

@@ -264,7 +264,7 @@ public class TestOzoneManagerStateMachine {
     when(clientResponse.getOMResponse()).thenReturn(expectedResponse);
     when(clientResponse.getOmLockDetails()).thenReturn(null);
 
-    when(handler.handleWriteRequest(eq(request), any(), eq(doubleBuffer)))
+    when(handler.handleWriteRequest(eq(request), any(), any(), eq(doubleBuffer)))
         .thenReturn(clientResponse);
 
     CompletableFuture<Message> future = sm.applyTransaction(trx);
@@ -290,7 +290,7 @@ public class TestOzoneManagerStateMachine {
     when(clientResponse.getOMResponse()).thenReturn(expectedResponse);
     when(clientResponse.getOmLockDetails()).thenReturn(null);
 
-    when(handler.handleWriteRequest(any(OMRequest.class), any(), eq(doubleBuffer)))
+    when(handler.handleWriteRequest(any(OMRequest.class), any(), any(), eq(doubleBuffer)))
         .thenReturn(clientResponse);
 
     CompletableFuture<Message> future = sm.applyTransaction(trx);
@@ -338,7 +338,7 @@ public class TestOzoneManagerStateMachine {
     when(clientResponse.getOMResponse()).thenReturn(expectedResponse);
     when(clientResponse.getOmLockDetails()).thenReturn(lockDetails);
 
-    when(handler.handleWriteRequest(eq(request), any(), eq(doubleBuffer)))
+    when(handler.handleWriteRequest(eq(request), any(), any(), eq(doubleBuffer)))
         .thenReturn(clientResponse);
 
     OMResponse result = sm.runCommand(request, ti);
@@ -364,7 +364,7 @@ public class TestOzoneManagerStateMachine {
     when(clientResponse.getOMResponse()).thenReturn(expectedResponse);
     when(clientResponse.getOmLockDetails()).thenReturn(null);
 
-    when(handler.handleWriteRequest(eq(request), any(), eq(doubleBuffer)))
+    when(handler.handleWriteRequest(eq(request), any(), any(), eq(doubleBuffer)))
         .thenReturn(clientResponse);
 
     OMResponse result = sm.runCommand(request, ti);
@@ -379,7 +379,7 @@ public class TestOzoneManagerStateMachine {
     OMRequest request = sampleWriteRequest();
     TermIndex ti = TermIndex.valueOf(1, 5);
 
-    when(handler.handleWriteRequest(eq(request), any(), eq(doubleBuffer)))
+    when(handler.handleWriteRequest(eq(request), any(), any(), eq(doubleBuffer)))
         .thenThrow(new IOException("disk full"));
 
     OMResponse result = sm.runCommand(request, ti);
@@ -394,7 +394,7 @@ public class TestOzoneManagerStateMachine {
     OMRequest request = sampleWriteRequest();
     TermIndex ti = TermIndex.valueOf(1, 5);
 
-    when(handler.handleWriteRequest(eq(request), any(), eq(doubleBuffer)))
+    when(handler.handleWriteRequest(eq(request), any(), any(), eq(doubleBuffer)))
         .thenThrow(new NullPointerException("boom"));
 
     // With ExitUtils.disableSystemExit(), terminate throws ExitException
@@ -732,7 +732,7 @@ public class TestOzoneManagerStateMachine {
 
     // Same node becomes leader → should warm up EDEK cache
     verify(om).initializeEdekCache(any());
-    verify(om).omHAMetricsInit("om1");
+    verify(om).omHAMetricsInit(any(), "om1");
   }
 
   @Test
@@ -749,7 +749,7 @@ public class TestOzoneManagerStateMachine {
 
     // Different node is leader → should NOT warm up cache
     verify(om, never()).initializeEdekCache(any());
-    verify(om).omHAMetricsInit("om2");
+    verify(om).omHAMetricsInit(any(), "om2");
   }
 
   @Test
@@ -832,7 +832,7 @@ public class TestOzoneManagerStateMachine {
     OzoneManagerRatisServer ratisServer = mock(OzoneManagerRatisServer.class);
     RaftServer.Division division = mock(RaftServer.Division.class);
     when(division.getPeer()).thenReturn(localPeer);
-    when(ratisServer.getServerDivision()).thenReturn(division);
+    when(ratisServer.getServerDivision(any())).thenReturn(division);
     when(om.getOmRatisServer()).thenReturn(ratisServer);
 
     OmRatisSnapshotProvider snapshotProvider = mock(OmRatisSnapshotProvider.class);
@@ -854,7 +854,7 @@ public class TestOzoneManagerStateMachine {
     OzoneManagerRatisServer ratisServer = mock(OzoneManagerRatisServer.class);
     RaftServer.Division division = mock(RaftServer.Division.class);
     when(division.getPeer()).thenReturn(localPeer);
-    when(ratisServer.getServerDivision()).thenReturn(division);
+    when(ratisServer.getServerDivision(any())).thenReturn(division);
     when(om.getOmRatisServer()).thenReturn(ratisServer);
 
     OmRatisSnapshotProvider snapshotProvider = mock(OmRatisSnapshotProvider.class);

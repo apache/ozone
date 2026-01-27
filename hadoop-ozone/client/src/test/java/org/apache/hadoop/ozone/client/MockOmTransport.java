@@ -147,6 +147,12 @@ public class MockOmTransport implements OmTransport {
     }
   }
 
+  @Override
+  public OMResponse submitRequest(OMRequest payload, String omNodeId) throws IOException {
+    // TODO try to send request to the certain om node with omNodeId
+    return submitRequest(payload);
+  }
+
   private OzoneManagerProtocolProtos.AllocateBlockResponse allocateBlock(
       OzoneManagerProtocolProtos.AllocateBlockRequest allocateBlockRequest) {
     Iterator<? extends OzoneManagerProtocolProtos.KeyLocation> iterator =

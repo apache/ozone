@@ -199,7 +199,7 @@ public class OMTenantAssignAdminRequest extends OMClientRequest {
               .build();
       omMetadataManager.getTenantAccessIdTable().addCacheEntry(
           new CacheKey<>(accessId),
-          CacheValue.get(context.getIndex(), newOmDBAccessIdInfo));
+          CacheValue.get(context.getCacheEpoch(), newOmDBAccessIdInfo));
 
       // Update tenant cache
       multiTenantManager.getCacheOp().assignTenantAdmin(accessId, delegated);

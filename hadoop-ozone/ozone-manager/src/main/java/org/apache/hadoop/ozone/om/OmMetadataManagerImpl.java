@@ -100,6 +100,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
 import org.apache.hadoop.ozone.om.helpers.ListOpenFilesResult;
+import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
@@ -138,6 +139,8 @@ import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
+import org.apache.ratis.proto.RaftProtos;
+import org.apache.ratis.protocol.RaftGroupId;
 import org.apache.ratis.util.ExitUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -149,6 +152,141 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     S3SecretStore, Closeable {
   private static final Logger LOG =
       LoggerFactory.getLogger(OmMetadataManagerImpl.class);
+
+  /**
+   * OM RocksDB Structure .
+   * <p>
+   * OM DB stores metadata as KV pairs iThis n different column families.
+   * <p>
+   * OM DB Schema:
+   *
+   *
+   * Common Tables:
+   * |----------------------------------------------------------------------|
+   * |  Column Family     |        VALUE                                    |
+   * |----------------------------------------------------------------------|
+   * | userTable          |     /user->UserVolumeInfo                       |
+   * |----------------------------------------------------------------------|
+   * | volumeTable        |     /volume->VolumeInfo                         |
+   * |----------------------------------------------------------------------|
+   * | bucketTable        |     /volume/bucket-> BucketInfo                 |
+   * |----------------------------------------------------------------------|
+   * | s3SecretTable      | s3g_access_key_id -> s3Secret                   |
+   * |----------------------------------------------------------------------|
+   * | dTokenTable        | OzoneTokenID -> renew_time                      |
+   * |----------------------------------------------------------------------|
+   * | prefixInfoTable    | prefix -> PrefixInfo                            |
+   * |----------------------------------------------------------------------|
+   * | multipartInfoTable | /volumeName/bucketName/keyName/uploadId ->...   |
+   * |----------------------------------------------------------------------|
+   * | transactionInfoTable| #TRANSACTIONINFO -> OMTransactionInfo          |
+   * |----------------------------------------------------------------------|
+   *
+   * Multi-Tenant Tables:
+   * |----------------------------------------------------------------------|
+   * | tenantStateTable          | tenantId -> OmDBTenantState              |
+   * |----------------------------------------------------------------------|
+   * | tenantAccessIdTable       | accessId -> OmDBAccessIdInfo             |
+   * |----------------------------------------------------------------------|
+   * | principalToAccessIdsTable | userPrincipal -> OmDBUserPrincipalInfo   |
+   * |----------------------------------------------------------------------|
+   *
+   *
+   * Simple Tables:
+   * |----------------------------------------------------------------------|
+   * |  Column Family     |        VALUE                                    |
+   * |----------------------------------------------------------------------|
+   * | keyTable           | /volumeName/bucketName/keyName->KeyInfo         |
+   * |----------------------------------------------------------------------|
+   * | deletedTable       | /volumeName/bucketName/keyName->RepeatedKeyInfo |
+   * |----------------------------------------------------------------------|
+   * | openKey            | /volumeName/bucketName/keyName/id->KeyInfo      |
+   * |----------------------------------------------------------------------|
+   *
+   * Prefix Tables:
+   * |----------------------------------------------------------------------|
+   * |  Column Family   |        VALUE                                      |
+   * |----------------------------------------------------------------------|
+   * |  directoryTable  | /volumeId/bucketId/parentId/dirName -> DirInfo    |
+   * |----------------------------------------------------------------------|
+   * |  fileTable       | /volumeId/bucketId/parentId/fileName -> KeyInfo   |
+   * |----------------------------------------------------------------------|
+   * |  openFileTable   | /volumeId/bucketId/parentId/fileName/id -> KeyInfo|
+   * |----------------------------------------------------------------------|
+   * |  deletedDirTable | /volumeId/bucketId/parentId/dirName/objectId ->   |
+   * |                  |                                      KeyInfo      |
+   * |----------------------------------------------------------------------|
+   *
+   * Snapshot Tables:
+   * |-------------------------------------------------------------------------|
+   * |  Column Family        |        VALUE                                    |
+   * |-------------------------------------------------------------------------|
+   * | snapshotInfoTable     | /volume/bucket/snapshotName -> SnapshotInfo     |
+   * |-------------------------------------------------------------------------|
+   * | snapshotRenamedTable  | /volumeName/bucketName/objectID -> One of:      |
+   * |                       |  1. /volumeId/bucketId/parentId/dirName         |
+   * |                       |  2. /volumeId/bucketId/parentId/fileName        |
+   * |                       |  3. /volumeName/bucketName/keyName              |
+   * |-------------------------------------------------------------------------|
+   * | compactionLogTable    | dbTrxId-compactionTime -> compactionLogEntry    |
+   * |-------------------------------------------------------------------------|
+   */
+
+  public static final String USER_TABLE = "userTable";
+  public static final String VOLUME_TABLE = "volumeTable";
+  public static final String BUCKET_TABLE = "bucketTable";
+  public static final String KEY_TABLE = "keyTable";
+  public static final String DELETED_TABLE = "deletedTable";
+  public static final String OPEN_KEY_TABLE = "openKeyTable";
+  public static final String MULTIPARTINFO_TABLE = "multipartInfoTable";
+  public static final String S3_SECRET_TABLE = "s3SecretTable";
+  public static final String DELEGATION_TOKEN_TABLE = "dTokenTable";
+  public static final String PREFIX_TABLE = "prefixTable";
+  public static final String DIRECTORY_TABLE = "directoryTable";
+  public static final String FILE_TABLE = "fileTable";
+  public static final String OPEN_FILE_TABLE = "openFileTable";
+  public static final String DELETED_DIR_TABLE = "deletedDirectoryTable";
+  public static final String TRANSACTION_INFO_TABLE =
+      "transactionInfoTable";
+  public static final String META_TABLE = "metaTable";
+
+  // Tables for multi-tenancy
+  public static final String TENANT_ACCESS_ID_TABLE = "tenantAccessIdTable";
+  public static final String PRINCIPAL_TO_ACCESS_IDS_TABLE =
+      "principalToAccessIdsTable";
+  public static final String TENANT_STATE_TABLE = "tenantStateTable";
+  public static final String SNAPSHOT_INFO_TABLE = "snapshotInfoTable";
+  public static final String SNAPSHOT_RENAMED_TABLE =
+      "snapshotRenamedTable";
+  public static final String COMPACTION_LOG_TABLE =
+      "compactionLogTable";
+  public static final String MULTI_RAFT_INFO_TABLE =
+      "multiRaftInfoTable";
+  static final String[] ALL_TABLES = new String[] {
+      USER_TABLE,
+      VOLUME_TABLE,
+      BUCKET_TABLE,
+      KEY_TABLE,
+      DELETED_TABLE,
+      OPEN_KEY_TABLE,
+      MULTIPARTINFO_TABLE,
+      S3_SECRET_TABLE,
+      DELEGATION_TOKEN_TABLE,
+      PREFIX_TABLE,
+      TRANSACTION_INFO_TABLE,
+      DIRECTORY_TABLE,
+      FILE_TABLE,
+      DELETED_DIR_TABLE,
+      OPEN_FILE_TABLE,
+      META_TABLE,
+      TENANT_ACCESS_ID_TABLE,
+      PRINCIPAL_TO_ACCESS_IDS_TABLE,
+      TENANT_STATE_TABLE,
+      SNAPSHOT_INFO_TABLE,
+      SNAPSHOT_RENAMED_TABLE,
+      COMPACTION_LOG_TABLE,
+      MULTI_RAFT_INFO_TABLE
+  };
 
   private DBStore store;
 
@@ -184,6 +322,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   private Table<String, SnapshotInfo> snapshotInfoTable;
   private Table<String, String> snapshotRenamedTable;
   private Table<String, CompactionLogEntry> compactionLogTable;
+
+  private boolean isRatisEnabled;
+  private boolean ignorePipelineinKey;
+  private Table<String, Long> multiRaftInfoTable;
+
 
   private OzoneManager ozoneManager;
 
@@ -507,6 +650,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
     // TODO: [SNAPSHOT] Initialize table lock for snapshotRenamedTable.
 
     compactionLogTable = initializer.get(OMDBDefinition.COMPACTION_LOG_TABLE_DEF);
+
+    multiRaftInfoTable = initializer.get(OMDBDefinition.MULTI_RAFT_INFO_TABLE_DEF);
   }
 
   /**
@@ -1707,6 +1852,11 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   @Override
   public Table<String, CompactionLogEntry> getCompactionLogTable() {
     return compactionLogTable;
+  }
+
+  @Override
+  public Table<String, Long> getMultiRaftInfoTable() {
+    return multiRaftInfoTable;
   }
 
   /**

@@ -47,6 +47,16 @@ public interface ConfigurationSource {
     return value != null ? Integer.parseInt(value) : defaultValue;
   }
 
+  default int getPositiveIntOrDefault(String key, int defaultValue) {
+    String value = get(key);
+    if (value == null) {
+      return defaultValue;
+    } else {
+      int parsedInt = Integer.parseInt(value);
+      return parsedInt > 0 ? parsedInt : defaultValue;
+    }
+  }
+
   /**
    * Get the value of the <code>name</code> property as a set of comma-delimited
    * <code>int</code> values.

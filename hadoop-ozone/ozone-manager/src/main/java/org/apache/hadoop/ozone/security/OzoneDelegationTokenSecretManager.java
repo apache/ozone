@@ -57,6 +57,11 @@ import org.apache.hadoop.security.HadoopKerberosName;
 import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Daemon;
 import org.apache.hadoop.util.Time;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_EXPIRED;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMTokenProto.Type.S3AUTHINFO;
+
+import org.apache.ratis.protocol.RaftGroupId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -364,7 +369,7 @@ public class OzoneDelegationTokenSecretManager
     // following check does not allow ANY token auth. In optimistic, it should
     // allow known tokens in.
     try {
-      ozoneManager.checkLeaderStatus();
+      ozoneManager.checkLeaderStatus(identifier.getRaftGroupId());
     } catch (OMNotLeaderException | OMLeaderNotReadyException e) {
       InvalidToken wrappedStandby = new InvalidToken("IOException");
       wrappedStandby.initCause(e);

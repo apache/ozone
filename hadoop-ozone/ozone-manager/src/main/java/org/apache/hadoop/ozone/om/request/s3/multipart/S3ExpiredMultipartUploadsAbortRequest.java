@@ -70,7 +70,7 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
 
   @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
-    final long trxnLogIndex = context.getIndex();
+    final long trxnLogIndex = context.getCacheEpoch();
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumExpiredMPUAbortRequests();
@@ -112,7 +112,10 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
       }
 
       omClientResponse = new S3ExpiredMultipartUploadsAbortResponse(
-          omResponse.build(), abortedMultipartUploads
+          omResponse.build(),
+          abortedMultipartUploads,
+          ozoneManager.isMultiRaftEnabled(),
+          ozoneManager.getCurrentMultiRaftTerm()
       );
 
       result = Result.SUCCESS;
@@ -236,6 +239,8 @@ public class S3ExpiredMultipartUploadsAbortRequest extends OMKeyRequest {
           // Set the UpdateID to current transactionLogIndex
           omMultipartKeyInfo = omMultipartKeyInfo.toBuilder()
               .setUpdateID(trxnLogIndex)
+              .setMultiRaftTerm(ozoneManager.getCurrentMultiRaftTerm())
+              .setMultiRaftEnabled(ozoneManager.isMultiRaftEnabled())
               .build();
 
           // Parse the multipart upload components (e.g. volume, bucket, key)

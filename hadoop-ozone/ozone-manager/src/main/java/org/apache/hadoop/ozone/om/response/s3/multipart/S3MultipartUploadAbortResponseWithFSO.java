@@ -37,13 +37,15 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 public class S3MultipartUploadAbortResponseWithFSO
     extends S3MultipartUploadAbortResponse {
 
+  @SuppressWarnings("checkstyle:ParameterNumber")
   public S3MultipartUploadAbortResponseWithFSO(@Nonnull OMResponse omResponse,
       String multipartKey, String multipartOpenKey,
       @Nonnull OmMultipartKeyInfo omMultipartKeyInfo,
-      @Nonnull OmBucketInfo omBucketInfo, @Nonnull BucketLayout bucketLayout) {
-
+      @Nonnull OmBucketInfo omBucketInfo, @Nonnull BucketLayout bucketLayout,
+                                               boolean multiRaftEnabled,
+                                               long currentMultiRaftTerm) {
     super(omResponse, multipartKey, multipartOpenKey, omMultipartKeyInfo,
-        omBucketInfo, bucketLayout);
+        omBucketInfo, bucketLayout, multiRaftEnabled, currentMultiRaftTerm);
   }
 
   /**

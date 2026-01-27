@@ -92,7 +92,7 @@ public class TestOMKeyPurgeRequestAndResponse extends TestOMKeyRequest {
     List<String> deletedKeyNames = new ArrayList<>(numKeys);
     for (String ozoneKey : ozoneKeyNames) {
       String deletedKeyName = OMRequestTestUtils.deleteKey(
-          ozoneKey, omBucketInfo.getObjectID(), omMetadataManager, trxnIndex++);
+          ozoneKey, omBucketInfo.getObjectID(), omMetadataManager, trxnIndex++, ozoneManager.isMultiRaftEnabled());
       deletedKeyNames.add(deletedKeyName);
     }
 

@@ -97,6 +97,13 @@ public class HadoopRpcOMFailoverProxyProvider<T> extends
     return omProxies;
   }
 
+  @Override
+  ProxyInfo<T> getProxy(String omNodeId) {
+    final OMProxyInfo<T> omProxyInfo = getOMProxyMap().get(omNodeId);
+    omProxyInfo.createProxyIfNeeded(this::createOMProxy);
+    return omProxyInfo;
+  }
+
   /**
    * Get the proxy object which should be used until the next failover event
    * occurs. RPC proxy object is intialized lazily.
