@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
+import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
@@ -56,6 +57,8 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneNativeAuthorizer;
+import org.apache.hadoop.ozone.security.acl.OzoneObj;
+import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -855,6 +858,132 @@ public class TestOMHALeaderSpecificACLEnforcement {
     OMException ex2 = assertThrows(OMException.class, () -> adminBucket.getKey(newKeyName2),
         "New key name should not exist after ACL filtering");
     assertEquals(OMException.ResultCodes.KEY_NOT_FOUND, ex2.getResult());
+  }
+
+  /**
+   * Tests that key ACL operations (addAcl, removeAcl, setAcl) are enforced in preExecute
+   * and are leader-specific. Uses FILE_SYSTEM_OPTIMIZED bucket layout.
+   *
+   * <p>This test verifies that ACL operations on keys work correctly across leadership changes:
+   * <ul>
+   *   <li>Admin user can modify ACLs on any key when they're admin on the current leader</li>
+   *   <li>Admin user cannot modify ACLs after leadership transfer to a node where they're not admin</li>
+   *   <li>ACL checks happen in preExecute phase before any transaction execution</li>
+   * </ul>
+   */
+  @Test
+  public void testKeyAclOperationsEnforcementAfterLeadershipChangeWithFSO() throws Exception {
+    ObjectStore adminObjectStore = client.getObjectStore();
+    String testVolume = "keyaclvol-" +
+        RandomStringUtils.secure().nextAlphabetic(5).toLowerCase(Locale.ROOT);
+    String testBucket = "keyaclbucket-" +
+        RandomStringUtils.secure().nextAlphabetic(5).toLowerCase(Locale.ROOT);
+    String keyName = "keyacl-" +
+        RandomStringUtils.secure().nextAlphabetic(5).toLowerCase(Locale.ROOT);
+
+    // Step 1: Create volume, bucket with FSO layout, and key as admin
+    VolumeArgs volumeArgs = VolumeArgs.newBuilder()
+        .setOwner(adminUserUgi.getShortUserName())
+        .build();
+    adminObjectStore.createVolume(testVolume, volumeArgs);
+    OzoneVolume adminVolume = adminObjectStore.getVolume(testVolume);
+
+    // Use FILE_SYSTEM_OPTIMIZED bucket layout
+    BucketArgs bucketArgs = BucketArgs.newBuilder()
+        .setBucketLayout(BucketLayout.FILE_SYSTEM_OPTIMIZED)
+        .build();
+    adminVolume.createBucket(testBucket, bucketArgs);
+    OzoneBucket adminBucket = adminVolume.getBucket(testBucket);
+
+    // Create a key as admin (so test user is NOT the owner)
+    try (OzoneOutputStream out = adminBucket.createKey(keyName, 0)) {
+      out.write("test data for ACL operations".getBytes(UTF_8));
+    }
+
+    OzoneKey key = adminBucket.getKey(keyName);
+    assertNotNull(key, "Key should be created successfully");
+
+    // Create OzoneObj for ACL operations
+    OzoneObj keyObj = OzoneObjInfo.Builder.newBuilder()
+        .setVolumeName(testVolume)
+        .setBucketName(testBucket)
+        .setKeyName(keyName)
+        .setResType(OzoneObj.ResourceType.KEY)
+        .setStoreType(OzoneObj.StoreType.OZONE)
+        .build();
+
+    int originalAclCount = adminObjectStore.getAcl(keyObj).size();
+
+    // Step 2: Add test user as admin on current leader
+    OzoneManager currentLeader = cluster.getOMLeader();
+    String leaderNodeId = currentLeader.getOMNodeId();
+    addAdminToSpecificOM(currentLeader, TEST_USER);
+    assertThat(currentLeader.getOmAdminUsernames()).contains(TEST_USER);
+
+    // Step 3: Test user performs ACL operations as admin (should succeed)
+    UserGroupInformation.setLoginUser(testUserUgi);
+    try (OzoneClient userClient = OzoneClientFactory.getRpcClient(OM_SERVICE_ID, cluster.getConf())) {
+      ObjectStore userObjectStore = userClient.getObjectStore();
+
+      // Add ACL - should succeed
+      OzoneAcl addAcl = OzoneAcl.parseAcl("user:anotheruser:rw[ACCESS]");
+      boolean addResult = userObjectStore.addAcl(keyObj, addAcl);
+      assertThat(addResult).isTrue();
+
+      // Verify ACL was added
+      List<OzoneAcl> acls = userObjectStore.getAcl(keyObj);
+      assertThat(acls).hasSize(originalAclCount + 1);
+      assertThat(acls).contains(addAcl);
+
+      // Set ACL - should succeed
+      OzoneAcl setAcl = OzoneAcl.parseAcl("user:setuser:rwx[ACCESS]");
+      boolean setResult = userObjectStore.setAcl(keyObj, Collections.singletonList(setAcl));
+      assertThat(setResult).isTrue();
+
+      // Verify ACL was set (replaced all previous ACLs)
+      acls = userObjectStore.getAcl(keyObj);
+      assertThat(acls).hasSize(1);
+      assertThat(acls).contains(setAcl);
+
+      // Step 4: Transfer leadership to another node where test user is NOT admin
+      OzoneManager newLeader = transferLeadershipToAnotherNode(currentLeader);
+      assertNotEquals(leaderNodeId, newLeader.getOMNodeId(),
+          "Leadership should have transferred to a different node");
+      assertThat(newLeader.getOmAdminUsernames()).doesNotContain(TEST_USER);
+
+      // Step 5: Try ACL operations on new leader - should fail with PERMISSION_DENIED
+      OzoneAcl anotherAcl = OzoneAcl.parseAcl("user:yetanotheruser:r[ACCESS]");
+
+      // Add ACL should fail
+      OMException addException = assertThrows(OMException.class, () -> {
+        userObjectStore.addAcl(keyObj, anotherAcl);
+      }, "addAcl should fail for non-admin user on new leader");
+      assertEquals(PERMISSION_DENIED, addException.getResult(),
+          "Should get PERMISSION_DENIED when ACL check fails in preExecute");
+
+      // Remove ACL should fail
+      OMException removeException = assertThrows(OMException.class, () -> {
+        userObjectStore.removeAcl(keyObj, setAcl);
+      }, "removeAcl should fail for non-admin user on new leader");
+      assertEquals(PERMISSION_DENIED, removeException.getResult(),
+          "Should get PERMISSION_DENIED when ACL check fails in preExecute");
+
+      // Set ACL should fail
+      OzoneAcl newSetAcl = OzoneAcl.parseAcl("user:failuser:w[ACCESS]");
+      OMException setException = assertThrows(OMException.class, () -> {
+        userObjectStore.setAcl(keyObj, Collections.singletonList(newSetAcl));
+      }, "setAcl should fail for non-admin user on new leader");
+      assertEquals(PERMISSION_DENIED, setException.getResult(),
+          "Should get PERMISSION_DENIED when ACL check fails in preExecute");
+
+    } finally {
+      UserGroupInformation.setLoginUser(adminUserUgi);
+    }
+
+    // Step 6: Verify the ACLs remain unchanged (operations were rejected in preExecute)
+    List<OzoneAcl> finalAcls = adminObjectStore.getAcl(keyObj);
+    assertThat(finalAcls).hasSize(1);
+    assertThat(finalAcls).contains(OzoneAcl.parseAcl("user:setuser:rwx[ACCESS]"));
   }
 
   /**

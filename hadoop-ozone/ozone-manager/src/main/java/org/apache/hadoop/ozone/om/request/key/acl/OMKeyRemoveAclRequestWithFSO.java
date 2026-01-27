@@ -55,14 +55,18 @@ public class OMKeyRemoveAclRequestWithFSO extends OMKeyAclRequestWithFSO {
   @Override
   public OzoneManagerProtocolProtos.OMRequest preExecute(
       OzoneManager ozoneManager) throws IOException {
+    // Call parent's preExecute to perform ACL checks
+    OzoneManagerProtocolProtos.OMRequest omRequest =
+        super.preExecute(ozoneManager);
+
     long modificationTime = Time.now();
     OzoneManagerProtocolProtos.RemoveAclRequest.Builder
         removeAclRequestBuilder =
-        getOmRequest().getRemoveAclRequest().toBuilder()
+        omRequest.getRemoveAclRequest().toBuilder()
             .setModificationTime(modificationTime);
 
-    return getOmRequest().toBuilder()
-        .setRemoveAclRequest(removeAclRequestBuilder).setUserInfo(getUserInfo())
+    return omRequest.toBuilder()
+        .setRemoveAclRequest(removeAclRequestBuilder)
         .build();
   }
 
