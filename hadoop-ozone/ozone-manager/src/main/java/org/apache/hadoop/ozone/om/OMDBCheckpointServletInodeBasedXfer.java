@@ -357,7 +357,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
 
   /**
    * Collects the snapshots to be transferred from the specified snapshot directories
-   * into the archive output stream,
+   * into the archive output stream.
    *
    * @param sstFilesToExclude   Set of SST file identifiers to exclude from the archive.
    * @param snapshotPaths       Set of paths to snapshot directories to be processed.
