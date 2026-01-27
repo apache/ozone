@@ -25,6 +25,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
 import static org.apache.hadoop.ozone.s3sts.S3STSConfigKeys.OZONE_S3G_STS_PAYLOAD_HASH_MAX_VALUE;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -68,6 +69,8 @@ public class AWSSignatureProcessor implements SignatureProcessor {
   private static final AuditLogger AUDIT =
       new AuditLogger(AuditLoggerType.S3GLOGGER);
 
+  private static final String X_AMZ_SECURITY_TOKEN = "x-amz-security-token";
+
   @Context
   private ContainerRequestContext context;
 
@@ -103,11 +106,47 @@ public class AWSSignatureProcessor implements SignatureProcessor {
     if (signatureInfo == null) {
       signatureInfo = new SignatureInfo.Builder(Version.NONE).setService("s3").build();
     }
+
+    // Capture STS session token if present (header-based or query-based).
+    // - Header-based SigV4: x-amz-security-token
+    // - Query-based (for presigned URLs): X-Amz-Security-Token
+    final String sessionToken = extractSessionToken(headers);
+    if (sessionToken != null && !sessionToken.isEmpty()) {
+      signatureInfo.setSessionToken(sessionToken);
+    }
+
     String payloadHash = getPayloadHash(headers, signatureInfo);
     signatureInfo.setPayloadHash(payloadHash);
     signatureInfo.setUnfilteredURI(
         context.getUriInfo().getRequestUri().getPath());
     return signatureInfo;
+  }
+
+  private String extractSessionToken(LowerCaseKeyStringMap headers) {
+    // Header-based token
+    final String headerToken = headers.get(X_AMZ_SECURITY_TOKEN);
+    if (headerToken != null && !headerToken.isEmpty()) {
+      return headerToken;
+    }
+
+    // Query-based token - this would be used for presigned URLs
+    final MultivaluedMap<String, String> queryParams = context.getUriInfo().getQueryParameters();
+    if (queryParams == null) {
+      return null;
+    }
+    for (Map.Entry<String, List<String>> entry : queryParams.entrySet()) {
+      final String key = entry.getKey();
+      if (Strings.isNullOrEmpty(key)) {
+        continue;
+      }
+      if (key.compareToIgnoreCase(X_AMZ_SECURITY_TOKEN) == 0) {
+        final List<String> values = entry.getValue();
+        if (values != null && !values.isEmpty()) {
+          return values.get(0);
+        }
+      }
+    }
+    return null;
   }
 
   private String getPayloadHash(Map<String, String> headers, SignatureInfo signatureInfo)
