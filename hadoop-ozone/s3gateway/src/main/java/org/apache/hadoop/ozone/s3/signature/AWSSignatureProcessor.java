@@ -69,6 +69,8 @@ public class AWSSignatureProcessor implements SignatureProcessor {
   private static final AuditLogger AUDIT =
       new AuditLogger(AuditLoggerType.S3GLOGGER);
 
+  private static final String X_AMZ_SECURITY_TOKEN = "x-amz-security-token";
+
   @Context
   private ContainerRequestContext context;
 
@@ -122,7 +124,7 @@ public class AWSSignatureProcessor implements SignatureProcessor {
 
   private String extractSessionToken(LowerCaseKeyStringMap headers) {
     // Header-based token
-    final String headerToken = headers.get("x-amz-security-token");
+    final String headerToken = headers.get(X_AMZ_SECURITY_TOKEN);
     if (headerToken != null && !headerToken.isEmpty()) {
       return headerToken;
     }
@@ -137,7 +139,7 @@ public class AWSSignatureProcessor implements SignatureProcessor {
       if (Strings.isNullOrEmpty(key)) {
         continue;
       }
-      if (key.compareToIgnoreCase("x-amz-security-token") == 0) {
+      if (key.compareToIgnoreCase(X_AMZ_SECURITY_TOKEN) == 0) {
         final List<String> values = entry.getValue();
         if (values != null && !values.isEmpty()) {
           return values.get(0);
