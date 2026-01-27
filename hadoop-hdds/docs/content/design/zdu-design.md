@@ -1,6 +1,9 @@
 ---
 jira: HDDS-3331
-author: Stephen O'Donnell, Ethan Rose, Istvan Fajth
+authors:
+- Stephen O'Donnell
+- Ethan Rose
+- Istvan Fajth
 ---
 
 <!--
