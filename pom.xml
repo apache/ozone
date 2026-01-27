@@ -38,7 +38,7 @@
     <aspectj.java21.version>1.9.24</aspectj.java21.version>
     <!-- Default aspectj version for java8 -->
     <aspectj.version>1.9.7</aspectj.version>
-    <assertj.version>3.27.6</assertj.version>
+    <assertj.version>3.27.7</assertj.version>
     <aws-java-sdk.version>1.12.788</aws-java-sdk.version>
     <aws-java-sdk2.version>2.41.14</aws-java-sdk2.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
