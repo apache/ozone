@@ -70,6 +70,14 @@ public class S3STSEndpointBase implements Auditor {
     AuditMessage.Builder builder = new AuditMessage.Builder()
         .forOperation(op)
         .withParams(auditMap);
+    
+    if (signatureInfo != null) {
+      String accessId = signatureInfo.getAwsAccessId();
+      if (accessId != null && !accessId.isEmpty()) {
+        builder.setUser(accessId);
+      }
+    }
+
     if (context != null) {
       builder.atIp(AuditUtils.getClientIpAddress(context));
     }
@@ -110,5 +118,9 @@ public class S3STSEndpointBase implements Auditor {
   @VisibleForTesting
   public void setSignatureInfo(SignatureInfo signatureInfo) {
     this.signatureInfo = signatureInfo;
+  }
+
+  protected Map<String, String> getAuditParameters() {
+    return AuditUtils.getAuditParameters(context);
   }
 }

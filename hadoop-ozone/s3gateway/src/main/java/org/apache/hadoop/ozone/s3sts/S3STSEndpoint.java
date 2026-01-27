@@ -28,6 +28,7 @@ import java.io.StringWriter;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.Map;
 import java.util.UUID;
 import javax.ws.rs.FormParam;
 import javax.ws.rs.GET;
@@ -40,8 +41,10 @@ import javax.ws.rs.core.Response;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
+import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
+import org.apache.hadoop.ozone.om.helpers.S3STSUtils;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.OSTSException;
 import org.slf4j.Logger;
@@ -242,11 +245,21 @@ public class S3STSEndpoint extends S3STSEndpointBase {
           .assumeRole(roleArn, roleSessionName, duration, awsIamSessionPolicy);
       // Generate AssumeRole response
       final String responseXml = generateAssumeRoleResponse(assumedRoleUserArn, responseInfo, requestId);
+
+      final Map<String, String> auditParams = getAuditParameters();
+      S3STSUtils.addAssumeRoleAuditParams(auditParams, roleArn, roleSessionName, awsIamSessionPolicy, duration);
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(S3GAction.ASSUME_ROLE, auditParams));
+
       return Response.ok(responseXml)
           .header("Content-Type", "text/xml")
           .build();
     } catch (IOException e) {
       LOG.error("Error during AssumeRole processing", e);
+
+      final Map<String, String> auditParams = getAuditParameters();
+      S3STSUtils.addAssumeRoleAuditParams(auditParams, roleArn, roleSessionName, awsIamSessionPolicy, duration);
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(S3GAction.ASSUME_ROLE, auditParams, e));
+
       if (e instanceof OMException) {
         final OMException omException = (OMException) e;
         if (omException.getResult() == OMException.ResultCodes.ACCESS_DENIED ||

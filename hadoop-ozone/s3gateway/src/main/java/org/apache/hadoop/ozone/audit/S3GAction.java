@@ -53,7 +53,10 @@ public enum S3GAction implements AuditAction {
   GET_OBJECT_TAGGING,
   PUT_OBJECT_TAGGING,
   DELETE_OBJECT_TAGGING,
-  PUT_OBJECT_ACL;
+  PUT_OBJECT_ACL,
+
+  // STS endpoint
+  ASSUME_ROLE;
 
   @Override
   public String getAction() {
