@@ -209,15 +209,18 @@ message NodePool {
 }
 
 message DatanodeUsageInfoProto {
-    optional int64 capacity = 1;
-    optional int64 used = 2;
-    optional int64 remaining = 3;
+    optional int64 capacity = 1; // ozone capacity after subtracting reserved space from fs capacity
+    optional int64 used = 2; // space used by ozone as calculated by DU
+    optional int64 remaining = 3; // space available to ozone after adjusting reserved space
     optional DatanodeDetailsProto node = 4;
     optional int64 containerCount = 5;
     optional int64 committed = 6;
     optional int64 freeSpaceToSpare = 7;
     optional int64 pipelineCount = 8;
     optional int64 reserved = 9;
+    // Raw filesystem stats
+    optional int64 fsCapacity = 10;
+    optional int64 fsAvailable = 11;
 }
 
 /**

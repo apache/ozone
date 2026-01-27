@@ -72,6 +72,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
@@ -1908,7 +1909,11 @@ public class TestSCMNodeManager {
       String storagePath = testDir.getAbsolutePath() + "/" + dnId;
       StorageReportProto report = HddsTestUtils
           .createStorageReport(dnId, storagePath, capacity, used,
-              remaining, null);
+              remaining, null)
+          .toBuilder()
+          .setFsCapacity(3000L)
+          .setFsAvailable(2400L)
+          .build();
 
       nodeManager.register(datanodeDetails, HddsTestUtils.createNodeReport(
           Arrays.asList(report), emptyList()),
@@ -1947,8 +1952,46 @@ public class TestSCMNodeManager {
     assertEquals(1900, stats.get("MaintenanceDiskRemaining").longValue());
 
     // All nodes
-    assertEquals(12000, stats.get("TotalCapacity").longValue());
-    assertEquals(600, stats.get("TotalUsed").longValue());
+    assertEquals(12000, stats.get("TotalOzoneCapacity").longValue());
+    assertEquals(600, stats.get("TotalOzoneUsed").longValue());
+    assertEquals(18000, stats.get("TotalFilesystemCapacity").longValue());
+    assertEquals(14400, stats.get("TotalFilesystemAvailable").longValue());
+    assertEquals(3600, stats.get("TotalFilesystemUsed").longValue());
+  }
+
+  @Test
+  public void testGetTotalFilesystemUsage()
+      throws IOException, AuthenticationException {
+    OzoneConfiguration conf = getConf();
+    try (SCMNodeManager nodeManager = createNodeManager(conf)) {
+      DatanodeDetails datanodeDetails = MockDatanodeDetails.randomDatanodeDetails();
+      DatanodeID dnId = datanodeDetails.getID();
+
+      StorageReportProto report1 = HddsTestUtils
+          .createStorageReport(dnId, testDir.getAbsolutePath() + "/vol-1",
+              500L, 100L, 400L, null)
+          .toBuilder()
+          .setFsCapacity(1000L)
+          .setFsAvailable(600L)
+          .build();
+      StorageReportProto report2 = HddsTestUtils
+          .createStorageReport(dnId, testDir.getAbsolutePath() + "/vol-2",
+              700L, 200L, 500L, null)
+          .toBuilder()
+          .setFsCapacity(2000L)
+          .setFsAvailable(1500L)
+          .build();
+
+      nodeManager.register(datanodeDetails,
+          HddsTestUtils.createNodeReport(Arrays.asList(report1, report2), emptyList()), null);
+      nodeManager.processHeartbeat(datanodeDetails);
+
+      SpaceUsageSource.Fixed totals = nodeManager.getTotalFilesystemUsage(datanodeDetails);
+      assertNotNull(totals);
+      assertEquals(3000L, totals.getCapacity());
+      assertEquals(2100L, totals.getAvailable());
+      assertEquals(900L, totals.getUsedSpace());
+    }
   }
 
   /**
