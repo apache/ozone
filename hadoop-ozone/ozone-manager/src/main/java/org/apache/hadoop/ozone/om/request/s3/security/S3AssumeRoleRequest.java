@@ -24,19 +24,25 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.security.SecureRandom;
 import java.time.Clock;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OzoneAclUtils;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
+import org.apache.hadoop.ozone.om.helpers.S3STSUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.s3.security.S3AssumeRoleResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AssumeRoleRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AssumeRoleResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -106,6 +112,12 @@ public class S3AssumeRoleRequest extends OMClientRequest {
       return roleSessionNameErrorResponse;
     }
 
+    Exception exception = null;
+    OMClientResponse omClientResponse;
+    final Map<String, String> auditMap = new HashMap<>();
+    final AuditLogger auditLogger = ozoneManager.getAuditLogger();
+    final OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
+
     final String roleArn = assumeRoleRequest.getRoleArn();
     try {
       // Validate role ARN and extract role
@@ -134,6 +146,10 @@ public class S3AssumeRoleRequest extends OMClientRequest {
       // Calculate expiration of session token
       final long expirationEpochSeconds = clock.instant().plusSeconds(durationSeconds).getEpochSecond();
 
+      // Audit params
+      S3STSUtils.addAssumeRoleAuditParams(auditMap, roleArn, roleSessionName,
+          assumeRoleRequest.getAwsIamSessionPolicy(), durationSeconds);
+
       final AssumeRoleResponse.Builder responseBuilder = AssumeRoleResponse.newBuilder()
           .setAccessKeyId(tempAccessKeyId)
           .setSecretAccessKey(secretAccessKey)
@@ -141,18 +157,25 @@ public class S3AssumeRoleRequest extends OMClientRequest {
           .setExpirationEpochSeconds(expirationEpochSeconds)
           .setAssumedRoleId(assumedRoleId);
 
-      return new S3AssumeRoleResponse(
+      omClientResponse = new S3AssumeRoleResponse(
           OmResponseUtil.getOMResponseBuilder(omRequest)
               .setAssumeRoleResponse(responseBuilder.build())
               .build());
     } catch (OMException e) {
-      return new S3AssumeRoleResponse(createErrorOMResponse(OmResponseUtil.getOMResponseBuilder(omRequest), e));
+      exception = e;
+      omClientResponse = new S3AssumeRoleResponse(
+          createErrorOMResponse(OmResponseUtil.getOMResponseBuilder(omRequest), e));
     } catch (IOException e) {
       final OMException omException = new OMException(
           "Failed to generate STS token for role: " + roleArn, e, OMException.ResultCodes.INTERNAL_ERROR);
-      return new S3AssumeRoleResponse(
+      omClientResponse = new S3AssumeRoleResponse(
           createErrorOMResponse(OmResponseUtil.getOMResponseBuilder(omRequest), omException));
     }
+
+    // Audit log
+    markForAudit(auditLogger, buildAuditMessage(OMAction.S3_ASSUME_ROLE, auditMap, exception, userInfo));
+
+    return omClientResponse;
   }
 
   /**
