@@ -19,9 +19,11 @@ package org.apache.hadoop.util;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -134,11 +136,11 @@ public class TestBackgroundService {
     // Verify that even index tasks have not run even after serviceTimeout.
     assertEquals(expValuesWithEvenLocks, IntStream.range(0, nTasks).boxed().map(map::get).collect(Collectors.toList()));
     // Background service is still waiting for all tasks to complete.
-    assertEquals(0, runCount.get());
+    assertEquals(-1, runCount.get());
     // Release the locks on even index tasks.
     lockList.forEach(Lock::unlock);
     // Wait for current run of BackgroundService to complete.
-    GenericTestUtils.waitFor(() -> runCount.get() == 1, interval / 5, serviceTimeout);
+    GenericTestUtils.waitFor(() -> runCount.get() >= 0, interval / 5, serviceTimeout);
     // Verify that all tasks have completed.
     assertEquals(expFinalValues, IntStream.range(0, nTasks).boxed().map(map::get).collect(Collectors.toList()));
     assertTrue(queue.isEmpty());
@@ -159,9 +161,61 @@ public class TestBackgroundService {
         1, serviceTimeout);
     backgroundService.start();
     // Wait till current run of BackgroundService completes.
-    GenericTestUtils.waitFor(() -> runCount.get() == 1, interval / 5, serviceTimeout);
+    GenericTestUtils.waitFor(() -> runCount.get() >= 0, interval / 5, serviceTimeout);
     // Verify that all tasks have completed.
     assertEquals(expFinalValues, IntStream.range(0, nTasks).boxed().map(map::get).collect(Collectors.toList()));
     assertTrue(queue.isEmpty());
+  }
+
+  @Test
+  public void testRunWaitsForTaskCompletion() throws TimeoutException, InterruptedException {
+    int interval = 100;
+    int serviceTimeout = 5000;
+    // Lock to control when the task can complete.
+    Lock taskLock = new ReentrantLock();
+    List<Long> runStartTimes = Collections.synchronizedList(new ArrayList<>());
+    List<Long> taskEndTimes = Collections.synchronizedList(new ArrayList<>());
+
+    backgroundService = new BackgroundService("testFixedDelay", interval,
+        TimeUnit.MILLISECONDS, 1, serviceTimeout) {
+      @Override
+      public BackgroundTaskQueue getTasks() {
+        BackgroundTaskQueue taskQueue = new BackgroundTaskQueue();
+        runStartTimes.add(System.currentTimeMillis());
+        taskQueue.add(() -> {
+          taskLock.lock();
+          try {
+            taskEndTimes.add(System.currentTimeMillis());
+          } finally {
+            taskLock.unlock();
+          }
+          return BackgroundTaskResult.EmptyTaskResult.newResult();
+        });
+        return taskQueue;
+      }
+
+      @Override
+      public void execTaskCompletion() {
+        runCount.incrementAndGet();
+      }
+    };
+
+    // Hold the lock so the first task blocks, the task cannot complete before release lock
+    taskLock.lock();
+    try {
+      backgroundService.start();
+      // Wait for the first run to start.
+      GenericTestUtils.waitFor(() -> !runStartTimes.isEmpty(), 100, serviceTimeout);
+      try {
+        // Task cannot complete before release lock
+        GenericTestUtils.waitFor(() -> runCount.get() >= 0, 100, 2000);
+        fail("BackgroundService should not complete task");
+      } catch (TimeoutException e) {
+      }
+    } finally {
+      taskLock.unlock();
+    }
+    // Wait for first run to complete after unlock
+    GenericTestUtils.waitFor(() -> runCount.get() >= 0, 10, serviceTimeout);
   }
 }
