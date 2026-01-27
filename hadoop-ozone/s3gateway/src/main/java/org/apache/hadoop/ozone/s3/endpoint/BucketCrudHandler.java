@@ -48,7 +48,7 @@ public class BucketCrudHandler extends EndpointBase implements BucketOperationHa
   /**
    * Handle only plain PUT bucket (create bucket), not subresources.
    */
-  private boolean shouldHandlePutCreateBucket() {
+  private boolean shouldHandle() {
     return queryParams().get(QueryParams.ACL) == null
         && queryParams().get(QueryParams.UPLOADS) == null
         && queryParams().get(QueryParams.DELETE) == null;
@@ -61,7 +61,7 @@ public class BucketCrudHandler extends EndpointBase implements BucketOperationHa
   public Response handlePutRequest(String bucketName, InputStream body)
       throws IOException, OS3Exception {
 
-    if (!shouldHandlePutCreateBucket()) {
+    if (!shouldHandle()) {
       return null;
     }
 
@@ -94,9 +94,7 @@ public class BucketCrudHandler extends EndpointBase implements BucketOperationHa
   public Response handleDeleteRequest(String bucketName)
       throws IOException, OS3Exception {
 
-    if (queryParams().get(QueryParams.ACL) != null
-        || queryParams().get(QueryParams.UPLOADS) != null
-        || queryParams().get(QueryParams.DELETE) != null) {
+    if (!shouldHandle()) {
       return null;
     }
 
