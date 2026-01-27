@@ -31,6 +31,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import java.io.File;
+import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -296,6 +297,28 @@ public class TestStorageVolumeChecker {
     assertEquals(1, metrics2.getNumScansSkipped());
     assertEquals(1, metrics3.getNumScansSkipped());
 
+    checker.shutdownAndWait(0, TimeUnit.SECONDS);
+  }
+
+  /**
+   * Verify that negative values disable the periodic disk checker.
+   */
+  @Test
+  public void testNegativeIntervalDisablesPeriodicDiskChecker() throws Exception {
+    setup();
+    conf.setLong("hdds.datanode.periodic.disk.check.interval.minutes", -1);
+
+    StorageVolumeChecker checker =
+        new StorageVolumeChecker(conf, new FakeTimer(), "test-");
+
+    checker.start();
+
+    Field f = StorageVolumeChecker.class.getDeclaredField("periodicDiskChecker");
+    f.setAccessible(true);
+    // Expect no ScheduledFuture to be created, as a negative interval disables
+    // the periodic disk checker entirely.
+    assertThat(f.get(checker)).isNull();
+    // Verify shutdown is safe when no periodic task was scheduled.
     checker.shutdownAndWait(0, TimeUnit.SECONDS);
   }
 
