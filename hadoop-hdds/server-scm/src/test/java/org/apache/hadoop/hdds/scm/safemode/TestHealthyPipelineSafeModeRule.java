@@ -181,9 +181,6 @@ public class TestHealthyPipelineSafeModeRule {
       HealthyPipelineSafeModeRule healthyPipelineSafeModeRule = SafeModeRuleFactory.getInstance()
           .getSafeModeRule(HealthyPipelineSafeModeRule.class);
 
-      // No datanodes have sent pipelinereport from datanode
-      assertFalse(healthyPipelineSafeModeRule.validate());
-
       // Fire pipeline report from all datanodes in first pipeline, as here we
       // have 3 pipelines, 10% is 0.3, when doing ceil it is 1. So, we should
       // validate should return true after fire pipeline event
@@ -274,18 +271,7 @@ public class TestHealthyPipelineSafeModeRule {
       HealthyPipelineSafeModeRule healthyPipelineSafeModeRule = SafeModeRuleFactory.getInstance()
           .getSafeModeRule(HealthyPipelineSafeModeRule.class);
 
-      // No pipeline event have sent to SCMSafemodeManager
-      assertFalse(healthyPipelineSafeModeRule.validate());
-
-      // fire event with pipeline create status with ratis type and factor 1
-      // pipeline, validate() should return false
-      firePipelineEvent(pipeline1, eventQueue);
-
-      assertFalse(healthyPipelineSafeModeRule.validate());
-
-      firePipelineEvent(pipeline2, eventQueue);
-      firePipelineEvent(pipeline3, eventQueue);
-
+      //No need of pipeline events.
       GenericTestUtils.waitFor(() -> healthyPipelineSafeModeRule.validate(),
           1000, 5000);
 
@@ -357,7 +343,7 @@ public class TestHealthyPipelineSafeModeRule {
 
       // Wait for log message indicating the pipeline's DN is in bad health.
       GenericTestUtils.waitFor(
-          () -> logCapturer.getOutput().contains("are either in bad health or un-registered with SCMs"),
+          () -> logCapturer.getOutput().contains("is not healthy"),
           100, 5000);
 
       // Ensure the rule is NOT satisfied due to unhealthy DN
