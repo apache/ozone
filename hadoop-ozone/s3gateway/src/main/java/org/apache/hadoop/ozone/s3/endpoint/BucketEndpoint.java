@@ -132,7 +132,7 @@ public class BucketEndpoint extends EndpointBase {
 
       // Actual bucket processing starts here
       // Validate and prepare parameters
-      BucketListingContext context = validateAndPrepareParameters(
+      BucketListingContext listingContext = validateAndPrepareParameters(
           bucketName, delimiter, encodingType, marker, maxKeys, prefix, 
           continueToken, startAfter);
 
@@ -142,7 +142,7 @@ public class BucketEndpoint extends EndpointBase {
           continueToken, startAfter);
 
       // Process key listing
-      processKeyListing(context, response);
+      processKeyListing(listingContext, response);
 
       // Build final response
       return buildFinalResponse(response, s3GAction, startNanos, perf);
@@ -172,7 +172,6 @@ public class BucketEndpoint extends EndpointBase {
     
     // Log audit entry for empty response to align with previous behavior
     long opLatencyNs = getMetrics().updateGetBucketSuccessStats(startNanos);
-    PerformanceStringBuilder perf = new PerformanceStringBuilder();
     perf.appendCount(0);
     perf.appendOpLatencyNanos(opLatencyNs);
     auditReadSuccess(s3GAction, perf);
@@ -282,20 +281,6 @@ public class BucketEndpoint extends EndpointBase {
   }
 
   /**
-   * Handle GetBucketAcl request.
-   * Implements the GetBucketAcl API operation.
-   * @see <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketAcl.html">GetBucketAcl</a>
-   */
-  Response handleGetBucketAcl(String bucketName, long startNanos) 
-      throws OS3Exception, IOException {
-    S3GAction s3GAction = S3GAction.GET_ACL;
-    S3BucketAcl result = getAcl(bucketName);
-    getMetrics().updateGetAclSuccessStats(startNanos);
-    auditReadSuccess(s3GAction);
-    return Response.ok(result, MediaType.APPLICATION_XML_TYPE).build();
-  }
-
-  /**
    * Validate and prepare parameters for bucket listing.
    */
   @SuppressWarnings({"parameternumber", "checkstyle:ParameterNumber"})
@@ -306,7 +291,8 @@ public class BucketEndpoint extends EndpointBase {
     
     // If you specify the encoding-type request parameter, should return encoded key name values 
     // in the following response elements: Delimiter, Prefix, Key, and StartAfter.
-    // For detail refer: https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjectsV2.html#AmazonS3-ListObjectsV2-response-EncodingType
+    // For detail refer: 
+    // https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjectsV2.html#AmazonS3-ListObjectsV2-response-EncodingType
     
     // Validate encoding type
     if (encodingType != null && !encodingType.equals(ENCODING_TYPE)) {
@@ -459,7 +445,8 @@ public class BucketEndpoint extends EndpointBase {
   /**
    * Build final response with metrics and audit logging.
    */
-  Response buildFinalResponse(ListObjectResponse response, S3GAction s3GAction, long startNanos, PerformanceStringBuilder perf) {
+  Response buildFinalResponse(ListObjectResponse response, S3GAction s3GAction,
+      long startNanos, PerformanceStringBuilder perf) {
     int keyCount = response.getCommonPrefixes().size() + response.getContents().size();
     long opLatencyNs = getMetrics().updateGetBucketSuccessStats(startNanos);
     getMetrics().incListKeyCount(keyCount);
