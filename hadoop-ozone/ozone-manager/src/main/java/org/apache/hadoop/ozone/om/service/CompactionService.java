@@ -155,7 +155,7 @@ public class CompactionService extends BackgroundService {
     }
   }
 
-  private class CompactTask extends BackgroundTask {
+  private class CompactTask implements BackgroundTask {
     private final String tableName;
 
     CompactTask(String tableName) {

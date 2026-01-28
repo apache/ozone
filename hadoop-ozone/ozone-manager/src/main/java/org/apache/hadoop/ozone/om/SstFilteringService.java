@@ -126,7 +126,7 @@ public class SstFilteringService extends BackgroundService
     running.set(true);
   }
 
-  private class SstFilteringTask extends BackgroundTask {
+  private class SstFilteringTask implements BackgroundTask {
 
     private boolean isSnapshotDeleted(SnapshotInfo snapshotInfo) {
       return snapshotInfo == null || snapshotInfo.getSnapshotStatus() == SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED;

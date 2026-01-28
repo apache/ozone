@@ -513,7 +513,7 @@ public class SnapshotDefragService extends BackgroundService
     }
   }
 
-  private final class SnapshotDefragTask extends BackgroundTask {
+  private final class SnapshotDefragTask implements BackgroundTask {
 
     @Override
     public BackgroundTaskResult call() throws Exception {

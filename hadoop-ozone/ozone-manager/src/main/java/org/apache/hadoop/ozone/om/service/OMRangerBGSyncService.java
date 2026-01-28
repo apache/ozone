@@ -187,7 +187,7 @@ public class OMRangerBGSyncService extends BackgroundService {
     return isServiceStarted && ozoneManager.isLeaderReady();
   }
 
-  private class RangerBGSyncTask extends BackgroundTask {
+  private class RangerBGSyncTask implements BackgroundTask {
 
     @Override
     public int getPriority() {

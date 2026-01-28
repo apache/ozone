@@ -18,56 +18,16 @@
 package org.apache.hadoop.hdds.utils;
 
 import java.util.concurrent.Callable;
-import java.util.concurrent.RecursiveTask;
 
 /**
  * A task thread to run by {@link BackgroundService}.
  */
-public abstract class BackgroundTask extends RecursiveTask<BackgroundTask.BackgroundTaskForkResult>
-    implements Callable<BackgroundTaskResult> {
-  private static final long serialVersionUID = 1L;
-
-  static final class BackgroundTaskForkResult {
-    private final BackgroundTaskResult result;
-    private final Throwable throwable;
-    private final long startTime;
-    private final long endTime;
-
-    private BackgroundTaskForkResult(BackgroundTaskResult result, long startTime, long endTime, Throwable throwable) {
-      this.endTime = endTime;
-      this.result = result;
-      this.startTime = startTime;
-      this.throwable = throwable;
-    }
-
-    public long getTotalExecutionTime() {
-      return endTime - startTime;
-    }
-
-    public BackgroundTaskResult getResult() {
-      return result;
-    }
-
-    public Throwable getThrowable() {
-      return throwable;
-    }
-  }
+public interface BackgroundTask extends Callable<BackgroundTaskResult> {
 
   @Override
-  protected final BackgroundTaskForkResult compute() {
-    long startTime = System.nanoTime();
-    BackgroundTaskResult result = null;
-    Throwable throwable = null;
-    try {
-      result = this.call();
-    } catch (Throwable e) {
-      throwable = e;
-    }
-    long endTime = System.nanoTime();
-    return new BackgroundTaskForkResult(result, startTime, endTime, throwable);
-  }
+  BackgroundTaskResult call() throws Exception;
 
-  public int getPriority() {
+  default int getPriority() {
     return 0;
   }
 }

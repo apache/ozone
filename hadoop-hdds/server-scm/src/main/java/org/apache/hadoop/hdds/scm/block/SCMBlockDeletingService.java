@@ -139,7 +139,7 @@ public class SCMBlockDeletingService extends BackgroundService
     return queue;
   }
 
-  private class DeletedBlockTransactionScanner extends BackgroundTask {
+  private class DeletedBlockTransactionScanner implements BackgroundTask {
 
     @Override
     public int getPriority() {

@@ -518,12 +518,11 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
   }
 
   @VisibleForTesting
-  static final class DirDeletingTask extends BackgroundTask {
-    private static final long serialVersionUID = 1L;
+  static final class DirDeletingTask implements BackgroundTask {
 
     private final UUID snapshotId;
     private final boolean allowForks;
-    private final transient DirectoryDeletingService dds;
+    private final DirectoryDeletingService dds;
 
     DirDeletingTask(UUID snapshotId, boolean allowForks, DirectoryDeletingService dds) {
       this.snapshotId = snapshotId;

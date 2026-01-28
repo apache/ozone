@@ -214,7 +214,7 @@ public class SnapshotDiffCleanupService extends BackgroundService {
     }
   }
 
-  private class SnapshotDiffCleanUpTask extends BackgroundTask {
+  private class SnapshotDiffCleanUpTask implements BackgroundTask {
 
     @Override
     public BackgroundTaskResult call() {

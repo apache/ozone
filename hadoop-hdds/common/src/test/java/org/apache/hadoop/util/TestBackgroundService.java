@@ -52,7 +52,7 @@ public class TestBackgroundService {
   private BackgroundService backgroundService;
   private AtomicInteger runCount;
 
-  private static class TestTask extends BackgroundTask {
+  private static class TestTask implements BackgroundTask {
     private Map<Integer, Integer> map;
     private Map<Integer, Lock> locks;
     private int index;
@@ -91,7 +91,7 @@ public class TestBackgroundService {
   }
 
   private BackgroundService createBackgroundService(String name, int interval,
-      TimeUnit unit, int workerThreads, int serviceTimeout) throws InterruptedException {
+      TimeUnit unit, int workerThreads, int serviceTimeout) {
     return new BackgroundService(name, interval, unit, workerThreads, serviceTimeout) {
       @Override
       public BackgroundTaskQueue getTasks() {

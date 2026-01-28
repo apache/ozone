@@ -138,7 +138,7 @@ public class MultipartUploadCleanupService extends BackgroundService {
     return !suspended.get() && ozoneManager.isLeaderReady();
   }
 
-  private class MultipartUploadCleanupTask extends BackgroundTask {
+  private class MultipartUploadCleanupTask implements BackgroundTask {
 
     @Override
     public int getPriority() {

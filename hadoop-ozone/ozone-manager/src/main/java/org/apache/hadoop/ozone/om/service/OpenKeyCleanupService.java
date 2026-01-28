@@ -160,7 +160,7 @@ public class OpenKeyCleanupService extends BackgroundService {
     return !suspended.get() && ozoneManager.isLeaderReady();
   }
 
-  private class OpenKeyCleanupTask extends BackgroundTask {
+  private class OpenKeyCleanupTask implements BackgroundTask {
 
     private final BucketLayout bucketLayout;
 

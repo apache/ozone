@@ -70,10 +70,8 @@ public class StaleRecoveringContainerScrubbingService
     return backgroundTaskQueue;
   }
 
-  static class RecoveringContainerScrubbingTask extends BackgroundTask {
-    private static final long serialVersionUID = 1L;
-
-    private final transient ContainerSet containerSet;
+  static class RecoveringContainerScrubbingTask implements BackgroundTask {
+    private final ContainerSet containerSet;
     private final long containerID;
 
     RecoveringContainerScrubbingTask(

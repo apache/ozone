@@ -106,10 +106,8 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     return true;
   }
 
-  private static final class BackgroundDeleteTask extends BackgroundTask {
-    private static final long serialVersionUID = 1L;
-
-    private final transient BootstrapStateHandler.Lock bootstrapLock;
+  private static final class BackgroundDeleteTask implements BackgroundTask {
+    private final BootstrapStateHandler.Lock bootstrapLock;
     private final BackgroundTask task;
 
     private BackgroundDeleteTask(BootstrapStateHandler.Lock bootstrapLock, BackgroundTask task) {

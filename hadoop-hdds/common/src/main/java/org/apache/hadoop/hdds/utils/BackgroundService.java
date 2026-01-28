@@ -143,7 +143,7 @@ public abstract class BackgroundService {
    * Wait until all tasks to return the result.
    */
   public class PeriodicalTask extends RecursiveAction {
-    private final Queue<BackgroundTask> tasksInFlight;
+    private final Queue<BackgroundTaskForkJoin> tasksInFlight;
     private final AtomicReference<Boolean> isShutdown;
     private final ScheduledExecutorService scheduledExecuterService;
 
@@ -199,19 +199,20 @@ public abstract class BackgroundService {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Number of background tasks to execute : {}", tasks.size());
       }
-      Consumer<BackgroundTask> taskForkHandler = task -> {
+      Consumer<BackgroundTaskForkJoin> taskForkHandler = task -> {
         task.fork();
         tasksInFlight.offer(task);
       };
       while (!tasks.isEmpty()) {
         BackgroundTask task = tasks.poll();
-        // Fork and submit the task back to executor.
-        if (performIfNotShutdown(taskForkHandler, task)) {
+        // Wrap the task in a ForkJoin wrapper and fork it.
+        BackgroundTaskForkJoin forkJoinTask = new BackgroundTaskForkJoin(task);
+        if (performIfNotShutdown(taskForkHandler, forkJoinTask)) {
           return false;
         }
       }
-      Consumer<BackgroundTask> taskCompletionHandler = task -> {
-        BackgroundTask.BackgroundTaskForkResult result = task.join();
+      Consumer<BackgroundTaskForkJoin> taskCompletionHandler = task -> {
+        BackgroundTaskForkJoin.BackgroundTaskForkResult result = task.join();
         // Check for exception first in the task execution.
         if (result.getThrowable() != null) {
           LOG.error("Background task execution failed", result.getThrowable());
@@ -226,7 +227,7 @@ public abstract class BackgroundService {
         }
       };
       while (!tasksInFlight.isEmpty()) {
-        BackgroundTask taskInFlight = tasksInFlight.poll();
+        BackgroundTaskForkJoin taskInFlight = tasksInFlight.poll();
         // Join the tasks forked before and wait for the result one by one.
         if (performIfNotShutdown(taskCompletionHandler, taskInFlight)) {
           return false;
