@@ -429,6 +429,15 @@ public class HddsVolume extends StorageVolume {
     spaceReservedForWrites.addAndGet(-bytes);
   }
 
+  /**
+   * Get the space reserved for in-flight writes.
+   *
+   * @return bytes reserved for in-flight writes
+   */
+  public long getSpaceReservedForWrites() {
+    return spaceReservedForWrites.get();
+  }
+
   public long getFreeSpaceToSpare(long volumeCapacity) {
     return getDatanodeConfig().getMinFreeSpace(volumeCapacity);
   }

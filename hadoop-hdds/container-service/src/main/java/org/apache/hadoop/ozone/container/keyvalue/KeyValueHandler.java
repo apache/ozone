@@ -1099,7 +1099,9 @@ public class KeyValueHandler extends Handler {
         metrics.incContainerOpsLatencies(Type.PutBlock, Time.monotonicNowNanos() - startTime);
       }
 
-      commitSpaceReservedForWrite(volume, spaceReserved, bytesToWrite);
+      if (spaceReserved) {
+        commitSpaceReservedForWrite(volume, bytesToWrite);
+      }
       // We should increment stats after writeChunk
       if (isWrite) {
         metrics.incContainerBytesStats(Type.WriteChunk, writeChunk
@@ -1121,11 +1123,9 @@ public class KeyValueHandler extends Handler {
   /**
    * Commit space reserved for write to usedSpace when write operation succeeds.
    */
-  private void commitSpaceReservedForWrite(HddsVolume volume, boolean spaceReserved, long bytes) {
-    if (spaceReserved) {
-      volume.releaseReservedSpaceForWrite(bytes);
-      volume.incrementUsedSpace(bytes);
-    }
+  private void commitSpaceReservedForWrite(HddsVolume volume, long bytes) {
+    volume.incrementUsedSpace(bytes);
+    volume.releaseReservedSpaceForWrite(bytes);
   }
 
   /**
