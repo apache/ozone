@@ -33,7 +33,6 @@ import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.metrics2.MetricsSource;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
-import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,8 +60,6 @@ public final class DatanodeQueueMetrics implements MetricsSource {
   public static final String PIPELINE_ACTION_QUEUE_PREFIX =
       "PipelineActionQueue";
 
-  private MetricsRegistry registry;
-
   private DatanodeStateMachine datanodeStateMachine;
   private static DatanodeQueueMetrics instance;
 
@@ -73,7 +70,6 @@ public final class DatanodeQueueMetrics implements MetricsSource {
   private Map<InetSocketAddress, MetricsInfo> pipelineActionQueueMap;
 
   public DatanodeQueueMetrics(DatanodeStateMachine datanodeStateMachine) {
-    this.registry = new MetricsRegistry(METRICS_SOURCE_NAME);
     this.datanodeStateMachine = datanodeStateMachine;
 
     initializeQueues();
