@@ -149,62 +149,26 @@ jobs:
        github.repository != 'apache/ozone')
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout repository to search commits
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
-          fetch-depth: 0  # Fetch full history to find branch point
           token: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: Extract JIRA ID from branch commits
+      - name: Extract JIRA ID from commit message
         id: extract-jira-early
-        run: |          
-          echo "Current commit: ${{ github.sha }}"
-          echo "Branch: ${{ github.ref_name }}"
+        run: |
+          COMMIT_MSG=$(git log -1 --format='%s' ${{ github.sha }})
+          echo "Commit message: $COMMIT_MSG"
           
-          if [ "${{ github.repository }}" = "apache/ozone" ] && [ "${{ github.ref_name }}" = "master" ]; then
-            COMMIT_MSG=$(git log -1 --format='%s' ${{ github.sha }})
-            echo "Commit message: $COMMIT_MSG"
-            
-            JIRA_ID=$(echo "$COMMIT_MSG" | grep -oE '(HDDS|OZONE)-[0-9]+' | head -1 || echo "")
-          else
-            # Fetch master branch
-            git fetch origin master:refs/remotes/origin/master 2>/dev/null || true
-            
-            JIRA_ID=""
-            while IFS= read -r line; do
-              # Split line into SHA and message (first space only)
-              commit_sha="${line%% *}"
-              commit_msg="${line#* }"
-                            
-              # Skip automated commits
-              if [[ "$commit_msg" == "[Auto]"* ]]; then
-                continue
-              fi
-              
-              # Try to extract JIRA ID
-              EXTRACTED=$(echo "$commit_msg" | grep -oE '(HDDS|OZONE)-[0-9]+' | head -1 || echo "")
-              
-              if [ -n "$EXTRACTED" ]; then
-                JIRA_ID="$EXTRACTED"
-                echo "Found JIRA ID: $JIRA_ID in commit: $commit_msg"
-                break  # Use first JIRA found (from oldest commit)
-              fi
-            done < <(git log origin/master..HEAD --reverse --format='%H %s')
-            
-            if [ -z "$JIRA_ID" ]; then
-              echo "No commits found in branch range, checking current commit"
-              COMMIT_MSG=$(git log -1 --format='%s' HEAD)
-              JIRA_ID=$(echo "$COMMIT_MSG" | grep -oE '(HDDS|OZONE)-[0-9]+' | head -1 || echo "")
-            fi
-          fi
+          JIRA_ID=$(echo "$COMMIT_MSG" | grep -oE '(HDDS|OZONE)-[0-9]+' | head -1 || echo "")
           
           if [ -n "$JIRA_ID" ]; then
             echo "jira_id=$JIRA_ID" >> $GITHUB_OUTPUT
             echo "Using JIRA ID: $JIRA_ID"
           else
             echo "jira_id=" >> $GITHUB_OUTPUT
-            echo "No JIRA ID found (this is OK for merge commits)"
+            echo "No JIRA ID found"
           fi
       
       - name: Checkout project for documentation update
@@ -325,19 +289,15 @@ jobs:
       !startsWith(github.event.head_commit.message, '[Auto]')
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout repository to search commits
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
-          fetch-depth: 0  # Fetch full history to find branch point
           token: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: Extract JIRA ID from branch commits
+      - name: Extract JIRA ID from commit message
         id: extract-jira-early
         run: |
-          echo "Current commit: ${{ github.sha }}"
-          echo "Branch: ${{ github.ref_name }}"
-          
           COMMIT_MSG=$(git log -1 --format='%s' ${{ github.sha }})
           echo "Commit message: $COMMIT_MSG"
           
@@ -562,6 +522,7 @@ jobs:
     needs:
       - build-info
       - build
+    if: needs.build-info.outputs.needs-compile == 'true'
     uses: ./.github/workflows/check.yml
     secrets: inherit
     with:

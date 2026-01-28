@@ -51,7 +51,6 @@ src/test/resources/test.db.ini
 # hadoop-hdds/docs
 **/themes/ozonedoc/**
 static/slides/*
-content/tools/Configurations.md
 
 # hadoop-ozone/dist
 **/.ssh/id_rsa*
