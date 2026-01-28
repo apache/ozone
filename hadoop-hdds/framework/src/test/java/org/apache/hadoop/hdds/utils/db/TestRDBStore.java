@@ -38,6 +38,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
@@ -402,5 +408,137 @@ public class TestRDBStore {
         assertArrayEquals(content1, content2);
       }
     }
+  }
+
+  @Test
+  public void testIteratorWithSeek() throws Exception {
+    final Table<byte[], byte[]> table = rdbStore.getTable(families.get(0));
+    // Write keys: a1, a3, a5, b2, b4
+    table.put(getBytesUtf16("a1"), getBytesUtf16("val1"));
+    table.put(getBytesUtf16("a3"), getBytesUtf16("val3"));
+    table.put(getBytesUtf16("a5"), getBytesUtf16("val5"));
+    table.put(getBytesUtf16("b2"), getBytesUtf16("val2"));
+    table.put(getBytesUtf16("b4"), getBytesUtf16("val4"));
+
+    // Case 1: Seek to existing key, no prefix
+    try (TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iter = table.iterator(null,
+        getBytesUtf16("a3"))) {
+      assertTrue(iter.hasNext());
+      assertArrayEquals(getBytesUtf16("a3"), iter.next().getKey());
+      assertTrue(iter.hasNext());
+      assertArrayEquals(getBytesUtf16("a5"), iter.next().getKey());
+    }
+
+    // Case 2: Seek to non-existent key (should land on next greater), no prefix
+    try (TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iter = table.iterator(null,
+        getBytesUtf16("a2"))) {
+      assertTrue(iter.hasNext());
+      assertArrayEquals(getBytesUtf16("a3"), iter.next().getKey());
+    }
+
+    // Case 3: Seek past all keys, no prefix
+    try (TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iter = table.iterator(null,
+        getBytesUtf16("z9"))) {
+      assertFalse(iter.hasNext());
+    }
+
+    // Case 4: Seek with prefix
+    try (TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iter = table.iterator(getBytesUtf16("b"),
+        getBytesUtf16("b3"))) {
+      assertTrue(iter.hasNext());
+      assertArrayEquals(getBytesUtf16("b4"), iter.next().getKey());
+      assertFalse(iter.hasNext());
+    }
+
+    // Case 5: Seek with prefix to start of prefix
+    try (TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iter = table.iterator(getBytesUtf16("b"),
+        getBytesUtf16("b2"))) {
+      assertTrue(iter.hasNext());
+      assertArrayEquals(getBytesUtf16("b2"), iter.next().getKey());
+    }
+  }
+
+  @Test
+  public void testIteratorSeekEdgeCases() throws Exception {
+    final Table<byte[], byte[]> table = rdbStore.getTable(families.get(0));
+    // Empty table check
+    try (TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iter = table.iterator(null,
+        getBytesUtf16("a1"))) {
+      assertFalse(iter.hasNext());
+    }
+
+    table.put(getBytesUtf16("a1"), getBytesUtf16("val1"));
+
+    // Seek before first key
+    try (TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iter = table.iterator(null,
+        getBytesUtf16("00"))) {
+      assertTrue(iter.hasNext());
+      assertArrayEquals(getBytesUtf16("a1"), iter.next().getKey());
+    }
+
+    // Seek after last key
+    try (TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iter = table.iterator(null,
+        getBytesUtf16("b1"))) {
+      assertFalse(iter.hasNext());
+    }
+  }
+
+  @Test
+  public void testConcurrentIteratorWithWrites() throws Exception {
+    final Table<byte[], byte[]> table = rdbStore.getTable(families.get(1));
+    final int keyCount = 5000;
+    final CountDownLatch readyLatch = new CountDownLatch(1);
+    final CountDownLatch startLatch = new CountDownLatch(1);
+    final AtomicLong writtenKeys = new AtomicLong(0);
+
+    // Writer thread
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    Future<Void> writer = executor.submit(() -> {
+      readyLatch.countDown();
+      startLatch.await();
+      for (int i = 0; i < keyCount; i++) {
+        String key = String.format("key-%05d", i);
+        table.put(getBytesUtf16(key), getBytesUtf16("value-" + i));
+        writtenKeys.incrementAndGet();
+        if (i % 100 == 0) {
+          Thread.yield(); // Give reader a chance
+        }
+      }
+      return null;
+    });
+
+    // Reader thread (using the optimization)
+    Future<Void> reader = executor.submit(() -> {
+      readyLatch.countDown();
+      startLatch.await();
+      // Wait for some data to be written
+      while (writtenKeys.get() < 100) {
+        Thread.sleep(1);
+      }
+
+      int seeks = 0;
+      for (int i = 0; i < 100; i++) {
+        // Randomly seek to a key that should exist (or be close to existing)
+        long targetId = (long) (Math.random() * writtenKeys.get());
+        String seekKeyStr = String.format("key-%05d", targetId);
+        try (TableIterator<byte[], ? extends Table.KeyValue<byte[], byte[]>> iter = table.iterator(null,
+            getBytesUtf16(seekKeyStr))) {
+          if (iter.hasNext()) {
+            assertNotNull(iter.next().getKey());
+          }
+          seeks++;
+        }
+      }
+      assertTrue(seeks > 0);
+      return null;
+    });
+
+    readyLatch.await();
+    startLatch.countDown();
+
+    writer.get(10, TimeUnit.SECONDS);
+    reader.get(10, TimeUnit.SECONDS);
+
+    executor.shutdown();
   }
 }
