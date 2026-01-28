@@ -285,6 +285,15 @@ public class SCMStateMachine extends BaseStateMachine {
     currentLeaderTerm.set(scm.getScmHAManager().getRatisServer().getDivision()
         .getInfo().getCurrentTerm());
 
+    if (!refreshedAfterLeaderReady.get()) {
+      // refresh and validate safe mode rules if it can exit safe mode
+      // if being leader, all previous term transactions have been applied
+      // if other states, just refresh safe mode rules, and transaction keeps flushing from leader
+      // and does not depend on pending transactions.
+      refreshedAfterLeaderReady.set(true);
+      scm.getScmSafeModeManager().refreshAndValidate();
+    }
+
     if (!groupMemberId.getPeerId().equals(newLeaderId)) {
       LOG.info("leader changed, yet current SCM is still follower.");
       return;
@@ -355,12 +364,9 @@ public class SCMStateMachine extends BaseStateMachine {
     }
 
     if (currentLeaderTerm.get() == term) {
-      // Means all transactions before this term have been applied.
       // This means after a restart, all pending transactions have been applied.
-      // Perform
-      // 1. Refresh Safemode rules state.
-      // 2. Start DN Rpc server.
       if (!refreshedAfterLeaderReady.get()) {
+        // Refresh Safemode rules state if not already done.
         refreshedAfterLeaderReady.set(true);
         scm.getScmSafeModeManager().refreshAndValidate();
       }
