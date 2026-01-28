@@ -147,8 +147,9 @@ public class S3AssumeRoleRequest extends OMClientRequest {
       final long expirationEpochSeconds = clock.instant().plusSeconds(durationSeconds).getEpochSecond();
 
       // Audit params
-      S3STSUtils.addAssumeRoleAuditParams(auditMap, roleArn, roleSessionName,
-          assumeRoleRequest.getAwsIamSessionPolicy(), durationSeconds);
+      final String requestId = assumeRoleRequest.getRequestId();
+      S3STSUtils.addAssumeRoleAuditParams(
+          auditMap, roleArn, roleSessionName, assumeRoleRequest.getAwsIamSessionPolicy(), durationSeconds, requestId);
 
       final AssumeRoleResponse.Builder responseBuilder = AssumeRoleResponse.newBuilder()
           .setAccessKeyId(tempAccessKeyId)

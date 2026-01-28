@@ -34,7 +34,9 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.time.Instant;
 import javax.ws.rs.container.ContainerRequestContext;
+import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.UriInfo;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -45,6 +47,7 @@ import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.s3.OzoneConfigurationHolder;
+import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.exception.OSTSException;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.junit.jupiter.api.BeforeEach;
@@ -70,6 +73,9 @@ public class TestS3STSEndpoint {
   @Mock
   private ContainerRequestContext context;
 
+  @Mock
+  private RequestIdentifier requestIdentifier;
+
   @BeforeEach
   public void setup() throws Exception {
     OzoneConfiguration config = new OzoneConfiguration();
@@ -77,9 +83,16 @@ public class TestS3STSEndpoint {
     OzoneConfigurationHolder.setConfiguration(config);
     OzoneClient clientStub = spy(new OzoneClientStub());
 
+    context = mock(ContainerRequestContext.class);
+    requestIdentifier = mock(RequestIdentifier.class);
+    final UriInfo uriInfo = mock(UriInfo.class);
+    when(context.getUriInfo()).thenReturn(uriInfo);
+    when(uriInfo.getPathParameters()).thenReturn(new MultivaluedHashMap<>());
+    when(uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
+
     // Stub assumeRole to return deterministic credentials.
     objectStore = mock(ObjectStore.class);
-    when(objectStore.assumeRole(anyString(), anyString(), anyInt(), any()))
+    when(objectStore.assumeRole(anyString(), anyString(), anyInt(), any(), anyString()))
         .thenReturn(new AssumeRoleResponseInfo(
             "ASIA1234567890123456",
             "mySecretAccessKey",
@@ -91,6 +104,10 @@ public class TestS3STSEndpoint {
     endpoint = new S3STSEndpoint();
     endpoint.setClient(clientStub);
     endpoint.setContext(context);
+    
+    when(requestIdentifier.getRequestId()).thenReturn("test-request-id");
+    endpoint.setRequestIdentifier(requestIdentifier);
+
     SignatureInfo signatureInfo = new SignatureInfo.Builder(SignatureInfo.Version.V4)
         .setAwsAccessId("test-user")
         .setSignature("some-signature")
@@ -240,7 +257,7 @@ public class TestS3STSEndpoint {
     assertEquals(200, response.getStatus());
 
     final ArgumentCaptor<Integer> durationCaptor = ArgumentCaptor.forClass(Integer.class);
-    verify(objectStore).assumeRole(anyString(), anyString(), durationCaptor.capture(), any());
+    verify(objectStore).assumeRole(anyString(), anyString(), durationCaptor.capture(), any(), anyString());
     assertEquals(3600, durationCaptor.getValue());
   }
 
@@ -382,7 +399,7 @@ public class TestS3STSEndpoint {
 
   @Test
   public void testStsInternalFailureWhenBackendThrows() throws Exception {
-    when(objectStore.assumeRole(anyString(), anyString(), anyInt(), any()))
+    when(objectStore.assumeRole(anyString(), anyString(), anyInt(), any(), anyString()))
         .thenThrow(new RuntimeException("some unexpected error"));
 
     final OSTSException ex = assertThrows(OSTSException.class, () ->
@@ -397,7 +414,7 @@ public class TestS3STSEndpoint {
 
   @Test
   public void testStsAccessDenied() throws Exception {
-    when(objectStore.assumeRole(anyString(), anyString(), anyInt(), any()))
+    when(objectStore.assumeRole(anyString(), anyString(), anyInt(), any(), anyString()))
         .thenThrow(new OMException("Permission denied", OMException.ResultCodes.ACCESS_DENIED));
 
     final OSTSException ex = assertThrows(OSTSException.class, () ->
@@ -413,7 +430,7 @@ public class TestS3STSEndpoint {
 
   @Test
   public void testStsIOExceptionWrappedAsInternalFailure() throws Exception {
-    when(objectStore.assumeRole(anyString(), anyString(), anyInt(), any()))
+    when(objectStore.assumeRole(anyString(), anyString(), anyInt(), any(), anyString()))
         .thenThrow(new IOException("An IO error occurred"));
 
     final OSTSException ex = assertThrows(OSTSException.class, () ->

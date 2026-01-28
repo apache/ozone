@@ -32,12 +32,13 @@ public final class S3STSUtils {
    * Adds standard AssumeRole audit params.
    */
   public static void addAssumeRoleAuditParams(Map<String, String> auditParams, String roleArn, String roleSessionName,
-      String awsIamSessionPolicy, int duration) {
+      String awsIamSessionPolicy, int duration, String requestId) {
 
     auditParams.put("action", "AssumeRole");
     auditParams.put("roleArn", roleArn);
     auditParams.put("roleSessionName", roleSessionName);
     auditParams.put("duration", String.valueOf(duration));
     auditParams.put("isPolicyIncluded", StringUtils.isNullOrEmpty(awsIamSessionPolicy) ? "N" : "Y");
+    auditParams.put("requestId", requestId);
   }
 }

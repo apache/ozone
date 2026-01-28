@@ -758,12 +758,13 @@ public class ObjectStore {
    * @param roleSessionName         The session name (should be unique) for this operation
    * @param durationSeconds         The duration in seconds for the token validity
    * @param awsIamSessionPolicy     The AWS IAM JSON session policy
+   * @param requestId               The requestId from the STS endpoint
    * @return AssumeRoleResponseInfo The AssumeRole response information containing temporary credentials
    * @throws IOException            if an error occurs during the AssumeRole operation
    */
   public AssumeRoleResponseInfo assumeRole(String roleArn, String roleSessionName, int durationSeconds,
-      String awsIamSessionPolicy) throws IOException {
-    return proxy.assumeRole(roleArn, roleSessionName, durationSeconds, awsIamSessionPolicy);
+      String awsIamSessionPolicy, String requestId) throws IOException {
+    return proxy.assumeRole(roleArn, roleSessionName, durationSeconds, awsIamSessionPolicy, requestId);
   }
 
   /**

@@ -22,6 +22,7 @@ import static javax.ws.rs.core.Response.Status.FORBIDDEN;
 import static javax.ws.rs.core.Response.Status.INTERNAL_SERVER_ERROR;
 import static javax.ws.rs.core.Response.Status.NOT_IMPLEMENTED;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import java.io.IOException;
 import java.io.StringWriter;
@@ -29,7 +30,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
-import java.util.UUID;
+import javax.inject.Inject;
 import javax.ws.rs.FormParam;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -45,6 +46,7 @@ import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.om.helpers.S3STSUtils;
+import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.OSTSException;
 import org.slf4j.Logger;
@@ -85,6 +87,14 @@ public class S3STSEndpoint extends S3STSEndpointBase {
   private static final int MAX_DURATION_SECONDS = 43200; // 12 hours
   private static final int MIN_DURATION_SECONDS = 900;   // 15 minutes
   private static final int MAX_SESSION_POLICY_SIZE = 2048;
+
+  @Inject
+  private RequestIdentifier requestIdentifier;
+
+  @VisibleForTesting
+  public void setRequestIdentifier(RequestIdentifier requestIdentifier) {
+    this.requestIdentifier = requestIdentifier;
+  }
 
   /**
    * STS endpoint that handles GET requests with query parameters.
@@ -136,7 +146,7 @@ public class S3STSEndpoint extends S3STSEndpointBase {
 
   private Response handleSTSRequest(String action, String roleArn, String roleSessionName,
       Integer durationSeconds, String version, String awsIamSessionPolicy) throws OS3Exception {
-    final String requestId = UUID.randomUUID().toString();
+    final String requestId = requestIdentifier.getRequestId();
     try {
       if (action == null) {
         // Amazon STS has a different structure for the XML error response when the action is missing
@@ -242,12 +252,13 @@ public class S3STSEndpoint extends S3STSEndpointBase {
     try {
       final AssumeRoleResponseInfo responseInfo = getClient()
           .getObjectStore()
-          .assumeRole(roleArn, roleSessionName, duration, awsIamSessionPolicy);
+          .assumeRole(roleArn, roleSessionName, duration, awsIamSessionPolicy, requestId);
       // Generate AssumeRole response
       final String responseXml = generateAssumeRoleResponse(assumedRoleUserArn, responseInfo, requestId);
 
       final Map<String, String> auditParams = getAuditParameters();
-      S3STSUtils.addAssumeRoleAuditParams(auditParams, roleArn, roleSessionName, awsIamSessionPolicy, duration);
+      S3STSUtils.addAssumeRoleAuditParams(
+          auditParams, roleArn, roleSessionName, awsIamSessionPolicy, duration, requestId);
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(S3GAction.ASSUME_ROLE, auditParams));
 
       return Response.ok(responseXml)
@@ -257,7 +268,8 @@ public class S3STSEndpoint extends S3STSEndpointBase {
       LOG.error("Error during AssumeRole processing", e);
 
       final Map<String, String> auditParams = getAuditParameters();
-      S3STSUtils.addAssumeRoleAuditParams(auditParams, roleArn, roleSessionName, awsIamSessionPolicy, duration);
+      S3STSUtils.addAssumeRoleAuditParams(
+          auditParams, roleArn, roleSessionName, awsIamSessionPolicy, duration, requestId);
       AUDIT.logWriteFailure(buildAuditMessageForFailure(S3GAction.ASSUME_ROLE, auditParams, e));
 
       if (e instanceof OMException) {

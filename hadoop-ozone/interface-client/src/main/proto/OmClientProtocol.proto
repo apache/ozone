@@ -2379,6 +2379,7 @@ message AssumeRoleRequest {
   required string roleSessionName         = 2;
   optional int32 durationSeconds          = 3 [default = 3600];
   optional string awsIamSessionPolicy     = 4;
+  required string requestId               = 5;
 }
 
 message AssumeRoleResponse {
