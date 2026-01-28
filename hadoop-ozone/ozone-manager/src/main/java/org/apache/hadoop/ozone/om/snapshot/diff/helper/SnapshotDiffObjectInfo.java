@@ -48,10 +48,12 @@ public class SnapshotDiffObjectInfo {
     return CODEC;
   }
 
+  @SuppressWarnings("PMD.UnusedPrivateMethod")
   private static SnapshotDiffObjectInfo getFromProtobuf(SnapDiffObjectInfo objectInfo) {
     return new SnapshotDiffObjectInfo(objectInfo.getObjectID(), objectInfo.getKeyName());
   }
 
+  @SuppressWarnings("PMD.UnusedPrivateMethod")
   private SnapDiffObjectInfo toProtobuf() {
     return SnapDiffObjectInfo.newBuilder()
         .setObjectID(objectId)
