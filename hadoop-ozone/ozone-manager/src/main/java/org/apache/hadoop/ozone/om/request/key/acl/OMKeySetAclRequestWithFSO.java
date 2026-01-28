@@ -56,13 +56,17 @@ public class OMKeySetAclRequestWithFSO extends OMKeyAclRequestWithFSO {
   @Override
   public OzoneManagerProtocolProtos.OMRequest preExecute(
       OzoneManager ozoneManager) throws IOException {
+    // Call parent's preExecute to perform ACL checks
+    OzoneManagerProtocolProtos.OMRequest omRequest =
+        super.preExecute(ozoneManager);
+
     long modificationTime = Time.now();
     OzoneManagerProtocolProtos.SetAclRequest.Builder setAclRequestBuilder =
-        getOmRequest().getSetAclRequest().toBuilder()
+        omRequest.getSetAclRequest().toBuilder()
             .setModificationTime(modificationTime);
 
-    return getOmRequest().toBuilder().setSetAclRequest(setAclRequestBuilder)
-        .setUserInfo(getUserInfo()).build();
+    return omRequest.toBuilder().setSetAclRequest(setAclRequestBuilder)
+        .build();
   }
 
   public OMKeySetAclRequestWithFSO(
