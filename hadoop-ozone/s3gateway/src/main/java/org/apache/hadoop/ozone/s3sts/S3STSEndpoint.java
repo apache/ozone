@@ -74,6 +74,8 @@ public class S3STSEndpoint extends S3STSEndpointBase {
   private static final String DECODE_AUTHORIZATION_MESSAGE_ACTION = "DecodeAuthorizationMessage";
   private static final String GET_ACCESS_KEY_INFO_ACTION = "GetAccessKeyInfo";
 
+  private static final String EXPECTED_VERSION = "2011-06-15";
+
   // Default token duration (in seconds) - AWS default is 3600 (1 hour)
   // TODO - add these constants and also validations in a common place that both endpoint and backend can use
   private static final int DEFAULT_DURATION_SECONDS = 3600;
@@ -156,7 +158,8 @@ public class S3STSEndpoint extends S3STSEndpointBase {
       default:
         throw new OSTSException(
             "InvalidAction", "Could not find operation " + action + " for version " +
-            (version == null ? "NO_VERSION_SPECIFIED" : version), BAD_REQUEST.getStatusCode());
+            (version == null ? "NO_VERSION_SPECIFIED.  Expected version is: " + EXPECTED_VERSION : version),
+            BAD_REQUEST.getStatusCode());
       }
     } catch (OSTSException e) {
       throw e;
@@ -182,7 +185,7 @@ public class S3STSEndpoint extends S3STSEndpointBase {
   }
 
   private Response handleAssumeRole(String roleArn, String roleSessionName, Integer durationSeconds,
-      String awsIamSessionPolicy, String version, String requestId) throws IOException, OSTSException {
+      String awsIamSessionPolicy, String version, String requestId) throws OSTSException {
     // Validate parameters
     final String action = "AssumeRole";
     int duration;
@@ -192,10 +195,11 @@ public class S3STSEndpoint extends S3STSEndpointBase {
       throw new OSTSException("ValidationError", e.getMessage(), BAD_REQUEST.getStatusCode());
     }
 
-    if (version == null || !version.equals("2011-06-15")) {
+    if (version == null || !version.equals(EXPECTED_VERSION)) {
       throw new OSTSException(
           "InvalidAction", "Could not find operation " + action + " for version " +
-          (version == null ? "NO_VERSION_SPECIFIED" : version), BAD_REQUEST.getStatusCode());
+          (version == null ? "NO_VERSION_SPECIFIED.  Expected version is: " + EXPECTED_VERSION : version),
+          BAD_REQUEST.getStatusCode());
     }
 
     if (roleArn == null || roleArn.isEmpty()) {
