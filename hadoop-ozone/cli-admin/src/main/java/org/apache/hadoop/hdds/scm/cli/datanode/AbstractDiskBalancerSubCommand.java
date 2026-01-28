@@ -20,8 +20,10 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -74,6 +76,10 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
       return null;
     }
 
+    // Remove duplicates while preserving order
+    Set<String> uniqueDatanodes = new LinkedHashSet<>(targetDatanodes);
+    List<String> deduplicatedDatanodes = new ArrayList<>(uniqueDatanodes);
+
     // Track if we're using batch mode for display
     isBatchMode = options.isInServiceDatanodes();
 
@@ -83,7 +89,7 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
     List<Object> jsonResults = new ArrayList<>();
     
     // Execute commands and collect results
-    for (String dn : targetDatanodes) {
+    for (String dn : deduplicatedDatanodes) {
       try {
         Object result = executeCommand(dn);
         successNodes.add(dn);
