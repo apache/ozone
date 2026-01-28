@@ -22,9 +22,11 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.IOException;
+import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
+import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -134,5 +136,18 @@ public class TestBucketEndpoint {
             continueToken, startAfter));
     
     assertEquals(S3ErrorTable.NO_SUCH_BUCKET.getCode(), exception.getCode());
+  }
+
+  @Test
+  public void testGetDelegatesToAclHandler() throws Exception {
+    // When ?acl is present, BucketEndpoint should delegate to BucketAclHandler.
+    bucketEndpoint.queryParamsForTest().set(QueryParams.ACL, "");
+
+    Response response = bucketEndpoint.get(TEST_BUCKET_NAME);
+
+    assertNotNull(response);
+    assertEquals(200, response.getStatus());
+    assertNotNull(response.getEntity());
+    assertEquals("S3BucketAcl", response.getEntity().getClass().getSimpleName());
   }
 }

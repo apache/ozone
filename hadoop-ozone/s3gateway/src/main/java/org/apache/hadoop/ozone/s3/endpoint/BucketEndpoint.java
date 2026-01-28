@@ -99,6 +99,7 @@ public class BucketEndpoint extends EndpointBase {
       @PathParam(BUCKET) String bucketName
   ) throws OS3Exception, IOException {
     long startNanos = Time.monotonicNowNanos();
+    S3GAction s3GAction = S3GAction.GET_BUCKET;
 
     // Chain of responsibility: let each handler try to handle the request
     for (BucketOperationHandler handler : handlers) {
@@ -275,20 +276,6 @@ public class BucketEndpoint extends EndpointBase {
     public ContinueToken getDecodedToken() {
       return decodedToken;
     }
-  }
-
-  /**
-   * Handle GetBucketAcl request.
-   * Implements the GetBucketAcl API operation.
-   * @see <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketAcl.html">GetBucketAcl</a>
-   */
-  Response handleGetBucketAcl(String bucketName, long startNanos) 
-      throws OS3Exception, IOException {
-    S3GAction s3GAction = S3GAction.GET_ACL;
-    S3BucketAcl result = getAcl(bucketName);
-    getMetrics().updateGetAclSuccessStats(startNanos);
-    auditReadSuccess(s3GAction);
-    return Response.ok(result, MediaType.APPLICATION_XML_TYPE).build();
   }
 
   /**
