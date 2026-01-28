@@ -27,12 +27,14 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -583,7 +585,55 @@ public final class OzoneBucketStub extends OzoneBucket {
 
   @Override
   public List<OzoneAcl> getAcls() throws IOException {
-    return (List<OzoneAcl>)aclList.clone();
+    return new ArrayList<>(aclList);
+  }
+
+  @Override
+  public OzoneMultipartUploadList listMultipartUploads(String prefix,
+      String keyMarker, String uploadIdMarker, int maxUploads)
+      throws IOException {
+    String normalizedPrefix = prefix == null ? "" : prefix;
+    SortedMap<String, MultipartInfoStub> sortedUploads =
+        new TreeMap<>(keyToMultipartUpload);
+    List<OzoneMultipartUpload> uploads = new ArrayList<>();
+    for (Map.Entry<String, MultipartInfoStub> entry : sortedUploads.entrySet()) {
+      String keyName = entry.getKey();
+      MultipartInfoStub uploadInfo = entry.getValue();
+
+      if (!keyName.startsWith(normalizedPrefix)) {
+        continue;
+      }
+
+      if (StringUtils.isNotEmpty(keyMarker)) {
+        int cmp = keyName.compareTo(keyMarker);
+        if (cmp < 0) {
+          continue;
+        }
+        if (cmp == 0) {
+          if (StringUtils.isNotEmpty(uploadIdMarker)) {
+            if (uploadInfo.getUploadId().compareTo(uploadIdMarker) <= 0) {
+              continue;
+            }
+          } else {
+            continue;
+          }
+        }
+      }
+
+      uploads.add(new OzoneMultipartUpload(
+          getVolumeName(),
+          getName(),
+          keyName,
+          uploadInfo.getUploadId(),
+          uploadInfo.getCreationTime(),
+          getReplicationConfig()));
+    }
+
+    return new OzoneMultipartUploadList(
+        uploads,
+        null,
+        null,
+        false);
   }
 
   @Override
@@ -820,12 +870,14 @@ public final class OzoneBucketStub extends OzoneBucket {
     private final String uploadId;
     private final Map<String, String> metadata;
     private final Map<String, String> tags;
+    private final Instant creationTime;
 
     MultipartInfoStub(String uploadId, Map<String, String> metadata,
                       Map<String, String> tags) {
       this.uploadId = uploadId;
       this.metadata = metadata;
       this.tags = tags;
+      this.creationTime = Instant.now();
     }
 
     public String getUploadId() {
@@ -838,6 +890,10 @@ public final class OzoneBucketStub extends OzoneBucket {
 
     public Map<String, String> getTags() {
       return tags;
+    }
+
+    public Instant getCreationTime() {
+      return creationTime;
     }
   }
 
