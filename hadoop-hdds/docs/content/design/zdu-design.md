@@ -478,7 +478,19 @@ There is no special command required to begin the upgrade process. SCMs can be r
 
 Recon currently does not use finalization, so this step is a trivial restart in the new version.
 
-### 3. OM: Deploy New Software
+### 3. Datanodes: Deploy New Software
+
+Datanodes can be restarted with the new software in any order. Restarting Datanodes one by one will ensure that data is always available, but will take the longest time. If temporary unavailability is tolerable, or data is are already grouped using rack placement, then Datanodes can be restarted in larger groups. For example, say all data is written with EC-3-2 replication and rack scatter placement with six total racks. Then datanodes could be upgraded one rack at a time while maintaining full availability for reads and writes.
+
+Since SCM has been upgraded but not finalized, all Datanodes in versions 100/100 and **100/105** will be accepted by SCM. This means Datanodes can begin participating in the cluster again individually as soon as they restart, regardless of the upgrade status of their peers.
+
+| Status                                                          | Datanode 1  | ...         | Datanode N  |
+| --------------------------------------------------------------- | ----------- | ----------- | ----------- |
+| All Datanodes are in the old version                            | 100/100     | 100/100     | 100/100     |
+| Some Datanodes have been stopped and started in the new version | **100/105** | ...         | 100/100     |
+| All Datanodes have been stopped and started in the new version  | **100/105** | **100/105** | **100/105** |
+
+### 4. OM: Deploy New Software
 
 Unlike the current non-rolling upgrade framework, there is no need to use "prepare for upgrade" to start the OM upgrade process. OMs can be restarted with the new software version one by one.
 
@@ -491,11 +503,11 @@ Unlike the current non-rolling upgrade framework, there is no need to use "prepa
 
 After completing this step, the leader OM will begin polling SCM to learn whether HDDS has finished finalizing, and therefore it should finalize.
 
-### 4. External Clients (S3 Gateway, HTTPFS): Deploy New Software
+### 5. External Clients (S3 Gateway, HTTPFS): Deploy New Software
 
 External clients are stateless and Ozone supports full external client/server cross compatibility, so no finalization is required for this step. After this point, all components are running the new software. Regression testing can be be done on the new version, and a downgrade is possible by reversing the previous steps.
 
-### 5. SCM: Receives Finalize Command From Admin
+### 6. SCM: Receives Finalize Command From Admin
 
 The admin will send this command when they have completed regression testing in the new version and do not wish to downgrade. SCM will first verify that all live Datanodes and its peer SCMs are running the newest software version 105. If any of these components are not, the finalize command will be rejected.
 
@@ -504,7 +516,7 @@ The admin will send this command when they have completed regression testing in 
 | New version has been deployed on all SCMs, but they have not yet finalized to use new features  | **100/105** | **100/105** | **100/105** | 100                 | Rejected          | Accepted          | Rejected          |
 | Finalize command has been sent over Ratis. All SCMs move to the new apparent version atomically | **105/105** | **105/105** | **105/105** | 100                 | Rejected          | Accepted          | Accepted          |
 
-### 6. Datanodes: Receive Finalize Command From SCM
+### 7. Datanodes: Receive Finalize Command From SCM
 
 After SCM has finalized, the leader will send finalize commands to all Datanodes. It will retry sending this command until all Datanodes heartbeat back that they have finalized. Once all Datanodes have finalized, SCM can increase the `DN Pipeline Version` so any new features on the Datanode write path can be used.
 
@@ -513,7 +525,7 @@ After SCM has finalized, the leader will send finalize commands to all Datanodes
 | All SCMs have finalized, and the leader begins instructing Datanodes to finalize | **105/105** | **105/105** | **105/105** | 100                 | Rejected          | Accepted                                                    | Accepted          |
 | All live datanodes have finalized                                                | **105/105** | **105/105** | **105/105** | **105**             | Rejected          | Rejected, but instructed to finalize and retry registration | Accepted          |
 
-### 7. OM: Learns to Finalize From Polling SCM 
+### 8. OM: Learns to Finalize From Polling SCM 
 
 | Status                                                                                                                         | OM1         | OM2         | OM3         |
 | ------------------------------------------------------------------------------------------------------------------------------ | ----------- | ----------- | ----------- |
