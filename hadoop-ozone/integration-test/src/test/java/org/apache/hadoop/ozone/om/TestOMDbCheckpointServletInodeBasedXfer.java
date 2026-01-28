@@ -71,6 +71,7 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -96,6 +97,7 @@ import org.apache.hadoop.hdds.utils.Archiver;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.InodeMetadataRocksDBCheckpoint;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.TestDataUtil;
@@ -164,6 +166,7 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
   @AfterEach
   void shutdown() {
     IOUtils.closeQuietly(client, cluster);
+    cluster = null;
   }
 
   private void setupCluster() throws Exception {
@@ -284,6 +287,31 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     }
   }
 
+  @Test
+  public void testWriteDBToArchiveClosesFilesListStream() throws Exception {
+    OMDBCheckpointServletInodeBasedXfer servlet = new OMDBCheckpointServletInodeBasedXfer();
+
+    final Path dbDir = Files.createTempDirectory(folder, "dbdir-");
+    final AtomicBoolean closed = new AtomicBoolean(false);
+    final Stream<Path> stream = Stream.<Path>empty().onClose(() -> closed.set(true));
+
+    // Do not use CALLS_REAL_METHODS for java.nio.file.Files: internal/private static
+    // methods (eg Files.provider()) get intercepted too and Mockito will try to invoke
+    // them reflectively, which fails on JDK9+ without --add-opens.
+    try (MockedStatic<Files> files = mockStatic(Files.class);
+         TarArchiveOutputStream tar = new TarArchiveOutputStream(new java.io.ByteArrayOutputStream())) {
+      files.when(() -> Files.exists(dbDir)).thenReturn(true);
+      files.when(() -> Files.list(dbDir)).thenReturn(stream);
+
+      boolean result = servlet.writeDBToArchive(
+          new HashSet<>(), dbDir, new AtomicLong(Long.MAX_VALUE),
+          tar, folder, null, true);
+      assertTrue(result);
+    }
+
+    assertTrue(closed.get(), "Files.list() stream should be closed to avoid FD leaks");
+  }
+
   @ParameterizedTest
   @ValueSource(booleans =  {true, false})
   public void testContentsOfTarballWithSnapshot(boolean includeSnapshot) throws Exception {
@@ -353,8 +381,9 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     assertEquals(numSnapshots, actualYamlFiles,
         "Number of generated YAML files should match the number of snapshots.");
 
-    // create hardlinks now
-    OmSnapshotUtils.createHardLinks(newDbDir.toPath(), true);
+    InodeMetadataRocksDBCheckpoint obtainedCheckpoint =
+        new InodeMetadataRocksDBCheckpoint(newDbDir.toPath());
+    assertNotNull(obtainedCheckpoint);
 
     if (includeSnapshot) {
       List<String> yamlRelativePaths = snapshotPaths.stream().map(path -> {
@@ -366,7 +395,8 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
       }).collect(Collectors.toList());
 
       for (String yamlRelativePath : yamlRelativePaths) {
-        String yamlFileName = Paths.get(newDbDir.getPath(), yamlRelativePath).toString();
+        String yamlFileName = Paths.get(newDbDir.getPath(),
+            yamlRelativePath).toString();
         assertTrue(Files.exists(Paths.get(yamlFileName)));
       }
     }
@@ -397,14 +427,11 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     File newDbDir = new File(newDbDirName);
     assertTrue(newDbDir.mkdirs());
     FileUtil.unTar(tempFile, newDbDir);
-    Set<Path> allPathsInTarball = getAllPathsInTarball(newDbDir);
-    // create hardlinks now
-    OmSnapshotUtils.createHardLinks(newDbDir.toPath(), false);
-    for (Path old : allPathsInTarball) {
-      assertTrue(old.toFile().delete());
-    }
-    Path snapshotDbDir = Paths.get(newDbDir.toPath().toString(), OM_SNAPSHOT_CHECKPOINT_DIR,
-        OM_DB_NAME + "-" + snapshotToModify.getSnapshotId());
+    InodeMetadataRocksDBCheckpoint obtainedCheckpoint =
+        new InodeMetadataRocksDBCheckpoint(newDbDir.toPath());
+    assertNotNull(obtainedCheckpoint);
+    Path snapshotDbDir = Paths.get(newDbDir.getPath(),
+        OM_SNAPSHOT_CHECKPOINT_DIR, OM_DB_NAME + "-" + snapshotToModify.getSnapshotId());
     assertTrue(Files.exists(snapshotDbDir));
     String value = getValueFromSnapshotDeleteTable(dummyKey, snapshotDbDir.toString());
     assertNotNull(value);
@@ -590,10 +617,12 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     File newDbDir = new File(newDbDirName);
     assertTrue(newDbDir.mkdirs());
     FileUtil.unTar(tempFile, newDbDir);
-    OmSnapshotUtils.createHardLinks(newDbDir.toPath(), true);
-    Path snapshot1DbDir = Paths.get(newDbDir.toPath().toString(),  OM_SNAPSHOT_CHECKPOINT_DIR,
+    InodeMetadataRocksDBCheckpoint obtainedCheckpoint =
+        new InodeMetadataRocksDBCheckpoint(newDbDir.toPath());
+    assertNotNull(obtainedCheckpoint);
+    Path snapshot1DbDir = Paths.get(newDbDir.getPath(),  OM_SNAPSHOT_CHECKPOINT_DIR,
         OM_DB_NAME + "-" + snapshot1.getSnapshotId());
-    Path snapshot2DbDir = Paths.get(newDbDir.toPath().toString(),  OM_SNAPSHOT_CHECKPOINT_DIR,
+    Path snapshot2DbDir = Paths.get(newDbDir.getPath(),  OM_SNAPSHOT_CHECKPOINT_DIR,
         OM_DB_NAME + "-" + snapshot2.getSnapshotId());
     assertTrue(purgeEndTime.get() >= checkpointEndTime.get(),
         "Purge should complete after checkpoint releases snapshot cache lock");
@@ -821,10 +850,12 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     File newDbDir = new File(newDbDirName);
     assertTrue(newDbDir.mkdirs());
     FileUtil.unTar(tempFile, newDbDir);
-    OmSnapshotUtils.createHardLinks(newDbDir.toPath(), true);
-    Path snapshot1DbDir = Paths.get(newDbDir.toPath().toString(),  OM_SNAPSHOT_CHECKPOINT_DIR,
+    InodeMetadataRocksDBCheckpoint obtainedCheckpoint =
+        new InodeMetadataRocksDBCheckpoint(newDbDir.toPath());
+    assertNotNull(obtainedCheckpoint);
+    Path snapshot1DbDir = Paths.get(newDbDir.getPath(), OM_SNAPSHOT_CHECKPOINT_DIR,
         OM_DB_NAME + "-" + snapshot1.getSnapshotId());
-    Path snapshot2DbDir = Paths.get(newDbDir.toPath().toString(),  OM_SNAPSHOT_CHECKPOINT_DIR,
+    Path snapshot2DbDir = Paths.get(newDbDir.getPath(),  OM_SNAPSHOT_CHECKPOINT_DIR,
         OM_DB_NAME + "-" + snapshot2.getSnapshotId());
     boolean snapshot1IncludedInCheckpoint = Files.exists(snapshot1DbDir);
     boolean snapshot2IncludedInCheckpoint = Files.exists(snapshot2DbDir);
@@ -834,21 +865,6 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     if (capturedCheckpoint.get() != null) {
       capturedCheckpoint.get().cleanupCheckpoint();
     }
-  }
-
-  private static Set<Path> getAllPathsInTarball(File newDbDir) throws IOException {
-    Set<Path> allPathsInTarball = new HashSet<>();
-    try (Stream<Path> filesInTarball = Files.list(newDbDir.toPath())) {
-      List<Path> files = filesInTarball.collect(Collectors.toList());
-      for (Path p : files) {
-        File file = p.toFile();
-        if (file.getName().equals(OmSnapshotManager.OM_HARDLINK_FILE)) {
-          continue;
-        }
-        allPathsInTarball.add(p);
-      }
-    }
-    return allPathsInTarball;
   }
 
   private void writeDummyKeyToDeleteTableOfSnapshotDB(OzoneSnapshot snapshotToModify, String bucketName,
@@ -968,13 +984,6 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         String path  = metadataDir.relativize(p).toString();
         if (path.contains(OM_CHECKPOINT_DIR)) {
           path = metadataDir.relativize(dbStore.getDbLocation().toPath().resolve(p.getFileName())).toString();
-        }
-        if (path.startsWith(OM_DB_NAME)) {
-          Path fileName = Paths.get(path).getFileName();
-          // fileName will not be null, added null check for findbugs
-          if (fileName != null) {
-            path = fileName.toString();
-          }
         }
         hardlinkMap.computeIfAbsent(inode, k -> new ArrayList<>()).add(path);
         inodesFromOmDbCheckpoint.add(inode);

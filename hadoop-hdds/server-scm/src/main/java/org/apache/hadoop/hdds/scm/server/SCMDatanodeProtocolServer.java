@@ -41,16 +41,15 @@ import static org.apache.hadoop.hdds.server.ServerUtils.getRemoteUserName;
 import static org.apache.hadoop.hdds.server.ServerUtils.updateRPCListenAddress;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.protobuf.BlockingService;
-import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.TextFormat;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -79,9 +78,9 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.io.IOUtils;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
+import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.audit.AuditAction;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -130,7 +129,7 @@ public class SCMDatanodeProtocolServer implements
   private final InetSocketAddress datanodeRpcAddress;
   private final SCMDatanodeHeartbeatDispatcher heartbeatDispatcher;
   private final EventPublisher eventPublisher;
-  private ProtocolMessageMetrics<ProtocolMessageEnum> protocolMessageMetrics;
+  private ProtocolMessageMetrics<StorageContainerDatanodeProtocolProtos.Type> protocolMessageMetrics;
 
   private final SCMContext scmContext;
 
@@ -142,8 +141,8 @@ public class SCMDatanodeProtocolServer implements
 
     // This constructor has broken down to smaller methods so that Recon's
     // passive SCM server can override them.
-    Preconditions.checkNotNull(scm, "SCM cannot be null");
-    Preconditions.checkNotNull(eventPublisher, "EventPublisher cannot be null");
+    Objects.requireNonNull(scm, "SCM cannot be null");
+    Objects.requireNonNull(eventPublisher, "EventPublisher cannot be null");
 
     this.scm = scm;
     this.eventPublisher = eventPublisher;
@@ -438,7 +437,6 @@ public class SCMDatanodeProtocolServer implements
           .setReconcileContainerCommandProto(
               ((ReconcileContainerCommand)cmd).getProto())
           .build();
-
     default:
       throw new IllegalArgumentException("Scm command " +
           cmd.getType().toString() + " is not implemented");
@@ -492,11 +490,11 @@ public class SCMDatanodeProtocolServer implements
    * Get the ProtocolMessageMetrics for this server.
    * @return ProtocolMessageMetrics
    */
-  protected ProtocolMessageMetrics<ProtocolMessageEnum>
+  protected ProtocolMessageMetrics<StorageContainerDatanodeProtocolProtos.Type>
         getProtocolMessageMetrics() {
     return ProtocolMessageMetrics
         .create("SCMDatanodeProtocol", "SCM Datanode protocol",
-            StorageContainerDatanodeProtocolProtos.Type.values());
+            StorageContainerDatanodeProtocolProtos.Type.class);
   }
 
   /**

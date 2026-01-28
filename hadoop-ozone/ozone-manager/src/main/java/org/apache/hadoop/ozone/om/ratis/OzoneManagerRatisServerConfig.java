@@ -36,7 +36,7 @@ import org.apache.ratis.server.RaftServerConfigKeys;
     + RaftServerConfigKeys.PREFIX)
 public class OzoneManagerRatisServerConfig {
   /** @see RaftServerConfigKeys.Log.Appender#WAIT_TIME_MIN_KEY */
-  @Config(key = "log.appender.wait-time.min",
+  @Config(key = "ozone.om.ha.raft.server.log.appender.wait-time.min",
       defaultValue = "0ms",
       type = ConfigType.TIME,
       tags = {OZONE, OM, RATIS, PERFORMANCE},
@@ -44,7 +44,7 @@ public class OzoneManagerRatisServerConfig {
   )
   private long logAppenderWaitTimeMin;
 
-  @Config(key = "retrycache.expirytime",
+  @Config(key = "ozone.om.ha.raft.server.retrycache.expirytime",
       defaultValue = "300s",
       type = ConfigType.TIME,
       tags = {OZONE, OM, RATIS},
@@ -52,7 +52,7 @@ public class OzoneManagerRatisServerConfig {
   )
   private long retryCacheTimeout = Duration.ofSeconds(300).toMillis();
 
-  @Config(key = "read.option",
+  @Config(key = "ozone.om.ha.raft.server.read.option",
       defaultValue = "DEFAULT",
       type = ConfigType.STRING,
       tags = {OZONE, OM, RATIS, PERFORMANCE},
@@ -65,7 +65,7 @@ public class OzoneManagerRatisServerConfig {
   )
   private String readOption;
 
-  @Config(key = "read.leader.lease.enabled",
+  @Config(key = "ozone.om.ha.raft.server.read.leader.lease.enabled",
       defaultValue = "false",
       type = ConfigType.BOOLEAN,
       tags = {OZONE, OM, RATIS, PERFORMANCE},

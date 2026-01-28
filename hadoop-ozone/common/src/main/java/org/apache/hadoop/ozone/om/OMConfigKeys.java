@@ -102,10 +102,6 @@ public final class OMConfigKeys {
   public static final int OZONE_OM_HTTP_BIND_PORT_DEFAULT = 9874;
   public static final int OZONE_OM_HTTPS_BIND_PORT_DEFAULT = 9875;
 
-  public static final String OZONE_OM_VOLUME_LISTALL_ALLOWED =
-      "ozone.om.volume.listall.allowed";
-  public static final boolean OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT = true;
-
   public static final String OZONE_KEY_DELETING_LIMIT_PER_TASK =
       "ozone.key.deleting.limit.per.task";
   public static final int OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT = 50000;

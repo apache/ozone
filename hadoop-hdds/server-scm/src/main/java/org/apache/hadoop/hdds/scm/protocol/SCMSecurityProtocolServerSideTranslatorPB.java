@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.protocol;
 
-import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
@@ -63,7 +62,7 @@ public class SCMSecurityProtocolServerSideTranslatorPB
   private static final String ROLE_TYPE = "SCM";
 
   private OzoneProtocolMessageDispatcher<SCMSecurityRequest,
-      SCMSecurityResponse, ProtocolMessageEnum>
+      SCMSecurityResponse, SCMSecurityProtocolProtos.Type>
       dispatcher;
 
   public SCMSecurityProtocolServerSideTranslatorPB(SCMSecurityProtocol impl,

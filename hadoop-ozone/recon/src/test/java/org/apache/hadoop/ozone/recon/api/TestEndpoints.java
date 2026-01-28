@@ -379,12 +379,16 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         StorageReportProto.newBuilder().setStorageType(StorageTypeProto.DISK)
             .setStorageLocation("/disk1").setScmUsed(10000).setRemaining(5400)
             .setCapacity(25000)
+            .setFsCapacity(40000)
+            .setFsAvailable(15000)
             .setStorageUuid(UUID.randomUUID().toString())
             .setFailed(false).build();
     StorageReportProto storageReportProto2 =
         StorageReportProto.newBuilder().setStorageType(StorageTypeProto.DISK)
             .setStorageLocation("/disk2").setScmUsed(25000).setRemaining(10000)
             .setCapacity(50000)
+            .setFsCapacity(60000)
+            .setFsAvailable(25000)
             .setStorageUuid(UUID.randomUUID().toString())
             .setFailed(false).build();
     NodeReportProto nodeReportProto =
@@ -409,12 +413,16 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         StorageReportProto.newBuilder().setStorageType(StorageTypeProto.DISK)
             .setStorageLocation("/disk1").setScmUsed(20000).setRemaining(7800)
             .setCapacity(50000)
+            .setFsCapacity(70000)
+            .setFsAvailable(20000)
             .setStorageUuid(UUID.randomUUID().toString())
             .setFailed(false).build();
     StorageReportProto storageReportProto4 =
         StorageReportProto.newBuilder().setStorageType(StorageTypeProto.DISK)
             .setStorageLocation("/disk2").setScmUsed(60000).setRemaining(10000)
             .setCapacity(80000)
+            .setFsCapacity(80000)
+            .setFsAvailable(30000)
             .setStorageUuid(UUID.randomUUID().toString())
             .setFailed(false).build();
     NodeReportProto nodeReportProto2 =
@@ -440,12 +448,16 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
         StorageReportProto.newBuilder().setStorageType(StorageTypeProto.DISK)
             .setStorageLocation("/disk1").setScmUsed(20000).setRemaining(7800)
             .setCapacity(50000)
+            .setFsCapacity(60000)
+            .setFsAvailable(25000)
             .setStorageUuid(UUID.randomUUID().toString())
             .setFailed(false).build();
     StorageReportProto storageReportProto6 =
         StorageReportProto.newBuilder().setStorageType(StorageTypeProto.DISK)
             .setStorageLocation("/disk2").setScmUsed(60000).setRemaining(10000)
             .setCapacity(80000)
+            .setFsCapacity(80000)
+            .setFsAvailable(35000)
             .setStorageUuid(UUID.randomUUID().toString())
             .setFailed(false).build();
     NodeReportProto nodeReportProto3 =
@@ -483,12 +495,12 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .setQuotaInBytes(OzoneConsts.GB)
             .setQuotaInNamespace(1000)
             .setUsedNamespace(500)
-            .addOzoneAcls(OzoneAcl.of(
+            .addAcl(OzoneAcl.of(
                 IAccessAuthorizer.ACLIdentityType.USER,
                 "TestUser2",
                 OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.WRITE
             ))
-            .addOzoneAcls(OzoneAcl.of(
+            .addAcl(OzoneAcl.of(
                 IAccessAuthorizer.ACLIdentityType.USER,
                 "TestUser2",
                 OzoneAcl.AclScope.ACCESS, IAccessAuthorizer.ACLType.READ
@@ -588,6 +600,12 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
           datanodeMetadata.getDatanodeStorageReport().getRemaining());
       assertEquals(35000,
           datanodeMetadata.getDatanodeStorageReport().getUsed());
+      assertEquals(100000,
+          datanodeMetadata.getDatanodeStorageReport().getFilesystemCapacity());
+      assertEquals(40000,
+          datanodeMetadata.getDatanodeStorageReport().getFilesystemAvailable());
+      assertEquals(60000,
+          datanodeMetadata.getDatanodeStorageReport().getFilesystemUsed());
 
       assertEquals(1, datanodeMetadata.getPipelines().size());
       assertEquals(pipelineId,
@@ -607,6 +625,12 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
           datanodeMetadata.getDatanodeStorageReport().getRemaining());
       assertEquals(80000,
           datanodeMetadata.getDatanodeStorageReport().getUsed());
+      assertEquals(150000,
+          datanodeMetadata.getDatanodeStorageReport().getFilesystemCapacity());
+      assertEquals(50000,
+          datanodeMetadata.getDatanodeStorageReport().getFilesystemAvailable());
+      assertEquals(100000,
+          datanodeMetadata.getDatanodeStorageReport().getFilesystemUsed());
 
       assertEquals(0, datanodeMetadata.getPipelines().size());
       assertEquals(0, datanodeMetadata.getLeaderCount());
@@ -618,6 +642,12 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
           datanodeMetadata.getDatanodeStorageReport().getRemaining());
       assertEquals(80000,
           datanodeMetadata.getDatanodeStorageReport().getUsed());
+      assertEquals(140000,
+          datanodeMetadata.getDatanodeStorageReport().getFilesystemCapacity());
+      assertEquals(60000,
+          datanodeMetadata.getDatanodeStorageReport().getFilesystemAvailable());
+      assertEquals(80000,
+          datanodeMetadata.getDatanodeStorageReport().getFilesystemUsed());
 
       assertEquals(0, datanodeMetadata.getPipelines().size());
       assertEquals(0, datanodeMetadata.getLeaderCount());

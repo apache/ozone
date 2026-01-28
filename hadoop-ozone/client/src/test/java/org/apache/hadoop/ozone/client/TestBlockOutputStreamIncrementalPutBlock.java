@@ -28,8 +28,7 @@ import java.util.HashMap;
 import java.util.UUID;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.InMemoryConfiguration;
+import org.apache.hadoop.hdds.conf.InMemoryConfigurationForTesting;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.XceiverClientFactory;
@@ -53,7 +52,7 @@ public class TestBlockOutputStreamIncrementalPutBlock {
   private final String volumeName = UUID.randomUUID().toString();
   private final String bucketName = UUID.randomUUID().toString();
   private OzoneBucket bucket;
-  private final ConfigurationSource config = new InMemoryConfiguration();
+  private final InMemoryConfigurationForTesting config = new InMemoryConfigurationForTesting();
 
   public static Iterable<Boolean> parameters() {
     return Arrays.asList(true, false);
@@ -65,16 +64,11 @@ public class TestBlockOutputStreamIncrementalPutBlock {
     clientConfig.setIncrementalChunkList(incrementalChunkList);
     clientConfig.setChecksumType(ContainerProtos.ChecksumType.CRC32C);
 
-    ((InMemoryConfiguration)config).setFromObject(clientConfig);
-
-    ((InMemoryConfiguration) config).setBoolean(
-        OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
-    ((InMemoryConfiguration) config).setBoolean(
-        "ozone.client.hbase.enhancements.allowed", true);
-    ((InMemoryConfiguration) config).setBoolean(
-        OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
-    ((InMemoryConfiguration) config).setInt(
-        "ozone.client.bytes.per.checksum", 8192);
+    config.setFromObject(clientConfig);
+    config.setBoolean(OzoneConfigKeys.OZONE_HBASE_ENHANCEMENTS_ALLOWED, true);
+    config.setBoolean("ozone.client.hbase.enhancements.allowed", true);
+    config.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
+    config.setInt("ozone.client.bytes.per.checksum", 8192);
 
     RpcClient rpcClient = new RpcClient(config, null) {
 

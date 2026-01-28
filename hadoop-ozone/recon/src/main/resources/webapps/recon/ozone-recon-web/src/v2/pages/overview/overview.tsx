@@ -24,9 +24,9 @@ import moment from 'moment';
 import filesize from 'filesize';
 
 import AutoReloadPanel from '@/components/autoReloadPanel/autoReloadPanel';
-import OverviewSimpleCard from '@/v2/components/overviewCard/overviewSimpleCard';
-import OverviewSummaryCard from '@/v2/components/overviewCard/overviewSummaryCard';
-import OverviewStorageCard from '@/v2/components/overviewCard/overviewStorageCard';
+import OverviewSimpleCard from '@/v2/components/cards/overviewSimpleCard';
+import OverviewSummaryCard from '@/v2/components/cards/overviewSummaryCard';
+import OverviewStorageCard from '@/v2/components/cards/overviewStorageCard';
 import { AxiosGetHelper } from '@/utils/axiosRequestHelper';
 import { showDataFetchError } from '@/utils/common';
 import { cancelRequests } from '@/utils/axiosRequestHelper';
@@ -71,10 +71,11 @@ const getHealthIcon = (value: string): React.ReactElement => {
 }
 
 const getSummaryTableValue = (
-  value: number | string | undefined,
+  value: number | string | undefined | null,
   colType: 'value' | undefined = undefined
 ): string => {
-  if (!value) return 'N/A';
+  if (value === null || value === undefined) return 'N/A';
+  if (typeof value === 'string' && value.trim() === '') return 'N/A';
   if (colType === 'value') return String(value as string)
   return size(value as number)
 }
@@ -280,7 +281,7 @@ const Overview: React.FC<{}> = () => {
             />
           </Col>
           <Col xs={24} sm={24} md={24} lg={14} xl={14}>
-            <OverviewStorageCard storageReport={storageReport} loading={loading} error={clusterState.error}/>
+            <OverviewStorageCard storageReport={storageReport} loading={clusterState.loading} error={clusterState.error}/>
           </Col>
         </Row>
         <Row gutter={[

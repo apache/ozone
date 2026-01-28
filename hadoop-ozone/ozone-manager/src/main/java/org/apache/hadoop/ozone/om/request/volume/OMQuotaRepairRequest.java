@@ -22,11 +22,11 @@ import static org.apache.hadoop.ozone.OzoneConsts.QUOTA_RESET;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -75,7 +75,7 @@ public class OMQuotaRepairRequest extends OMClientRequest {
     final long transactionLogIndex = context.getIndex();
     OzoneManagerProtocolProtos.QuotaRepairRequest quotaRepairRequest =
         getOmRequest().getQuotaRepairRequest();
-    Preconditions.checkNotNull(quotaRepairRequest);
+    Objects.requireNonNull(quotaRepairRequest, "quotaRepairRequest == null");
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(getOmRequest());

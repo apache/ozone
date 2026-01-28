@@ -74,7 +74,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -82,6 +81,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.Provider;
 import java.security.Security;
 import java.time.Duration;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -143,7 +143,7 @@ public class SecurityConfig {
    * @param configuration - HDDS Configuration
    */
   public SecurityConfig(ConfigurationSource configuration) {
-    Preconditions.checkNotNull(configuration, "Configuration cannot be null");
+    Objects.requireNonNull(configuration, "Configuration cannot be null");
     this.size = configuration.getInt(HDDS_KEY_LEN, HDDS_DEFAULT_KEY_LEN);
     this.keyAlgo = configuration.get(HDDS_KEY_ALGORITHM,
         HDDS_DEFAULT_KEY_ALGORITHM);
@@ -425,8 +425,7 @@ public class SecurityConfig {
    * @return Path Key location.
    */
   public Path getKeyLocation(String component) {
-    Preconditions.checkNotNull(this.metadataDir, "Metadata directory can't be"
-        + " null. Please check configs.");
+    Objects.requireNonNull(this.metadataDir, "Metadata directory can't be null. Please check configs.");
     return Paths.get(metadataDir, component, keyDir);
   }
 
@@ -438,8 +437,7 @@ public class SecurityConfig {
    * @return Path location.
    */
   public Path getCertificateLocation(String component) {
-    Preconditions.checkNotNull(this.metadataDir, "Metadata directory can't be"
-        + " null. Please check configs.");
+    Objects.requireNonNull(this.metadataDir, "Metadata directory can't be null. Please check configs.");
     return Paths.get(metadataDir, component, certificateDir);
   }
 
@@ -450,8 +448,7 @@ public class SecurityConfig {
    * @return Path location.
    */
   public Path getLocation(String component) {
-    Preconditions.checkNotNull(this.metadataDir, "Metadata directory can't be"
-        + " null. Please check configs.");
+    Objects.requireNonNull(this.metadataDir, "Metadata directory can't be null. Please check configs.");
     return Paths.get(metadataDir, component);
   }
 

@@ -23,17 +23,10 @@
   <version>2.2.0-SNAPSHOT</version>
   <packaging>jar</packaging>
   <name>Apache Ozone FS Hadoop 2.x compatibility</name>
-  <properties>
-    <shaded.prefix>org.apache.hadoop.ozone.shaded</shaded.prefix>
-  </properties>
   <dependencies>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdfs-client</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hadoop.thirdparty</groupId>
-      <artifactId>${hadoop-thirdparty.protobuf.artifact}</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
@@ -113,6 +106,16 @@
         <configuration>
           <proc>none</proc>
         </configuration>
+        <executions>
+          <execution>
+            <id>default-compile</id>
+            <configuration>
+              <compileSourceRoots>
+                <compileSourceRoot>${project.basedir}/target/generated-sources/java</compileSourceRoot>
+              </compileSourceRoots>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -132,7 +135,6 @@
             </goals>
             <phase>prepare-package</phase>
             <configuration>
-              <skip>${maven.shade.skip}</skip>
               <excludes>META-INF/versions/**/*.*</excludes>
               <artifactItems>
                 <artifactItem>
@@ -158,6 +160,50 @@
         <configuration>
           <onlyAnalyze>org.apache.hadoop.fs.ozone.*</onlyAnalyze>
         </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <executions>
+          <execution>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <phase>generate-sources</phase>
+            <configuration>
+              <target>
+                <copy todir="target/generated-sources/java">
+                  <fileset dir="src/main/java" />
+                </copy>
+              </target>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>com.google.code.maven-replacer-plugin</groupId>
+        <artifactId>replacer</artifactId>
+        <executions>
+          <execution>
+            <id>replace-sources</id>
+            <goals>
+              <goal>replace</goal>
+            </goals>
+            <phase>process-sources</phase>
+            <configuration>
+              <basedir>${project.basedir}/target/generated-sources</basedir>
+              <includes>
+                <include>**/*.java</include>
+              </includes>
+              <replacements>
+                <replacement>
+                  <token>([^\.])com.google.protobuf</token>
+                  <value>$1${ozone.shaded.prefix}.com.google.protobuf</value>
+                </replacement>
+              </replacements>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>

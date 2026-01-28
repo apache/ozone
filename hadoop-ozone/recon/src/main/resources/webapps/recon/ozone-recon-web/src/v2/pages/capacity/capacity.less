@@ -1,0 +1,177 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+.data-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+  
+  .section-title {
+    flex-grow: 0;
+    font-family: Roboto;
+    font-size: 20px;
+    font-weight: 500;
+    font-stretch: normal;
+    font-style: normal;
+    line-height: 1.4;
+    letter-spacing: normal;
+    text-align: left;
+    color: #1b2329;
+  }
+
+  .node-select-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin: 16px 0px auto 0px;
+    height: 11em;
+  }
+
+  .cluster-card-data-container {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+
+    &.vertical-layout {
+      flex-direction: column;
+      gap: 0px;
+    }
+
+    .cluster-card-statistic {
+      flex: 2 1 10em;
+    }
+
+    .data-detail-item {
+      display: flex;
+      width: 100%;
+      flex-direction: column;
+      justify-content: flex-start;
+      align-items: stretch;
+      border-radius: 3px;
+
+      .data-detail-breakdown-container {
+        justify-content: flex-end;
+        flex-wrap: wrap;
+        .data-detail-breakdown-item {
+          margin-left: 20px;
+          .data-detail-breakdown-label {
+            font-size: 12px;
+            color: #5a656d;
+            margin-right: 4px;
+          }
+
+          .data-detail-breakdown-value {
+            font-size: 14px;
+            font-weight: 500;
+          }
+          
+        }
+      }
+    }
+
+    .data-detail-breakdown-container {
+      .ant-statistic-title {
+        margin-bottom: 0;
+      }
+
+      .ant-statistic-content {
+        .ant-statistic-content-prefix {
+          margin-right: 1px;
+        }
+        .ant-statistic-content-value {
+          font-size: 16px;
+        }
+      }
+    }
+  }
+
+  .stacked-progress {
+    display: flex;
+    width: 100%;
+    height: 8px;
+    border-radius: 100px;
+    overflow: hidden;
+    margin: 24px auto 8px auto;
+  }
+  .stacked-progress-empty {
+    width: 100%;
+    height: 8px;
+    border-radius: 100px;
+    background-color: #f4f5f6;
+    margin: 24px auto 8px auto;
+  }
+}
+
+.data-breakdown-section {
+  display: flex;
+  gap: 16px;
+  width: 100%;
+  justify-content: space-between;
+  align-items: stretch;
+
+  > .ant-card {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+}
+
+.unused-space-breakdown {
+  display: grid;
+  grid-template-columns: 150px auto;
+  grid-column-gap: 20px;
+  grid-row-gap: 4px;
+
+  .ant-tag {
+    text-align: center;
+  }
+}
+
+.ant-statistic-title {
+  font-size: 12px;
+}
+
+// This is for the suffix part of the value ex: TB, GB etc
+.ant-statistic-content-suffix {
+  font-family: Roboto;
+  font-size: 14px;
+  font-weight: normal;
+  font-stretch: normal;
+  font-style: normal;
+  line-height: 1.43;
+  letter-spacing: normal;
+  text-align: left;
+  vertical-align: text-top;
+  color: rgba(0, 0, 0, 0.85);
+  margin: 3px 0 0 1px;
+}
+
+.ant-divider-horizontal {
+  margin: 16px 0;
+}
+
+.ant-card-body {
+  // This is to enforce 16px padding for card body which is 12px by default
+  padding: 16px !important;
+}
+
+.dn-select-option-uuid {
+  font-size: 14px;
+  color: #5a656d;
+  margin-left: 15px;
+}

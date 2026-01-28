@@ -118,8 +118,7 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
         .setContainerID(info.getContainerID())
         .setDeleteTransactionId(info.getDeleteTransactionId())
         .setReplicationConfig(config)
-        .setSequenceId(info.getSequenceId())
-        .build();
+        .setSequenceId(info.getSequenceId());
 
     if (info.hasPipelineID()) {
       builder.setPipelineID(PipelineID.getFromProtobuf(info.getPipelineID()));

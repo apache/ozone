@@ -94,11 +94,11 @@
 
 <!-- Only display Deletion Progress on OM leader -->
 <div ng-show="$ctrl.role.Role.trim() === 'LEADER'">
-  <h2>Deletion Progress [since {{$ctrl.overview.jmx.MetricsResetTimeStamp * 1000 | date:'yyyy-MM-dd HH:mm:ss'}}]
+  <h2>Deletion Progress [{{$ctrl.overview.jmx.MetricsResetTimeStamp ? 'since ' + ($ctrl.overview.jmx.MetricsResetTimeStamp * 1000 | date:'yyyy-MM-dd HH:mm:ss') : 'Initializing'}}]
     &nbsp;&nbsp;•&nbsp;&nbsp;
     <b>Size Reclaimed:</b> {{$ctrl.formatBytes($ctrl.overview.jmx.ReclaimedSizeInInterval)}}
     &nbsp;&nbsp;•&nbsp;&nbsp;
-    <b>Keys Reclaimed:</b> {{$ctrl.overview.jmx.KeysReclaimedInInterval}}
+    <b>Keys Reclaimed:</b> {{$ctrl.overview.jmx.KeysReclaimedInInterval || 0}}
   </h2>
   <div class="mt-4">
       <div class="mt-3">

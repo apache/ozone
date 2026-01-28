@@ -28,9 +28,9 @@ import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
 import org.apache.hadoop.io.retry.RetryProxy;
-import org.apache.hadoop.ipc.ProtobufHelper;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc_.ProtobufHelper;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
+import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
@@ -132,9 +132,8 @@ public final class OMAdminProtocolClientSideImpl implements OMAdminProtocol {
     RPC.setProtocolEngine(OzoneConfiguration.of(conf),
         OMAdminProtocolPB.class, ProtobufRpcEngine.class);
 
-    HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider =
-        new HadoopRpcOMFailoverProxyProvider(conf, ugi, omServiceId,
-            OMAdminProtocolPB.class);
+    final HadoopRpcOMFailoverProxyProvider<OMAdminProtocolPB> omFailoverProxyProvider
+        = new HadoopRpcOMFailoverProxyProvider<>(conf, ugi, omServiceId, OMAdminProtocolPB.class);
 
     // Multiple the max number of retries with number of OMs to calculate the
     // max number of failovers.

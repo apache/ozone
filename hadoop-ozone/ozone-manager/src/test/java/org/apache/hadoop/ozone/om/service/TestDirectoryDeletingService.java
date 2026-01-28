@@ -141,7 +141,7 @@ public class TestDirectoryDeletingService {
       sb.append("0123456789");
     }
     String longName = sb.toString();
-    OmDirectoryInfo dir1 = new OmDirectoryInfo.Builder()
+    OmDirectoryInfo dir1 = OmDirectoryInfo.newBuilder()
         .setName("dir" + longName)
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())

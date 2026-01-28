@@ -22,7 +22,6 @@ import static org.apache.hadoop.hdds.utils.Archiver.linkAndIncludeFile;
 import static org.apache.hadoop.hdds.utils.Archiver.tar;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.includeRatisSnapshotCompleteFlag;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
 import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT;
@@ -296,8 +295,10 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
             }
             writeDBToArchive(sstFilesToExclude, getCompactionLogDir(), maxTotalSstSize, archiveOutputStream, tmpdir,
                 hardLinkFileMap, false);
-            writeDBToArchive(sstFilesToExclude, sstBackupFiles.stream(), maxTotalSstSize, archiveOutputStream, tmpdir,
-                hardLinkFileMap, false);
+            try (Stream<Path> backupFiles = sstBackupFiles.stream()) {
+              writeDBToArchive(sstFilesToExclude, backupFiles, maxTotalSstSize, archiveOutputStream, tmpdir,
+                  hardLinkFileMap, false);
+            }
             Collection<Path> snapshotLocalPropertyFiles = getSnapshotLocalDataPaths(localDataManager,
                 snapshotInCheckpoint.keySet());
             // This is done to ensure all data to be copied correctly is flushed in the snapshot DB
@@ -408,13 +409,6 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
       Path p = Paths.get(entry.getKey());
       String fileId = entry.getValue();
       Path relativePath = metaDirPath.relativize(p);
-      // if the file is in "om.db" directory, strip off the 'o
-      // m.db' name from the path
-      // and only keep the file name as this would be created in the current dir of the untarred dir
-      // on the follower.
-      if (relativePath.startsWith(OM_DB_NAME)) {
-        relativePath = relativePath.getFileName();
-      }
       sb.append(relativePath).append('\t').append(fileId).append('\n');
     }
     Files.write(data, sb.toString().getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING);
@@ -466,9 +460,10 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
       LOG.warn("DB directory {} does not exist. Skipping.", dbDir);
       return true;
     }
-    Stream<Path> files = Files.list(dbDir);
-    return writeDBToArchive(sstFilesToExclude, files,
-        maxTotalSstSize, archiveOutputStream, tmpDir, hardLinkFileMap, onlySstFile);
+    try (Stream<Path> files = Files.list(dbDir)) {
+      return writeDBToArchive(sstFilesToExclude, files,
+          maxTotalSstSize, archiveOutputStream, tmpDir, hardLinkFileMap, onlySstFile);
+    }
   }
 
   /**

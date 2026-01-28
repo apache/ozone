@@ -32,6 +32,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -136,9 +137,9 @@ import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.retry.RetryProxy;
-import org.apache.hadoop.ipc.ProtobufHelper;
-import org.apache.hadoop.ipc.ProtocolTranslator;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc_.ProtobufHelper;
+import org.apache.hadoop.ipc_.ProtocolTranslator;
+import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
@@ -169,7 +170,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    */
   public StorageContainerLocationProtocolClientSideTranslatorPB(
       SCMContainerLocationFailoverProxyProvider proxyProvider) {
-    Preconditions.checkNotNull(proxyProvider);
+    Objects.requireNonNull(proxyProvider, "proxyProvider == null");
     this.fpp = proxyProvider;
     this.rpcProxy = (StorageContainerLocationProtocolPB) RetryProxy.create(
         StorageContainerLocationProtocolPB.class,
@@ -555,7 +556,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   @Override
   public List<DatanodeAdminError> decommissionNodes(List<String> nodes, boolean force)
       throws IOException {
-    Preconditions.checkNotNull(nodes);
+    Objects.requireNonNull(nodes, "nodes == null");
     DecommissionNodesRequestProto request =
         DecommissionNodesRequestProto.newBuilder()
         .addAllHosts(nodes).setForce(force)
@@ -579,7 +580,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   @Override
   public List<DatanodeAdminError> recommissionNodes(List<String> nodes)
       throws IOException {
-    Preconditions.checkNotNull(nodes);
+    Objects.requireNonNull(nodes, "nodes == null");
     RecommissionNodesRequestProto request =
         RecommissionNodesRequestProto.newBuilder()
             .addAllHosts(nodes)
@@ -608,7 +609,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   @Override
   public List<DatanodeAdminError> startMaintenanceNodes(
       List<String> nodes, int endInHours, boolean force) throws IOException {
-    Preconditions.checkNotNull(nodes);
+    Objects.requireNonNull(nodes, "nodes == null");
     StartMaintenanceNodesRequestProto request =
         StartMaintenanceNodesRequestProto.newBuilder()
             .addAllHosts(nodes)

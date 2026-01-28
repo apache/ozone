@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
@@ -133,6 +134,32 @@ public class SstFilteringService extends BackgroundService
     }
 
     /**
+     * Checks if the snapshot has been defragged.
+     * @param snapshotInfo snapshotInfo
+     * @return true if the snapshot has been defragged, false otherwise
+     */
+    private boolean isSnapshotDefragged(SnapshotInfo snapshotInfo) {
+      try {
+        OmSnapshotManager omSnapshotManager = ozoneManager.getOmSnapshotManager();
+        if (omSnapshotManager == null) {
+          return false;
+        }
+        OmSnapshotLocalDataManager localDataManager = omSnapshotManager.getSnapshotLocalDataManager();
+        if (localDataManager == null) {
+          return false;
+        }
+        try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider provider =
+                 localDataManager.getOmSnapshotLocalData(snapshotInfo)) {
+          // If snapshot local data version is not 0, it means the snapshot has been defragged
+          return provider.getVersion() > 0;
+        }
+      } catch (IOException e) {
+        LOG.debug("Error checking if snapshot {} is defragged", snapshotInfo.getSnapshotId(), e);
+        return false;
+      }
+    }
+
+    /**
      * Marks the snapshot as SSTFiltered by creating a file in snapshot directory.
      * @param snapshotInfo snapshotInfo
      * @throws IOException
@@ -184,6 +211,12 @@ public class SstFilteringService extends BackgroundService
           SnapshotInfo snapshotInfo = keyValue.getValue();
           try {
             if (isSstFiltered(ozoneManager.getConfiguration(), snapshotInfo)) {
+              continue;
+            }
+
+            // Skip defragged snapshots as defrag already performs filtering
+            if (isSnapshotDefragged(snapshotInfo)) {
+              LOG.debug("Skipping SST filtering for defragged snapshot: {}", snapShotTableKey);
               continue;
             }
 
