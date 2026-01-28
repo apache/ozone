@@ -4138,7 +4138,8 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     this.omRpcServer = server;
   }
 
-  boolean isOmRpcServerRunning() {
+  @VisibleForTesting
+  public boolean isOmRpcServerRunning() {
     return isOmRpcServerRunning;
   }
 

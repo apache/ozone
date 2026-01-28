@@ -18,8 +18,8 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR;
 
 import java.io.File;
 import java.io.IOException;
