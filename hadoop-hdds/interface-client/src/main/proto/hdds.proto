@@ -542,6 +542,22 @@ message CompactionLogEntryProto {
     optional string compactionReason = 5;
 }
 
+// Flush tracking messages (simpler than compaction tracking)
+message FlushFileInfoProto {
+    required string fileName = 1;
+    optional string startKey = 2;
+    optional string endKey = 3;
+    optional string columnFamily = 4;
+    optional bool pruned = 5;
+}
+
+message FlushLogEntryProto {
+    required uint64 dbSequenceNumber = 1;
+    required uint64 flushTime = 2;
+    required FlushFileInfoProto fileInfo = 3;  // Single file (not repeated)
+    optional string flushReason = 4;
+}
+
 message NodeTopology {
     optional string name = 1;
     optional string location = 2;
