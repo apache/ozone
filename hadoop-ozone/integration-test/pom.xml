@@ -25,6 +25,10 @@
   <name>Apache Ozone Integration Tests</name>
   <description>Apache Ozone Integration Tests</description>
 
+  <properties>
+    <maven.compiler.release>${ozone.server.java.version}</maven.compiler.release>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>ch.qos.reload4j</groupId>
