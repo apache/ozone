@@ -20,23 +20,34 @@ package org.apache.hadoop.ozone.recon.api;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 
+import java.io.BufferedWriter;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.StreamingOutput;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVPrinter;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
+import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsServiceResponse;
+import org.apache.hadoop.ozone.recon.api.types.DatanodePendingDeletionMetrics;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
 import org.apache.hadoop.ozone.recon.api.types.GlobalNamespaceReport;
 import org.apache.hadoop.ozone.recon.api.types.GlobalStorageReport;
@@ -71,16 +82,19 @@ public class StorageDistributionEndpoint {
   private static final Logger LOG = LoggerFactory.getLogger(StorageDistributionEndpoint.class);
   private final ReconGlobalStatsManager reconGlobalStatsManager;
   private final ReconGlobalMetricsService reconGlobalMetricsService;
+  private final DataNodeMetricsService dataNodeMetricsService;
 
   @Inject
   public StorageDistributionEndpoint(OzoneStorageContainerManager reconSCM,
                                      NSSummaryEndpoint nsSummaryEndpoint,
                                      ReconGlobalStatsManager reconGlobalStatsManager,
-                                     ReconGlobalMetricsService reconGlobalMetricsService) {
+                                     ReconGlobalMetricsService reconGlobalMetricsService,
+                                     DataNodeMetricsService dataNodeMetricsService) {
     this.nodeManager = (ReconNodeManager) reconSCM.getScmNodeManager();
     this.nsSummaryEndpoint = nsSummaryEndpoint;
     this.reconGlobalStatsManager = reconGlobalStatsManager;
     this.reconGlobalMetricsService = reconGlobalMetricsService;
+    this.dataNodeMetricsService = dataNodeMetricsService;
   }
 
   @GET
@@ -112,6 +126,85 @@ public class StorageDistributionEndpoint {
               .entity("Error retrieving storage distribution: " + e.getMessage())
               .build();
     }
+  }
+
+  @GET
+  @Path("/download")
+  public Response downloadDataNodeDistribution() {
+    DataNodeMetricsServiceResponse metricsResponse =
+        dataNodeMetricsService.getCollectedMetrics(null);
+
+    if (metricsResponse.getStatus() != DataNodeMetricsService.MetricCollectionStatus.FINISHED) {
+      return Response.status(Response.Status.ACCEPTED)
+          .entity(metricsResponse)
+          .type(MediaType.APPLICATION_JSON)
+          .build();
+    }
+
+    List<DatanodePendingDeletionMetrics> pendingDeletionMetrics =
+        metricsResponse.getPendingDeletionPerDataNode();
+
+    if (pendingDeletionMetrics == null) {
+      return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+          .entity("Metrics data is missing despite FINISHED status.")
+          .type(MediaType.TEXT_PLAIN)
+          .build();
+    }
+
+    Map<String, DatanodeStorageReport> reportByUuid =
+        collectDatanodeReports().stream()
+            .collect(Collectors.toMap(
+                DatanodeStorageReport::getDatanodeUuid,
+                Function.identity()));
+
+    StreamingOutput stream = output -> {
+      CSVFormat format = CSVFormat.DEFAULT.builder()
+          .setHeader(
+              "HostName",
+              "Datanode UUID",
+              "Capacity",
+              "Used Space",
+              "Remaining Space",
+              "Committed Space",
+              "Reserved Space",
+              "Minimum Free Space",
+              "Pending Block Size")
+          .build();
+
+      try (CSVPrinter printer = new CSVPrinter(
+          new BufferedWriter(new OutputStreamWriter(output, StandardCharsets.UTF_8)),
+          format)) {
+
+        for (DatanodePendingDeletionMetrics metric : pendingDeletionMetrics) {
+          DatanodeStorageReport report = reportByUuid.get(metric.getDatanodeUuid());
+          if (report == null) {
+            continue; // skip if report is missing
+          }
+
+          printer.printRecord(
+              metric.getHostName(),
+              metric.getDatanodeUuid(),
+              report.getCapacity(),
+              report.getUsed(),
+              report.getRemaining(),
+              report.getCommitted(),
+              report.getReserved(),
+              report.getMinimumFreeSpace(),
+              metric.getPendingBlockSize()
+          );
+        }
+        printer.flush();
+      } catch (Exception e) {
+        LOG.error("Failed to stream CSV", e);
+        throw new WebApplicationException("Failed to generate CSV", e);
+      }
+    };
+
+    return Response.status(Response.Status.ACCEPTED)
+        .entity(stream)
+        .type("text/csv")
+        .header("Content-Disposition", "attachment; filename=\"datanode_storage_and_pending_deletion_stats.csv\"")
+        .build();
   }
 
   private GlobalStorageReport calculateGlobalStorageReport() {
@@ -189,7 +282,7 @@ public class StorageDistributionEndpoint {
             .build();
   }
 
-  private List<DatanodeStorageReport> collectDatanodeReports() {
+  public List<DatanodeStorageReport> collectDatanodeReports() {
     return nodeManager.getAllNodes().stream()
         .map(this::getStorageReport)
         .filter(Objects::nonNull) // Filter out null reports
