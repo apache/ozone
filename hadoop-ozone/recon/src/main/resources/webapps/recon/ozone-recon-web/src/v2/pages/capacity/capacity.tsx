@@ -47,7 +47,7 @@ type CapacityState = {
 
 const Capacity: React.FC<object> = () => {
   const PENDING_POLL_INTERVAL = 5 * 1000;
-  const DN_CSV_DOWNLOAD_URL = '/api/v1/pendingDeletion/download';
+  const DN_CSV_DOWNLOAD_URL = '/api/v1/storageDistribution/download';
   const DN_STATUS_URL = '/api/v1/pendingDeletion?component=dn';
   const DOWNLOAD_POLL_TIMEOUT_MS = 10 * 60 * 1000;
 
