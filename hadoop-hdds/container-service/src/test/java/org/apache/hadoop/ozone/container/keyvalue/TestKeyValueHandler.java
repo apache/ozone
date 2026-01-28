@@ -914,29 +914,51 @@ public class TestKeyValueHandler {
   @Test
   public void testWriteChunkSpaceTrackingSuccess() throws Exception {
     final long containerID = 1L;
-    SpaceTrackingTestSetup setup = setupSpaceTrackingTest();
+    final String testDir = tempDir.toString();
+    final String clusterId = UUID.randomUUID().toString();
+    final String datanodeId = UUID.randomUUID().toString();
+    OzoneConfiguration testConf = new OzoneConfiguration();
+    final ContainerSet containerSet = newContainerSet();
+    final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
+
+    HddsVolume hddsVolume = new HddsVolume.Builder(testDir).conf(testConf)
+        .clusterID(clusterId).datanodeUuid(datanodeId)
+        .volumeSet(volumeSet)
+        .build();
+    hddsVolume.format(clusterId);
+    hddsVolume.createWorkingDir(clusterId, null);
+    hddsVolume.createTmpDirs(clusterId);
+
+    when(volumeSet.getVolumesList())
+        .thenReturn(Collections.singletonList(hddsVolume));
+
+    final ContainerMetrics metrics = ContainerMetrics.create(testConf);
+    final KeyValueHandler kvHandler = new KeyValueHandler(testConf,
+        datanodeId, containerSet, volumeSet, metrics,
+        c -> { }, new ContainerChecksumTreeManager(testConf));
+    kvHandler.setClusterID(clusterId);
 
     final ContainerCommandRequestProto createContainer =
-        createContainerRequest(setup.datanodeId, containerID);
-    setup.handler.handleCreateContainer(createContainer, null);
+        createContainerRequest(datanodeId, containerID);
+    kvHandler.handleCreateContainer(createContainer, null);
 
-    KeyValueContainer container = (KeyValueContainer) setup.containerSet.getContainer(containerID);
+    KeyValueContainer container = (KeyValueContainer) containerSet.getContainer(containerID);
     assertNotNull(container);
 
-    long initialUsedSpace = setup.volume.getCurrentUsage().getUsedSpace();
-    long initialCommittedBytes = setup.volume.getCommittedBytes();
-    long initialReservedSpace = setup.volume.getSpaceReservedForWrites();
+    long initialUsedSpace = hddsVolume.getCurrentUsage().getUsedSpace();
+    long initialCommittedBytes = hddsVolume.getCommittedBytes();
+    long initialReservedSpace = hddsVolume.getSpaceReservedForWrites();
 
     long chunkSize = 1024 * 1024; // 1MB
     ContainerCommandRequestProto writeRequest =
-        createWriteChunkRequest(setup.datanodeId, chunkSize);
+        createWriteChunkRequest(datanodeId, chunkSize);
     ContainerProtos.ContainerCommandResponseProto response =
-        setup.handler.handleWriteChunk(writeRequest, container, null);
+        kvHandler.handleWriteChunk(writeRequest, container, null);
     assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
 
-    long finalUsedSpace = setup.volume.getCurrentUsage().getUsedSpace();
-    long finalCommittedBytes = setup.volume.getCommittedBytes();
-    long finalReservedSpace = setup.volume.getSpaceReservedForWrites();
+    long finalUsedSpace = hddsVolume.getCurrentUsage().getUsedSpace();
+    long finalCommittedBytes = hddsVolume.getCommittedBytes();
+    long finalReservedSpace = hddsVolume.getSpaceReservedForWrites();
 
     assertEquals(initialUsedSpace + chunkSize, finalUsedSpace,
         "usedSpace should be incremented by chunk size after successful write");
@@ -957,24 +979,46 @@ public class TestKeyValueHandler {
   @Test
   public void testWriteChunkSpaceTrackingFailure() throws Exception {
     final long containerID = 1L;
-    SpaceTrackingTestSetup setup = setupSpaceTrackingTest();
+    final String testDir = tempDir.toString();
+    final String clusterId = UUID.randomUUID().toString();
+    final String datanodeId = UUID.randomUUID().toString();
+    OzoneConfiguration testConf = new OzoneConfiguration();
+    final ContainerSet containerSet = newContainerSet();
+    final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
+
+    HddsVolume hddsVolume = new HddsVolume.Builder(testDir).conf(testConf)
+        .clusterID(clusterId).datanodeUuid(datanodeId)
+        .volumeSet(volumeSet)
+        .build();
+    hddsVolume.format(clusterId);
+    hddsVolume.createWorkingDir(clusterId, null);
+    hddsVolume.createTmpDirs(clusterId);
+
+    when(volumeSet.getVolumesList())
+        .thenReturn(Collections.singletonList(hddsVolume));
+
+    final ContainerMetrics metrics = ContainerMetrics.create(testConf);
+    final KeyValueHandler kvHandler = new KeyValueHandler(testConf,
+        datanodeId, containerSet, volumeSet, metrics,
+        c -> { }, new ContainerChecksumTreeManager(testConf));
+    kvHandler.setClusterID(clusterId);
 
     final ContainerCommandRequestProto createContainer =
-        createContainerRequest(setup.datanodeId, containerID);
-    setup.handler.handleCreateContainer(createContainer, null);
+        createContainerRequest(datanodeId, containerID);
+    kvHandler.handleCreateContainer(createContainer, null);
 
-    KeyValueContainer container = (KeyValueContainer) setup.containerSet.getContainer(containerID);
+    KeyValueContainer container = (KeyValueContainer) containerSet.getContainer(containerID);
     assertNotNull(container);
 
-    long initialUsedSpace = setup.volume.getCurrentUsage().getUsedSpace();
-    long initialCommittedBytes = setup.volume.getCommittedBytes();
-    long initialReservedSpace = setup.volume.getSpaceReservedForWrites();
+    long initialUsedSpace = hddsVolume.getCurrentUsage().getUsedSpace();
+    long initialCommittedBytes = hddsVolume.getCommittedBytes();
+    long initialReservedSpace = hddsVolume.getSpaceReservedForWrites();
 
     // Use reflection to replace the chunkManager in the handler with a spy,
     // so we can inject a failure during writeChunk()
     Field chunkManagerField = KeyValueHandler.class.getDeclaredField("chunkManager");
     chunkManagerField.setAccessible(true);
-    ChunkManager originalChunkManager = (ChunkManager) chunkManagerField.get(setup.handler);
+    ChunkManager originalChunkManager = (ChunkManager) chunkManagerField.get(kvHandler);
     ChunkManager spyChunkManager = spy(originalChunkManager);
     
     // Configure the spy to throw an IOException on writeChunk call
@@ -987,23 +1031,23 @@ public class TestKeyValueHandler {
         any(ChunkBuffer.class), 
         any(DispatcherContext.class));
     
-    chunkManagerField.set(setup.handler, spyChunkManager);
+    chunkManagerField.set(kvHandler, spyChunkManager);
 
     try {
       // Attempt to write a chunk - should fail during chunkManager.writeChunk()
       // but AFTER space has been reserved
       long chunkSize = 1024 * 1024; // 1MB
       ContainerCommandRequestProto writeRequest =
-          createWriteChunkRequest(setup.datanodeId, chunkSize);
+          createWriteChunkRequest(datanodeId, chunkSize);
       ContainerProtos.ContainerCommandResponseProto response =
-          setup.handler.handleWriteChunk(writeRequest, container, null);
+          kvHandler.handleWriteChunk(writeRequest, container, null);
 
       assertNotEquals(ContainerProtos.Result.SUCCESS, response.getResult(),
           "Write should fail due to injected IOException");
 
-      long finalUsedSpace = setup.volume.getCurrentUsage().getUsedSpace();
-      long finalCommittedBytes = setup.volume.getCommittedBytes();
-      long finalReservedSpace = setup.volume.getSpaceReservedForWrites();
+      long finalUsedSpace = hddsVolume.getCurrentUsage().getUsedSpace();
+      long finalCommittedBytes = hddsVolume.getCommittedBytes();
+      long finalReservedSpace = hddsVolume.getSpaceReservedForWrites();
 
       assertEquals(initialUsedSpace, finalUsedSpace,
           "usedSpace should remain unchanged after failed write");
@@ -1012,7 +1056,7 @@ public class TestKeyValueHandler {
       assertEquals(initialReservedSpace, finalReservedSpace,
           "spaceReservedForWrites should be back to initial value after failed write");
     } finally {
-      chunkManagerField.set(setup.handler, originalChunkManager);
+      chunkManagerField.set(kvHandler, originalChunkManager);
     }
   }
 
@@ -1055,57 +1099,6 @@ public class TestKeyValueHandler {
     containerSet.registerOnDemandScanner(onDemandScanner);
 
     return kvHandler;
-  }
-
-  /**
-   * Helper class to hold the setup components for space tracking tests.
-   */
-  private static class SpaceTrackingTestSetup {
-    final KeyValueHandler handler;
-    final ContainerSet containerSet;
-    final HddsVolume volume;
-    final String datanodeId;
-    final String clusterId;
-
-    SpaceTrackingTestSetup(KeyValueHandler handler, ContainerSet containerSet,
-        HddsVolume volume, String datanodeId, String clusterId) {
-      this.handler = handler;
-      this.containerSet = containerSet;
-      this.volume = volume;
-      this.datanodeId = datanodeId;
-      this.clusterId = clusterId;
-    }
-  }
-
-  /**
-   * Helper method to set up a KeyValueHandler with real volume for space tracking tests.
-   */
-  private SpaceTrackingTestSetup setupSpaceTrackingTest() throws IOException {
-    final String testDir = tempDir.toString();
-    final String clusterId = UUID.randomUUID().toString();
-    final String datanodeId = UUID.randomUUID().toString();
-    OzoneConfiguration testConf = new OzoneConfiguration();
-    final ContainerSet containerSet = newContainerSet();
-    final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
-
-    HddsVolume hddsVolume = new HddsVolume.Builder(testDir).conf(testConf)
-        .clusterID(clusterId).datanodeUuid(datanodeId)
-        .volumeSet(volumeSet)
-        .build();
-    hddsVolume.format(clusterId);
-    hddsVolume.createWorkingDir(clusterId, null);
-    hddsVolume.createTmpDirs(clusterId);
-
-    when(volumeSet.getVolumesList())
-        .thenReturn(Collections.singletonList(hddsVolume));
-
-    final ContainerMetrics metrics = ContainerMetrics.create(testConf);
-    final KeyValueHandler kvHandler = new KeyValueHandler(testConf,
-        datanodeId, containerSet, volumeSet, metrics,
-        c -> { }, new ContainerChecksumTreeManager(testConf));
-    kvHandler.setClusterID(clusterId);
-
-    return new SpaceTrackingTestSetup(kvHandler, containerSet, hddsVolume, datanodeId, clusterId);
   }
 
   /**
