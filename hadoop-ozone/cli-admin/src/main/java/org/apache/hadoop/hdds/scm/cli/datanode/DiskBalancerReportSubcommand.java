@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import static java.util.stream.Collectors.toList;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -72,8 +74,10 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
 
     // Display error messages for failed nodes
     if (!failedNodes.isEmpty()) {
-      System.err.printf("Failed to get DiskBalancer report from nodes: [%s]%n", 
-          String.join(", ", failedNodes));
+      System.err.printf("Failed to get DiskBalancer report from nodes: [%s]%n",
+          String.join(", ", failedNodes.stream()
+              .map(this::formatDatanodeDisplayName)
+              .collect(toList())));
     }
 
     // Display consolidated report for successful nodes
@@ -91,7 +95,7 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
         Double.compare(b.getCurrentVolumeDensitySum(), a.getCurrentVolumeDensitySum()));
 
     StringBuilder formatBuilder = new StringBuilder("Report result:%n" +
-        "%-50s %s%n");
+        "%-55s %s%n");
 
     List<String> contentList = new ArrayList<>();
     contentList.add("Datanode");
@@ -99,7 +103,12 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
 
     for (DatanodeDiskBalancerInfoProto proto : sortedProtos) {
       formatBuilder.append("%-50s %s%n");
-      contentList.add(proto.getNode().getHostName());
+      // Format datanode string with hostname and IP address
+      String[] hostnameIpPort = DiskBalancerSubCommandUtil.extractHostIpAndPort(
+          proto.getNode());
+      String formattedDatanode = DiskBalancerSubCommandUtil.getDatanodeHostAndIp(
+          hostnameIpPort[0], hostnameIpPort[1], Integer.parseInt(hostnameIpPort[2]));
+      contentList.add(formattedDatanode);
       contentList.add(String.valueOf(proto.getCurrentVolumeDensitySum()));
     }
 

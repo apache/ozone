@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import static java.util.stream.Collectors.toList;
+
 import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -109,7 +111,9 @@ public class DiskBalancerStartSubcommand extends AbstractDiskBalancerSubCommand 
     if (isBatchMode()) {
       if (!failedNodes.isEmpty()) {
         System.err.printf("Failed to start DiskBalancer on nodes: [%s]%n",
-            String.join(", ", failedNodes));
+            String.join(", ", failedNodes.stream()
+                .map(this::formatDatanodeDisplayName)
+                .collect(toList())));
       } else {
         System.out.println("Started DiskBalancer on all IN_SERVICE nodes.");
       }
@@ -117,11 +121,15 @@ public class DiskBalancerStartSubcommand extends AbstractDiskBalancerSubCommand 
       // Detailed message for specific nodes
       if (!successNodes.isEmpty()) {
         System.out.printf("Started DiskBalancer on nodes: [%s]%n", 
-            String.join(", ", successNodes));
+            String.join(", ", successNodes.stream()
+                .map(this::formatDatanodeDisplayName)
+                .collect(toList())));
       }
       if (!failedNodes.isEmpty()) {
         System.err.printf("Failed to start DiskBalancer on nodes: [%s]%n", 
-            String.join(", ", failedNodes));
+            String.join(", ", failedNodes.stream()
+                .map(this::formatDatanodeDisplayName)
+                .collect(toList())));
       }
     }
   }
