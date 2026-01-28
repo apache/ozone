@@ -185,7 +185,7 @@ class TestOmLCRule {
         .setBucket("bucket")
         .setRules(rules);
 
-    assertOMException(() -> config.buildAndValid(), INVALID_REQUEST, "Duplicate rule IDs found");
+    assertOMException(config::build, INVALID_REQUEST, "Duplicate rule IDs found");
   }
 
   @Test

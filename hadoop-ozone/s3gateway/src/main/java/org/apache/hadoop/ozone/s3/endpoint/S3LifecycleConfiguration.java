@@ -264,12 +264,14 @@ public class S3LifecycleConfiguration {
         builder.addRule(convertToOmRule(rule));
       }
 
-      return builder.buildAndValid();
-    } catch (Exception ex) {
-      if (ex instanceof IllegalStateException) {
-        throw S3ErrorTable.newError(S3ErrorTable.INVALID_REQUEST, ozoneBucket.getName(), ex);
+      return builder.build();
+    } catch (IllegalArgumentException ex) {
+      if (ex.getCause() instanceof OMException) {
+        throw (OMException) ex.getCause();
       }
-      throw ex;
+      throw S3ErrorTable.newError(S3ErrorTable.INVALID_REQUEST, ozoneBucket.getName(), ex);
+    } catch (IllegalStateException ex) {
+      throw S3ErrorTable.newError(S3ErrorTable.INVALID_REQUEST, ozoneBucket.getName(), ex);
     }
   }
 

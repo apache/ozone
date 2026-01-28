@@ -312,14 +312,52 @@ public final class OmLifecycleConfiguration extends WithObjectID
     }
 
     @Override
-    public OmLifecycleConfiguration buildObject() {
-      return new OmLifecycleConfiguration(this);
+    protected void validate() {
+      super.validate();
+      try {
+        if (StringUtils.isBlank(volume)) {
+          throw new OMException("Invalid lifecycle configuration: Volume cannot be blank.",
+              OMException.ResultCodes.INVALID_REQUEST);
+        }
+
+        if (StringUtils.isBlank(bucket)) {
+          throw new OMException("Invalid lifecycle configuration: Bucket cannot be blank.",
+              OMException.ResultCodes.INVALID_REQUEST);
+        }
+
+        if (rules.isEmpty()) {
+          throw new OMException("At least one rules needs to be specified in a lifecycle configuration.",
+              OMException.ResultCodes.INVALID_REQUEST);
+        }
+
+        if (rules.size() > LC_MAX_RULES) {
+          throw new OMException("The number of lifecycle rules must not exceed the allowed limit of "
+              + LC_MAX_RULES + " rules", OMException.ResultCodes.INVALID_REQUEST);
+        }
+
+        if (!hasNoDuplicateID()) {
+          throw new OMException("Invalid lifecycle configuration: Duplicate rule IDs found.",
+              OMException.ResultCodes.INVALID_REQUEST);
+        }
+
+        for (OmLCRule rule : rules) {
+          rule.valid(bucketLayout, creationTime);
+        }
+      } catch (OMException e) {
+        throw new IllegalArgumentException(e.getMessage(), e);
+      }
     }
 
-    public OmLifecycleConfiguration buildAndValid() throws OMException {
-      OmLifecycleConfiguration omLifecycleConfiguration = buildObject();
-      omLifecycleConfiguration.valid();
-      return omLifecycleConfiguration;
+    private boolean hasNoDuplicateID() {
+      return rules.size() == rules.stream()
+          .map(OmLCRule::getId)
+          .collect(Collectors.toSet())
+          .size();
+    }
+
+    @Override
+    protected OmLifecycleConfiguration buildObject() {
+      return new OmLifecycleConfiguration(this);
     }
   }
 }
