@@ -41,7 +41,9 @@ public class DiskBalancerStopSubcommand extends AbstractDiskBalancerSubCommand {
     try {
       diskBalancerProxy.stopDiskBalancer();
       Map<String, Object> result = new java.util.LinkedHashMap<>();
-      result.put("datanode", hostName);
+      // Format datanode string with hostname if available
+      String formattedDatanode = formatDatanodeDisplayName(hostName);
+      result.put("datanode", formattedDatanode);
       result.put("action", "stop");
       result.put("status", "success");
       return result;

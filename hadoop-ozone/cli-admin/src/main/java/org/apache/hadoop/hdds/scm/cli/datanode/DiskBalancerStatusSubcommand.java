@@ -149,7 +149,12 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
    */
   private Map<String, Object> createStatusResult(DatanodeDiskBalancerInfoProto status) {
     Map<String, Object> result = new LinkedHashMap<>();
-    result.put("datanode", status.getNode().getHostName());
+    // Format datanode string with hostname and IP address
+    String[] hostnameIpPort = DiskBalancerSubCommandUtil.extractHostIpAndPort(
+        status.getNode());
+    String formattedDatanode = DiskBalancerSubCommandUtil.getDatanodeHostAndIp(
+        hostnameIpPort[0], hostnameIpPort[1], Integer.parseInt(hostnameIpPort[2]));
+    result.put("datanode", formattedDatanode);
     result.put("action", "status");
     result.put("status", "success");
     result.put("serviceStatus", status.getRunningStatus().name());

@@ -65,7 +65,9 @@ public class DiskBalancerStartSubcommand extends AbstractDiskBalancerSubCommand 
       diskBalancerProxy.startDiskBalancer(config);
       
       Map<String, Object> result = new LinkedHashMap<>();
-      result.put("datanode", hostName);
+      // Format datanode string with hostname if available
+      String formattedDatanode = formatDatanodeDisplayName(hostName);
+      result.put("datanode", formattedDatanode);
       result.put("action", "start");
       result.put("status", "success");
       Map<String, Object> configMap = getConfigurationMap();

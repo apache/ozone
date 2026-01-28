@@ -74,7 +74,9 @@ public class DiskBalancerUpdateSubcommand extends AbstractDiskBalancerSubCommand
       diskBalancerProxy.updateDiskBalancerConfiguration(config);
       
       Map<String, Object> result = new LinkedHashMap<>();
-      result.put("datanode", hostName);
+      // Format datanode string with hostname if available
+      String formattedDatanode = formatDatanodeDisplayName(hostName);
+      result.put("datanode", formattedDatanode);
       result.put("action", "update");
       result.put("status", "success");
       Map<String, Object> configMap = getConfigurationMap();

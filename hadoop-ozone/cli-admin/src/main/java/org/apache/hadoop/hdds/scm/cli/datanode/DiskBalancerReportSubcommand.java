@@ -121,7 +121,12 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
   private Map<String, Object> createReportResult(
       HddsProtos.DatanodeDiskBalancerInfoProto report) {
     Map<String, Object> result = new LinkedHashMap<>();
-    result.put("datanode", report.getNode().getHostName());
+    // Format datanode string with hostname and IP address
+    String[] hostnameIpPort = DiskBalancerSubCommandUtil.extractHostIpAndPort(
+        report.getNode());
+    String formattedDatanode = DiskBalancerSubCommandUtil.getDatanodeHostAndIp(
+        hostnameIpPort[0], hostnameIpPort[1], Integer.parseInt(hostnameIpPort[2]));
+    result.put("datanode", formattedDatanode);
     result.put("action", "report");
     result.put("status", "success");
     result.put("volumeDensity", report.getCurrentVolumeDensitySum());

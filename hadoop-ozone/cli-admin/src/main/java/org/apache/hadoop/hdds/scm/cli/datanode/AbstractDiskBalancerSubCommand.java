@@ -220,7 +220,9 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
    */
   private Map<String, Object> createErrorResult(String datanode, String errorMsg) {
     Map<String, Object> errorResult = new LinkedHashMap<>();
-    errorResult.put("datanode", datanode);
+    // Format datanode string with hostname if available
+    String formattedDatanode = formatDatanodeDisplayName(datanode);
+    errorResult.put("datanode", formattedDatanode);
     errorResult.put("action", getActionName());
     errorResult.put("status", "failure");
     errorResult.put("errorMsg", errorMsg);
@@ -232,6 +234,22 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
     }
     
     return errorResult;
+  }
+
+  /**
+   * Format a datanode address string to include hostname if available.
+   * Queries SCM to get the hostname for the given IP address and port.
+   * 
+   * @param address the datanode address in "ip:port" format
+   * @return formatted string "hostname (ip:port)" or "ip:port" if hostname is not available
+   */
+  protected String formatDatanodeDisplayName(String address) {
+    try (ScmClient scmClient = new ContainerOperationClient(new OzoneConfiguration())) {
+      return DiskBalancerSubCommandUtil.getDatanodeHostAndIp(scmClient, address);
+    } catch (IOException e) {
+      // If SCM query fails, return original address
+      return address;
+    }
   }
 }
 
