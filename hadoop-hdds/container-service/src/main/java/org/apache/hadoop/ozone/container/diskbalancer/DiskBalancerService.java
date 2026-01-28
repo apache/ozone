@@ -37,6 +37,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -258,11 +259,15 @@ public class DiskBalancerService extends BackgroundService {
     setStopAfterDiskEven(diskBalancerInfo.isStopAfterDiskEven());
     setVersion(diskBalancerInfo.getVersion());
 
-    // Default executorService is ScheduledThreadPoolExecutor, so we can
-    // update the poll size by setting corePoolSize.
-    if ((getExecutorService() instanceof ScheduledThreadPoolExecutor)) {
-      ((ScheduledThreadPoolExecutor) getExecutorService())
+    Object executorService = getExecutorService();
+    if (executorService instanceof ScheduledThreadPoolExecutor) {
+      // Update the pool size by setting corePoolSize for ScheduledThreadPoolExecutor
+      ((ScheduledThreadPoolExecutor) executorService)
           .setCorePoolSize(parallelThread);
+    } else if (executorService instanceof ForkJoinPool) {
+      // For ForkJoinPool, dynamic resizing is not supported and requires service restart
+      LOG.warn("ForkJoinPool doesn't support dynamic pool size changes. " +
+          "Service restart is required for pool size change to take effect.");
     }
   }
 
