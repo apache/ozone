@@ -48,8 +48,18 @@ public class S3STSEndpointBase implements Auditor {
   @Inject
   private SignatureInfo signatureInfo;
 
-  protected static final AuditLogger AUDIT =
-      new AuditLogger(AuditLoggerType.S3GLOGGER);
+  protected static final AuditLogger DEFAULT_AUDIT = new AuditLogger(AuditLoggerType.S3GLOGGER);
+
+  private AuditLogger auditLogger = DEFAULT_AUDIT;
+
+  protected AuditLogger getAuditLogger() {
+    return auditLogger;
+  }
+
+  @VisibleForTesting
+  public void setAuditLogger(AuditLogger auditLogger) {
+    this.auditLogger = auditLogger;
+  }
 
   @PostConstruct
   public void initialization() {

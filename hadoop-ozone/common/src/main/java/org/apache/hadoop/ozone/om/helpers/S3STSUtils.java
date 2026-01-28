@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import io.opentelemetry.api.internal.StringUtils;
+import com.google.common.base.Strings;
 import java.util.Map;
 
 /**
@@ -38,7 +38,7 @@ public final class S3STSUtils {
     auditParams.put("roleArn", roleArn);
     auditParams.put("roleSessionName", roleSessionName);
     auditParams.put("duration", String.valueOf(duration));
-    auditParams.put("isPolicyIncluded", StringUtils.isNullOrEmpty(awsIamSessionPolicy) ? "N" : "Y");
+    auditParams.put("isPolicyIncluded", Strings.isNullOrEmpty(awsIamSessionPolicy) ? "N" : "Y");
     auditParams.put("requestId", requestId);
   }
 }

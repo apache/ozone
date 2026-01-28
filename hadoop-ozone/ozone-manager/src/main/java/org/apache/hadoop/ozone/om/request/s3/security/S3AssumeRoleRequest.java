@@ -95,39 +95,39 @@ public class S3AssumeRoleRequest extends OMClientRequest {
     final OMRequest omRequest = getOmRequest();
     final AssumeRoleRequest assumeRoleRequest = omRequest.getAssumeRoleRequest();
     final int durationSeconds = assumeRoleRequest.getDurationSeconds();
-
-    // Validate duration
-    if (durationSeconds < MIN_TOKEN_EXPIRATION_SECONDS || durationSeconds > MAX_TOKEN_EXPIRATION_SECONDS) {
-      final OMException omException = new OMException(
-          "Duration must be between " + MIN_TOKEN_EXPIRATION_SECONDS + " and " + MAX_TOKEN_EXPIRATION_SECONDS,
-          OMException.ResultCodes.INVALID_REQUEST);
-      return new S3AssumeRoleResponse(
-          createErrorOMResponse(OmResponseUtil.getOMResponseBuilder(omRequest), omException));
-    }
-
-    // Validate role session name
     final String roleSessionName = assumeRoleRequest.getRoleSessionName();
-    final S3AssumeRoleResponse roleSessionNameErrorResponse = validateRoleSessionName(roleSessionName, omRequest);
-    if (roleSessionNameErrorResponse != null) {
-      return roleSessionNameErrorResponse;
-    }
+    final String roleArn = assumeRoleRequest.getRoleArn();
+    final String awsIamSessionPolicy = assumeRoleRequest.getAwsIamSessionPolicy();
+    final String requestId = assumeRoleRequest.getRequestId();
+
+    final Map<String, String> auditMap = new HashMap<>();
+    // In HA environments, only the tempAccessKeyId on the leader is used by S3G, so it could be helpful to
+    // have the leader information
+    auditMap.put("omRole", ozoneManager.isLeaderReady() ? "LEADER" : "FOLLOWER");
+    final AuditLogger auditLogger = ozoneManager.getAuditLogger();
+    final OzoneManagerProtocolProtos.UserInfo userInfo = omRequest.getUserInfo();
+    S3STSUtils.addAssumeRoleAuditParams(
+        auditMap, roleArn, roleSessionName, awsIamSessionPolicy, durationSeconds, requestId);
 
     Exception exception = null;
     OMClientResponse omClientResponse;
-    final Map<String, String> auditMap = new HashMap<>();
-    final AuditLogger auditLogger = ozoneManager.getAuditLogger();
-    final OzoneManagerProtocolProtos.UserInfo userInfo = getOmRequest().getUserInfo();
-
-    final String roleArn = assumeRoleRequest.getRoleArn();
     try {
+      // Validate duration
+      if (durationSeconds < MIN_TOKEN_EXPIRATION_SECONDS || durationSeconds > MAX_TOKEN_EXPIRATION_SECONDS) {
+        throw new OMException(
+            "Duration must be between " + MIN_TOKEN_EXPIRATION_SECONDS + " and " + MAX_TOKEN_EXPIRATION_SECONDS,
+            OMException.ResultCodes.INVALID_REQUEST);
+      }
+
+      // Validate role session name
+      validateRoleSessionName(roleSessionName);
+
       // Validate role ARN and extract role
       final String targetRoleName = AwsRoleArnValidator.validateAndExtractRoleNameFromArn(roleArn);
 
       if (!omRequest.hasS3Authentication()) {
-        final String msg = "S3AssumeRoleRequest does not have S3 authentication";
-        final OMException omException = new OMException(msg, OMException.ResultCodes.INVALID_REQUEST);
-        return new S3AssumeRoleResponse(
-            createErrorOMResponse(OmResponseUtil.getOMResponseBuilder(omRequest), omException));
+        throw new OMException(
+            "S3AssumeRoleRequest does not have S3 authentication", OMException.ResultCodes.INVALID_REQUEST);
       }
 
       // Generate temporary AWS credentials using cryptographically strong SecureRandom
@@ -146,10 +146,8 @@ public class S3AssumeRoleRequest extends OMClientRequest {
       // Calculate expiration of session token
       final long expirationEpochSeconds = clock.instant().plusSeconds(durationSeconds).getEpochSecond();
 
-      // Audit params
-      final String requestId = assumeRoleRequest.getRequestId();
-      S3STSUtils.addAssumeRoleAuditParams(
-          auditMap, roleArn, roleSessionName, assumeRoleRequest.getAwsIamSessionPolicy(), durationSeconds, requestId);
+      // Add tempAccessKeyId to the log so it can be determined which permanent user created the tempAccessKeyId
+      auditMap.put("tempAccessKeyId", tempAccessKeyId);
 
       final AssumeRoleResponse.Builder responseBuilder = AssumeRoleResponse.newBuilder()
           .setAccessKeyId(tempAccessKeyId)
@@ -169,6 +167,7 @@ public class S3AssumeRoleRequest extends OMClientRequest {
     } catch (IOException e) {
       final OMException omException = new OMException(
           "Failed to generate STS token for role: " + roleArn, e, OMException.ResultCodes.INTERNAL_ERROR);
+      exception = omException;
       omClientResponse = new S3AssumeRoleResponse(
           createErrorOMResponse(OmResponseUtil.getOMResponseBuilder(omRequest), omException));
     }
@@ -182,22 +181,16 @@ public class S3AssumeRoleRequest extends OMClientRequest {
   /**
    * Ensures RoleSessionName is valid.
    */
-  private S3AssumeRoleResponse validateRoleSessionName(String roleSessionName, OMRequest omRequest) {
+  private void validateRoleSessionName(String roleSessionName) throws OMException {
     if (StringUtils.isBlank(roleSessionName)) {
-      final OMException omException = new OMException(
-          "RoleSessionName is required", OMException.ResultCodes.INVALID_REQUEST);
-      return new S3AssumeRoleResponse(
-          createErrorOMResponse(OmResponseUtil.getOMResponseBuilder(omRequest), omException));
+      throw new OMException("RoleSessionName is required", OMException.ResultCodes.INVALID_REQUEST);
     }
     if (roleSessionName.length() < ASSUME_ROLE_SESSION_NAME_MIN_LENGTH ||
         roleSessionName.length() > ASSUME_ROLE_SESSION_NAME_MAX_LENGTH) {
-      final OMException omException = new OMException(
+      throw new OMException(
           "RoleSessionName length must be between " + ASSUME_ROLE_SESSION_NAME_MIN_LENGTH + " and " +
           ASSUME_ROLE_SESSION_NAME_MAX_LENGTH, OMException.ResultCodes.INVALID_REQUEST);
-      return new S3AssumeRoleResponse(
-          createErrorOMResponse(OmResponseUtil.getOMResponseBuilder(omRequest), omException));
     }
-    return null;
   }
 
   /**
