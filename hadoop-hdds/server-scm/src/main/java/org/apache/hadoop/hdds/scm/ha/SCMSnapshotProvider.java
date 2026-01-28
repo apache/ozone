@@ -55,24 +55,111 @@ public class SCMSnapshotProvider {
 
   private final CertificateClient scmCertificateClient;
 
+  /**
+   * Startup options for SCM snapshot provider.
+   */
+  public enum StartupOption {
+    /**
+     * FORMAT mode: Ratis snapshot directory should not exist.
+     * Will create and initialize a new Ratis snapshot directory.
+     */
+    FORMAT,
+    /**
+     * NORMAL mode: Ratis snapshot directory should already exist.
+     * Will read from existing Ratis snapshot directory.
+     */
+    NORMAL
+  }
+
+  /**
+   * Creates SCMSnapshotProvider with default NORMAL startup option.
+   * This constructor is used in most scenarios where the Ratis snapshot
+   * directory is expected to already exist.
+   *
+   * @param conf Configuration source
+   * @param peerNodes List of peer SCM nodes
+   * @param scmCertificateClient Certificate client for secure communication
+   */
   public SCMSnapshotProvider(ConfigurationSource conf,
       List<SCMNodeDetails> peerNodes,
       CertificateClient scmCertificateClient) {
-    LOG.info("Initializing SCM Snapshot Provider");
+    this(conf, peerNodes, scmCertificateClient, StartupOption.NORMAL);
+  }
+
+  /**
+   * Creates SCMSnapshotProvider with specified startup option.
+   *
+   * @param conf Configuration source
+   * @param peerNodes List of peer SCM nodes
+   * @param scmCertificateClient Certificate client for secure communication
+   * @param startupOption Startup mode: FORMAT (create new) or NORMAL (use existing)
+   */
+  public SCMSnapshotProvider(ConfigurationSource conf,
+      List<SCMNodeDetails> peerNodes,
+      CertificateClient scmCertificateClient,
+      StartupOption startupOption) {
+    LOG.info("Initializing SCM Snapshot Provider with startup option: {}",
+        startupOption);
     this.conf = conf;
     this.scmCertificateClient = scmCertificateClient;
-    // Create Ratis storage dir
+
+    // Get directory paths from configuration
     String scmRatisDirectory = SCMHAUtils.getSCMRatisDirectory(conf);
+    String scmSnapshotDirectory = SCMHAUtils.getSCMRatisSnapshotDirectory(conf);
 
     if (scmRatisDirectory == null || scmRatisDirectory.isEmpty()) {
       throw new IllegalArgumentException(HddsConfigKeys.OZONE_METADATA_DIRS +
           " must be defined.");
     }
-    HddsUtils.createDir(scmRatisDirectory);
 
-    // Create Ratis snapshot dir
-    scmSnapshotDir = HddsUtils.createDir(
-        SCMHAUtils.getSCMRatisSnapshotDirectory(conf));
+    if (scmSnapshotDirectory == null || scmSnapshotDirectory.isEmpty()) {
+      throw new IllegalArgumentException("SCM Ratis snapshot directory must be defined.");
+    }
+
+    File ratisDir = new File(scmRatisDirectory);
+    File snapshotDir = new File(scmSnapshotDirectory);
+
+    // Ratis storage directory should already be created by SCMRatisServerImpl
+    // or by init/bootstrap commands. SCMSnapshotProvider is NOT responsible for creating it.
+    if (!ratisDir.exists()) {
+      throw new IllegalStateException(
+          "Ratis storage directory does not exist: " + ratisDir.getAbsolutePath()
+          + ". It should have been created by SCMRatisServerImpl.initialize().");
+    }
+
+    // Handle snapshot directory based on startup option
+    switch (startupOption) {
+    case FORMAT:
+      // FORMAT mode: snapshot directory should NOT exist
+      if (snapshotDir.exists()) {
+        throw new IllegalStateException(
+            "Cannot format: Ratis snapshot directory already exists: "
+            + snapshotDir.getAbsolutePath());
+      }
+      // Create new snapshot directory
+      this.scmSnapshotDir = HddsUtils.createDir(scmSnapshotDirectory);
+      LOG.info("Formatted: created new Ratis snapshot directory at {}",
+          this.scmSnapshotDir.getAbsolutePath());
+      break;
+
+    case NORMAL:
+      // NORMAL mode: snapshot directory MUST exist
+      if (!snapshotDir.exists()) {
+        throw new IllegalStateException(
+            "Ratis snapshot directory does not exist: "
+            + snapshotDir.getAbsolutePath()
+            + ". Please run 'ozone scm --init' first.");
+      }
+      this.scmSnapshotDir = snapshotDir;
+      LOG.info("Using existing Ratis snapshot directory at {}",
+          this.scmSnapshotDir.getAbsolutePath());
+      break;
+
+    default:
+      throw new IllegalArgumentException("Unknown startup option: " + startupOption);
+    }
+
+    // Initialize peer nodes map
     if (peerNodes != null) {
       this.peerNodesMap = new HashMap<>();
       for (SCMNodeDetails peerNode : peerNodes) {

@@ -1210,6 +1210,16 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
         scmStorageConfig.setPrimaryScmNodeId(scmInfo.getScmId());
         scmStorageConfig.setSCMHAFlag(true);
         scmStorageConfig.initialize();
+
+        // Create Ratis storage and snapshot directories during bootstrap
+        // This ensures they exist before the bootstrapped SCM starts normally
+        String ratisStorageDir = SCMHAUtils.getSCMRatisDirectory(conf);
+        String ratisSnapshotDir = SCMHAUtils.getSCMRatisSnapshotDirectory(conf);
+        HddsUtils.createDir(ratisStorageDir);
+        HddsUtils.createDir(ratisSnapshotDir);
+        LOG.info("Created Ratis storage directory: {}", ratisStorageDir);
+        LOG.info("Created Ratis snapshot directory: {}", ratisSnapshotDir);
+
         LOG.info("SCM BootStrap  is successful for ClusterID {}, SCMID {}",
             scmInfo.getClusterId(), scmStorageConfig.getScmId());
         LOG.info("Primary SCM Node ID {}",
@@ -1340,6 +1350,13 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     final SCMHANodeDetails haDetails = SCMHANodeDetails.loadSCMHAConfig(conf, storageConfig);
     SCMRatisServerImpl.initialize(storageConfig.getClusterID(),
         storageConfig.getScmId(), haDetails.getLocalNodeDetails(), conf);
+
+    // Create Ratis snapshot directory during initialization
+    // This ensures the directory exists before SCM starts normally
+    String snapshotDir = SCMHAUtils.getSCMRatisSnapshotDirectory(conf);
+    HddsUtils.createDir(snapshotDir);
+    LOG.info("Created Ratis snapshot directory: {}", snapshotDir);
+
     storageConfig.setSCMHAFlag(true);
     storageConfig.setPrimaryScmNodeId(storageConfig.getScmId());
     storageConfig.forceInitialize();

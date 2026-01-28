@@ -98,5 +98,14 @@ echo "Test keys created"
 
 echo "Restarting OM after key creation to flush and generate sst files"
 docker restart "${om_container}"
+wait_for_om_leader
+
+echo "Deleting test keys to create tombstones"
+docker exec "${om_container}" bash -c "kinit -kt /etc/security/keytabs/testuser.keytab testuser/om@EXAMPLE.COM && ozone fs -rm -R -skipTrash ofs://omservice/vol1/bucket1"
+echo "Test keys deleted"
+
+echo "Restarting OM after key deletion to flush tombstones to sst files"
+docker restart "${om_container}"
+wait_for_om_leader
 
 execute_robot_test ${OM} repair/om-compact.robot

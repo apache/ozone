@@ -95,10 +95,31 @@ public class SCMHAManagerImpl implements SCMHAManager {
   }
 
   @VisibleForTesting
-  protected SCMSnapshotProvider newScmSnapshotProvider(StorageContainerManager storageContainerManager) {
-    return new SCMSnapshotProvider(storageContainerManager.getConfiguration(),
+  protected SCMSnapshotProvider newScmSnapshotProvider(
+      StorageContainerManager storageContainerManager) {
+
+    // Determine startup option based on snapshot directory existence
+    String snapshotDir = SCMHAUtils.getSCMRatisSnapshotDirectory(
+        storageContainerManager.getConfiguration());
+    File snapshotDirFile = new File(snapshotDir);
+
+    SCMSnapshotProvider.StartupOption startupOption;
+    if (snapshotDirFile.exists()) {
+      // Snapshot directory exists -> use NORMAL mode
+      startupOption = SCMSnapshotProvider.StartupOption.NORMAL;
+    } else {
+      // Snapshot directory does not exist -> use FORMAT mode
+      startupOption = SCMSnapshotProvider.StartupOption.FORMAT;
+    }
+
+    LOG.info("Creating SCMSnapshotProvider with {} mode. Snapshot directory: {}",
+        startupOption, snapshotDir);
+
+    return new SCMSnapshotProvider(
+        storageContainerManager.getConfiguration(),
         storageContainerManager.getSCMHANodeDetails().getPeerNodeDetails(),
-        storageContainerManager.getScmCertificateClient());
+        storageContainerManager.getScmCertificateClient(),
+        startupOption);
   }
 
   /**
