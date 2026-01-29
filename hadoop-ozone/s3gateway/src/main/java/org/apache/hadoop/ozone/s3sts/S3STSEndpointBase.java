@@ -48,8 +48,18 @@ public class S3STSEndpointBase implements Auditor {
   @Inject
   private SignatureInfo signatureInfo;
 
-  protected static final AuditLogger AUDIT =
-      new AuditLogger(AuditLoggerType.S3GLOGGER);
+  protected static final AuditLogger DEFAULT_AUDIT = new AuditLogger(AuditLoggerType.S3GLOGGER);
+
+  private AuditLogger auditLogger = DEFAULT_AUDIT;
+
+  protected AuditLogger getAuditLogger() {
+    return auditLogger;
+  }
+
+  @VisibleForTesting
+  public void setAuditLogger(AuditLogger auditLogger) {
+    this.auditLogger = auditLogger;
+  }
 
   @PostConstruct
   public void initialization() {
@@ -70,6 +80,14 @@ public class S3STSEndpointBase implements Auditor {
     AuditMessage.Builder builder = new AuditMessage.Builder()
         .forOperation(op)
         .withParams(auditMap);
+    
+    if (signatureInfo != null) {
+      String accessId = signatureInfo.getAwsAccessId();
+      if (accessId != null && !accessId.isEmpty()) {
+        builder.setUser(accessId);
+      }
+    }
+
     if (context != null) {
       builder.atIp(AuditUtils.getClientIpAddress(context));
     }
@@ -110,5 +128,9 @@ public class S3STSEndpointBase implements Auditor {
   @VisibleForTesting
   public void setSignatureInfo(SignatureInfo signatureInfo) {
     this.signatureInfo = signatureInfo;
+  }
+
+  protected Map<String, String> getAuditParameters() {
+    return AuditUtils.getAuditParameters(context);
   }
 }

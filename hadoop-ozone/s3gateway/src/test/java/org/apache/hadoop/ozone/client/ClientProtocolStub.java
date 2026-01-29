@@ -805,12 +805,8 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
-  public AssumeRoleResponseInfo assumeRole(
-      String roleArn,
-      String roleSessionName,
-      int durationSeconds,
-      String awsIamSessionPolicy
-  ) throws IOException {
+  public AssumeRoleResponseInfo assumeRole(String roleArn, String roleSessionName, int durationSeconds,
+      String awsIamSessionPolicy, String requestId) throws IOException {
     return null;
   }
 

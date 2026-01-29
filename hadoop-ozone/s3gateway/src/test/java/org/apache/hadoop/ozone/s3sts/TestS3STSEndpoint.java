@@ -26,31 +26,37 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.io.StringReader;
 import java.time.Instant;
 import javax.ws.rs.container.ContainerRequestContext;
+import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.UriInfo;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
 import org.apache.hadoop.ozone.s3.OzoneConfigurationHolder;
+import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.exception.OSTSException;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.xml.sax.InputSource;
@@ -61,14 +67,12 @@ import org.xml.sax.InputSource;
 public class TestS3STSEndpoint {
   private S3STSEndpoint endpoint;
   private ObjectStore objectStore;
+  private AuditLogger auditLogger;
   private static final String ROLE_ARN = "arn:aws:iam::123456789012:role/test-role";
   private static final String ROLE_SESSION_NAME = "test-session";
   private static final String ROLE_USER_ARN = "arn:aws:sts::123456789012:assumed-role/test-role/" + ROLE_SESSION_NAME;
   private static final String STS_NS = "https://sts.amazonaws.com/doc/2011-06-15/";
   private static final String AWS_FAULT_NS = "http://webservices.amazon.com/AWSFault/2005-15-09";
-
-  @Mock
-  private ContainerRequestContext context;
 
   @BeforeEach
   public void setup() throws Exception {
@@ -77,9 +81,16 @@ public class TestS3STSEndpoint {
     OzoneConfigurationHolder.setConfiguration(config);
     OzoneClient clientStub = spy(new OzoneClientStub());
 
+    final ContainerRequestContext context = mock(ContainerRequestContext.class);
+    final RequestIdentifier requestIdentifier = mock(RequestIdentifier.class);
+    final UriInfo uriInfo = mock(UriInfo.class);
+    when(context.getUriInfo()).thenReturn(uriInfo);
+    when(uriInfo.getPathParameters()).thenReturn(new MultivaluedHashMap<>());
+    when(uriInfo.getQueryParameters()).thenReturn(new MultivaluedHashMap<>());
+
     // Stub assumeRole to return deterministic credentials.
     objectStore = mock(ObjectStore.class);
-    when(objectStore.assumeRole(anyString(), anyString(), anyInt(), any()))
+    when(objectStore.assumeRole(anyString(), anyString(), anyInt(), any(), anyString()))
         .thenReturn(new AssumeRoleResponseInfo(
             "ASIA1234567890123456",
             "mySecretAccessKey",
@@ -91,6 +102,12 @@ public class TestS3STSEndpoint {
     endpoint = new S3STSEndpoint();
     endpoint.setClient(clientStub);
     endpoint.setContext(context);
+    auditLogger = mock(AuditLogger.class);
+    endpoint.setAuditLogger(auditLogger);
+    
+    when(requestIdentifier.getRequestId()).thenReturn("test-request-id");
+    endpoint.setRequestIdentifier(requestIdentifier);
+
     SignatureInfo signatureInfo = new SignatureInfo.Builder(SignatureInfo.Version.V4)
         .setAwsAccessId("test-user")
         .setSignature("some-signature")
@@ -105,6 +122,8 @@ public class TestS3STSEndpoint {
         "AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null);
 
     assertEquals(200, response.getStatus());
+    verify(auditLogger).logWriteSuccess(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteFailure(any(AuditMessage.class));
 
     String responseXml = (String) response.getEntity();
     assertNotNull(responseXml);
@@ -141,6 +160,8 @@ public class TestS3STSEndpoint {
     final Response response = endpoint.post("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null);
 
     assertEquals(200, response.getStatus());
+    verify(auditLogger).logWriteSuccess(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteFailure(any(AuditMessage.class));
     final String responseXml = (String) response.getEntity();
     assertNotNull(responseXml);
 
@@ -174,6 +195,7 @@ public class TestS3STSEndpoint {
     final Response response = endpoint.get(null, ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null);
 
     assertEquals(400, response.getStatus());
+    verifyNoInteractions(auditLogger);
     final String errorMessage = (String) response.getEntity();
     assertEquals("<UnknownOperationException/>", errorMessage);
 
@@ -188,6 +210,7 @@ public class TestS3STSEndpoint {
         endpoint.get("UnsupportedAction", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
 
     assertEquals(400, ex.getHttpCode());
+    verifyNoInteractions(auditLogger);
 
     final String requestId = "test-request-id";
     ex.setRequestId(requestId);
@@ -201,6 +224,7 @@ public class TestS3STSEndpoint {
         endpoint.get("UnsupportedAction", ROLE_ARN, ROLE_SESSION_NAME, 3600, null, null));
 
     assertEquals(400, ex.getHttpCode());
+    verifyNoInteractions(auditLogger);
 
     final String requestId = "test-request-id";
     ex.setRequestId(requestId);
@@ -214,6 +238,8 @@ public class TestS3STSEndpoint {
         endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2000-01-01", null));
 
     assertEquals(400, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
 
     final String requestId = "test-request-id";
     ex.setRequestId(requestId);
@@ -227,6 +253,8 @@ public class TestS3STSEndpoint {
         endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, -1, "2011-06-15", null));
 
     assertEquals(400, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
 
     final String requestId = "test-request-id";
     ex.setRequestId(requestId);
@@ -238,9 +266,11 @@ public class TestS3STSEndpoint {
     final Response response = endpoint.get(
         "AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, null, "2011-06-15", null);
     assertEquals(200, response.getStatus());
+    verify(auditLogger).logWriteSuccess(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteFailure(any(AuditMessage.class));
 
     final ArgumentCaptor<Integer> durationCaptor = ArgumentCaptor.forClass(Integer.class);
-    verify(objectStore).assumeRole(anyString(), anyString(), durationCaptor.capture(), any());
+    verify(objectStore).assumeRole(anyString(), anyString(), durationCaptor.capture(), any(), anyString());
     assertEquals(3600, durationCaptor.getValue());
   }
 
@@ -252,6 +282,8 @@ public class TestS3STSEndpoint {
         endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", tooLargePolicy));
 
     assertEquals(400, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
 
     final String requestId = "test-request-id";
     ex.setRequestId(requestId);
@@ -267,6 +299,8 @@ public class TestS3STSEndpoint {
         endpoint.get("AssumeRole", invalidRoleArn, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
 
     assertEquals(400, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
 
     final String requestId = "test-request-id";
     ex.setRequestId(requestId);
@@ -280,6 +314,8 @@ public class TestS3STSEndpoint {
         endpoint.get("AssumeRole", null, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
 
     assertEquals(400, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
 
     final String requestId = "test-request-id";
     ex.setRequestId(requestId);
@@ -294,6 +330,8 @@ public class TestS3STSEndpoint {
 
     assertEquals(400, ex.getHttpCode());
     assertEquals("ValidationError", ex.getCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
 
     final String requestId = "test-request-id";
     ex.setRequestId(requestId);
@@ -308,6 +346,8 @@ public class TestS3STSEndpoint {
 
     assertEquals(400, ex.getHttpCode());
     assertEquals("ValidationError", ex.getCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
 
     final String requestId = "test-request-id";
     ex.setRequestId(requestId);
@@ -321,6 +361,7 @@ public class TestS3STSEndpoint {
         endpoint.get("GetSessionToken", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
 
     assertEquals(501, ex.getHttpCode());
+    verifyNoInteractions(auditLogger);
 
     final String requestId = "test-request-id";
     ex.setRequestId(requestId);
@@ -334,6 +375,8 @@ public class TestS3STSEndpoint {
         endpoint.get("AssumeRole", ROLE_ARN, null, 3600, "2011-06-15", null));
 
     assertEquals(400, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
 
     final String requestId = "test-request-id";
     ex.setRequestId(requestId);
@@ -347,6 +390,8 @@ public class TestS3STSEndpoint {
         endpoint.get("AssumeRole", ROLE_ARN, invalidSession, 3600, "2011-06-15", null));
 
     assertEquals(400, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
 
     final String requestId = "test-request-id";
     ex.setRequestId(requestId);
@@ -360,6 +405,8 @@ public class TestS3STSEndpoint {
         endpoint.get("AssumeRole", ROLE_ARN, invalidSession, 3600, "2011-06-15", null));
 
     assertEquals(400, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
 
     final String requestId = "test-request-id";
     ex.setRequestId(requestId);
@@ -374,6 +421,8 @@ public class TestS3STSEndpoint {
         endpoint.get("AssumeRole", invalidRoleArn, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
 
     assertEquals(400, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
 
     final String requestId = "test-request-id";
     ex.setRequestId(requestId);
@@ -382,13 +431,15 @@ public class TestS3STSEndpoint {
 
   @Test
   public void testStsInternalFailureWhenBackendThrows() throws Exception {
-    when(objectStore.assumeRole(anyString(), anyString(), anyInt(), any()))
+    when(objectStore.assumeRole(anyString(), anyString(), anyInt(), any(), anyString()))
         .thenThrow(new RuntimeException("some unexpected error"));
 
     final OSTSException ex = assertThrows(OSTSException.class, () ->
         endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
 
     assertEquals(500, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
 
     final String requestId = "test-request-id";
     ex.setRequestId(requestId);
@@ -397,13 +448,15 @@ public class TestS3STSEndpoint {
 
   @Test
   public void testStsAccessDenied() throws Exception {
-    when(objectStore.assumeRole(anyString(), anyString(), anyInt(), any()))
+    when(objectStore.assumeRole(anyString(), anyString(), anyInt(), any(), anyString()))
         .thenThrow(new OMException("Permission denied", OMException.ResultCodes.ACCESS_DENIED));
 
     final OSTSException ex = assertThrows(OSTSException.class, () ->
         endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
 
     assertEquals(403, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
 
     final String requestId = "test-request-id";
     ex.setRequestId(requestId);
@@ -413,13 +466,15 @@ public class TestS3STSEndpoint {
 
   @Test
   public void testStsIOExceptionWrappedAsInternalFailure() throws Exception {
-    when(objectStore.assumeRole(anyString(), anyString(), anyInt(), any()))
+    when(objectStore.assumeRole(anyString(), anyString(), anyInt(), any(), anyString()))
         .thenThrow(new IOException("An IO error occurred"));
 
     final OSTSException ex = assertThrows(OSTSException.class, () ->
         endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
 
     assertEquals(500, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
 
     final String requestId = "test-request-id";
     ex.setRequestId(requestId);
