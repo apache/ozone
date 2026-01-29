@@ -1846,21 +1846,29 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
   private void createLifecyclePolicy(String volume, String bucket, BucketLayout layout, String prefix,
       OmLCFilter filter, String date, boolean enabled) throws IOException {
-    OmLifecycleConfiguration lcc = new OmLifecycleConfiguration.Builder()
-        .setVolume(volume)
-        .setBucket(bucket)
-        .setBucketLayout(layout)
-        .setBucketObjectID(bucketObjectID)
-        .setRules(Collections.singletonList(new OmLCRule.Builder()
-            .setId(String.valueOf(OBJECT_ID_COUNTER.getAndIncrement()))
-            .setEnabled(enabled)
-            .setPrefix(prefix)
-            .setFilter(filter)
-            .setAction(new OmLCExpiration.Builder()
-                .setDate(date)
-                .build())
-            .build()))
-        .build();
+    OmLifecycleConfiguration lcc;
+    try {
+      lcc = new OmLifecycleConfiguration.Builder()
+          .setVolume(volume)
+          .setBucket(bucket)
+          .setBucketLayout(layout)
+          .setBucketObjectID(bucketObjectID)
+          .setRules(Collections.singletonList(new OmLCRule.Builder()
+              .setId(String.valueOf(OBJECT_ID_COUNTER.getAndIncrement()))
+              .setEnabled(enabled)
+              .setPrefix(prefix)
+              .setFilter(filter)
+              .setAction(new OmLCExpiration.Builder()
+                  .setDate(date)
+                  .build())
+              .build()))
+          .build();
+    } catch (IllegalArgumentException e) {
+      if (e.getCause() instanceof OMException) {
+        throw (OMException) e.getCause();
+      }
+      throw e;
+    }
     String key = "/" + volume + "/" + bucket;
     LifecycleConfiguration lcProto = lcc.getProtobuf();
     OmLifecycleConfiguration canonicalLcc = OmLifecycleConfiguration.getFromProtobuf(lcProto);
@@ -1872,13 +1880,21 @@ class TestKeyLifecycleService extends OzoneTestBase {
 
   private void createLifecyclePolicy(String volume, String bucket, BucketLayout layout, List<OmLCRule> ruleList)
       throws IOException {
-    OmLifecycleConfiguration lcc = new OmLifecycleConfiguration.Builder()
-        .setVolume(volume)
-        .setBucket(bucket)
-        .setBucketObjectID(bucketObjectID)
-        .setBucketLayout(layout)
-        .setRules(ruleList)
-        .build();
+    OmLifecycleConfiguration lcc;
+    try {
+      lcc = new OmLifecycleConfiguration.Builder()
+          .setVolume(volume)
+          .setBucket(bucket)
+          .setBucketObjectID(bucketObjectID)
+          .setBucketLayout(layout)
+          .setRules(ruleList)
+          .build();
+    } catch (IllegalArgumentException e) {
+      if (e.getCause() instanceof OMException) {
+        throw (OMException) e.getCause();
+      }
+      throw e;
+    }
     String key = "/" + volume + "/" + bucket;
     LifecycleConfiguration lcProto = lcc.getProtobuf();
     OmLifecycleConfiguration canonicalLcc = OmLifecycleConfiguration.getFromProtobuf(lcProto);
