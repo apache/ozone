@@ -26,11 +26,11 @@ import org.apache.hadoop.ozone.s3.endpoint.ObjectEndpoint.ObjectRequestContext;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 
 /** Chain of responsibility for {@link ObjectOperationHandler}s. */
-final class CompositeObjectOperationHandler extends ObjectOperationHandler {
+final class ObjectOperationHandlerChain extends ObjectOperationHandler {
 
   private final List<ObjectOperationHandler> handlers;
 
-  private CompositeObjectOperationHandler(List<ObjectOperationHandler> handlers) {
+  private ObjectOperationHandlerChain(List<ObjectOperationHandler> handlers) {
     this.handlers = handlers;
   }
 
@@ -83,7 +83,7 @@ final class CompositeObjectOperationHandler extends ObjectOperationHandler {
     return new Builder(endpoint);
   }
 
-  /** Builds {@code CompositeObjectOperationHandler}. */
+  /** Builds {@code ObjectOperationHandlerChain}. */
   static final class Builder {
     private final List<ObjectOperationHandler> handlers = new LinkedList<>();
     private final ObjectEndpoint endpoint;
@@ -98,9 +98,9 @@ final class CompositeObjectOperationHandler extends ObjectOperationHandler {
       return this;
     }
 
-    /** Create {@code CompositeObjectOperationHandler} with the list of delegates. */
+    /** Create {@code ObjectOperationHandlerChain} with the list of delegates. */
     ObjectOperationHandler build() {
-      return new CompositeObjectOperationHandler(handlers)
+      return new ObjectOperationHandlerChain(handlers)
           .copyDependenciesFrom(endpoint);
     }
   }

@@ -148,12 +148,12 @@ public class ObjectEndpoint extends ObjectOperationHandler {
   @Override
   protected void init() {
     super.init();
-    ObjectOperationHandler composite = CompositeObjectOperationHandler.newBuilder(this)
+    ObjectOperationHandler chain = ObjectOperationHandlerChain.newBuilder(this)
         .add(new ObjectAclHandler())
         .add(new ObjectTaggingHandler())
         .add(this)
         .build();
-    handler = new AuditingObjectOperationHandler(composite);
+    handler = new AuditingObjectOperationHandler(chain);
   }
 
   /**
