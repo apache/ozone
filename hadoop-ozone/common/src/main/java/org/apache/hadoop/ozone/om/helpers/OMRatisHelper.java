@@ -67,11 +67,12 @@ public final class OMRatisHelper {
   public static OMResponse getOMResponseFromRaftClientReply(RaftClientReply reply, String leaderOMNodeId)
       throws IOException {
     final OMResponse response = convertByteStringToOMResponse(reply.getMessage().getContent());
-    OMResponse.Builder omResponse = OMResponse.newBuilder(response);
-    if (leaderOMNodeId != null) {
-      omResponse.setLeaderOMNodeId(leaderOMNodeId);
+    if (leaderOMNodeId == null) {
+      return response;
     }
-    return omResponse.build();
+    return OMResponse.newBuilder(response)
+        .setLeaderOMNodeId(leaderOMNodeId)
+        .build();
   }
 
   /** Convert the given {@link StateMachineLogEntryProto} to a short {@link String}. */
