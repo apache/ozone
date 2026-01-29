@@ -21,10 +21,13 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.List;
+import javax.ws.rs.HttpMethod;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -97,12 +100,14 @@ public final class EndpointTestUtils {
       String content
   ) throws IOException, OS3Exception {
     subject.queryParamsForTest().set(S3Consts.QueryParams.TAGGING, "");
+    when(subject.getContext().getMethod()).thenReturn(HttpMethod.PUT);
+    setLengthHeader(subject, content);
+
     if (content == null) {
-      return subject.put(bucket, key, 0, null);
+      return subject.put(bucket, key, null);
     } else {
-      final long length = content.length();
       try (ByteArrayInputStream body = new ByteArrayInputStream(content.getBytes(UTF_8))) {
-        return subject.put(bucket, key, length, body);
+        return subject.put(bucket, key, body);
       }
     }
   }
@@ -120,13 +125,14 @@ public final class EndpointTestUtils {
       subject.queryParamsForTest().set(S3Consts.QueryParams.UPLOAD_ID, uploadID);
     }
     subject.queryParamsForTest().setInt(S3Consts.QueryParams.PART_NUMBER, partNumber);
+    when(subject.getContext().getMethod()).thenReturn(HttpMethod.PUT);
+    setLengthHeader(subject, content);
 
     if (content == null) {
-      return subject.put(bucket, key, 0, null);
+      return subject.put(bucket, key, null);
     } else {
-      final long length = content.length();
       try (ByteArrayInputStream body = new ByteArrayInputStream(content.getBytes(UTF_8))) {
-        return subject.put(bucket, key, length, body);
+        return subject.put(bucket, key, body);
       }
     }
   }
@@ -250,6 +256,12 @@ public final class EndpointTestUtils {
     assertEquals(expected.getCode(), actual.getCode());
     assertEquals(expected.getHttpCode(), actual.getHttpCode());
     return actual;
+  }
+
+  private static void setLengthHeader(ObjectEndpoint subject, String content) {
+    final long length = content != null ? content.length() : 0;
+    when(subject.getHeaders().getHeaderString(HttpHeaders.CONTENT_LENGTH))
+        .thenReturn(String.valueOf(length));
   }
 
   private EndpointTestUtils() {
