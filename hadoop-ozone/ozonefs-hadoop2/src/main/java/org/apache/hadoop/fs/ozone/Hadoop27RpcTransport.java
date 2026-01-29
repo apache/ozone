@@ -85,18 +85,7 @@ public class Hadoop27RpcTransport implements OmTransport {
   @Override
   public OMResponse submitRequest(OMRequest payload) throws IOException {
     try {
-      OMResponse omResponse =
-          rpcProxy.submitRequest(NULL_RPC_CONTROLLER, payload);
-
-      if (omResponse.hasLeaderOMNodeId() && omFailoverProxyProvider != null) {
-        String leaderOmId = omResponse.getLeaderOMNodeId();
-
-        // Failover to the OM node returned by OMResponse leaderOMNodeId if
-        // current proxy is not pointing to that node.
-        omFailoverProxyProvider.setNextOmProxy(leaderOmId);
-        omFailoverProxyProvider.performFailover(null);
-      }
-      return omResponse;
+      return rpcProxy.submitRequest(NULL_RPC_CONTROLLER, payload);
     } catch (ServiceException e) {
       OMNotLeaderException notLeaderException =
           HadoopRpcOMFailoverProxyProvider.getNotLeaderException(e);

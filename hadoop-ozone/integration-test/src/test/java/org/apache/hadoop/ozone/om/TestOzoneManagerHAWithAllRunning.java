@@ -33,7 +33,6 @@ import static org.apache.ratis.metrics.RatisMetrics.RATIS_APPLICATION_NAME_METRI
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -309,45 +308,6 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
       assertTrue(omClientProxyExists,
           () -> "No Client Proxy for node " + om.getOMNodeId());
     }
-  }
-
-  /**
-   * Test HadoopRpcOMFailoverProxyProvider failover when current OM proxy is not
-   * the current OM Leader.
-   */
-  @Test
-  public void testOMProxyProviderFailoverToCurrentLeader() throws Exception {
-    ObjectStore objectStore = getObjectStore();
-    final HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> omFailoverProxyProvider
-        = OmTestUtil.getFailoverProxyProvider(objectStore);
-
-    // Run couple of createVolume tests to discover the current Leader OM
-    createVolumeTest(true);
-    createVolumeTest(true);
-
-    // The oMFailoverProxyProvider will point to the current leader OM node.
-    String leaderOMNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
-
-    // Perform a manual failover of the proxy provider to move the
-    // currentProxyIndex to a node other than the leader OM.
-    omFailoverProxyProvider.selectNextOmProxy();
-    omFailoverProxyProvider.performFailover(null);
-
-    String newProxyNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
-    assertNotEquals(leaderOMNodeId, newProxyNodeId);
-
-    // Once another request is sent to this new proxy node, the leader
-    // information must be returned via the response and a failover must
-    // happen to the leader proxy node.
-    createVolumeTest(true);
-    Thread.sleep(2000);
-
-    String newLeaderOMNodeId =
-        omFailoverProxyProvider.getCurrentProxyOMNodeId();
-
-    // The old and new Leader OM NodeId must match since there was no new
-    // election in the Ratis ring.
-    assertEquals(leaderOMNodeId, newLeaderOMNodeId);
   }
 
   /**
