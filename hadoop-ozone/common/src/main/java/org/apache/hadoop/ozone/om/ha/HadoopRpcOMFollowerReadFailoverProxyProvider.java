@@ -61,8 +61,7 @@ import org.slf4j.LoggerFactory;
  * follower is disabled.
  */
 public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverProxyProvider<OzoneManagerProtocolPB> {
-  @VisibleForTesting
-  public static final Logger LOG = LoggerFactory.getLogger(HadoopRpcOMFollowerReadFailoverProxyProvider.class);
+  private static final Logger LOG = LoggerFactory.getLogger(HadoopRpcOMFollowerReadFailoverProxyProvider.class);
 
   /** The inner proxy provider used for leader-based failover. */
   private final HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> failoverProxy;
@@ -85,16 +84,14 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
   /** The last proxy that has been used. Only used for testing. */
   private volatile OMProxyInfo<OzoneManagerProtocolPB> lastProxy = null;
 
-  public HadoopRpcOMFollowerReadFailoverProxyProvider(String omServiceId,
+  public HadoopRpcOMFollowerReadFailoverProxyProvider(
       HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> failoverProxy) {
     this.failoverProxy = failoverProxy;
-
     // Create a wrapped proxy containing all the proxies. Since this combined
     // proxy is just redirecting to other proxies, all invocations can share it.
     final String combinedInfo = "[" + failoverProxy.getOMProxies().stream()
         .map(a -> a.proxyInfo)
         .reduce((a, b) -> a + ", " + b).orElse("") + "]";
-    @SuppressWarnings("unchecked")
     OzoneManagerProtocolPB wrappedProxy = (OzoneManagerProtocolPB) Proxy.newProxyInstance(
         FollowerReadInvocationHandler.class.getClassLoader(),
         new Class<?>[] {OzoneManagerProtocolPB.class}, new FollowerReadInvocationHandler());
@@ -152,11 +149,6 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
       throwServiceException(new RpcNoSuchProtocolException("Failed to parseOMRequest: " + error));
     }
     return (OMRequest) args[1];
-  }
-
-  @VisibleForTesting
-  void setUseFollowerRead(boolean flag) {
-    this.useFollowerRead = flag;
   }
 
   @VisibleForTesting

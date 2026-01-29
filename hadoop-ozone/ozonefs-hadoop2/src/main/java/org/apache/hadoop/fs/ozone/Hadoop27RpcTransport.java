@@ -68,8 +68,8 @@ public class Hadoop27RpcTransport implements OmTransport {
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT);
 
     if (followerReadEnabled) {
-      this.followerReadFailoverProxyProvider = new HadoopRpcOMFollowerReadFailoverProxyProvider(
-          omServiceId, omFailoverProxyProvider);
+      this.followerReadFailoverProxyProvider =
+          new HadoopRpcOMFollowerReadFailoverProxyProvider(omFailoverProxyProvider);
       this.rpcProxy = OzoneManagerProtocolPB.newProxy(followerReadFailoverProxyProvider, maxFailovers);
     } else {
       // TODO: It should be possible to simply instantiate HadoopRpcOMFollowerReadFailoverProxyProvider

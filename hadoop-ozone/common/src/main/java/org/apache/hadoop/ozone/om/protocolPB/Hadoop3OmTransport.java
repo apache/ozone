@@ -74,8 +74,8 @@ public class Hadoop3OmTransport implements OmTransport {
     //  So instead of enabling using follower read configuration, we can simply let user to configure the
     //  failover proxy provider instead (similar to dfs.client.failover.proxy.provider.<nameservice>)
     if (followerReadEnabled) {
-      this.followerReadFailoverProxyProvider = new HadoopRpcOMFollowerReadFailoverProxyProvider(
-          omServiceId, omFailoverProxyProvider);
+      this.followerReadFailoverProxyProvider =
+          new HadoopRpcOMFollowerReadFailoverProxyProvider(omFailoverProxyProvider);
       this.rpcProxy = OzoneManagerProtocolPB.newProxy(followerReadFailoverProxyProvider, maxFailovers);
     } else {
       // TODO: It should be possible to simply instantiate HadoopRpcOMFollowerReadFailoverProxyProvider

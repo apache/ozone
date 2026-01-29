@@ -417,8 +417,7 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
         };
 
     // Wrap the leader-based failover proxy provider with follower read proxy provider
-    proxyProvider = new HadoopRpcOMFollowerReadFailoverProxyProvider(
-        OM_SERVICE_ID, underlyingProxyProvider);
+    proxyProvider = new HadoopRpcOMFollowerReadFailoverProxyProvider(underlyingProxyProvider);
     assertTrue(proxyProvider.isUseFollowerRead());
     // Wrap the follower read proxy provider in retry proxy to allow automatic failover
     retryProxy = (OzoneManagerProtocolPB) RetryProxy.create(
