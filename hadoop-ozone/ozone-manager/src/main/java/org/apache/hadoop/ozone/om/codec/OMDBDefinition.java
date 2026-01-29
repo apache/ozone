@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBAccessIdInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDBTenantState;
 import org.apache.hadoop.ozone.om.helpers.OmDBUserPrincipalInfo;
@@ -315,6 +316,13 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
           StringCodec.get(),
           CompactionLogEntry.getCodec());
 
+  public static final String COMPLETED_REQUEST_INFO_TABLE = "completedRequestInfoTable";
+  /** completedOperationnfoTable: txId :- OmCompletedRequestInfo. */
+  public static final DBColumnFamilyDefinition<Long, OmCompletedRequestInfo> COMPLETED_REQUEST_INFO_TABLE_DEF
+      = new DBColumnFamilyDefinition<>(COMPLETED_REQUEST_INFO_TABLE,
+          LongCodec.get(),
+          OmCompletedRequestInfo.getCodec());
+
   //---------------------------------------------------------------------------
   private static final Map<String, DBColumnFamilyDefinition<?, ?>> COLUMN_FAMILIES
       = DBColumnFamilyDefinition.newUnmodifiableMap(
@@ -339,7 +347,8 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
           TENANT_STATE_TABLE_DEF,
           TRANSACTION_INFO_TABLE_DEF,
           USER_TABLE_DEF,
-          VOLUME_TABLE_DEF);
+          VOLUME_TABLE_DEF,
+          COMPLETED_REQUEST_INFO_TABLE_DEF);
 
   private static final OMDBDefinition INSTANCE = new OMDBDefinition();
 
