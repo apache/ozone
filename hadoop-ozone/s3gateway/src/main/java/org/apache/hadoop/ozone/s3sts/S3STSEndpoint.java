@@ -22,13 +22,15 @@ import static javax.ws.rs.core.Response.Status.FORBIDDEN;
 import static javax.ws.rs.core.Response.Status.INTERNAL_SERVER_ERROR;
 import static javax.ws.rs.core.Response.Status.NOT_IMPLEMENTED;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
-import java.util.UUID;
+import java.util.Map;
+import javax.inject.Inject;
 import javax.ws.rs.FormParam;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -40,8 +42,11 @@ import javax.ws.rs.core.Response;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
+import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
+import org.apache.hadoop.ozone.om.helpers.S3STSUtils;
+import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.OSTSException;
 import org.slf4j.Logger;
@@ -75,6 +80,11 @@ public class S3STSEndpoint extends S3STSEndpointBase {
   private static final String GET_ACCESS_KEY_INFO_ACTION = "GetAccessKeyInfo";
 
   private static final String EXPECTED_VERSION = "2011-06-15";
+  private static final String VALIDATION_ERROR = "ValidationError";
+  private static final String INVALID_ACTION = "InvalidAction";
+  private static final String INTERNAL_FAILURE = "InternalFailure";
+  private static final String ACCESS_DENIED = "AccessDenied";
+  private static final String INVALID_CLIENT_TOKEN_ID = "InvalidClientTokenId";
 
   // Default token duration (in seconds) - AWS default is 3600 (1 hour)
   // TODO - add these constants and also validations in a common place that both endpoint and backend can use
@@ -82,6 +92,14 @@ public class S3STSEndpoint extends S3STSEndpointBase {
   private static final int MAX_DURATION_SECONDS = 43200; // 12 hours
   private static final int MIN_DURATION_SECONDS = 900;   // 15 minutes
   private static final int MAX_SESSION_POLICY_SIZE = 2048;
+
+  @Inject
+  private RequestIdentifier requestIdentifier;
+
+  @VisibleForTesting
+  public void setRequestIdentifier(RequestIdentifier requestIdentifier) {
+    this.requestIdentifier = requestIdentifier;
+  }
 
   /**
    * STS endpoint that handles GET requests with query parameters.
@@ -133,7 +151,8 @@ public class S3STSEndpoint extends S3STSEndpointBase {
 
   private Response handleSTSRequest(String action, String roleArn, String roleSessionName,
       Integer durationSeconds, String version, String awsIamSessionPolicy) throws OS3Exception {
-    final String requestId = UUID.randomUUID().toString();
+    final String requestId = requestIdentifier.getRequestId();
+    // NOTE: invalid, missing or unsupported actions are not added to the audit log
     try {
       if (action == null) {
         // Amazon STS has a different structure for the XML error response when the action is missing
@@ -154,10 +173,10 @@ public class S3STSEndpoint extends S3STSEndpointBase {
       case DECODE_AUTHORIZATION_MESSAGE_ACTION:
       case GET_ACCESS_KEY_INFO_ACTION:
         throw new OSTSException(
-            "InvalidAction", "Operation " + action + " is not supported yet.", NOT_IMPLEMENTED.getStatusCode());
+            INVALID_ACTION, "Operation " + action + " is not supported yet.", NOT_IMPLEMENTED.getStatusCode());
       default:
         throw new OSTSException(
-            "InvalidAction", "Could not find operation " + action + " for version " +
+            INVALID_ACTION, "Could not find operation " + action + " for version " +
             (version == null ? "NO_VERSION_SPECIFIED.  Expected version is: " + EXPECTED_VERSION : version),
             BAD_REQUEST.getStatusCode());
       }
@@ -166,7 +185,119 @@ public class S3STSEndpoint extends S3STSEndpointBase {
     } catch (Exception ex) {
       LOG.error("Unexpected error during STS request", ex);
       throw new OSTSException(
-          "InternalFailure", "An internal error has occurred.", INTERNAL_SERVER_ERROR.getStatusCode(), "Receiver");
+          INTERNAL_FAILURE, "An internal error has occurred.", INTERNAL_SERVER_ERROR.getStatusCode(), "Receiver");
+    }
+  }
+
+  private Response handleAssumeRole(String roleArn, String roleSessionName, Integer durationSeconds,
+      String awsIamSessionPolicy, String version, String requestId) throws OSTSException {
+    final String action = "AssumeRole";
+    final Map<String, String> auditParams = getAuditParameters();
+    S3STSUtils.addAssumeRoleAuditParams(
+        auditParams, roleArn, roleSessionName, awsIamSessionPolicy,
+        durationSeconds == null ? DEFAULT_DURATION_SECONDS : durationSeconds,
+        requestId);
+
+    int duration;
+    try {
+      // Validate parameters
+      duration = validateDuration(durationSeconds);
+    } catch (IllegalArgumentException e) {
+      final OSTSException exception = new OSTSException(VALIDATION_ERROR, e.getMessage(), BAD_REQUEST.getStatusCode());
+      getAuditLogger().logWriteFailure(buildAuditMessageForFailure(S3GAction.ASSUME_ROLE, auditParams, exception));
+      throw exception;
+    }
+
+    if (version == null || !version.equals(EXPECTED_VERSION)) {
+      final OSTSException exception = new OSTSException(
+          INVALID_ACTION, "Could not find operation " + action + " for version " +
+          (version == null ? "NO_VERSION_SPECIFIED.  Expected version is: " + EXPECTED_VERSION : version),
+          BAD_REQUEST.getStatusCode());
+      getAuditLogger().logWriteFailure(buildAuditMessageForFailure(S3GAction.ASSUME_ROLE, auditParams, exception));
+      throw exception;
+    }
+
+    if (roleArn == null || roleArn.isEmpty()) {
+      final OSTSException exception = new OSTSException(
+          VALIDATION_ERROR, "Value null at 'roleArn' failed to satisfy constraint: Member must not be null",
+          BAD_REQUEST.getStatusCode());
+      getAuditLogger().logWriteFailure(buildAuditMessageForFailure(S3GAction.ASSUME_ROLE, auditParams, exception));
+      throw exception;
+    }
+
+    if (roleSessionName == null || roleSessionName.isEmpty()) {
+      final OSTSException exception = new OSTSException(
+          VALIDATION_ERROR, "Value null at 'roleSessionName' failed to satisfy constraint: Member must not be null",
+          BAD_REQUEST.getStatusCode());
+      getAuditLogger().logWriteFailure(buildAuditMessageForFailure(S3GAction.ASSUME_ROLE, auditParams, exception));
+      throw exception;
+    }
+
+    // Validate role session name format (AWS requirements)
+    if (!isValidRoleSessionName(roleSessionName)) {
+      final OSTSException exception = new OSTSException(
+          VALIDATION_ERROR, "Invalid RoleSessionName: must be 2-64 characters long and " +
+          "contain only alphanumeric characters, +, =, ,, ., @, -",
+          BAD_REQUEST.getStatusCode());
+      getAuditLogger().logWriteFailure(buildAuditMessageForFailure(S3GAction.ASSUME_ROLE, auditParams, exception));
+      throw exception;
+    }
+
+    // Check Policy size if available
+    if (awsIamSessionPolicy != null && awsIamSessionPolicy.length() > MAX_SESSION_POLICY_SIZE) {
+      final OSTSException exception = new OSTSException(
+          VALIDATION_ERROR, "Value '" + awsIamSessionPolicy + "' at 'policy' failed to satisfy constraint: Member " +
+          "must have length less than or equal to 2048", BAD_REQUEST.getStatusCode());
+      getAuditLogger().logWriteFailure(buildAuditMessageForFailure(S3GAction.ASSUME_ROLE, auditParams, exception));
+      throw exception;
+    }
+
+    final String assumedRoleUserArn;
+    try {
+      assumedRoleUserArn = toAssumedRoleUserArn(roleArn, roleSessionName);
+    } catch (IllegalArgumentException e) {
+      final OSTSException exception = new OSTSException(VALIDATION_ERROR, e.getMessage(), BAD_REQUEST.getStatusCode());
+      getAuditLogger().logWriteFailure(buildAuditMessageForFailure(S3GAction.ASSUME_ROLE, auditParams, exception));
+      throw exception;
+    }
+
+    try {
+      final AssumeRoleResponseInfo responseInfo = getClient()
+          .getObjectStore()
+          .assumeRole(roleArn, roleSessionName, duration, awsIamSessionPolicy, requestId);
+      // Generate AssumeRole response
+      final String responseXml = generateAssumeRoleResponse(assumedRoleUserArn, responseInfo, requestId);
+
+      getAuditLogger().logWriteSuccess(buildAuditMessageForSuccess(S3GAction.ASSUME_ROLE, auditParams));
+
+      return Response.ok(responseXml)
+          .header("Content-Type", "text/xml")
+          .build();
+    } catch (IOException e) {
+      LOG.error("Error during AssumeRole processing", e);
+
+      getAuditLogger().logWriteFailure(buildAuditMessageForFailure(S3GAction.ASSUME_ROLE, auditParams, e));
+
+      if (e instanceof OMException) {
+        final OMException omException = (OMException) e;
+        if (omException.getResult() == OMException.ResultCodes.ACCESS_DENIED ||
+            omException.getResult() == OMException.ResultCodes.PERMISSION_DENIED ||
+            omException.getResult() == OMException.ResultCodes.TOKEN_EXPIRED) {
+          throw new OSTSException(
+              ACCESS_DENIED, "User is not authorized to perform: sts:AssumeRole on resource: " + roleArn,
+              FORBIDDEN.getStatusCode());
+        }
+        if (omException.getResult() == OMException.ResultCodes.INVALID_TOKEN) {
+          throw new OSTSException(
+              INVALID_CLIENT_TOKEN_ID, "The security token included in the request is invalid.",
+              FORBIDDEN.getStatusCode());
+        }
+      }
+      throw new OSTSException(
+          INTERNAL_FAILURE, "An internal error has occurred.", INTERNAL_SERVER_ERROR.getStatusCode(), "Receiver");
+    } catch (Exception e) {
+      getAuditLogger().logWriteFailure(buildAuditMessageForFailure(S3GAction.ASSUME_ROLE, auditParams, e));
+      throw e;
     }
   }
 
@@ -182,89 +313,6 @@ public class S3STSEndpoint extends S3STSEndpointBase {
     }
 
     return durationSeconds;
-  }
-
-  private Response handleAssumeRole(String roleArn, String roleSessionName, Integer durationSeconds,
-      String awsIamSessionPolicy, String version, String requestId) throws OSTSException {
-    // Validate parameters
-    final String action = "AssumeRole";
-    int duration;
-    try {
-      duration = validateDuration(durationSeconds);
-    } catch (IllegalArgumentException e) {
-      throw new OSTSException("ValidationError", e.getMessage(), BAD_REQUEST.getStatusCode());
-    }
-
-    if (version == null || !version.equals(EXPECTED_VERSION)) {
-      throw new OSTSException(
-          "InvalidAction", "Could not find operation " + action + " for version " +
-          (version == null ? "NO_VERSION_SPECIFIED.  Expected version is: " + EXPECTED_VERSION : version),
-          BAD_REQUEST.getStatusCode());
-    }
-
-    if (roleArn == null || roleArn.isEmpty()) {
-      throw new OSTSException(
-          "ValidationError", "Value null at 'roleArn' failed to satisfy constraint: Member must not be null",
-          BAD_REQUEST.getStatusCode());
-    }
-
-    if (roleSessionName == null || roleSessionName.isEmpty()) {
-      throw new OSTSException(
-          "ValidationError", "Value null at 'roleSessionName' failed to satisfy constraint: Member must not be null",
-          BAD_REQUEST.getStatusCode());
-    }
-
-    // Validate role session name format (AWS requirements)
-    if (!isValidRoleSessionName(roleSessionName)) {
-      throw new OSTSException(
-          "ValidationError", "Invalid RoleSessionName: must be 2-64 characters long and " +
-          "contain only alphanumeric characters, +, =, ,, ., @, -",
-          BAD_REQUEST.getStatusCode());
-    }
-
-    // Check Policy size if available
-    if (awsIamSessionPolicy != null && awsIamSessionPolicy.length() > MAX_SESSION_POLICY_SIZE) {
-      throw new OSTSException(
-          "ValidationError", "Value '" + awsIamSessionPolicy + "' at 'policy' failed to satisfy constraint: Member " +
-          "must have length less than or equal to 2048", BAD_REQUEST.getStatusCode());
-    }
-
-    final String assumedRoleUserArn;
-    try {
-      assumedRoleUserArn = toAssumedRoleUserArn(roleArn, roleSessionName);
-    } catch (IllegalArgumentException e) {
-      throw new OSTSException("ValidationError", e.getMessage(), BAD_REQUEST.getStatusCode());
-    }
-
-    try {
-      final AssumeRoleResponseInfo responseInfo = getClient()
-          .getObjectStore()
-          .assumeRole(roleArn, roleSessionName, duration, awsIamSessionPolicy);
-      // Generate AssumeRole response
-      final String responseXml = generateAssumeRoleResponse(assumedRoleUserArn, responseInfo, requestId);
-      return Response.ok(responseXml)
-          .header("Content-Type", "text/xml")
-          .build();
-    } catch (IOException e) {
-      LOG.error("Error during AssumeRole processing", e);
-      if (e instanceof OMException) {
-        final OMException omException = (OMException) e;
-        if (omException.getResult() == OMException.ResultCodes.ACCESS_DENIED ||
-            omException.getResult() == OMException.ResultCodes.PERMISSION_DENIED ||
-            omException.getResult() == OMException.ResultCodes.TOKEN_EXPIRED) {
-          throw new OSTSException(
-              "AccessDenied", "User is not authorized to perform: sts:AssumeRole on resource: " + roleArn,
-              FORBIDDEN.getStatusCode());
-        }
-        if (omException.getResult() == OMException.ResultCodes.INVALID_TOKEN) {
-          throw new OSTSException(
-              "InvalidClientTokenId", "The security token included in the request is invalid.",
-              FORBIDDEN.getStatusCode());
-        }
-      }
-      throw new OSTSException("InternalFailure", "An internal error has occurred.",
-          INTERNAL_SERVER_ERROR.getStatusCode(), "Receiver");
-    }
   }
 
   private boolean isValidRoleSessionName(String roleSessionName) {
@@ -335,6 +383,7 @@ public class S3STSEndpoint extends S3STSEndpointBase {
     }
 
     final String roleName = resource.substring("role/".length());
+    //noinspection StringBufferReplaceableByString
     final StringBuilder stringBuilder = new StringBuilder("arn:");
     stringBuilder.append(partition);
     stringBuilder.append(":sts::");

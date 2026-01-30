@@ -2659,13 +2659,14 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
   @Override
   public AssumeRoleResponseInfo assumeRole(String roleArn, String roleSessionName, int durationSeconds,
-      String awsIamSessionPolicy) throws IOException {
+      String awsIamSessionPolicy, String requestId) throws IOException {
     final OzoneManagerProtocolProtos.AssumeRoleRequest.Builder request =
         OzoneManagerProtocolProtos.AssumeRoleRequest.newBuilder()
             .setRoleArn(roleArn)
             .setRoleSessionName(roleSessionName)
             .setDurationSeconds(durationSeconds)
-            .setAwsIamSessionPolicy(awsIamSessionPolicy != null ? awsIamSessionPolicy : "");
+            .setAwsIamSessionPolicy(awsIamSessionPolicy != null ? awsIamSessionPolicy : "")
+            .setRequestId(requestId);
 
     final OMRequest omRequest = createOMRequest(Type.AssumeRole)
         .setAssumeRoleRequest(request)

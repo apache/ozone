@@ -23,6 +23,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -42,9 +43,12 @@ import javax.crypto.spec.SecretKeySpec;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeySignerClient;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.om.OMMultiTenantManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
+import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AssumeRoleRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AssumeRoleResponse;
@@ -87,14 +91,21 @@ public class TestS3AssumeRoleRequest {
   private static final String OM_HOST = "om-host";
   private static final InetAddress LOOPBACK_IP = InetAddress.getLoopbackAddress();
   private static final Set<OzoneGrant> EMPTY_GRANTS = Collections.singleton(new OzoneGrant(emptySet(), emptySet()));
+  private static final String REQUEST_ID = UUID.randomUUID().toString();
+
+  private static final Pattern ABC_PATTERN_32 = Pattern.compile("^[ABC]{32}$");
+  private static final Pattern XYZ_PATTERN = Pattern.compile("^[XYZ]$");
 
   private OzoneManager ozoneManager;
   private ExecutionContext context;
   private IAccessAuthorizer accessAuthorizer;
+  private AuditLogger auditLogger;
 
   @BeforeEach
   public void setup() throws IOException {
     ozoneManager = mock(OzoneManager.class);
+    auditLogger = mock(AuditLogger.class);
+    when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
 
     final OzoneConfiguration configuration = new OzoneConfiguration();
     when(ozoneManager.getConfiguration()).thenReturn(configuration);
@@ -135,15 +146,17 @@ public class TestS3AssumeRoleRequest {
                 .setRoleArn(ROLE_ARN_1)
                 .setRoleSessionName(SESSION_NAME)
                 .setDurationSeconds(899)  // less than 900
+                .setRequestId(REQUEST_ID)
         ).build();
 
-    final OMClientResponse response = new S3AssumeRoleRequest(omRequest, CLOCK)
-        .validateAndUpdateCache(ozoneManager, context);
+    final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
+    final OMClientResponse response = request.validateAndUpdateCache(ozoneManager, context);
     final OMResponse omResponse = response.getOMResponse();
 
     assertThat(omResponse.getStatus()).isEqualTo(Status.INVALID_REQUEST);
     assertThat(omResponse.getMessage()).isEqualTo("Duration must be between 900 and 43200");
     assertThat(omResponse.hasAssumeRoleResponse()).isFalse();
+    assertMarkForAuditCalled(request);
   }
 
   @Test
@@ -154,15 +167,17 @@ public class TestS3AssumeRoleRequest {
                 .setRoleArn(ROLE_ARN_1)
                 .setRoleSessionName(SESSION_NAME)
                 .setDurationSeconds(43201)  // more than 43200
+                .setRequestId(REQUEST_ID)
         ).build();
 
-    final OMClientResponse response = new S3AssumeRoleRequest(omRequest, CLOCK)
-        .validateAndUpdateCache(ozoneManager, context);
+    final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
+    final OMClientResponse response = request.validateAndUpdateCache(ozoneManager, context);
     final OMResponse omResponse = response.getOMResponse();
 
     assertThat(omResponse.getStatus()).isEqualTo(Status.INVALID_REQUEST);
     assertThat(omResponse.getMessage()).isEqualTo("Duration must be between 900 and 43200");
     assertThat(omResponse.hasAssumeRoleResponse()).isFalse();
+    assertMarkForAuditCalled(request);
   }
 
   @Test
@@ -173,14 +188,16 @@ public class TestS3AssumeRoleRequest {
                 .setRoleArn(ROLE_ARN_1)
                 .setRoleSessionName(SESSION_NAME)
                 .setDurationSeconds(43200)  // exactly max
+                .setRequestId(REQUEST_ID)
         ).build();
 
-    final OMClientResponse response = new S3AssumeRoleRequest(omRequest, CLOCK)
-        .validateAndUpdateCache(ozoneManager, context);
+    final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
+    final OMClientResponse response = request.validateAndUpdateCache(ozoneManager, context);
     final OMResponse omResponse = response.getOMResponse();
 
     assertThat(omResponse.getStatus()).isEqualTo(Status.OK);
     assertThat(omResponse.hasAssumeRoleResponse()).isTrue();
+    assertMarkForAuditCalled(request);
   }
 
   @Test
@@ -191,14 +208,16 @@ public class TestS3AssumeRoleRequest {
                 .setRoleArn(ROLE_ARN_1)
                 .setRoleSessionName(SESSION_NAME)
                 .setDurationSeconds(900)  // exactly min
+                .setRequestId(REQUEST_ID)
         ).build();
 
-    final OMClientResponse response = new S3AssumeRoleRequest(omRequest, CLOCK)
-        .validateAndUpdateCache(ozoneManager, context);
+    final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
+    final OMClientResponse response = request.validateAndUpdateCache(ozoneManager, context);
     final OMResponse omResponse = response.getOMResponse();
 
     assertThat(omResponse.getStatus()).isEqualTo(Status.OK);
     assertThat(omResponse.hasAssumeRoleResponse()).isTrue();
+    assertMarkForAuditCalled(request);
   }
 
   @Test
@@ -211,15 +230,17 @@ public class TestS3AssumeRoleRequest {
                 .setRoleArn(ROLE_ARN_1)
                 .setRoleSessionName(SESSION_NAME)
                 .setDurationSeconds(3600)
+                .setRequestId(REQUEST_ID)
         ).build();
 
-    final OMClientResponse response = new S3AssumeRoleRequest(omRequest, CLOCK)
-        .validateAndUpdateCache(ozoneManager, context);
+    final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
+    final OMClientResponse response = request.validateAndUpdateCache(ozoneManager, context);
     final OMResponse omResponse = response.getOMResponse();
 
     assertThat(omResponse.getStatus()).isEqualTo(Status.INVALID_REQUEST);
     assertThat(omResponse.getMessage()).isEqualTo("S3AssumeRoleRequest does not have S3 authentication");
     assertThat(omResponse.hasAssumeRoleResponse()).isFalse();
+    assertMarkForAuditCalled(request);
   }
 
   @Test
@@ -231,10 +252,11 @@ public class TestS3AssumeRoleRequest {
                 .setRoleArn(ROLE_ARN_1)
                 .setRoleSessionName(SESSION_NAME)
                 .setDurationSeconds(durationSeconds)
+                .setRequestId(REQUEST_ID)
         ).build();
 
-    final OMClientResponse clientResponse = new S3AssumeRoleRequest(omRequest, CLOCK)
-        .validateAndUpdateCache(ozoneManager, context);
+    final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
+    final OMClientResponse clientResponse = request.validateAndUpdateCache(ozoneManager, context);
     final OMResponse omResponse = clientResponse.getOMResponse();
 
     assertThat(omResponse.getStatus()).isEqualTo(Status.OK);
@@ -260,6 +282,7 @@ public class TestS3AssumeRoleRequest {
     // Verify expiration added durationSeconds
     final long expirationEpochSeconds = assumeRoleResponse.getExpirationEpochSeconds();
     assertThat(expirationEpochSeconds).isEqualTo(CLOCK.instant().getEpochSecond() + durationSeconds);
+    assertMarkForAuditCalled(request);
   }
 
   @Test
@@ -268,7 +291,7 @@ public class TestS3AssumeRoleRequest {
     final int length = 32;
     final String s = S3AssumeRoleRequest.generateSecureRandomStringUsingChars(
         chars, chars.length(), length);
-    assertThat(s).hasSize(length).matches(Pattern.compile("^[ABC]{" + length + "}$"));
+    assertThat(s).hasSize(length).matches(ABC_PATTERN_32);
 
     // Test with length 0
     final String empty = S3AssumeRoleRequest.generateSecureRandomStringUsingChars(
@@ -278,7 +301,7 @@ public class TestS3AssumeRoleRequest {
     // Test with length 1
     final String single = S3AssumeRoleRequest.generateSecureRandomStringUsingChars(
         "XYZ", 3, 1);
-    assertThat(single).hasSize(1).matches(Pattern.compile("^[XYZ]$"));
+    assertThat(single).hasSize(1).matches(XYZ_PATTERN);
   }
 
   @Test
@@ -290,12 +313,13 @@ public class TestS3AssumeRoleRequest {
                 .setRoleArn(ROLE_ARN_1)
                 .setRoleSessionName(SESSION_NAME)
                 .setDurationSeconds(3600)
+                .setRequestId(REQUEST_ID)
         ).build();
 
-    final OMClientResponse response1 = new S3AssumeRoleRequest(omRequest, CLOCK)
-        .validateAndUpdateCache(ozoneManager, context);
-    final OMClientResponse response2 = new S3AssumeRoleRequest(omRequest, CLOCK)
-        .validateAndUpdateCache(ozoneManager, context);
+    final S3AssumeRoleRequest request1 = new S3AssumeRoleRequest(omRequest, CLOCK);
+    final OMClientResponse response1 = request1.validateAndUpdateCache(ozoneManager, context);
+    final S3AssumeRoleRequest request2 = new S3AssumeRoleRequest(omRequest, CLOCK);
+    final OMClientResponse response2 = request2.validateAndUpdateCache(ozoneManager, context);
 
     final AssumeRoleResponse assumeRoleResponse1 = response1.getOMResponse().getAssumeRoleResponse();
     final AssumeRoleResponse assumeRoleResponse2 = response2.getOMResponse().getAssumeRoleResponse();
@@ -311,6 +335,10 @@ public class TestS3AssumeRoleRequest {
 
     // Different assumed role IDs
     assertThat(assumeRoleResponse1.getAssumedRoleId()).isNotEqualTo(assumeRoleResponse2.getAssumedRoleId());
+
+    OMAuditLogger.log(request1.getAuditBuilder());
+    OMAuditLogger.log(request2.getAuditBuilder());
+    verify(auditLogger, times(2)).logWrite(any(AuditMessage.class));
   }
 
   @Test
@@ -321,12 +349,14 @@ public class TestS3AssumeRoleRequest {
                 .setRoleArn(ROLE_ARN_1)
                 .setRoleSessionName("")
                 .setDurationSeconds(3600)
+                .setRequestId(REQUEST_ID)
         ).build();
 
-    final OMClientResponse response = new S3AssumeRoleRequest(omRequest, CLOCK)
-        .validateAndUpdateCache(ozoneManager, context);
+    final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
+    final OMClientResponse response = request.validateAndUpdateCache(ozoneManager, context);
     assertThat(response.getOMResponse().getStatus()).isEqualTo(Status.INVALID_REQUEST);
     assertThat(response.getOMResponse().getMessage()).isEqualTo("RoleSessionName is required");
+    assertMarkForAuditCalled(request);
   }
 
   @Test
@@ -336,15 +366,17 @@ public class TestS3AssumeRoleRequest {
             AssumeRoleRequest.newBuilder()
                 .setRoleArn(ROLE_ARN_1)
                 .setRoleSessionName("T")   // Less than 2 characters
+                .setRequestId(REQUEST_ID)
         ).build();
 
-    final OMClientResponse response = new S3AssumeRoleRequest(omRequest, CLOCK)
-        .validateAndUpdateCache(ozoneManager, context);
+    final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
+    final OMClientResponse response = request.validateAndUpdateCache(ozoneManager, context);
     final OMResponse omResponse = response.getOMResponse();
 
     assertThat(omResponse.getStatus()).isEqualTo(Status.INVALID_REQUEST);
     assertThat(omResponse.getMessage()).isEqualTo("RoleSessionName length must be between 2 and 64");
     assertThat(omResponse.hasAssumeRoleResponse()).isFalse();
+    assertMarkForAuditCalled(request);
   }
 
   @Test
@@ -355,15 +387,17 @@ public class TestS3AssumeRoleRequest {
             AssumeRoleRequest.newBuilder()
                 .setRoleArn(ROLE_ARN_1)
                 .setRoleSessionName(tooLongRoleSessionName)
+                .setRequestId(REQUEST_ID)
         ).build();
 
-    final OMClientResponse response = new S3AssumeRoleRequest(omRequest, CLOCK)
-        .validateAndUpdateCache(ozoneManager, context);
+    final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
+    final OMClientResponse response = request.validateAndUpdateCache(ozoneManager, context);
     final OMResponse omResponse = response.getOMResponse();
 
     assertThat(omResponse.getStatus()).isEqualTo(Status.INVALID_REQUEST);
     assertThat(omResponse.getMessage()).isEqualTo("RoleSessionName length must be between 2 and 64");
     assertThat(omResponse.hasAssumeRoleResponse()).isFalse();
+    assertMarkForAuditCalled(request);
   }
 
   @Test
@@ -374,14 +408,16 @@ public class TestS3AssumeRoleRequest {
             AssumeRoleRequest.newBuilder()
                 .setRoleArn(ROLE_ARN_1)
                 .setRoleSessionName(roleSessionName)  // exactly max length
+                .setRequestId(REQUEST_ID)
         ).build();
 
-    final OMClientResponse response = new S3AssumeRoleRequest(omRequest, CLOCK)
-        .validateAndUpdateCache(ozoneManager, context);
+    final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
+    final OMClientResponse response = request.validateAndUpdateCache(ozoneManager, context);
     final OMResponse omResponse = response.getOMResponse();
 
     assertThat(omResponse.getStatus()).isEqualTo(Status.OK);
     assertThat(omResponse.hasAssumeRoleResponse()).isTrue();
+    assertMarkForAuditCalled(request);
   }
 
   @Test
@@ -391,14 +427,16 @@ public class TestS3AssumeRoleRequest {
             AssumeRoleRequest.newBuilder()
                 .setRoleArn(ROLE_ARN_1)
                 .setRoleSessionName("TT")   // exactly min length
+                .setRequestId(REQUEST_ID)
         ).build();
 
-    final OMClientResponse response = new S3AssumeRoleRequest(omRequest, CLOCK)
-        .validateAndUpdateCache(ozoneManager, context);
+    final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
+    final OMClientResponse response = request.validateAndUpdateCache(ozoneManager, context);
     final OMResponse omResponse = response.getOMResponse();
 
     assertThat(omResponse.getStatus()).isEqualTo(Status.OK);
     assertThat(omResponse.hasAssumeRoleResponse()).isTrue();
+    assertMarkForAuditCalled(request);
   }
 
   @Test
@@ -411,11 +449,13 @@ public class TestS3AssumeRoleRequest {
                 .setRoleSessionName(SESSION_NAME)
                 .setDurationSeconds(3600)
                 .setAwsIamSessionPolicy(sessionPolicy)
+                .setRequestId(REQUEST_ID)
         ).build();
 
-    final OMClientResponse response = new S3AssumeRoleRequest(omRequest, CLOCK)
-        .validateAndUpdateCache(ozoneManager, context);
+    final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
+    final OMClientResponse response = request.validateAndUpdateCache(ozoneManager, context);
     assertThat(response.getOMResponse().getStatus()).isEqualTo(Status.OK);
+    assertMarkForAuditCalled(request);
   }
 
   @Test
@@ -529,6 +569,11 @@ public class TestS3AssumeRoleRequest {
             S3Authentication.newBuilder()
                 .setAccessId(ORIGINAL_ACCESS_KEY_ID)
         );
+  }
+
+  private void assertMarkForAuditCalled(S3AssumeRoleRequest request) {
+    OMAuditLogger.log(request.getAuditBuilder());
+    verify(auditLogger).logWrite(any(AuditMessage.class));
   }
 }
 
