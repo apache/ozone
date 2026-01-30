@@ -55,6 +55,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
@@ -1036,6 +1037,10 @@ public class SCMNodeManager implements NodeManager {
       usageInfo.setContainerCount(getContainerCount(dn));
       usageInfo.setPipelineCount(getPipeLineCount(dn));
       usageInfo.setReserved(getTotalReserved(dn));
+      SpaceUsageSource.Fixed fs = getTotalFilesystemUsage(dn);
+      if (fs != null) {
+        usageInfo.setFilesystemUsage(fs.getCapacity(), fs.getAvailable());
+      }
     } catch (NodeNotFoundException ex) {
       LOG.error("Unknown datanode {}.", dn, ex);
     }
@@ -1131,8 +1136,21 @@ public class SCMNodeManager implements NodeManager {
         nodeInfo.put(s.label + stat.name(), 0L);
       }
     }
-    nodeInfo.put("TotalCapacity", 0L);
-    nodeInfo.put("TotalUsed", 0L);
+    nodeInfo.put("TotalOzoneCapacity", 0L);
+    nodeInfo.put("TotalOzoneUsed", 0L);
+    // Raw filesystem totals across non-dead nodes. -1 means old (older version) DN did not send fs stats.
+    nodeInfo.put("TotalFilesystemCapacity", -1L);
+    nodeInfo.put("TotalFilesystemUsed", -1L);
+    nodeInfo.put("TotalFilesystemAvailable", -1L);
+
+    long totalFsCapacity = 0L;
+    long totalFsAvailable = 0L;
+    /*
+    If any storage report is missing fs stats, this is a rolling upgrade scenario in which some older dn versions
+    aren't reporting fs stats. Better to not report aggregated fs stats at all in this case?
+     */
+    boolean fsPresent = false;
+    boolean fsMissing = false;
 
     for (DatanodeInfo node : nodeStateManager.getAllNodes()) {
       String keyPrefix = "";
@@ -1165,9 +1183,26 @@ public class SCMNodeManager implements NodeManager {
           nodeInfo.compute(keyPrefix + UsageMetrics.SSDUsed.name(),
               (k, v) -> v + reportProto.getScmUsed());
         }
-        nodeInfo.compute("TotalCapacity", (k, v) -> v + reportProto.getCapacity());
-        nodeInfo.compute("TotalUsed", (k, v) -> v + reportProto.getScmUsed());
+        nodeInfo.compute("TotalOzoneCapacity", (k, v) -> v + reportProto.getCapacity());
+        nodeInfo.compute("TotalOzoneUsed", (k, v) -> v + reportProto.getScmUsed());
+
+        if (reportProto.hasFailed() && reportProto.getFailed()) {
+          continue;
+        }
+        if (reportProto.hasFsCapacity() && reportProto.hasFsAvailable()) {
+          fsPresent = true;
+          totalFsCapacity += reportProto.getFsCapacity();
+          totalFsAvailable += reportProto.getFsAvailable();
+        } else {
+          fsMissing = true;
+        }
       }
+    }
+    if (fsPresent && !fsMissing) {
+      // don't report aggregated fs stats if some storage reports did not have them
+      nodeInfo.put("TotalFilesystemCapacity", totalFsCapacity);
+      nodeInfo.put("TotalFilesystemUsed", totalFsCapacity - totalFsAvailable);
+      nodeInfo.put("TotalFilesystemAvailable", totalFsAvailable);
     }
     return nodeInfo;
   }
@@ -1735,6 +1770,38 @@ public class SCMNodeManager implements NodeManager {
       }
     }
     return reserved;
+  }
+
+  /**
+   * Compute aggregated raw filesystem capacity/available/used for a datanode
+   * from the storage reports.
+   */
+  public SpaceUsageSource.Fixed getTotalFilesystemUsage(DatanodeDetails datanodeDetails) {
+    final DatanodeInfo datanodeInfo;
+    try {
+      datanodeInfo = nodeStateManager.getNode(datanodeDetails);
+    } catch (NodeNotFoundException exception) {
+      LOG.error("Node not found when calculating fs usage for {}.", datanodeDetails, exception);
+      return null;
+    }
+
+    long capacity = 0L;
+    long available = 0L;
+    boolean hasFsReport = false;
+    for (StorageReportProto r : datanodeInfo.getStorageReports()) {
+      if (r.hasFailed() && r.getFailed()) {
+        continue;
+      }
+      if (r.hasFsCapacity() && r.hasFsAvailable()) {
+        hasFsReport = true;
+        capacity += r.getFsCapacity();
+        available += r.getFsAvailable();
+      }
+    }
+    if (!hasFsReport) {
+      LOG.debug("Datanode {} does not have filesystem storage stats in its storage reports.", datanodeDetails);
+    }
+    return hasFsReport ? new SpaceUsageSource.Fixed(capacity, available, capacity - available) : null;
   }
 
   @Override
