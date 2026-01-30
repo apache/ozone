@@ -41,10 +41,16 @@ import java.net.InetSocketAddress;
 import java.nio.file.Path;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.ozone.test.GenericTestUtils;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.slf4j.LoggerFactory;
 
 /**
  * Unit tests for {@link OmUtils}.
@@ -326,4 +332,32 @@ public class TestOmUtils {
 
   // Consistency checks between epoch and txId are covered by
   // testAddEpochToTxId() and testGetObjectIdFromTxId().
+
+  /**
+   * Test that all of {@link OzoneManagerProtocolProtos.Type} enum values are
+   * categorized in {@link OmUtils#shouldSendToFollower(OMRequest)}.
+   */
+  @Test
+  public void testShouldSendToFollowerFollowerReadCapturesAllCmdTypeEnums() {
+    GenericTestUtils.LogCapturer logCapturer =
+        GenericTestUtils.LogCapturer.captureLogs(
+            LoggerFactory.getLogger(OmUtils.class));
+    OzoneManagerProtocolProtos.Type[] cmdTypes =
+        OzoneManagerProtocolProtos.Type.values();
+    String clientId = UUID.randomUUID().toString();
+
+    for (OzoneManagerProtocolProtos.Type cmdType : cmdTypes) {
+      OMRequest request = OMRequest.newBuilder()
+          .setCmdType(cmdType)
+          .setClientId(clientId)
+          .build();
+      OmUtils.shouldSendToFollower(request);
+      Assertions.assertFalse(
+          logCapturer.getOutput().contains(
+              "CmdType " + cmdType + " is not categorized to be sent to follower."
+          )
+      );
+      logCapturer.clearOutput();
+    }
+  }
 }

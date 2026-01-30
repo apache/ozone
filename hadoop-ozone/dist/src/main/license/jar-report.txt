@@ -26,6 +26,7 @@ share/ozone/lib/commons-collections.jar
 share/ozone/lib/commons-collections4.jar
 share/ozone/lib/commons-compress.jar
 share/ozone/lib/commons-configuration2.jar
+share/ozone/lib/commons-csv.jar
 share/ozone/lib/commons-daemon.jar
 share/ozone/lib/commons-digester.jar
 share/ozone/lib/commons-io.jar

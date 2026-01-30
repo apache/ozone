@@ -33,6 +33,9 @@ public final class DatanodeStorageReport {
   private long committed;
   private long minimumFreeSpace;
   private long reserved;
+  private long filesystemCapacity;
+  private long filesystemUsed;
+  private long filesystemAvailable;
 
   public DatanodeStorageReport() {
   }
@@ -46,6 +49,9 @@ public final class DatanodeStorageReport {
     this.committed = builder.committed;
     this.minimumFreeSpace = builder.minimumFreeSpace;
     this.reserved = builder.reserved;
+    this.filesystemCapacity = builder.filesystemCapacity;
+    this.filesystemUsed = builder.filesystemUsed;
+    this.filesystemAvailable = builder.filesystemAvailable;
     builder.validate();
   }
 
@@ -85,6 +91,18 @@ public final class DatanodeStorageReport {
     return new Builder();
   }
 
+  public long getFilesystemCapacity() {
+    return filesystemCapacity;
+  }
+
+  public long getFilesystemUsed() {
+    return filesystemUsed;
+  }
+
+  public long getFilesystemAvailable() {
+    return filesystemAvailable;
+  }
+
   /**
    * Builder class for DataNodeStorage Report.
    */
@@ -97,6 +115,9 @@ public final class DatanodeStorageReport {
     private long committed = 0;
     private long minimumFreeSpace = 0;
     private long reserved = 0;
+    private long filesystemCapacity = 0;
+    private long filesystemUsed = 0;
+    private long filesystemAvailable = 0;
 
     private static final Logger LOG =
         LoggerFactory.getLogger(Builder.class);
@@ -144,6 +165,21 @@ public final class DatanodeStorageReport {
       return this;
     }
 
+    public Builder setFilesystemCapacity(long filesystemCapacity) {
+      this.filesystemCapacity = filesystemCapacity;
+      return this;
+    }
+
+    public Builder setFilesystemUsed(long filesystemUsed) {
+      this.filesystemUsed = filesystemUsed;
+      return this;
+    }
+
+    public Builder setFilesystemAvailable(long filesystemAvailable) {
+      this.filesystemAvailable = filesystemAvailable;
+      return this;
+    }
+
     public void validate() {
       Objects.requireNonNull(hostName, "hostName cannot be null");
 
@@ -166,6 +202,18 @@ public final class DatanodeStorageReport {
 
       if (reserved < 0) {
         throw new IllegalArgumentException("reserved cannot be negative");
+      }
+
+      if (filesystemCapacity < 0) {
+        throw new IllegalArgumentException("filesystemCapacity cannot be negative");
+      }
+
+      if (filesystemAvailable < 0) {
+        throw new IllegalArgumentException("filesystemAvailable cannot be negative");
+      }
+
+      if (filesystemUsed < 0) {
+        throw new IllegalArgumentException("filesystemUsed cannot be negative");
       }
 
       // Logical consistency checks
