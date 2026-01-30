@@ -102,8 +102,8 @@ public final class S3STSUtils {
     for (int i = 0; i < roleSessionNameLength; i++) {
       final char c = roleSessionName.charAt(i);
       if (!isRoleSessionNameChar(c)) {
-        throw new OMException("Invalid character '" + c + "' in RoleSessionName: it must be " + ASSUME_ROLE_SESSION_NAME_MIN_LENGTH + "-" +
-            ASSUME_ROLE_SESSION_NAME_MAX_LENGTH + " characters long and " +
+        throw new OMException("Invalid character '" + c + "' in RoleSessionName: it must be " +
+            ASSUME_ROLE_SESSION_NAME_MIN_LENGTH + "-" + ASSUME_ROLE_SESSION_NAME_MAX_LENGTH + " characters long and " +
             "contain only alphanumeric characters and +, =, ,, ., @, -", INVALID_REQUEST);
       }
     }
