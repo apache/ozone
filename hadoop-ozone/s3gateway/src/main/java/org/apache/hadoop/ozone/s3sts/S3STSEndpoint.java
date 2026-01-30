@@ -23,13 +23,14 @@ import static javax.ws.rs.core.Response.Status.INTERNAL_SERVER_ERROR;
 import static javax.ws.rs.core.Response.Status.NOT_IMPLEMENTED;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Strings;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import javax.inject.Inject;
 import javax.ws.rs.FormParam;
 import javax.ws.rs.GET;
@@ -45,6 +46,7 @@ import javax.xml.bind.Marshaller;
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
+import org.apache.hadoop.ozone.om.helpers.AwsRoleArnValidator;
 import org.apache.hadoop.ozone.om.helpers.S3STSUtils;
 import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
@@ -71,7 +73,6 @@ public class S3STSEndpoint extends S3STSEndpointBase {
 
   // STS API constants
   private static final String ASSUME_ROLE_ACTION = "AssumeRole";
-  private static final String ROLE_DURATION_SECONDS_PARAM = "DurationSeconds";
   private static final String GET_SESSION_TOKEN_ACTION = "GetSessionToken";
   private static final String ASSUME_ROLE_WITH_SAML_ACTION = "AssumeRoleWithSAML";
   private static final String ASSUME_ROLE_WITH_WEB_IDENTITY_ACTION = "AssumeRoleWithWebIdentity";
@@ -85,13 +86,6 @@ public class S3STSEndpoint extends S3STSEndpointBase {
   private static final String INTERNAL_FAILURE = "InternalFailure";
   private static final String ACCESS_DENIED = "AccessDenied";
   private static final String INVALID_CLIENT_TOKEN_ID = "InvalidClientTokenId";
-
-  // Default token duration (in seconds) - AWS default is 3600 (1 hour)
-  // TODO - add these constants and also validations in a common place that both endpoint and backend can use
-  private static final int DEFAULT_DURATION_SECONDS = 3600;
-  private static final int MAX_DURATION_SECONDS = 43200; // 12 hours
-  private static final int MIN_DURATION_SECONDS = 900;   // 15 minutes
-  private static final int MAX_SESSION_POLICY_SIZE = 2048;
 
   @Inject
   private RequestIdentifier requestIdentifier;
@@ -195,19 +189,10 @@ public class S3STSEndpoint extends S3STSEndpointBase {
     final Map<String, String> auditParams = getAuditParameters();
     S3STSUtils.addAssumeRoleAuditParams(
         auditParams, roleArn, roleSessionName, awsIamSessionPolicy,
-        durationSeconds == null ? DEFAULT_DURATION_SECONDS : durationSeconds,
+        durationSeconds == null ? S3STSUtils.DEFAULT_DURATION_SECONDS : durationSeconds,
         requestId);
 
-    int duration;
-    try {
-      // Validate parameters
-      duration = validateDuration(durationSeconds);
-    } catch (IllegalArgumentException e) {
-      final OSTSException exception = new OSTSException(VALIDATION_ERROR, e.getMessage(), BAD_REQUEST.getStatusCode());
-      getAuditLogger().logWriteFailure(buildAuditMessageForFailure(S3GAction.ASSUME_ROLE, auditParams, exception));
-      throw exception;
-    }
-
+    // Validate parameters
     if (version == null || !version.equals(EXPECTED_VERSION)) {
       final OSTSException exception = new OSTSException(
           INVALID_ACTION, "Could not find operation " + action + " for version " +
@@ -217,50 +202,48 @@ public class S3STSEndpoint extends S3STSEndpointBase {
       throw exception;
     }
 
-    if (roleArn == null || roleArn.isEmpty()) {
-      final OSTSException exception = new OSTSException(
-          VALIDATION_ERROR, "Value null at 'roleArn' failed to satisfy constraint: Member must not be null",
-          BAD_REQUEST.getStatusCode());
-      getAuditLogger().logWriteFailure(buildAuditMessageForFailure(S3GAction.ASSUME_ROLE, auditParams, exception));
-      throw exception;
-    }
-
-    if (roleSessionName == null || roleSessionName.isEmpty()) {
-      final OSTSException exception = new OSTSException(
-          VALIDATION_ERROR, "Value null at 'roleSessionName' failed to satisfy constraint: Member must not be null",
-          BAD_REQUEST.getStatusCode());
-      getAuditLogger().logWriteFailure(buildAuditMessageForFailure(S3GAction.ASSUME_ROLE, auditParams, exception));
-      throw exception;
-    }
-
-    // Validate role session name format (AWS requirements)
-    if (!isValidRoleSessionName(roleSessionName)) {
-      final OSTSException exception = new OSTSException(
-          VALIDATION_ERROR, "Invalid RoleSessionName: must be 2-64 characters long and " +
-          "contain only alphanumeric characters, +, =, ,, ., @, -",
-          BAD_REQUEST.getStatusCode());
-      getAuditLogger().logWriteFailure(buildAuditMessageForFailure(S3GAction.ASSUME_ROLE, auditParams, exception));
-      throw exception;
-    }
-
-    // Check Policy size if available
-    if (awsIamSessionPolicy != null && awsIamSessionPolicy.length() > MAX_SESSION_POLICY_SIZE) {
-      final OSTSException exception = new OSTSException(
-          VALIDATION_ERROR, "Value '" + awsIamSessionPolicy + "' at 'policy' failed to satisfy constraint: Member " +
-          "must have length less than or equal to 2048", BAD_REQUEST.getStatusCode());
-      getAuditLogger().logWriteFailure(buildAuditMessageForFailure(S3GAction.ASSUME_ROLE, auditParams, exception));
-      throw exception;
-    }
-
-    final String assumedRoleUserArn;
+    final Set<String> validationErrors = new HashSet<>();
+    int duration = durationSeconds == null ? S3STSUtils.DEFAULT_DURATION_SECONDS : durationSeconds;
     try {
-      assumedRoleUserArn = toAssumedRoleUserArn(roleArn, roleSessionName);
-    } catch (IllegalArgumentException e) {
-      final OSTSException exception = new OSTSException(VALIDATION_ERROR, e.getMessage(), BAD_REQUEST.getStatusCode());
+      duration = S3STSUtils.validateDuration(durationSeconds);
+    } catch (OMException e) {
+      validationErrors.add(e.getMessage());
+    }
+
+    try {
+      AwsRoleArnValidator.validateAndExtractRoleNameFromArn(roleArn);
+    } catch (OMException e) {
+      validationErrors.add(e.getMessage());
+    }
+
+    try {
+      S3STSUtils.validateRoleSessionName(roleSessionName);
+    } catch (OMException e) {
+      validationErrors.add(e.getMessage());
+    }
+
+    try {
+      S3STSUtils.validateSessionPolicy(awsIamSessionPolicy);
+    } catch (OMException e) {
+      validationErrors.add(e.getMessage());
+    }
+
+    final int numValidationErrors = validationErrors.size();
+    if (numValidationErrors > 0) {
+      //noinspection StringBufferReplaceableByString
+      final StringBuilder builder = new StringBuilder();
+      builder.append(numValidationErrors);
+      builder.append(" validation ");
+      builder.append(numValidationErrors > 1 ? "errors detected: " : "error detected: ");
+      builder.append(String.join(";", validationErrors));
+      final String validationMessage = builder.toString();
+      final OSTSException exception = new OSTSException(
+          VALIDATION_ERROR, validationMessage, BAD_REQUEST.getStatusCode());
       getAuditLogger().logWriteFailure(buildAuditMessageForFailure(S3GAction.ASSUME_ROLE, auditParams, exception));
       throw exception;
     }
 
+    final String assumedRoleUserArn = S3STSUtils.toAssumedRoleUserArn(roleArn, roleSessionName);
     try {
       final AssumeRoleResponseInfo responseInfo = getClient()
           .getObjectStore()
@@ -301,29 +284,6 @@ public class S3STSEndpoint extends S3STSEndpointBase {
     }
   }
 
-  private int validateDuration(Integer durationSeconds) throws IllegalArgumentException {
-    if (durationSeconds == null) {
-      return DEFAULT_DURATION_SECONDS;
-    }
-
-    if (durationSeconds < MIN_DURATION_SECONDS || durationSeconds > MAX_DURATION_SECONDS) {
-      throw new IllegalArgumentException(
-          "Invalid Value: " + ROLE_DURATION_SECONDS_PARAM + " must be between " + MIN_DURATION_SECONDS +
-              " and " + MAX_DURATION_SECONDS + " seconds");
-    }
-
-    return durationSeconds;
-  }
-
-  private boolean isValidRoleSessionName(String roleSessionName) {
-    if (roleSessionName.length() < 2 || roleSessionName.length() > 64) {
-      return false;
-    }
-
-    // AWS allows: alphanumeric, +, =, ,, ., @, -
-    return roleSessionName.matches("[a-zA-Z0-9+=,.@\\-]+");
-  }
-
   private String generateAssumeRoleResponse(String assumedRoleUserArn, AssumeRoleResponseInfo responseInfo,
       String requestId) throws IOException {
     final String accessKeyId = responseInfo.getAccessKeyId();
@@ -362,36 +322,5 @@ public class S3STSEndpoint extends S3STSEndpointBase {
       throw new IOException("Failed to marshal AssumeRole response", e);
     }
   }
-
-  private String toAssumedRoleUserArn(String roleArn, String roleSessionName) {
-    // RoleArn format: arn:aws:iam::<account-id>:role/<role-name>
-    // Assumed role user arn format: arn:aws:sts::<account-id>:assumed-role/<role-name>/<role-session-name>
-    // TODO - refactor and reuse AwsRoleArnValidator for validation in future PR
-    final String errMsg = "Invalid RoleArn: must be in the format arn:aws:iam::<account-id>:role/<role-name>";
-    final String[] parts = roleArn.split(":", 6);
-    if (parts.length != 6 || !"arn".equals(parts[0]) || parts[1].isEmpty() || !"iam".equals(parts[2])) {
-      throw new IllegalArgumentException(errMsg);
-    }
-
-    final String partition = parts[1];
-    final String accountId = parts[4];
-    final String resource = parts[5]; // role/<name>
-
-    if (Strings.isNullOrEmpty(accountId) || Strings.isNullOrEmpty(resource) || !resource.startsWith("role/") ||
-        resource.length() == "role/".length()) {
-      throw new IllegalArgumentException(errMsg);
-    }
-
-    final String roleName = resource.substring("role/".length());
-    //noinspection StringBufferReplaceableByString
-    final StringBuilder stringBuilder = new StringBuilder("arn:");
-    stringBuilder.append(partition);
-    stringBuilder.append(":sts::");
-    stringBuilder.append(accountId);
-    stringBuilder.append(":assumed-role/");
-    stringBuilder.append(roleName);
-    stringBuilder.append('/');
-    stringBuilder.append(roleSessionName);
-    return stringBuilder.toString();
-  }
 }
+

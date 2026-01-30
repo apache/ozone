@@ -118,8 +118,7 @@ public class TestS3STSEndpoint {
 
   @Test
   public void testStsAssumeRoleValidForGetMethod() throws Exception {
-    Response response = endpoint.get(
-        "AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null);
+    final Response response = endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null);
 
     assertEquals(200, response.getStatus());
     verify(auditLogger).logWriteSuccess(any(AuditMessage.class));
@@ -157,6 +156,7 @@ public class TestS3STSEndpoint {
 
   @Test
   public void testStsAssumeRoleValidForPostMethod() throws Exception {
+    //noinspection resource
     final Response response = endpoint.post("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null);
 
     assertEquals(200, response.getStatus());
@@ -305,7 +305,7 @@ public class TestS3STSEndpoint {
     final String requestId = "test-request-id";
     ex.setRequestId(requestId);
     assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError",
-        "Invalid RoleArn: must be in the format arn:aws:iam::<account-id>:role/<role-name>");
+        "Invalid role ARN (does not start with arn:aws:iam::)");
   }
 
   @Test
@@ -335,7 +335,7 @@ public class TestS3STSEndpoint {
 
     final String requestId = "test-request-id";
     ex.setRequestId(requestId);
-    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", "Invalid RoleArn: must be in the format");
+    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", "Invalid role ARN: missing role name");
   }
 
   @Test
@@ -351,7 +351,7 @@ public class TestS3STSEndpoint {
 
     final String requestId = "test-request-id";
     ex.setRequestId(requestId);
-    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", "Invalid RoleArn: must be in the format"
+    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", "Invalid AWS account ID in ARN"
     );
   }
 
@@ -395,7 +395,10 @@ public class TestS3STSEndpoint {
 
     final String requestId = "test-request-id";
     ex.setRequestId(requestId);
-    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", "Invalid RoleSessionName");
+    assertStsErrorXml(
+        ex.toXml(), STS_NS, "Sender", "ValidationError", "1 validation error detected: " +
+        "Invalid character '/' in RoleSessionName: it must be 2-64 characters long and contain only alphanumeric " +
+        "characters and +, =, ,, ., @, -");
   }
 
   @Test
@@ -410,7 +413,9 @@ public class TestS3STSEndpoint {
 
     final String requestId = "test-request-id";
     ex.setRequestId(requestId);
-    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", "Invalid RoleSessionName");
+    assertStsErrorXml(
+        ex.toXml(), STS_NS, "Sender", "ValidationError", "1 validation error detected: Invalid RoleSessionName " +
+        "length 1: it must be 2-64 characters long and contain only alphanumeric characters and +, =, ,, ., @, -");
   }
 
   @Test
@@ -426,7 +431,7 @@ public class TestS3STSEndpoint {
 
     final String requestId = "test-request-id";
     ex.setRequestId(requestId);
-    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", "Invalid RoleArn: must be in the format");
+    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", "Invalid role ARN (unexpected field count)");
   }
 
   @Test
@@ -479,6 +484,35 @@ public class TestS3STSEndpoint {
     final String requestId = "test-request-id";
     ex.setRequestId(requestId);
     assertStsErrorXml(ex.toXml(), STS_NS, "Receiver", "InternalFailure", "An internal error has occurred.");
+  }
+
+  @Test
+  public void testStsMultipleValidationErrors() throws Exception {
+    final String invalidRoleSessionName = "test/session";
+    final String tooLargePolicy = RandomStringUtils.insecure().nextAlphanumeric(2049);
+    final int invalidDurationSeconds = -1;
+
+    final OSTSException ex = assertThrows(OSTSException.class, () ->
+        endpoint.get("AssumeRole", ROLE_ARN, invalidRoleSessionName, invalidDurationSeconds, "2011-06-15",
+            tooLargePolicy));
+
+    assertEquals(400, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
+
+    final String requestId = "test-request-id";
+    ex.setRequestId(requestId);
+
+    final String xml = ex.toXml();
+    // The order of individual validation errors is not guaranteed because it's a HashSet, so check
+    // that multiple messages are included
+    final Document doc = parseXml(xml);
+    final String message = doc.getElementsByTagName("Message").item(0).getTextContent();
+    assertTrue(message.contains("3 validation errors detected"));
+    assertTrue(message.contains("Invalid Value: DurationSeconds"));
+    assertTrue(message.contains("Invalid character '/' in RoleSessionName"));
+    assertTrue(message.contains(
+        "'policy' failed to satisfy constraint: Member must have length less than or equal to 2048"));
   }
 
   private static Document parseXml(String xml) throws Exception {
