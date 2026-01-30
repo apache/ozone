@@ -126,7 +126,6 @@ run cp -r "${ROOT}/dev-support/byteman" "share/ozone/"
 run cp -p -R "${ROOT}/hadoop-ozone/dist/target/compose" .
 run cp -p -r "${ROOT}/hadoop-ozone/dist/target/smoketest" .
 run cp -p -r "${ROOT}/hadoop-ozone/dist/target/k8s" kubernetes
-run cp -p -r "${ROOT}/hadoop-ozone/dist/target/Dockerfile" .
 
 run mkdir compose/_keytabs
 
