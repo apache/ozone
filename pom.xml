@@ -85,7 +85,6 @@
     <docker-maven-plugin.version>0.45.1</docker-maven-plugin.version>
     <download-maven-plugin.version>1.9.0</download-maven-plugin.version>
     <dropwizard-metrics.version>3.2.6</dropwizard-metrics.version>
-    <enforced.java.version>[${javac.version},)</enforced.java.version>
     <enforced.maven.version>[3.6.3,)</enforced.maven.version>
     <errorprone-annotations.version>2.29.2</errorprone-annotations.version>
     <!-- test groups excluded by default (without any manual profile activation) -->
@@ -113,7 +112,6 @@
     <jakarta.ws.rs-api.version>2.1.6</jakarta.ws.rs-api.version>
     <java.dev.jna.version>5.2.0</java.dev.jna.version>
     <java.security.egd>file:///dev/urandom</java.security.egd>
-    <javac.version>8</javac.version>
     <javassist.version>3.30.2-GA</javassist.version>
     <javax.inject.version>1</javax.inject.version>
     <jaxb-api.version>2.3.3</jaxb-api.version>
@@ -165,7 +163,7 @@
     <maven-surefire-report-plugin.version>${maven-surefire-plugin.version}</maven-surefire-report-plugin.version>
     <maven-war-plugin.version>3.4.0</maven-war-plugin.version>
     <maven.compiler.createMissingPackageInfoClass>false</maven.compiler.createMissingPackageInfoClass>
-    <maven.compiler.release>${javac.version}</maven.compiler.release>
+    <maven.compiler.release>8</maven.compiler.release>
     <maven.core.version>3.9.10</maven.core.version>
     <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
     <metainf-services.version>1.11</metainf-services.version>
@@ -1808,9 +1806,6 @@
               <requireMavenVersion>
                 <version>${enforced.maven.version}</version>
               </requireMavenVersion>
-              <requireJavaVersion>
-                <version>${enforced.java.version}</version>
-              </requireJavaVersion>
             </rules>
           </configuration>
           <dependencies>
