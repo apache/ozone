@@ -378,8 +378,8 @@ public class TestS3AssumeRoleRequest {
 
     assertThat(omResponse.getStatus()).isEqualTo(Status.INVALID_REQUEST);
     assertThat(omResponse.getMessage()).isEqualTo(
-        "Invalid RoleSessionName: must be 2-64 characters long and contain only alphanumeric " +
-        "characters, +, =, ,, ., @, -");
+        "Invalid RoleSessionName length 1: it must be 2-64 characters long and contain only alphanumeric " +
+        "characters and +, =, ,, ., @, -");
     assertThat(omResponse.hasAssumeRoleResponse()).isFalse();
     assertMarkForAuditCalled(request);
   }
@@ -401,8 +401,8 @@ public class TestS3AssumeRoleRequest {
 
     assertThat(omResponse.getStatus()).isEqualTo(Status.INVALID_REQUEST);
     assertThat(omResponse.getMessage()).isEqualTo(
-        "Invalid RoleSessionName: must be 2-64 characters long and contain only alphanumeric " +
-        "characters, +, =, ,, ., @, -"
+        "Invalid RoleSessionName length 70: it must be 2-64 characters long and contain only alphanumeric " +
+        "characters and +, =, ,, ., @, -"
     );
     assertThat(omResponse.hasAssumeRoleResponse()).isFalse();
     assertMarkForAuditCalled(request);

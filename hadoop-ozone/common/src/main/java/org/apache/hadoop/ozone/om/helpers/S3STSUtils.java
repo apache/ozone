@@ -91,9 +91,9 @@ public final class S3STSUtils {
     final int roleSessionNameLength = roleSessionName.length();
     if (roleSessionNameLength < ASSUME_ROLE_SESSION_NAME_MIN_LENGTH ||
         roleSessionNameLength > ASSUME_ROLE_SESSION_NAME_MAX_LENGTH) {
-      throw new OMException("Invalid RoleSessionName: must be " + ASSUME_ROLE_SESSION_NAME_MIN_LENGTH + "-" +
-          ASSUME_ROLE_SESSION_NAME_MAX_LENGTH + " characters long and " +
-          "contain only alphanumeric characters, +, =, ,, ., @, -", INVALID_REQUEST);
+      throw new OMException("Invalid RoleSessionName length " + roleSessionNameLength + ": it must be " +
+          ASSUME_ROLE_SESSION_NAME_MIN_LENGTH + "-" + ASSUME_ROLE_SESSION_NAME_MAX_LENGTH + " characters long and " +
+          "contain only alphanumeric characters and +, =, ,, ., @, -", INVALID_REQUEST);
     }
 
     // AWS allows: alphanumeric, +, =, ,, ., @, -
@@ -102,9 +102,9 @@ public final class S3STSUtils {
     for (int i = 0; i < roleSessionNameLength; i++) {
       final char c = roleSessionName.charAt(i);
       if (!isRoleSessionNameChar(c)) {
-        throw new OMException("Invalid RoleSessionName: must be " + ASSUME_ROLE_SESSION_NAME_MIN_LENGTH + "-" +
+        throw new OMException("Invalid character '" + c + "' in RoleSessionName: it must be " + ASSUME_ROLE_SESSION_NAME_MIN_LENGTH + "-" +
             ASSUME_ROLE_SESSION_NAME_MAX_LENGTH + " characters long and " +
-            "contain only alphanumeric characters, +, =, ,, ., @, -", INVALID_REQUEST);
+            "contain only alphanumeric characters and +, =, ,, ., @, -", INVALID_REQUEST);
       }
     }
   }
