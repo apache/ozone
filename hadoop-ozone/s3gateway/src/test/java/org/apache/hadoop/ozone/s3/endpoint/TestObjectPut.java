@@ -248,12 +248,13 @@ class TestObjectPut {
   @Test
   public void testPutObjectMessageDigestResetDuringException() {
     MessageDigest messageDigest = mock(MessageDigest.class);
-    try (MockedStatic<IOUtils> mocked = mockStatic(IOUtils.class)) {
+    try (MockedStatic<IOUtils> mocked = mockStatic(IOUtils.class);
+        MockedStatic<EndpointBase> endpoint = mockStatic(EndpointBase.class)) {
       // For example, EOFException during put-object due to client cancelling the operation before it completes
       mocked.when(() -> IOUtils.copyLarge(any(InputStream.class), any(OutputStream.class), anyLong(),
               anyLong(), any(byte[].class)))
           .thenThrow(IOException.class);
-      when(objectEndpoint.getMD5DigestInstance()).thenReturn(messageDigest);
+      endpoint.when(EndpointBase::getMD5DigestInstance).thenReturn(messageDigest);
 
       assertThrows(IOException.class, () -> putObject(CONTENT).close());
 
@@ -369,9 +370,11 @@ class TestObjectPut {
     assertThat(keyDetails.getMetadata().get(OzoneConsts.ETAG)).isNotEmpty();
 
     MessageDigest messageDigest = mock(MessageDigest.class);
-    try (MockedStatic<IOUtils> mocked = mockStatic(IOUtils.class)) {
+    try (MockedStatic<IOUtils> mocked = mockStatic(IOUtils.class);
+        MockedStatic<EndpointBase> endpoint = mockStatic(EndpointBase.class)) {
       // Add the mocked methods only during the copy request
-      when(objectEndpoint.getMD5DigestInstance()).thenReturn(messageDigest);
+      endpoint.when(EndpointBase::getMD5DigestInstance).thenReturn(messageDigest);
+      endpoint.when(() -> EndpointBase.parseSourceHeader(any())).thenCallRealMethod();
       mocked.when(() -> IOUtils.copyLarge(any(InputStream.class), any(OutputStream.class), anyLong(),
               anyLong(), any(byte[].class)))
           .thenThrow(IOException.class);
@@ -390,9 +393,8 @@ class TestObjectPut {
   @Test
   public void testCopyObjectWithTags() throws Exception {
     // Put object in to source bucket
-    HttpHeaders headersForPut = newMockHttpHeaders();
+    HttpHeaders headersForPut = objectEndpoint.getHeaders();
     when(headersForPut.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
-    objectEndpoint.setHeaders(headersForPut);
 
     String sourceKeyName = "sourceKey";
 
@@ -405,10 +407,9 @@ class TestObjectPut {
 
     // Copy object without x-amz-tagging-directive (default to COPY)
     String destKey = "key=value/2";
-    HttpHeaders headersForCopy = newMockHttpHeaders();
+    HttpHeaders headersForCopy = objectEndpoint.getHeaders();
     when(headersForCopy.getHeaderString(COPY_SOURCE_HEADER)).thenReturn(
         BUCKET_NAME  + "/" + urlEncode(sourceKeyName));
-    objectEndpoint.setHeaders(headersForCopy);
 
     assertSucceeds(() -> putObject(DEST_BUCKET_NAME, destKey));
 

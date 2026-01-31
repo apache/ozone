@@ -62,4 +62,9 @@ public interface BucketOperationHandler {
       throws IOException, OS3Exception {
     return null;
   }
+
+  default Response handleDeleteRequest(String bucketName)
+      throws IOException, OS3Exception {
+    return null;
+  }
 }

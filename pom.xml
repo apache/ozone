@@ -38,7 +38,7 @@
     <aspectj.java21.version>1.9.24</aspectj.java21.version>
     <!-- Default aspectj version for java8 -->
     <aspectj.version>1.9.7</aspectj.version>
-    <assertj.version>3.27.6</assertj.version>
+    <assertj.version>3.27.7</assertj.version>
     <aws-java-sdk.version>1.12.788</aws-java-sdk.version>
     <aws-java-sdk2.version>2.41.14</aws-java-sdk2.version>
     <bonecp.version>0.8.0.RELEASE</bonecp.version>
@@ -104,8 +104,9 @@
     <hk2.version>2.6.1</hk2.version>
     <httpclient.version>4.5.14</httpclient.version>
     <httpcore.version>4.4.16</httpcore.version>
-    <io.grpc.version>1.77.0</io.grpc.version>
-    <jackson2-bom.version>2.16.2</jackson2-bom.version>
+    <io.grpc.version>1.77.1</io.grpc.version>
+    <jackson2-bom.version>2.21.0</jackson2-bom.version>
+    <jackson2.version>2.21.0</jackson2.version>
     <jacoco.version>0.8.14</jacoco.version>
     <jakarta.annotation.version>2.1.1</jakarta.annotation.version>
     <jakarta.inject.version>2.6.1</jakarta.inject.version>
@@ -170,7 +171,7 @@
     <metainf-services.version>1.11</metainf-services.version>
     <mockito.version>4.11.0</mockito.version>
     <native.lib.tmp.dir />
-    <netty.version>4.1.128.Final</netty.version>
+    <netty.version>4.1.130.Final</netty.version>
     <!-- Node.js version number (without the v prefix required by frontend-maven-plugin) -->
     <nodejs.version>16.14.2</nodejs.version>
     <okhttp3.version>4.12.0</okhttp3.version>
@@ -398,6 +399,18 @@
         <groupId>com.codahale.metrics</groupId>
         <artifactId>metrics-core</artifactId>
         <version>${codahale-metrics.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.fasterxml.jackson.module</groupId>
+        <artifactId>jackson-module-jaxb-annotations</artifactId>
+        <version>${jackson2.version}</version>
+        <exclusions>
+          <exclusion>
+            <!-- using jakarta.xml.bind instead -->
+            <groupId>javax.xml.bind</groupId>
+            <artifactId>jaxb-api</artifactId>
+          </exclusion>
+        </exclusions>
       </dependency>
       <dependency>
         <groupId>com.fasterxml.woodstox</groupId>

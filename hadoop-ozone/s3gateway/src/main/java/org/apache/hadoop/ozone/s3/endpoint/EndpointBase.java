@@ -623,6 +623,9 @@ public abstract class EndpointBase {
    * Used for initializing handler instances.
    */
   protected void copyDependenciesTo(EndpointBase target) {
+    if (this == target) {
+      return;
+    }
     target.queryParams = queryParams;
     target.s3Auth = s3Auth;
     target.setClient(this.client);
@@ -820,11 +823,11 @@ public abstract class EndpointBase {
     return chunkSize;
   }
 
-  public MessageDigest getMD5DigestInstance() {
+  public static MessageDigest getMD5DigestInstance() {
     return MD5_PROVIDER.get();
   }
 
-  public MessageDigest getSha256DigestInstance() {
+  public static MessageDigest getSha256DigestInstance() {
     return SHA_256_PROVIDER.get();
   }
 
