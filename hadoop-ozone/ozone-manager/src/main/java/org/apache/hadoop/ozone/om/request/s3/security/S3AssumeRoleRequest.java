@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om.request.s3.security;
 import static org.apache.hadoop.ozone.security.acl.AssumeRoleRequest.OzoneGrant;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.security.SecureRandom;
@@ -28,7 +29,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ipc.ProtobufRpcEngine;
 import org.apache.hadoop.ozone.audit.AuditLogger;
@@ -47,6 +47,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AssumeRoleRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.AssumeRoleResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UpdateAssumeRoleRequest;
 import org.apache.hadoop.ozone.security.acl.iam.IamSessionPolicyResolver;
 import org.apache.hadoop.security.UserGroupInformation;
 
@@ -88,19 +89,77 @@ public class S3AssumeRoleRequest extends OMClientRequest {
   }
 
   @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    final AssumeRoleRequest assumeRoleRequest = getOmRequest().getAssumeRoleRequest();
+
+    // Brief overview of flow:
+    // The STS Endpoint makes the AssumeRole call, which when received by OM leader (via this method),
+    // it will generate the temporary credentials (tempAccessKeyId, secretAccessKey) and roleId.
+    // The original AssumeRole request is converted to an UpdateAssumeRoleRequest with the generated
+    // credentials. This update request will be submitted to Ratis and the credentials
+    // created by the leader will be replicated across all OMs.  All OMs in
+    // HA mode therefore will have identical audit logs with the same tempAccessKeyId.
+
+    // Generate temporary AWS credentials using cryptographically strong SecureRandom
+    final String tempAccessKeyId = STS_TOKEN_PREFIX + generateSecureRandomStringUsingChars(
+        CHARS_FOR_ACCESS_KEY_IDS, CHARS_FOR_ACCESS_KEY_IDS_LENGTH, STS_ACCESS_KEY_ID_LENGTH);
+    final String secretAccessKey = generateSecureRandomStringUsingChars(
+        CHARS_FOR_SECRET_ACCESS_KEYS, CHARS_FOR_SECRET_ACCESS_KEYS_LENGTH, STS_SECRET_ACCESS_KEY_LENGTH);
+    final String roleId = ASSUME_ROLE_ID_PREFIX + generateSecureRandomStringUsingChars(
+        CHARS_FOR_ACCESS_KEY_IDS, CHARS_FOR_ACCESS_KEY_IDS_LENGTH, STS_ROLE_ID_LENGTH);
+
+    // Build UpdateAssumeRoleRequest with leader-generated credentials
+    final UpdateAssumeRoleRequest.Builder updateAssumeRoleRequestBuilder =
+        UpdateAssumeRoleRequest.newBuilder()
+            .setRoleArn(assumeRoleRequest.getRoleArn())
+            .setRoleSessionName(assumeRoleRequest.getRoleSessionName())
+            .setDurationSeconds(assumeRoleRequest.getDurationSeconds())
+            .setRequestId(assumeRoleRequest.getRequestId())
+            .setTempAccessKeyId(tempAccessKeyId)
+            .setSecretAccessKey(secretAccessKey)
+            .setRoleId(roleId);
+
+    if (assumeRoleRequest.hasAwsIamSessionPolicy()) {
+      updateAssumeRoleRequestBuilder.setAwsIamSessionPolicy(assumeRoleRequest.getAwsIamSessionPolicy());
+    }
+
+    // Build new OMRequest with both original and update requests
+    final OMRequest.Builder omRequest = OMRequest.newBuilder()
+        .setUserInfo(getUserInfo())
+        .setCmdType(getOmRequest().getCmdType())
+        .setClientId(getOmRequest().getClientId())
+        .setAssumeRoleRequest(assumeRoleRequest)
+        .setUpdateAssumeRoleRequest(updateAssumeRoleRequestBuilder.build());
+
+    if (getOmRequest().hasS3Authentication()) {
+      omRequest.setS3Authentication(getOmRequest().getS3Authentication());
+    }
+
+    if (getOmRequest().hasTraceID()) {
+      omRequest.setTraceID(getOmRequest().getTraceID());
+    }
+
+    return omRequest.build();
+  }
+
+  @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     final OMRequest omRequest = getOmRequest();
     final AssumeRoleRequest assumeRoleRequest = omRequest.getAssumeRoleRequest();
+    final UpdateAssumeRoleRequest updateAssumeRoleRequest = omRequest.getUpdateAssumeRoleRequest();
+
     final int durationSeconds = assumeRoleRequest.getDurationSeconds();
     final String roleSessionName = assumeRoleRequest.getRoleSessionName();
     final String roleArn = assumeRoleRequest.getRoleArn();
     final String awsIamSessionPolicy = assumeRoleRequest.getAwsIamSessionPolicy();
     final String requestId = assumeRoleRequest.getRequestId();
 
+    // Extract leader-generated credentials and roleId from UpdateAssumeRoleRequest
+    final String tempAccessKeyId = updateAssumeRoleRequest.getTempAccessKeyId();
+    final String secretAccessKey = updateAssumeRoleRequest.getSecretAccessKey();
+    final String roleId = updateAssumeRoleRequest.getRoleId();
+
     final Map<String, String> auditMap = new HashMap<>();
-    // In HA environments, only the tempAccessKeyId on the leader is used by S3G, so it could be helpful to
-    // have the leader information
-    auditMap.put("omRole", ozoneManager.isLeaderReady() ? "LEADER" : "FOLLOWER");
     final AuditLogger auditLogger = ozoneManager.getAuditLogger();
     final OzoneManagerProtocolProtos.UserInfo userInfo = omRequest.getUserInfo();
     S3STSUtils.addAssumeRoleAuditParams(
@@ -118,22 +177,18 @@ public class S3AssumeRoleRequest extends OMClientRequest {
       // Validate role ARN and extract role
       final String targetRoleName = AwsRoleArnValidator.validateAndExtractRoleNameFromArn(roleArn);
 
+      // Note: The IamSessionPolicyResolver validates the awsIamPolicy length internally
+
       if (!omRequest.hasS3Authentication()) {
         throw new OMException(
             "S3AssumeRoleRequest does not have S3 authentication", OMException.ResultCodes.INVALID_REQUEST);
       }
 
-      // Generate temporary AWS credentials using cryptographically strong SecureRandom
-      final String tempAccessKeyId = STS_TOKEN_PREFIX + generateSecureRandomStringUsingChars(
-          CHARS_FOR_ACCESS_KEY_IDS, CHARS_FOR_ACCESS_KEY_IDS_LENGTH, STS_ACCESS_KEY_ID_LENGTH);
-      final String secretAccessKey = generateSecureRandomStringUsingChars(
-          CHARS_FOR_SECRET_ACCESS_KEYS, CHARS_FOR_SECRET_ACCESS_KEYS_LENGTH, STS_SECRET_ACCESS_KEY_LENGTH);
+      // Generate session token using leader-generated credentials
       final String sessionToken = generateSessionToken(
           targetRoleName, omRequest, ozoneManager, assumeRoleRequest, secretAccessKey, tempAccessKeyId);
 
-      // Generate AssumedRoleId for response
-      final String roleId = ASSUME_ROLE_ID_PREFIX + generateSecureRandomStringUsingChars(
-          CHARS_FOR_ACCESS_KEY_IDS, CHARS_FOR_ACCESS_KEY_IDS_LENGTH, STS_ROLE_ID_LENGTH);
+      // Generate AssumedRoleId for response using leader-generated roleId
       final String assumedRoleId = roleId + ":" + roleSessionName;
 
       // Calculate expiration of session token
@@ -227,7 +282,7 @@ public class S3AssumeRoleRequest extends OMClientRequest {
       volumeName = HddsClientUtils.getDefaultS3VolumeName(ozoneManager.getConfiguration());
     }
 
-    final Set<OzoneGrant> grants = StringUtils.isBlank(awsIamPolicy) ?
+    final Set<OzoneGrant> grants = Strings.isNullOrEmpty(awsIamPolicy) ?
         null :
         IamSessionPolicyResolver.resolve(awsIamPolicy, volumeName, IamSessionPolicyResolver.AuthorizerType.RANGER);
 

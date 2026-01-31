@@ -183,7 +183,7 @@ public class TestS3AssumeRoleRequest {
   }
 
   @Test
-  public void testValidDurationMaxBoundary() {
+  public void testValidDurationMaxBoundary() throws IOException {
     final OMRequest omRequest = baseOmRequestBuilder()
         .setAssumeRoleRequest(
             AssumeRoleRequest.newBuilder()
@@ -193,17 +193,20 @@ public class TestS3AssumeRoleRequest {
                 .setRequestId(REQUEST_ID)
         ).build();
 
+    // Call preExecute first to generate credentials
     final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
-    final OMClientResponse response = request.validateAndUpdateCache(ozoneManager, context);
+    final OMRequest preExecutedRequest = request.preExecute(ozoneManager);
+    final S3AssumeRoleRequest requestWithCredentials = new S3AssumeRoleRequest(preExecutedRequest, CLOCK);
+    final OMClientResponse response = requestWithCredentials.validateAndUpdateCache(ozoneManager, context);
     final OMResponse omResponse = response.getOMResponse();
 
     assertThat(omResponse.getStatus()).isEqualTo(Status.OK);
     assertThat(omResponse.hasAssumeRoleResponse()).isTrue();
-    assertMarkForAuditCalled(request);
+    assertMarkForAuditCalled(requestWithCredentials);
   }
 
   @Test
-  public void testValidDurationMinBoundary() {
+  public void testValidDurationMinBoundary() throws IOException {
     final OMRequest omRequest = baseOmRequestBuilder()
         .setAssumeRoleRequest(
             AssumeRoleRequest.newBuilder()
@@ -213,13 +216,16 @@ public class TestS3AssumeRoleRequest {
                 .setRequestId(REQUEST_ID)
         ).build();
 
+    // Call preExecute first to generate credentials
     final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
-    final OMClientResponse response = request.validateAndUpdateCache(ozoneManager, context);
+    final OMRequest preExecutedRequest = request.preExecute(ozoneManager);
+    final S3AssumeRoleRequest requestWithCredentials = new S3AssumeRoleRequest(preExecutedRequest, CLOCK);
+    final OMClientResponse response = requestWithCredentials.validateAndUpdateCache(ozoneManager, context);
     final OMResponse omResponse = response.getOMResponse();
 
     assertThat(omResponse.getStatus()).isEqualTo(Status.OK);
     assertThat(omResponse.hasAssumeRoleResponse()).isTrue();
-    assertMarkForAuditCalled(request);
+    assertMarkForAuditCalled(requestWithCredentials);
   }
 
   @Test
@@ -246,7 +252,7 @@ public class TestS3AssumeRoleRequest {
   }
 
   @Test
-  public void testSuccessfulAssumeRoleGeneratesCredentials() {
+  public void testSuccessfulAssumeRoleGeneratesCredentials() throws IOException {
     final int durationSeconds = 3600;
     final OMRequest omRequest = baseOmRequestBuilder()
         .setAssumeRoleRequest(
@@ -258,7 +264,10 @@ public class TestS3AssumeRoleRequest {
         ).build();
 
     final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
-    final OMClientResponse clientResponse = request.validateAndUpdateCache(ozoneManager, context);
+    // Call preExecute first to generate credentials
+    final OMRequest preExecutedRequest = request.preExecute(ozoneManager);
+    final S3AssumeRoleRequest requestWithCredentials = new S3AssumeRoleRequest(preExecutedRequest, CLOCK);
+    final OMClientResponse clientResponse = requestWithCredentials.validateAndUpdateCache(ozoneManager, context);
     final OMResponse omResponse = clientResponse.getOMResponse();
 
     assertThat(omResponse.getStatus()).isEqualTo(Status.OK);
@@ -284,7 +293,7 @@ public class TestS3AssumeRoleRequest {
     // Verify expiration added durationSeconds
     final long expirationEpochSeconds = assumeRoleResponse.getExpirationEpochSeconds();
     assertThat(expirationEpochSeconds).isEqualTo(CLOCK.instant().getEpochSecond() + durationSeconds);
-    assertMarkForAuditCalled(request);
+    assertMarkForAuditCalled(requestWithCredentials);
   }
 
   @Test
@@ -307,7 +316,7 @@ public class TestS3AssumeRoleRequest {
   }
 
   @Test
-  public void testAssumeRoleCredentialsAreUnique() {
+  public void testAssumeRoleCredentialsAreUnique() throws IOException {
     // Test that multiple calls generate different credentials
     final OMRequest omRequest = baseOmRequestBuilder()
         .setAssumeRoleRequest(
@@ -319,9 +328,16 @@ public class TestS3AssumeRoleRequest {
         ).build();
 
     final S3AssumeRoleRequest request1 = new S3AssumeRoleRequest(omRequest, CLOCK);
-    final OMClientResponse response1 = request1.validateAndUpdateCache(ozoneManager, context);
+    // Call preExecute first to generate credentials
+    final OMRequest preExecutedRequest1 = request1.preExecute(ozoneManager);
+    final S3AssumeRoleRequest requestWithCredentials1 = new S3AssumeRoleRequest(preExecutedRequest1, CLOCK);
+    final OMClientResponse response1 = requestWithCredentials1.validateAndUpdateCache(ozoneManager, context);
+    
     final S3AssumeRoleRequest request2 = new S3AssumeRoleRequest(omRequest, CLOCK);
-    final OMClientResponse response2 = request2.validateAndUpdateCache(ozoneManager, context);
+    // Call preExecute again to generate different credentials
+    final OMRequest preExecutedRequest2 = request2.preExecute(ozoneManager);
+    final S3AssumeRoleRequest requestWithCredentials2 = new S3AssumeRoleRequest(preExecutedRequest2, CLOCK);
+    final OMClientResponse response2 = requestWithCredentials2.validateAndUpdateCache(ozoneManager, context);
 
     final AssumeRoleResponse assumeRoleResponse1 = response1.getOMResponse().getAssumeRoleResponse();
     final AssumeRoleResponse assumeRoleResponse2 = response2.getOMResponse().getAssumeRoleResponse();
@@ -338,8 +354,8 @@ public class TestS3AssumeRoleRequest {
     // Different assumed role IDs
     assertThat(assumeRoleResponse1.getAssumedRoleId()).isNotEqualTo(assumeRoleResponse2.getAssumedRoleId());
 
-    OMAuditLogger.log(request1.getAuditBuilder());
-    OMAuditLogger.log(request2.getAuditBuilder());
+    OMAuditLogger.log(requestWithCredentials1.getAuditBuilder());
+    OMAuditLogger.log(requestWithCredentials2.getAuditBuilder());
     verify(auditLogger, times(2)).logWrite(any(AuditMessage.class));
   }
 
@@ -409,7 +425,7 @@ public class TestS3AssumeRoleRequest {
   }
 
   @Test
-  public void testValidRoleSessionNameMaxLengthBoundary() {
+  public void testValidRoleSessionNameMaxLengthBoundary() throws IOException {
     final String roleSessionName = S3SecurityTestUtils.repeat('g', 64);
     final OMRequest omRequest = baseOmRequestBuilder()
         .setAssumeRoleRequest(
@@ -419,17 +435,20 @@ public class TestS3AssumeRoleRequest {
                 .setRequestId(REQUEST_ID)
         ).build();
 
+    // Call preExecute first to generate credentials
     final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
-    final OMClientResponse response = request.validateAndUpdateCache(ozoneManager, context);
+    final OMRequest preExecutedRequest = request.preExecute(ozoneManager);
+    final S3AssumeRoleRequest requestWithCredentials = new S3AssumeRoleRequest(preExecutedRequest, CLOCK);
+    final OMClientResponse response = requestWithCredentials.validateAndUpdateCache(ozoneManager, context);
     final OMResponse omResponse = response.getOMResponse();
 
     assertThat(omResponse.getStatus()).isEqualTo(Status.OK);
     assertThat(omResponse.hasAssumeRoleResponse()).isTrue();
-    assertMarkForAuditCalled(request);
+    assertMarkForAuditCalled(requestWithCredentials);
   }
 
   @Test
-  public void testValidRoleSessionNameMinLengthBoundary() {
+  public void testValidRoleSessionNameMinLengthBoundary() throws IOException {
     final OMRequest omRequest = baseOmRequestBuilder()
         .setAssumeRoleRequest(
             AssumeRoleRequest.newBuilder()
@@ -438,17 +457,20 @@ public class TestS3AssumeRoleRequest {
                 .setRequestId(REQUEST_ID)
         ).build();
 
+    // Call preExecute first to generate credentials
     final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
-    final OMClientResponse response = request.validateAndUpdateCache(ozoneManager, context);
+    final OMRequest preExecutedRequest = request.preExecute(ozoneManager);
+    final S3AssumeRoleRequest requestWithCredentials = new S3AssumeRoleRequest(preExecutedRequest, CLOCK);
+    final OMClientResponse response = requestWithCredentials.validateAndUpdateCache(ozoneManager, context);
     final OMResponse omResponse = response.getOMResponse();
 
     assertThat(omResponse.getStatus()).isEqualTo(Status.OK);
     assertThat(omResponse.hasAssumeRoleResponse()).isTrue();
-    assertMarkForAuditCalled(request);
+    assertMarkForAuditCalled(requestWithCredentials);
   }
 
   @Test
-  public void testAssumeRoleWithSessionPolicyPresent() {
+  public void testAssumeRoleWithSessionPolicyPresent() throws IOException {
     final String sessionPolicy = "{\"Version\":\"2012-10-17\",\"Statement\":[]}";
     final OMRequest omRequest = baseOmRequestBuilder()
         .setAssumeRoleRequest(
@@ -460,10 +482,13 @@ public class TestS3AssumeRoleRequest {
                 .setRequestId(REQUEST_ID)
         ).build();
 
+    // Call preExecute first to generate credentials
     final S3AssumeRoleRequest request = new S3AssumeRoleRequest(omRequest, CLOCK);
-    final OMClientResponse response = request.validateAndUpdateCache(ozoneManager, context);
+    final OMRequest preExecutedRequest = request.preExecute(ozoneManager);
+    final S3AssumeRoleRequest requestWithCredentials = new S3AssumeRoleRequest(preExecutedRequest, CLOCK);
+    final OMClientResponse response = requestWithCredentials.validateAndUpdateCache(ozoneManager, context);
     assertThat(response.getOMResponse().getStatus()).isEqualTo(Status.OK);
-    assertMarkForAuditCalled(request);
+    assertMarkForAuditCalled(requestWithCredentials);
   }
 
   @Test
