@@ -82,7 +82,6 @@
     <distMgmtStagingId>apache.staging.https</distMgmtStagingId>
     <distMgmtStagingName>Apache Release Distribution Repository</distMgmtStagingName>
     <distMgmtStagingUrl>https://repository.apache.org/service/local/staging/deploy/maven2</distMgmtStagingUrl>
-    <docker-maven-plugin.version>0.45.1</docker-maven-plugin.version>
     <download-maven-plugin.version>1.9.0</download-maven-plugin.version>
     <dropwizard-metrics.version>3.2.6</dropwizard-metrics.version>
     <enforced.java.version>[${javac.version},)</enforced.java.version>
@@ -2071,11 +2070,6 @@
           <groupId>org.jacoco</groupId>
           <artifactId>jacoco-maven-plugin</artifactId>
           <version>${jacoco.version}</version>
-        </plugin>
-        <plugin>
-          <groupId>io.fabric8</groupId>
-          <artifactId>docker-maven-plugin</artifactId>
-          <version>${docker-maven-plugin.version}</version>
         </plugin>
         <plugin>
           <groupId>com.googlecode.maven-download-plugin</groupId>
