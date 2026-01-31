@@ -78,7 +78,7 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends TestOzoneManag
 
   @Test
   void testOMFollowerReadProxyProviderInitialization() {
-    HadoopRpcOMFollowerReadFailoverProxyProvider<OzoneManagerProtocolPB> followerReadFailoverProxyProvider =
+    HadoopRpcOMFollowerReadFailoverProxyProvider followerReadFailoverProxyProvider =
         OmTestUtil.getFollowerReadFailoverProxyProvider(getObjectStore());
 
     List<OMProxyInfo<OzoneManagerProtocolPB>> omProxies =
@@ -104,7 +104,7 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends TestOzoneManag
   @Test
   void testFollowerReadTargetsFollower() throws Exception {
     ObjectStore objectStore = getObjectStore();
-    HadoopRpcOMFollowerReadFailoverProxyProvider<OzoneManagerProtocolPB> followerReadFailoverProxyProvider =
+    HadoopRpcOMFollowerReadFailoverProxyProvider followerReadFailoverProxyProvider =
         OmTestUtil.getFollowerReadFailoverProxyProvider(objectStore);
 
     String leaderOMNodeId = getCluster().getOMLeader().getOMNodeId();
@@ -199,7 +199,7 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends TestOzoneManag
       assertNotSame(
           OmTestUtil.getFailoverProxyProvider(getObjectStore()),
           OmTestUtil.getFailoverProxyProvider(anotherObjectStore));
-      HadoopRpcOMFollowerReadFailoverProxyProvider<OzoneManagerProtocolPB> otherClientFollowerReadProxyProvider =
+      HadoopRpcOMFollowerReadFailoverProxyProvider otherClientFollowerReadProxyProvider =
           OmTestUtil.getFollowerReadFailoverProxyProvider(anotherObjectStore);
       assertNotSame(
           OmTestUtil.getFollowerReadFailoverProxyProvider(getObjectStore()),
@@ -426,7 +426,7 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends TestOzoneManag
   void testOMResponseLeaderOmNodeId() throws Exception {
     HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> omFailoverProxyProvider =
         OmTestUtil.getFailoverProxyProvider(getObjectStore());
-    HadoopRpcOMFollowerReadFailoverProxyProvider<OzoneManagerProtocolPB> followerReadFailoverProxyProvider =
+    HadoopRpcOMFollowerReadFailoverProxyProvider followerReadFailoverProxyProvider =
         OmTestUtil.getFollowerReadFailoverProxyProvider(getObjectStore());
 
     // Make sure All OMs are ready

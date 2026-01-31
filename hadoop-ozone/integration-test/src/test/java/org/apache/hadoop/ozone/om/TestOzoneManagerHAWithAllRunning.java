@@ -1130,7 +1130,7 @@ class TestOzoneManagerHAWithAllRunning extends TestOzoneManagerHA {
       ObjectStore objectStore = ozoneClient.getObjectStore();
       HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> leaderFailoverProxyProvider =
           OmTestUtil.getFailoverProxyProvider(objectStore);
-      HadoopRpcOMFollowerReadFailoverProxyProvider<OzoneManagerProtocolPB> followerReadFailoverProxyProvider =
+      HadoopRpcOMFollowerReadFailoverProxyProvider followerReadFailoverProxyProvider =
           OmTestUtil.getFollowerReadFailoverProxyProvider(objectStore);
       assertNotNull(followerReadFailoverProxyProvider);
       assertTrue(followerReadFailoverProxyProvider.isUseFollowerRead());
