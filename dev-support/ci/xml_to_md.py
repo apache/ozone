@@ -36,10 +36,22 @@ def extract_xml_from_jar(jar_path, xml_filename):
           xml_files.append(xml_file.read())
   return xml_files
 
-def wrap_config_keys_in_description(description, properties):
-  for key in properties.keys():
-    description = re.sub(r'\b' + re.escape(key) + r'\b', f'`{key}`', description)
-  return description
+def wrap_config_keys_in_description(description, config_keys):
+  words = description.split()
+  wrapped_words = []
+  
+  for word in words:
+    # Strip punctuation to check if the word is a config key
+    stripped_word = word.strip('.,;:!?()[]{}')
+    if stripped_word in config_keys:
+      # Preserve punctuation around the wrapped key
+      prefix = word[:len(word) - len(word.lstrip('.,;:!?()[]{}'))]
+      suffix = word[len(stripped_word) + len(prefix):]
+      wrapped_words.append(f'{prefix}`{stripped_word}`{suffix}')
+    else:
+      wrapped_words.append(word)
+  
+  return ' '.join(wrapped_words)
 
 def parse_xml_file(xml_content, properties):
   root = ET.fromstring(xml_content)
@@ -51,38 +63,56 @@ def parse_xml_file(xml_content, properties):
     if not description:
       raise ValueError(f"Property '{name}' is missing a description.")
     tag = prop.findtext('tag', '')
-    if tag:
-      formatted_tag = '<br/>'.join(f'`{t.strip()}`' for t in tag.split(','))
-    else:
-      formatted_tag = ''
-    
+
     properties[name] = Property(
       name=name,
       value=prop.findtext('value', ''),
-      tag=formatted_tag,
-      description=wrap_config_keys_in_description(
-        ' '.join(description.split()).strip(),
-        properties
-      )
+      tag=tag,
+      description=' '.join(description.split()).strip()
     )
   return properties
 
+def format_properties(properties):
+  config_keys = set(properties.keys())
+  formatted_properties = {}
+  
+  for name, prop in properties.items():
+    if prop.tag:
+      formatted_tag = ', '.join(f'`{t.strip()}`' for t in prop.tag.split(','))
+    else:
+      formatted_tag = ''
+    
+    # Wrap config keys in description now that we have all configs
+    formatted_description = wrap_config_keys_in_description(prop.description, config_keys)
+    
+    formatted_properties[name] = Property(
+      name=prop.name,
+      value=prop.value,
+      tag=formatted_tag,
+      description=formatted_description
+    )
+  return formatted_properties
+
 def generate_markdown(properties):
-  markdown = f"""
-## Ozone Configuration Keys
-This page provides da comprehensive overview of the configuration keys available in Ozone.
-### Configuration Keys
+  markdown = """---
+sidebar_label: Appendix
+---
+
+# Configuration Key Appendix
+
+This page provides a comprehensive overview of the configuration keys available in Ozone.
+
+| Name | Default Value | Tags | Description |
+|:-----|:--------------|:-----|:------------|
 """
 
   for prop in sorted(properties.values(), key=lambda p: p.name):
-    markdown += f"""
-| **Name**        | `{prop.name}` |
-|:----------------|:----------------------------|
-| **Value**       | {prop.value} |
-| **Tag**         | {prop.tag} |
-| **Description** | {prop.description} |
---------------------------------------------------------------------------------
-"""
+    # Escape pipe characters in description to prevent breaking the table
+    description = prop.description.replace('|', '\\|')
+    value = prop.value if prop.value else ''
+    
+    markdown += f"| `{prop.name}` | {value} | {prop.tag} | {description} |\n"
+  
   return markdown
 
 def main():
@@ -107,13 +137,14 @@ def main():
 
   property_map = {}
   for file_name in os.listdir(extract_path):
-    if file_name.endswith('.jar'):
+    if file_name.startswith('hdds-common-') and file_name.endswith('.jar'):
       jar_path = os.path.join(extract_path, file_name)
       xml_contents = extract_xml_from_jar(jar_path, xml_filename)
       for xml_content in xml_contents:
         parse_xml_file(xml_content, property_map)
 
-  markdown_content = generate_markdown(property_map)
+  formatted_properties = format_properties(property_map)
+  markdown_content = generate_markdown(formatted_properties)
 
   if output_path:
     output_path = Path(output_path)

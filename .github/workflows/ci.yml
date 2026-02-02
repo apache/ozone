@@ -358,7 +358,7 @@ jobs:
           fi
           
           echo "Copying to $TARGET_DIR/99-appendix.md"
-          cp ../Configurations.md "$TARGET_DIR/99-appendix.md"
+          cp ../Configurations.md "$TARGET_DIR/05-appendix.md"
           
           # Check if file changed using git status
           if git status --porcelain "$TARGET_DIR/99-appendix.md" | grep -q .; then
