@@ -229,6 +229,8 @@ public class TestStorageDistributionEndpoint {
             assertEquals(report.getRemaining(), scmReport.getRemaining());
             assertEquals(report.getUsed(), scmReport.getUsed());
             assertEquals(report.getCommitted(), scmReport.getCommitted());
+            assertEquals(report.getFilesystemAvailable(), scmReport.getFsAvailable());
+            assertEquals(report.getFilesystemCapacity(), scmReport.getFsCapacity());
           }
         }
       }
