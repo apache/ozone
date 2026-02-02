@@ -285,12 +285,11 @@ public class SCMStateMachine extends BaseStateMachine {
     currentLeaderTerm.set(scm.getScmHAManager().getRatisServer().getDivision()
         .getInfo().getCurrentTerm());
 
-    if (!refreshedAfterLeaderReady.get()) {
+    if (refreshedAfterLeaderReady.compareAndSet(false, true)) {
       // refresh and validate safe mode rules if it can exit safe mode
       // if being leader, all previous term transactions have been applied
       // if other states, just refresh safe mode rules, and transaction keeps flushing from leader
       // and does not depend on pending transactions.
-      refreshedAfterLeaderReady.set(true);
       scm.getScmSafeModeManager().refreshAndValidate();
     }
 
@@ -365,9 +364,8 @@ public class SCMStateMachine extends BaseStateMachine {
 
     if (currentLeaderTerm.get() == term) {
       // This means after a restart, all pending transactions have been applied.
-      if (!refreshedAfterLeaderReady.get()) {
+      if (refreshedAfterLeaderReady.compareAndSet(false, true)) {
         // Refresh Safemode rules state if not already done.
-        refreshedAfterLeaderReady.set(true);
         scm.getScmSafeModeManager().refreshAndValidate();
       }
       currentLeaderTerm.set(-1L);
