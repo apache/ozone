@@ -267,7 +267,7 @@ jobs:
             gh pr edit "$EXISTING_PR" --body-file pr_body.txt
           else
             echo "Creating new PR"
-            TITLE="Update configuration documentation"
+            TITLE="[Auto] Update configuration documentation"
             if [ -n "$JIRA_ID" ]; then
               TITLE="$JIRA_ID. $TITLE"
             fi
@@ -342,7 +342,7 @@ jobs:
           repository: ${{ github.repository_owner }}/ozone-site
           ref: 'HDDS-9225-website-v2'
           path: ozone-site
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.OZONE_WEBSITE_BUILD }}
       
       - name: Copy and commit documentation
         if: steps.check-site-repo.outputs.exists == 'true'
@@ -357,11 +357,11 @@ jobs:
             exit 0
           fi
           
-          echo "Copying to $TARGET_DIR/99-appendix.md"
+          echo "Copying to $TARGET_DIR/05-appendix.md"
           cp ../Configurations.md "$TARGET_DIR/05-appendix.md"
           
           # Check if file changed using git status
-          if git status --porcelain "$TARGET_DIR/99-appendix.md" | grep -q .; then
+          if git status --porcelain "$TARGET_DIR/05-appendix.md" | grep -q .; then
             echo "Configurations.md has changed in ozone-site"
           else
             echo "No changes in ozone-site documentation"
@@ -381,7 +381,7 @@ jobs:
           git checkout -B "$BRANCH_NAME"
           echo "Created/reset branch $BRANCH_NAME at current commit"
           
-          git add "$TARGET_DIR/99-appendix.md"
+          git add "$TARGET_DIR/05-appendix.md"
           
           # Build commit message with JIRA ID if available
           JIRA_ID="${{ steps.extract-jira-early.outputs.jira_id }}"
@@ -398,7 +398,7 @@ jobs:
       - name: Create or update Pull Request in ozone-site
         if: steps.check-site-repo.outputs.exists == 'true' && github.repository == 'apache/ozone'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.OZONE_WEBSITE_BUILD }}
         run: |
           cd ozone-site
           
@@ -433,7 +433,7 @@ jobs:
             gh pr edit "$EXISTING_PR" --repo "${{ github.repository_owner }}/ozone-site" --body-file pr_body.txt
           else
             echo "Creating new PR"
-            TITLE="Update configuration documentation"
+            TITLE="[Auto] Update configuration documentation"
             if [ -n "$JIRA_ID" ]; then
               TITLE="$JIRA_ID. $TITLE"
             fi
