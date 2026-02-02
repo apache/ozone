@@ -1260,16 +1260,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       }
     }
   }
-
-  private Response getObjectTagging(OzoneBucket bucket, String keyName) throws IOException {
-    long startNanos = Time.monotonicNowNanos();
-
-    Map<String, String> tagMap = bucket.getObjectTagging(keyName);
-
-    getMetrics().updateGetObjectTaggingSuccessStats(startNanos);
-    return Response.ok(S3Tagging.fromMap(tagMap), MediaType.APPLICATION_XML_TYPE).build();
-  }
-
+  
   /** Request context shared among {@code ObjectOperationHandler}s. */
   final class ObjectRequestContext {
     private final String bucketName;
