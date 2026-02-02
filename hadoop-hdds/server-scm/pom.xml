@@ -308,6 +308,37 @@
           <excludeFilterFile>${basedir}/dev-support/findbugsExcludeFile.xml</excludeFilterFile>
         </configuration>
       </plugin>
+      <plugin>
+        <groupId>org.xolstice.maven.plugins</groupId>
+        <artifactId>protobuf-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>compile-test-protobuf</id>
+            <goals>
+              <goal>test-compile</goal>
+            </goals>
+            <phase>generate-test-sources</phase>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>build-helper-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>add-test-protobuf-sources</id>
+            <goals>
+              <goal>add-test-source</goal>
+            </goals>
+            <phase>generate-test-sources</phase>
+            <configuration>
+              <sources>
+                <source>${project.build.directory}/generated-test-sources/protobuf/java</source>
+              </sources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
 </project>
