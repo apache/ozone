@@ -17,12 +17,14 @@
 
 package org.apache.hadoop.ozone.om.request.lifecycle;
 
+import static org.apache.hadoop.ozone.om.request.validation.ValidationContext.of;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.util.UUID;
@@ -33,13 +35,16 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
+import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.lifecycle.OMLifecycleConfigurationSetResponse;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleConfiguration;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
+import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -237,5 +242,41 @@ public class TestOMLifecycleConfigurationSetRequest extends
     assertEquals(original.getBucket(), updated.getBucket());
     assertNotEquals(original.getCreationTime(), updated.getCreationTime());
     assertEquals(original.getRulesList(), updated.getRulesList());
+  }
+
+  @Test
+  public void testDisallowSetLifecycleConfigurationBeforeFinalization() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    LayoutVersionManager versionManager = mock(LayoutVersionManager.class);
+    when(versionManager.isAllowed(OMLayoutFeature.LIFECYCLE_SUPPORT)).thenReturn(false);
+
+    ValidationContext ctx = of(versionManager, omMetadataManager);
+    OMRequest request = setLifecycleConfigurationRequest(volumeName, bucketName, "ownerName");
+
+    OMException ex = assertThrows(OMException.class, () ->
+        OMLifecycleConfigurationSetRequest
+            .disallowSetLifecycleConfigurationBeforeFinalization(request, ctx));
+
+    assertEquals(OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION,
+        ex.getResult());
+  }
+
+  @Test
+  public void testAllowSetLifecycleConfigurationAfterFinalization() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    LayoutVersionManager versionManager = mock(LayoutVersionManager.class);
+    when(versionManager.isAllowed(OMLayoutFeature.LIFECYCLE_SUPPORT)).thenReturn(true);
+
+    ValidationContext ctx = of(versionManager, omMetadataManager);
+    OMRequest request = setLifecycleConfigurationRequest(volumeName, bucketName, "ownerName");
+
+    OMRequest result = OMLifecycleConfigurationSetRequest
+        .disallowSetLifecycleConfigurationBeforeFinalization(request, ctx);
+
+    assertEquals(request, result);
   }
 }
