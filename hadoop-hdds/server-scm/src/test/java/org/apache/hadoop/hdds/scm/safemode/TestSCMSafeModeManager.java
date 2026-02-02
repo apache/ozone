@@ -189,7 +189,7 @@ public class TestSCMSafeModeManager {
     when(mockScmhaManager.getRatisServer()).thenReturn(mockScmRatisServer);
     SCMStateMachine mockScmStateMachine = mock(SCMStateMachine.class);
     when(mockScmRatisServer.getSCMStateMachine()).thenReturn(mockScmStateMachine);
-    when((mockScmStateMachine.isRefreshedAfterLeaderReady())).thenReturn(true);
+    when((mockScmStateMachine.getIsStateMachineReady())).thenReturn(true);
     scmContext = new SCMContext.Builder().setSCM(mockScmManager).build();
     scmSafeModeManager = new SCMSafeModeManager(config, null, null, containerManager,
         serviceManager, queue, scmContext);
