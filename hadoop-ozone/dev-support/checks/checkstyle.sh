@@ -43,7 +43,7 @@ cat "${REPORT_DIR}/output.log"
 if [[ -d "${BASE_DIR}/ozone-ui/src" ]]; then
   (
     cd "${BASE_DIR}/ozone-ui/src" || exit 1
-    pnpm -s run lint -- --format unix
+    pnpm run lint
   ) > "$UI_REPORT_FILE" 2>&1
 else
   echo "ozone-ui/src not found. Skipping UI lint." > "$UI_REPORT_FILE"
