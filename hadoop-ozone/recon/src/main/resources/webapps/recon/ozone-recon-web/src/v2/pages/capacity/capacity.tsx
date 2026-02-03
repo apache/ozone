@@ -61,7 +61,12 @@ const Capacity: React.FC<object> = () => {
     CONSTANTS.DEFAULT_CAPACITY_UTILIZATION,
     {
       retryAttempts: 2,
-      onError: (error) => showDataFetchError(error)
+      onError: (error) => showDataFetchError(error),
+      onSuccess: (data) => {
+        console.log('Storage Distribution API Response:', data);
+        console.log('usedSpaceBreakdown:', data.usedSpaceBreakdown);
+        console.log('openKeyBytes:', data.usedSpaceBreakdown?.openKeyBytes);
+      }
     }
   );
   
@@ -229,7 +234,7 @@ const Capacity: React.FC<object> = () => {
       </>
     }>
       <CheckCircleFilled style={{ color: '#1ea57a', marginRight: 8, fontSize: 14 }} />
-        Datanodes  
+        Datanodes
     </Popover>
   );
 
@@ -258,6 +263,26 @@ const Capacity: React.FC<object> = () => {
       Node Selector <WrappedInfoIcon title={nodeSelectorMessage} />
     </span>
   );
+
+const openKeyUsageBreakdown = (
+    <span>
+      OPEN KEYS
+      <Popover
+        title="Open Key Breakdown"
+        placement='topLeft'
+        content={
+          <div className='openkeys-space-breakdown'>
+            Open Key/File Bytes
+            <Tag color='red'>{filesize(storageDistribution.data.usedSpaceBreakdown.openKeyBytes?.openKeyAndFileBytes ?? 0, {round: 1})}</Tag>
+            Multipart Key Bytes
+            <Tag color='green'>{filesize(storageDistribution.data.usedSpaceBreakdown.openKeyBytes?.multipartOpenKeyBytes ?? 0, {round: 1})}</Tag>
+          </div>
+        }
+      >
+        <InfoCircleOutlined style={{ color: '#2f84d8', fontSize: 12, marginLeft: 2 }} />
+      </Popover>
+    </span>
+   );
 
   return (
     <>
@@ -322,8 +347,8 @@ const Capacity: React.FC<object> = () => {
             title: 'TOTAL',
             value: storageDistribution.data.globalStorage.totalUsedSpace
           }, {
-            title: 'OPEN KEYS',
-            value: storageDistribution.data.usedSpaceBreakdown.openKeyBytes,
+            title: openKeyUsageBreakdown,
+            value: storageDistribution.data.usedSpaceBreakdown.openKeyBytes?.totalOpenKeyBytes ?? 0,
             color: '#f47c2d'
           }, {
             title: 'COMMITTED KEYS',
