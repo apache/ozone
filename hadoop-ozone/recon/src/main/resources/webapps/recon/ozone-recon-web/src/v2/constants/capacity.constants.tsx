@@ -29,7 +29,11 @@ export const DEFAULT_CAPACITY_UTILIZATION: UtilizationResponse = {
     totalKeys: 0
   },
   usedSpaceBreakdown: {
-    openKeyBytes: 0,
+    openKeyBytes: {
+      totalOpenKeyBytes : 0,
+      openKeyAndFileBytes: 0,
+      multipartOpenKeyBytes: 0
+    },
     committedKeyBytes: 0,
     preAllocatedContainerBytes: 0
   },

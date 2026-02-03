@@ -214,7 +214,9 @@ public class TestStorageDistributionEndpoint {
 
       assertEquals(20, storageResponse.getGlobalNamespace().getTotalKeys());
       assertEquals(60, storageResponse.getGlobalNamespace().getTotalUsedSpace());
-      assertEquals(0, storageResponse.getUsedSpaceBreakDown().getOpenKeyBytes());
+      assertEquals(0, storageResponse.getUsedSpaceBreakDown().getOpenKeyBytes().getTotalOpenKeyBytes());
+      assertEquals(0, storageResponse.getUsedSpaceBreakDown().getOpenKeyBytes().getMultipartOpenKeyBytes());
+      assertEquals(0, storageResponse.getUsedSpaceBreakDown().getOpenKeyBytes().getOpenKeyAndFileBytes());
       assertEquals(60, storageResponse.getUsedSpaceBreakDown().getCommittedKeyBytes());
       assertEquals(3, storageResponse.getDataNodeUsage().size());
       List<DatanodeStorageReport> reports = storageResponse.getDataNodeUsage();
