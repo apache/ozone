@@ -30,6 +30,10 @@ import org.junit.jupiter.api.Test;
  */
 public class TestSCMRatisProtocolCompatibility {
 
+  /**
+   * Verifies that messages encoded with the legacy proto2 schema
+   * can be parsed by the current proto3 schema.
+   */
   @Test
   public void testProto2RequestCanBeParsedByProto3() throws Exception {
     // Build request using proto2 (test-only schema)
@@ -67,6 +71,10 @@ public class TestSCMRatisProtocolCompatibility {
     assertEquals(ByteString.copyFromUtf8("v"), proto3.getMethod().getArgs(0).getValue());
   }
 
+  /**
+   * Verifies that responses encoded with the legacy proto2 schema
+   * can be parsed by the current proto3 schema.
+   */
   @Test
   public void testProto2ResponseCanBeParsedByProto3() throws Exception {
     // Build response using proto2
