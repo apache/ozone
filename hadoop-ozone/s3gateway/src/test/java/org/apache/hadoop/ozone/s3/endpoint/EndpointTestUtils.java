@@ -45,6 +45,7 @@ public final class EndpointTestUtils {
       String bucket,
       String key
   ) throws IOException, OS3Exception {
+    when(subject.getContext().getMethod()).thenReturn(HttpMethod.GET);
     return subject.get(bucket, key);
   }
 
@@ -55,6 +56,7 @@ public final class EndpointTestUtils {
       String key
   ) throws IOException, OS3Exception {
     subject.queryParamsForTest().set(S3Consts.QueryParams.TAGGING, "");
+    when(subject.getContext().getMethod()).thenReturn(HttpMethod.GET);
     return subject.get(bucket, key);
   }
 

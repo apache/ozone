@@ -719,7 +719,6 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         context.setAction(S3GAction.ABORT_MULTIPART_UPLOAD);
         Response r = abortMultipartUpload(volume, bucketName, keyPath, uploadId);
 
-        getMetrics().updateAbortMultipartUploadSuccessStats(startNanos);
         return r;
       }
 
