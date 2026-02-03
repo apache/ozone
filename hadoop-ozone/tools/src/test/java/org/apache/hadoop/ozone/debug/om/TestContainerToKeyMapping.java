@@ -165,7 +165,7 @@ public class TestContainerToKeyMapping {
 
   @Test
   public void testContainerToKeyMappingWithMPU() {
-    int exitCode = execute("--containers", CONTAINER_ID_4 + "", "--in-progress");
+    int exitCode = execute("--containers", String.valueOf(CONTAINER_ID_4), "--in-progress");
     assertEquals(0, exitCode);
 
     String output = outWriter.toString();
@@ -180,7 +180,7 @@ public class TestContainerToKeyMapping {
 
   @Test
   public void testContainerToKeyMappingWithMPUOnlyFileNames() {
-    int exitCode = execute("--containers", CONTAINER_ID_4 + "", "--in-progress", "--onlyFileNames");
+    int exitCode = execute("--containers", String.valueOf(CONTAINER_ID_4), "--in-progress", "--onlyFileNames");
     assertEquals(0, exitCode);
 
     String output = outWriter.toString();
