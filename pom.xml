@@ -2214,6 +2214,9 @@
             </rulesets>
             <printFailingErrors>true</printFailingErrors>
             <includeTests>true</includeTests>
+            <excludes>
+              <exclude>**/target/generated-test-sources/**</exclude>
+            </excludes>
           </configuration>
         </plugin>
         <plugin>
