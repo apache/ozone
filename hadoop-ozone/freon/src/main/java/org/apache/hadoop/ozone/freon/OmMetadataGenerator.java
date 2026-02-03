@@ -141,9 +141,8 @@ public class OmMetadataGenerator extends BaseFreonGenerator
 
   @Option(
       names = "--clients",
-      description = "The number of Ozone clients used. It cannot be zero." +
-          "If the number of clients exceeds number of threads N, only N clients " +
-          "will be created.",
+      description = "The number of Ozone clients used. If zero or less, " +
+          "will fallback to 1",
       defaultValue = "1")
   private int clientsNo;
 
@@ -540,7 +539,7 @@ public class OmMetadataGenerator extends BaseFreonGenerator
       }
     }
     if (followerOMNodeIds.isEmpty()) {
-      throw new IllegalArgumentException("There is no follower the OM service, please retry again");
+      throw new IllegalArgumentException("There is no follower in the OM service, please retry again");
     }
     return followerOMNodeIds;
   }
