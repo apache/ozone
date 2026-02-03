@@ -273,80 +273,68 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
     }
   }
 
-  private void processOpenFiles(Set<Long> containerIds, Map<Long, List<String>> containerToKeysMap,
+  private void processOpenFiles(Set<Long> containerIds, Map<Long, List<String>> containerToOpenKeysMap,
       Map<Long, Long> unreferencedCountMap, Map<Long, Pair<Long, String>> bucketVolMap) {
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> fileIterator =
              openFileTable.iterator()) {
       while (fileIterator.hasNext()) {
-        Table.KeyValue<String, OmKeyInfo> entry = fileIterator.next();
-        OmKeyInfo keyInfo = entry.getValue();
-
-        // Find which containers this key uses
-        Set<Long> keyContainers = getKeyContainers(keyInfo, containerIds);
-
-        if (!keyContainers.isEmpty()) {
-          OmKeyLocationInfoGroup locations = keyInfo.getLatestVersionLocations();
-          boolean isMpuKey = locations != null && locations.isMultipartKey();
-
-          String keyPath;
-          String prefix;
-          if (onlyFileNames) {
-            prefix = isMpuKey ? "[mpu-fso] " : "[fso] ";
-            keyPath = prefix + keyInfo.getKeyName();
-          } else {
-            keyPath = reconstructFullPath(keyInfo, bucketVolMap, unreferencedCountMap, keyContainers);
-            if (keyPath != null) {
-              prefix = isMpuKey ? "[mpu] " : "";
-              keyPath = prefix + keyPath;
-            }
-          }
-
-          if (keyPath != null) {
-            for (Long containerId : keyContainers) {
-              containerToKeysMap.get(containerId).add(keyPath);
-            }
-          }
-        }
+        OmKeyInfo keyInfo = fileIterator.next().getValue();
+        addOpenKeyToContainerMap(keyInfo, containerIds, containerToOpenKeysMap, true,
+            bucketVolMap, unreferencedCountMap);
       }
     } catch (Exception e) {
       err().println("Exception occurred reading openFileTable (FSO keys), " + e);
     }
   }
 
-  private void processOpenKeys(Set<Long> containerIds, Map<Long, List<String>> containerToKeysMap) {
+  private void processOpenKeys(Set<Long> containerIds, Map<Long, List<String>> containerToOpenKeysMap) {
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyIterator =
              openKeyTable.iterator()) {
       while (keyIterator.hasNext()) {
         OmKeyInfo keyInfo = keyIterator.next().getValue();
-
-        // Find which containers this key uses
-        Set<Long> keyContainers = getKeyContainers(keyInfo, containerIds);
-
-        if (!keyContainers.isEmpty()) {
-          OmKeyLocationInfoGroup locations = keyInfo.getLatestVersionLocations();
-          boolean isMpuKey = locations != null && locations.isMultipartKey();
-
-          String keyPath;
-          String prefix;
-          if (onlyFileNames) {
-            prefix = isMpuKey ? "[mpu-obs] " : "[obs] ";
-            keyPath = prefix + keyInfo.getKeyName();
-          } else {
-            prefix = isMpuKey ? "[mpu] " : "";
-            keyPath = prefix + buildFullOBSPath(keyInfo);
-          }
-
-          for (Long containerId : keyContainers) {
-            containerToKeysMap.get(containerId).add(keyPath);
-          }
-        }
+        addOpenKeyToContainerMap(keyInfo, containerIds, containerToOpenKeysMap, false, null, null);
       }
     } catch (Exception e) {
       err().println("Exception occurred reading openKeyTable (OBS keys), " + e);
     }
   }
 
-  private void processMultipartUpload(Set<Long> containerIds, Map<Long, List<String>> containerToKeysMap,
+  private void addOpenKeyToContainerMap(OmKeyInfo keyInfo, Set<Long> containerIds,
+      Map<Long, List<String>> containerToOpenKeysMap, boolean isFSO,
+      Map<Long, Pair<Long, String>> bucketVolMap, Map<Long, Long> unreferencedCountMap) throws Exception {
+    // Find which containers this key uses
+    Set<Long> keyContainers = getKeyContainers(keyInfo, containerIds);
+
+    if (!keyContainers.isEmpty()) {
+      OmKeyLocationInfoGroup locations = keyInfo.getLatestVersionLocations();
+      boolean isMpuKey = locations != null && locations.isMultipartKey();
+
+      String keyPath;
+      if (onlyFileNames) {
+        String bucketType = isFSO ? "fso" : "obs";
+        String prefix = isMpuKey ? "[mpu-" + bucketType + "] " : "[" + bucketType + "] ";
+        keyPath = prefix + keyInfo.getKeyName();
+      } else {
+        if (isFSO) {
+          keyPath = reconstructFullPath(keyInfo, bucketVolMap, unreferencedCountMap, keyContainers);
+          if (keyPath != null && isMpuKey) {
+            keyPath = "[mpu] " + keyPath;
+          }
+        } else {
+          String prefix = isMpuKey ? "[mpu] " : "";
+          keyPath = prefix + buildFullOBSPath(keyInfo);
+        }
+      }
+
+      if (keyPath != null) {
+        for (Long containerId : keyContainers) {
+          containerToOpenKeysMap.get(containerId).add(keyPath);
+        }
+      }
+    }
+  }
+
+  private void processMultipartUpload(Set<Long> containerIds, Map<Long, List<String>> containerToOpenKeysMap,
       Map<Long, Long> unreferencedCountMap, Map<Long, Pair<Long, String>> bucketVolMap) {
     try (TableIterator<String, ? extends Table.KeyValue<String, OmMultipartKeyInfo>> mpuIterator =
              multipartInfoTable.iterator()) {
@@ -386,14 +374,14 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
 
             if (keyPath != null) {
               for (Long containerId : keyContainers) {
-                containerToKeysMap.get(containerId).add(keyPath);
+                containerToOpenKeysMap.get(containerId).add(keyPath);
               }
             }
           }
         }
       }
     } catch (Exception e) {
-      err().println("Exception occurred reading openFileTable (FSO keys), " + e);
+      err().println("Exception occurred reading multipartInfoTable, " + e);
     }
   }
 
