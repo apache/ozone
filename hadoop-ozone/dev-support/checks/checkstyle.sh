@@ -23,6 +23,7 @@ BASE_DIR="$(pwd -P)"
 REPORT_DIR=${OUTPUT_DIR:-"$DIR/../../../target/checkstyle"}
 mkdir -p "$REPORT_DIR"
 REPORT_FILE="$REPORT_DIR/summary.txt"
+UI_REPORT_FILE="$REPORT_DIR/ui-summary.txt"
 
 MAVEN_OPTIONS='-B -fae -DskipDocs -DskipRecon -Dcheckstyle.failOnViolation=false --no-transfer-progress'
 
@@ -37,6 +38,16 @@ if [[ ${rc} -ne 0 ]]; then
 fi
 
 cat "${REPORT_DIR}/output.log"
+
+# Run eslint for ozone-ui and capture unix-style violations
+if [[ -d "${BASE_DIR}/ozone-ui/src" ]]; then
+  (
+    cd "${BASE_DIR}/ozone-ui/src" || exit 1
+    pnpm -s run lint -- --format unix
+  ) > "$UI_REPORT_FILE" 2>&1
+else
+  echo "ozone-ui/src not found. Skipping UI lint." > "$UI_REPORT_FILE"
+fi
 
 #Print out the exact violations with parsing XML results with sed
 find "." -name checkstyle-errors.xml -print0 \
