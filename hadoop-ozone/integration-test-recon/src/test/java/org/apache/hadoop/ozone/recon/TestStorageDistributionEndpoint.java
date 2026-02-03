@@ -223,14 +223,14 @@ public class TestStorageDistributionEndpoint {
       for (DatanodeStorageReport report : reports) {
         for (HddsProtos.DatanodeUsageInfoProto scmReport : scmReports) {
           if (scmReport.getNode().getUuid().equals(report.getDatanodeUuid())) {
-            assertEquals(report.getMinimumFreeSpace(), scmReport.getFreeSpaceToSpare());
-            assertEquals(report.getReserved(), scmReport.getReserved());
-            assertEquals(report.getCapacity(), scmReport.getCapacity());
-            assertEquals(report.getRemaining(), scmReport.getRemaining());
-            assertEquals(report.getUsed(), scmReport.getUsed());
-            assertEquals(report.getCommitted(), scmReport.getCommitted());
-            assertEquals(report.getFilesystemAvailable(), scmReport.getFsAvailable());
-            assertEquals(report.getFilesystemCapacity(), scmReport.getFsCapacity());
+            assertEquals(scmReport.getFreeSpaceToSpare(), report.getMinimumFreeSpace());
+            assertEquals(scmReport.getReserved(), report.getReserved());
+            assertEquals(scmReport.getCapacity(), report.getCapacity());
+            assertEquals(scmReport.getRemaining(), report.getRemaining());
+            assertEquals(scmReport.getUsed(), report.getUsed());
+            assertEquals(scmReport.getCommitted(), report.getCommitted());
+            assertEquals(scmReport.getFsAvailable(), report.getFilesystemAvailable());
+            assertEquals(scmReport.getFsCapacity(), report.getFilesystemCapacity());
           }
         }
       }
