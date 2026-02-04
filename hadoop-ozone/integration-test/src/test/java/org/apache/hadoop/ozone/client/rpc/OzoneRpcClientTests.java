@@ -250,6 +250,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @BeforeAll
   public static void initialize() throws NoSuchAlgorithmException, UnsupportedEncodingException {
     eTagProvider = MessageDigest.getInstance(MD5_HASH);
+    AuditLogTestUtils.enableAuditLog();
     output = GenericTestUtils.captureOut();
   }
 
@@ -1097,81 +1098,60 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
   @Test
   public void testDeleteAuditLog() throws Exception {
-    String oldLog4jConfig = System.getProperty("log4j.configurationFile");
-    AuditLogTestUtils.enableAuditLog();
-    org.apache.logging.log4j.core.LoggerContext ctx =
-        (org.apache.logging.log4j.core.LoggerContext)
-            org.apache.logging.log4j.LogManager.getContext(false);
-    ctx.reconfigure();
-    try {
-      String volumeName = UUID.randomUUID().toString();
-      String bucketName = UUID.randomUUID().toString();
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
 
-      byte[] value = "sample value".getBytes(UTF_8);
-      int valueLength = value.length;
-      store.createVolume(volumeName);
-      OzoneVolume volume = store.getVolume(volumeName);
-      volume.createBucket(bucketName);
-      OzoneBucket bucket = volume.getBucket(bucketName);
+    byte[] value = "sample value".getBytes(UTF_8);
+    int valueLength = value.length;
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
 
-      // create a three replica file
-      String keyName1 = "key1";
-      TestDataUtil.createKey(bucket, keyName1,
-          ReplicationConfig.fromTypeAndFactor(RATIS, THREE), value);
+    // create a three replica file
+    String keyName1 = "key1";
+    TestDataUtil.createKey(bucket, keyName1, ReplicationConfig.fromTypeAndFactor(RATIS, THREE), value);
 
-      // create a EC replica file
-      String keyName2 = "key2";
-      ReplicationConfig replicationConfig = new ECReplicationConfig(
-          "rs-3-2-1024k");
-      TestDataUtil.createKey(bucket, keyName2, replicationConfig, value);
+    // create a EC replica file
+    String keyName2 = "key2";
+    ReplicationConfig replicationConfig = new ECReplicationConfig("rs-3-2-1024k");
+    TestDataUtil.createKey(bucket, keyName2, replicationConfig, value);
 
-      // create a directory and a file
-      String dirName = "dir1";
-      bucket.createDirectory(dirName);
-      String keyName3 = "key3";
-      TestDataUtil.createKey(bucket, keyName3,
-          ReplicationConfig.fromTypeAndFactor(RATIS, THREE), value);
+    // create a directory and a file
+    String dirName = "dir1";
+    bucket.createDirectory(dirName);
+    String keyName3 = "key3";
+    TestDataUtil.createKey(bucket, keyName3, ReplicationConfig.fromTypeAndFactor(RATIS, THREE), value);
 
-      // delete files and directory
-      output.reset();
-      bucket.deleteKey(keyName1);
-      bucket.deleteKey(keyName2);
-      bucket.deleteDirectory(dirName, true);
+    // delete files and directory
+    output.reset();
+    bucket.deleteKey(keyName1);
+    bucket.deleteKey(keyName2);
+    bucket.deleteDirectory(dirName, true);
 
-      // create keys for deleteKeys case
-      String keyName4 = "key4";
-      TestDataUtil.createKey(bucket, dirName + "/" + keyName4,
-          ReplicationConfig.fromTypeAndFactor(RATIS, THREE), value);
+    // create keys for deleteKeys case
+    String keyName4 = "key4";
+    TestDataUtil.createKey(bucket, dirName + "/" + keyName4, ReplicationConfig.fromTypeAndFactor(RATIS, THREE), value);
 
-      String keyName5 = "key5";
-      TestDataUtil.createKey(bucket, dirName + "/" + keyName5,
-          replicationConfig, value);
+    String keyName5 = "key5";
+    TestDataUtil.createKey(bucket, dirName + "/" + keyName5, replicationConfig, value);
 
-      List<String> keysToDelete = new ArrayList<>();
-      keysToDelete.add(dirName + "/" + keyName4);
-      keysToDelete.add(dirName + "/" + keyName5);
-      bucket.deleteKeys(keysToDelete);
+    List<String> keysToDelete = new ArrayList<>();
+    keysToDelete.add(dirName + "/" + keyName4);
+    keysToDelete.add(dirName + "/" + keyName5);
+    bucket.deleteKeys(keysToDelete);
 
-      String consoleOutput = output.get();
-      assertThat(consoleOutput).contains("op=DELETE_KEY {\"volume\":\"" + volumeName + "\",\"bucket\":\"" + bucketName +
-          "\",\"key\":\"key1\",\"dataSize\":\"" + valueLength + "\",\"replicationConfig\":\"RATIS/THREE");
-      assertThat(consoleOutput).contains("op=DELETE_KEY {\"volume\":\"" + volumeName + "\",\"bucket\":\"" + bucketName +
-          "\",\"key\":\"key2\",\"dataSize\":\"" + valueLength + "\",\"replicationConfig\":\"EC{rs-3-2-1024k}");
-      assertThat(consoleOutput).contains("op=DELETE_KEY {\"volume\":\"" + volumeName + "\",\"bucket\":\"" + bucketName +
-          "\",\"key\":\"dir1\",\"Transaction\"");
-      assertThat(consoleOutput).contains(
-          "op=DELETE_KEYS {\"volume\":\"" + volumeName + "\",\"bucket\":\"" + bucketName +
-              "\",\"deletedKeysList\":\"{key=dir1/key4, dataSize=" + valueLength +
-              ", replicationConfig=RATIS/THREE}, {key=dir1/key5, dataSize=" + valueLength +
-              ", replicationConfig=EC{rs-3-2-1024k}}\",\"unDeletedKeysList\"");
-    } finally {
-      if (oldLog4jConfig == null) {
-        System.clearProperty("log4j.configurationFile");
-      } else {
-        System.setProperty("log4j.configurationFile", oldLog4jConfig);
-      }
-      ctx.reconfigure();
-    }
+    String consoleOutput = output.get();
+    assertThat(consoleOutput).contains("op=DELETE_KEY {\"volume\":\"" + volumeName + "\",\"bucket\":\"" + bucketName +
+        "\",\"key\":\"key1\",\"dataSize\":\"" + valueLength + "\",\"replicationConfig\":\"RATIS/THREE");
+    assertThat(consoleOutput).contains("op=DELETE_KEY {\"volume\":\"" + volumeName + "\",\"bucket\":\"" + bucketName +
+        "\",\"key\":\"key2\",\"dataSize\":\"" + valueLength + "\",\"replicationConfig\":\"EC{rs-3-2-1024k}");
+    assertThat(consoleOutput).contains("op=DELETE_KEY {\"volume\":\"" + volumeName + "\",\"bucket\":\"" + bucketName +
+        "\",\"key\":\"dir1\",\"Transaction\"");
+    assertThat(consoleOutput).contains("op=DELETE_KEYS {\"volume\":\"" + volumeName + "\",\"bucket\":\"" + bucketName +
+        "\",\"deletedKeysList\":\"{key=dir1/key4, dataSize=" + valueLength +
+        ", replicationConfig=RATIS/THREE}, {key=dir1/key5, dataSize=" + valueLength +
+        ", replicationConfig=EC{rs-3-2-1024k}}\",\"unDeletedKeysList\"");
   }
 
   /**
