@@ -94,6 +94,14 @@ public final class SCMRatisResponse {
 
     final SCMRatisResponseProto responseProto = SCMRatisResponseProto.parseFrom(response.toByteArray());
 
+    // proto2 required-equivalent checks
+    if (!responseProto.hasType()) {
+      throw new InvalidProtocolBufferException("Missing response type");
+    }
+    if (!responseProto.hasValue()) {
+      throw new InvalidProtocolBufferException("Missing response value");
+    }
+
     try {
       final Class<?> type = ReflectionUtil.getClass(responseProto.getType());
       return new SCMRatisResponse(CodecFactory.getCodec(type)
