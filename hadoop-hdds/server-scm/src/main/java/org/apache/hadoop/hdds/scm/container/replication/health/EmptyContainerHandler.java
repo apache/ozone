@@ -63,6 +63,13 @@ public class EmptyContainerHandler extends AbstractCheck {
         // delete replicas if they are closed and empty
         deleteContainerReplicas(containerInfo, replicas);
 
+        if (containerInfo.getReplicationType() == HddsProtos.ReplicationType.RATIS) {
+          if (replicas.stream().filter(r -> r.getSequenceId() != null)
+              .noneMatch(r -> r.getSequenceId() == containerInfo.getSequenceId())) {
+            // don't update container state if replica seqid don't match with container seq id
+            return true;
+          }
+        }
         // Update the container's state
         replicationManager.updateContainerState(
             containerInfo.containerID(), HddsProtos.LifeCycleEvent.DELETE);
