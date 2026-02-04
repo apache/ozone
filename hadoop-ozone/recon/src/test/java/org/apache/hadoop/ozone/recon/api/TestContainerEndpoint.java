@@ -26,8 +26,10 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeData
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -1594,6 +1596,102 @@ public class TestContainerEndpoint {
     // ContainerID 1 and 2 are missing in SCM but present in OM
     assertThat(missingContainerIdsSCM).contains(1L);
     assertThat(missingContainerIdsSCM).contains(2L);
+  }
+
+  /**
+   * Helper to create a container in SCM with a specific pipeline.
+   */
+  private void createContainerInSCM(long containerId, Pipeline targetPipeline)
+      throws IOException, TimeoutException {
+    ContainerInfo containerInfo = new ContainerInfo.Builder()
+        .setContainerID(containerId)
+        .setReplicationConfig(
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
+        .setState(HddsProtos.LifeCycleState.OPEN)
+        .setOwner("owner" + containerId)
+        .setNumberOfKeys(0)
+        .setPipelineID(targetPipeline.getId())
+        .build();
+    reconContainerManager.addNewContainer(
+        new ContainerWithPipeline(containerInfo, targetPipeline));
+  }
+
+  /**
+   * Helper to verify pipeline isolation for a container missing in OM.
+   */
+  private void verifyPipelineIsolation(ContainerDiscrepancyInfo info,
+      long containerId, PipelineID expectedPipelineId,
+      List<List<Pipeline>> otherPipelineLists) {
+    List<Pipeline> pipelines = info.getPipelines();
+    assertNotNull(pipelines);
+    assertEquals(1, pipelines.size(),
+        "Container " + containerId + " should have exactly 1 pipeline");
+    assertEquals(expectedPipelineId, pipelines.get(0).getId(),
+        "Container " + containerId + " should have correct pipeline");
+    assertEquals("SCM", info.getExistsAt());
+    assertEquals(0, info.getNumberOfKeys());
+    // Verify list isolation
+    for (List<Pipeline> other : otherPipelineLists) {
+      if (other != null) {
+        assertNotSame(pipelines, other,
+            "Container " + containerId + " should have independent list");
+      }
+    }
+  }
+
+  @Test
+  public void testGetContainerInsightsNonOMContainersPipelineIsolation()
+      throws IOException, TimeoutException {
+    // Verifies fix for pipeline accumulation bug: containers missing in OM
+    // should each have their own isolated pipeline list, not shared.
+    
+    // Create 3 different pipelines
+    Pipeline[] pipelines = {
+        getRandomPipeline(), getRandomPipeline(), getRandomPipeline()
+    };
+    for (Pipeline p : pipelines) {
+      reconPipelineManager.addPipeline(p);
+    }
+    
+    // Create 3 containers in SCM with different pipelines (not in OM)
+    long[] containerIds = {501L, 502L, 503L};
+    for (int i = 0; i < containerIds.length; i++) {
+      createContainerInSCM(containerIds[i], pipelines[i]);
+      assertFalse(reconContainerMetadataManager.doesContainerExists(containerIds[i]),
+          "Container " + containerIds[i] + " should NOT exist in OM");
+    }
+    
+    // Call API
+    Response response = containerEndpoint.getContainerMisMatchInsights(10, 500, "OM");
+    assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    
+    Map<String, Object> responseMap = (Map<String, Object>) response.getEntity();
+    List<ContainerDiscrepancyInfo> discrepancies =
+        (List<ContainerDiscrepancyInfo>) responseMap.get("containerDiscrepancyInfo");
+    assertNotNull(discrepancies);
+    
+    // Find containers in response
+    ContainerDiscrepancyInfo[] infos = new ContainerDiscrepancyInfo[3];
+    for (int i = 0; i < containerIds.length; i++) {
+      final long id = containerIds[i];
+      infos[i] = discrepancies.stream()
+          .filter(d -> d.getContainerID() == id)
+          .findFirst()
+          .orElseThrow(() -> new AssertionError(
+              "Container " + id + " not found in mismatch list"));
+    }
+    
+    // Verify pipeline isolation for each container
+    List<Pipeline> pipelineList1 = infos[0].getPipelines();
+    List<Pipeline> pipelineList2 = infos[1].getPipelines();
+    List<Pipeline> pipelineList3 = infos[2].getPipelines();
+    
+    verifyPipelineIsolation(infos[0], containerIds[0], pipelines[0].getId(),
+        Arrays.asList(pipelineList2, pipelineList3));
+    verifyPipelineIsolation(infos[1], containerIds[1], pipelines[1].getId(),
+        Arrays.asList(pipelineList1, pipelineList3));
+    verifyPipelineIsolation(infos[2], containerIds[2], pipelines[2].getId(),
+        Arrays.asList(pipelineList1, pipelineList2));
   }
 
   @Test
