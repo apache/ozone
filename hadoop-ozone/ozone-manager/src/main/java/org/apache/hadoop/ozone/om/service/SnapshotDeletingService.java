@@ -119,7 +119,8 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
     this.lockIds = new ArrayList<>(2);
   }
 
-  private class SnapshotDeletingTask implements BackgroundTask {
+  @VisibleForTesting
+  final class SnapshotDeletingTask implements BackgroundTask {
 
     @SuppressWarnings("checkstyle:MethodLength")
     @Override
@@ -304,7 +305,8 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
      * @param dirsToMove List of deleted directories to move
      * @return The number of entries successfully submitted
      */
-    private int submitSnapshotMoveDeletedKeysWithBatching(SnapshotInfo snapInfo,
+    @VisibleForTesting
+    public int submitSnapshotMoveDeletedKeysWithBatching(SnapshotInfo snapInfo,
                                                            List<SnapshotMoveKeyInfos> deletedKeys,
                                                            List<HddsProtos.KeyValue> renamedList,
                                                            List<SnapshotMoveKeyInfos> dirsToMove) {
@@ -456,10 +458,5 @@ public class SnapshotDeletingService extends AbstractKeyDeletingService {
 
   public long getSuccessfulRunCount() {
     return successRunCount.get();
-  }
-
-  @VisibleForTesting
-  public void setSuccessRunCount(long num) {
-    successRunCount.getAndSet(num);
   }
 }
