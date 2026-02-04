@@ -33,6 +33,7 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
@@ -211,6 +212,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -248,7 +250,6 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
   @BeforeAll
   public static void initialize() throws NoSuchAlgorithmException, UnsupportedEncodingException {
     eTagProvider = MessageDigest.getInstance(MD5_HASH);
-    AuditLogTestUtils.enableAuditLog();
     output = GenericTestUtils.captureOut();
   }
 
@@ -263,6 +264,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
     conf.setTimeDuration(OZONE_DIR_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
+    conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
 
     ClientConfigForTesting.newBuilder(StorageUnit.MB)
         .setDataStreamMinPacketSize(1)
@@ -1095,63 +1097,146 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
   @Test
   public void testDeleteAuditLog() throws Exception {
+    String oldLog4jConfig = System.getProperty("log4j.configurationFile");
+    AuditLogTestUtils.enableAuditLog();
+    org.apache.logging.log4j.core.LoggerContext ctx =
+        (org.apache.logging.log4j.core.LoggerContext)
+            org.apache.logging.log4j.LogManager.getContext(false);
+    ctx.reconfigure();
+    try {
+      String volumeName = UUID.randomUUID().toString();
+      String bucketName = UUID.randomUUID().toString();
+
+      byte[] value = "sample value".getBytes(UTF_8);
+      int valueLength = value.length;
+      store.createVolume(volumeName);
+      OzoneVolume volume = store.getVolume(volumeName);
+      volume.createBucket(bucketName);
+      OzoneBucket bucket = volume.getBucket(bucketName);
+
+      // create a three replica file
+      String keyName1 = "key1";
+      TestDataUtil.createKey(bucket, keyName1,
+          ReplicationConfig.fromTypeAndFactor(RATIS, THREE), value);
+
+      // create a EC replica file
+      String keyName2 = "key2";
+      ReplicationConfig replicationConfig = new ECReplicationConfig(
+          "rs-3-2-1024k");
+      TestDataUtil.createKey(bucket, keyName2, replicationConfig, value);
+
+      // create a directory and a file
+      String dirName = "dir1";
+      bucket.createDirectory(dirName);
+      String keyName3 = "key3";
+      TestDataUtil.createKey(bucket, keyName3,
+          ReplicationConfig.fromTypeAndFactor(RATIS, THREE), value);
+
+      // delete files and directory
+      output.reset();
+      bucket.deleteKey(keyName1);
+      bucket.deleteKey(keyName2);
+      bucket.deleteDirectory(dirName, true);
+
+      // create keys for deleteKeys case
+      String keyName4 = "key4";
+      TestDataUtil.createKey(bucket, dirName + "/" + keyName4,
+          ReplicationConfig.fromTypeAndFactor(RATIS, THREE), value);
+
+      String keyName5 = "key5";
+      TestDataUtil.createKey(bucket, dirName + "/" + keyName5,
+          replicationConfig, value);
+
+      List<String> keysToDelete = new ArrayList<>();
+      keysToDelete.add(dirName + "/" + keyName4);
+      keysToDelete.add(dirName + "/" + keyName5);
+      bucket.deleteKeys(keysToDelete);
+
+      String consoleOutput = output.get();
+      assertThat(consoleOutput).contains("op=DELETE_KEY {\"volume\":\"" + volumeName + "\",\"bucket\":\"" + bucketName +
+          "\",\"key\":\"key1\",\"dataSize\":\"" + valueLength + "\",\"replicationConfig\":\"RATIS/THREE");
+      assertThat(consoleOutput).contains("op=DELETE_KEY {\"volume\":\"" + volumeName + "\",\"bucket\":\"" + bucketName +
+          "\",\"key\":\"key2\",\"dataSize\":\"" + valueLength + "\",\"replicationConfig\":\"EC{rs-3-2-1024k}");
+      assertThat(consoleOutput).contains("op=DELETE_KEY {\"volume\":\"" + volumeName + "\",\"bucket\":\"" + bucketName +
+          "\",\"key\":\"dir1\",\"Transaction\"");
+      assertThat(consoleOutput).contains(
+          "op=DELETE_KEYS {\"volume\":\"" + volumeName + "\",\"bucket\":\"" + bucketName +
+              "\",\"deletedKeysList\":\"{key=dir1/key4, dataSize=" + valueLength +
+              ", replicationConfig=RATIS/THREE}, {key=dir1/key5, dataSize=" + valueLength +
+              ", replicationConfig=EC{rs-3-2-1024k}}\",\"unDeletedKeysList\"");
+    } finally {
+      if (oldLog4jConfig == null) {
+        System.clearProperty("log4j.configurationFile");
+      } else {
+        System.setProperty("log4j.configurationFile", oldLog4jConfig);
+      }
+      ctx.reconfigure();
+    }
+  }
+
+  /**
+   * Verifies pendingDelete* fields are populated after key delete,
+   * with/without snapshot retention.
+   *
+   * @param withSnapshot whether to create a snapshot before deleting the key
+   * @throws Exception on failure
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testBucketPendingDeleteBytes(boolean withSnapshot) throws Exception {
     String volumeName = UUID.randomUUID().toString();
     String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+    String snapshotName = "snap-" + UUID.randomUUID();
+    String value = "sample value";
+    int valueLength = value.getBytes(UTF_8).length;
 
-    byte[] value = "sample value".getBytes(UTF_8);
-    int valueLength = value.length;
     store.createVolume(volumeName);
     OzoneVolume volume = store.getVolume(volumeName);
     volume.createBucket(bucketName);
     OzoneBucket bucket = volume.getBucket(bucketName);
 
-    // create a three replica file
-    String keyName1 = "key1";
-    TestDataUtil.createKey(bucket, keyName1, ReplicationConfig
-        .fromTypeAndFactor(RATIS, THREE), value);
+    writeKey(bucket, keyName, ONE, value, valueLength);
 
-    // create a EC replica file
-    String keyName2 = "key2";
-    ReplicationConfig replicationConfig = new ECReplicationConfig("rs-3-2-1024k");
-    TestDataUtil.createKey(bucket, keyName2, replicationConfig, value);
+    OzoneBucket bucketAfterKeyWrite = store.getVolume(volumeName)
+        .getBucket(bucketName);
+    assertThat(bucketAfterKeyWrite.getUsedBytes()).isEqualTo(valueLength);
+    assertThat(bucketAfterKeyWrite.getUsedNamespace()).isEqualTo(1);
+    assertThat(bucketAfterKeyWrite.getPendingDeleteBytes()).isEqualTo(0);
+    assertThat(bucketAfterKeyWrite.getPendingDeleteNamespace()).isEqualTo(0);
 
-    // create a directory and a file
-    String dirName = "dir1";
-    bucket.createDirectory(dirName);
-    String keyName3 = "key3";
-    TestDataUtil.createKey(bucket, keyName3, ReplicationConfig
-        .fromTypeAndFactor(RATIS, THREE), value);
+    if (withSnapshot) {
+      store.createSnapshot(volumeName, bucketName, snapshotName);
+    }
+    bucket.deleteKey(keyName);
+    // After delete: usedBytes should still be totalBucketSpace.
+    OzoneBucket bucketAfterKeyDelete = store.getVolume(volumeName)
+        .getBucket(bucketName);
+    assertThat(bucketAfterKeyDelete.getUsedBytes()).isEqualTo(valueLength);
+    assertThat(bucketAfterKeyDelete.getUsedNamespace()).isEqualTo(1);
+    assertThat(bucketAfterKeyDelete.getPendingDeleteBytes()).isEqualTo(valueLength);
+    assertThat(bucketAfterKeyDelete.getPendingDeleteNamespace()).isEqualTo(1);
 
-    // delete files and directory
-    output.reset();
-    bucket.deleteKey(keyName1);
-    bucket.deleteKey(keyName2);
-    bucket.deleteDirectory(dirName, true);
+    if (withSnapshot) {
+      // if snapshot is present bytes won't be released until snapshot is deleted.
+      store.deleteSnapshot(volumeName, bucketName, snapshotName);
+    }
 
-    // create keys for deleteKeys case
-    String keyName4 = "key4";
-    TestDataUtil.createKey(bucket, dirName + "/" + keyName4,
-        ReplicationConfig.fromTypeAndFactor(RATIS, THREE), value);
-
-    String keyName5 = "key5";
-    TestDataUtil.createKey(bucket, dirName + "/" + keyName5, replicationConfig, value);
-
-    List<String> keysToDelete = new ArrayList<>();
-    keysToDelete.add(dirName + "/" + keyName4);
-    keysToDelete.add(dirName + "/" + keyName5);
-    bucket.deleteKeys(keysToDelete);
-
-    String consoleOutput = output.get();
-    assertThat(consoleOutput).contains("op=DELETE_KEY {\"volume\":\"" + volumeName + "\",\"bucket\":\"" + bucketName +
-        "\",\"key\":\"key1\",\"dataSize\":\"" + valueLength + "\",\"replicationConfig\":\"RATIS/THREE");
-    assertThat(consoleOutput).contains("op=DELETE_KEY {\"volume\":\"" + volumeName + "\",\"bucket\":\"" + bucketName +
-        "\",\"key\":\"key2\",\"dataSize\":\"" + valueLength + "\",\"replicationConfig\":\"EC{rs-3-2-1024k}");
-    assertThat(consoleOutput).contains("op=DELETE_KEY {\"volume\":\"" + volumeName + "\",\"bucket\":\"" + bucketName +
-        "\",\"key\":\"dir1\",\"Transaction\"");
-    assertThat(consoleOutput).contains("op=DELETE_KEYS {\"volume\":\"" + volumeName + "\",\"bucket\":\"" + bucketName +
-        "\",\"deletedKeysList\":\"{key=dir1/key4, dataSize=" + valueLength +
-        ", replicationConfig=RATIS/THREE}, {key=dir1/key5, dataSize=" + valueLength +
-        ", replicationConfig=EC{rs-3-2-1024k}}\",\"unDeletedKeysList\"");
+    GenericTestUtils.waitFor(() -> {
+      OzoneBucket buck = null;
+      try {
+        buck = store.getVolume(volumeName).getBucket(bucketName);
+      } catch (IOException e) {
+        fail("Failed to get bucket details", e);
+      }
+      return buck.getUsedBytes() == 0 && buck.getUsedNamespace() == 0;
+    }, 1000, 30000);
+    OzoneBucket bucketAfterKeyPurge = store.getVolume(volumeName)
+        .getBucket(bucketName);
+    assertThat(bucketAfterKeyPurge.getUsedBytes()).isEqualTo(0);
+    assertThat(bucketAfterKeyPurge.getUsedNamespace()).isEqualTo(0);
+    assertThat(bucketAfterKeyPurge.getPendingDeleteBytes()).isEqualTo(0);
+    assertThat(bucketAfterKeyPurge.getPendingDeleteNamespace()).isEqualTo(0);
   }
 
   protected void verifyReplication(String volumeName, String bucketName,
