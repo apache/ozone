@@ -64,7 +64,8 @@ public class EmptyContainerHandler extends AbstractCheck {
         deleteContainerReplicas(containerInfo, replicas);
 
         if (containerInfo.getReplicationType() == HddsProtos.ReplicationType.RATIS) {
-          if (replicas.stream().noneMatch(r -> r.getSequenceId() == containerInfo.getSequenceId())) {
+          if (replicas.stream().filter(r -> r.getSequenceId() != null)
+              .noneMatch(r -> r.getSequenceId() == containerInfo.getSequenceId())) {
             // don't update container state if replica seqid don't match with container seq id
             return true;
           }
