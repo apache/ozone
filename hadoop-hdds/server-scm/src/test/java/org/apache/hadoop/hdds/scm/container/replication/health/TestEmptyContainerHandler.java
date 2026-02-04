@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container.replication.health;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSING;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.eq;
@@ -273,7 +274,7 @@ public class TestEmptyContainerHandler {
         .build();
     // Handler should return true but NOT update container state
     // because no replica has matching sequence ID
-    assertEquals(true, emptyContainerHandler.handle(request));
+    assertTrue(emptyContainerHandler.handle(request));
     verify(replicationManager, times(3)).sendDeleteCommand(
         any(ContainerInfo.class), anyInt(),
         any(DatanodeDetails.class), eq(false));
