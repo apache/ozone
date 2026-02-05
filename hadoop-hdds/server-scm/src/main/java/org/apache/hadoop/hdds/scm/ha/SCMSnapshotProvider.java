@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.ha;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
@@ -29,7 +30,6 @@ import java.util.concurrent.ExecutionException;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
@@ -55,51 +55,10 @@ public class SCMSnapshotProvider {
 
   private final CertificateClient scmCertificateClient;
 
-  /**
-   * Startup options for SCM snapshot provider.
-   */
-  public enum StartupOption {
-    /**
-     * FORMAT mode: Ratis snapshot directory should not exist.
-     * Will create and initialize a new Ratis snapshot directory.
-     */
-    FORMAT,
-    /**
-     * NORMAL mode: Ratis snapshot directory should already exist.
-     * Will read from existing Ratis snapshot directory.
-     */
-    NORMAL
-  }
-
-  /**
-   * Creates SCMSnapshotProvider with default NORMAL startup option.
-   * This constructor is used in most scenarios where the Ratis snapshot
-   * directory is expected to already exist.
-   *
-   * @param conf Configuration source
-   * @param peerNodes List of peer SCM nodes
-   * @param scmCertificateClient Certificate client for secure communication
-   */
   public SCMSnapshotProvider(ConfigurationSource conf,
       List<SCMNodeDetails> peerNodes,
       CertificateClient scmCertificateClient) {
-    this(conf, peerNodes, scmCertificateClient, StartupOption.NORMAL);
-  }
-
-  /**
-   * Creates SCMSnapshotProvider with specified startup option.
-   *
-   * @param conf Configuration source
-   * @param peerNodes List of peer SCM nodes
-   * @param scmCertificateClient Certificate client for secure communication
-   * @param startupOption Startup mode: FORMAT (create new) or NORMAL (use existing)
-   */
-  public SCMSnapshotProvider(ConfigurationSource conf,
-      List<SCMNodeDetails> peerNodes,
-      CertificateClient scmCertificateClient,
-      StartupOption startupOption) {
-    LOG.info("Initializing SCM Snapshot Provider with startup option: {}",
-        startupOption);
+    LOG.info("Initializing SCM Snapshot Provider");
     this.conf = conf;
     this.scmCertificateClient = scmCertificateClient;
 
@@ -116,48 +75,24 @@ public class SCMSnapshotProvider {
       throw new IllegalArgumentException("SCM Ratis snapshot directory must be defined.");
     }
 
-    File ratisDir = new File(scmRatisDirectory);
-    File snapshotDir = new File(scmSnapshotDirectory);
-
     // Ratis storage directory should already be created by SCMRatisServerImpl
     // or by init/bootstrap commands. SCMSnapshotProvider is NOT responsible for creating it.
-    if (!ratisDir.exists()) {
+    Path ratisPath = Paths.get(scmRatisDirectory);
+    if (!Files.isDirectory(ratisPath)) {
       throw new IllegalStateException(
-          "Ratis storage directory does not exist: " + ratisDir.getAbsolutePath()
-          + ". It should have been created by SCMRatisServerImpl.initialize().");
+          "Ratis storage directory does not exist: " + scmRatisDirectory
+          + ". Please run 'ozone scm --init' or 'ozone scm --bootstrap' first.");
     }
 
-    // Handle snapshot directory based on startup option
-    switch (startupOption) {
-    case FORMAT:
-      // FORMAT mode: snapshot directory should NOT exist
-      if (snapshotDir.exists()) {
-        throw new IllegalStateException(
-            "Cannot format: Ratis snapshot directory already exists: "
-            + snapshotDir.getAbsolutePath());
-      }
-      // Create new snapshot directory
-      this.scmSnapshotDir = HddsUtils.createDir(scmSnapshotDirectory);
-      LOG.info("Formatted: created new Ratis snapshot directory at {}",
-          this.scmSnapshotDir.getAbsolutePath());
-      break;
-
-    case NORMAL:
-      // NORMAL mode: snapshot directory MUST exist
-      if (!snapshotDir.exists()) {
-        throw new IllegalStateException(
-            "Ratis snapshot directory does not exist: "
-            + snapshotDir.getAbsolutePath()
-            + ". Please run 'ozone scm --init' first.");
-      }
-      this.scmSnapshotDir = snapshotDir;
-      LOG.info("Using existing Ratis snapshot directory at {}",
-          this.scmSnapshotDir.getAbsolutePath());
-      break;
-
-    default:
-      throw new IllegalArgumentException("Unknown startup option: " + startupOption);
+    // Ratis snapshot directory should already exist (created by --init or --bootstrap)
+    Path snapshotPath = Paths.get(scmSnapshotDirectory);
+    if (!Files.isDirectory(snapshotPath)) {
+      throw new IllegalStateException(
+          "Ratis snapshot directory does not exist: " + scmSnapshotDirectory
+          + ". Please run 'ozone scm --init' or 'ozone scm --bootstrap' first.");
     }
+    this.scmSnapshotDir = snapshotPath.toFile();
+    LOG.info("Using Ratis snapshot directory at {}", scmSnapshotDirectory);
 
     // Initialize peer nodes map
     if (peerNodes != null) {
