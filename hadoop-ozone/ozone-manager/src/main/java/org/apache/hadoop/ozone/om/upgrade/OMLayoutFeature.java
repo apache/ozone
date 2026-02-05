@@ -17,9 +17,7 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
-import java.util.EnumMap;
 import java.util.Optional;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 
 /**
@@ -49,31 +47,14 @@ public enum OMLayoutFeature implements LayoutFeature {
   SNAPSHOT_DEFRAG(9, "Supporting defragmentation of snapshot");
 
   ///////////////////////////////  /////////////////////////////
-  //    Example OM Layout Feature with Actions
-  //      CREATE_EC(1, "",
-  //          new ImmutablePair<>(ON_FINALIZE, new OnFinalizeECAction()),
-  //          new ImmutablePair<>(FIRST_RUN_ON_UPGRADE,
-  //          new OnFirstUpgradeStartECAction());
-  //
-  //////////////////////////////  //////////////////////////////
 
   private int layoutVersion;
   private String description;
-  private EnumMap<UpgradeActionType, OmUpgradeAction> actions =
-      new EnumMap<>(UpgradeActionType.class);
+  private OmUpgradeAction action;
 
   OMLayoutFeature(final int layoutVersion, String description) {
     this.layoutVersion = layoutVersion;
     this.description = description;
-  }
-
-  OMLayoutFeature(final int layoutVersion, String description,
-                  Pair<UpgradeActionType, OmUpgradeAction>... actions) {
-    this.layoutVersion = layoutVersion;
-    this.description = description;
-    for (Pair<UpgradeActionType, OmUpgradeAction> action : actions) {
-      this.actions.put(action.getKey(), action.getValue());
-    }
   }
 
   @Override
@@ -86,12 +67,12 @@ public enum OMLayoutFeature implements LayoutFeature {
     return description;
   }
 
-  public void addAction(UpgradeActionType type, OmUpgradeAction action) {
-    this.actions.put(type, action);
+  public void addAction(OmUpgradeAction upgradeAction) {
+    this.action = upgradeAction;
   }
 
   @Override
-  public Optional<OmUpgradeAction> action(UpgradeActionType phase) {
-    return Optional.ofNullable(actions.get(phase));
+  public Optional<OmUpgradeAction> action() {
+    return Optional.ofNullable(action);
   }
 }
