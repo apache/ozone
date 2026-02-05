@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.V
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
@@ -28,6 +29,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -54,6 +56,43 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
   }
 
   @Override
+  public OzoneManagerProtocolProtos.OMRequest preExecute(OzoneManager ozoneManager)
+      throws IOException {
+    OzoneManagerProtocolProtos.OMRequest omRequest = super.preExecute(ozoneManager);
+
+    // ACL check during preExecute
+    if (ozoneManager.getAclsEnabled()) {
+      String volume = getVolumeName();
+      try {
+        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
+            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
+            volume, null, null);
+      } catch (IOException ex) {
+        // Ensure audit log captures preExecute failures
+        Map<String, String> auditMap = new LinkedHashMap<>();
+        auditMap.put(OzoneConsts.VOLUME, volume);
+        List<OzoneAcl> acls = getAcls();
+        if (acls != null) {
+          auditMap.put(OzoneConsts.ACL, acls.toString());
+        }
+        // Determine which action based on request type
+        OMAction action = OMAction.SET_ACL;
+        if (omRequest.hasAddAclRequest()) {
+          action = OMAction.ADD_ACL;
+        } else if (omRequest.hasRemoveAclRequest()) {
+          action = OMAction.REMOVE_ACL;
+        }
+        markForAudit(ozoneManager.getAuditLogger(),
+            buildAuditMessage(action, auditMap, ex,
+                omRequest.getUserInfo()));
+        throw ex;
+      }
+    }
+
+    return omRequest;
+  }
+
+  @Override
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     final long trxnLogIndex = context.getIndex();
     // protobuf guarantees volume and acls are non-null.
@@ -71,12 +110,6 @@ public abstract class OMVolumeAclRequest extends OMVolumeRequest {
     boolean lockAcquired = false;
     Result result;
     try {
-      // check Acl
-      if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
-            volume, null, null);
-      }
       mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volume));
       lockAcquired = getOmLockDetails().isLockAcquired();
