@@ -78,14 +78,28 @@ public class SCMUpgradeFinalizer extends
   @Override
   public void finalizeLayoutFeature(LayoutFeature lf,
        SCMUpgradeFinalizationContext context) throws UpgradeException {
-    // Run upgrade actions, update VERSION file, and update layout version in
-    // DB.
+    throw new UnsupportedOperationException("FinalizeLayoutFeature is not supported in this implemementation. " +
+        "Please use finalizeLayoutFeatures instead.");
+  }
+
+  @Override
+  public void finalizeLayoutFeatures(Iterable<LayoutFeature> features, SCMUpgradeFinalizationContext context)
+      throws UpgradeException {
+    int firstLv = -1;
+    int lastLv = -1;
+    for (LayoutFeature lf : features) {
+      if (firstLv == -1) {
+        firstLv = lf.layoutVersion();
+      }
+      lastLv = lf.layoutVersion();
+    }
     try {
-      context.getFinalizationStateManager()
-          .finalizeLayoutFeature(lf.layoutVersion());
+      if (firstLv > -1) {
+        // If there are no feature to finalize we just skip this and the finalize operation is a noop.
+        context.getFinalizationStateManager().finalizeLayoutFeatures(firstLv, lastLv);
+      }
     } catch (IOException ex) {
-      throw new UpgradeException(ex,
-          UpgradeException.ResultCodes.LAYOUT_FEATURE_FINALIZATION_FAILED);
+      throw new UpgradeException(ex, UpgradeException.ResultCodes.LAYOUT_FEATURE_FINALIZATION_FAILED);
     }
   }
 

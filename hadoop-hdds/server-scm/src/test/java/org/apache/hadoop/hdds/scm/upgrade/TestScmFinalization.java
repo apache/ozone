@@ -138,7 +138,7 @@ public class TestScmFinalization {
     for (HDDSLayoutFeature feature: HDDSLayoutFeature.values()) {
       // Cannot finalize initial version since we are already there.
       if (!feature.equals(HDDSLayoutFeature.INITIAL_VERSION)) {
-        stateManager.finalizeLayoutFeature(feature.layoutVersion());
+        stateManager.finalizeLayoutFeatures(feature.layoutVersion(), feature.layoutVersion());
         if (versionManager.needsFinalization()) {
           assertCurrentCheckpoint(scmContext, stateManager,
               FinalizationCheckpoint.FINALIZATION_STARTED);
