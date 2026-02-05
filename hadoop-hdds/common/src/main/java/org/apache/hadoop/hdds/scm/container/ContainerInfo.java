@@ -87,6 +87,7 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
   private long sequenceId;
   // Health state of the container (determined by ReplicationManager)
   private ContainerHealthState healthState;
+  private boolean ackMissing;
 
   private ContainerInfo(Builder b) {
     containerID = ContainerID.valueOf(b.containerID);
@@ -102,6 +103,7 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
     replicationConfig = b.replicationConfig;
     clock = b.clock;
     healthState = b.healthState != null ? b.healthState : ContainerHealthState.HEALTHY;
+    ackMissing = b.ackMissing;
   }
 
   public static Codec<ContainerInfo> getCodec() {
@@ -121,7 +123,8 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
         .setContainerID(info.getContainerID())
         .setDeleteTransactionId(info.getDeleteTransactionId())
         .setReplicationConfig(config)
-        .setSequenceId(info.getSequenceId());
+        .setSequenceId(info.getSequenceId())
+        .setAckMissing(info.getAckMissing());
 
     if (info.hasPipelineID()) {
       builder.setPipelineID(PipelineID.getFromProtobuf(info.getPipelineID()));
@@ -263,6 +266,24 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
     this.healthState = newHealthState;
   }
 
+  /**
+   * Check if container is acked as missing.
+   *
+   * @return boolean
+   */
+  public boolean getAckMissing() {
+    return ackMissing;
+  }
+
+  /**
+   * Set the boolean for ackMissing.
+   *
+   * @param isAckMissing checks if container is acked as missing or not
+   */
+  public void setAckMissing(boolean isAckMissing) {
+    this.ackMissing = isAckMissing;
+  }
+
   @JsonIgnore
   public HddsProtos.ContainerInfoProto getProtobuf() {
     HddsProtos.ContainerInfoProto.Builder builder =
@@ -275,7 +296,8 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
         .setDeleteTransactionId(getDeleteTransactionId())
         .setOwner(getOwner())
         .setSequenceId(getSequenceId())
-        .setReplicationType(getReplicationType());
+        .setReplicationType(getReplicationType())
+        .setAckMissing(getAckMissing());
 
     if (replicationConfig instanceof ECReplicationConfig) {
       builder.setEcReplicationConfig(((ECReplicationConfig) replicationConfig)
@@ -393,6 +415,7 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
     private PipelineID pipelineID;
     private ReplicationConfig replicationConfig;
     private ContainerHealthState healthState;
+    private boolean ackMissing;
 
     public Builder setPipelineID(PipelineID pipelineId) {
       this.pipelineID = pipelineId;
@@ -447,6 +470,11 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
 
     public Builder setHealthState(ContainerHealthState healthState) {
       this.healthState = healthState;
+      return this;
+    }
+
+    public Builder setAckMissing(boolean ackMissing) {
+      this.ackMissing = ackMissing;
       return this;
     }
 

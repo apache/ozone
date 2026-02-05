@@ -1680,4 +1680,55 @@ public class SCMClientProtocolServer implements
       throw ex;
     }
   }
+
+  @Override
+  public void acknowledgeMissingContainer(long longContainerID) throws IOException {
+    ContainerID containerID = ContainerID.valueOf(longContainerID);
+    final Map<String, String> auditMap = new HashMap<>();
+    auditMap.put("containerID", containerID.toString());
+
+    try {
+      ContainerInfo containerInfo = scm.getContainerManager().getContainer(containerID);
+      Set<ContainerReplica> replicas = scm.getContainerManager().getContainerReplicas(containerID);
+      if (replicas != null && !replicas.isEmpty()) {
+        throw new IOException("Container " + longContainerID +
+            " has " + replicas.size() + " replicas and cannot be acknowledged as missing");
+      }
+
+      if (containerInfo.getNumberOfKeys() == 0) {
+        throw new IOException("Container " + longContainerID + " is empty (0 keys) and cannot be acknowledged.");
+      }
+
+      HddsProtos.ContainerInfoProto updatedProto = containerInfo.getProtobuf().toBuilder()
+          .setAckMissing(true)
+          .build();
+      scm.getContainerManager().updateContainerInfo(containerID, updatedProto);
+
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(SCMAction.ACKNOWLEDGE_MISSING_CONTAINER, auditMap));
+    } catch (IOException ex) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(SCMAction.ACKNOWLEDGE_MISSING_CONTAINER, auditMap, ex));
+      throw ex;
+    }
+  }
+
+  @Override
+  public void unacknowledgeMissingContainer(long longContainerID) throws IOException {
+    ContainerID containerID = ContainerID.valueOf(longContainerID);
+    final Map<String, String> auditMap = new HashMap<>();
+    auditMap.put("containerID", containerID.toString());
+
+    try {
+      ContainerInfo containerInfo = scm.getContainerManager().getContainer(containerID);
+
+      HddsProtos.ContainerInfoProto updatedProto = containerInfo.getProtobuf().toBuilder()
+          .setAckMissing(false)
+          .build();
+      scm.getContainerManager().updateContainerInfo(containerID, updatedProto);
+
+      AUDIT.logWriteSuccess(buildAuditMessageForSuccess(SCMAction.UNACKNOWLEDGE_MISSING_CONTAINER, auditMap));
+    } catch (IOException ex) {
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(SCMAction.UNACKNOWLEDGE_MISSING_CONTAINER, auditMap, ex));
+      throw ex;
+    }
+  }
 }

@@ -511,4 +511,20 @@ public interface StorageContainerLocationProtocol extends Closeable {
    * @throws IOException On error
    */
   void reconcileContainer(long containerID) throws IOException;
+
+  /**
+   * Acknowledge the missing container.
+   *
+   * @param containerId The ID of the container to acknowledge as missing.
+   * @throws IOException
+   */
+  void acknowledgeMissingContainer(long containerId) throws IOException;
+
+  /**
+   * Unacknowledge the missing container.
+   *
+   * @param containerId The ID of the container to unacknowledge as missing.
+   * @throws IOException
+   */
+  void unacknowledgeMissingContainer(long containerId) throws IOException;
 }

@@ -551,6 +551,23 @@ public final class ContainerStateManagerImpl
     }
   }
 
+  @Override
+  public void updateContainerInfo(HddsProtos.ContainerInfoProto updatedInfoProto)
+      throws IOException {
+    ContainerInfo updatedInfo = ContainerInfo.fromProtobuf(updatedInfoProto);
+    ContainerID containerID = updatedInfo.containerID();
+    
+    try (AutoCloseableLock ignored = writeLock(containerID)) {
+      final ContainerInfo currentInfo = containers.getContainerInfo(containerID);
+      if (currentInfo == null) {
+        throw new ContainerNotFoundException(containerID);
+      }
+      currentInfo.setAckMissing(updatedInfo.getAckMissing());
+      transactionBuffer.addToBuffer(containerStore, containerID, currentInfo);
+      LOG.debug("Updated container info for container: {}, ackMissing={}", containerID, currentInfo.getAckMissing());
+    }
+  }
+
   private AutoCloseableLock readLock() {
     return AutoCloseableLock.acquire(lock.readLock());
   }
