@@ -48,11 +48,10 @@ public class TestSafeModeSCMHA {
   private static final int NUM_OF_SCMS = 3;
 
   private MiniOzoneHAClusterImpl cluster = null;
-  private OzoneConfiguration conf;
 
   @BeforeEach
   public void init() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     cluster = MiniOzoneCluster.newHABuilder(conf)
         .setOMServiceId(OM_SERVICE_ID)
         .setSCMServiceId(SCM_SERVICE_ID).setNumOfOzoneManagers(NUM_OF_OMS)
@@ -90,7 +89,7 @@ public class TestSafeModeSCMHA {
     SCMStateMachine leaderScmStateMachine = leaderScm.getScmHAManager().getRatisServer().getSCMStateMachine();
     SCMStateMachine followerScmStateMachine = followerScm.getScmHAManager().getRatisServer().getSCMStateMachine();
     GenericTestUtils.waitFor(() -> leaderScmStateMachine.getLastAppliedTermIndex().getIndex()
-            == followerScmStateMachine.getLastAppliedTermIndex().getIndex(),1000, 60000);
+        == followerScmStateMachine.getLastAppliedTermIndex().getIndex(), 1000, 60000);
 
     // wait for follower to exit safe mode
     StorageContainerManager newFollowerScm = cluster.restartStorageContainerManager(followerScm, false);
