@@ -267,6 +267,13 @@ public final class ServerUtils {
     if (dir == null || !dir.exists()) {
       return;
     }
+    // Don't attempt to set permissions on non-writable directories
+    // This allows volume initialization to fail naturally for read-only volumes
+    if (!dir.canWrite()) {
+      LOG.debug("Skipping permission setting for non-writable directory {}", dir);
+      return;
+    }
+
     try {
       String permissionValue = conf.get(permissionConfigKey);
       if (permissionValue == null) {

@@ -511,4 +511,35 @@ public class TestServerUtils {
     ServerUtils.setDataDirectoryPermissions(nonExistentDir, conf,
         ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS);
   }
+
+  @Test
+  public void testSetDataDirectoryPermissionsSkipsReadOnlyDir() throws IOException {
+    // Create a directory and set it to read-only
+    File readOnlyDir = new File(folder.toFile(), "readOnlyDir");
+    assertTrue(readOnlyDir.mkdirs());
+
+    // Set initial permissions and make it read-only
+    Path dirPath = readOnlyDir.toPath();
+    Set<PosixFilePermission> readOnlyPermissions =
+        PosixFilePermissions.fromString("r-xr-xr-x");
+    Files.setPosixFilePermissions(dirPath, readOnlyPermissions);
+
+    // Verify directory is read-only
+    assertFalse(readOnlyDir.canWrite());
+
+    // Configure system to use 700 permissions
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS, "700");
+
+    // Call setDataDirectoryPermissions on read-only directory
+    // Should skip permission setting and not throw exception
+    ServerUtils.setDataDirectoryPermissions(readOnlyDir, conf,
+        ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS);
+
+    // Verify permissions were NOT changed (still read-only)
+    Set<PosixFilePermission> actualPermissions =
+        Files.getPosixFilePermissions(dirPath);
+    assertEquals(readOnlyPermissions, actualPermissions);
+    assertFalse(readOnlyDir.canWrite());
+  }
 }
