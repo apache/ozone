@@ -424,6 +424,14 @@ public class SCMDeletedBlockTransactionStatusManager {
     scmDeleteBlocksCommandStatusManager.clear();
     transactionToDNsCommitMap.clear();
     txSizeMap.clear();
+    try {
+      initDataDistributionData();
+    } catch (IOException e) {
+      LOG.warn("Failed to initialize Storage space distribution data. The feature will continue with current " +
+              "totalBlockCount {}, totalBlockCount {}, totalBlocksSize {} and totalReplicatedBlocksSize {}. " +
+              "There is a high chance that the real data and current data has a fixed gap.",
+          totalBlockCount.get(), totalBlocksSize.get(), totalBlocksSize.get(), totalReplicatedBlocksSize.get());
+    }
   }
 
   public void cleanAllTimeoutSCMCommand(long timeoutMs) {
@@ -672,8 +680,9 @@ public class SCMDeletedBlockTransactionStatusManager {
       totalBlockCount.set(summary.getTotalBlockCount());
       totalBlocksSize.set(summary.getTotalBlockSize());
       totalReplicatedBlocksSize.set(summary.getTotalBlockReplicatedSize());
-      LOG.info("Data distribution is enabled with totalBlockCount {} totalBlocksSize {}",
-          totalBlockCount.get(), totalBlocksSize.get());
+      LOG.info("Storage space distribution is initialized with totalTxCount {}, totalBlockCount {}, " +
+              "totalBlocksSize {} and totalReplicatedBlocksSize {}", totalTxCount.get(),
+          totalBlockCount.get(), totalBlocksSize.get(), totalReplicatedBlocksSize.get());
     }
   }
 
@@ -688,8 +697,7 @@ public class SCMDeletedBlockTransactionStatusManager {
       }
       return DeletedBlocksTransactionSummary.parseFrom(byteString);
     } catch (IOException e) {
-      LOG.error("Failed to get property {} for service {}. DataDistribution function will be disabled.",
-          propertyName, SERVICE_NAME, e);
+      LOG.error("Failed to get property {} for service {}.", propertyName, SERVICE_NAME, e);
       throw new IOException("Failed to get property " + propertyName, e);
     }
   }
