@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.upgrade;
 
-import java.util.EnumMap;
 import java.util.Optional;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 
@@ -49,23 +48,29 @@ public enum HDDSLayoutFeature implements LayoutFeature {
 
   private int layoutVersion;
   private String description;
-  private EnumMap<UpgradeActionType, HDDSUpgradeAction> scmActions =
-      new EnumMap<>(UpgradeActionType.class);
-  private EnumMap<UpgradeActionType, HDDSUpgradeAction> datanodeActions =
-      new EnumMap<>(UpgradeActionType.class);
+  private HDDSUpgradeAction scmAction;
+  private HDDSUpgradeAction datanodeAction;
 
   HDDSLayoutFeature(final int layoutVersion, String description) {
     this.layoutVersion = layoutVersion;
     this.description = description;
   }
 
-  public void addScmAction(UpgradeActionType type, HDDSUpgradeAction action) {
-    this.scmActions.put(type, action);
+  public void addScmAction(HDDSUpgradeAction action) {
+    // Required by SpotBugs since this setter exists in an enum.
+    if (this.scmAction != null) {
+      throw new IllegalStateException("SCM action already set for " + name());
+    }
+    this.scmAction = action;
   }
 
-  public void addDatanodeAction(UpgradeActionType type,
-                                HDDSUpgradeAction action) {
-    this.datanodeActions.put(type, action);
+  public void addDatanodeAction(HDDSUpgradeAction action) {
+    // Required by SpotBugs since this setter exists in an enum.
+    if (this.datanodeAction != null) {
+      throw new IllegalStateException(
+          "Datanode action already set for " + name());
+    }
+    this.datanodeAction = action;
   }
 
   @Override
@@ -78,11 +83,11 @@ public enum HDDSLayoutFeature implements LayoutFeature {
     return description;
   }
 
-  public Optional<HDDSUpgradeAction> scmAction(UpgradeActionType type) {
-    return Optional.ofNullable(scmActions.get(type));
+  public Optional<HDDSUpgradeAction> scmAction() {
+    return Optional.ofNullable(scmAction);
   }
 
-  public Optional<HDDSUpgradeAction> datanodeAction(UpgradeActionType type) {
-    return Optional.ofNullable(datanodeActions.get(type));
+  public Optional<HDDSUpgradeAction> datanodeAction() {
+    return Optional.ofNullable(datanodeAction);
   }
 }

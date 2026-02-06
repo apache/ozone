@@ -133,11 +133,6 @@ public class FinalizationManagerImpl implements FinalizationManager {
   }
 
   @Override
-  public void runPrefinalizeStateActions() throws IOException  {
-    upgradeFinalizer.runPrefinalizeStateActions(storage, context);
-  }
-
-  @Override
   public boolean crossedCheckpoint(FinalizationCheckpoint checkpoint) {
     return finalizationStateManager.crossedCheckpoint(checkpoint);
   }
