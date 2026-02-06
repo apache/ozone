@@ -21,27 +21,15 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
 import static org.apache.hadoop.ozone.upgrade.TestUpgradeFinalizerActions.MockLayoutFeature.VERSION_2;
 import static org.apache.hadoop.ozone.upgrade.TestUpgradeFinalizerActions.MockLayoutFeature.VERSION_3;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.Optional;
-import java.util.Properties;
 import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
 import org.apache.hadoop.hdds.upgrade.test.MockComponent;
-import org.apache.hadoop.ozone.common.Storage;
 
 /**
  * Class to test upgrade related actions.
  */
 public class TestUpgradeFinalizerActions {
-
-  private Storage newStorage(File f) throws IOException {
-    return new Storage(SCM, f, "scm", 1) {
-      @Override
-      protected Properties getNodeProperties() {
-        return new Properties();
-      }
-    };
-  }
 
   /**
    * Mock upgrade finalizer.
