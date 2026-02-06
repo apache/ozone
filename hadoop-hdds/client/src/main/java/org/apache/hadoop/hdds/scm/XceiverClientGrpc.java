@@ -127,7 +127,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
         new Semaphore(HddsClientUtils.getMaxOutstandingRequests(config));
     this.metrics = XceiverClientManager.getXceiverClientMetrics();
     this.channels = new ConcurrentHashMap<>();
-    this.asyncStubs = new HashMap<>();
+    this.asyncStubs = new ConcurrentHashMap<>();
     this.topologyAwareRead = config.getBoolean(
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY,
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_DEFAULT);
@@ -160,7 +160,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     connectToDatanode(dn);
   }
 
-  private synchronized void connectToDatanode(DatanodeDetails dn)
+  private void connectToDatanode(DatanodeDetails dn)
       throws IOException {
     if (isConnected(dn)) {
       return;
@@ -173,15 +173,14 @@ public class XceiverClientGrpc extends XceiverClientSpi {
           OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
     }
 
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Connecting to server : {}; nodes in pipeline : {}, ",
-          dn, pipeline.getNodes());
-    }
+    LOG.debug("Connecting to server : {}; nodes in pipeline : {}, ", dn, pipeline.getNodes());
+
     ManagedChannel channel = createChannel(dn, port).build();
-    XceiverClientProtocolServiceStub asyncStub =
-        XceiverClientProtocolServiceGrpc.newStub(channel);
-    asyncStubs.put(dn.getID(), asyncStub);
-    channels.put(dn.getID(), channel);
+    XceiverClientProtocolServiceStub asyncStub = XceiverClientProtocolServiceGrpc.newStub(channel);
+    synchronized (this) {
+      asyncStubs.put(dn.getID(), asyncStub);
+      channels.put(dn.getID(), channel);
+    }
   }
 
   protected NettyChannelBuilder createChannel(DatanodeDetails dn, int port)
@@ -711,7 +710,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     return new XceiverClientReply(replyFuture);
   }
 
-  private synchronized void checkOpen(DatanodeDetails dn)
+  private void checkOpen(DatanodeDetails dn)
       throws IOException {
     if (closed) {
       throw new IOException("This channel is not connected.");
