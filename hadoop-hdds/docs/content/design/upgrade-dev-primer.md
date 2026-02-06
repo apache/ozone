@@ -57,7 +57,8 @@ Generic factory which stores different instances of Type 'T' sharded by a key & 
 A typical use case during upgrade is to have multiple versions of a class / method / object and choose them based  on the current layout version at runtime. Before finalizing, an older version is typically needed, and after finalization, a newer version is needed. This class serves this purpose in a generic way. For example, we can create a Factory to create multiple versions of OMRequests sharded by Request Type & Layout Version Supported.
 
 ## Upgrade Action (UpgradeActionOm & UpgradeActionHdds)
-Annotation to specify upgrade action run during finalization. Each layout feature can optionally define a single upgrade action that will be executed when the feature is finalized. An action run once during finalization of layout version (feature). This action will be run again if it fails partway through, and may be run again if another error occurs during the upgrade. This action makes changes to on disk structures during finalization. If a failure partway through could leave the component in an inoperable state, ensure the action is idempotent or can handle partial completion.
+Annotation to specify upgrade action run during finalization. Each layout feature can optionally define a single upgrade action that will be executed when the feature is finalized. This action should be idempotent and execute quickly. The action must complete for the feature to finish
+finalizing, so if there is an error executing the action it will be retried. This partial failure should not leave the component inoperable.
 
 - Example: Adding a new RocksDB column family.
 
