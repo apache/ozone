@@ -31,6 +31,8 @@ ${ROLE_SESSION_NAME}              sts-session-name
 Configure AWS Profile
     [Arguments]                   ${profile}  ${access_key}  ${secret_key}  ${session_token}=${EMPTY}  ${region}=us-east-1
     Run Keyword                   Install aws cli
+    # Use v4 signatures so presign URL will work (Ozone rejects v2 signatures)
+    Execute                       aws configure set s3.signature_version s3v4 --profile ${profile}
     Execute                       aws configure set aws_access_key_id ${access_key} --profile ${profile}
     Execute                       aws configure set aws_secret_access_key ${secret_key} --profile ${profile}
     Execute                       aws configure set region ${region} --profile ${profile}
@@ -61,7 +63,7 @@ Create Ranger Policy
     Create Ranger Artifact        ${policy_json}                '${RANGER_ENDPOINT_URL}/service/public/v2/api/policy'
 
 Assume Role And Get Temporary Credentials
-    [Arguments]                   ${perm_access_key_id}  ${perm_secret_key}  ${policy_json}=${EMPTY}
+    [Arguments]                   ${perm_access_key_id}  ${perm_secret_key}  ${policy_json}=${EMPTY}  ${role_arn}=${ROLE_ARN}
     Configure AWS Profile         permanent  ${perm_access_key_id}  ${perm_secret_key}
 
     ${now} =                      Get Current Date              time_zone=UTC
@@ -85,6 +87,16 @@ Assume Role And Get Temporary Credentials
     ${time_diff} =                Subtract Date From Date       ${expiration}    ${now}
     Should Be True                ${time_diff} >= 898           Expected expiration to be at least 898s in the future, but was ${time_diff}s
     Should Be True                ${time_diff} <= 902           Expected expiration to be at most 902s in the future, but was ${time_diff}s
+
+Assume Role Should Fail
+    [Arguments]                   ${perm_access_key_id}  ${perm_secret_key}  ${policy_json}=${EMPTY}  ${expected_error}=AccessDenied
+    Configure AWS Profile         permanent  ${perm_access_key_id}  ${perm_secret_key}
+
+    ${cmd} =                      Set Variable                  aws sts assume-role --endpoint-url ${STS_ENDPOINT_URL} --role-arn ${ROLE_ARN} --role-session-name ${ROLE_SESSION_NAME} --duration-seconds 900 --output json --profile permanent
+    ${cmd} =                      Set Variable If               '${policy_json}' != '${EMPTY}'    ${cmd} --policy '${policy_json}'    ${cmd}
+
+    ${output} =                   Execute And Ignore Error      ${cmd}
+    Should Contain                ${output}                     ${expected_error}
 
 Get Object Should Succeed
     [Arguments]                   ${bucket}  ${key}  ${destination}=./${key}  ${profile}=sts

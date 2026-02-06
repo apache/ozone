@@ -336,3 +336,31 @@ Verify Limited-Scoped Token Accesses
     Get Object Should Fail        ${TENANT_TWO_ANOTHER_BUCKET}  ${ANOTHER_BUCKET_TESTFILE}  NoSuchBucket
     Get Object Should Fail        ${TENANT_ONE_LINKED_BUCKET}   ${ANOTHER_BUCKET_TESTFILE}  NoSuchBucket
     Put Object Should Fail        ${TENANT_THREE_ICEBERG_BUCKET}   ${ICEBERG_BUCKET_TESTFILE}  AccessDenied
+
+Multitenant Revocation Scenarios
+    # Create another session token for ${USER_A} in ${TENANT_ONE}, verify it works, then revoke that permanent secret and verify the token no longer works.
+    # Also verify the token for ${USER_A} in ${TENANT_TWO} still works
+    Set Global Variable           ${ROLE_ARN}                   arn:aws:iam::123456789012:role/${TENANT_ONE_ROLE}
+    Assume Role And Get Temporary Credentials                   perm_access_key_id=${USER_A_T1_PERM_ACCESS_KEY_ID}  perm_secret_key=${USER_A_T1_PERM_SECRET_KEY}
+    Set Global Variable           ${USER_A_T1_STS_ACCESS_KEY_ID}  ${STS_ACCESS_KEY_ID}
+    Set Global Variable           ${USER_A_T1_STS_SECRET_KEY}   ${STS_SECRET_KEY}
+    Set Global Variable           ${USER_A_T1_STS_SESSION_TOKEN}  ${STS_SESSION_TOKEN}
+    Configure STS Profile         ${USER_A_T1_STS_ACCESS_KEY_ID}  ${USER_A_T1_STS_SECRET_KEY}  ${USER_A_T1_STS_SESSION_TOKEN}
+    Get Object Should Succeed     ${TENANT_ONE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}
+
+    Kinit test user               ${OM_ADMIN_USER}              ${OM_ADMIN_USER}.keytab
+    ${output} =                   Execute                       ozone tenant --verbose user revoke '${TENANT_ONE}$${USER_A}'
+    Should contain                ${output}                     Revoked accessId '${TENANT_ONE}$${USER_A}'.
+    Get Object Should Fail        ${TENANT_ONE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}  AccessDenied
+
+    Configure STS Profile         ${USER_A_T2_STS_ACCESS_KEY_ID}  ${USER_A_T2_STS_SECRET_KEY}  ${USER_A_T2_STS_SESSION_TOKEN}
+    Get Object Should Succeed     ${TENANT_TWO_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}
+
+    # Revoking the secret for ${USER_B} should NOT affect the session token, as it is based on ${TENANT_THREE}$${USER_B} combination.
+    Kinit test user               ${USER_B}                     ${USER_B}.keytab
+    Execute                       ozone s3 getsecret -u ${TEST_USER} ${OM_HA_PARAM}
+    Execute                       ozone s3 revokesecret -y -u ${TEST_USER} ${OM_HA_PARAM}
+    Configure STS Profile         ${USER_B_T3_STS_ACCESS_KEY_ID}  ${USER_B_T3_STS_SECRET_KEY}  ${USER_B_T3_STS_SESSION_TOKEN}
+    Get Object Should Succeed     ${TENANT_THREE_ICEBERG_BUCKET}  ${ICEBERG_BUCKET_TESTFILE}
+
+
