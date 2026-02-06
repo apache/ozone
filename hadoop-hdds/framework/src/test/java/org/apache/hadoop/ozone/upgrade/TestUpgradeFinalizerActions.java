@@ -17,10 +17,6 @@
 
 package org.apache.hadoop.ozone.upgrade;
 
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType.SCM;
-import static org.apache.hadoop.ozone.upgrade.TestUpgradeFinalizerActions.MockLayoutFeature.VERSION_2;
-import static org.apache.hadoop.ozone.upgrade.TestUpgradeFinalizerActions.MockLayoutFeature.VERSION_3;
-
 import java.io.IOException;
 import java.util.Optional;
 import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
