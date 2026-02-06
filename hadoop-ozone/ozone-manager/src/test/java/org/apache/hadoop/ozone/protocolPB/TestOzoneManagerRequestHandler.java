@@ -242,4 +242,72 @@ public class TestOzoneManagerRequestHandler {
     Assertions.assertTrue(basicKeyInfoList.get(0).getIsEncrypted(), "encrypted-key should have isEncrypted=true");
     Assertions.assertFalse(basicKeyInfoList.get(1).getIsEncrypted(), "normal-key should have isEncrypted=false");
   }
+
+  /**
+   * Test to verify prepare-related requests return success as no-ops.
+   */
+  @Test
+  public void testPrepareRequestsAreNoOps() {
+    OzoneManagerRequestHandler requestHandler = getRequestHandler(10);
+
+    // Prepare command should be a no-op.
+    OzoneManagerProtocolProtos.OMRequest prepareRequest =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.Prepare)
+            .setClientId("test-client")
+            .setPrepareRequest(OzoneManagerProtocolProtos.PrepareRequest.newBuilder()
+                .setArgs(OzoneManagerProtocolProtos.PrepareRequestArgs.newBuilder().build())
+                .build())
+            .build();
+
+    OzoneManagerProtocolProtos.OMResponse prepareResponse =
+        requestHandler.handleReadRequest(prepareRequest);
+
+    Assertions.assertTrue(prepareResponse.getSuccess(), "Prepare should return success");
+    Assertions.assertTrue(prepareResponse.hasPrepareResponse(), "Prepare response should be present");
+    Assertions.assertEquals(0, prepareResponse.getPrepareResponse().getTxnID(),
+        "Prepare should return empty txnID of 0");
+    Assertions.assertEquals("Prepare is no longer required in this version",
+        prepareResponse.getMessage(), "Prepare should return deprecation message");
+
+    // PrepareStatus should always return NOT_PREPARED.
+    OzoneManagerProtocolProtos.OMRequest prepareStatusRequest =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.PrepareStatus)
+            .setClientId("test-client")
+            .setPrepareStatusRequest(OzoneManagerProtocolProtos.PrepareStatusRequest.newBuilder()
+                .setTxnID(0)
+                .build())
+            .build();
+
+    OzoneManagerProtocolProtos.OMResponse prepareStatusResponse =
+        requestHandler.handleReadRequest(prepareStatusRequest);
+
+    Assertions.assertTrue(prepareStatusResponse.getSuccess(), "PrepareStatus should return success");
+    Assertions.assertTrue(prepareStatusResponse.hasPrepareStatusResponse(),
+        "PrepareStatus response should be present");
+    Assertions.assertEquals(
+        OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus.NOT_PREPARED,
+        prepareStatusResponse.getPrepareStatusResponse().getStatus(),
+        "PrepareStatus should always return NOT_PREPARED");
+    Assertions.assertEquals(0, prepareStatusResponse.getPrepareStatusResponse().getCurrentTxnIndex(),
+        "PrepareStatus should return currentTxnIndex of 0");
+
+    // CancelPrepare command should be a no-op.
+    OzoneManagerProtocolProtos.OMRequest cancelPrepareRequest =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCmdType(OzoneManagerProtocolProtos.Type.CancelPrepare)
+            .setClientId("test-client")
+            .setCancelPrepareRequest(OzoneManagerProtocolProtos.CancelPrepareRequest.newBuilder().build())
+            .build();
+
+    OzoneManagerProtocolProtos.OMResponse cancelPrepareResponse =
+        requestHandler.handleReadRequest(cancelPrepareRequest);
+
+    Assertions.assertTrue(cancelPrepareResponse.getSuccess(), "CancelPrepare should return success");
+    Assertions.assertTrue(cancelPrepareResponse.hasCancelPrepareResponse(),
+        "CancelPrepare response should be present");
+    Assertions.assertEquals("Prepare is no longer required in this version",
+        cancelPrepareResponse.getMessage(), "CancelPrepare should return deprecation message");
+  }
 }
