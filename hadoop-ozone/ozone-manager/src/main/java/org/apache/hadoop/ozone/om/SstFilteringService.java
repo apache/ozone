@@ -187,7 +187,7 @@ public class SstFilteringService extends BackgroundService
     }
 
     @Override
-    public BackgroundTaskResult call() throws Exception {
+    public BackgroundTaskResult call() {
 
       Optional<OmSnapshotManager> snapshotManager = Optional.ofNullable(ozoneManager)
           .map(OzoneManager::getOmSnapshotManager);
@@ -255,6 +255,9 @@ public class SstFilteringService extends BackgroundService
                       .getSnapshotId());
                 }
               }
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+              LOG.error("SST filtering task interrupted for snapshot: {}", snapShotTableKey, e);
             }
           } catch (IOException e) {
             if (isSnapshotDeleted(snapshotInfoTable.get(snapShotTableKey))) {
