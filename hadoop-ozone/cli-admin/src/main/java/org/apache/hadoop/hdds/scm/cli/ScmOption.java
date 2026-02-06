@@ -88,4 +88,8 @@ public class ScmOption extends AbstractMixin {
           "Can't create SCM Security client", ex);
     }
   }
+
+  public String getScm() {
+    return scm;
+  }
 }
