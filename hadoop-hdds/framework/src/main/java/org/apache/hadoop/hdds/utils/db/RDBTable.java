@@ -215,7 +215,14 @@ class RDBTable implements Table<byte[], byte[]> {
   public KeyValueIterator<byte[], byte[]> iterator(byte[] prefix, IteratorType type)
       throws RocksDatabaseException {
     return new RDBStoreByteArrayIterator(db.newIterator(family, false), this,
-        prefix, type);
+        prefix, type, null);
+  }
+
+  @Override
+  public KeyValueIterator<byte[], byte[]> iterator(byte[] prefix, byte[] seek)
+      throws RocksDatabaseException {
+    return new RDBStoreByteArrayIterator(db.newIterator(family, false), this,
+        prefix, IteratorType.KEY_AND_VALUE, seek);
   }
 
   KeyValueIterator<CodecBuffer, CodecBuffer> iterator(
@@ -281,7 +288,7 @@ class RDBTable implements Table<byte[], byte[]> {
 
     if (count < 0) {
       throw new IllegalArgumentException(
-            "Invalid count given " + count + ", count must be greater than 0");
+          "Invalid count given " + count + ", count must be greater than 0");
     }
     final List<KeyValue<byte[], byte[]>> result = new ArrayList<>();
     try (KeyValueIterator<byte[], byte[]> it = iterator(prefix)) {
