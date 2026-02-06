@@ -86,6 +86,7 @@ enum Type {
   Echo = 22;
   // Retrieves checksum information for a container.
   GetContainerChecksumInfo = 23;
+  // Allows us to read a block
   ReadBlock = 24;
 }
 
