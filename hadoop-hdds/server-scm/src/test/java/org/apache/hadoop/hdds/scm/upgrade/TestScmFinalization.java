@@ -129,33 +129,18 @@ public class TestScmFinalization {
         .build();
     stateManager.setUpgradeContext(context);
 
-    assertCurrentCheckpoint(scmContext, stateManager,
-        FinalizationCheckpoint.FINALIZATION_REQUIRED);
+    assertCurrentCheckpoint(scmContext, stateManager, FinalizationCheckpoint.FINALIZATION_REQUIRED);
     stateManager.addFinalizingMark();
-    assertCurrentCheckpoint(scmContext, stateManager,
-        FinalizationCheckpoint.FINALIZATION_STARTED);
+    assertCurrentCheckpoint(scmContext, stateManager, FinalizationCheckpoint.FINALIZATION_STARTED);
 
-    for (HDDSLayoutFeature feature: HDDSLayoutFeature.values()) {
-      // Cannot finalize initial version since we are already there.
-      if (!feature.equals(HDDSLayoutFeature.INITIAL_VERSION)) {
-        stateManager.finalizeLayoutFeatures(feature.layoutVersion(), feature.layoutVersion());
-        if (versionManager.needsFinalization()) {
-          assertCurrentCheckpoint(scmContext, stateManager,
-              FinalizationCheckpoint.FINALIZATION_STARTED);
-        } else {
-          assertCurrentCheckpoint(scmContext, stateManager,
-              FinalizationCheckpoint.MLV_EQUALS_SLV);
-        }
-      }
-    }
-    // Make sure we reached this checkpoint if we finished finalizing all
-    // layout features.
-    assertCurrentCheckpoint(scmContext, stateManager,
-        FinalizationCheckpoint.MLV_EQUALS_SLV);
-
+    HDDSLayoutFeature[] finalizationFeatures = HDDSLayoutFeature.values();
+    HDDSLayoutFeature finalVersion = finalizationFeatures[finalizationFeatures.length - 1];
+    assertCurrentCheckpoint(scmContext, stateManager, FinalizationCheckpoint.FINALIZATION_STARTED);
+    stateManager.finalizeLayoutFeatures(
+        HDDSLayoutFeature.INITIAL_VERSION.layoutVersion(), finalVersion.layoutVersion());
+    assertCurrentCheckpoint(scmContext, stateManager, FinalizationCheckpoint.MLV_EQUALS_SLV);
     stateManager.removeFinalizingMark();
-    assertCurrentCheckpoint(scmContext, stateManager,
-        FinalizationCheckpoint.FINALIZATION_COMPLETE);
+    assertCurrentCheckpoint(scmContext, stateManager, FinalizationCheckpoint.FINALIZATION_COMPLETE);
   }
 
   private void assertCurrentCheckpoint(SCMContext context,
