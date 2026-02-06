@@ -126,7 +126,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     this.semaphore =
         new Semaphore(HddsClientUtils.getMaxOutstandingRequests(config));
     this.metrics = XceiverClientManager.getXceiverClientMetrics();
-    this.channels = new HashMap<>();
+    this.channels = new ConcurrentHashMap<>();
     this.asyncStubs = new HashMap<>();
     this.topologyAwareRead = config.getBoolean(
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY,
@@ -239,7 +239,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
    * and the method waits to finish all ongoing communication.
    */
   @Override
-  public synchronized void close() {
+  public void close() {
     closed = true;
     for (ManagedChannel channel : channels.values()) {
       channel.shutdown();
