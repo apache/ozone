@@ -27,7 +27,8 @@ import picocli.CommandLine;
  */
 @CommandLine.Command(
     name = "cancelprepare",
-    description = "Cancel prepare state in the OMs.",
+    description = "Deprecated. Kept for backward compatibility.",
+    hidden = true,
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )

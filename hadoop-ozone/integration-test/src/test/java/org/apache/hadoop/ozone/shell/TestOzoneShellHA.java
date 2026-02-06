@@ -2478,6 +2478,54 @@ public class TestOzoneShellHA {
     execute(ozoneShell, args);
   }
 
+  /**
+   * Test that prepare commands are deprecated but still work and don't block writes.
+   */
+  @Test
+  public void testPrepareCommandDoesNotBlockWrites() throws IOException {
+    String volumeName = "vol-prepare-test";
+    String bucketName = "bucket-prepare-test";
+    
+    // Execute prepare command via CLI
+    String[] args = new String[] {"om", "prepare", "--service-id", omServiceId};
+    execute(ozoneAdminShell, args);
+    out.reset();
+    
+    // Verify write operations still work (prepare should not block them)
+    // Create volume
+    args = new String[] {"volume", "create", "o3://" + omServiceId + OZONE_URI_DELIMITER + volumeName};
+    execute(ozoneShell, args);
+    out.reset();
+    
+    // Create bucket
+    args = new String[] {"bucket", "create", "o3://" + omServiceId + OZONE_URI_DELIMITER +
+        volumeName + OZONE_URI_DELIMITER + bucketName};
+    execute(ozoneShell, args);
+    out.reset();
+    
+    // Create key
+    String keyName = OZONE_URI_DELIMITER + volumeName + OZONE_URI_DELIMITER + 
+        bucketName + OZONE_URI_DELIMITER + "testkey";
+    args = new String[] {"key", "put", "o3://" + omServiceId + keyName, testFile.getPath()};
+    execute(ozoneShell, args);
+    out.reset();
+    
+    // Verify the key was created successfully
+    OzoneVolume volume = client.getObjectStore().getVolume(volumeName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+    assertNotNull(bucket.getKey("testkey"), "Key should be created successfully after prepare");
+    
+    // Execute cancelprepare command via CLI
+    args = new String[] {"om", "cancelprepare", "--service-id", omServiceId};
+    execute(ozoneAdminShell, args);
+    out.reset();
+    
+    // Cleanup
+    args = new String[] {"volume", "delete", volumeName, "-r", "--yes"};
+    execute(ozoneShell, args);
+    out.reset();
+  }
+
   private static String getKeyProviderURI(MiniKMS kms) {
     if (kms == null) {
       return "";
