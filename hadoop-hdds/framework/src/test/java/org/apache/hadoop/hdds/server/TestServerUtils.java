@@ -439,4 +439,76 @@ public class TestServerUtils {
       FileUtils.deleteQuietly(metaDir);
     }
   }
+
+  @Test
+  public void testSetDataDirectoryPermissionsWithOctal() throws IOException {
+    File testDir = new File(folder.toFile(), "testDir");
+    assertTrue(testDir.mkdirs());
+
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS, "700");
+
+    ServerUtils.setDataDirectoryPermissions(testDir, conf,
+        ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS);
+
+    Path dirPath = testDir.toPath();
+    Set<PosixFilePermission> expectedPermissions =
+        PosixFilePermissions.fromString("rwx------");
+    Set<PosixFilePermission> actualPermissions =
+        Files.getPosixFilePermissions(dirPath);
+
+    assertEquals(expectedPermissions, actualPermissions);
+  }
+
+  @Test
+  public void testSetDataDirectoryPermissionsWithSymbolic() throws IOException {
+    File testDir = new File(folder.toFile(), "testDir2");
+    assertTrue(testDir.mkdirs());
+
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS, "rwx------");
+
+    ServerUtils.setDataDirectoryPermissions(testDir, conf,
+        ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS);
+
+    Path dirPath = testDir.toPath();
+    Set<PosixFilePermission> expectedPermissions =
+        PosixFilePermissions.fromString("rwx------");
+    Set<PosixFilePermission> actualPermissions =
+        Files.getPosixFilePermissions(dirPath);
+
+    assertEquals(expectedPermissions, actualPermissions);
+  }
+
+  @Test
+  public void testSetDataDirectoryPermissionsWithDefaultValue() throws IOException {
+    File testDir = new File(folder.toFile(), "testDir3");
+    assertTrue(testDir.mkdirs());
+
+    OzoneConfiguration conf = new OzoneConfiguration();
+    // Don't explicitly set the permission config key - should use default value (700)
+
+    // Should use default value from ozone-default.xml (700)
+    ServerUtils.setDataDirectoryPermissions(testDir, conf,
+        ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS);
+
+    // Permissions should be set to default value (700 = rwx------)
+    Path dirPath = testDir.toPath();
+    Set<PosixFilePermission> expectedPermissions =
+        PosixFilePermissions.fromString("rwx------");
+    Set<PosixFilePermission> actualPermissions =
+        Files.getPosixFilePermissions(dirPath);
+    assertEquals(expectedPermissions, actualPermissions);
+  }
+
+  @Test
+  public void testSetDataDirectoryPermissionsWithNonExistentDir() {
+    File nonExistentDir = new File(folder.toFile(), "nonExistent");
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS, "700");
+
+    // Should not throw exception for non-existent directory
+    ServerUtils.setDataDirectoryPermissions(nonExistentDir, conf,
+        ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS);
+  }
 }

@@ -255,6 +255,38 @@ public final class ServerUtils {
   }
 
   /**
+   * Sets directory permissions based on configuration.
+   *
+   * @param dir The directory to set permissions on
+   * @param conf Configuration source
+   * @param permissionConfigKey The configuration key for permissions
+   * @throws RuntimeException If setting permissions fails
+   */
+  public static void setDataDirectoryPermissions(File dir, ConfigurationSource conf,
+      String permissionConfigKey) {
+    if (dir == null || !dir.exists()) {
+      return;
+    }
+    try {
+      String permissionValue = conf.get(permissionConfigKey);
+      if (permissionValue == null) {
+        LOG.warn("Permission configuration key {} not found, skipping permission " +
+            "setting for directory {}", permissionConfigKey, dir);
+        return;
+      }
+      String symbolicPermission = getSymbolicPermission(permissionValue);
+      Path path = dir.toPath();
+      Files.setPosixFilePermissions(path,
+          PosixFilePermissions.fromString(symbolicPermission));
+      LOG.debug("Set permissions {} on directory {}", symbolicPermission, dir);
+    } catch (Exception e) {
+      LOG.warn("Failed to set directory permissions for {}: {}", dir,
+          e.getMessage());
+      // Don't throw exception to avoid failing startup, just log warning
+    }
+  }
+
+  /**
    * Checks and creates Ozone Metadir Path if it does not exist.
    *
    * @param conf - Configuration

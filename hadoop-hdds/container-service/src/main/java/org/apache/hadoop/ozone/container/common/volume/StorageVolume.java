@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.container.common.volume;
 
 import static org.apache.hadoop.ozone.container.common.HDDSVolumeLayoutVersion.getLatestVersion;
+import static org.apache.hadoop.ozone.container.common.volume.HddsVolume.HDDS_VOLUME_DIR;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -40,6 +41,8 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckParams;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.hdfs.server.datanode.checker.Checkable;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
@@ -226,16 +229,22 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
       if (!getStorageDir().mkdirs()) {
         throw new IOException("Cannot create directory " + getStorageDir());
       }
+      // Set permissions on storage directory (e.g., hdds subdirectory)
+      setStorageDirPermissions();
       setState(VolumeState.NOT_FORMATTED);
       createVersionFile();
       break;
     case NOT_FORMATTED:
       // Version File does not exist. Create it.
+      // Ensure permissions are correct even if directory already existed
+      setStorageDirPermissions();
       createVersionFile();
       break;
     case NOT_INITIALIZED:
       // Version File exists.
       // Verify its correctness and update property fields.
+      // Ensure permissions are correct even if directory already existed
+      setStorageDirPermissions();
       readVersionFile();
       setState(VolumeState.NORMAL);
       break;
@@ -460,6 +469,10 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
 
     public StorageType getStorageType() {
       return this.storageType;
+    }
+
+    public String getStorageDirStr() {
+      return this.storageDirStr;
     }
   }
 
@@ -768,11 +781,30 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
       throw new IOException("Unable to create the volume root dir at " + root);
     }
 
+    // Set permissions on volume root directory immediately after creation/check
+    // (for data volumes, we want to ensure the root has secure permissions,
+    // even if the directory already existed from a previous run)
+    // This follows the same pattern as metadata directories in getDirectoryFromConfig()
+    if (b.conf != null && root.exists() && HDDS_VOLUME_DIR.equals(b.getStorageDirStr())) {
+      ServerUtils.setDataDirectoryPermissions(root, b.conf,
+          ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS);
+    }
+
     SpaceUsageCheckFactory usageCheckFactory = b.usageCheckFactory;
     if (usageCheckFactory == null) {
       usageCheckFactory = SpaceUsageCheckFactory.create(b.conf);
     }
 
     return usageCheckFactory.paramsFor(root, exclusionProvider);
+  }
+
+  /**
+   * Sets permissions on the storage directory (e.g., hdds subdirectory).
+   */
+  private void setStorageDirPermissions() {
+    if (conf != null && getStorageDir().exists()) {
+      ServerUtils.setDataDirectoryPermissions(getStorageDir(), conf,
+          ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS);
+    }
   }
 }

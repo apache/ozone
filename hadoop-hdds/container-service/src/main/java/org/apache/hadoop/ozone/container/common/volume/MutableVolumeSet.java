@@ -33,6 +33,8 @@ import java.util.function.Function;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.server.ServerUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdfs.server.datanode.StorageLocation;
 import org.apache.hadoop.ozone.container.common.impl.StorageLocationReport;
@@ -178,6 +180,15 @@ public class MutableVolumeSet implements VolumeSet {
             !volume.getStorageDir().exists()) {
           throw new IOException("Failed to create storage dir " +
               volume.getStorageDir());
+        }
+
+        // Ensure permissions are set on the storage directory
+        // (permissions are also set in StorageVolume.initializeImpl(),
+        // but this ensures they're set even if directory already existed
+        // from a previous run with incorrect permissions)
+        if (volumeType == StorageVolume.VolumeType.DATA_VOLUME) {
+          ServerUtils.setDataDirectoryPermissions(volume.getStorageDir(), conf,
+              ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS);
         }
         volumeMap.put(volume.getStorageDir().getPath(), volume);
         volumeStateMap.get(volume.getStorageType()).add(volume);
