@@ -34,6 +34,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -84,8 +85,9 @@ import org.slf4j.LoggerFactory;
  * how it works, and how it is integrated with the Ozone client.
  */
 public class XceiverClientGrpc extends XceiverClientSpi {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(XceiverClientGrpc.class);
+  private static final Logger LOG = LoggerFactory.getLogger(XceiverClientGrpc.class);
+  private static final int SHUTDOWN_WAIT_INTERVAL_MILLIS = 100;
+  private static final int SHUTDOWN_WAIT_MAX_SECONDS = 5;
   private final Pipeline pipeline;
   private final ConfigurationSource config;
   private final Map<DatanodeID, XceiverClientProtocolServiceStub> asyncStubs;
@@ -124,8 +126,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     this.semaphore =
         new Semaphore(HddsClientUtils.getMaxOutstandingRequests(config));
     this.metrics = XceiverClientManager.getXceiverClientMetrics();
-    this.channels = new HashMap<>();
-    this.asyncStubs = new HashMap<>();
+    this.channels = new ConcurrentHashMap<>();
+    this.asyncStubs = new ConcurrentHashMap<>();
     this.topologyAwareRead = config.getBoolean(
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_KEY,
         OzoneConfigKeys.OZONE_NETWORK_TOPOLOGY_AWARE_READ_DEFAULT);
@@ -158,7 +160,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     connectToDatanode(dn);
   }
 
-  private synchronized void connectToDatanode(DatanodeDetails dn)
+  private void connectToDatanode(DatanodeDetails dn)
       throws IOException {
     if (isConnected(dn)) {
       return;
@@ -171,15 +173,14 @@ public class XceiverClientGrpc extends XceiverClientSpi {
           OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
     }
 
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Connecting to server : {}; nodes in pipeline : {}, ",
-          dn, pipeline.getNodes());
-    }
+    LOG.debug("Connecting to server : {}; nodes in pipeline : {}, ", dn, pipeline.getNodes());
+
     ManagedChannel channel = createChannel(dn, port).build();
-    XceiverClientProtocolServiceStub asyncStub =
-        XceiverClientProtocolServiceGrpc.newStub(channel);
-    asyncStubs.put(dn.getID(), asyncStub);
-    channels.put(dn.getID(), channel);
+    XceiverClientProtocolServiceStub asyncStub = XceiverClientProtocolServiceGrpc.newStub(channel);
+    synchronized (this) {
+      asyncStubs.put(dn.getID(), asyncStub);
+      channels.put(dn.getID(), channel);
+    }
   }
 
   protected NettyChannelBuilder createChannel(DatanodeDetails dn, int port)
@@ -235,23 +236,38 @@ public class XceiverClientGrpc extends XceiverClientSpi {
    * Closes all the communication channels of the client one-by-one.
    * When a channel is closed, no further requests can be sent via the channel,
    * and the method waits to finish all ongoing communication.
-   *
-   * Note: the method wait 1 hour per channel tops and if that is not enough
-   * to finish ongoing communication, then interrupts the connection anyway.
    */
   @Override
-  public synchronized void close() {
+  public void close() {
     closed = true;
     for (ManagedChannel channel : channels.values()) {
-      channel.shutdownNow();
-      try {
-        channel.awaitTermination(60, TimeUnit.MINUTES);
-      } catch (InterruptedException e) {
-        LOG.error("InterruptedException while waiting for channel termination",
-            e);
-        // Re-interrupt the thread while catching InterruptedException
-        Thread.currentThread().interrupt();
+      channel.shutdown();
+    }
+
+    final long maxWaitNanos = TimeUnit.SECONDS.toNanos(SHUTDOWN_WAIT_MAX_SECONDS);
+    long deadline = System.nanoTime() + maxWaitNanos;
+    List<ManagedChannel> nonTerminatedChannels = new ArrayList<>(channels.values());
+
+    while (!nonTerminatedChannels.isEmpty() && System.nanoTime() < deadline) {
+      nonTerminatedChannels.removeIf(ManagedChannel::isTerminated);
+      if (nonTerminatedChannels.isEmpty()) {
+        break;
       }
+      try {
+        Thread.sleep(SHUTDOWN_WAIT_INTERVAL_MILLIS);
+      } catch (InterruptedException e) {
+        LOG.error("Interrupted while waiting for channels to terminate", e);
+        Thread.currentThread().interrupt();
+        break;
+      }
+    }
+
+    if (!nonTerminatedChannels.isEmpty()) {
+      List<DatanodeID> failedChannels = channels.entrySet().stream()
+          .filter(e -> !e.getValue().isTerminated())
+          .map(Map.Entry::getKey)
+          .collect(Collectors.toList());
+      LOG.warn("Channels {} did not terminate within timeout.", failedChannels);
     }
   }
 
@@ -694,7 +710,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     return new XceiverClientReply(replyFuture);
   }
 
-  private synchronized void checkOpen(DatanodeDetails dn)
+  private void checkOpen(DatanodeDetails dn)
       throws IOException {
     if (closed) {
       throw new IOException("This channel is not connected.");
