@@ -68,6 +68,10 @@ public enum OMLayoutFeature implements LayoutFeature {
   }
 
   public void addAction(OmUpgradeAction upgradeAction) {
+    // Required by SpotBugs since this setter exists in an enum.
+    if (this.action != null) {
+      throw new IllegalStateException("Action already set for " + name());
+    }
     this.action = upgradeAction;
   }
 

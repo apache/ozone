@@ -57,10 +57,19 @@ public enum HDDSLayoutFeature implements LayoutFeature {
   }
 
   public void addScmAction(HDDSUpgradeAction action) {
+    // Required by SpotBugs since this setter exists in an enum.
+    if (this.scmAction != null) {
+      throw new IllegalStateException("SCM action already set for " + name());
+    }
     this.scmAction = action;
   }
 
   public void addDatanodeAction(HDDSUpgradeAction action) {
+    // Required by SpotBugs since this setter exists in an enum.
+    if (this.datanodeAction != null) {
+      throw new IllegalStateException(
+          "Datanode action already set for " + name());
+    }
     this.datanodeAction = action;
   }
 

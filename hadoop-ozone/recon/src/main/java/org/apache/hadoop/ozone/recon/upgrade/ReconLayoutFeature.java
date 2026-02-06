@@ -68,6 +68,10 @@ public enum ReconLayoutFeature {
    * @param upgradeAction The upgrade action to associate with this feature.
    */
   public void addAction(ReconUpgradeAction upgradeAction) {
+    // Required by SpotBugs since this setter exists in an enum.
+    if (this.action != null) {
+      throw new IllegalStateException("Action already set for " + name());
+    }
     this.action = upgradeAction;
   }
 
