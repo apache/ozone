@@ -210,4 +210,14 @@ public interface ContainerStateManager {
    */
   void reinitialize(Table<ContainerID, ContainerInfo> containerStore)
       throws IOException;
+
+  /**
+   * Update container info.
+   *
+   * @param containerInfo Updated container info proto
+   * @throws IOException
+   */
+  @Replicate
+  void updateContainerInfo(HddsProtos.ContainerInfoProto containerInfo)
+      throws IOException;
 }

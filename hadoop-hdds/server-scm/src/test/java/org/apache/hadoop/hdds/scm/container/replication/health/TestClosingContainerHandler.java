@@ -213,7 +213,7 @@ public class TestClosingContainerHandler {
   @Test
   public void testClosingContainerStateIsUpdatedWhenThereAreNotReplicas() {
     ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
-        RATIS_REPLICATION_CONFIG, 1, CLOSING);
+        RATIS_REPLICATION_CONFIG, 1, CLOSING, 1, 10);
     Set<ContainerReplica> containerReplicas = new HashSet<>();
     ReplicationManagerReport report = new ReplicationManagerReport(rmConf.getContainerSampleLimit());
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()

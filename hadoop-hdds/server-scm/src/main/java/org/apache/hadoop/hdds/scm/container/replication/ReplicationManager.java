@@ -61,6 +61,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.replication.health.AcknowledgedMissingContainerHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.ClosedWithUnhealthyReplicasHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.ClosingContainerHandler;
 import org.apache.hadoop.hdds.scm.container.replication.health.DeletingContainerHandler;
@@ -269,6 +270,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         .addNext(new MismatchedReplicasHandler(this))
         .addNext(new EmptyContainerHandler(this))
         .addNext(new DeletingContainerHandler(this))
+        .addNext(new AcknowledgedMissingContainerHandler())
         .addNext(new QuasiClosedStuckReplicationCheck())
         .addNext(ecReplicationCheckHandler)
         .addNext(ratisReplicationCheckHandler)
