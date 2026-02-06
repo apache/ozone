@@ -111,16 +111,18 @@ public class OzoneManagerStarter extends GenericCli implements Callable<Void> {
   @CommandLine.Command(name = "--upgrade",
       aliases = "--downgrade",
       customSynopsis = "ozone om [global options] --upgrade",
-      description = "Cancels prepare state in this OM on startup",
+      description = "Deprecated. Starts OM normally. Kept for backward compatibility.",
+      hidden = true,
       mixinStandardHelpOptions = true,
       versionProvider = HddsVersionProvider.class)
   public void startOmUpgrade() throws Exception {
     try {
       commonInit();
-      receiver.startAndCancelPrepare(conf);
+      // These flags are deprecated and no longer have special behavior.
+      // Just start OM normally for backward compatibility.
+      receiver.start(conf);
     } catch (Exception ex) {
-      LOG.error("Cancelling prepare to start OM in upgrade mode failed " +
-          "with exception", ex);
+      LOG.error("Starting OM failed with exception", ex);
       throw ex;
     }
   }
@@ -220,16 +222,6 @@ public class OzoneManagerStarter extends GenericCli implements Callable<Void> {
       }
       // Bootstrap the OM
       try (OzoneManager om = OzoneManager.createOm(conf, startupOption)) {
-        om.start();
-        om.join();
-      }
-    }
-
-    @Override
-    public void startAndCancelPrepare(OzoneConfiguration conf)
-        throws IOException, AuthenticationException {
-      try (OzoneManager om = OzoneManager.createOm(conf)) {
-        om.getPrepareState().cancelPrepare();
         om.start();
         om.join();
       }

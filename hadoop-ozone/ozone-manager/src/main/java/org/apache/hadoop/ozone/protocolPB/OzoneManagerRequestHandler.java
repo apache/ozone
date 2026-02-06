@@ -62,7 +62,6 @@ import org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
@@ -100,6 +99,7 @@ import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelPrepareResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelSnapshotDiffRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CancelSnapshotDiffResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CheckVolumeAccessRequest;
@@ -141,6 +141,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Multipa
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneFileStatusProto;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrintCompactionLogDagRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrintCompactionLogDagResponse;
@@ -300,6 +301,21 @@ public class OzoneManagerRequestHandler implements RequestHandler {
       case PrepareStatus:
         PrepareStatusResponse prepareStatusResponse = getPrepareStatus();
         responseBuilder.setPrepareStatusResponse(prepareStatusResponse);
+        break;
+      case Prepare:
+        // Prepare is no longer functional but return success for backward compatibility
+        PrepareResponse prepareResponse = PrepareResponse.newBuilder()
+            .setTxnID(0)  // Dummy transaction ID
+            .build();
+        responseBuilder.setPrepareResponse(prepareResponse);
+        responseBuilder.setMessage("Prepare is no longer required in this version");
+        break;
+      case CancelPrepare:
+        // CancelPrepare is no longer functional but return success for backward compatibility
+        CancelPrepareResponse cancelPrepareResponse = CancelPrepareResponse.newBuilder()
+            .build();
+        responseBuilder.setCancelPrepareResponse(cancelPrepareResponse);
+        responseBuilder.setMessage("Prepare is no longer required in this version");
         break;
       case GetS3VolumeContext:
         GetS3VolumeContextResponse s3VolumeContextResponse =
@@ -1372,11 +1388,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   private PrepareStatusResponse getPrepareStatus() {
-    OzoneManagerPrepareState.State prepareState =
-        impl.getPrepareState().getState();
+    // Prepare is no longer used, always return NOT_PREPARED
     return PrepareStatusResponse.newBuilder()
-        .setStatus(prepareState.getStatus())
-        .setCurrentTxnIndex(prepareState.getIndex()).build();
+        .setStatus(PrepareStatusResponse.PrepareStatus.NOT_PREPARED)
+        .setCurrentTxnIndex(0).build();
   }
 
   private GetS3VolumeContextResponse getS3VolumeContext()

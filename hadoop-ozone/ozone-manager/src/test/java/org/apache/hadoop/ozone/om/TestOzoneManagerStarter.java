@@ -109,18 +109,6 @@ public class TestOzoneManagerStarter {
   }
 
   @Test
-  public void testCallsStartAndCancelPrepareWithUpgradeFlag() {
-    assertEquals(OK, executeCommand("--upgrade"));
-    assertTrue(mock.startAndCancelPrepareCalled);
-  }
-
-  @Test
-  public void testUnsuccessfulUpgradeThrowsException() {
-    mock.throwOnStartAndCancelPrepare = true;
-    assertEquals(EXECUTION_ERROR_EXIT_CODE, executeCommand("--upgrade"));
-  }
-
-  @Test
   public void testUsagePrintedOnInvalidInput()
       throws UnsupportedEncodingException {
     assertEquals(USAGE, executeCommand("--invalid"));
@@ -140,8 +128,6 @@ public class TestOzoneManagerStarter {
     private boolean initStatus = true;
     private boolean throwOnStart = false;
     private boolean throwOnInit = false;
-    private boolean startAndCancelPrepareCalled = false;
-    private boolean throwOnStartAndCancelPrepare = false;
 
     @Override
     public void start(OzoneConfiguration conf) throws IOException,
@@ -166,15 +152,6 @@ public class TestOzoneManagerStarter {
     public void bootstrap(OzoneConfiguration conf, boolean force)
         throws IOException, AuthenticationException {
       //TODO: Add test for bootstrap
-    }
-
-    @Override
-    public void startAndCancelPrepare(OzoneConfiguration conf)
-        throws IOException, AuthenticationException {
-      startAndCancelPrepareCalled = true;
-      if (throwOnStartAndCancelPrepare) {
-        throw new IOException("Simulated Exception");
-      }
     }
   }
 }

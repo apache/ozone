@@ -18,11 +18,9 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
-import static org.apache.hadoop.ozone.om.OMUpgradeTestUtils.assertClusterPrepared;
 import static org.apache.hadoop.ozone.om.OMUpgradeTestUtils.waitForFinalization;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.maxLayoutVersion;
-import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -30,7 +28,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
@@ -39,9 +36,7 @@ import org.apache.hadoop.ozone.audit.AuditLogTestUtils;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.om.ratis.OzoneManagerStateMachine;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
-import org.apache.ratis.util.LifeCycle;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -81,14 +76,7 @@ class TestOMUpgradeFinalization {
 
         OzoneManagerProtocol omClient = client.getObjectStore().getClientProxy()
             .getOzoneManagerClient();
-        // Have to do a "prepare" operation to get rid of the logs in the active
-        // OMs.
-        long prepareIndex = omClient.prepareOzoneManager(120L, 5L);
-        assertClusterPrepared(prepareIndex, runningOms);
-        AuditLogTestUtils.verifyAuditLog(OMAction.UPGRADE_PREPARE, AuditEventStatus.SUCCESS);
-
-        omClient.cancelOzoneManagerPrepare();
-        AuditLogTestUtils.verifyAuditLog(OMAction.UPGRADE_CANCEL, AuditEventStatus.SUCCESS);
+        
         StatusAndMessages response =
             omClient.finalizeUpgrade("finalize-test");
         System.out.println("Finalization Messages : " + response.msgs());
@@ -96,19 +84,6 @@ class TestOMUpgradeFinalization {
 
         waitForFinalization(omClient);
         cluster.restartOzoneManager(downedOM, true);
-
-        OzoneManagerStateMachine omStateMachine = downedOM.getOmRatisServer()
-            .getOmStateMachine();
-        try {
-          waitFor(() -> omStateMachine.getLifeCycleState().isPausingOrPaused(),
-              1000, 60000);
-        } catch (TimeoutException timeEx) {
-          assertEquals(LifeCycle.State.RUNNING,
-              omStateMachine.getLifeCycle().getCurrentState());
-        }
-
-        waitFor(() -> !omStateMachine.getLifeCycle().getCurrentState()
-            .isPausingOrPaused(), 1000, 60000);
 
         assertEquals(maxLayoutVersion(),
             downedOM.getVersionManager().getMetadataLayoutVersion());

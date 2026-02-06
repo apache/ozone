@@ -71,7 +71,6 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmMetadataReader;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.ScmClient;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -110,7 +109,6 @@ public class TestOMKeyRequest {
   protected OMMetrics omMetrics;
   protected OMMetadataManager omMetadataManager;
   protected AuditLogger auditLogger;
-  protected OzoneManagerPrepareState prepareState;
 
   protected ScmClient scmClient;
   protected OzoneBlockTokenSecretManager ozoneBlockTokenSecretManager;
@@ -203,9 +201,6 @@ public class TestOMKeyRequest {
     OmMetadataReader omMetadataReader = mock(OmMetadataReader.class);
     when(omMetadataReader.isNativeAuthorizerEnabled()).thenReturn(true);
     when(rcOmMetadataReader.get()).thenReturn(omMetadataReader);
-
-    prepareState = new OzoneManagerPrepareState(ozoneConfiguration);
-    when(ozoneManager.getPrepareState()).thenReturn(prepareState);
 
     Pipeline pipeline = Pipeline.newBuilder()
         .setState(Pipeline.PipelineState.OPEN)

@@ -40,11 +40,8 @@ import picocli.CommandLine;
  */
 @CommandLine.Command(
     name = "prepare",
-    description = "Prepares Ozone Manager for upgrade/downgrade, by applying " +
-        "all pending transactions, taking a Ratis snapshot at the last " +
-        "transaction and purging all logs on each OM instance. The returned " +
-        "transaction #ID corresponds to the last transaction in the quorum in" +
-        " which the snapshot is taken.",
+    description = "Deprecated. Kept for backward compatibility with older server versions.",
+    hidden = true,
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class
 )
