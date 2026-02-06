@@ -86,7 +86,7 @@ import org.slf4j.LoggerFactory;
  */
 public class XceiverClientGrpc extends XceiverClientSpi {
   private static final Logger LOG = LoggerFactory.getLogger(XceiverClientGrpc.class);
-  private static final int SHUTDOWN_WAIT_INTERVAL = 100;
+  private static final int SHUTDOWN_WAIT_INTERVAL_MILLIS = 100;
   private static final int SHUTDOWN_WAIT_MAX_SECONDS = 5;
   private final Pipeline pipeline;
   private final ConfigurationSource config;
@@ -251,15 +251,15 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
     while (!nonTerminatedChannels.isEmpty() && System.nanoTime() < deadline) {
       nonTerminatedChannels.removeIf(ManagedChannel::isTerminated);
-
+      if (nonTerminatedChannels.isEmpty()) {
+        break;
+      }
       try {
-        if (!nonTerminatedChannels.isEmpty()) {
-          ManagedChannel channel = nonTerminatedChannels.get(0);
-          channel.awaitTermination(SHUTDOWN_WAIT_INTERVAL, TimeUnit.MILLISECONDS);
-        }
+        Thread.sleep(SHUTDOWN_WAIT_INTERVAL_MILLIS);
       } catch (InterruptedException e) {
         LOG.error("Interrupted while waiting for channels to terminate", e);
         Thread.currentThread().interrupt();
+        break;
       }
     }
 
