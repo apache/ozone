@@ -32,10 +32,11 @@ package hadoop.hdds.datanode;
 
 /**
  Commands that are used to manipulate the state of containers on a datanode.
- These commands allow us to work against the datanode - from StorageContainerManager as well as clients.
+ These commands allow us to work against the datanode from clients.
  */
 enum Type {
-  // This call is usually made by Storage Container manager, when we need to create a new container on a given datanode.
+  // This call is usually made by clients who will create a container
+  // which does not already exist with the first chunk write to that container.
   CreateContainer = 1;
   // Allows end user to stat a container. For example this allows us to return the metadata of a container.
   ReadContainer = 2;
