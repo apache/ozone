@@ -34,6 +34,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -84,8 +85,9 @@ import org.slf4j.LoggerFactory;
  * how it works, and how it is integrated with the Ozone client.
  */
 public class XceiverClientGrpc extends XceiverClientSpi {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(XceiverClientGrpc.class);
+  private static final Logger LOG = LoggerFactory.getLogger(XceiverClientGrpc.class);
+  private static final int SHUTDOWN_WAIT_INTERVAL_MILLIS = 100;
+  private static final int SHUTDOWN_WAIT_MAX_SECONDS = 5;
   private final Pipeline pipeline;
   private final ConfigurationSource config;
   private final Map<DatanodeID, XceiverClientProtocolServiceStub> asyncStubs;
@@ -235,23 +237,38 @@ public class XceiverClientGrpc extends XceiverClientSpi {
    * Closes all the communication channels of the client one-by-one.
    * When a channel is closed, no further requests can be sent via the channel,
    * and the method waits to finish all ongoing communication.
-   *
-   * Note: the method wait 1 hour per channel tops and if that is not enough
-   * to finish ongoing communication, then interrupts the connection anyway.
    */
   @Override
   public synchronized void close() {
     closed = true;
     for (ManagedChannel channel : channels.values()) {
-      channel.shutdownNow();
-      try {
-        channel.awaitTermination(60, TimeUnit.MINUTES);
-      } catch (InterruptedException e) {
-        LOG.error("InterruptedException while waiting for channel termination",
-            e);
-        // Re-interrupt the thread while catching InterruptedException
-        Thread.currentThread().interrupt();
+      channel.shutdown();
+    }
+
+    final long maxWaitNanos = TimeUnit.SECONDS.toNanos(SHUTDOWN_WAIT_MAX_SECONDS);
+    long deadline = System.nanoTime() + maxWaitNanos;
+    List<ManagedChannel> nonTerminatedChannels = new ArrayList<>(channels.values());
+
+    while (!nonTerminatedChannels.isEmpty() && System.nanoTime() < deadline) {
+      nonTerminatedChannels.removeIf(ManagedChannel::isTerminated);
+      if (nonTerminatedChannels.isEmpty()) {
+        break;
       }
+      try {
+        Thread.sleep(SHUTDOWN_WAIT_INTERVAL_MILLIS);
+      } catch (InterruptedException e) {
+        LOG.error("Interrupted while waiting for channels to terminate", e);
+        Thread.currentThread().interrupt();
+        break;
+      }
+    }
+
+    if (!nonTerminatedChannels.isEmpty()) {
+      List<DatanodeID> failedChannels = channels.entrySet().stream()
+          .filter(e -> !e.getValue().isTerminated())
+          .map(Map.Entry::getKey)
+          .collect(Collectors.toList());
+      LOG.warn("Channels {} did not terminate within timeout.", failedChannels);
     }
   }
 
