@@ -66,8 +66,6 @@ public class DefaultUpgradeFinalizationExecutor<T>
   protected void finalizeFeatures(T component,
       BasicUpgradeFinalizer<T, ?> finalizer,  Iterable<LayoutFeature> lfs)
       throws UpgradeException {
-    for (LayoutFeature lf: lfs) {
-      finalizer.finalizeLayoutFeature(lf, component);
-    }
+    finalizer.finalizeLayoutFeatures(lfs, component);
   }
 }
