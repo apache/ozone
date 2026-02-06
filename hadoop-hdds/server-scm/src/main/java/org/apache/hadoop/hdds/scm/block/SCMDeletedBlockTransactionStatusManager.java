@@ -428,9 +428,9 @@ public class SCMDeletedBlockTransactionStatusManager {
       initDataDistributionData();
     } catch (IOException e) {
       LOG.warn("Failed to initialize Storage space distribution data. The feature will continue with current " +
-              "totalBlockCount {}, totalBlockCount {}, totalBlocksSize {} and totalReplicatedBlocksSize {}. " +
-              "There is a high chance that the real data and current data has a fixed gap.",
-          totalBlockCount.get(), totalBlocksSize.get(), totalBlocksSize.get(), totalReplicatedBlocksSize.get());
+              "totalTxCount {}, totalBlockCount {}, totalBlocksSize {} and totalReplicatedBlocksSize {}. " +
+              "There is a high chance that the real data and current data has a gap.",
+          totalTxCount.get(), totalBlockCount.get(), totalBlocksSize.get(), totalReplicatedBlocksSize.get());
     }
   }
 
