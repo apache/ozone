@@ -32,7 +32,6 @@ import java.nio.ByteBuffer;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -234,10 +233,8 @@ public class TestRDBBatchOperation {
                       string2Bytes(key2)));
               performDeleteRange(withBatchTable, batchOperation, withoutBatchTable, key.get(0), key.get(1));
             });
-        Map<Integer, Integer> cntMap = new HashMap<>();
         for (int i = 0; i < 30000; i++) {
           int opIdx = opProbMap.higherEntry(ThreadLocalRandom.current().nextDouble()).getValue();
-          cntMap.compute(opIdx, (k, v) -> v == null ? 1 : (v + 1));
           CheckedConsumer<List<String>, IOException> op = ops.get(opIdx);
           int numberOfKeys = opIdxToNumKeyMap.getOrDefault(opIdx, 1);
           boolean performWithPreExistingKey = ThreadLocalRandom.current().nextBoolean();
