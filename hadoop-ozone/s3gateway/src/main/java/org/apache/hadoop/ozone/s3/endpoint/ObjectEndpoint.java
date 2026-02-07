@@ -365,14 +365,12 @@ public class ObjectEndpoint extends ObjectOperationHandler {
    * https://docs.aws.amazon.com/AmazonS3/latest/API/mpUploadListParts.html
    * for more details.
    */
-  @SuppressWarnings("checkstyle:MethodLength")
   @GET
   public Response get(
       @PathParam(BUCKET) String bucketName,
       @PathParam(PATH) String keyPath
   ) throws IOException, OS3Exception {
-    ObjectRequestContext context =
-        new ObjectRequestContext(S3GAction.GET_KEY, bucketName);
+    ObjectRequestContext context = new ObjectRequestContext(S3GAction.GET_KEY, bucketName);
     try {
       return handler.handleGetRequest(context, keyPath);
     } catch (OMException ex) {
@@ -389,7 +387,6 @@ public class ObjectEndpoint extends ObjectOperationHandler {
   }
 
   @Override
-  @SuppressWarnings("checkstyle:MethodLength")
   Response handleGetRequest(ObjectRequestContext context, String keyPath)
       throws IOException, OS3Exception {
 
@@ -676,8 +673,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       @PathParam(BUCKET) String bucketName,
       @PathParam(PATH) String keyPath
   ) throws IOException, OS3Exception {
-    ObjectRequestContext context =
-        new ObjectRequestContext(S3GAction.DELETE_KEY, bucketName);
+    ObjectRequestContext context = new ObjectRequestContext(S3GAction.DELETE_KEY, bucketName);
     try {
       return handler.handleDeleteRequest(context, keyPath);
     } catch (OMException ex) {
@@ -717,9 +713,8 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       if (uploadId != null && !uploadId.isEmpty()) {
         context.setAction(S3GAction.ABORT_MULTIPART_UPLOAD);
-        Response r = abortMultipartUpload(volume, bucketName, keyPath, uploadId);
 
-        return r;
+        return abortMultipartUpload(volume, bucketName, keyPath, uploadId);
       }
 
       getClientProtocol().deleteKey(volume.getName(), context.getBucketName(), keyPath, false);

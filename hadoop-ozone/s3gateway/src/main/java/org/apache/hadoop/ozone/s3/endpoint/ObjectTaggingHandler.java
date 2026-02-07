@@ -76,15 +76,21 @@ class ObjectTaggingHandler extends ObjectOperationHandler {
     }
     try {
       context.getBucket().deleteObjectTagging(keyName);
+      getMetrics().updateDeleteObjectTaggingSuccessStats(context.getStartNanos());
+      return Response.noContent().build();
     } catch (OMException ex) {
       getMetrics().updateDeleteObjectTaggingFailureStats(context.getStartNanos());
+
+      // Unlike normal key deletion that ignores the key not found exception,
+      // DeleteObjectTagging should throw the exception if the key does not exist
       if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
         throw S3ErrorTable.newError(S3ErrorTable.NO_SUCH_KEY, keyName);
       }
       throw ex;
+    } catch (IOException | RuntimeException ex) {
+      getMetrics().updateDeleteObjectTaggingFailureStats(context.getStartNanos());
+      throw ex;
     }
-    getMetrics().updateDeleteObjectTaggingSuccessStats(context.getStartNanos());
-    return Response.noContent().build();
   }
 
   @Override
