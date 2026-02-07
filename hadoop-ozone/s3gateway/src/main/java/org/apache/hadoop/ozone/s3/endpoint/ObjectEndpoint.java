@@ -1102,6 +1102,9 @@ public class ObjectEndpoint extends ObjectOperationHandler {
             bucketName + "/" + key + "/" + uploadID, ex);
       }
       throw ex;
+    } catch (IOException | RuntimeException ex) {
+      getMetrics().updateListPartsFailureStats(startNanos);
+      throw ex;
     }
     long opLatencyNs = getMetrics().updateListPartsSuccessStats(startNanos);
     perf.appendCount(listPartsResponse.getPartList().size());
