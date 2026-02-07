@@ -109,6 +109,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   private ReconOMMetadataManager reconOMMetadataManager;
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private OMDBInsightEndpoint omdbInsightEndpoint;
+  private ReconTestInjector reconTestInjector;
   private Pipeline pipeline;
   private Random random = new Random();
   private OzoneConfiguration ozoneConfiguration;
@@ -297,7 +298,7 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
     reconOMMetadataManager = getTestReconOmMetadataManager(omMetadataManager,
         Files.createDirectory(temporaryFolder.resolve(
             "JunitOmMetadataTest")).toFile());
-    ReconTestInjector reconTestInjector =
+    reconTestInjector =
         new ReconTestInjector.Builder(temporaryFolder.toFile())
             .withReconSqlDb()
             .withReconOm(reconOMMetadataManager)
@@ -347,6 +348,9 @@ public class TestOmDBInsightEndPoint extends AbstractReconSqlDBTest {
   public void tearDown() throws Exception {
     if (reconOMMetadataManager != null) {
       reconOMMetadataManager.stop();
+    }
+    if (reconTestInjector != null) {
+      reconTestInjector.close();
     }
   }
 
