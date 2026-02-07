@@ -95,4 +95,46 @@ public class TestSCMRatisProtocolCompatibility {
     assertEquals("java.lang.String", proto3.getType());
     assertEquals(ByteString.copyFromUtf8("ok"), proto3.getValue());
   }
+
+  /**
+   * Verifies that messages encoded with the current proto3 schema
+   * can be parsed by the legacy proto2 schema.
+   */
+  @Test
+  public void testProto3RequestCanBeParsedByProto2() throws Exception {
+    // Build request using proto3 (production schema)
+    SCMRatisProtocol.MethodArgument arg =
+        SCMRatisProtocol.MethodArgument.newBuilder()
+            .setType("java.lang.String")
+            .setValue(ByteString.copyFromUtf8("v"))
+            .build();
+
+    SCMRatisProtocol.Method method =
+        SCMRatisProtocol.Method.newBuilder()
+            .setName("testOp")
+            .addArgs(arg)
+            .build();
+
+    SCMRatisProtocol.SCMRatisRequestProto proto3 =
+        SCMRatisProtocol.SCMRatisRequestProto.newBuilder()
+            .setType(SCMRatisProtocol.RequestType.PIPELINE)
+            .setMethod(method)
+            .build();
+
+    byte[] bytes = proto3.toByteArray();
+
+    // Parse using legacy proto2 (test-only schema)
+    Proto2SCMRatisProtocolForTesting.SCMRatisRequestProto proto2 =
+        Proto2SCMRatisProtocolForTesting.SCMRatisRequestProto.parseFrom(bytes);
+
+    // Validate parsed values
+    assertEquals(
+        Proto2SCMRatisProtocolForTesting.RequestType.PIPELINE,
+        proto2.getType());
+    assertTrue(proto2.hasMethod());
+    assertEquals("testOp", proto2.getMethod().getName());
+    assertEquals(1, proto2.getMethod().getArgsCount());
+    assertEquals("java.lang.String", proto2.getMethod().getArgs(0).getType());
+    assertEquals(ByteString.copyFromUtf8("v"), proto2.getMethod().getArgs(0).getValue());
+  }
 }
