@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.utils.db;
 import static org.apache.hadoop.ozone.OzoneConsts.COMPACTION_LOG_TABLE;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_LOG_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_COMPACTION_SST_BACKUP_DIR;
+import static org.apache.hadoop.ozone.OzoneConsts.FLUSH_LOG_TABLE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_SNAPSHOT_CHECKPOINT_DIR;
@@ -167,6 +168,13 @@ public class RDBStore implements DBStore {
             "CompactionLogTable column family handle should not be null.");
         rocksDBCheckpointDiffer.setCompactionLogTableCFHandle(
             compactionLogTableCF.getHandle());
+        // Set CF handle in differ to store flush log entry.
+        ColumnFamily flushLogTableCF =
+            db.getColumnFamily(FLUSH_LOG_TABLE);
+        Objects.requireNonNull(flushLogTableCF,
+            "FlushLogTable column family handle should not be null.");
+        rocksDBCheckpointDiffer.setFlushLogTableCFHandle(
+            flushLogTableCF.getHandle());
         // Set activeRocksDB in differ to access compaction log CF.
         rocksDBCheckpointDiffer.setActiveRocksDB(db.getManagedRocksDb());
         // Load all previous compaction logs
