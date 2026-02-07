@@ -49,7 +49,7 @@
     <classpath.skip>true</classpath.skip>
     <codahale-metrics.version>3.0.2</codahale-metrics.version>
     <com.nimbusds.nimbus-jose-jwt.version>10.4</com.nimbusds.nimbus-jose-jwt.version>
-    <common-pool2.version>2.12.1</common-pool2.version>
+    <common-pool2.version>2.13.1</common-pool2.version>
     <commons-beanutils.version>1.11.0</commons-beanutils.version>
     <commons-cli.version>1.8.0</commons-cli.version>
     <commons-codec.version>1.18.0</commons-codec.version>
