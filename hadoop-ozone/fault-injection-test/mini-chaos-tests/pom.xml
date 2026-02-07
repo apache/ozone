@@ -25,6 +25,10 @@
   <name>Apache Ozone Mini Ozone Chaos Tests</name>
   <description>Apache Ozone Mini Ozone Chaos Tests</description>
 
+  <properties>
+    <maven.compiler.release>${ozone.server.java.version}</maven.compiler.release>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>info.picocli</groupId>

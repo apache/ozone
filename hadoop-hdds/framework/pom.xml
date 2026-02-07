@@ -25,6 +25,10 @@
   <name>Apache Ozone HDDS Server Framework</name>
   <description>Apache Ozone Distributed Data Store Server Framework</description>
 
+  <properties>
+    <maven.compiler.release>${ozone.server.java.version}</maven.compiler.release>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>ch.qos.reload4j</groupId>
