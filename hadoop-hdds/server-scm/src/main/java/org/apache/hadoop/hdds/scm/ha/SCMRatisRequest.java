@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.ha;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.TextFormat;
+import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.Method;
@@ -111,9 +112,10 @@ public final class SCMRatisRequest {
     }
     methodBuilder.addAllArgs(args);
     requestProtoBuilder.setMethod(methodBuilder.build());
+    final SCMRatisRequestProto requestProto = requestProtoBuilder.build();
     return Message.valueOf(
-        org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFrom(
-            requestProtoBuilder.build().toByteArray()));
+        UnsafeByteOperations.unsafeWrap(
+            requestProto.toByteString().asReadOnlyByteBuffer()));
   }
 
   /**
@@ -122,7 +124,7 @@ public final class SCMRatisRequest {
   public static SCMRatisRequest decode(Message message)
       throws InvalidProtocolBufferException {
     final SCMRatisRequestProto requestProto =
-        SCMRatisRequestProto.parseFrom(message.getContent().toByteArray());
+        SCMRatisRequestProto.parseFrom(message.getContent().asReadOnlyByteBuffer());
 
     // proto2 required-equivalent checks
     if (!requestProto.hasType()) {
@@ -173,7 +175,7 @@ public final class SCMRatisRequest {
     StringBuilder builder = new StringBuilder();
     try {
       builder.append(TextFormat.shortDebugString(
-          SCMRatisRequestProto.parseFrom(proto.getLogData().toByteArray())));
+          SCMRatisRequestProto.parseFrom(proto.getLogData().asReadOnlyByteBuffer())));
     } catch (Throwable ex) {
       LOG.error("smProtoToString failed", ex);
       builder.append("smProtoToString failed with");

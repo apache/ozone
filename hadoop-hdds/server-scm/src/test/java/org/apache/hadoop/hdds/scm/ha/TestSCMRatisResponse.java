@@ -108,8 +108,8 @@ public class TestSCMRatisResponse {
     RaftClientReply reply = mock(RaftClientReply.class);
     when(reply.isSuccess()).thenReturn(true);
     when(reply.getMessage()).thenReturn(Message.valueOf(
-        org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFrom(
-            proto.toByteArray())));
+        org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations
+            .unsafeWrap(proto.toByteString().asReadOnlyByteBuffer())));
 
     InvalidProtocolBufferException ex = assertThrows(
         InvalidProtocolBufferException.class,
@@ -130,8 +130,8 @@ public class TestSCMRatisResponse {
     RaftClientReply reply = mock(RaftClientReply.class);
     when(reply.isSuccess()).thenReturn(true);
     when(reply.getMessage()).thenReturn(Message.valueOf(
-        org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFrom(
-            proto.toByteArray())));
+        org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations
+            .unsafeWrap(proto.toByteString().asReadOnlyByteBuffer())));
 
     InvalidProtocolBufferException ex = assertThrows(
         InvalidProtocolBufferException.class,

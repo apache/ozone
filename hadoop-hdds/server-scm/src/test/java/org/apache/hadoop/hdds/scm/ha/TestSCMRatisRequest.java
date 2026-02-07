@@ -105,8 +105,8 @@ public class TestSCMRatisRequest {
             .build();
 
     Message msg = Message.valueOf(
-        org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFrom(
-            proto.toByteArray()));
+        org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations
+            .unsafeWrap(proto.toByteString().asReadOnlyByteBuffer()));
 
     InvalidProtocolBufferException ex = assertThrows(
         InvalidProtocolBufferException.class,
@@ -124,8 +124,8 @@ public class TestSCMRatisRequest {
             .build();
 
     Message msg = Message.valueOf(
-        org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFrom(
-            proto.toByteArray()));
+        org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations
+            .unsafeWrap(proto.toByteString().asReadOnlyByteBuffer()));
 
     InvalidProtocolBufferException ex = assertThrows(
         InvalidProtocolBufferException.class,
@@ -145,8 +145,8 @@ public class TestSCMRatisRequest {
             .build();
 
     Message msg = Message.valueOf(
-        org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFrom(
-            proto.toByteArray()));
+        org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations
+            .unsafeWrap(proto.toByteString().asReadOnlyByteBuffer()));
 
     InvalidProtocolBufferException ex = assertThrows(
         InvalidProtocolBufferException.class,
@@ -173,8 +173,8 @@ public class TestSCMRatisRequest {
             .build();
 
     Message msg = Message.valueOf(
-        org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFrom(
-            proto.toByteArray()));
+        org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations
+            .unsafeWrap(proto.toByteString().asReadOnlyByteBuffer()));
 
     InvalidProtocolBufferException ex = assertThrows(
         InvalidProtocolBufferException.class,
@@ -201,8 +201,8 @@ public class TestSCMRatisRequest {
             .build();
 
     Message msg = Message.valueOf(
-        org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFrom(
-            proto.toByteArray()));
+        org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations
+            .unsafeWrap(proto.toByteString().asReadOnlyByteBuffer()));
 
     InvalidProtocolBufferException ex = assertThrows(
         InvalidProtocolBufferException.class,

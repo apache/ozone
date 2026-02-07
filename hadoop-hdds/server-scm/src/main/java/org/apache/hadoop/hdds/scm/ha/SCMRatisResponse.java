@@ -92,7 +92,7 @@ public final class SCMRatisResponse {
       return new SCMRatisResponse();
     }
 
-    final SCMRatisResponseProto responseProto = SCMRatisResponseProto.parseFrom(response.toByteArray());
+    final SCMRatisResponseProto responseProto = SCMRatisResponseProto.parseFrom(response.asReadOnlyByteBuffer());
 
     // proto2 required-equivalent checks
     if (!responseProto.hasType()) {
