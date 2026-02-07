@@ -177,6 +177,11 @@ public abstract class OMFailoverProxyProviderBase<T> implements
   }
 
   @VisibleForTesting
+  public synchronized String getNextProxyOMNodeId() {
+    return omProxies.getNodeId(nextProxyIndex);
+  }
+
+  @VisibleForTesting
   public RetryPolicy getRetryPolicy(int maxFailovers) {
     // Client will attempt up to maxFailovers number of failovers between
     // available OMs before throwing exception.
