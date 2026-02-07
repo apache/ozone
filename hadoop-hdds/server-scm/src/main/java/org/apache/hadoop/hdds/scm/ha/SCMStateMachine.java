@@ -304,6 +304,12 @@ public class SCMStateMachine extends BaseStateMachine {
         currentLeaderTerm.get());
     scm.getSequenceIdGen().invalidateBatch();
 
+    try {
+      transactionBuffer.flush();
+    } catch (Exception ex) {
+      ExitUtils.terminate(1, "Failed to flush transactionBuffer", ex, StateMachine.LOG);
+    }
+
     DeletedBlockLog deletedBlockLog = scm.getScmBlockManager()
         .getDeletedBlockLog();
     Preconditions.checkArgument(
