@@ -2320,7 +2320,7 @@
   </property>
   <property>
     <name>ozone.om.ratis.snapshot.max.total.sst.size</name>
-    <value>100000000</value>
+    <value>10737418240</value>
     <tag>OZONE, OM, RATIS</tag>
     <description>
       Max size of SST files in OM Ratis Snapshot tarball.
