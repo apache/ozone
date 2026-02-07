@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.ha;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.TextFormat;
-import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.Method;
@@ -30,6 +29,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.SCMRatisRequestPro
 import org.apache.hadoop.hdds.scm.ha.io.CodecFactory;
 import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
 import org.apache.ratis.protocol.Message;
+import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
