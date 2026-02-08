@@ -16,8 +16,6 @@
  */
 
 /**
- * This package contains class that support ozone implementation on the datanode
- * side.  Datanode container classes support persistence of ozone objects on
- * datanode. These classes live under container directory.
+ * Utility classes required for ozone.
  */
-package org.apache.hadoop.ozone;
+package org.apache.hadoop.ozone.util;
