@@ -21,8 +21,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Map;
 import javax.ws.rs.HttpMethod;
+import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.ozone.audit.S3GAction;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.s3.endpoint.ObjectEndpoint.ObjectRequestContext;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
@@ -61,6 +64,47 @@ class ObjectTaggingHandler extends ObjectOperationHandler {
       return Response.ok().build();
     } catch (Exception e) {
       getMetrics().updatePutObjectTaggingFailureStats(context.getStartNanos());
+      throw e;
+    }
+  }
+
+  @Override
+  Response handleDeleteRequest(ObjectRequestContext context, String keyName)
+      throws IOException, OS3Exception {
+    if (context.ignore(getAction())) {
+      return null;
+    }
+    try {
+      context.getBucket().deleteObjectTagging(keyName);
+      getMetrics().updateDeleteObjectTaggingSuccessStats(context.getStartNanos());
+      return Response.noContent().build();
+    } catch (OMException ex) {
+      getMetrics().updateDeleteObjectTaggingFailureStats(context.getStartNanos());
+
+      // Unlike normal key deletion that ignores the key not found exception,
+      // DeleteObjectTagging should throw the exception if the key does not exist
+      if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
+        throw S3ErrorTable.newError(S3ErrorTable.NO_SUCH_KEY, keyName);
+      }
+      throw ex;
+    } catch (IOException | RuntimeException ex) {
+      getMetrics().updateDeleteObjectTaggingFailureStats(context.getStartNanos());
+      throw ex;
+    }
+  }
+
+  @Override
+  Response handleGetRequest(ObjectRequestContext context, String keyName)
+      throws IOException, OS3Exception {
+    if (context.ignore(getAction())) {
+      return null;
+    }
+    try {
+      Map<String, String> tagMap = context.getBucket().getObjectTagging(keyName);
+      getMetrics().updateGetObjectTaggingSuccessStats(context.getStartNanos());
+      return Response.ok(S3Tagging.fromMap(tagMap), MediaType.APPLICATION_XML_TYPE).build();
+    } catch (Exception e) {
+      getMetrics().updateGetObjectTaggingFailureStats(context.getStartNanos());
       throw e;
     }
   }
