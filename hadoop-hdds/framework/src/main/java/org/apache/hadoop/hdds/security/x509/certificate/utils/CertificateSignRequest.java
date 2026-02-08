@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.security.x509.certificate.utils;
 
 import static org.apache.hadoop.hdds.security.exception.SCMSecurityException.ErrorCode.INVALID_CSR;
 import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.CSR_ERROR;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getValidInetsForCurrentHost;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
@@ -35,7 +36,6 @@ import org.apache.commons.validator.routines.DomainValidator;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.exception.SCMSecurityException;
 import org.apache.hadoop.hdds.security.x509.exception.CertificateException;
-import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.bouncycastle.asn1.ASN1EncodableVector;
 import org.bouncycastle.asn1.ASN1Object;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
@@ -294,8 +294,7 @@ public final class CertificateSignRequest {
       try {
         DomainValidator validator = DomainValidator.getInstance();
         // Add all valid ips.
-        List<InetAddress> inetAddresses =
-            OzoneSecurityUtil.getValidInetsForCurrentHost();
+        List<InetAddress> inetAddresses = getValidInetsForCurrentHost();
         this.addInetAddresses(inetAddresses, validator);
       } catch (IOException e) {
         throw new CertificateException("Error while getting Inet addresses " +
