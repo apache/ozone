@@ -419,7 +419,7 @@ public class SCMDeletedBlockTransactionStatusManager {
         .putIfAbsent(txId, new LinkedHashSet<>()));
   }
 
-  public void clear() {
+  public void onBecomeLeader() {
     transactionToRetryCountMap.clear();
     scmDeleteBlocksCommandStatusManager.clear();
     transactionToDNsCommitMap.clear();
