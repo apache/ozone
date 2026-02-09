@@ -281,6 +281,7 @@ import org.apache.hadoop.ozone.om.ratis_snapshot.OmRatisSnapshotProvider;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.s3.S3SecretCacheProvider;
 import org.apache.hadoop.ozone.om.s3.S3SecretStoreProvider;
+import org.apache.hadoop.ozone.om.service.CompactDBUtil;
 import org.apache.hadoop.ozone.om.service.CompactionService;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
@@ -5381,16 +5382,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public void compactOMDB(String columnFamily) throws IOException {
     checkAdminUserPrivilege("compact column family " + columnFamily);
-    // Use CompactionService if available, otherwise use static method for on-demand compaction
-    // The compaction happens asynchronously - we don't wait for completion
-    CompactionService compactionService = keyManager.getCompactionService();
-    if (compactionService != null) {
-      compactionService.compactTableAsync(columnFamily);
-    } else {
-      // If CompactionService is not initialized (e.g., disabled),
-      // use static method for on-demand async compaction
-      CompactionService.compactTableOnDemandAsync(this, columnFamily);
-    }
+    CompactDBUtil.compactTableAsync(metadataManager, columnFamily);
   }
 
   public OMExecutionFlow getOmExecutionFlow() {

@@ -141,54 +141,7 @@ public class CompactionService extends BackgroundService {
    * @return CompletableFuture that completes when compaction finishes
    */
   public CompletableFuture<Void> compactTableAsync(String tableName) {
-    return CompletableFuture.supplyAsync(() -> {
-      try {
-        CompactDBUtil.compactTable(omMetadataManager, tableName);
-        return null;
-      } catch (Exception e) {
-        LOG.warn("Failed to compact column family: {}", tableName, e);
-      }
-      return null;
-    });
-  }
-
-  /**
-   * Compact a specific table on-demand without requiring the table
-   * to be in the configured compaction list. This is useful for
-   * ad-hoc compaction requests (e.g., via admin RPC).
-   *
-   * @param ozoneManager the OzoneManager instance
-   * @param tableName the name of the table to compact
-   * @throws IOException if compaction fails or table is not found
-   */
-  public static void compactTableOnDemand(OzoneManager ozoneManager, String tableName)
-      throws IOException {
-    OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
-    CompactDBUtil.compactTable(omMetadataManager, tableName);
-  }
-
-  /**
-   * Compact a specific table on-demand asynchronously without requiring the table
-   * to be in the configured compaction list. This method returns immediately
-   * with a CompletableFuture that completes when the compaction finishes.
-   * This is useful for ad-hoc compaction requests (e.g., via admin RPC)
-   * where the caller doesn't need to wait for completion.
-   *
-   * @param ozoneManager the OzoneManager instance
-   * @param tableName the name of the table to compact
-   * @return CompletableFuture that completes when compaction finishes
-   */
-  public static CompletableFuture<Void> compactTableOnDemandAsync(
-      OzoneManager ozoneManager, String tableName) {
-    return CompletableFuture.supplyAsync(() -> {
-      try {
-        compactTableOnDemand(ozoneManager, tableName);
-        return null;
-      } catch (Exception e) {
-        LOG.warn("Failed to compact column family: {}", tableName, e);
-      }
-      return null;
-    });
+    return CompactDBUtil.compactTableAsync(omMetadataManager, tableName);
   }
 
   protected void compactFully(String tableName) throws IOException {

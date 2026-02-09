@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.service;
 
 import java.io.IOException;
+import java.util.concurrent.CompletableFuture;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
@@ -59,5 +60,15 @@ public final class CompactDBUtil {
         throw new IOException("Column family \"" + tableName + "\" not found.");
       }
     }
+  }
+
+  public static CompletableFuture<Void> compactTableAsync(OMMetadataManager metadataManager, String tableName) {
+    return CompletableFuture.runAsync(() -> {
+      try {
+        compactTable(metadataManager, tableName);
+      } catch (Exception e) {
+        LOG.warn("Failed to compact column family: {}", tableName, e);
+      }
+    });
   }
 }
