@@ -90,11 +90,15 @@ All metrics are aggregated, and exposed through a **RESTful API (/storagedistrib
 **Response Objects:**
 
 ##### globalStorage Object
-| Field          | Type | Description                                       |
-|----------------|------|---------------------------------------------------|
-| totalUsedSpace | Long | Total used space across all DataNodes in bytes.   |
-| totalFreeSpace | Long | Total free space across all DataNodes in bytes.   |
-| totalCapacity  | Long | Total raw capacity across all DataNodes in bytes. |
+| Field                                | Type | Description                                                                |
+|--------------------------------------|------|----------------------------------------------------------------------------|
+| totalFileSystemCapacity              | Long | Total raw capacity of filesystem across all DataNodes in bytes.            |
+| totalReservedSpace                   | Long | Total space reserved in filesystem which cannot be used by ozone           |
+| totalOzoneCapacity                   | Long | Total raw capacity across all DataNodes in bytes.                          |
+| totalOzoneUsedSpace                  | Long | Total used space across all DataNodes in bytes.                            |
+| totalOzoneFreeSpace                  | Long | Total free space across all DataNodes in bytes.                            |
+| totalOzonePreAllocatedContainerSpace | Long | Pre-allocated space for open containers.                                   |
+| totalOzoneMinimumFreeSpace           | Long | Sum of all the minium free space configured across all DataNodes in bytes. |
 
 ##### globalNamespace Object
 | Field          | Type | Description                                             |
@@ -103,11 +107,17 @@ All metrics are aggregated, and exposed through a **RESTful API (/storagedistrib
 | totalKeys      | Long | Total number of keys in the namespace.                  |
 
 ##### usedSpaceBreakdown Object
-| Field                      | Type | Description                                            |
-|----------------------------|------|--------------------------------------------------------|
-| openKeyBytes               | Long | Bytes currently held by open keys (not yet committed). |
-| committedKeyBytes          | Long | Bytes committed to existing keys.                      |
-| preAllocatedContainerBytes | Long | Pre-allocated space for open containers.               |
+| Field                      | Type   | Description                                            |
+|----------------------------|--------|--------------------------------------------------------|
+| openKeyBytes               | Object | Bytes currently held by open keys (not yet committed). |
+| committedKeyBytes          | Long   | Bytes committed to existing keys.                      |
+
+##### openKeyBytes Object
+| Field                 | Type | Description                                            |
+|-----------------------|------|--------------------------------------------------------|
+| totalOpenKeyBytes     | Long | Bytes currently held by open keys (not yet committed). |
+| openKeyAndFileBytes   | Long | Bytes currently held by open keys/files                |
+| multipartOpenKeyBytes | Long | Bytes currently held by open multipart keys            |      
 
 ##### dataNodeUsage Array (Per-DataNode Metrics)
 Each object represents the storage metrics for a single DataNode.
@@ -128,18 +138,25 @@ Each object represents the storage metrics for a single DataNode.
 ```json
 {
   "globalStorage": {
-    "totalUsedSpace": 15744356352,
-    "totalFreeSpace": 3002519420928,
-    "totalCapacity": 3242976054744
+    "totalFileSystemCapacity" : 3242976157144,
+    "totalReservedSpace" : 102400,
+    "totalOzoneCapacity": 3242976054744,
+    "totalOzoneUsedSpace": 15744356352,
+    "totalOzoneFreeSpace": 3002519420928,
+    "totalOzonePreAllocatedContainerSpace": 0,
+    "totalMinimumFreeSpace" : 0
   },
   "globalNamespace": {
     "totalUsedSpace": 5242880000,
     "totalKeys": 10
   },
   "usedSpaceBreakdown": {
-    "openKeysBytes": 0,
-    "committedKeyBytes": 5242880000,
-    "preAllocatedContainerBytes": 0
+    "openKeysBytes": {
+      "totalOpenKeyBytes" : 0,
+      "openKeyAndFileBytes" : 0,
+      "multipartOpenKeyBytes" : 0
+    },
+    "committedKeyBytes": 5242880000
   },
   "dataNodeUsage": [
     {
@@ -301,9 +318,9 @@ To enhance storage visibility, a new metric will be introduced: the total bytes 
 
 The core idea involves:
 
-- **Measuring Deleted Data Size:** The system will now measure the total size in bytes of deleted items, rather than just counting them.
+- **Measuring Deleted Data Size:** The system will now measure the total size in bytes of deleted items, rather than just counting them. Whenever a block deletion request is received at DN, it will increment corresponding counter, and also it will be persisted under container info. Once deletion is completed at DN side the same size will decrement. This keeps the pending deletion value consistent.
 - **Integrating into Existing Systems:** This new size measurement will be incorporated into the current data deletion service and container data structures.
-- **Calculating Size During Deletion:** Mechanisms will be implemented to accurately capture the byte size of blocks as they are marked for deletion and it will be exposed via metrics.
+- **Calculating Size During Deletion:** Mechanisms will be implemented to accurately capture the byte size of blocks as they are marked for deletion, and it will be exposed via metrics.
 
 DataNodes currently provide storage reports, which Recon consumes regularly. However, these reports lack information about pending deletion bytes. To address this, we propose publishing TotalPendingBytes as a metric via BlockDeletingService, which Recon can then consume via JMX. This approach is more reliable and performs better than alternative solutions, such as including pending deletion information in the storage report. 
 
