@@ -67,12 +67,16 @@ public enum OMLayoutFeature implements LayoutFeature {
     return description;
   }
 
+  /**
+   * Associates a given upgrade action with this feature. Only the first upgrade action registered will be used.
+   *
+   * @param upgradeAction The upgrade action to associate with this feature.
+   */
   public void addAction(OmUpgradeAction upgradeAction) {
     // Required by SpotBugs since this setter exists in an enum.
-    if (this.action != null) {
-      throw new IllegalStateException("Action already set for " + name());
+    if (this.action == null) {
+      this.action = upgradeAction;
     }
-    this.action = upgradeAction;
   }
 
   @Override
