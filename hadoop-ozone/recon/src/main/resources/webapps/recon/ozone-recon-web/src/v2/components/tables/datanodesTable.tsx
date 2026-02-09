@@ -130,10 +130,7 @@ export const COLUMNS: ColumnsType<Datanode> = [
     render: (_: string, record: Datanode) => (
       <StorageBar
         strokeWidth={6}
-        capacity={record.storageTotal}
-        used={record.storageUsed}
-        remaining={record.storageRemaining}
-        committed={record.storageCommitted} />
+        {...record.storageReport} />
     )
   },
   {

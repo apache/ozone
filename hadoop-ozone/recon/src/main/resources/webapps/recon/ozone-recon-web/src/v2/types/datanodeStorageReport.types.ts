@@ -15,22 +15,22 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.conf;
-
 /**
- * Parent class for the example configuration.
+ * Storage report used by the Datanodes page.
  */
-public class SimpleConfigurationParent extends ReconfigurableConfig {
+export type DatanodeStorageReport = {
+  // Ozone-usable stats (after reserved-space adjustment).
+  capacity: number;
+  used: number;
+  remaining: number;
+  committed: number;
 
-  @Config(key = "enabled", defaultValue = "true", description = "Example "
-      + "boolean config.", tags = ConfigTag.MANAGEMENT)
-  private boolean enabled;
+  reserved?: number;
+  minimumFreeSpace?: number;
 
-  public boolean isEnabled() {
-    return enabled;
-  }
-
-  public void setEnabled(boolean enabled) {
-    this.enabled = enabled;
-  }
+  // Raw filesystem stats aggregated across volumes.
+  filesystemCapacity?: number;
+  filesystemUsed?: number;
+  filesystemAvailable?: number;
 }
+

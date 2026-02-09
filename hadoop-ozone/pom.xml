@@ -104,12 +104,6 @@
 
   <profiles>
     <profile>
-      <id>docker-build</id>
-      <properties>
-        <docker.image>${user.name}/ozone:${project.version}</docker.image>
-      </properties>
-    </profile>
-    <profile>
       <id>build-with-ozonefs</id>
       <activation>
         <property>

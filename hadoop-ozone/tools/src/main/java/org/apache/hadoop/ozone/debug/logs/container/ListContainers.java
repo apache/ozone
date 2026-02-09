@@ -17,11 +17,16 @@
 
 package org.apache.hadoop.ozone.debug.logs.container;
 
+import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.OVER_REPLICATED;
+import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.QUASI_CLOSED_STUCK;
+import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.UNDER_REPLICATED;
+import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.UNHEALTHY;
+
 import java.nio.file.Path;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.AbstractSubcommand;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.ozone.debug.logs.container.utils.ContainerDatanodeDatabase;
 import org.apache.hadoop.ozone.shell.ListLimitOptions;
 import picocli.CommandLine;
@@ -53,7 +58,7 @@ public class ListContainers extends AbstractSubcommand implements Callable<Void>
 
     @CommandLine.Option(names = {"--health"},
         description = "Health state of the container.")
-    private ReplicationManagerReport.HealthState healthState;
+    private ContainerHealthState healthState;
   }
 
   @Override

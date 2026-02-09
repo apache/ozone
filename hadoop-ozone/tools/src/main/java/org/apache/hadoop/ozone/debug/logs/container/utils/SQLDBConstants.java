@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.debug.logs.container.utils;
 
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 
 /**
  * Constants used for ContainerDatanodeDatabase.
@@ -34,7 +34,7 @@ public final class SQLDBConstants {
   public static final String CONTAINER_LOG_TABLE_NAME = "ContainerLogTable";
   public static final String CLOSED_STATE = HddsProtos.LifeCycleState.CLOSED.name();
   public static final String DELETED_STATE = HddsProtos.LifeCycleState.DELETED.name();
-  public static final String UNHEALTHY_STATE = ReplicationManagerReport.HealthState.UNHEALTHY.name();
+  public static final String UNHEALTHY_STATE = ContainerHealthState.UNHEALTHY.name();
   public static final String QUASI_CLOSED_STATE = HddsProtos.LifeCycleState.QUASI_CLOSED.name();
 
   public static final String CREATE_DATANODE_CONTAINER_LOG_TABLE = 

@@ -239,6 +239,8 @@ public class TestPermissionCheck {
   @Test
   public void testGetKey() throws IOException {
     when(client.getProxy()).thenReturn(clientProtocol);
+    when(objectStore.getS3Volume()).thenReturn(volume);
+    when(volume.getBucket(anyString())).thenReturn(bucket);
     when(objectStore.getS3Bucket(anyString())).thenReturn(bucket);
     doThrow(exception).when(clientProtocol)
         .getS3KeyDetails(anyString(), anyString());

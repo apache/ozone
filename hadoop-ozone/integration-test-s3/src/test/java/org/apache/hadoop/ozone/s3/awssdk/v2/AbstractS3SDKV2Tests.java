@@ -45,6 +45,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -271,6 +272,151 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonH
     long currentAllocatedBlocks =
         cluster.getStorageContainerManager().getPipelineManager().getMetrics().getTotalNumBlocksAllocated();
     assertEquals(initialAllocatedBlocks, currentAllocatedBlocks);
+  }
+
+  @Test
+  public void testPutObjectWithMD5Header() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
+    byte[] md5Bytes = calculateDigest(new ByteArrayInputStream(contentBytes), 0, contentBytes.length);
+    String md5Base64 = Base64.getEncoder().encodeToString(md5Bytes);
+
+    PutObjectResponse putObjectResponse = s3Client.putObject(b -> b
+            .bucket(bucketName)
+            .key(keyName)
+            .contentMD5(md5Base64),
+        RequestBody.fromString(content));
+
+    assertEquals("\"37b51d194a7513e45b56f6524f2d51f2\"", putObjectResponse.eTag());
+
+    ResponseBytes<GetObjectResponse> objectBytes = s3Client.getObjectAsBytes(
+        b -> b.bucket(bucketName).key(keyName)
+    );
+    GetObjectResponse getObjectResponse = objectBytes.response();
+
+    assertEquals(content, objectBytes.asUtf8String());
+    assertEquals("\"37b51d194a7513e45b56f6524f2d51f2\"", getObjectResponse.eTag());
+  }
+
+  @Test
+  public void testPutObjectWithWrongMD5Header() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    // Use wrong content to calculate MD5
+    byte[] wrongContentBytes = "wrong".getBytes(StandardCharsets.UTF_8);
+    byte[] wrongMd5Bytes = calculateDigest(new ByteArrayInputStream(wrongContentBytes), 0, wrongContentBytes.length);
+    String wrongMd5Base64 = Base64.getEncoder().encodeToString(wrongMd5Bytes);
+
+    S3Exception exception = assertThrows(S3Exception.class, () -> s3Client.putObject(b -> b
+            .bucket(bucketName)
+            .key(keyName)
+            .contentMD5(wrongMd5Base64),
+        RequestBody.fromString(content)));
+
+    assertEquals(400, exception.statusCode());
+    assertEquals("BadDigest", exception.awsErrorDetails().errorCode());
+
+    // Verify the object was not uploaded
+    assertThrows(NoSuchKeyException.class, () -> s3Client.headObject(b -> b.bucket(bucketName).key(keyName)));
+  }
+
+  @Test
+  public void testMultipartUploadWithMD5Header() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    // Initiate multipart upload
+    CreateMultipartUploadResponse createResponse = s3Client.createMultipartUpload(b -> b
+        .bucket(bucketName)
+        .key(keyName));
+    String uploadId = createResponse.uploadId();
+
+    // Prepare part data
+    String part1Content = "part1data";
+    byte[] part1Bytes = part1Content.getBytes(StandardCharsets.UTF_8);
+    byte[] part1Md5Bytes = calculateDigest(new ByteArrayInputStream(part1Bytes), 0, part1Bytes.length);
+    String part1Md5Base64 = Base64.getEncoder().encodeToString(part1Md5Bytes);
+
+    // Upload part 1 with MD5
+    UploadPartResponse part1Response = s3Client.uploadPart(b -> b
+            .bucket(bucketName)
+            .key(keyName)
+            .uploadId(uploadId)
+            .partNumber(1)
+            .contentMD5(part1Md5Base64),
+        RequestBody.fromBytes(part1Bytes));
+
+    // Verify ETag
+    String expectedETag = DatatypeConverter.printHexBinary(part1Md5Bytes).toLowerCase();
+    assertEquals(expectedETag, stripQuotes(part1Response.eTag()));
+
+    // Complete multipart upload
+    CompletedPart completedPart = CompletedPart.builder()
+        .partNumber(1)
+        .eTag(part1Response.eTag())
+        .build();
+
+    s3Client.completeMultipartUpload(b -> b
+        .bucket(bucketName)
+        .key(keyName)
+        .uploadId(uploadId)
+        .multipartUpload(CompletedMultipartUpload.builder().parts(completedPart).build()));
+
+    // Verify object was uploaded
+    ResponseBytes<GetObjectResponse> objectBytes = s3Client.getObjectAsBytes(
+        b -> b.bucket(bucketName).key(keyName)
+    );
+    assertEquals(part1Content, objectBytes.asUtf8String());
+  }
+
+  @Test
+  public void testMultipartUploadPartWithWrongMD5Header() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    // Initiate multipart upload
+    CreateMultipartUploadResponse createResponse = s3Client.createMultipartUpload(b -> b
+        .bucket(bucketName)
+        .key(keyName));
+    String uploadId = createResponse.uploadId();
+
+    // Prepare part data with wrong MD5
+    String partContent = "partdata";
+    byte[] partBytes = partContent.getBytes(StandardCharsets.UTF_8);
+
+    byte[] wrongMd5Bytes = calculateDigest(
+        new ByteArrayInputStream("wrongdata".getBytes(StandardCharsets.UTF_8)), 0, 9);
+    String wrongMd5Base64 = Base64.getEncoder().encodeToString(wrongMd5Bytes);
+
+    // Upload part with wrong MD5 should fail
+    S3Exception exception = assertThrows(S3Exception.class, () -> s3Client.uploadPart(b -> b
+            .bucket(bucketName)
+            .key(keyName)
+            .uploadId(uploadId)
+            .partNumber(1)
+            .contentMD5(wrongMd5Base64),
+        RequestBody.fromBytes(partBytes)));
+
+    assertEquals(400, exception.statusCode());
+    assertEquals("BadDigest", exception.awsErrorDetails().errorCode());
+
+    // Abort the multipart upload
+    s3Client.abortMultipartUpload(b -> b
+        .bucket(bucketName)
+        .key(keyName)
+        .uploadId(uploadId));
+
+    // Verify object was not created
+    assertThrows(NoSuchKeyException.class, () -> s3Client.headObject(b -> b.bucket(bucketName).key(keyName)));
   }
 
   @Test

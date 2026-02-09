@@ -57,13 +57,12 @@ import picocli.CommandLine;
 
 /**
  * Tool to map full key paths that use the specified containers.
- * Note: Currently only processes FSO layout buckets.
+ * Supports both FSO (File System Optimized) and OBS (Object Store) bucket layouts.
  */
 @CommandLine.Command(
     name = "container-key-mapping",
     aliases = "ckm",
-    description = "Maps full key paths that use the specified containers. " +
-        "Note: A container can have both FSO and OBS keys. Currently this tool processes only FSO keys")
+    description = "Maps full key paths that use the specified containers.")
 public class ContainerToKeyMapping extends AbstractSubcommand implements Callable<Void> {
   private static final String DIRTREE_DB_NAME = "omdirtree.db";
   private static final String DIRTREE_TABLE_NAME = "dirTreeTable";
@@ -80,22 +79,26 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
       description = "Comma separated Container IDs")
   private String containers;
 
+  @CommandLine.Option(names = {"--onlyFileNames"},
+      defaultValue = "false",
+      description = "Only display file names without full path")
+  private boolean onlyFileNames;
+
   private DBStore omDbStore;
   private Table<String, OmVolumeArgs> volumeTable;
   private Table<String, OmBucketInfo> bucketTable;
   private Table<String, OmDirectoryInfo> directoryTable;
   private Table<String, OmKeyInfo> fileTable;
+  private Table<String, OmKeyInfo> keyTable;
   private DBStore dirTreeDbStore;
   private Table<Long, String> dirTreeTable;
   // Cache volume IDs to avoid repeated lookups
   private final Map<String, Long> volumeCache = new HashMap<>();
   private ConfigurationSource conf;
 
-  // TODO: Add support to OBS keys (HDDS-14118)
   @Override
   public Void call() throws Exception {
-    err().println("Note: A container can have both FSO and OBS keys. Currently this tool processes only FSO keys");
-    
+
     String dbPath = parent.getDbPath();
     // Parse container IDs
     Set<Long> containerIDs = Arrays.stream(containers.split(","))
@@ -122,9 +125,9 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
       bucketTable = OMDBDefinition.BUCKET_TABLE_DEF.getTable(omDbStore, CacheType.NO_CACHE);
       directoryTable = OMDBDefinition.DIRECTORY_TABLE_DEF.getTable(omDbStore, CacheType.NO_CACHE);
       fileTable = OMDBDefinition.FILE_TABLE_DEF.getTable(omDbStore, CacheType.NO_CACHE);
+      keyTable = OMDBDefinition.KEY_TABLE_DEF.getTable(omDbStore, CacheType.NO_CACHE);
 
-      openDirTreeDB(dbPath);
-      retrieve(writer, containerIDs);
+      retrieve(dbPath, writer, containerIDs);
     } catch (Exception e) {
       err().println("Failed to open RocksDB: " + e);
       throw e;
@@ -163,27 +166,40 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
     }
   }
 
-  private void retrieve(PrintWriter writer, Set<Long> containerIds) {
-    // Build dir tree
+  private void retrieve(String dbPath, PrintWriter writer, Set<Long> containerIds) {
     Map<Long, Pair<Long, String>> bucketVolMap = new HashMap<>();
-    try {
-      prepareDirIdTree(bucketVolMap);
-    } catch (Exception e) {
-      err().println("Exception occurred reading directory Table, " + e);
-      return;
+    // Build dir tree for FSO keys only if we need full paths
+    if (!onlyFileNames) {
+      try {
+        openDirTreeDB(dbPath);
+        prepareDirIdTree(bucketVolMap);
+      } catch (Exception e) {
+        err().println("Exception occurred reading directory Table, " + e);
+        return;
+      }
     }
 
     // Map to collect keys per container
     Map<Long, List<String>> containerToKeysMap = new HashMap<>();
-    // Track unreferenced keys count per container
+    // Track unreferenced keys count per container (FSO only)
     Map<Long, Long> unreferencedCountMap = new HashMap<>();
     for (Long containerId : containerIds) {
       containerToKeysMap.put(containerId, new ArrayList<>());
       unreferencedCountMap.put(containerId, 0L);
     }
 
-    // Iterate file table and filter for container
-    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> fileIterator = 
+    // Process FSO keys (fileTable)
+    processFSOKeys(containerIds, containerToKeysMap, unreferencedCountMap, bucketVolMap);
+
+    // Process OBS keys (keyTable)
+    processOBSKeys(containerIds, containerToKeysMap);
+
+    jsonOutput(writer, containerToKeysMap, unreferencedCountMap);
+  }
+
+  private void processFSOKeys(Set<Long> containerIds, Map<Long, List<String>> containerToKeysMap,
+      Map<Long, Long> unreferencedCountMap, Map<Long, Pair<Long, String>> bucketVolMap) {
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> fileIterator =
         fileTable.iterator()) {
       
       while (fileIterator.hasNext()) {
@@ -191,31 +207,61 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
         OmKeyInfo keyInfo = entry.getValue();
 
         // Find which containers this key uses
-        Set<Long> keyContainers = new HashSet<>();
-        keyInfo.getKeyLocationVersions().forEach(
-            e -> e.getLocationList().forEach(
-                blk -> {
-                  long cid = blk.getBlockID().getContainerID();
-                  if (containerIds.contains(cid)) {
-                    keyContainers.add(cid);
-                  }
-                }));
+        Set<Long> keyContainers = getKeyContainers(keyInfo, containerIds);
 
         if (!keyContainers.isEmpty()) {
-          // Reconstruct full path
-          String fullPath = reconstructFullPath(keyInfo, bucketVolMap, unreferencedCountMap, keyContainers);
-          if (fullPath != null) {
+          // For FSO keys, reconstruct the full path
+          // Or extract just the key name if onlyFileNames is true
+          String keyPath = onlyFileNames ? keyInfo.getKeyName() :
+              reconstructFullPath(keyInfo, bucketVolMap, unreferencedCountMap, keyContainers);
+          if (keyPath != null) {
             for (Long containerId : keyContainers) {
-              containerToKeysMap.get(containerId).add(fullPath);
+              containerToKeysMap.get(containerId).add(keyPath);
             }
           }
         }
       }
     } catch (Exception e) {
-      err().println("Exception occurred reading file Table, " + e);
-      return;
+      err().println("Exception occurred reading fileTable (FSO keys), " + e);
     }
-    jsonOutput(writer, containerToKeysMap, unreferencedCountMap);
+  }
+
+  private void processOBSKeys(Set<Long> containerIds, Map<Long, List<String>> containerToKeysMap) {
+    try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyIterator =
+         keyTable.iterator()) {
+
+      while (keyIterator.hasNext()) {
+        Table.KeyValue<String, OmKeyInfo> entry = keyIterator.next();
+        OmKeyInfo keyInfo = entry.getValue();
+
+        // Find which containers this key uses
+        Set<Long> keyContainers = getKeyContainers(keyInfo, containerIds);
+
+        if (!keyContainers.isEmpty()) {
+          // For OBS keys, use the database key directly (already in /volume/bucket/key format)
+          // Or extract just the key name if onlyFileNames is true
+          String keyPath = onlyFileNames ? keyInfo.getKeyName() : entry.getKey();
+          for (Long containerId : keyContainers) {
+            containerToKeysMap.get(containerId).add(keyPath);
+          }
+        }
+      }
+    } catch (Exception e) {
+      err().println("Exception occurred reading keyTable (OBS keys), " + e);
+    }
+  }
+
+  private Set<Long> getKeyContainers(OmKeyInfo keyInfo, Set<Long> targetContainerIds) {
+    Set<Long> keyContainers = new HashSet<>();
+    keyInfo.getKeyLocationVersions().forEach(
+        e -> e.getLocationList().forEach(
+            blk -> {
+              long cid = blk.getBlockID().getContainerID();
+              if (targetContainerIds.contains(cid)) {
+                keyContainers.add(cid);
+              }
+            }));
+    return keyContainers;
   }
 
   private void prepareDirIdTree(Map<Long, Pair<Long, String>> bucketVolMap) throws Exception {
@@ -263,7 +309,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
         sb.insert(0, nameParentPair.getValue() + OM_KEY_PREFIX);
         prvParent = nameParentPair.getKey();
         if (null == prvParent) {
-          return sb.toString();
+          return OM_KEY_PREFIX + sb;
         }
         continue;
       }
@@ -271,11 +317,11 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
       // Check dir tree
       Pair<Long, String> nameParentPair = getFromDirTree(prvParent);
       if (nameParentPair == null) {
-        // Parent not found - increment unreferenced count for all containers this key uses
+        // If parent is not found, mark the key as unreferenced and increment its count
         for (Long containerId : keyContainers) {
           unreferencedCountMap.put(containerId, unreferencedCountMap.get(containerId) + 1);
         }
-        break;
+        return "[unreferenced] " + keyInfo.getKeyName();
       }
       sb.insert(0, nameParentPair.getValue() + OM_KEY_PREFIX);
       prvParent = nameParentPair.getKey();
@@ -342,7 +388,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
         }
         
         containerNode.set("keys", keysArray);
-        containerNode.put("numOfKeys", entry.getValue().size());
+        containerNode.put("totalKeys", entry.getValue().size()); // includes unreferenced keys
         
         // Add unreferenced count if > 0
         long unreferencedCount = unreferencedCountMap.get(containerId);
