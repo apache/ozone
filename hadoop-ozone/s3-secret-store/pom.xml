@@ -26,7 +26,6 @@
   <properties>
     <downloadSources>true</downloadSources>
     <file.encoding>UTF-8</file.encoding>
-    <maven.compiler.release>${ozone.server.java.version}</maven.compiler.release>
   </properties>
 
   <dependencies>

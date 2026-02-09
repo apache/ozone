@@ -25,10 +25,6 @@
   <name>Apache Ozone S3 Integration Tests</name>
   <description>Apache Ozone Integration Tests with S3 Gateway</description>
 
-  <properties>
-    <maven.compiler.release>${ozone.server.java.version}</maven.compiler.release>
-  </properties>
-
   <dependencies>
     <dependency>
       <groupId>com.amazonaws</groupId>

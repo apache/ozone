@@ -25,6 +25,10 @@
   <name>Apache Ozone HDDS Test Utils</name>
   <description>Apache Ozone Distributed Data Store Test Utils</description>
 
+  <properties>
+    <maven.compiler.release>${ozone.java.version.client}</maven.compiler.release>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>org.apache.hadoop</groupId>

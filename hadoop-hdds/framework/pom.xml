@@ -26,7 +26,8 @@
   <description>Apache Ozone Distributed Data Store Server Framework</description>
 
   <properties>
-    <maven.compiler.release>${ozone.server.java.version}</maven.compiler.release>
+    <!-- hdds-server-framework is used by ozone-cli-admin -->
+    <maven.compiler.release>${ozone.java.version.client}</maven.compiler.release>
   </properties>
 
   <dependencies>

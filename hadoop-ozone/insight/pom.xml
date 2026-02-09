@@ -16,9 +16,8 @@
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.apache.ozone</groupId>
-    <artifactId>hdds-hadoop-dependency-client</artifactId>
+    <artifactId>ozone</artifactId>
     <version>2.2.0-SNAPSHOT</version>
-    <relativePath>../../hadoop-hdds/hadoop-dependency-client</relativePath>
   </parent>
   <artifactId>ozone-insight</artifactId>
   <version>2.2.0-SNAPSHOT</version>
@@ -28,7 +27,6 @@
 
   <properties>
     <classpath.skip>false</classpath.skip>
-    <maven.compiler.release>${ozone.server.java.version}</maven.compiler.release>
   </properties>
 
   <dependencies>

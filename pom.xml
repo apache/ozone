@@ -162,7 +162,7 @@
     <maven-surefire-report-plugin.version>${maven-surefire-plugin.version}</maven-surefire-report-plugin.version>
     <maven-war-plugin.version>3.4.0</maven-war-plugin.version>
     <maven.compiler.createMissingPackageInfoClass>false</maven.compiler.createMissingPackageInfoClass>
-    <maven.compiler.release>8</maven.compiler.release>
+    <maven.compiler.release>${ozone.java.version.server}</maven.compiler.release>
     <maven.core.version>3.9.10</maven.core.version>
     <maven.test.redirectTestOutputToFile>true</maven.test.redirectTestOutputToFile>
     <metainf-services.version>1.11</metainf-services.version>
@@ -174,8 +174,9 @@
     <okhttp3.version>4.12.0</okhttp3.version>
     <opentelemetry.version>1.58.0</opentelemetry.version>
     <os-maven-plugin.version>1.7.1</os-maven-plugin.version>
+    <ozone.java.version.client>8</ozone.java.version.client>
+    <ozone.java.version.server>17</ozone.java.version.server>
     <ozone.release>Katmai</ozone.release>
-    <ozone.server.java.version>17</ozone.server.java.version>
     <ozone.shaded.native.prefix>org_apache_ozone_shaded</ozone.shaded.native.prefix>
     <ozone.shaded.prefix>org.apache.ozone.shaded</ozone.shaded.prefix>
     <ozone.version>2.2.0-SNAPSHOT</ozone.version>

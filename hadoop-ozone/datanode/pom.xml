@@ -26,7 +26,6 @@
 
   <properties>
     <classpath.skip>false</classpath.skip>
-    <maven.compiler.release>${ozone.server.java.version}</maven.compiler.release>
     <!-- no tests in this module so far -->
     <maven.test.skip>true</maven.test.skip>
     <spotbugs.skip>true</spotbugs.skip>

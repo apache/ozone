@@ -26,6 +26,7 @@
   <name>Apache Ozone FileSystem Common</name>
   <properties>
     <file.encoding>UTF-8</file.encoding>
+    <maven.compiler.release>${ozone.java.version.client}</maven.compiler.release>
   </properties>
 
   <dependencies>

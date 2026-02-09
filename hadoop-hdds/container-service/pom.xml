@@ -25,10 +25,6 @@
   <name>Apache Ozone HDDS Container Service</name>
   <description>Apache Ozone Distributed Data Store Container Service</description>
 
-  <properties>
-    <maven.compiler.release>${ozone.server.java.version}</maven.compiler.release>
-  </properties>
-
   <dependencies>
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
