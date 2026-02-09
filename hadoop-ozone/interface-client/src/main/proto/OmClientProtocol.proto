@@ -75,9 +75,9 @@ enum Type {
   DBUpdates = 53;
   FinalizeUpgrade = 54;
   FinalizeUpgradeProgress = 55;
-  Prepare = 56;
-  PrepareStatus = 57;
-  CancelPrepare = 58;
+  Prepare = 56; // Deprecated
+  PrepareStatus = 57; // Deprecated
+  CancelPrepare = 58; // Deprecated
 
   GetDelegationToken = 61;
   RenewDelegationToken = 62;
@@ -214,9 +214,9 @@ message OMRequest {
   optional DBUpdatesRequest                  dbUpdatesRequest              = 53;
   optional FinalizeUpgradeRequest           finalizeUpgradeRequest         = 54;
   optional FinalizeUpgradeProgressRequest   finalizeUpgradeProgressRequest = 55;
-  optional PrepareRequest                   prepareRequest                 = 56;
-  optional PrepareStatusRequest             prepareStatusRequest           = 57;
-  optional CancelPrepareRequest             cancelPrepareRequest           = 58;
+  optional PrepareRequest                   prepareRequest                 = 56 [deprecated = true];
+  optional PrepareStatusRequest             prepareStatusRequest           = 57 [deprecated = true];
+  optional CancelPrepareRequest             cancelPrepareRequest           = 58 [deprecated = true];
 
   optional hadoop.common.GetDelegationTokenRequestProto getDelegationTokenRequest = 61;
   optional hadoop.common.RenewDelegationTokenRequestProto renewDelegationTokenRequest= 62;
@@ -355,9 +355,9 @@ message OMResponse {
   optional DBUpdatesResponse                 dbUpdatesResponse             = 52;
   optional FinalizeUpgradeResponse           finalizeUpgradeResponse       = 54;
   optional FinalizeUpgradeProgressResponse finalizeUpgradeProgressResponse = 55;
-  optional PrepareResponse                 prepareResponse                 = 56;
-  optional PrepareStatusResponse           prepareStatusResponse           = 57;
-  optional CancelPrepareResponse           cancelPrepareResponse           = 58;
+  optional PrepareResponse                 prepareResponse                 = 56 [deprecated = true];
+  optional PrepareStatusResponse           prepareStatusResponse           = 57 [deprecated = true];
+  optional CancelPrepareResponse           cancelPrepareResponse           = 58 [deprecated = true];
 
   optional GetDelegationTokenResponseProto getDelegationTokenResponse = 61;
   optional RenewDelegationTokenResponseProto renewDelegationTokenResponse = 62;
@@ -529,9 +529,9 @@ enum Status {
     REMOVE_UPGRADE_TO_LAYOUT_VERSION_FAILED = 70;
     UPDATE_LAYOUT_VERSION_FAILED = 71;
     LAYOUT_FEATURE_FINALIZATION_FAILED = 72;
-    PREPARE_FAILED = 73;
-    NOT_SUPPORTED_OPERATION_WHEN_PREPARED = 74;
-    NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION = 75;
+    PREPARE_FAILED = 73; // Deprecated
+    NOT_SUPPORTED_OPERATION_WHEN_PREPARED = 74; // Deprecated
+    NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION = 75; // Deprecated
 
     TENANT_NOT_FOUND = 76;
     TENANT_ALREADY_EXISTS = 77;
@@ -1616,23 +1616,38 @@ message FinalizeUpgradeProgressResponse {
     required hadoop.hdds.UpgradeFinalizationStatus status = 1;
 }
 
+/**
+ * Deprecated. Prepare functionality has been removed.
+ */
 message PrepareRequest {
-    required PrepareRequestArgs args = 1;
+    required PrepareRequestArgs args = 1 [deprecated = true];
 }
 
+/**
+ * Deprecated. Prepare functionality has been removed.
+ */
 message PrepareRequestArgs {
-    optional uint64 txnApplyWaitTimeoutSeconds = 1 [default = 300];
-    optional uint64 txnApplyCheckIntervalSeconds = 2 [default = 5];
+    optional uint64 txnApplyWaitTimeoutSeconds = 1 [default = 300, deprecated = true];
+    optional uint64 txnApplyCheckIntervalSeconds = 2 [default = 5, deprecated = true];
 }
 
+/**
+ * Deprecated. Prepare functionality has been removed.
+ */
 message PrepareResponse {
-    required uint64 txnID = 1;
+    required uint64 txnID = 1 [deprecated = true];
 }
 
+/**
+ * Deprecated. Prepare functionality has been removed.
+ */
 message PrepareStatusRequest {
-    required uint64 txnID = 1;
+    required uint64 txnID = 1 [deprecated = true];
 }
 
+/**
+ * Deprecated. Prepare functionality has been removed and server status will always be NOT_PREPARED.
+ */
 message PrepareStatusResponse {
     enum PrepareStatus {
         NOT_PREPARED = 1;
@@ -1640,13 +1655,19 @@ message PrepareStatusResponse {
         PREPARE_COMPLETED = 3;
     }
     required PrepareStatus status = 1;
-    optional uint64 currentTxnIndex = 2;
+    optional uint64 currentTxnIndex = 2 [deprecated = true];
 }
 
+/**
+ * Deprecated. Prepare functionality has been removed.
+ */
 message CancelPrepareRequest {
 
 }
 
+/**
+ * Deprecated. Prepare functionality has been removed.
+ */
 message CancelPrepareResponse {
 
 }

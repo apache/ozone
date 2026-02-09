@@ -68,7 +68,6 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.ratis.conf.Parameters;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.grpc.GrpcConfigKeys;
@@ -245,27 +244,9 @@ public final class OzoneManagerRatisServer {
    * @throws ServiceException
    */
   public OMResponse submitRequest(OMRequest omRequest, boolean isWrite) throws ServiceException {
-    // In prepare mode, only prepare and cancel requests are allowed to go
-    // through.
-    if (ozoneManager.getPrepareState().requestAllowed(omRequest.getCmdType())) {
-      RaftClientRequest raftClientRequest = createRaftRequest(omRequest, isWrite);
-      RaftClientReply raftClientReply = submitRequestToRatis(raftClientRequest);
-      return createOmResponse(omRequest, raftClientReply);
-    } else {
-      LOG.info("Rejecting write request on OM {} because it is in prepare " +
-          "mode: {}", ozoneManager.getOMNodeId(),
-          omRequest.getCmdType().name());
-
-      String message = "Cannot apply write request " +
-          omRequest.getCmdType().name() + " when OM is in prepare mode.";
-      OMResponse.Builder omResponse = OMResponse.newBuilder()
-          .setMessage(message)
-          .setStatus(Status.NOT_SUPPORTED_OPERATION_WHEN_PREPARED)
-          .setCmdType(omRequest.getCmdType())
-          .setTraceID(omRequest.getTraceID())
-          .setSuccess(false);
-      return omResponse.build();
-    }
+    RaftClientRequest raftClientRequest = createRaftRequest(omRequest, isWrite);
+    RaftClientReply raftClientReply = submitRequestToRatis(raftClientRequest);
+    return createOmResponse(omRequest, raftClientReply);
   }
 
   private OMResponse createOmResponse(OMRequest omRequest,
