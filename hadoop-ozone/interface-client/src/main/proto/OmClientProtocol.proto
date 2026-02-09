@@ -917,6 +917,35 @@ message SnapshotDiffJobProto {
   optional double keysProcessedPct = 13;
 }
 
+/**
+ * Per request type entities to hold arguments
+ * captured for CompletedRequestInfo
+ */
+message RenameKeyOperationArgs {
+    optional string toKeyName = 1;
+}
+
+message CreateFileOperationArgs {
+    optional bool isRecursive = 1;
+    optional bool isOverwrite = 2;
+}
+
+/**
+ * CompletedRequestInfo table entry
+ */
+message CompletedRequestInfo {
+
+  optional int64 trxLogIndex = 1;
+  optional Type cmdType = 2; // Type of the command
+  optional string volumeName = 3;
+  optional string bucketName = 4;
+  optional string keyName = 5;
+  optional uint64 creationTime = 6;
+
+  optional RenameKeyOperationArgs  renameKeyArgs = 7;
+  optional CreateFileOperationArgs createFileArgs = 8;
+}
+
 message OzoneObj {
   enum ObjectType {
     VOLUME = 1;
