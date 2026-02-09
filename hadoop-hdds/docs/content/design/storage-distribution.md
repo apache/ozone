@@ -90,15 +90,15 @@ All metrics are aggregated, and exposed through a **RESTful API (/storagedistrib
 **Response Objects:**
 
 ##### globalStorage Object
-| Field                                | Type | Description                                                                |
-|--------------------------------------|------|----------------------------------------------------------------------------|
-| totalFileSystemCapacity              | Long | Total raw capacity of filesystem across all DataNodes in bytes.            |
-| totalReservedSpace                   | Long | Total space reserved in filesystem which cannot be used by ozone           |
-| totalOzoneCapacity                   | Long | Total raw capacity across all DataNodes in bytes.                          |
-| totalOzoneUsedSpace                  | Long | Total used space across all DataNodes in bytes.                            |
-| totalOzoneFreeSpace                  | Long | Total free space across all DataNodes in bytes.                            |
-| totalOzonePreAllocatedContainerSpace | Long | Pre-allocated space for open containers.                                   |
-| totalOzoneMinimumFreeSpace           | Long | Sum of all the minium free space configured across all DataNodes in bytes. |
+| Field                                | Type | Description                                                               |
+|--------------------------------------|------|---------------------------------------------------------------------------|
+| totalFileSystemCapacity              | Long | Total raw capacity of filesystem across all DataNodes in bytes.           |
+| totalReservedSpace                   | Long | Total space reserved in filesystem which cannot be used by ozone          |
+| totalOzoneCapacity                   | Long | Total raw capacity across all DataNodes in bytes.                         |
+| totalOzoneUsedSpace                  | Long | Total used space across all DataNodes in bytes.                           |
+| totalOzoneFreeSpace                  | Long | Total free space across all DataNodes in bytes.                           |
+| totalOzonePreAllocatedContainerSpace | Long | Pre-allocated space for open containers.                                  |
+| totalOzoneMinimumFreeSpace           | Long | Sum of all the minimumFreeSpace configured across all DataNodes in bytes. |
 
 ##### globalNamespace Object
 | Field          | Type | Description                                             |
