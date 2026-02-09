@@ -29,7 +29,7 @@
     <!-- suffix appended to Hadoop version to get Docker image version -->
     <docker.hadoop.image.flavor>-lean</docker.hadoop.image.flavor>
     <docker.ozone-runner.client.version>20260207-1-jdk8</docker.ozone-runner.client.version>
-    <docker.ozone-runner.version>20250625-2-jdk21</docker.ozone-runner.version>
+    <docker.ozone-runner.version>20260206-2-jdk21</docker.ozone-runner.version>
     <docker.ozone-testkr5b.image>ghcr.io/apache/ozone-testkrb5:20241129-1</docker.ozone-testkr5b.image>
     <docker.ozone.image>apache/ozone</docker.ozone.image>
     <!-- suffix appended to Ozone version to get Docker image version; only used in xcompat test, to avoid old centos-based images -->
