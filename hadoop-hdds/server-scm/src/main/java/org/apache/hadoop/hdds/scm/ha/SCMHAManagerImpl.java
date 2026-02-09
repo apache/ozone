@@ -95,10 +95,8 @@ public class SCMHAManagerImpl implements SCMHAManager {
   }
 
   @VisibleForTesting
-  protected SCMSnapshotProvider newScmSnapshotProvider(
-      StorageContainerManager storageContainerManager) {
-    return new SCMSnapshotProvider(
-        storageContainerManager.getConfiguration(),
+  protected SCMSnapshotProvider newScmSnapshotProvider(StorageContainerManager storageContainerManager) {
+    return new SCMSnapshotProvider(storageContainerManager.getConfiguration(),
         storageContainerManager.getSCMHANodeDetails().getPeerNodeDetails(),
         storageContainerManager.getScmCertificateClient());
   }

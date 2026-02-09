@@ -1376,7 +1376,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
     final SCMHANodeDetails haDetails = SCMHANodeDetails.loadSCMHAConfig(conf, storageConfig);
     SCMRatisServerImpl.initialize(storageConfig.getClusterID(),
         storageConfig.getScmId(), haDetails.getLocalNodeDetails(), conf);
-
     storageConfig.setSCMHAFlag(true);
     storageConfig.setPrimaryScmNodeId(storageConfig.getScmId());
     storageConfig.forceInitialize();
