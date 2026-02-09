@@ -270,7 +270,7 @@ public class TestOzoneManagerRequestHandler {
     Assertions.assertEquals("Prepare is no longer required in this version",
         prepareResponse.getMessage(), "Prepare should return deprecation message");
 
-    // PrepareStatus should always return NOT_PREPARED.
+    // PrepareStatus should always return PREPARE_COMPLETED.
     OzoneManagerProtocolProtos.OMRequest prepareStatusRequest =
         OzoneManagerProtocolProtos.OMRequest.newBuilder()
             .setCmdType(OzoneManagerProtocolProtos.Type.PrepareStatus)
@@ -287,9 +287,9 @@ public class TestOzoneManagerRequestHandler {
     Assertions.assertTrue(prepareStatusResponse.hasPrepareStatusResponse(),
         "PrepareStatus response should be present");
     Assertions.assertEquals(
-        OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus.NOT_PREPARED,
+        OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus.PREPARE_COMPLETED,
         prepareStatusResponse.getPrepareStatusResponse().getStatus(),
-        "PrepareStatus should always return NOT_PREPARED");
+        "PrepareStatus should always return PREPARE_COMPLETED for backward compatibility");
     Assertions.assertEquals(0, prepareStatusResponse.getPrepareStatusResponse().getCurrentTxnIndex(),
         "PrepareStatus should return currentTxnIndex of 0");
 

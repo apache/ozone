@@ -1388,9 +1388,9 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   }
 
   private PrepareStatusResponse getPrepareStatus() {
-    // Prepare is no longer used, always return NOT_PREPARED
+    // Prepare is no longer used, always return PREPARE_COMPLETED for backward compatibility
     return PrepareStatusResponse.newBuilder()
-        .setStatus(PrepareStatusResponse.PrepareStatus.NOT_PREPARED)
+        .setStatus(PrepareStatusResponse.PrepareStatus.PREPARE_COMPLETED)
         .setCurrentTxnIndex(0).build();
   }
 
