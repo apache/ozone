@@ -320,7 +320,9 @@ The core idea involves:
 
 - **Measuring Deleted Data Size:** The system will now measure the total size in bytes of deleted items, rather than just counting them. Whenever a block deletion request is received at DN, it will increment corresponding counter, and also it will be persisted under container info. Once deletion is completed at DN side the same size will decrement. This keeps the pending deletion value consistent.
 - **Integrating into Existing Systems:** This new size measurement will be incorporated into the current data deletion service and container data structures.
-- **Calculating Size During Deletion:** Mechanisms will be implemented to accurately capture the byte size of blocks as they are marked for deletion, and it will be exposed via metrics.
+- **Calculating Size During Deletion:** In DeleteBlockCommandHandler, whenever a delete request is received, the pendingBytes from the transaction are added to the existing pendingBytes of the corresponding ContainerData, and this updated value is persisted.
+Once the deletion process completes, the same amount is decremented from the container’s pendingBytes.
+Since BlockDeletionService already iterates over all containers while running, it calculates the total pendingBytes per datanode during this iteration and updates the corresponding metrics.
 
 DataNodes currently provide storage reports, which Recon consumes regularly. However, these reports lack information about pending deletion bytes. To address this, we propose publishing TotalPendingBytes as a metric via BlockDeletingService, which Recon can then consume via JMX. This approach is more reliable and performs better than alternative solutions, such as including pending deletion information in the storage report. 
 
