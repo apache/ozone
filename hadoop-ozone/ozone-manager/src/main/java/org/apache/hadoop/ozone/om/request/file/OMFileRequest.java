@@ -30,10 +30,12 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -866,11 +868,15 @@ public final class OMFileRequest {
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmDirectoryInfo>>>
             cacheIter = dirTable.cacheIterator();
 
+    // Track deleted entries in cache (null values = pending Ratis delete)
+    Set<String> deletedKeysInCache = new HashSet<>();
     while (cacheIter.hasNext()) {
       Map.Entry<CacheKey<String>, CacheValue<OmDirectoryInfo>> entry =
               cacheIter.next();
       OmDirectoryInfo cacheOmDirInfo = entry.getValue().getCacheValue();
       if (cacheOmDirInfo == null) {
+        // Entry marked for deletion in cache (Ratis transaction committed but not yet flushed to DB)
+        deletedKeysInCache.add(entry.getKey().getCacheKey());
         continue;
       }
       if (isImmediateChild(cacheOmDirInfo.getParentObjectID(),
@@ -889,11 +895,24 @@ public final class OMFileRequest {
         Table.KeyValue<String, OmDirectoryInfo>>
             iterator = dirTable.iterator(seekDirInDB)) {
 
-      if (iterator.hasNext()) {
+      while (iterator.hasNext()) {
         Table.KeyValue<String, OmDirectoryInfo> entry = iterator.next();
+        String dbKey = entry.getKey();
         OmDirectoryInfo dirInfo = entry.getValue();
-        return isImmediateChild(dirInfo.getParentObjectID(),
+        boolean isChild = isImmediateChild(dirInfo.getParentObjectID(),
             omKeyInfo.getObjectID());
+
+        if (!isChild) {
+          return false;
+        }
+
+        // If child found in DB, check if it's marked as deleted in cache
+        if (deletedKeysInCache.contains(dbKey)) {
+          // Entry is in DB but marked for deletion in cache, ignore it
+          continue;
+        }
+
+        return true;
       }
 
     }
@@ -911,11 +930,15 @@ public final class OMFileRequest {
     Iterator<Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>>>
             cacheIter = fileTable.cacheIterator();
 
+    // Track deleted entries in cache (null values = pending Ratis delete)
+    Set<String> deletedKeysInCache = new HashSet<>();
     while (cacheIter.hasNext()) {
       Map.Entry<CacheKey<String>, CacheValue<OmKeyInfo>> entry =
               cacheIter.next();
       OmKeyInfo cacheOmFileInfo = entry.getValue().getCacheValue();
       if (cacheOmFileInfo == null) {
+        // Entry marked for deletion in cache (Ratis transaction committed but not yet flushed to DB)
+        deletedKeysInCache.add(entry.getKey().getCacheKey());
         continue;
       }
       if (isImmediateChild(cacheOmFileInfo.getParentObjectID(),
@@ -933,11 +956,24 @@ public final class OMFileRequest {
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>>
             iterator = fileTable.iterator(seekFileInDB)) {
 
-      if (iterator.hasNext()) {
+      while (iterator.hasNext()) {
         Table.KeyValue<String, OmKeyInfo> entry = iterator.next();
+        String dbKey = entry.getKey();
         OmKeyInfo fileInfo = entry.getValue();
-        return isImmediateChild(fileInfo.getParentObjectID(),
-            omKeyInfo.getObjectID()); // found a sub path file
+        boolean isChild = isImmediateChild(fileInfo.getParentObjectID(),
+            omKeyInfo.getObjectID());
+
+        if (!isChild) {
+          return false;
+        }
+
+        // If child found in DB, check if it's marked as deleted in cache
+        if (deletedKeysInCache.contains(dbKey)) {
+          // Entry is in DB but marked for deletion in cache, ignore it
+          continue;
+        }
+
+        return true; // found a sub path file
       }
     }
     return false; // no sub paths found
