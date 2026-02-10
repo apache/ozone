@@ -557,8 +557,6 @@ abstract class AbstractOzoneFileSystemTestWithFSO extends AbstractOzoneFileSyste
    * Test to reproduce "Directory Not Empty" bug using public FileSystem API.
    * Tests both checkSubDirectoryExists() and checkSubFileExists() paths.
    * Creates child directory and file, deletes them, then tries to delete parent.
-   * This test exposes a Ratis transaction visibility issue where deleted
-   * entries are in cache but not yet flushed to DB via double buffer.
    */
   @Test
   public void testDeleteParentAfterChildDeleted() throws Exception {
@@ -573,11 +571,11 @@ abstract class AbstractOzoneFileSystemTestWithFSO extends AbstractOzoneFileSyste
     // Create child file (tests checkSubFileExists path)
     ContractTestUtils.touch(getFs(), childFile);
 
-    // Stop double buffer to prevent flushing deleted entries to DB
-    // This makes the bug reproduce more reliably
+    // Pause double buffer to prevent flushing deleted entries to DB
+    // This makes the bug reproduce deterministically
     OzoneManagerDoubleBuffer doubleBuffer = getCluster().getOzoneManager()
         .getOmRatisServer().getOmStateMachine().getOzoneManagerDoubleBuffer();
-    doubleBuffer.stopDaemon();
+    doubleBuffer.pause();
 
     try {
       // Delete child directory
@@ -590,8 +588,8 @@ abstract class AbstractOzoneFileSystemTestWithFSO extends AbstractOzoneFileSyste
       boolean parentDeleted = getFs().delete(parent, false);
       assertTrue(parentDeleted, "Parent delete should succeed after children deleted");
     } finally {
-      // Resume double buffer to avoid affecting other tests
-      doubleBuffer.resume();
+      // Unpause double buffer to avoid affecting other tests
+      doubleBuffer.unpause();
     }
   }
 

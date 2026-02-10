@@ -297,7 +297,7 @@ public class TestOMKeyDeleteRequestWithFSO extends TestOMKeyDeleteRequest {
 
     // Create a child directory (tests checkSubDirectoryExists path)
     OMRequestTestUtils.addParentsToDirTable(volumeName, bucketName, parentDir + "/childDir", omMetadataManager);
-    
+
     // Create a child file (tests checkSubFileExists path)
     String fileName = "childFile";
     OmKeyInfo fileInfo = OMRequestTestUtils.createOmKeyInfo(volumeName,
