@@ -86,7 +86,7 @@ public class SCMStateMachine extends BaseStateMachine {
   private List<ManagedSecretKey> installingSecretKeys = null;
 
   private AtomicLong currentLeaderTerm = new AtomicLong(-1L);
-  private AtomicBoolean refreshedAfterLeaderReady = new AtomicBoolean();
+  private AtomicBoolean isStateMachineReady = new AtomicBoolean();
 
   public SCMStateMachine(final StorageContainerManager scm,
       SCMHADBTransactionBuffer buffer) {
@@ -164,7 +164,7 @@ public class SCMStateMachine extends BaseStateMachine {
 
       // After previous term transactions are applied, still in safe mode,
       // perform refreshAndValidate to update the safemode rule state.
-      if (scm.isInSafeMode() && refreshedAfterLeaderReady.get()) {
+      if (scm.isInSafeMode() && isStateMachineReady.get()) {
         scm.getScmSafeModeManager().refreshAndValidate();
       }
       final TermIndex appliedTermIndex = TermIndex.valueOf(trx.getLogEntry());
@@ -285,6 +285,14 @@ public class SCMStateMachine extends BaseStateMachine {
     currentLeaderTerm.set(scm.getScmHAManager().getRatisServer().getDivision()
         .getInfo().getCurrentTerm());
 
+    if (isStateMachineReady.compareAndSet(false, true)) {
+      // refresh and validate safe mode rules if it can exit safe mode
+      // if being leader, all previous term transactions have been applied
+      // if other states, just refresh safe mode rules, and transaction keeps flushing from leader
+      // and does not depend on pending transactions.
+      scm.getScmSafeModeManager().refreshAndValidate();
+    }
+
     if (!groupMemberId.getPeerId().equals(newLeaderId)) {
       LOG.info("leader changed, yet current SCM is still follower.");
       return;
@@ -295,6 +303,12 @@ public class SCMStateMachine extends BaseStateMachine {
     scm.getScmContext().updateLeaderAndTerm(true,
         currentLeaderTerm.get());
     scm.getSequenceIdGen().invalidateBatch();
+
+    try {
+      transactionBuffer.flush();
+    } catch (Exception ex) {
+      ExitUtils.terminate(1, "Failed to flush transactionBuffer", ex, StateMachine.LOG);
+    }
 
     DeletedBlockLog deletedBlockLog = scm.getScmBlockManager()
         .getDeletedBlockLog();
@@ -355,21 +369,17 @@ public class SCMStateMachine extends BaseStateMachine {
     }
 
     if (currentLeaderTerm.get() == term) {
-      // Means all transactions before this term have been applied.
       // This means after a restart, all pending transactions have been applied.
-      // Perform
-      // 1. Refresh Safemode rules state.
-      // 2. Start DN Rpc server.
-      if (!refreshedAfterLeaderReady.get()) {
-        refreshedAfterLeaderReady.set(true);
+      if (isStateMachineReady.compareAndSet(false, true)) {
+        // Refresh Safemode rules state if not already done.
         scm.getScmSafeModeManager().refreshAndValidate();
       }
       currentLeaderTerm.set(-1L);
     }
   }
 
-  public boolean isRefreshedAfterLeaderReady() {
-    return refreshedAfterLeaderReady.get();
+  public boolean getIsStateMachineReady() {
+    return isStateMachineReady.get();
   }
 
   @Override
