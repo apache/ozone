@@ -150,29 +150,36 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
           .get(multipartOpenKey);
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
 
-      // If there is no entry in openKeyTable, then there is no multipart
-      // upload initiated for this key.
       if (omKeyInfo == null) {
+        // In old env, OpenKeycleanupservice may have deleted key from openKeyTable leaving behind
+        // orphan parts in multipartInfoTable.
+        LOG.warn("Entry doesn't exist in openKeyTable, bucket: {}, key: {}", bucketName, keyName);
+      }
+
+      multipartKeyInfo = omMetadataManager.getMultipartInfoTable()
+          .get(multipartKey);
+
+      if (multipartKeyInfo == null) {
         throw new OMException("Abort Multipart Upload Failed: volume: " +
             requestedVolume + "bucket: " + requestedBucket + "key: " + keyName,
             OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
       }
 
-      multipartKeyInfo = omMetadataManager.getMultipartInfoTable()
-          .get(multipartKey);
       multipartKeyInfo = multipartKeyInfo.toBuilder()
           .setUpdateID(trxnLogIndex)
           .build();
 
       // When abort uploaded key, we need to subtract the PartKey length from
       // the volume usedBytes.
-      long quotaReleased = 0;
-      for (PartKeyInfo iterPartKeyInfo : multipartKeyInfo.getPartKeyInfoMap()) {
-        quotaReleased += QuotaUtil.getReplicatedSize(
-            iterPartKeyInfo.getPartKeyInfo().getDataSize(),
-            omKeyInfo.getReplicationConfig());
+      if (omKeyInfo != null) {
+        long quotaReleased = 0;
+        for (PartKeyInfo iterPartKeyInfo : multipartKeyInfo.getPartKeyInfoMap()) {
+          quotaReleased += QuotaUtil.getReplicatedSize(
+              iterPartKeyInfo.getPartKeyInfo().getDataSize(),
+              omKeyInfo.getReplicationConfig());
+        }
+        omBucketInfo.incrUsedBytes(-quotaReleased);
       }
-      omBucketInfo.incrUsedBytes(-quotaReleased);
 
       // Update cache of openKeyTable and multipartInfo table.
       // No need to add the cache entries to delete table, as the entries
