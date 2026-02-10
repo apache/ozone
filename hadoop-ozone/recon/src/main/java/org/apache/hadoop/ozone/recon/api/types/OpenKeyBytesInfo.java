@@ -28,6 +28,8 @@ public class OpenKeyBytesInfo {
   private long openKeyAndFileBytes;
   private long multipartOpenKeyBytes;
 
+  public OpenKeyBytesInfo() { }
+
   public OpenKeyBytesInfo(long openKeyAndFileBytes, long multipartOpenKeyBytes) {
     this.openKeyAndFileBytes = openKeyAndFileBytes;
     this.multipartOpenKeyBytes = multipartOpenKeyBytes;

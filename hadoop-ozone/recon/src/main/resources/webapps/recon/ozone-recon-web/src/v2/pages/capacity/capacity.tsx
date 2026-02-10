@@ -61,12 +61,7 @@ const Capacity: React.FC<object> = () => {
     CONSTANTS.DEFAULT_CAPACITY_UTILIZATION,
     {
       retryAttempts: 2,
-      onError: (error) => showDataFetchError(error),
-      onSuccess: (data) => {
-        console.log('Storage Distribution API Response:', data);
-        console.log('usedSpaceBreakdown:', data.usedSpaceBreakdown);
-        console.log('openKeyBytes:', data.usedSpaceBreakdown?.openKeyBytes);
-      }
+      onError: (error) => showDataFetchError(error)
     }
   );
   
