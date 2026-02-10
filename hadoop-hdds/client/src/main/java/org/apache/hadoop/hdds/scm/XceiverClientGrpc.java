@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
@@ -117,9 +118,8 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     super();
     Objects.requireNonNull(pipeline, "pipeline == null");
     Objects.requireNonNull(config, "config == null");
-    setTimeout(config.getTimeDuration(OzoneConfigKeys.
-        OZONE_CLIENT_READ_TIMEOUT, OzoneConfigKeys
-        .OZONE_CLIENT_READ_TIMEOUT_DEFAULT, TimeUnit.SECONDS));
+    setTimeout(config.getTimeDuration(OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT,
+        OzoneConfigKeys.OZONE_CLIENT_READ_TIMEOUT_DEFAULT, TimeUnit.SECONDS));
     this.pipeline = pipeline;
     this.config = config;
     this.secConfig = new SecurityConfig(config);
@@ -154,8 +154,9 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   public void connect() throws Exception {
     // connect to the closest node, if closest node doesn't exist, delegate to
     // first node, which is usually the leader in the pipeline.
-    DatanodeDetails dn = topologyAwareRead ? this.pipeline.getClosestNode() :
-        this.pipeline.getFirstNode();
+    DatanodeDetails dn = topologyAwareRead
+        ? this.pipeline.getClosestNode()
+        : this.pipeline.getFirstNode();
     // just make a connection to the picked datanode at the beginning
     connectToDatanode(dn);
   }
@@ -165,22 +166,40 @@ public class XceiverClientGrpc extends XceiverClientSpi {
     if (isConnected(dn)) {
       return;
     }
-    // read port from the data node, on failure use default configured
-    // port.
+    // read port from the data node, on failure use default configured port
     int port = dn.getStandalonePort().getValue();
     if (port == 0) {
       port = config.getInt(OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT,
           OzoneConfigKeys.HDDS_CONTAINER_IPC_PORT_DEFAULT);
     }
+    final int finalPort = port;
 
     LOG.debug("Connecting to server : {}; nodes in pipeline : {}, ", dn, pipeline.getNodes());
 
-    ManagedChannel channel = createChannel(dn, port).build();
-    XceiverClientProtocolServiceStub asyncStub = XceiverClientProtocolServiceGrpc.newStub(channel);
-    synchronized (this) {
-      asyncStubs.put(dn.getID(), asyncStub);
-      channels.put(dn.getID(), channel);
+    channels.computeIfPresent(dn.getID(), (dnId, channel) -> {
+      if (channel.isTerminated() || channel.isShutdown()) {
+        asyncStubs.remove(dnId);
+        return null; // removes from channels map
+      }
+
+      return channel;
+    });
+
+    ManagedChannel channel;
+    try {
+      channel = channels.computeIfAbsent(dn.getID(), dnId -> {
+        try {
+          return createChannel(dn, finalPort).build();
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      });
+    } catch (RuntimeException e) {
+      LOG.error("Failed to create channel to datanode {}", dn, e);
+      throw new IOException(e.getCause());
     }
+
+    asyncStubs.computeIfAbsent(dn.getID(), dnId -> XceiverClientProtocolServiceGrpc.newStub(channel));
   }
 
   protected NettyChannelBuilder createChannel(DatanodeDetails dn, int port)
@@ -250,9 +269,6 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
     while (!nonTerminatedChannels.isEmpty() && System.nanoTime() < deadline) {
       nonTerminatedChannels.removeIf(ManagedChannel::isTerminated);
-      if (nonTerminatedChannels.isEmpty()) {
-        break;
-      }
       try {
         Thread.sleep(SHUTDOWN_WAIT_INTERVAL_MILLIS);
       } catch (InterruptedException e) {
@@ -262,13 +278,14 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       }
     }
 
-    if (!nonTerminatedChannels.isEmpty()) {
-      List<DatanodeID> failedChannels = channels.entrySet().stream()
-          .filter(e -> !e.getValue().isTerminated())
-          .map(Map.Entry::getKey)
-          .collect(Collectors.toList());
-      LOG.warn("Channels {} did not terminate within timeout.", failedChannels);
-    }
+    Set<DatanodeID> failedChannels = channels.entrySet().stream()
+        .filter(e -> !e.getValue().isTerminated())
+        .map(Map.Entry::getKey)
+        .collect(Collectors.toSet());
+    LOG.warn("Channels {} did not terminate within timeout.", failedChannels);
+
+    channels.keySet().removeIf(e -> !failedChannels.contains(e));
+    asyncStubs.keySet().removeIf(e -> !failedChannels.contains(e));
   }
 
   @Override
