@@ -35,6 +35,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -103,7 +104,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
   // command can be sent to the same DN.
   private final Map<DatanodeBlockID, DatanodeDetails> getBlockDNcache;
 
-  private boolean closed = false;
+  private final AtomicBoolean isClosed = new AtomicBoolean(false);
 
   /**
    * Constructs a client that can communicate with the Container framework on
@@ -163,6 +164,10 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
   private void connectToDatanode(DatanodeDetails dn)
       throws IOException {
+    if (isClosed.get()) {
+      throw new IOException("Client is closed.");
+    }
+
     if (isConnected(dn)) {
       return;
     }
@@ -258,7 +263,11 @@ public class XceiverClientGrpc extends XceiverClientSpi {
    */
   @Override
   public void close() {
-    closed = true;
+    if (!isClosed.compareAndSet(false, true)) {
+      // we should allow only one thread to perform the close operation to make it idempotent
+      return;
+    }
+
     for (ManagedChannel channel : channels.values()) {
       channel.shutdown();
     }
@@ -729,7 +738,7 @@ public class XceiverClientGrpc extends XceiverClientSpi {
 
   private void checkOpen(DatanodeDetails dn)
       throws IOException {
-    if (closed) {
+    if (isClosed.get()) {
       throw new IOException("This channel is not connected.");
     }
 
