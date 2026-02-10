@@ -29,7 +29,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
@@ -287,14 +286,16 @@ public class XceiverClientGrpc extends XceiverClientSpi {
       }
     }
 
-    Set<DatanodeID> failedChannels = channels.entrySet().stream()
+    List<DatanodeID> failedChannels = channels.entrySet().stream()
         .filter(e -> !e.getValue().isTerminated())
         .map(Map.Entry::getKey)
-        .collect(Collectors.toSet());
-    LOG.warn("Channels {} did not terminate within timeout.", failedChannels);
+        .collect(Collectors.toList());
+    if (!failedChannels.isEmpty()) {
+      LOG.warn("Channels {} did not terminate within timeout.", failedChannels);
+    }
 
-    channels.keySet().removeIf(e -> !failedChannels.contains(e));
-    asyncStubs.keySet().removeIf(e -> !failedChannels.contains(e));
+    channels.clear();
+    asyncStubs.clear();
   }
 
   @Override
