@@ -87,16 +87,18 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
 
 /**
  * Tests snapshot background services.
  */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestSnapshotBackgroundServices {
-  private static MiniOzoneHAClusterImpl cluster;
-  private static OzoneClient client;
-  private static ObjectStore objectStore;
+  private MiniOzoneHAClusterImpl cluster;
+  private OzoneClient client;
+  private ObjectStore objectStore;
 
   private OzoneBucket ozoneBucket;
   private String volumeName;
@@ -108,10 +110,10 @@ public class TestSnapshotBackgroundServices {
   private static final BucketLayout TEST_BUCKET_LAYOUT = BucketLayout.OBJECT_STORE;
   private static final String SNAPSHOT_NAME_PREFIX = "snapshot-";
   private static final String KEY_NAME_PREFIX = "key-";
-  private static final AtomicInteger COUNTER = new AtomicInteger();
+  private final AtomicInteger counter = new AtomicInteger();
 
   @BeforeAll
-  public static void init() throws Exception {
+  public void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     String omServiceId = "om-service-test1";
     OzoneManagerRatisServerConfig omRatisConf = conf.getObject(OzoneManagerRatisServerConfig.class);
@@ -161,11 +163,11 @@ public class TestSnapshotBackgroundServices {
     recoverCluster();
     stopFollowerOM(cluster.getOMLeader());
 
-    volumeName = "volume" + COUNTER.incrementAndGet();
-    bucketName = "bucket" + COUNTER.incrementAndGet();
+    volumeName = "volume" + counter.incrementAndGet();
+    bucketName = "bucket" + counter.incrementAndGet();
     VolumeArgs createVolumeArgs = VolumeArgs.newBuilder()
-        .setOwner("user" + COUNTER.incrementAndGet())
-        .setAdmin("admin" + COUNTER.incrementAndGet())
+        .setOwner("user" + counter.incrementAndGet())
+        .setAdmin("admin" + counter.incrementAndGet())
         .build();
     objectStore.createVolume(volumeName, createVolumeArgs);
     OzoneVolume retVolumeinfo = objectStore.getVolume(volumeName);
@@ -201,7 +203,7 @@ public class TestSnapshotBackgroundServices {
   }
 
   @AfterAll
-  public static void shutdown() {
+  public void shutdown() {
     IOUtils.closeQuietly(client);
     if (cluster != null) {
       cluster.shutdown();
@@ -231,7 +233,7 @@ public class TestSnapshotBackgroundServices {
         cluster.getOzoneManager(leaderOM.getOMNodeId());
     assertEquals(leaderOM, newFollowerOM);
 
-    SnapshotInfo newSnapshot = createOzoneSnapshot(newLeaderOM, SNAPSHOT_NAME_PREFIX + COUNTER.incrementAndGet());
+    SnapshotInfo newSnapshot = createOzoneSnapshot(newLeaderOM, SNAPSHOT_NAME_PREFIX + counter.incrementAndGet());
 
     /*
       Check whether newly created key data is reclaimed
@@ -256,7 +258,7 @@ public class TestSnapshotBackgroundServices {
     assertNotNull(keyInfoA);
 
     // create snapshot b
-    SnapshotInfo snapshotInfoB = createOzoneSnapshot(newLeaderOM, SNAPSHOT_NAME_PREFIX + COUNTER.incrementAndGet());
+    SnapshotInfo snapshotInfoB = createOzoneSnapshot(newLeaderOM, SNAPSHOT_NAME_PREFIX + counter.incrementAndGet());
     assertNotNull(snapshotInfoB);
 
     // delete key a
@@ -266,7 +268,7 @@ public class TestSnapshotBackgroundServices {
         () -> !isKeyInTable(keyA, omKeyInfoTable));
 
     // create snapshot c
-    SnapshotInfo snapshotInfoC = createOzoneSnapshot(newLeaderOM, SNAPSHOT_NAME_PREFIX + COUNTER.incrementAndGet());
+    SnapshotInfo snapshotInfoC = createOzoneSnapshot(newLeaderOM, SNAPSHOT_NAME_PREFIX + counter.incrementAndGet());
 
     // get snapshot c
     OmSnapshot snapC;
@@ -282,7 +284,7 @@ public class TestSnapshotBackgroundServices {
         () -> isKeyInTable(keyA, snapC.getMetadataManager().getDeletedTable()));
 
     // create snapshot d
-    SnapshotInfo snapshotInfoD = createOzoneSnapshot(newLeaderOM, SNAPSHOT_NAME_PREFIX + COUNTER.incrementAndGet());
+    SnapshotInfo snapshotInfoD = createOzoneSnapshot(newLeaderOM, SNAPSHOT_NAME_PREFIX + counter.incrementAndGet());
 
     // delete snapshot c
     client.getObjectStore()
@@ -555,10 +557,10 @@ public class TestSnapshotBackgroundServices {
   private void confirmSnapDiffForTwoSnapshotsDifferingBySingleKey(
       OzoneManager ozoneManager)
       throws IOException, InterruptedException, TimeoutException {
-    String firstSnapshot = createOzoneSnapshot(ozoneManager, SNAPSHOT_NAME_PREFIX + COUNTER.incrementAndGet())
+    String firstSnapshot = createOzoneSnapshot(ozoneManager, SNAPSHOT_NAME_PREFIX + counter.incrementAndGet())
         .getName();
     String diffKey = writeKeys(1).get(0);
-    String secondSnapshot = createOzoneSnapshot(ozoneManager, SNAPSHOT_NAME_PREFIX + COUNTER.incrementAndGet())
+    String secondSnapshot = createOzoneSnapshot(ozoneManager, SNAPSHOT_NAME_PREFIX + counter.incrementAndGet())
         .getName();
     SnapshotDiffReportOzone diff = getSnapDiffReport(volumeName, bucketName, firstSnapshot, secondSnapshot);
     assertEquals(Collections.singletonList(
@@ -592,7 +594,7 @@ public class TestSnapshotBackgroundServices {
   private void checkIfSnapshotGetsProcessedBySFS(OzoneManager ozoneManager)
       throws IOException, TimeoutException, InterruptedException {
     writeKeys(1);
-    SnapshotInfo newSnapshot = createOzoneSnapshot(ozoneManager, SNAPSHOT_NAME_PREFIX + COUNTER.incrementAndGet());
+    SnapshotInfo newSnapshot = createOzoneSnapshot(ozoneManager, SNAPSHOT_NAME_PREFIX + counter.incrementAndGet());
     assertNotNull(newSnapshot);
     Table<String, SnapshotInfo> snapshotInfoTable =
         ozoneManager.getMetadataManager().getSnapshotInfoTable();
@@ -676,7 +678,7 @@ public class TestSnapshotBackgroundServices {
     List<String> keys = new ArrayList<>();
     long index = 0;
     while (index < keyCount) {
-      String key = KEY_NAME_PREFIX + COUNTER.incrementAndGet();
+      String key = KEY_NAME_PREFIX + counter.incrementAndGet();
       createKey(ozoneBucket, key);
       keys.add(key);
       index++;
