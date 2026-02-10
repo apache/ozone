@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
-import com.google.protobuf.ByteString;
-import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Message;
 import com.google.protobuf.ProtocolMessageEnum;
 import java.math.BigInteger;
@@ -29,6 +27,8 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.ClassUtils;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 
 /**
  * Maps types to the corresponding {@link Codec} implementation.

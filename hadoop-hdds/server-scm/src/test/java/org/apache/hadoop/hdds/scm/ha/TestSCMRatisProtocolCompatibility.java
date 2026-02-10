@@ -68,7 +68,7 @@ public class TestSCMRatisProtocolCompatibility {
     assertEquals("testOp", proto3.getMethod().getName());
     assertEquals(1, proto3.getMethod().getArgsCount());
     assertEquals("java.lang.String", proto3.getMethod().getArgs(0).getType());
-    assertEquals(ByteString.copyFromUtf8("v"), proto3.getMethod().getArgs(0).getValue());
+    assertEquals("v", proto3.getMethod().getArgs(0).getValue().toStringUtf8());
   }
 
   /**
@@ -93,6 +93,6 @@ public class TestSCMRatisProtocolCompatibility {
     assertTrue(proto3.hasType(), "proto3 should see type presence from proto2 bytes");
     assertTrue(proto3.hasValue(), "proto3 should see value presence from proto2 bytes");
     assertEquals("java.lang.String", proto3.getType());
-    assertEquals(ByteString.copyFromUtf8("ok"), proto3.getValue());
+    assertEquals("ok", proto3.getValue().toStringUtf8());
   }
 }

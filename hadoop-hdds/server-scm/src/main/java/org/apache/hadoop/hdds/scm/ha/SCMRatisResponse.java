@@ -17,12 +17,12 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
-import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.SCMRatisResponseProto;
 import org.apache.hadoop.hdds.scm.ha.io.CodecFactory;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 
 /**
