@@ -871,7 +871,6 @@ public final class OMFileRequest {
               cacheIter.next();
       OmDirectoryInfo cacheOmDirInfo = entry.getValue().getCacheValue();
       if (cacheOmDirInfo == null) {
-        // Entry marked for deletion in cache (Ratis transaction committed but not yet flushed to DB)
         continue;
       }
       if (isImmediateChild(cacheOmDirInfo.getParentObjectID(),
@@ -931,7 +930,6 @@ public final class OMFileRequest {
               cacheIter.next();
       OmKeyInfo cacheOmFileInfo = entry.getValue().getCacheValue();
       if (cacheOmFileInfo == null) {
-        // Entry marked for deletion in cache (Ratis transaction committed but not yet flushed to DB)
         continue;
       }
       if (isImmediateChild(cacheOmFileInfo.getParentObjectID(),
