@@ -81,6 +81,27 @@ public class TestServerUtils {
   }
 
   @Test
+  public void testGetPermissionsWithDefaults() {
+    // Create an OzoneConfiguration without explicitly setting permissions
+    // Should fall back to default values from ozone-default.xml (700)
+    OzoneConfiguration conf = new OzoneConfiguration();
+
+    // Test getPermissions for different config names and verify they use defaults
+    assertEquals("700",
+        ServerUtils.getPermissions(ReconConfigKeys.OZONE_RECON_DB_DIR, conf),
+        "Should use default 700 for Recon DB dirs");
+    assertEquals("700",
+        ServerUtils.getPermissions(ScmConfigKeys.OZONE_SCM_DB_DIRS, conf),
+        "Should use default 700 for SCM DB dirs");
+    assertEquals("700",
+        ServerUtils.getPermissions(OzoneConfigKeys.OZONE_METADATA_DIRS, conf),
+        "Should use default 700 for metadata dirs");
+    assertEquals("700",
+        ServerUtils.getPermissions(OzoneConfigKeys.OZONE_OM_DB_DIRS, conf),
+        "Should use default 700 for OM DB dirs");
+  }
+
+  @Test
   public void testGetDirectoryFromConfigWithOctalPermissions()
       throws IOException {
     // Create a temporary directory

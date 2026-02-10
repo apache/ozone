@@ -802,7 +802,8 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
    * Sets permissions on the storage directory (e.g., hdds subdirectory).
    */
   private void setStorageDirPermissions() {
-    if (conf != null && getStorageDir().exists()) {
+    if (conf != null && getStorageDir().exists()
+        && HDDS_VOLUME_DIR.equals(getStorageDir().getName())) {
       ServerUtils.setDataDirectoryPermissions(getStorageDir(), conf,
           ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS);
     }

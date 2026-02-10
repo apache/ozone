@@ -260,7 +260,6 @@ public final class ServerUtils {
    * @param dir The directory to set permissions on
    * @param conf Configuration source
    * @param permissionConfigKey The configuration key for permissions
-   * @throws RuntimeException If setting permissions fails
    */
   public static void setDataDirectoryPermissions(File dir, ConfigurationSource conf,
       String permissionConfigKey) {
@@ -285,7 +284,8 @@ public final class ServerUtils {
       Path path = dir.toPath();
       Files.setPosixFilePermissions(path,
           PosixFilePermissions.fromString(symbolicPermission));
-      LOG.debug("Set permissions {} on directory {}", symbolicPermission, dir);
+      LOG.debug("Set permissions {} on directory {} using config key {}",
+          symbolicPermission, dir, permissionConfigKey);
     } catch (Exception e) {
       LOG.warn("Failed to set directory permissions for {}: {}", dir,
           e.getMessage());
