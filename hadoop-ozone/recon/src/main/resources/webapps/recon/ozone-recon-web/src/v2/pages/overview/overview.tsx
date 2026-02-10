@@ -17,58 +17,33 @@
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Row, Col, Button } from 'antd';
-import { CheckCircleFilled, WarningFilled } from '@ant-design/icons';
-import { Link } from 'react-router-dom';
+import { Row, Col } from 'antd';
 import moment from 'moment';
 import filesize from 'filesize';
 
 import AutoReloadPanel from '@/components/autoReloadPanel/autoReloadPanel';
 import OverviewSimpleCard from '@/v2/components/cards/overviewSimpleCard';
 import OverviewSummaryCard from '@/v2/components/cards/overviewSummaryCard';
-import OverviewStorageCard from '@/v2/components/cards/overviewStorageCard';
+import OverviewHealthCard from '@/v2/components/cards/overviewHealthCard';
+import CapacityBreakdown from '@/v2/pages/capacity/components/CapacityBreakdown';
+import WrappedInfoIcon from '@/v2/pages/capacity/components/WrappedInfoIcon';
+
 import { AxiosGetHelper } from '@/utils/axiosRequestHelper';
 import { showDataFetchError } from '@/utils/common';
 import { cancelRequests } from '@/utils/axiosRequestHelper';
 import { useApiData } from '@/v2/hooks/useAPIData.hook';
 import { useAutoReload } from '@/v2/hooks/useAutoReload.hook';
-import * as CONSTANTS from '@/v2/constants/overview.constants';
+
 import { ClusterStateResponse, KeysSummary, OverviewState, TaskStatus } from '@/v2/types/overview.types';
+
+import * as CONSTANTS from '@/v2/constants/overview.constants';
+import { otherUsedSpaceDesc, totalCapacityDesc } from '@/v2/pages/capacity/constants/descriptions.constants';
+
 
 import './overview.less';
 
 // ------------- Helper Functions -------------- //
 const size = filesize.partial({ round: 1 });
-
-const getHealthIcon = (value: string): React.ReactElement => {
-  const values = value.split('/');
-  if (values.length == 2 && values[0] < values[1]) {
-    return (
-      <>
-        <div className='icon-warning' style={{
-          fontSize: '20px',
-          alignItems: 'center'
-        }}>
-          <WarningFilled style={{
-            marginRight: '5px'
-          }} />
-          Unhealthy
-        </div>
-      </>
-    )
-  }
-  return (
-    <div className='icon-success' style={{
-      fontSize: '20px',
-      alignItems: 'center'
-    }}>
-      <CheckCircleFilled style={{
-        marginRight: '5px'
-      }} />
-      Healthy
-    </div>
-  )
-}
 
 const getSummaryTableValue = (
   value: number | string | undefined | null,
@@ -165,33 +140,6 @@ const Overview: React.FC<{}> = () => {
     };
   }, []);
 
-  const healthCardIndicators = (
-    <>
-      <Col span={14}>
-        Datanodes
-        {getHealthIcon(`${clusterState.data?.healthyDatanodes}/${clusterState.data?.totalDatanodes}`)}
-      </Col>
-      <Col span={10}>
-        Containers
-        {getHealthIcon(`${(clusterState.data?.containers || 0) - (clusterState.data?.missingContainers || 0)}/${clusterState.data?.containers}`)}
-      </Col>
-    </>
-  );
-
-  const datanodesLink = (
-    <Button type='link' size='small'>
-      <Link to='/Datanodes'> View More </Link>
-    </Button>
-  );
-
-  const containersLink = (
-    <Button
-      type='link'
-      size='small'>
-      <Link to='/Containers'> View More</Link>
-    </Button>
-  )
-
   const loading = clusterState.loading || taskStatus.loading || openKeysSummary.loading || deletePendingKeysSummary.loading;
   const {
     healthyDatanodes,
@@ -238,50 +186,59 @@ const Overview: React.FC<{}> = () => {
               lg: 16,
               xl: 16
             }, 20]}>
-          <Col xs={24} sm={24} md={24} lg={10} xl={10}>
-            <OverviewSummaryCard
-              title='Health'
-              data={healthCardIndicators}
-              showHeader={true}
+          <Col xs={24} sm={24} md={24} lg={12} xl={12}>
+            <OverviewHealthCard
+              title='Datanodes'
               loading={clusterState.loading}
-              columns={[
-                {
-                  title: '',
-                  dataIndex: 'name',
-                  key: 'name'
-                },
-                {
-                  title: 'Available',
-                  dataIndex: 'value',
-                  key: 'value',
-                  align: 'right'
-                },
-                {
-                  title: 'Actions',
-                  dataIndex: 'action',
-                  key: 'action',
-                  align: 'right'
-                }
-              ]}
-              tableData={[
-                {
-                  key: 'datanodes',
-                  name: 'Datanodes',
-                  value: `${healthyDatanodes}/${totalDatanodes}`,
-                  action: datanodesLink
-                },
-                {
-                  key: 'containers',
-                  name: 'Containers',
-                  value: `${containers - missingContainers}/${containers}`,
-                  action: containersLink
-                }
-              ]}
+              available={healthyDatanodes ?? 'N/A'}
+              total={totalDatanodes ?? 'N/A'}
               error={clusterState.error}
-            />
+              linkToUrl='/Datanodes' />
           </Col>
-          <Col xs={24} sm={24} md={24} lg={14} xl={14}>
-            <OverviewStorageCard storageReport={storageReport} loading={clusterState.loading} error={clusterState.error}/>
+          <Col xs={24} sm={24} md={24} lg={12} xl={12}>
+            <OverviewHealthCard
+              title='Containers'
+              loading={clusterState.loading}
+              available={(containers ?? 0) - (missingContainers ?? 0)}
+              total={containers ?? 'N/A'}
+              error={clusterState.error}
+              linkToUrl='/Containers' />
+          </Col>
+          <Col xs={24} sm={24} md={24} lg={24} xl={24}>
+            <CapacityBreakdown
+              title='Ozone Capacity'
+              loading={clusterState.loading}
+              items={[{
+                title: (
+                  <span>
+                    TOTAL
+                    <WrappedInfoIcon title={totalCapacityDesc} />
+                  </span>
+                ),
+                value: storageReport.capacity,
+              }, {
+                title: 'OZONE USED SPACE',
+                value: storageReport.used,
+                color: '#f4a233'
+              }, {
+                title: (
+                  <span>
+                    OTHER USED SPACE
+                    <WrappedInfoIcon title={otherUsedSpaceDesc} />
+                  </span>
+                ),
+                value: (
+                  storageReport.capacity
+                  - storageReport.remaining
+                  - storageReport.used
+                ),
+                color: '#11073a'
+              }, {
+                title: 'CONTAINER PRE-ALLOCATED',
+                value: storageReport.committed,
+                color: '#f47b2d'
+              }]}
+            />
           </Col>
         </Row>
         <Row gutter={[
