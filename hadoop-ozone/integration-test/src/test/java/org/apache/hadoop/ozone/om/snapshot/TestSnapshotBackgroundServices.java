@@ -97,9 +97,7 @@ import org.junit.jupiter.api.TestMethodOrder;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestSnapshotBackgroundServices {
   private MiniOzoneHAClusterImpl cluster;
-  private OzoneClient client;
   private ObjectStore objectStore;
-
   private OzoneBucket ozoneBucket;
   private String volumeName;
   private String bucketName;
@@ -110,6 +108,7 @@ public class TestSnapshotBackgroundServices {
   private static final BucketLayout TEST_BUCKET_LAYOUT = BucketLayout.OBJECT_STORE;
   private static final String SNAPSHOT_NAME_PREFIX = "snapshot-";
   private static final String KEY_NAME_PREFIX = "key-";
+  private OzoneClient client;
   private final AtomicInteger counter = new AtomicInteger();
 
   @BeforeAll
