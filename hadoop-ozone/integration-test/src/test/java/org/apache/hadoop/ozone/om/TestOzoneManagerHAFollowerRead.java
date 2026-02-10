@@ -162,6 +162,12 @@ public abstract class TestOzoneManagerHAFollowerRead {
 
     conf.setFromObject(omHAConfig);
 
+    // Enable local lease
+    OmConfig omConfig = conf.getObject(OmConfig.class);
+    omConfig.setFollowerReadLocalLeaseEnabled(true);
+
+    conf.setFromObject(omConfig);
+
     // config for key deleting service.
     conf.set(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, "10s");
     conf.set(OZONE_KEY_DELETING_LIMIT_PER_TASK, "2");

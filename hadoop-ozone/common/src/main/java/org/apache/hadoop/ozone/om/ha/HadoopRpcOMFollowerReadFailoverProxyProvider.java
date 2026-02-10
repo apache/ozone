@@ -40,6 +40,8 @@ import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyHint;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,7 +66,7 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
   private static final Logger LOG = LoggerFactory.getLogger(HadoopRpcOMFollowerReadFailoverProxyProvider.class);
 
   /** The inner proxy provider used for leader-based failover. */
-  private final HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> failoverProxy;
+  private final HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> leaderFailoverProxy;
 
   /** The combined proxy which redirects to other proxies as necessary. */
   private final ProxyInfo<OzoneManagerProtocolPB> combinedProxy;
@@ -84,12 +86,23 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
   /** The last proxy that has been used. Only used for testing. */
   private volatile OMProxyInfo<OzoneManagerProtocolPB> lastProxy = null;
 
+  private final ReadConsistencyType followerReadConsistencyType;
+  private final ReadConsistencyType leaderReadConsistencyType;
+
   public HadoopRpcOMFollowerReadFailoverProxyProvider(
-      HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> failoverProxy) {
-    this.failoverProxy = failoverProxy;
+      HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> leaderFailoverProxy
+  ) {
+    this(leaderFailoverProxy, ReadConsistencyType.LINEARIZABLE_FOLLOWER_READ, ReadConsistencyType.DEFAULT);
+  }
+
+  public HadoopRpcOMFollowerReadFailoverProxyProvider(
+      HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> leaderFailoverProxy,
+      ReadConsistencyType followerReadConsistencyType,
+      ReadConsistencyType leaderReadConsistencyType) {
+    this.leaderFailoverProxy = leaderFailoverProxy;
     // Create a wrapped proxy containing all the proxies. Since this combined
     // proxy is just redirecting to other proxies, all invocations can share it.
-    final String combinedInfo = "[" + failoverProxy.getOMProxies().stream()
+    final String combinedInfo = "[" + leaderFailoverProxy.getOMProxies().stream()
         .map(a -> a.proxyInfo)
         .reduce((a, b) -> a + ", " + b).orElse("") + "]";
     OzoneManagerProtocolPB wrappedProxy = (OzoneManagerProtocolPB) Proxy.newProxyInstance(
@@ -97,6 +110,8 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
         new Class<?>[] {OzoneManagerProtocolPB.class}, new FollowerReadInvocationHandler());
     combinedProxy = new ProxyInfo<>(wrappedProxy, combinedInfo);
     this.useFollowerRead = true;
+    this.followerReadConsistencyType = followerReadConsistencyType;
+    this.leaderReadConsistencyType = leaderReadConsistencyType;
   }
 
   @Override
@@ -113,7 +128,7 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
   public void performFailover(OzoneManagerProtocolPB currProxy) {
     // Since FollowerReadInvocationHandler might user or fallback to leader-based failover logic,
     // we should delegate the failover logic to the leader's failover.
-    failoverProxy.performFailover(currProxy);
+    leaderFailoverProxy.performFailover(currProxy);
   }
 
   public RetryPolicy getRetryPolicy(int maxFailovers) {
@@ -123,7 +138,7 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
     //    (when follower read is disabled or using write request)
     // 2. The FollowerInvocationHandler is also written so that the thrown exception is handled by the
     //    OMFailoverProxyProviderbase's RetryPolicy
-    return failoverProxy.getRetryPolicy(maxFailovers);
+    return leaderFailoverProxy.getRetryPolicy(maxFailovers);
   }
 
   /**
@@ -176,15 +191,15 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
    * @return The new proxy that should be used.
    */
   private synchronized OMProxyInfo<OzoneManagerProtocolPB> changeProxy(OMProxyInfo<OzoneManagerProtocolPB> initial) {
-    OMProxyInfo<OzoneManagerProtocolPB> currentProxy = failoverProxy.getOMProxyMap().get(currentIndex);
+    OMProxyInfo<OzoneManagerProtocolPB> currentProxy = leaderFailoverProxy.getOMProxyMap().get(currentIndex);
     if (currentProxy != initial) {
       // Must have been a concurrent modification; ignore the move request
       return currentProxy;
     }
-    final OMProxyInfo.OrderedMap<OzoneManagerProtocolPB> omProxies = failoverProxy.getOMProxyMap();
+    final OMProxyInfo.OrderedMap<OzoneManagerProtocolPB> omProxies = leaderFailoverProxy.getOMProxyMap();
     currentIndex = (currentIndex + 1) % omProxies.size();
     final String currentOmNodeId = omProxies.getNodeId(currentIndex);
-    currentProxy = failoverProxy.createOMProxyIfNeeded(currentOmNodeId);
+    currentProxy = leaderFailoverProxy.createOMProxyIfNeeded(currentOmNodeId);
     LOG.debug("Changed current proxy from {} to {}",
         initial == null ? "none" : initial.proxyInfo,
         currentProxy.proxyInfo);
@@ -213,9 +228,27 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
         return method.invoke(this, args);
       }
       OMRequest omRequest = parseOMRequest(args);
-      if (useFollowerRead && OmUtils.shouldSendToFollower(omRequest)) {
+
+      // Apply default consistency hint once, before any routing decision.
+      // In the future, we will support per-request hints which allows client (e.g. S3 clients)
+      // to specify a custom request header (e.g. x-ozone-read-consistency) as a consistency hint
+      // for read requests.
+      boolean isFollowerEligible = useFollowerRead && OmUtils.shouldSendToFollower(omRequest);
+      if (!omRequest.hasReadConsistencyHint()) {
+        ReadConsistencyType defaultType = isFollowerEligible
+            ? followerReadConsistencyType : leaderReadConsistencyType;
+        if (defaultType != null && defaultType != ReadConsistencyType.CONSISTENCY_TYPE_UNKNOWN) {
+          omRequest = omRequest.toBuilder()
+              .setReadConsistencyHint(ReadConsistencyHint.newBuilder()
+                  .setConsistencyType(defaultType).build())
+              .build();
+          args[1] = omRequest;
+        }
+      }
+
+      if (isFollowerEligible) {
         int failedCount = 0;
-        for (int i = 0; useFollowerRead && i < failoverProxy.getOMProxyMap().size(); i++) {
+        for (int i = 0; useFollowerRead && i < leaderFailoverProxy.getOMProxyMap().size(); i++) {
           OMProxyInfo<OzoneManagerProtocolPB> current = getCurrentProxy();
           LOG.debug("Attempting to service {} with cmdType {} using proxy {}",
               method.getName(), omRequest.getCmdType(), current.proxyInfo);
@@ -265,7 +298,7 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
               }
             }
 
-            if (!failoverProxy.shouldFailover(e)) {
+            if (!leaderFailoverProxy.shouldFailover(e)) {
               // We reuse the leader proxy provider failover since we want to ensure
               // if the follower read proxy decides that the exception should be failed,
               // the leader proxy provider failover retry policy (i.e. OMFailoverProxyProviderBase#getRetryPolicy)
@@ -307,13 +340,13 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
       // Either all followers have failed, follower reads are disabled,
       // or this is a write request. In any case, forward the request to
       // the leader OM.
-      LOG.debug("Using leader-based failoverProxy to service {}", method.getName());
-      final OMProxyInfo<OzoneManagerProtocolPB> leaderProxy = failoverProxy.getProxy();
+      LOG.debug("Using leader-based leaderFailoverProxy to service {}", method.getName());
+      final OMProxyInfo<OzoneManagerProtocolPB> leaderProxy = leaderFailoverProxy.getProxy();
       Object retVal = null;
       try {
         retVal = method.invoke(leaderProxy.getProxy(), args);
       } catch (InvocationTargetException e) {
-        LOG.debug("Exception thrown from leader-based failoverProxy", e.getCause());
+        LOG.debug("Exception thrown from leader-based leaderFailoverProxy", e.getCause());
         // This exception will be handled by the OMFailoverProxyProviderBase#getRetryPolicy
         // (see getRetryPolicy). This ensures that the leader-only failover should still work.
         throwServiceException(e.getCause());
@@ -330,15 +363,15 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
     @Override
     public ConnectionId getConnectionId() {
       return RPC.getConnectionIdForProxy(useFollowerRead
-          ? getCurrentProxy().proxy : failoverProxy.getProxy().getProxy());
+          ? getCurrentProxy().proxy : leaderFailoverProxy.getProxy().getProxy());
     }
   }
 
   @Override
   public synchronized void close() throws IOException {
-    // All the proxies are stored in the underlying failoverProxy
-    // so we invoke close on the underlying failoverProxy
-    failoverProxy.close();
+    // All the proxies are stored in the underlying leaderFailoverProxy
+    // so we invoke close on the underlying leaderFailoverProxy
+    leaderFailoverProxy.close();
   }
 
   @VisibleForTesting
@@ -348,22 +381,22 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
 
   @VisibleForTesting
   public List<OMProxyInfo<OzoneManagerProtocolPB>> getOMProxies() {
-    return failoverProxy.getOMProxies();
+    return leaderFailoverProxy.getOMProxies();
   }
 
   public synchronized void changeInitialProxyForTest(String initialOmNodeId) {
-    final OMProxyInfo<OzoneManagerProtocolPB> currentProxy = failoverProxy.getOMProxyMap().get(currentIndex);
+    final OMProxyInfo<OzoneManagerProtocolPB> currentProxy = leaderFailoverProxy.getOMProxyMap().get(currentIndex);
     if (currentProxy != null && currentProxy.getNodeId().equals(initialOmNodeId)) {
       return;
     }
 
-    int indexOfTargetNodeId = failoverProxy.getOMProxyMap().indexOf(initialOmNodeId);
+    int indexOfTargetNodeId = leaderFailoverProxy.getOMProxyMap().indexOf(initialOmNodeId);
     if (indexOfTargetNodeId == -1) {
       return;
     }
 
     currentIndex = indexOfTargetNodeId;
-    failoverProxy.createOMProxyIfNeeded(initialOmNodeId);
+    leaderFailoverProxy.createOMProxyIfNeeded(initialOmNodeId);
   }
 
   /**
