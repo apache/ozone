@@ -2014,6 +2014,13 @@
                       <bannedImport>org.eclipse.jetty.util.StringUtil</bannedImport>
                     </bannedImports>
                   </restrictImports>
+                  <restrictImports>
+                    <includeTestCode>true</includeTestCode>
+                    <reason>Avoid using private API</reason>
+                    <bannedImports>
+                      <bannedImport>io.netty.util.internal.**</bannedImport>
+                    </bannedImports>
+                  </restrictImports>
                 </rules>
               </configuration>
             </execution>
