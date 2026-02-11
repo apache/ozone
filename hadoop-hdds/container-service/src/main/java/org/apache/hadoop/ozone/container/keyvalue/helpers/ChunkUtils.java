@@ -492,7 +492,7 @@ public final class ChunkUtils {
     }
   }
 
-  public static void limitReadSize(long len)
+  public static int limitReadSize(long len)
       throws StorageContainerException {
     if (len > OzoneConsts.OZONE_SCM_CHUNK_MAX_SIZE) {
       String err = String.format(
@@ -501,6 +501,7 @@ public final class ChunkUtils {
       LOG.error(err);
       throw new StorageContainerException(err, UNSUPPORTED_REQUEST);
     }
+    return (int) len;
   }
 
   public static StorageContainerException wrapInStorageContainerException(
