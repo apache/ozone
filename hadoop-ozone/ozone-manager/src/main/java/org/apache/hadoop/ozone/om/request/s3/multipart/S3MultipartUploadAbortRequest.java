@@ -161,7 +161,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
 
       if (multipartKeyInfo == null) {
         throw new OMException("Abort Multipart Upload Failed: volume: " +
-            requestedVolume + "bucket: " + requestedBucket + "key: " + keyName,
+            requestedVolume + " bucket: " + requestedBucket + " key: " + keyName,
             OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
       }
 
