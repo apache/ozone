@@ -39,28 +39,28 @@ export const getVendorChunks = () => ({
  */
 export const getOptimizeDepsConfig = () => ({
   include: ['react', 'react-dom', 'antd', '@ant-design/icons', 'react-router-dom', 'axios'],
-  force: false // Set to true temporarily if you need to force re-optimization
+  force: false, // Set to true temporarily if you need to force re-optimization
 });
 
 /**
  * Common build configuration
  */
 export const getBuildConfig = (outDir: string) => ({
-  target: "es2015",
+  target: 'es2015',
   outDir,
   rollupOptions: {
     output: {
       chunkFileNames: 'static/js/[name]-[hash].js',
       entryFileNames: 'static/js/[name]-[hash].js',
       assetFileNames: (assetInfo: any) => {
-        const extName = assetInfo.name!.split(".")[1];
+        const extName = assetInfo.name!.split('.')[1];
         if (/css/.test(extName)) {
           return `static/css/[name]-[hash].${extName}`;
         } else {
           return `static/media/[name]-[hash].${extName}`;
         }
       },
-      manualChunks: getVendorChunks()
-    }
-  }
+      manualChunks: getVendorChunks(),
+    },
+  },
 });
