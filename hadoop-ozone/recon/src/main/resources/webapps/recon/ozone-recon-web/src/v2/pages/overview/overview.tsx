@@ -41,6 +41,7 @@ import { otherUsedSpaceDesc, totalCapacityDesc } from '@/v2/pages/capacity/const
 
 
 import './overview.less';
+import { Link } from 'react-router-dom';
 
 // ------------- Helper Functions -------------- //
 const size = filesize.partial({ round: 1 });
@@ -140,6 +141,19 @@ const Overview: React.FC<{}> = () => {
     };
   }, []);
 
+  const capacityCardTitle = (
+    <div className='card-title-div'>
+      Ozone Capacity
+      <Link
+        to={{
+          pathname: "/Capacity"
+        }}
+        style={{
+          fontWeight: 400
+        }}>View More</Link>
+    </div>
+  );
+
   const loading = clusterState.loading || taskStatus.loading || openKeysSummary.loading || deletePendingKeysSummary.loading;
   const {
     healthyDatanodes,
@@ -206,7 +220,7 @@ const Overview: React.FC<{}> = () => {
           </Col>
           <Col xs={24} sm={24} md={24} lg={24} xl={24}>
             <CapacityBreakdown
-              title='Ozone Capacity'
+              title={capacityCardTitle}
               loading={clusterState.loading}
               items={[{
                 title: (
