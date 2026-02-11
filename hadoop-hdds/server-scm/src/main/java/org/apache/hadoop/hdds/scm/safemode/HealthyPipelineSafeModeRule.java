@@ -124,9 +124,6 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
         Pipeline.PipelineState.OPEN);
     
     LOG.debug("Found {} open RATIS/THREE pipelines", openPipelines.size());
-    currentHealthyPipelineCount = (int) openPipelines.stream()
-        .filter(this::isPipelineHealthy)
-        .count();
 
     int pipelineCount = openPipelines.size();
     healthyPipelineThresholdCount = Math.max(minHealthyPipelines,
