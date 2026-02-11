@@ -24,7 +24,6 @@ import static org.apache.hadoop.fs.CommonPathCapabilities.FS_CHECKSUMS;
 import static org.apache.hadoop.fs.FileSystem.TRASH_PREFIX;
 import static org.apache.hadoop.fs.contract.ContractTestUtils.assertHasPathCapabilities;
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
-import static org.apache.hadoop.fs.ozone.OzoneFileSystemTests.createKeyWithECReplicationConfiguration;
 import static org.apache.hadoop.hdds.client.ECReplicationConfig.EcCodec.RS;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
@@ -144,7 +143,7 @@ import org.slf4j.LoggerFactory;
  * TODO: Refactor this and TestOzoneFileSystem to reduce duplication.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-abstract class AbstractRootedOzoneFileSystemTest {
+abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase {
 
   private static final Logger LOG = LoggerFactory.getLogger(AbstractRootedOzoneFileSystemTest.class);
 
@@ -279,16 +278,6 @@ abstract class AbstractRootedOzoneFileSystemTest {
   }
 
   @Test
-  void testOzoneFsServiceLoader() throws IOException {
-    assumeFalse(isBucketFSOptimized);
-
-    OzoneConfiguration confTestLoader = new OzoneConfiguration();
-    // fs.ofs.impl should be loaded from META-INF, no need to explicitly set it
-    assertEquals(FileSystem.getFileSystemClass(
-        OzoneConsts.OZONE_OFS_URI_SCHEME, confTestLoader), RootedOzoneFileSystem.class);
-  }
-
-  @Test
   void testUserHomeDirectory() {
     assertEquals(new Path(rootPath + "user/" + USER1),
         userOfs.getHomeDirectory());
@@ -323,15 +312,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
 
   @Test
   public void testCreateKeyWithECReplicationConfig() throws Exception {
-    String testKeyName = "testKey";
-    Path testKeyPath = new Path(bucketPath, testKeyName);
-    createKeyWithECReplicationConfiguration(cluster.getConf(), testKeyPath);
-
-    OzoneKeyDetails key = getKey(testKeyPath, false);
-    assertEquals(HddsProtos.ReplicationType.EC,
-        key.getReplicationConfig().getReplicationType());
-    assertEquals("rs-3-2-1024k",
-        key.getReplicationConfig().getReplication());
+    createKeyWithECReplicationConfig(bucketPath, cluster.getConf());
   }
 
   @Test
@@ -410,7 +391,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
     Path path = new Path(parent, "key1");
 
     try {
-      OzoneFileSystemTests.listLocatedStatusForZeroByteFile(fs, path);
+      listLocatedStatusForZeroByteFile(fs, path);
     } finally {
       // Cleanup
       fs.delete(parent, true);
@@ -457,51 +438,12 @@ abstract class AbstractRootedOzoneFileSystemTest {
    */
   @Test
   void testListStatusIteratorWithDir() throws Exception {
-    Path parent = new Path(bucketPath, "testListStatus");
-    Path file1 = new Path(parent, "key1");
-    Path file2 = new Path(parent, "key2");
-    try {
-      // Iterator should have no items when dir is empty
-      RemoteIterator<FileStatus> it = ofs.listStatusIterator(bucketPath);
-      assertFalse(it.hasNext());
-      ContractTestUtils.touch(fs, file1);
-      ContractTestUtils.touch(fs, file2);
-      // Iterator should have an item when dir is not empty
-      it = ofs.listStatusIterator(bucketPath);
-      while (it.hasNext()) {
-        FileStatus fileStatus = it.next();
-        assertNotNull(fileStatus);
-        assertEquals(fileStatus.getPath().toUri().getPath(), parent.toString(), "Parent path doesn't match");
-      }
-      // Iterator on a directory should return all subdirs along with
-      // files.
-      it = ofs.listStatusIterator(parent);
-      int iCount = 0;
-      while (it.hasNext()) {
-        iCount++;
-        FileStatus fileStatus = it.next();
-        assertNotNull(fileStatus);
-      }
-      assertEquals(2, iCount, "Iterator did not return all the file status");
-      // Iterator should return file status for only the
-      // immediate children of a directory.
-      Path file3 = new Path(parent, "dir1/key3");
-      Path file4 = new Path(parent, "dir1/key4");
-      ContractTestUtils.touch(fs, file3);
-      ContractTestUtils.touch(fs, file4);
-      it = ofs.listStatusIterator(parent);
-      iCount = 0;
-      while (it.hasNext()) {
-        iCount++;
-        FileStatus fileStatus = it.next();
-        assertNotNull(fileStatus);
-      }
-      assertEquals(3, iCount, "Iterator did not return file status " +
-          "of all the children of the directory");
-    } finally {
-      // Cleanup
-      fs.delete(parent, true);
-    }
+    listStatusIteratorWithDir(bucketPath, fs);
+  }
+
+  @Override
+  RemoteIterator<FileStatus> listStatusIterator(Path path) throws IOException {
+    return ofs.listStatusIterator(path);
   }
 
   /**
@@ -556,7 +498,7 @@ abstract class AbstractRootedOzoneFileSystemTest {
    */
   @Test
   void testListStatusIteratorOnPageSize() throws Exception {
-    OzoneFileSystemTests.listStatusIteratorOnPageSize(conf,
+    listStatusIteratorOnPageSize(conf,
         "/" + volumeName + "/" + bucketName);
   }
 
@@ -910,7 +852,8 @@ abstract class AbstractRootedOzoneFileSystemTest {
     fs.delete(source, true);
   }
 
-  private OzoneKeyDetails getKey(Path keyPath, boolean isDirectory)
+  @Override
+  protected OzoneKeyDetails getKey(Path keyPath, boolean isDirectory)
       throws IOException {
     String key = ofs.pathToKey(keyPath);
     if (isDirectory) {
