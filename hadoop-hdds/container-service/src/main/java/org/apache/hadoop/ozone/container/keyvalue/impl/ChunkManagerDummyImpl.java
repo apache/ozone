@@ -73,11 +73,7 @@ public class ChunkManagerDummyImpl implements ChunkManager {
 
       try (FileChannel ch = FileChannel.open(backingFile,
           StandardOpenOption.READ, StandardOpenOption.WRITE)) {
-        long currentSize = ch.size();
-        if (currentSize < newSize) {
-          ch.position(newSize - 1L);
-          ch.write(ByteBuffer.wrap(new byte[]{0}));
-        } else if (currentSize > newSize) {
+        if (ch.size() < newSize) {
           ch.truncate(newSize);
         }
         mapped = ch.map(FileChannel.MapMode.READ_ONLY, 0, newSize);
