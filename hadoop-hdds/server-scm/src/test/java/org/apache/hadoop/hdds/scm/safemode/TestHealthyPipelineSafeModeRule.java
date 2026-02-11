@@ -49,7 +49,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -332,20 +331,12 @@ public class TestHealthyPipelineSafeModeRule {
           nodeManager, pipelineManager, containerManager, serviceManager, eventQueue, scmContext);
       scmSafeModeManager.start();
 
-      LogCapturer logCapturer = LogCapturer.captureLogs(
-          HealthyPipelineSafeModeRule.class);
-
       HealthyPipelineSafeModeRule healthyPipelineSafeModeRule = SafeModeRuleFactory.getInstance()
           .getSafeModeRule(HealthyPipelineSafeModeRule.class);
 
       // Fire the pipeline report
       firePipelineEvent(pipeline, eventQueue);
-
-      // Wait for log message indicating the pipeline's DN is in bad health.
-      GenericTestUtils.waitFor(
-          () -> logCapturer.getOutput().contains("is not healthy"),
-          100, 5000);
-
+      assertFalse(healthyPipelineSafeModeRule.isPipelineHealthy(pipeline));
       // Ensure the rule is NOT satisfied due to unhealthy DN
       assertFalse(healthyPipelineSafeModeRule.validate());
     } finally {

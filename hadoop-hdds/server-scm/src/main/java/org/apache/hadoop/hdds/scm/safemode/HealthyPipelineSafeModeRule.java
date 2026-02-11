@@ -123,10 +123,19 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
         RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
         Pipeline.PipelineState.OPEN);
     
-    LOG.info("Found {} open RATIS/THREE pipelines", openPipelines.size());
+    LOG.debug("Found {} open RATIS/THREE pipelines", openPipelines.size());
     currentHealthyPipelineCount = (int) openPipelines.stream()
         .filter(this::isPipelineHealthy)
         .count();
+
+    int pipelineCount = openPipelines.size();
+    healthyPipelineThresholdCount = Math.max(minHealthyPipelines,
+        (int) Math.ceil(healthyPipelinesPercent * pipelineCount));
+
+    currentHealthyPipelineCount = (int) openPipelines.stream()
+        .filter(this::isPipelineHealthy)
+        .count();
+
     getSafeModeMetrics().setNumCurrentHealthyPipelines(currentHealthyPipelineCount);
     boolean isValid = currentHealthyPipelineCount >= healthyPipelineThresholdCount;
     if (scmInSafeMode()) {
@@ -139,11 +148,11 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
     return isValid;
   }
 
-  private boolean isPipelineHealthy(Pipeline pipeline) {
+  boolean isPipelineHealthy(Pipeline pipeline) {
     // Verify pipeline has all 3 nodes
     List<DatanodeDetails> nodes = pipeline.getNodes();
     if (nodes.size() != 3) {
-      LOG.info("Pipeline {} is not healthy: has {} nodes instead of 3",
+      LOG.debug("Pipeline {} is not healthy: has {} nodes instead of 3",
           pipeline.getId(), nodes.size());
       return false;
     }
@@ -153,7 +162,7 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
       try {
         NodeStatus status = nodeManager.getNodeStatus(dn);
         if (!status.equals(NodeStatus.inServiceHealthy())) {
-          LOG.info("Pipeline {} is not healthy: DN {} has status - Health: {}, Operational State: {}",
+          LOG.debug("Pipeline {} is not healthy: DN {} has status - Health: {}, Operational State: {}",
               pipeline.getId(), dn.getUuidString(), status.getHealth(), status.getOperationalState());
           return false;
         }
