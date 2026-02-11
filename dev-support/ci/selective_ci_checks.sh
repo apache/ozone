@@ -441,6 +441,23 @@ function check_needs_pmd() {
     start_end::group_end
 }
 
+function check_needs_ui_lint() {
+    start_end::group_start "Check if UI lint is needed"
+    local pattern_array=(
+        "^hadoop-ozone/dev-support/checks/lint.sh"
+        "^ozone-ui"
+        "\\.tsx?$"
+        "\\.jsx?$"
+    )
+    filter_changed_files
+
+    if [[ ${match_count} != "0" ]]; then
+        ui_lint_needed=true
+    fi
+
+    start_end::group_end
+}
+
 # Counts other files which do not need to trigger any functional test
 # (i.e. no compose/integration/kubernetes)
 function get_count_misc_files() {
@@ -532,6 +549,7 @@ function set_outputs() {
     initialization::ga_output needs-compose-tests "${compose_tests_needed}"
     initialization::ga_output needs-integration-tests "${integration_tests_needed}"
     initialization::ga_output needs-kubernetes-tests "${kubernetes_tests_needed}"
+    initialization::ga_output needs-ui-lint "${ui_lint_needed:-false}"
 }
 
 check_for_full_tests_needed_label
@@ -576,5 +594,6 @@ check_needs_checkstyle
 check_needs_docs
 check_needs_findbugs
 check_needs_pmd
+check_needs_ui_lint
 calculate_test_types_to_run
 set_outputs

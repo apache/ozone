@@ -15,9 +15,9 @@
   limitations under the License.
 -->
 
-# Hadoop UI Monorepo
+# Ozone UI Monorepo
 
-This monorepo contains three React applications for Apache Ozone HDDS UI components:
+This monorepo contains three React applications for Apache Ozone UI components:
 
 ## Applications
 
