@@ -89,6 +89,7 @@ function set_outputs_run_everything_and_exit() {
     compose_tests_needed=true
     integration_tests_needed=true
     kubernetes_tests_needed=true
+    ui_lint_needed=true
 
     start_end::group_end
     set_outputs
