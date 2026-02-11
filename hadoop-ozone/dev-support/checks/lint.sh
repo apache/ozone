@@ -37,11 +37,23 @@ if [[ -d "${BASE_DIR}/ozone-ui/src" ]]; then
   
   cat "${REPORT_DIR}/output.log"
   
-  # Parse lint output to report file (format: path:line:col: error message)
-  # ::: Sample error output :::
-  # 39:36  error  Insert `,`  prettier/prettier
+  # Parse lint output to report file
+  # ::: Sample output :::
+  # /path/to/file.ts
+  # 63:38  error  Insert `,`                          prettier/prettier
+  # 64:6   error  Insert `,`                          prettier/prettier
   if [[ ${rc} -ne 0 ]]; then
-    grep "^/" "${REPORT_DIR}/output.log" | grep ":.*error" > "$REPORT_FILE" || true
+    awk '
+      /^\/.*\.(ts|tsx|js|jsx)$/ { 
+        filename = $0
+        next
+      }
+      /^[[:space:]]+[0-9]+:[0-9]+[[:space:]]+(error|warning)/ {
+        # Print filename and error line together
+        print filename
+        print $0
+      }
+    ' "${REPORT_DIR}/output.log" > "$REPORT_FILE" || true
   fi
 else
   rc=0
