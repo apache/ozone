@@ -36,7 +36,7 @@ module.exports = [
       'plugin:react/recommended',
       'plugin:jsx-a11y/recommended',
       'plugin:@typescript-eslint/recommended',
-      'prettier'
+      'plugin:prettier/recommended',
     ],
     parser: '@typescript-eslint/parser',
     parserOptions: {
@@ -124,6 +124,24 @@ module.exports = [
       '@typescript-eslint/no-empty-function': 0,
       '@typescript-eslint/ban-ts-ignore': 0,
       '@typescript-eslint/no-this-alias': 0,
+      'prettier/prettier': [
+        'error',
+        {
+          printWidth: 100,
+          singleQuote: true,
+          trailingComma: 'es5',
+          semi: true,
+          tabWidth: 2,
+          endOfLine: 'lf',
+          arrowParens: 'always',
+          bracketSpacing: true,
+          htmlWhitespaceSensitivity: 'css',
+          quoteProps: 'as-needed',
+          bracketSameLine: false,
+          insertPragma: false,
+          requirePragma: false,
+        },
+      ],
     },
     overrides: [
       {

@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 cd "$DIR/../../.." || exit 1
 
@@ -33,21 +32,21 @@ if [[ -d "${BASE_DIR}/ozone-ui/src" ]]; then
       pnpm install --frozen-lockfile
     fi
     pnpm run lint
-  ) 2>&1 | tee "${REPORT_DIR}/output.log"
-  rc=${PIPESTATUS[0]}
+  ) > "${REPORT_DIR}/output.log" 2>&1
+  rc=$?
   
-  # Parse lint output to report file
+  cat "${REPORT_DIR}/output.log"
+  
+  # Parse lint output to report file (format: path:line:col: error message)
+  # ::: Sample error output :::
+  # 39:36  error  Insert `,`  prettier/prettier
   if [[ ${rc} -ne 0 ]]; then
-    grep -v "^>" "${REPORT_DIR}/output.log" | grep ":" > "$REPORT_FILE" || true
-    if [[ ! -s "$REPORT_FILE" ]]; then
-      echo "UI lint failed. See ${REPORT_DIR}/output.log for details." > "$REPORT_FILE"
-    fi
-  else
-    touch "$REPORT_FILE"
+    grep "^/" "${REPORT_DIR}/output.log" | grep ":.*error" > "$REPORT_FILE" || true
   fi
 else
   rc=0
-  echo "ozone-ui/src not found. Skipping UI lint." | tee "$REPORT_FILE"
+  echo "ozone-ui/src not found. Skipping UI lint."
 fi
 
-exit ${rc}
+ERROR_PATTERN="error"
+source "${DIR}/_post_process.sh"
