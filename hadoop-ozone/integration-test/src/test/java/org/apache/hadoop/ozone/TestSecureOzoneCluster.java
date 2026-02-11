@@ -39,6 +39,7 @@ import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigString
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.ROLLBACK_ERROR;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClient;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getValidInetsForCurrentHost;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
@@ -1449,8 +1450,7 @@ final class TestSecureOzoneCluster {
       CertificateSignRequest.Builder csrBuilder) throws IOException {
     DomainValidator validator = DomainValidator.getInstance();
     // Add all valid ips.
-    List<InetAddress> inetAddresses =
-        OzoneSecurityUtil.getValidInetsForCurrentHost();
+    List<InetAddress> inetAddresses = getValidInetsForCurrentHost();
     csrBuilder.addInetAddresses(inetAddresses, validator);
   }
 }

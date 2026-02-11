@@ -115,6 +115,7 @@ import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithFSO;
 import org.apache.hadoop.ozone.recon.tasks.ReconOmTask;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainers;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -124,6 +125,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Test for container endpoint.
  */
+@Flaky("HDDS-14178")
 public class TestContainerEndpoint {
 
   @TempDir
