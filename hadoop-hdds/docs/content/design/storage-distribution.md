@@ -97,7 +97,7 @@ All metrics are aggregated, and exposed through a **RESTful API (/storagedistrib
 | totalOzoneCapacity                   | Long | Total raw capacity across all DataNodes in bytes.                         |
 | totalOzoneUsedSpace                  | Long | Total used space across all DataNodes in bytes.                           |
 | totalOzoneFreeSpace                  | Long | Total free space across all DataNodes in bytes.                           |
-| totalOzonePreAllocatedContainerSpace | Long | Pre-allocated space for open containers.                                  |
+| totalOzoneCommittedSpace             | Long | Pre-allocated space for open containers.                                  |
 | totalOzoneMinimumFreeSpace           | Long | Sum of all the minimumFreeSpace configured across all DataNodes in bytes. |
 
 ##### globalNamespace Object
@@ -110,7 +110,7 @@ All metrics are aggregated, and exposed through a **RESTful API (/storagedistrib
 | Field                      | Type   | Description                                            |
 |----------------------------|--------|--------------------------------------------------------|
 | openKeyBytes               | Object | Bytes currently held by open keys (not yet committed). |
-| committedKeyBytes          | Long   | Bytes committed to existing keys.                      |
+| finalizedKeyBytes          | Long   | Total bytes in keys that have completed writing.       |
 
 ##### openKeyBytes Object
 | Field                 | Type | Description                                            |
@@ -129,7 +129,7 @@ Each object represents the storage metrics for a single DataNode.
 | capacity         | Long   | Total capacity of the DataNode in bytes.       |
 | used             | Long   | Used space on the DataNode in bytes.           |
 | remaining        | Long   | Remaining free space on the DataNode in bytes. |
-| committed        | Long   | Bytes committed to keys on this DataNode.      |
+| committed        | Long   | Bytes pre allocated for the containers.      |
 | minimumFreeSpace | Long   | Configured minimum free space in bytes.        |
 | reserved         | Long   | Configured reserved space in bytes.            | 
 
@@ -143,7 +143,7 @@ Each object represents the storage metrics for a single DataNode.
     "totalOzoneCapacity": 3242976054744,
     "totalOzoneUsedSpace": 15744356352,
     "totalOzoneFreeSpace": 3002519420928,
-    "totalOzonePreAllocatedContainerSpace": 0,
+    "totalOzoneCommittedSpace": 0,
     "totalMinimumFreeSpace" : 0
   },
   "globalNamespace": {
@@ -156,7 +156,7 @@ Each object represents the storage metrics for a single DataNode.
       "openKeyAndFileBytes" : 0,
       "multipartOpenKeyBytes" : 0
     },
-    "committedKeyBytes": 5242880000
+    "finalizedKeyBytes": 5242880000
   },
   "dataNodeUsage": [
     {
