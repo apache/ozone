@@ -106,9 +106,6 @@ import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
-import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
-import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
-import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
@@ -445,18 +442,10 @@ final class TestSecureOzoneCluster {
     Files.createDirectories(scmPath);
     conf.set(OZONE_METADATA_DIRS, scmPath.toString());
 
+    // Use scmInit to properly initialize SCM with all required directories
+    StorageContainerManager.scmInit(conf, clusterId);
     SCMStorageConfig scmStore = new SCMStorageConfig(conf);
-    scmStore.setClusterId(clusterId);
-    scmStore.setScmId(scmId);
-    scmStore.setSCMHAFlag(true);
-    HASecurityUtils.initializeSecurity(scmStore, conf,
-        InetAddress.getLocalHost().getHostName(), true);
-    scmStore.setPrimaryScmNodeId(scmId);
-    // writes the version file properties
-    scmStore.initialize();
-    SCMRatisServerImpl.initialize(clusterId, scmId,
-        SCMHANodeDetails.loadSCMHAConfig(conf, scmStore)
-                .getLocalNodeDetails(), conf);
+    scmId = scmStore.getScmId();
 
     /*
      * As all these processes run inside the same JVM, there are issues around
