@@ -16,24 +16,17 @@
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.apache.ozone</groupId>
-    <artifactId>ozone</artifactId>
+    <artifactId>hdds-hadoop-dependency-client</artifactId>
     <version>2.2.0-SNAPSHOT</version>
+    <relativePath>../hadoop-dependency-client</relativePath>
   </parent>
-  <artifactId>ozone-tools</artifactId>
+  <artifactId>hdds-cli-common</artifactId>
   <version>2.2.0-SNAPSHOT</version>
   <packaging>jar</packaging>
-  <name>Apache Ozone Tools</name>
-  <description>Apache Ozone Tools</description>
-
-  <properties>
-    <classpath.skip>false</classpath.skip>
-  </properties>
+  <name>Apache Ozone CLI Common</name>
+  <description>Apache Ozone CLI Common</description>
 
   <dependencies>
-    <dependency>
-      <groupId>ch.qos.reload4j</groupId>
-      <artifactId>reload4j</artifactId>
-    </dependency>
     <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
@@ -43,8 +36,8 @@
       <artifactId>picocli</artifactId>
     </dependency>
     <dependency>
-      <groupId>jakarta.xml.bind</groupId>
-      <artifactId>jakarta.xml.bind-api</artifactId>
+      <groupId>jakarta.annotation</groupId>
+      <artifactId>jakarta.annotation-api</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
@@ -52,99 +45,18 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-cli-common</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-common</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-config</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>ozone-common</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ratis</groupId>
       <artifactId>ratis-common</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.apache.ratis</groupId>
-      <artifactId>ratis-shell</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.reflections</groupId>
-      <artifactId>reflections</artifactId>
-    </dependency>
-    <dependency>
-      <!-- required for @MetaInfServices at compile-time, but not at runtime -->
-      <groupId>org.kohsuke.metainf-services</groupId>
-      <artifactId>metainf-services</artifactId>
-      <scope>provided</scope>
-    </dependency>
-    <dependency>
-      <!-- commons-cli is required by OzoneFsShell -->
-      <groupId>commons-cli</groupId>
-      <artifactId>commons-cli</artifactId>
-      <scope>runtime</scope>
-    </dependency>
-    <dependency>
-      <groupId>commons-codec</groupId>
-      <artifactId>commons-codec</artifactId>
-      <scope>runtime</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>ozone-filesystem</artifactId>
-      <scope>runtime</scope>
-    </dependency>
-    <dependency>
-      <!-- transitive via hdds-common, but also for test in this module -->
-      <groupId>org.apache.ratis</groupId>
-      <artifactId>ratis-proto</artifactId>
-      <scope>runtime</scope>
-    </dependency>
-    <dependency>
-      <!-- transitive via hdds-common, but also for test in this module -->
-      <groupId>org.apache.ratis</groupId>
-      <artifactId>ratis-thirdparty-misc</artifactId>
-      <scope>runtime</scope>
-    </dependency>
-    <dependency>
-      <!-- transitive via hdds-common, but also for test in this module -->
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
-      <scope>runtime</scope>
-    </dependency>
-
-    <!-- Test dependencies -->
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-common</artifactId>
-      <type>test-jar</type>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-container-service</artifactId>
-      <type>test-jar</type>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-server-framework</artifactId>
-      <type>test-jar</type>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.ozone</groupId>
-      <artifactId>hdds-test-utils</artifactId>
-      <type>test-jar</type>
-      <scope>test</scope>
     </dependency>
   </dependencies>
+
   <build>
     <plugins>
       <plugin>
@@ -152,8 +64,6 @@
         <artifactId>spotbugs-maven-plugin</artifactId>
         <configuration>
           <excludeFilterFile>${basedir}/dev-support/findbugsExcludeFile.xml</excludeFilterFile>
-          <fork>true</fork>
-          <maxHeap>2048</maxHeap>
         </configuration>
       </plugin>
       <plugin>
@@ -195,10 +105,6 @@
                   <bannedImports>
                     <bannedImport>org.apache.hadoop.hdds.conf.Config</bannedImport>
                     <bannedImport>org.apache.hadoop.hdds.conf.ConfigGroup</bannedImport>
-                    <bannedImport>org.apache.hadoop.hdds.scm.metadata.Replicate</bannedImport>
-                    <bannedImport>org.apache.hadoop.ozone.om.request.validation.OMClientVersionValidator</bannedImport>
-                    <bannedImport>org.apache.hadoop.ozone.om.request.validation.OMLayoutVersionValidator</bannedImport>
-                    <bannedImport>org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator</bannedImport>
                   </bannedImports>
                 </restrictImports>
               </rules>

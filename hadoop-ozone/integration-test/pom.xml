@@ -286,6 +286,11 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-cli-common</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-client</artifactId>
       <scope>test</scope>
     </dependency>
