@@ -25,6 +25,10 @@
   <name>Apache Ozone HDDS Config</name>
   <description>Apache Ozone Distributed Data Store Config Tools</description>
 
+  <properties>
+    <maven.compiler.release>${ozone.java.version.client}</maven.compiler.release>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>org.slf4j</groupId>

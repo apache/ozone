@@ -25,6 +25,11 @@
   <name>Apache Ozone HDDS Server Framework</name>
   <description>Apache Ozone Distributed Data Store Server Framework</description>
 
+  <properties>
+    <!-- hdds-server-framework is used by ozone-cli-admin -->
+    <maven.compiler.release>${ozone.java.version.client}</maven.compiler.release>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>ch.qos.reload4j</groupId>

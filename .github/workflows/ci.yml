@@ -133,7 +133,7 @@ jobs:
     if: needs.build-info.outputs.needs-compile == 'true'
     strategy:
       matrix:
-        java: [ 8, 11, 17 ]
+        java: [ 17 ]
         include:
           - os: ubuntu-24.04
           - java: 21
@@ -160,7 +160,6 @@ jobs:
     uses: ./.github/workflows/check.yml
     with:
       checkout-fetch-depth: ${{ matrix.check != 'bats' && 1 || 0 }}
-      java-version: 8 # HDDS-10150
       needs-maven-cache: ${{ !contains('author,bats', matrix.check) }}
       ratis-args: ${{ inputs.ratis_args }}
       script: ${{ matrix.check }}
