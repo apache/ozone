@@ -171,6 +171,29 @@ jobs:
     strategy:
       matrix:
         check: ${{ fromJson(needs.build-info.outputs.basic-checks) }}
+        exclude:
+          - check: checkstyle
+      fail-fast: false
+
+  checkstyle:
+    needs:
+      - build-info
+    if: needs.build-info.outputs.needs-basic-check == 'true' && contains(needs.build-info.outputs.basic-checks, 'checkstyle')
+    uses: ./.github/workflows/check.yml
+    with:
+      java-version: ${{ matrix.part == 'java' && '8' || '' }}
+      needs-maven-cache: ${{ matrix.part == 'java' }}
+      needs-npm-cache: ${{ matrix.part == 'ui' }}
+      ratis-args: ${{ inputs.ratis_args }}
+      script: checkstyle
+      script-args: ${{ matrix.part }}
+      sha: ${{ needs.build-info.outputs.sha }}
+      split: ${{ matrix.part }}
+      timeout-minutes: 30
+    secrets: inherit
+    strategy:
+      matrix:
+        part: [ java, ui ]
       fail-fast: false
 
   dependency:
