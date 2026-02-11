@@ -21,14 +21,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.matches;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Arrays;
@@ -67,10 +65,6 @@ import org.slf4j.LoggerFactory;
 public class TestScmFinalization {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestScmFinalization.class);
-
-  // Indicates the current state of the mock pipeline manager's pipeline
-  // creation.
-  private boolean pipelineCreationFrozen = false;
 
   /**
    * Order of finalization checkpoints within the enum is used to determine
@@ -253,9 +247,6 @@ public class TestScmFinalization {
         matches(OzoneConsts.FINALIZING_KEY),
         matches(""));
 
-    // Next, all pipeline creation should be stopped.
-    inOrder.verify(pipelineManager, count).freezePipelineCreation();
-
     if (initialCheckpoint == FinalizationCheckpoint.FINALIZATION_STARTED) {
       count = times(1);
     }
@@ -267,20 +258,12 @@ public class TestScmFinalization {
         inOrder.verify(storage, count)
             .setLayoutVersion(feature.layoutVersion());
         inOrder.verify(storage, count).persistCurrentState();
-        // After MLV == SLV, all datanodes should be moved to healthy readonly.
-        if (feature.layoutVersion() ==
-            HDDSLayoutVersionManager.maxLayoutVersion()) {
-          inOrder.verify(nodeManager, count).forceNodesToHealthyReadOnly();
-        }
         inOrder.verify(buffer, count).addToBuffer(
             eq(finalizationStore),
             matches(OzoneConsts.LAYOUT_VERSION_KEY),
             eq(String.valueOf(feature.layoutVersion())));
       }
     }
-    // If this was not called in the loop, there was an error. To detect this
-    // mistake, verify again here.
-    verify(nodeManager, count).forceNodesToHealthyReadOnly();
 
     if (initialCheckpoint == FinalizationCheckpoint.MLV_EQUALS_SLV) {
       count = times(1);
@@ -350,19 +333,6 @@ public class TestScmFinalization {
     // just return something with length >= 1.
     when(pipelineManager.getPipelines(any(),
         any())).thenReturn(Arrays.asList(null, null, null));
-
-    // Set the initial value for pipeline creation based on the checkpoint.
-    // In a real cluster, this would be set on startup of the
-    // PipelineManagerImpl.
-    pipelineCreationFrozen =
-        !FinalizationManager.shouldCreateNewPipelines(inititalCheckpoint);
-    doAnswer(args -> pipelineCreationFrozen = true)
-        .when(pipelineManager).freezePipelineCreation();
-    doAnswer(args -> pipelineCreationFrozen = false)
-        .when(pipelineManager).resumePipelineCreation();
-
-    doAnswer(args -> pipelineCreationFrozen)
-        .when(pipelineManager).isPipelineCreationFrozen();
 
     return pipelineManager;
   }

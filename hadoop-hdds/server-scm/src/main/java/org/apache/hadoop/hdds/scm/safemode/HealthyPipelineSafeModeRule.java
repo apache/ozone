@@ -39,7 +39,6 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
-import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.server.events.TypedEvent;
 import org.slf4j.Logger;
@@ -116,16 +115,7 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
   @Override
   protected synchronized boolean validate() {
-    boolean shouldRunSafemodeCheck =
-        FinalizationManager.shouldCreateNewPipelines(
-            scmContext.getFinalizationCheckpoint());
-    if (!shouldRunSafemodeCheck) {
-      LOG.info("All SCM pipelines are closed due to ongoing upgrade " +
-          "finalization. Bypassing healthy pipeline safemode rule.");
-      return true;
-    } else {
-      return currentHealthyPipelineCount >= healthyPipelineThresholdCount;
-    }
+    return currentHealthyPipelineCount >= healthyPipelineThresholdCount;
   }
 
   @Override
