@@ -17,16 +17,13 @@
 
 package org.apache.hadoop.ozone.recon.api.types;
 
-import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Metadata object that contains storage report of a Datanode.
+ * Metadata object that contains the storage report of the cluster.
  */
-public final class DatanodeStorageReport {
-  private String datanodeUuid;
-  private String hostName;
+public final class ClusterStorageReport {
   private long capacity;
   private long used;
   private long remaining;
@@ -37,12 +34,10 @@ public final class DatanodeStorageReport {
   private long filesystemUsed;
   private long filesystemAvailable;
 
-  public DatanodeStorageReport() {
+  public ClusterStorageReport() {
   }
 
-  private DatanodeStorageReport(Builder builder) {
-    this.datanodeUuid = builder.datanodeUuid;
-    this.hostName = builder.hostName;
+  private ClusterStorageReport(Builder builder) {
     this.capacity = builder.capacity;
     this.used = builder.used;
     this.remaining = builder.remaining;
@@ -53,14 +48,6 @@ public final class DatanodeStorageReport {
     this.filesystemUsed = builder.filesystemUsed;
     this.filesystemAvailable = builder.filesystemAvailable;
     builder.validate();
-  }
-
-  public String getDatanodeUuid() {
-    return datanodeUuid;
-  }
-
-  public String getHostName() {
-    return hostName;
   }
 
   public long getCapacity() {
@@ -107,8 +94,6 @@ public final class DatanodeStorageReport {
    * Builder class for DataNodeStorage Report.
    */
   public static final class Builder {
-    private String datanodeUuid = "";
-    private String hostName = "";
     private long capacity = 0;
     private long used = 0;
     private long remaining = 0;
@@ -123,16 +108,6 @@ public final class DatanodeStorageReport {
         LoggerFactory.getLogger(Builder.class);
 
     private Builder() {
-    }
-
-    public Builder setDatanodeUuid(String datanodeUuid) {
-      this.datanodeUuid = datanodeUuid;
-      return this;
-    }
-
-    public Builder setHostName(String hostName) {
-      this.hostName = hostName;
-      return this;
     }
 
     public Builder setCapacity(long capacity) {
@@ -181,8 +156,6 @@ public final class DatanodeStorageReport {
     }
 
     public void validate() {
-      Objects.requireNonNull(hostName, "hostName cannot be null");
-
       if (capacity < 0) {
         throw new IllegalArgumentException("capacity cannot be negative");
       }
@@ -218,13 +191,13 @@ public final class DatanodeStorageReport {
 
       // Logical consistency checks
       if (used + remaining > capacity) {
-        LOG.warn("Inconsistent storage report for {}: used({}) + remaining({}) > capacity({})",
-            hostName, used, remaining, capacity);
+        LOG.warn("Inconsistent storage report for cluster: " +
+            "used({}) + remaining({}) > capacity({})", used, remaining, capacity);
       }
     }
 
-    public DatanodeStorageReport build() {
-      return new DatanodeStorageReport(this);
+    public ClusterStorageReport build() {
+      return new ClusterStorageReport(this);
     }
   }
 }

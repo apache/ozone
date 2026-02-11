@@ -36,13 +36,15 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.api.types.ClusterStateResponse;
+import org.apache.hadoop.ozone.recon.api.types.ClusterStorageReport;
 import org.apache.hadoop.ozone.recon.api.types.ContainerStateCounts;
-import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
@@ -51,13 +53,12 @@ import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
 import org.apache.hadoop.ozone.recon.tasks.GlobalStatsValue;
 import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
-import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Endpoint to fetch current state of ozone cluster.
+ * Endpoint to fetch the current state of the ozone cluster.
  */
 @Path("/clusterState")
 @Produces(MediaType.APPLICATION_JSON)
@@ -67,17 +68,15 @@ public class ClusterStateEndpoint {
       LoggerFactory.getLogger(ClusterStateEndpoint.class);
   public static final int MISSING_CONTAINER_COUNT_LIMIT = 1001;
 
-  private ReconNodeManager nodeManager;
-  private ReconPipelineManager pipelineManager;
-  private ReconContainerManager containerManager;
-  private GlobalStatsDao globalStatsDao;
-  private ReconGlobalStatsManager reconGlobalStatsManager;
-  private OzoneConfiguration ozoneConfiguration;
+  private final ReconNodeManager nodeManager;
+  private final ReconPipelineManager pipelineManager;
+  private final ReconContainerManager containerManager;
+  private final ReconGlobalStatsManager reconGlobalStatsManager;
+  private final OzoneConfiguration ozoneConfiguration;
   private final ContainerHealthSchemaManager containerHealthSchemaManager;
 
   @Inject
   ClusterStateEndpoint(OzoneStorageContainerManager reconSCM,
-                       GlobalStatsDao globalStatsDao,
                        ReconGlobalStatsManager reconGlobalStatsManager,
                        ContainerHealthSchemaManager
                            containerHealthSchemaManager,
@@ -87,14 +86,13 @@ public class ClusterStateEndpoint {
     this.pipelineManager = (ReconPipelineManager) reconSCM.getPipelineManager();
     this.containerManager =
         (ReconContainerManager) reconSCM.getContainerManager();
-    this.globalStatsDao = globalStatsDao;
     this.reconGlobalStatsManager = reconGlobalStatsManager;
     this.containerHealthSchemaManager = containerHealthSchemaManager;
     this.ozoneConfiguration = ozoneConfiguration;
   }
 
   /**
-   * Return a summary report on current cluster state.
+   * Return a summary report on the current cluster state.
    * @return {@link Response}
    */
   @GET
@@ -119,18 +117,34 @@ public class ClusterStateEndpoint {
         this.containerManager.getContainerStateCount(
             HddsProtos.LifeCycleState.DELETED));
 
-    int healthyDatanodes =
+    int healthyDataNodes =
         nodeManager.getNodeCount(NodeStatus.inServiceHealthy()) +
             nodeManager.getNodeCount(NodeStatus.inServiceHealthyReadOnly());
 
     SCMNodeStat stats = nodeManager.getStats();
+    long fsCapacity = 0;
+    long fsUsed = 0;
+    long fsAvailable = 0;
 
-    DatanodeStorageReport storageReport = DatanodeStorageReport.newBuilder()
+    for (DatanodeInfo datanode : nodeManager.getAllNodes()) {
+      SpaceUsageSource.Fixed fsUsage = nodeManager.getTotalFilesystemUsage(datanode);
+      if (fsUsage != null) {
+        fsCapacity += fsUsage.getCapacity();
+        fsAvailable += fsUsage.getAvailable();
+        fsUsed += fsUsage.getUsedSpace();
+      }
+    }
+
+    ClusterStorageReport storageReport = ClusterStorageReport.newBuilder()
         .setCapacity(stats.getCapacity().get())
         .setCommitted(stats.getCommitted().get())
         .setUsed(stats.getScmUsed().get())
         .setMinimumFreeSpace(stats.getFreeSpaceToSpare().get())
         .setRemaining(stats.getRemaining().get())
+        .setReserved(stats.getReserved().get())
+        .setFilesystemUsed(fsUsed)
+        .setFilesystemCapacity(fsCapacity)
+        .setFilesystemAvailable(fsAvailable)
         .build();
 
     ClusterStateResponse.Builder builder = ClusterStateResponse.newBuilder();
@@ -197,7 +211,7 @@ public class ClusterStateEndpoint {
         .setContainers(containerStateCounts.getTotalContainerCount())
         .setMissingContainers(containerStateCounts.getMissingContainerCount())
         .setTotalDatanodes(nodeManager.getAllNodeCount())
-        .setHealthyDatanodes(healthyDatanodes)
+        .setHealthyDatanodes(healthyDataNodes)
         .setOpenContainers(containerStateCounts.getOpenContainersCount())
         .setDeletedContainers(containerStateCounts.getDeletedContainersCount())
         .setScmServiceId(ozoneConfiguration.get(OZONE_SCM_SERVICE_IDS_KEY))
