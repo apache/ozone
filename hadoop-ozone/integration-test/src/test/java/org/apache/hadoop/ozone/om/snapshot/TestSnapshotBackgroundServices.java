@@ -215,7 +215,7 @@ public class TestSnapshotBackgroundServices {
   public void testSnapshotAndKeyDeletionBackgroundServices()
       throws Exception {
     OzoneManager leaderOM = getLeaderOM();
-    OzoneManager followerOM = getInactiveFollowerOM(leaderOM);
+    OzoneManager followerOM = getInactiveFollowerOM();
 
     createSnapshotsEachWithNewKeys(leaderOM);
 
@@ -370,7 +370,7 @@ public class TestSnapshotBackgroundServices {
     }
   }
 
-  private OzoneManager getInactiveFollowerOM(OzoneManager leaderOM)
+  private OzoneManager getInactiveFollowerOM()
       throws TimeoutException, InterruptedException {
     // Wait for an inactive OM to be available
     AtomicReference<OzoneManager> inactiveOM = new AtomicReference<>();
@@ -404,7 +404,7 @@ public class TestSnapshotBackgroundServices {
     });
 
     OzoneManager leaderOM = getLeaderOM();
-    OzoneManager followerOM = getInactiveFollowerOM(leaderOM);
+    OzoneManager followerOM = getInactiveFollowerOM();
 
     createSnapshotsEachWithNewKeys(leaderOM);
 
@@ -475,7 +475,7 @@ public class TestSnapshotBackgroundServices {
         .forEach(TestSnapshotBackgroundServices::suspendBackupCompactionFilesPruning);
 
     OzoneManager leaderOM = getLeaderOM();
-    OzoneManager followerOM = getInactiveFollowerOM(leaderOM);
+    OzoneManager followerOM = getInactiveFollowerOM();
 
 
     startInactiveFollower(leaderOM, followerOM,
@@ -530,7 +530,7 @@ public class TestSnapshotBackgroundServices {
   public void testSSTFilteringBackgroundService()
       throws IOException, InterruptedException, TimeoutException {
     OzoneManager leaderOM = getLeaderOM();
-    OzoneManager followerOM = getInactiveFollowerOM(leaderOM);
+    OzoneManager followerOM = getInactiveFollowerOM();
 
     createSnapshotsEachWithNewKeys(leaderOM);
 
