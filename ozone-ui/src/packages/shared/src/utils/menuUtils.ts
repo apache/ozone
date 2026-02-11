@@ -26,23 +26,26 @@ export type MenuItem = {
 };
 
 export const getNavMenuItem = (
-  label: string, 
-  key: string, 
-  path?: string, 
-  icon?: React.ReactNode, 
+  label: string,
+  key: string,
+  path?: string,
+  icon?: React.ReactNode,
   children?: MenuItem[]
 ): MenuItem => ({
   key,
   label,
   path,
   icon,
-  children
+  children,
 });
 
 export const findSelectedKey = (
-  items: MenuItem[], 
+  items: MenuItem[],
   pathname: string
-): { selectedKey: string | null, header: string | null } => {
+): {
+  selectedKey: string | null;
+  header: string | null;
+} => {
   for (const item of items) {
     if (item.path === pathname) {
       return { selectedKey: item.key, header: item.label };
@@ -55,4 +58,4 @@ export const findSelectedKey = (
     }
   }
   return { selectedKey: null, header: null };
-}; 
+};

@@ -17,28 +17,28 @@
  */
 
 import React, { Dispatch, SetStateAction, useEffect, useState } from 'react';
-import { Menu, Layout } from 'antd'
+import { Menu, Layout } from 'antd';
 import { DashboardOutlined, DoubleLeftOutlined, EditOutlined } from '@ant-design/icons';
 import { useLocation } from 'react-router-dom';
 import { MenuItem, getNavMenuItem, findSelectedKey } from '../../utils/menuUtils';
 
 type SiderProps = {
-  setHeader: Dispatch<SetStateAction<string>>
+  setHeader: Dispatch<SetStateAction<string>>;
 };
 
 // Logo components using the favicon
 const expandedSidebarLogo = (
   <span style={{ padding: '8px 0px 8px 12px', display: 'block', alignItems: 'center' }}>
-    <img 
-      src="/shared/icons/favicon.ico" 
-      alt="Ozone Logo" 
-      style={{ 
-        width: '24px', 
-        height: '24px', 
+    <img
+      src="/shared/icons/favicon.ico"
+      alt="Ozone Logo"
+      style={{
+        width: '24px',
+        height: '24px',
         marginRight: '8px',
         display: 'inline-block',
-        verticalAlign: 'middle'
-      }} 
+        verticalAlign: 'middle',
+      }}
     />
     <span style={{ color: '#fff', fontSize: '16px', fontWeight: 'bold' }}>Ozone</span>
   </span>
@@ -46,21 +46,18 @@ const expandedSidebarLogo = (
 
 const collapsedSidebarLogo = (
   <span style={{ padding: '12px 12px', display: 'block', textAlign: 'center' }}>
-    <img 
-      src="/shared/icons/favicon.ico" 
-      alt="Ozone Logo" 
-      style={{ 
-        width: '24px', 
-        height: '24px'
-      }} 
+    <img
+      src="/shared/icons/favicon.ico"
+      alt="Ozone Logo"
+      style={{
+        width: '24px',
+        height: '24px',
+      }}
     />
   </span>
-)
+);
 
-const Sidebar: React.FC<SiderProps> = ({
-  setHeader
-}) => {
-
+const Sidebar: React.FC<SiderProps> = ({ setHeader }) => {
   const [collapsed, setCollapsed] = useState<boolean>(false);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const location = useLocation();
@@ -68,13 +65,28 @@ const Sidebar: React.FC<SiderProps> = ({
   const navigationItems: MenuItem[] = [
     getNavMenuItem('Overview', 'Overview', '/', <DashboardOutlined />, undefined),
     getNavMenuItem('Configurations', 'Configurations', undefined, <EditOutlined />, [
-      getNavMenuItem('Application Settings', 'Application Settings', '/appconfig', undefined, undefined),
-      getNavMenuItem('Profile Settings', 'Profile Settings', '/profileconfig', undefined, undefined)
-    ])
+      getNavMenuItem(
+        'Application Settings',
+        'Application Settings',
+        '/appconfig',
+        undefined,
+        undefined
+      ),
+      getNavMenuItem(
+        'Profile Settings',
+        'Profile Settings',
+        '/profileconfig',
+        undefined,
+        undefined
+      ),
+    ]),
   ];
 
   useEffect(() => {
-    const { selectedKey: newSelectedKey, header: newHeader } = findSelectedKey(navigationItems, location.pathname)
+    const { selectedKey: newSelectedKey, header: newHeader } = findSelectedKey(
+      navigationItems,
+      location.pathname
+    );
 
     if (newSelectedKey && newSelectedKey !== selectedKey) {
       setSelectedKey(newSelectedKey);
@@ -85,29 +97,31 @@ const Sidebar: React.FC<SiderProps> = ({
     if (newHeader) {
       setHeader(newHeader);
     }
-  }, [location.pathname, selectedKey])
+  }, [location.pathname, selectedKey, setHeader]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <Layout.Sider
-      prefixCls='navbar'
+      prefixCls="navbar"
       collapsible={true}
       collapsed={collapsed}
       collapsedWidth={56}
       onCollapse={(value: boolean) => setCollapsed(value)}
       width={'15%'}
-      trigger={<DoubleLeftOutlined />}>
-      {(collapsed ? collapsedSidebarLogo : expandedSidebarLogo)}
+      trigger={<DoubleLeftOutlined />}
+    >
+      {collapsed ? collapsedSidebarLogo : expandedSidebarLogo}
       <Menu
-        theme='dark'
+        theme="dark"
         defaultSelectedKeys={['Overview']}
         selectedKeys={selectedKey ? [selectedKey] : []}
-        mode='inline'
+        mode="inline"
         items={navigationItems}
         onSelect={({ keyPath }) => {
-          setHeader([...keyPath].map(keyPath.pop, keyPath).join(' / '))
-        }} />
+          setHeader([...keyPath].map(keyPath.pop, keyPath).join(' / '));
+        }}
+      />
     </Layout.Sider>
   );
 };
 
-export default Sidebar; 
+export default Sidebar;

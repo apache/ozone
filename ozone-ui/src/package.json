@@ -8,7 +8,7 @@
     "build:shared": "pnpm --filter @hadoop-ui/shared run build",
     "build:all": "pnpm --filter @hadoop-ui/ozone-recon --filter @hadoop-ui/ozone-scm --filter @hadoop-ui/ozone-om run build",
     "build:recon": "pnpm --filter @hadoop-ui/ozone-recon run build",
-    "build:scm": "pnpm --filter @hadoop-ui/ozone-scm run build", 
+    "build:scm": "pnpm --filter @hadoop-ui/ozone-scm run build",
     "build:om": "pnpm --filter @hadoop-ui/ozone-om run build",
     "dev:recon": "pnpm --filter @hadoop-ui/ozone-recon run dev",
     "dev:scm": "pnpm --filter @hadoop-ui/ozone-scm run dev",
@@ -34,13 +34,13 @@
     "react-router-dom": "^7.3.0"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.3",
     "@types/node": "^20.14.8",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.1",
     "@typescript-eslint/eslint-plugin": "8.54.0",
     "@typescript-eslint/parser": "8.54.0",
     "@vitejs/plugin-react-swc": "^3.5.0",
-    "@eslint/eslintrc": "^3.3.3",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-jsx-a11y": "6.10.2",
@@ -52,6 +52,7 @@
     "typescript": "~5.6.2",
     "typescript-eslint": "8.54.0",
     "vite": "^5.4.10",
+    "vite-plugin-svgr": "4.5.0",
     "vite-tsconfig-paths": "^3.6.0",
     "vitest": "^1.6.1"
   },

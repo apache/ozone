@@ -15,7 +15,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { UserConfig } from 'vite';
 
 /**
  * Common vendor chunking configuration for all packages
@@ -24,14 +23,14 @@ import { UserConfig } from 'vite';
 export const getVendorChunks = () => ({
   // React ecosystem
   'react-vendor': ['react', 'react-dom'],
-  // Ant Design ecosystem  
+  // Ant Design ecosystem
   'antd-vendor': ['antd', '@ant-design/icons'],
   // Router
   'router-vendor': ['react-router-dom'],
   // HTTP client
   'axios-vendor': ['axios'],
   // Other utilities
-  'utils-vendor': ['@fontsource/roboto', 'less']
+  'utils-vendor': ['@fontsource/roboto', 'less'],
 });
 
 /**
@@ -39,14 +38,7 @@ export const getVendorChunks = () => ({
  * This helps prevent "outdated optimize deps" issues
  */
 export const getOptimizeDepsConfig = () => ({
-  include: [
-    'react',
-    'react-dom',
-    'antd',
-    '@ant-design/icons',
-    'react-router-dom',
-    'axios'
-  ],
+  include: ['react', 'react-dom', 'antd', '@ant-design/icons', 'react-router-dom', 'axios'],
   force: false // Set to true temporarily if you need to force re-optimization
 });
 
@@ -71,4 +63,4 @@ export const getBuildConfig = (outDir: string) => ({
       manualChunks: getVendorChunks()
     }
   }
-}); 
+});

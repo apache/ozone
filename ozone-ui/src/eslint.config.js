@@ -33,10 +33,10 @@ module.exports = [
       es2020: true,
     },
     extends: [
-      'plugin:prettier/recommended',
       'plugin:react/recommended',
       'plugin:jsx-a11y/recommended',
       'plugin:@typescript-eslint/recommended',
+      'prettier'
     ],
     parser: '@typescript-eslint/parser',
     parserOptions: {
@@ -47,6 +47,12 @@ module.exports = [
       },
     },
     plugins: ['jsx-a11y', 'react-hooks'],
+    settings: {
+      react: {
+        pragma: 'React',
+        version: '18.3.1',
+      },
+    },
     rules: {
       'no-duplicate-imports': 'warn',
       'new-cap': 0,
@@ -118,9 +124,6 @@ module.exports = [
       '@typescript-eslint/no-empty-function': 0,
       '@typescript-eslint/ban-ts-ignore': 0,
       '@typescript-eslint/no-this-alias': 0,
-    },
-    settings: {
-      react: '18.3.1',
     },
     overrides: [
       {
