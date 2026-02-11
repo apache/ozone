@@ -57,6 +57,7 @@ import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB.ScmNodeTarget;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CACertificateProvider;
 import org.apache.hadoop.hdds.utils.HAUtils;
@@ -94,8 +95,16 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   public ContainerOperationClient(OzoneConfiguration conf) throws IOException {
+    this(conf, null);
+  }
+
+  public ContainerOperationClient(OzoneConfiguration conf, ScmNodeTarget targetScmNode) throws IOException {
     this.configuration = conf;
-    storageContainerLocationClient = newContainerRpcClient(conf);
+    if (targetScmNode != null) {
+      storageContainerLocationClient = newContainerRpcClientForNode(conf, targetScmNode);
+    } else {
+      storageContainerLocationClient = newContainerRpcClient(conf);
+    }
     secretKeyClient = newSecretKeyClient(conf);
     containerSizeB = (int) conf.getStorageSize(OZONE_SCM_CONTAINER_SIZE,
         OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
@@ -133,6 +142,11 @@ public class ContainerOperationClient implements ScmClient {
   public static StorageContainerLocationProtocol newContainerRpcClient(
       ConfigurationSource configSource) {
     return HAUtils.getScmContainerClient(configSource);
+  }
+
+  public static StorageContainerLocationProtocol newContainerRpcClientForNode(
+      ConfigurationSource configSource, ScmNodeTarget targetScmNode) {
+    return HAUtils.getScmContainerClientForNode(configSource, targetScmNode);
   }
 
   public static SecretKeyProtocolScm newSecretKeyClient(
@@ -475,16 +489,6 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public boolean forceExitSafeMode() throws IOException {
     return storageContainerLocationClient.forceExitSafeMode();
-  }
-
-  @Override
-  public boolean inSafeModeForNode(String nodeId) throws IOException {
-    return storageContainerLocationClient.inSafeModeForNode(nodeId);
-  }
-
-  @Override
-  public Map<String, Pair<Boolean, String>> getSafeModeRuleStatusesForNode(String nodeId) throws IOException {
-    return storageContainerLocationClient.getSafeModeRuleStatusesForNode(nodeId);
   }
 
   @Override

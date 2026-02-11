@@ -164,6 +164,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   private final StorageContainerLocationProtocolPB rpcProxy;
   private final SCMContainerLocationFailoverProxyProvider fpp;
+  private final ScmNodeTarget targetScmNode;
   private static final Logger LOG =
       LoggerFactory.getLogger(StorageContainerLocationProtocolClientSideTranslatorPB.class);
 
@@ -174,8 +175,20 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    */
   public StorageContainerLocationProtocolClientSideTranslatorPB(
       SCMContainerLocationFailoverProxyProvider proxyProvider) {
+    this(proxyProvider, null);
+  }
+
+  /**
+   * Creates a new StorageContainerLocationProtocolClientSideTranslatorPB with a ScmNodeTarget.
+   *
+   * @param proxyProvider {@link SCMContainerLocationFailoverProxyProvider}
+   * @param targetScmNode {@link ScmNodeTarget} to route requests to specific SCM nodes
+   */
+  public StorageContainerLocationProtocolClientSideTranslatorPB(
+      SCMContainerLocationFailoverProxyProvider proxyProvider, ScmNodeTarget targetScmNode) {
     Objects.requireNonNull(proxyProvider, "proxyProvider == null");
     this.fpp = proxyProvider;
+    this.targetScmNode = targetScmNode;
     this.rpcProxy = (StorageContainerLocationProtocolPB) RetryProxy.create(
         StorageContainerLocationProtocolPB.class,
         fpp,
@@ -204,36 +217,19 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     return response;
   }
 
-  /**
-   * Helper method to wrap the request and send the message to a specific SCM node.
-   * This is used for operations that need to query a specific SCM node in an HA cluster.
-   *
-   * @param nodeId the SCM node ID to send the request to
-   * @param type the request type
-   * @param builderConsumer consumer to populate the request specific fields
-   * @return the response from the specified SCM node
-   */
-  private ScmContainerLocationResponse submitRequestToNode(
-      String nodeId,
-      StorageContainerLocationProtocolProtos.Type type,
-      Consumer<Builder> builderConsumer) throws IOException {
-    try {
-      StorageContainerLocationProtocolPB proxy = fpp.getProxyForNode(nodeId);
-      Builder builder = ScmContainerLocationRequest.newBuilder()
-          .setCmdType(type)
-          .setVersion(ClientVersion.CURRENT_VERSION)
-          .setTraceID(TracingUtil.exportCurrentSpan());
-      builderConsumer.accept(builder);
-      ScmContainerLocationRequest wrapper = builder.build();
-      
-      return proxy.submitRequest(NULL_RPC_CONTROLLER, wrapper);
-    } catch (ServiceException ex) {
-      throw ProtobufHelper.getRemoteException(ex);
-    }
-  }
-
   private ScmContainerLocationResponse submitRpcRequest(
       ScmContainerLocationRequest wrapper) throws ServiceException {
+    // If targetScmNode has a specific node ID, route follower-readable requests to that node
+    if (targetScmNode != null && targetScmNode.hasNodeId() && 
+        FOLLOWER_READABLE_COMMAND_TYPES.contains(wrapper.getCmdType())) {
+      try {
+        StorageContainerLocationProtocolPB proxy = fpp.getProxyForNode(targetScmNode.getNodeId());
+        return proxy.submitRequest(NULL_RPC_CONTROLLER, wrapper);
+      } catch (IOException e) {
+        throw new ServiceException("Failed to get proxy for node: " + targetScmNode.getNodeId(), e);
+      }
+    }
+
     if (!ADMIN_COMMAND_TYPE.contains(wrapper.getCmdType())) {
       return rpcProxy.submitRequest(NULL_RPC_CONTROLLER, wrapper);
     }
@@ -911,24 +907,6 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public boolean inSafeModeForNode(String nodeId) throws IOException {
-    InSafeModeRequestProto request = InSafeModeRequestProto.getDefaultInstance();
-    return submitRequestToNode(nodeId, Type.InSafeMode,
-        builder -> builder.setInSafeModeRequest(request))
-        .getInSafeModeResponse().getInSafeMode();
-  }
-
-  @Override
-  public Map<String, Pair<Boolean, String>> getSafeModeRuleStatusesForNode(String nodeId) throws IOException {
-    GetSafeModeRuleStatusesRequestProto request = GetSafeModeRuleStatusesRequestProto.getDefaultInstance();
-    GetSafeModeRuleStatusesResponseProto response =
-        submitRequestToNode(nodeId, Type.GetSafeModeRuleStatuses,
-            builder -> builder.setGetSafeModeRuleStatusesRequest(request))
-            .getGetSafeModeRuleStatusesResponse();
-    return buildSafeModeRuleStatusesMap(response);
-  }
-
-  @Override
   public void startReplicationManager() throws IOException {
 
     StartReplicationManagerRequestProto request =
@@ -1297,5 +1275,25 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         .build();
     // TODO check error handling.
     submitRequest(Type.ReconcileContainer, builder -> builder.setReconcileContainerRequest(request));
+  }
+
+  /**
+   * Holder class to store the target SCM node ID for routing requests.
+   * This allows requests to be directed to specific SCM nodes in an HA cluster.
+   */
+  public static class ScmNodeTarget {
+    private String nodeId;
+
+    public String getNodeId() {
+      return nodeId;
+    }
+
+    public void setNodeId(String nodeId) {
+      this.nodeId = nodeId;
+    }
+
+    public boolean hasNodeId() {
+      return nodeId != null && !nodeId.isEmpty();
+    }
   }
 }

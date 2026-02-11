@@ -30,6 +30,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.SCMSecurityProtocol;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB.ScmNodeTarget;
 import picocli.CommandLine;
 
 /**
@@ -55,6 +56,11 @@ public class ScmOption extends AbstractMixin {
   public ScmClient createScmClient(OzoneConfiguration conf) throws IOException {
     checkAndSetSCMAddressArg(conf);
     return new ContainerOperationClient(conf);
+  }
+
+  public ScmClient createScmClient(OzoneConfiguration conf, ScmNodeTarget targetScmNode) throws IOException {
+    checkAndSetSCMAddressArg(conf);
+    return new ContainerOperationClient(conf, targetScmNode);
   }
 
   private void checkAndSetSCMAddressArg(MutableConfigurationSource conf) {
