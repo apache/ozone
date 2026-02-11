@@ -110,6 +110,11 @@ public final class OmLifecycleConfiguration extends WithObjectID
    * @throws OMException if the validation fails
    */
   public void valid() throws OMException {
+    validateFields(volume, bucket, rules, bucketLayout, creationTime);
+  }
+
+  private static void validateFields(String volume, String bucket, List<OmLCRule> rules,
+      BucketLayout bucketLayout, long creationTime) throws OMException {
     if (StringUtils.isBlank(volume)) {
       throw new OMException("Invalid lifecycle configuration: Volume cannot be blank.",
           OMException.ResultCodes.INVALID_REQUEST);
@@ -130,7 +135,7 @@ public final class OmLifecycleConfiguration extends WithObjectID
           + LC_MAX_RULES + " rules", OMException.ResultCodes.INVALID_REQUEST);
     }
 
-    if (!hasNoDuplicateID()) {
+    if (!hasNoDuplicateID(rules)) {
       throw new OMException("Invalid lifecycle configuration: Duplicate rule IDs found.",
           OMException.ResultCodes.INVALID_REQUEST);
     }
@@ -140,7 +145,7 @@ public final class OmLifecycleConfiguration extends WithObjectID
     }
   }
 
-  private boolean hasNoDuplicateID() {
+  private static boolean hasNoDuplicateID(List<OmLCRule> rules) {
     return rules.size() == rules.stream()
         .map(OmLCRule::getId)
         .collect(Collectors.toSet())
@@ -315,44 +320,10 @@ public final class OmLifecycleConfiguration extends WithObjectID
     protected void validate() {
       super.validate();
       try {
-        if (StringUtils.isBlank(volume)) {
-          throw new OMException("Invalid lifecycle configuration: Volume cannot be blank.",
-              OMException.ResultCodes.INVALID_REQUEST);
-        }
-
-        if (StringUtils.isBlank(bucket)) {
-          throw new OMException("Invalid lifecycle configuration: Bucket cannot be blank.",
-              OMException.ResultCodes.INVALID_REQUEST);
-        }
-
-        if (rules.isEmpty()) {
-          throw new OMException("At least one rules needs to be specified in a lifecycle configuration.",
-              OMException.ResultCodes.INVALID_REQUEST);
-        }
-
-        if (rules.size() > LC_MAX_RULES) {
-          throw new OMException("The number of lifecycle rules must not exceed the allowed limit of "
-              + LC_MAX_RULES + " rules", OMException.ResultCodes.INVALID_REQUEST);
-        }
-
-        if (!hasNoDuplicateID()) {
-          throw new OMException("Invalid lifecycle configuration: Duplicate rule IDs found.",
-              OMException.ResultCodes.INVALID_REQUEST);
-        }
-
-        for (OmLCRule rule : rules) {
-          rule.valid(bucketLayout, creationTime);
-        }
+        validateFields(volume, bucket, rules, bucketLayout, creationTime);
       } catch (OMException e) {
         throw new IllegalArgumentException(e.getMessage(), e);
       }
-    }
-
-    private boolean hasNoDuplicateID() {
-      return rules.size() == rules.stream()
-          .map(OmLCRule::getId)
-          .collect(Collectors.toSet())
-          .size();
     }
 
     @Override
