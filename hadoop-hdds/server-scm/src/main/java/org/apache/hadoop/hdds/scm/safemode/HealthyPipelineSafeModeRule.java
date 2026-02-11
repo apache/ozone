@@ -32,7 +32,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
-import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -62,16 +61,14 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   private final Set<PipelineID> processedPipelineIDs = new HashSet<>();
   private final PipelineManager pipelineManager;
   private final int minHealthyPipelines;
-  private final SCMContext scmContext;
   private final Set<PipelineID> unProcessedPipelineSet = new HashSet<>();
   private final NodeManager nodeManager;
 
   HealthyPipelineSafeModeRule(EventQueue eventQueue,
       PipelineManager pipelineManager, SCMSafeModeManager manager,
-      ConfigurationSource configuration, SCMContext scmContext, NodeManager nodeManager) {
+      ConfigurationSource configuration, NodeManager nodeManager) {
     super(manager, eventQueue);
     this.pipelineManager = pipelineManager;
-    this.scmContext = scmContext;
     this.nodeManager = nodeManager;
     healthyPipelinesPercent =
         configuration.getDouble(HddsConfigKeys.
