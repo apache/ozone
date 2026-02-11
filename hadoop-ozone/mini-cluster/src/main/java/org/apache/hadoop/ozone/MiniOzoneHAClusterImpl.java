@@ -267,17 +267,18 @@ public class MiniOzoneHAClusterImpl extends MiniOzoneClusterImpl {
   public void restartOzoneManager(OzoneManager ozoneManager, boolean waitForOM)
       throws IOException, TimeoutException, InterruptedException {
     LOG.info("Restarting OzoneManager " + ozoneManager.getOMNodeId());
-    omhaService.inactiveServices().forEachRemaining(om -> {
-      if (om.equals(ozoneManager)) {
-        this.omhaService.activate(om);
-      }
-    });
     ozoneManager.restart();
 
     if (waitForOM) {
       GenericTestUtils.waitFor(ozoneManager::isRunning,
           1000, waitForClusterToBeReadyTimeout);
     }
+
+    omhaService.inactiveServices().forEachRemaining(om -> {
+      if (om.equals(ozoneManager)) {
+        this.omhaService.activate(om);
+      }
+    });
   }
 
   public void shutdownStorageContainerManager(StorageContainerManager scm) {
