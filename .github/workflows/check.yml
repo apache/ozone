@@ -172,6 +172,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-
 
+      - name: Setup Node.js and pnpm
+        if: ${{ inputs.needs-npm-cache }}
+        run: |
+          corepack enable
+          corepack prepare pnpm@8.15.7 --activate
+
       - name: Cache for Maven dependencies
         if: ${{ inputs.needs-maven-cache }}
         uses: actions/cache/restore@v4

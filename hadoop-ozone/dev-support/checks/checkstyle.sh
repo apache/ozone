@@ -65,6 +65,10 @@ run_ui_lint() {
   if [[ -d "${BASE_DIR}/ozone-ui/src" ]]; then
     (
       cd "${BASE_DIR}/ozone-ui/src" || exit 1
+      # Install dependencies if node_modules doesn't exist
+      if [[ ! -d "node_modules" ]]; then
+        pnpm install --frozen-lockfile
+      fi
       pnpm -s --filter @hadoop-ui/ozone-recon \
         --filter @hadoop-ui/ozone-scm \
         --filter @hadoop-ui/ozone-om \
