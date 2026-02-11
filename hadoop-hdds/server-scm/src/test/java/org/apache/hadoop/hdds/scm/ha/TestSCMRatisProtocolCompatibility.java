@@ -17,11 +17,10 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.google.protobuf.ByteString;
-import com.google.protobuf.TextFormat;
 import java.nio.ByteBuffer;
 import java.util.Random;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
@@ -35,7 +34,7 @@ public class TestSCMRatisProtocolCompatibility {
   static final Random RANDOM = new Random();
   static final Class<?>[] TYPES = {String.class, Integer.class, byte[].class};
 
-  static <T> ByteString randomValue(Class<T> clazz) {
+  static <T> com.google.protobuf.ByteString randomValueProto2(Class<T> clazz) {
     if (clazz == String.class) {
       final int length = RANDOM.nextInt(3);
       final StringBuilder builder = new StringBuilder(length);
@@ -44,15 +43,37 @@ public class TestSCMRatisProtocolCompatibility {
       }
       final String string = builder.toString();
       assertEquals(length, string.length());
-      return ByteString.copyFromUtf8(string);
+      return com.google.protobuf.ByteString.copyFromUtf8(string);
     } else if (clazz == Integer.class) {
       final ByteBuffer buffer = ByteBuffer.allocate(4);
       buffer.putInt(RANDOM.nextInt());
-      return ByteString.copyFrom(buffer.array());
+      return com.google.protobuf.ByteString.copyFrom(buffer.array());
     } else if (clazz == byte[].class) {
       final byte[] bytes = new byte[RANDOM.nextInt(3)];
       RANDOM.nextBytes(bytes);
-      return ByteString.copyFrom(bytes);
+      return com.google.protobuf.ByteString.copyFrom(bytes);
+    }
+    throw new IllegalArgumentException("Unrecognized class " + clazz);
+  }
+
+  static <T> org.apache.ratis.thirdparty.com.google.protobuf.ByteString randomValueProto3(Class<T> clazz) {
+    if (clazz == String.class) {
+      final int length = RANDOM.nextInt(3);
+      final StringBuilder builder = new StringBuilder(length);
+      for (int i = 0; i < length; i++) {
+        builder.append(RANDOM.nextInt(10));
+      }
+      final String string = builder.toString();
+      assertEquals(length, string.length());
+      return org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFromUtf8(string);
+    } else if (clazz == Integer.class) {
+      final ByteBuffer buffer = ByteBuffer.allocate(4);
+      buffer.putInt(RANDOM.nextInt());
+      return org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFrom(buffer.array());
+    } else if (clazz == byte[].class) {
+      final byte[] bytes = new byte[RANDOM.nextInt(3)];
+      RANDOM.nextBytes(bytes);
+      return org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFrom(bytes);
     }
     throw new IllegalArgumentException("Unrecognized class " + clazz);
   }
@@ -61,7 +82,7 @@ public class TestSCMRatisProtocolCompatibility {
     final Class<?> type = TYPES[RANDOM.nextInt(TYPES.length)];
     return Proto2SCMRatisProtocolForTesting.MethodArgument.newBuilder()
         .setType(type.getName())
-        .setValue(randomValue(type))
+        .setValue(randomValueProto2(type))
         .build();
   }
 
@@ -69,7 +90,7 @@ public class TestSCMRatisProtocolCompatibility {
     final Class<?> type = TYPES[RANDOM.nextInt(TYPES.length)];
     return SCMRatisProtocol.MethodArgument.newBuilder()
             .setType(type.getName())
-            .setValue(randomValue(type))
+            .setValue(randomValueProto3(type))
             .build();
   }
 
@@ -77,7 +98,7 @@ public class TestSCMRatisProtocolCompatibility {
     final Class<?> type = TYPES[RANDOM.nextInt(TYPES.length)];
     return Proto2SCMRatisProtocolForTesting.SCMRatisResponseProto.newBuilder()
         .setType(type.getName())
-        .setValue(randomValue(type))
+        .setValue(randomValueProto2(type))
         .build();
   }
 
@@ -85,7 +106,7 @@ public class TestSCMRatisProtocolCompatibility {
     final Class<?> type = TYPES[RANDOM.nextInt(TYPES.length)];
     return SCMRatisProtocol.SCMRatisResponseProto.newBuilder()
             .setType(type.getName())
-            .setValue(randomValue(type))
+            .setValue(randomValueProto3(type))
             .build();
   }
 
@@ -155,20 +176,28 @@ public class TestSCMRatisProtocolCompatibility {
     }
 
     assertEquals(proto2.toString(), proto3.toString());
-    assertEquals(TextFormat.shortDebugString(proto2), TextFormat.shortDebugString(proto3));
+    assertEquals(shortDebugStringProto2(proto2), shortDebugStringProto3(proto3));
     assertEquals(proto2, Proto2SCMRatisProtocolForTesting.SCMRatisRequestProto.parseFrom(proto3.toByteArray()));
+  }
+
+  private static byte[] bytesOf(com.google.protobuf.ByteString b) {
+    return b.toByteArray();
+  }
+
+  private static byte[] bytesOf(org.apache.ratis.thirdparty.com.google.protobuf.ByteString b) {
+    return b.toByteArray();
   }
 
   static void assertMethodArgument(Proto2SCMRatisProtocolForTesting.MethodArgument proto2,
       SCMRatisProtocol.MethodArgument proto3) {
-    assertEquals(proto2.getValue(), proto3.getValue());
     assertEquals(proto2.getType(), proto3.getType());
+    assertArrayEquals(bytesOf(proto2.getValue()), bytesOf(proto3.getValue()));
   }
 
   static void assertSCMRatisResponseProto(Proto2SCMRatisProtocolForTesting.SCMRatisResponseProto proto2,
       SCMRatisProtocol.SCMRatisResponseProto proto3) {
-    assertEquals(proto2.getValue(), proto3.getValue());
     assertEquals(proto2.getType(), proto3.getType());
+    assertArrayEquals(bytesOf(proto2.getValue()), bytesOf(proto3.getValue()));
   }
 
   /**
@@ -195,7 +224,7 @@ public class TestSCMRatisProtocolCompatibility {
     assertSCMRatisResponseProto(proto2, proto3);
 
     assertEquals(proto2.toString(), proto3.toString());
-    assertEquals(TextFormat.shortDebugString(proto2), TextFormat.shortDebugString(proto3));
+    assertEquals(shortDebugStringProto2(proto2), shortDebugStringProto3(proto3));
     assertEquals(proto2, Proto2SCMRatisProtocolForTesting.SCMRatisResponseProto.parseFrom(proto3.toByteArray()));
   }
 
@@ -246,11 +275,12 @@ public class TestSCMRatisProtocolCompatibility {
 
     for (int i = 0; i < numArgs; i++) {
       assertEquals(proto3.getMethod().getArgs(i).getType(), proto2.getMethod().getArgs(i).getType());
-      assertEquals(proto3.getMethod().getArgs(i).getValue(), proto2.getMethod().getArgs(i).getValue());
+      assertArrayEquals(bytesOf(proto3.getMethod().getArgs(i).getValue()),
+          bytesOf(proto2.getMethod().getArgs(i).getValue()));
     }
 
     assertEquals(proto2.toString(), proto3.toString());
-    assertEquals(TextFormat.shortDebugString(proto2), TextFormat.shortDebugString(proto3));
+    assertEquals(shortDebugStringProto2(proto2), shortDebugStringProto3(proto3));
     assertEquals(proto3, SCMRatisProtocol.SCMRatisRequestProto.parseFrom(proto2.toByteArray()));
   }
 
@@ -268,10 +298,20 @@ public class TestSCMRatisProtocolCompatibility {
             Proto2SCMRatisProtocolForTesting.SCMRatisResponseProto.parseFrom(proto3.toByteArray());
 
     assertEquals(proto3.getType(), proto2.getType());
-    assertEquals(proto3.getValue(), proto2.getValue());
+    assertArrayEquals(bytesOf(proto3.getValue()), bytesOf(proto2.getValue()));
 
     assertEquals(proto2.toString(), proto3.toString());
-    assertEquals(TextFormat.shortDebugString(proto2), TextFormat.shortDebugString(proto3));
+    assertEquals(shortDebugStringProto2(proto2), shortDebugStringProto3(proto3));
     assertEquals(proto3, SCMRatisProtocol.SCMRatisResponseProto.parseFrom(proto2.toByteArray()));
+  }
+
+  private static String shortDebugStringProto2(
+      com.google.protobuf.MessageOrBuilder msg) {
+    return com.google.protobuf.TextFormat.shortDebugString(msg);
+  }
+
+  private static String shortDebugStringProto3(
+      org.apache.ratis.thirdparty.com.google.protobuf.MessageOrBuilder msg) {
+    return org.apache.ratis.thirdparty.com.google.protobuf.TextFormat.shortDebugString(msg);
   }
 }
