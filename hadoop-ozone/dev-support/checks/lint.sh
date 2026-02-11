@@ -43,13 +43,13 @@ if [[ -d "${BASE_DIR}/ozone-ui/src" ]]; then
   # 63:38  error  Insert `,`                          prettier/prettier
   # 64:6   error  Insert `,`                          prettier/prettier
   if [[ ${rc} -ne 0 ]]; then
-    awk '
+    awk -v base_dir="${BASE_DIR}/" '
       /^\/.*\.(ts|tsx|js|jsx)$/ { 
         filename = $0
+        sub("^" base_dir, "", filename)
         next
       }
       /^[[:space:]]+[0-9]+:[0-9]+[[:space:]]+(error|warning)/ {
-        # Print filename and error line together
         print filename
         print $0
       }
