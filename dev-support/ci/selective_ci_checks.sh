@@ -585,6 +585,7 @@ get_count_misc_files
 
 check_needs_build
 check_needs_compile
+check_needs_ui_lint
 
 # calculate basic checks to run
 BASIC_CHECKS="rat"
@@ -594,6 +595,5 @@ check_needs_checkstyle
 check_needs_docs
 check_needs_findbugs
 check_needs_pmd
-check_needs_ui_lint
 calculate_test_types_to_run
 set_outputs
