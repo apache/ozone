@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.hdds.cli;
 
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Strings;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.file.AccessDeniedException;
@@ -84,7 +82,6 @@ public abstract class GenericCli implements GenericParentCommand {
     }
   }
 
-  @VisibleForTesting
   public int execute(String[] argv) {
     return cmd.execute(argv);
   }
@@ -93,14 +90,15 @@ public abstract class GenericCli implements GenericParentCommand {
   public void printError(Throwable error) {
     //message could be null in case of NPE. This is unexpected so we can
     //print out the stack trace.
-    if (verbose || Strings.isNullOrEmpty(error.getMessage())) {
+    final String rawMessage = error.getMessage();
+    if (verbose || rawMessage == null || rawMessage.isEmpty()) {
       error.printStackTrace(cmd.getErr());
     } else {
       if (error instanceof FileSystemException) {
         String errorMessage = handleFileSystemException((FileSystemException) error);
         cmd.getErr().println(errorMessage);
       } else {
-        cmd.getErr().println(error.getMessage().split("\n")[0]);
+        cmd.getErr().println(rawMessage.split("\n")[0]);
       }
     }
   }
@@ -118,7 +116,6 @@ public abstract class GenericCli implements GenericParentCommand {
     return user;
   }
 
-  @VisibleForTesting
   public CommandLine getCmd() {
     return cmd;
   }
