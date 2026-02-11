@@ -418,7 +418,8 @@ public class BasicRootedOzoneFileSystem extends FileSystem {
     OFSPath ofsDst = new OFSPath(dst,
         ozoneConfiguration);
     if (!ofsSrc.isInSameBucketAs(ofsDst)) {
-      throw new IOException("Cannot rename across different volumes or buckets. Only supported within the same bucket.");
+      throw new IOException("Cannot rename across different volumes or buckets." +
+          " Only supported within the same bucket.");
     }
     OzoneBucket bucket = adapterImpl.getBucket(ofsSrc, false);
     if (bucket.getBucketLayout().isFileSystemOptimized()) {
