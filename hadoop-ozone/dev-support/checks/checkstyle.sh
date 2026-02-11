@@ -69,21 +69,26 @@ run_ui_lint() {
       if [[ ! -d "node_modules" ]]; then
         pnpm install --frozen-lockfile
       fi
-      pnpm -s --filter @hadoop-ui/ozone-recon \
-        --filter @hadoop-ui/ozone-scm \
-        --filter @hadoop-ui/ozone-om \
-        run lint -- --format unix
+      pnpm run lint
     ) > "${REPORT_DIR}/ui-output.log" 2>&1
     ui_rc=$?
+    
+    # Show the lint output
+    cat "${REPORT_DIR}/ui-output.log"
+    
     if [[ ${ui_rc} -ne 0 ]]; then
-      cat "${REPORT_DIR}/ui-output.log" > "$UI_REPORT_FILE"
-      if [[ ! -s "$UI_REPORT_FILE" ]]; then
-        echo "UI lint failed. See ${REPORT_DIR}/ui-output.log for details." > "$UI_REPORT_FILE"
+      # Parse and save lint errors to report file
+      cat "${REPORT_DIR}/ui-output.log" | tee "$REPORT_FILE"
+      if [[ ! -s "$REPORT_FILE" ]]; then
+        echo "UI lint failed. See ${REPORT_DIR}/ui-output.log for details." > "$REPORT_FILE"
       fi
+    else
+      # No errors, create empty report file
+      touch "$REPORT_FILE"
     fi
   else
     ui_rc=0
-    echo "ozone-ui/src not found. Skipping UI lint." > "$UI_REPORT_FILE"
+    echo "ozone-ui/src not found. Skipping UI lint." | tee "$REPORT_FILE"
   fi
 }
 
@@ -100,19 +105,16 @@ case "${MODE}" in
     ;;
   ui)
     run_ui_lint
-    if [[ -s "$UI_REPORT_FILE" ]]; then
-      cat "$UI_REPORT_FILE" > "$REPORT_FILE"
-    fi
 
-    if [[ ! -s "${REPORT_DIR}/failures" ]]; then
-      wc -l "$REPORT_FILE" | awk '{ print $1 }' > "$REPORT_DIR/failures"
-    fi
-
-    rc=${ui_rc}
+    # Generate failure counter
     if [[ -s "$REPORT_FILE" ]]; then
-      rc=1
+      wc -l "$REPORT_FILE" | awk '{ print $1 }' > "$REPORT_DIR/failures"
+    else
+      echo "0" > "$REPORT_DIR/failures"
     fi
-    exit ${rc}
+
+    # Exit with the actual lint exit code
+    exit ${ui_rc}
     ;;
   *)
     echo "Unknown mode: ${MODE}. Expected java, ui, or all."
