@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.ClassUtils;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 
 /**
@@ -47,7 +46,9 @@ public final class CodecFactory {
     codecs.put(Boolean.class, new BooleanCodec());
     codecs.put(BigInteger.class, new BigIntegerCodec());
     codecs.put(X509Certificate.class, new X509CertificateCodec());
-    codecs.put(ByteString.class, new ByteStringCodec());
+    codecs.put(com.google.protobuf.ByteString.class, new ByteStringCodec());
+    codecs.put(org.apache.ratis.thirdparty.com.google.protobuf.ByteString.class,
+        new ByteStringCodec());
     codecs.put(ManagedSecretKey.class, new ManagedSecretKeyCodec());
   }
 
