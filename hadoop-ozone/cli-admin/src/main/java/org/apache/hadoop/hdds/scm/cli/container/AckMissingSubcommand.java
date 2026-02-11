@@ -52,7 +52,7 @@ public class AckMissingSubcommand extends ScmSubcommand {
       // List acknowledged containers
       ContainerListResult result = scmClient.listContainer(1, Integer.MAX_VALUE);
       for (ContainerInfo info : result.getContainerInfoList()) {
-        if (info.getAckMissing()) {
+        if (info.isAckMissing()) {
           out().println(info.getContainerID());
         }
       }

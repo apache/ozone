@@ -37,9 +37,9 @@ public class AcknowledgedMissingContainerHandler extends AbstractCheck {
     ContainerInfo containerInfo = request.getContainerInfo();
     ContainerID containerID = containerInfo.containerID();
     LOG.debug("Checking container {}, ackMissing={} in AcknowledgedMissingContainerHandler",
-        containerID, containerInfo.getAckMissing());
+        containerID, containerInfo.isAckMissing());
 
-    if (!containerInfo.getAckMissing()) {
+    if (!containerInfo.isAckMissing()) {
       LOG.debug("Container {} is not acknowledged ", containerID);
       return false;
     }

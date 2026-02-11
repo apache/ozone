@@ -51,7 +51,7 @@ public class UnackMissingSubcommand extends ScmSubcommand {
     for (Long id : ids) {
       try {
         ContainerInfo containerInfo = scmClient.getContainer(id);
-        if (!containerInfo.getAckMissing()) {
+        if (!containerInfo.isAckMissing()) {
           err().println("Cannot unacknowledge container " + id + ": " +
               "Only acknowledged missing containers can be unacknowledged.");
           continue;

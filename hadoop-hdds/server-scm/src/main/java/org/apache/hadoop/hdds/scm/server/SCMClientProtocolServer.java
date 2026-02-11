@@ -1688,6 +1688,7 @@ public class SCMClientProtocolServer implements
     auditMap.put("containerID", containerID.toString());
 
     try {
+      getScm().checkAdminAccess(getRemoteUser(), false);
       ContainerInfo containerInfo = scm.getContainerManager().getContainer(containerID);
       Set<ContainerReplica> replicas = scm.getContainerManager().getContainerReplicas(containerID);
       if (replicas != null && !replicas.isEmpty()) {
@@ -1718,6 +1719,7 @@ public class SCMClientProtocolServer implements
     auditMap.put("containerID", containerID.toString());
 
     try {
+      getScm().checkAdminAccess(getRemoteUser(), false);
       ContainerInfo containerInfo = scm.getContainerManager().getContainer(containerID);
 
       HddsProtos.ContainerInfoProto updatedProto = containerInfo.getProtobuf().toBuilder()

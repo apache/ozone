@@ -271,17 +271,17 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
    *
    * @return boolean
    */
-  public boolean getAckMissing() {
+  public boolean isAckMissing() {
     return ackMissing;
   }
 
   /**
    * Set the boolean for ackMissing.
    *
-   * @param isAckMissing checks if container is acked as missing or not
+   * @param acked checks if container is acked as missing or not
    */
-  public void setAckMissing(boolean isAckMissing) {
-    this.ackMissing = isAckMissing;
+  public void setAckMissing(boolean acked) {
+    this.ackMissing = acked;
   }
 
   @JsonIgnore
@@ -297,7 +297,7 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
         .setOwner(getOwner())
         .setSequenceId(getSequenceId())
         .setReplicationType(getReplicationType())
-        .setAckMissing(getAckMissing());
+        .setAckMissing(isAckMissing());
 
     if (replicationConfig instanceof ECReplicationConfig) {
       builder.setEcReplicationConfig(((ECReplicationConfig) replicationConfig)

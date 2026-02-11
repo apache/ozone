@@ -562,9 +562,9 @@ public final class ContainerStateManagerImpl
       if (currentInfo == null) {
         throw new ContainerNotFoundException(containerID);
       }
-      currentInfo.setAckMissing(updatedInfo.getAckMissing());
+      currentInfo.setAckMissing(updatedInfo.isAckMissing());
       transactionBuffer.addToBuffer(containerStore, containerID, currentInfo);
-      LOG.debug("Updated container info for container: {}, ackMissing={}", containerID, currentInfo.getAckMissing());
+      LOG.debug("Updated container info for container: {}, ackMissing={}", containerID, currentInfo.isAckMissing());
     }
   }
 
