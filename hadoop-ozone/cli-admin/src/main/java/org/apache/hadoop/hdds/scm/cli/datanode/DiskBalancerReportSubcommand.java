@@ -95,14 +95,14 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
         Double.compare(b.getCurrentVolumeDensitySum(), a.getCurrentVolumeDensitySum()));
 
     StringBuilder formatBuilder = new StringBuilder("Report result:%n" +
-        "%-55s %s%n");
+        "%-60s %s%n");
 
     List<String> contentList = new ArrayList<>();
     contentList.add("Datanode");
     contentList.add("VolumeDensity");
 
     for (DatanodeDiskBalancerInfoProto proto : sortedProtos) {
-      formatBuilder.append("%-50s %s%n");
+      formatBuilder.append("%-60s %s%n");
       // Format datanode string with hostname and IP address
       String[] hostnameIpPort = DiskBalancerSubCommandUtil.extractHostIpAndPort(
           proto.getNode());

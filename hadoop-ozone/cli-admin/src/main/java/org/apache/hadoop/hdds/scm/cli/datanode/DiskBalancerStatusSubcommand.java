@@ -90,7 +90,7 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
 
   private String generateStatus(List<DatanodeDiskBalancerInfoProto> protos) {
     StringBuilder formatBuilder = new StringBuilder("Status result:%n" +
-        "%-55s %-15s %-15s %-15s %-12s %-20s %-12s %-12s %-15s %-18s %-20s%n");
+        "%-60s %-12s %-15s %-15s %-12s %-20s %-12s %-12s %-15s %-18s %-20s%n");
 
     List<String> contentList = new ArrayList<>();
     contentList.add("Datanode");
