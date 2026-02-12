@@ -89,6 +89,7 @@ function set_outputs_run_everything_and_exit() {
     compose_tests_needed=true
     integration_tests_needed=true
     kubernetes_tests_needed=true
+    ui_lint_needed=true
 
     start_end::group_end
     set_outputs
@@ -167,6 +168,7 @@ SOURCES_TRIGGERING_TESTS=(
     "^dev-support"
     "^hadoop-hdds"
     "^hadoop-ozone"
+    "^ozone-ui"
     "^pom.xml"
 )
 readonly SOURCES_TRIGGERING_TESTS
@@ -441,6 +443,23 @@ function check_needs_pmd() {
     start_end::group_end
 }
 
+function check_needs_ui_lint() {
+    start_end::group_start "Check if UI lint is needed"
+    local pattern_array=(
+        "^hadoop-ozone/dev-support/checks/lint.sh"
+        "^ozone-ui"
+        "\\.tsx?$"
+        "\\.jsx?$"
+    )
+    filter_changed_files true
+
+    if [[ ${match_count} != "0" ]]; then
+        ui_lint_needed=true
+    fi
+
+    start_end::group_end
+}
+
 # Counts other files which do not need to trigger any functional test
 # (i.e. no compose/integration/kubernetes)
 function get_count_misc_files() {
@@ -532,6 +551,7 @@ function set_outputs() {
     initialization::ga_output needs-compose-tests "${compose_tests_needed}"
     initialization::ga_output needs-integration-tests "${integration_tests_needed}"
     initialization::ga_output needs-kubernetes-tests "${kubernetes_tests_needed}"
+    initialization::ga_output needs-ui-lint "${ui_lint_needed:-false}"
 }
 
 check_for_full_tests_needed_label
@@ -567,6 +587,7 @@ get_count_misc_files
 
 check_needs_build
 check_needs_compile
+check_needs_ui_lint
 
 # calculate basic checks to run
 BASIC_CHECKS="rat"
