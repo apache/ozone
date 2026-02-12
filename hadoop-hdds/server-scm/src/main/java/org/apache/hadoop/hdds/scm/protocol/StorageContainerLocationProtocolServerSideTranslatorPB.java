@@ -47,6 +47,8 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipReques
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.AcknowledgeMissingContainerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.AcknowledgeMissingContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ActivatePipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ActivatePipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ClosePipelineRequestProto;
@@ -134,6 +136,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopContainerBalancerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.UnacknowledgeMissingContainerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.UnacknowledgeMissingContainerResponseProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -747,6 +751,20 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setCmdType(request.getCmdType())
             .setStatus(Status.OK)
             .setReconcileContainerResponse(reconcileContainer(request.getReconcileContainerRequest()))
+            .build();
+      case AcknowledgeMissingContainer:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setAcknowledgeMissingContainerResponse(
+                acknowledgeMissingContainer(request.getAcknowledgeMissingContainerRequest()))
+            .build();
+      case UnacknowledgeMissingContainer:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setUnacknowledgeMissingContainerResponse(
+                unacknowledgeMissingContainer(request.getUnacknowledgeMissingContainerRequest()))
             .build();
       default:
         throw new IllegalArgumentException(
@@ -1387,4 +1405,15 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     return ReconcileContainerResponseProto.getDefaultInstance();
   }
 
+  public AcknowledgeMissingContainerResponseProto acknowledgeMissingContainer(
+      AcknowledgeMissingContainerRequestProto request) throws IOException {
+    impl.acknowledgeMissingContainer(request.getContainerID());
+    return AcknowledgeMissingContainerResponseProto.getDefaultInstance();
+  }
+
+  public UnacknowledgeMissingContainerResponseProto unacknowledgeMissingContainer(
+      UnacknowledgeMissingContainerRequestProto request) throws IOException {
+    impl.unacknowledgeMissingContainer(request.getContainerID());
+    return UnacknowledgeMissingContainerResponseProto.getDefaultInstance();
+  }
 }
