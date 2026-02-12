@@ -210,7 +210,6 @@ public class TestStorageVolumeChecker {
     conf.setFromObject(dnConf);
     File volParentDir =
         new File(folder.toString(), UUID.randomUUID().toString());
-    conf.get(ScmConfigKeys.HDDS_DATANODE_DIR_KEY);
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
         conf.get(ScmConfigKeys.HDDS_DATANODE_DIR_KEY) + "," + volParentDir.getPath());
 
