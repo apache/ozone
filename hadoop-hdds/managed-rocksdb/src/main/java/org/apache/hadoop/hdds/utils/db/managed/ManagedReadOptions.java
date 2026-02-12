@@ -17,8 +17,11 @@
 
 package org.apache.hadoop.hdds.utils.db.managed;
 
+import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.LOG;
 import static org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils.track;
 
+import com.google.common.annotations.VisibleForTesting;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.ReadOptions;
 
@@ -28,12 +31,47 @@ import org.rocksdb.ReadOptions;
 public class ManagedReadOptions extends ReadOptions {
   private final UncheckedAutoCloseable leakTracker = track(this);
 
+  private ManagedSlice lowerBound;
+  private ManagedSlice upperBound;
+
+  public ManagedReadOptions() {
+    super();
+  }
+
+  public ManagedReadOptions(boolean fillCache) {
+    this(fillCache, null, null);
+  }
+
+  public ManagedReadOptions(boolean fillCache, byte[] lowerBound, byte[] upperBound) {
+    super();
+    setFillCache(fillCache);
+    if (lowerBound != null) {
+      this.lowerBound = new ManagedSlice(lowerBound);
+      this.setIterateLowerBound(this.lowerBound);
+    }
+    if (upperBound != null) {
+      this.upperBound = new ManagedSlice(upperBound);
+      this.setIterateUpperBound(this.upperBound);
+    }
+  }
+
   @Override
   public void close() {
     try {
       super.close();
+      IOUtils.close(LOG, lowerBound, upperBound);
     } finally {
       leakTracker.close();
     }
+  }
+
+  @VisibleForTesting
+  public ManagedSlice getLowerBound() {
+    return lowerBound;
+  }
+
+  @VisibleForTesting
+  public ManagedSlice getUpperBound() {
+    return upperBound;
   }
 }
