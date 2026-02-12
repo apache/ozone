@@ -1554,8 +1554,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    */
   @Override
   public void start() throws IOException {
-    finalizationManager.runPrefinalizeStateActions();
-
     if (LOG.isInfoEnabled()) {
       LOG.info(buildRpcServerStartMessage(
           "StorageContainerLocationProtocol RPC server",

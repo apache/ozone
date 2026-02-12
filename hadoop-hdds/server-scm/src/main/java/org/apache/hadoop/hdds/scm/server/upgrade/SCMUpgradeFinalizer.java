@@ -27,7 +27,6 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
-import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
@@ -102,7 +101,7 @@ public class SCMUpgradeFinalizer extends
       SCMUpgradeFinalizationContext context) throws UpgradeException {
     // Run upgrade actions and update VERSION file.
     super.finalizeLayoutFeature(lf,
-        lf.scmAction(LayoutFeature.UpgradeActionType.ON_FINALIZE),
+        lf.scmAction(),
         context.getStorage());
   }
 
@@ -119,13 +118,6 @@ public class SCMUpgradeFinalizer extends
       createPipelinesAfterFinalization(context);
       stateManager.removeFinalizingMark();
     }
-  }
-
-  @Override
-  public void runPrefinalizeStateActions(Storage storage,
-      SCMUpgradeFinalizationContext context) throws IOException {
-    super.runPrefinalizeStateActions(
-        lf -> ((HDDSLayoutFeature) lf)::scmAction, storage, context);
   }
 
   private void closePipelinesBeforeFinalization(PipelineManager pipelineManager)
