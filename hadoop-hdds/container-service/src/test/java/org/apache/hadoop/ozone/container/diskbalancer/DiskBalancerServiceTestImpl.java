@@ -65,7 +65,7 @@ public class DiskBalancerServiceTestImpl extends DiskBalancerService {
   // Override the implementation to start a single on-call control thread.
   @Override
   public void start() {
-    PeriodicalTask svc = new PeriodicalTask();
+    PeriodicalTask svc = new PeriodicalTask(null);
     // In test mode, relies on a latch countdown to runDeletingTasks tasks.
     Runnable r = () -> {
       while (true) {
