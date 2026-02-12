@@ -143,7 +143,10 @@ const Overview: React.FC<{}> = () => {
 
   const capacityCardTitle = (
     <div className='card-title-div'>
-      Ozone Capacity
+      <span>
+        Ozone Capacity
+        <WrappedInfoIcon title="Cluster Capacity fetches data from Datanode Reports and includes the replicated data-size"/>
+      </span>
       <Link
         to={{
           pathname: "/Capacity"
@@ -252,6 +255,7 @@ const Overview: React.FC<{}> = () => {
                 value: storageReport.committed,
                 color: '#f47b2d'
               }]}
+              error={clusterState.error}
             />
           </Col>
         </Row>

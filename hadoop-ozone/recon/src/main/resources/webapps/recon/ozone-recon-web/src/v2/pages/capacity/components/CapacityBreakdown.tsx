@@ -17,6 +17,7 @@
  */
 
 import { GraphLegendIcon } from '@/utils/themeIcons';
+import ErrorCard from '@/v2/components/errors/errorCard';
 import StackedProgress from '@/v2/pages/capacity/components/StackedProgress';
 import { cardHeadStyle, statisticValueStyle } from '@/v2/pages/capacity/constants/styles.constants';
 import { Segment } from '@/v2/types/capacity.types';
@@ -35,6 +36,7 @@ type ClusterCardProps = {
   title: string | React.ReactNode;
   items: GridItem[];
   loading: boolean;
+  error?: string | null;
 };
 
 const getProgressSegments = (items: GridItem[]) => {
@@ -45,7 +47,10 @@ const getProgressSegments = (items: GridItem[]) => {
   } as Segment));
 }
 
-const CapacityBreakdown: React.FC<ClusterCardProps> = ({ title, items, loading }) => {
+const CapacityBreakdown: React.FC<ClusterCardProps> = ({ title, items, loading, error }) => {
+  if (error) {
+    return <ErrorCard title={title} />;
+  }
 
   return (
     <Card title={title} size='small' headStyle={cardHeadStyle} loading={loading}>
