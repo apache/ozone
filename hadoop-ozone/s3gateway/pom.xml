@@ -120,6 +120,10 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-cli-common</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-client</artifactId>
       <!-- <scope>test</scope> but transitive via ozone-client -->
     </dependency>

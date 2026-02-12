@@ -66,6 +66,7 @@ share/ozone/lib/hadoop-hdfs-client.jar
 share/ozone/lib/hadoop-hdfs.jar
 share/ozone/lib/hadoop-shaded-guava.jar
 share/ozone/lib/hadoop-shaded-protobuf_3_25.jar
+share/ozone/lib/hdds-cli-common.jar
 share/ozone/lib/hdds-client.jar
 share/ozone/lib/hdds-common.jar
 share/ozone/lib/hdds-config.jar
@@ -210,6 +211,8 @@ share/ozone/lib/opentelemetry-sdk.jar
 share/ozone/lib/osgi-resource-locator.jar
 share/ozone/lib/ozone-client.jar
 share/ozone/lib/ozone-cli-admin.jar
+share/ozone/lib/ozone-cli-debug.jar
+share/ozone/lib/ozone-cli-repair.jar
 share/ozone/lib/ozone-cli-shell.jar
 share/ozone/lib/ozone-common.jar
 share/ozone/lib/ozone-csi.jar
