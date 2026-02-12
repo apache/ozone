@@ -47,7 +47,16 @@ public final class OMLCUtils {
 
   public static void assertOMException(Executable action, OMException.ResultCodes expectedResultCode,
       String expectedMessageContent) {
-    OMException e = assertThrows(OMException.class, action);
+    Exception thrown = assertThrows(Exception.class, action);
+    OMException e;
+    if (thrown instanceof OMException) {
+      e = (OMException) thrown;
+    } else if (thrown instanceof IllegalArgumentException
+        && thrown.getCause() instanceof OMException) {
+      e = (OMException) thrown.getCause();
+    } else {
+      throw new AssertionError("Expected OMException but got: " + thrown.getClass().getName(), thrown);
+    }
     assertEquals(expectedResultCode, e.getResult());
     assertTrue(e.getMessage().contains(expectedMessageContent),
         "Expected: " + expectedMessageContent + "\n Actual: " + e.getMessage());
