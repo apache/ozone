@@ -41,13 +41,11 @@ import org.slf4j.LoggerFactory;
 @UpgradeActionRecon(feature = UNHEALTHY_CONTAINER_REPLICA_MISMATCH, type = FINALIZE)
 public class UnhealthyContainerReplicaMismatchAction implements ReconUpgradeAction {
   private static final Logger LOG = LoggerFactory.getLogger(UnhealthyContainerReplicaMismatchAction.class);
-  private DataSource dataSource;
   private DSLContext dslContext;
 
   @Override
   public void execute(DataSource source) throws Exception {
-    this.dataSource = source;
-    try (Connection conn = dataSource.getConnection()) {
+    try (Connection conn = source.getConnection()) {
       if (!TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
         return;
       }

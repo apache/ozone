@@ -99,6 +99,7 @@ public abstract class ContainerData {
 
   // Checksum of the data within the container.
   private long dataChecksum;
+  private static final long UNSET_DATA_CHECKSUM = -1;
 
   private boolean isEmpty;
 
@@ -153,7 +154,7 @@ public abstract class ContainerData {
     this.originNodeId = originNodeId;
     this.isEmpty = false;
     this.checksum = ZERO_CHECKSUM;
-    this.dataChecksum = 0;
+    this.dataChecksum = UNSET_DATA_CHECKSUM;
   }
 
   protected ContainerData(ContainerData source) {
@@ -538,11 +539,22 @@ public abstract class ContainerData {
   }
 
   public void setDataChecksum(long dataChecksum) {
+    if (dataChecksum < 0) {
+      throw new IllegalArgumentException("Data checksum cannot be set to a negative number.");
+    }
     this.dataChecksum = dataChecksum;
   }
 
   public long getDataChecksum() {
+    // UNSET_DATA_CHECKSUM is an internal placeholder, it should not be used outside this class.
+    if (needsDataChecksum()) {
+      return 0;
+    }
     return dataChecksum;
+  }
+
+  public boolean needsDataChecksum() {
+    return dataChecksum == UNSET_DATA_CHECKSUM;
   }
 
   /**
@@ -579,11 +591,13 @@ public abstract class ContainerData {
     private final long bytes;
     private final long count;
     private final long pendingDeletion;
+    private final long pendingDeletionBytes;
 
-    public BlockByteAndCounts(long bytes, long count, long pendingDeletion) {
+    public BlockByteAndCounts(long bytes, long count, long pendingDeletion, long pendingDeletionBytes) {
       this.bytes = bytes;
       this.count = count;
       this.pendingDeletion = pendingDeletion;
+      this.pendingDeletionBytes = pendingDeletionBytes;
     }
 
     public long getBytes() {
@@ -596,6 +610,10 @@ public abstract class ContainerData {
 
     public long getPendingDeletion() {
       return pendingDeletion;
+    }
+
+    public long getPendingDeletionBytes() {
+      return pendingDeletionBytes;
     }
   }
 
@@ -613,6 +631,7 @@ public abstract class ContainerData {
     private long blockBytes;
     private long blockCount;
     private long blockPendingDeletion;
+    private long blockPendingDeletionBytes;
 
     public synchronized long getWriteBytes() {
       return writeBytes;
@@ -623,11 +642,15 @@ public abstract class ContainerData {
     }
 
     public synchronized BlockByteAndCounts getBlockByteAndCounts() {
-      return new BlockByteAndCounts(blockBytes, blockCount, blockPendingDeletion);
+      return new BlockByteAndCounts(blockBytes, blockCount, blockPendingDeletion, blockPendingDeletionBytes);
     }
 
     public synchronized long getBlockPendingDeletion() {
       return blockPendingDeletion;
+    }
+
+    public synchronized long getBlockPendingDeletionBytes() {
+      return blockPendingDeletionBytes;
     }
 
     public synchronized void incrementBlockCount() {
@@ -649,16 +672,17 @@ public abstract class ContainerData {
       writeBytes += length;
     }
 
-    public synchronized void updateDeletion(long deletedBytes, long deletedBlockCount, long processedBlockCount) {
+    public synchronized void decDeletion(long deletedBytes, long processedBytes, long deletedBlockCount,
+        long processedBlockCount) {
       blockBytes -= deletedBytes;
       blockCount -= deletedBlockCount;
       blockPendingDeletion -= processedBlockCount;
+      blockPendingDeletionBytes -= processedBytes;
     }
 
-    public synchronized void updateBlocks(long bytes, long count, long pendingDeletionIncrement) {
+    public synchronized void updateBlocks(long bytes, long count) {
       blockBytes = bytes;
       blockCount = count;
-      blockPendingDeletion += pendingDeletionIncrement;
     }
 
     public synchronized ContainerDataProto.Builder setContainerDataProto(ContainerDataProto.Builder b) {
@@ -677,12 +701,19 @@ public abstract class ContainerData {
           .setKeyCount(blockCount);
     }
 
-    public synchronized void addBlockPendingDeletion(long count) {
+    public synchronized void setBlockPendingDeletion(long count, long bytes) {
+      blockPendingDeletion = count;
+      blockPendingDeletionBytes = bytes;
+    }
+
+    public synchronized void addBlockPendingDeletion(long count, long bytes) {
       blockPendingDeletion += count;
+      blockPendingDeletionBytes += bytes;
     }
 
     public synchronized void resetBlockPendingDeletion() {
       blockPendingDeletion = 0;
+      blockPendingDeletionBytes = 0;
     }
 
     public synchronized void assertRead(long expectedBytes, long expectedCount) {
@@ -714,7 +745,8 @@ public abstract class ContainerData {
       return "Statistics{read(" + readBytes + " bytes, #" + readCount + ")"
           + ", write(" + writeBytes + " bytes, #" + writeCount + ")"
           + ", block(" + blockBytes + " bytes, #" + blockCount
-          + ", pendingDelete=" + blockPendingDeletion + ")}";
+          + ", pendingDelete=" + blockPendingDeletion
+          + ", pendingDeleteBytes=" + blockPendingDeletionBytes + ")}";
     }
   }
 }

@@ -23,13 +23,9 @@ import com.codahale.metrics.ConsoleReporter;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.ScheduledReporter;
 import com.codahale.metrics.Slf4jReporter;
-import io.opentracing.Scope;
-import io.opentracing.Span;
-import io.opentracing.util.GlobalTracer;
+import io.opentelemetry.api.trace.StatusCode;
 import java.io.IOException;
 import java.io.InputStream;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -49,9 +45,10 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.TimeDurationUtil;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HAUtils;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
+import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -212,16 +209,14 @@ public class BaseFreonGenerator implements FreonSubcommand {
    * @param taskId unique ID of the task
    */
   private void tryNextTask(TaskProvider provider, long taskId) {
-    Span span = GlobalTracer.get().buildSpan(spanName).start();
-    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
+    try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan(spanName)) {
       provider.executeNextTask(taskId);
       successCounter.incrementAndGet();
     } catch (Exception e) {
-      span.setTag("failure", true);
+      TracingUtil.getActiveSpan().addEvent("failure with exception: " + e.getMessage());
+      TracingUtil.getActiveSpan().setStatus(StatusCode.ERROR);
       failureCounter.incrementAndGet();
       LOG.error("Error on executing task {}", taskId, e);
-    } finally {
-      span.finish();
     }
   }
 
@@ -330,8 +325,7 @@ public class BaseFreonGenerator implements FreonSubcommand {
     LongSupplier supplier;
     if (duration != null) {
       maxValue = durationInSecond;
-      supplier = () -> Duration.between(
-          Instant.ofEpochMilli(startTime), Instant.now()).getSeconds();
+      supplier = () -> (Time.monotonicNow() - startTime) / 1000;
     } else {
       maxValue = testNo;
       supplier = () -> successCounter.get() + failureCounter.get();

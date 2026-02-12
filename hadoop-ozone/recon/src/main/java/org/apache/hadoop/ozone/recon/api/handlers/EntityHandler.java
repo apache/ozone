@@ -244,11 +244,8 @@ public abstract class EntityHandler {
     if (nsSummary == null) {
       return 0L;
     }
-    long totalCnt = nsSummary.getNumOfFiles();
-    for (long childId: nsSummary.getChildDir()) {
-      totalCnt += getTotalKeyCount(childId);
-    }
-    return totalCnt;
+    // With materialized optimization: getNumOfFiles now returns total count (including all subdirectories)
+    return nsSummary.getNumOfFiles();
   }
 
   /**
@@ -263,11 +260,8 @@ public abstract class EntityHandler {
     if (nsSummary == null) {
       return 0L;
     }
-    long totalSize = nsSummary.getSizeOfFiles();
-    for (long childId: nsSummary.getChildDir()) {
-      totalSize += getTotalSize(childId);
-    }
-    return totalSize;
+    // With materialized optimization: getSizeOfFiles now returns total size (including all subdirectories)
+    return nsSummary.getSizeOfFiles();
   }
 
   public static String[] parseRequestPath(String path) {

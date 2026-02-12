@@ -88,8 +88,8 @@ class TestReconcileContainerTask {
 
     // Same container ID and peers.
     assertEquals(peerSet1Task, otherPeerSet1Task);
-    // Same container ID, different peers.
-    assertNotEquals(peerSet1Task, peerSet2Task);
+    // Same container ID, different peers - should still be equal now.
+    assertEquals(peerSet1Task, peerSet2Task);
   }
 
   @Test

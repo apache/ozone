@@ -277,6 +277,15 @@ public final class OzoneConfigKeys {
       OZONE_SNAPSHOT_SST_FILTERING_SERVICE_TIMEOUT_DEFAULT = "300s";
       // 300s for default
 
+  public static final String OZONE_SNAPSHOT_DEFRAG_SERVICE_TIMEOUT =
+      "ozone.snapshot.defrag.service.timeout";
+  public static final String
+      OZONE_SNAPSHOT_DEFRAG_SERVICE_TIMEOUT_DEFAULT = "300s";
+  // TODO: Adjust timeout as needed.
+  //  One concern would be that snapdiff can take a long time.
+  //  If snapdiff wait time is included in the timeout it can make it indeterministic.
+  //  -- So don't wait? Trigger and check later?
+
   public static final String OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL =
       "ozone.snapshot.deleting.service.interval";
   public static final String
@@ -479,6 +488,11 @@ public final class OzoneConfigKeys {
   public static final long OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT =
       2000;
 
+  // Ozone Client Follower Read
+  public static final String OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY =
+      "ozone.client.follower.read.enabled";
+  public static final boolean OZONE_CLIENT_FOLLOWER_READ_ENABLED_DEFAULT = false;
+
   public static final String OZONE_FREON_HTTP_ENABLED_KEY =
       "ozone.freon.http.enabled";
   public static final String OZONE_FREON_HTTP_BIND_HOST_KEY =
@@ -637,7 +651,7 @@ public final class OzoneConfigKeys {
 
   public static final long
       OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_DAG_DAEMON_RUN_INTERVAL_DEFAULT =
-      TimeUnit.HOURS.toMillis(1);
+      TimeUnit.MINUTES.toMillis(10);
 
   public static final String
       OZONE_OM_SNAPSHOT_PRUNE_COMPACTION_BACKUP_BATCH_SIZE =
@@ -680,6 +694,10 @@ public final class OzoneConfigKeys {
   public static final String OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE =
       "ozone.security.crypto.compliance.mode";
   public static final String OZONE_SECURITY_CRYPTO_COMPLIANCE_MODE_UNRESTRICTED = "unrestricted";
+
+  public static final String OZONE_CLIENT_ELASTIC_BYTE_BUFFER_POOL_MAX_SIZE =
+      "ozone.client.elastic.byte.buffer.pool.max.size";
+  public static final String OZONE_CLIENT_ELASTIC_BYTE_BUFFER_POOL_MAX_SIZE_DEFAULT = "16GB";
 
   /**
    * There is no need to instantiate this class.

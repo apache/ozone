@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common.volume;
 
 import static org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult.HEALTHY;
 import static org.apache.hadoop.ozone.container.common.volume.TestStorageVolumeChecker.makeVolumes;
+import static org.apache.hadoop.ozone.container.common.volume.TestVolumeSet.assertNumVolumes;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.IOException;
@@ -78,7 +79,7 @@ public class TestPeriodicVolumeChecker {
     FakeTimer timer = new FakeTimer();
 
     StorageVolumeChecker volumeChecker = new StorageVolumeChecker(conf, timer, "");
-    StorageVolumeScannerMetrics metrics = volumeChecker.getMetrics();
+    BackgroundVolumeScannerMetrics metrics = volumeChecker.getMetrics();
 
     try {
       volumeChecker.registerVolumeSet(new ImmutableVolumeSet(makeVolumes(2, HEALTHY)));
@@ -91,6 +92,8 @@ public class TestPeriodicVolumeChecker {
       assertEquals(0, metrics.getNumDataVolumeScans());
       assertEquals(0, metrics.getNumMetadataVolumeScans());
       assertEquals(0, metrics.getNumVolumesScannedInLastIteration());
+      assertNumVolumes(volumeSet, 1, 0);
+      assertNumVolumes(metaVolumeSet, 1, 0);
 
       // first round
       timer.advance(gap.toMillis() / 3);
@@ -101,6 +104,8 @@ public class TestPeriodicVolumeChecker {
       assertEquals(1, metrics.getNumMetadataVolumeScans());
       assertEquals(5, metrics.getNumVolumesScannedInLastIteration());
       assertEquals(0, metrics.getNumIterationsSkipped());
+      assertNumVolumes(volumeSet, 1, 0);
+      assertNumVolumes(metaVolumeSet, 1, 0);
 
       // periodic disk checker next round within gap
       timer.advance(gap.toMillis() / 3);
@@ -112,6 +117,8 @@ public class TestPeriodicVolumeChecker {
       assertEquals(1, metrics.getNumMetadataVolumeScans());
       assertEquals(5, metrics.getNumVolumesScannedInLastIteration());
       assertEquals(1, metrics.getNumIterationsSkipped());
+      assertNumVolumes(volumeSet, 1, 0);
+      assertNumVolumes(metaVolumeSet, 1, 0);
 
       // periodic disk checker next round
       timer.advance(interval.toMillis());
@@ -122,6 +129,8 @@ public class TestPeriodicVolumeChecker {
       assertEquals(2, metrics.getNumMetadataVolumeScans());
       assertEquals(5, metrics.getNumVolumesScannedInLastIteration());
       assertEquals(1, metrics.getNumIterationsSkipped());
+      assertNumVolumes(volumeSet, 1, 0);
+      assertNumVolumes(metaVolumeSet, 1, 0);
     } finally {
       volumeChecker.shutdownAndWait(1, TimeUnit.SECONDS);
     }

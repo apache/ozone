@@ -38,7 +38,6 @@ import org.junit.jupiter.api.Test;
 public class TestBucketDelete {
 
   private String bucketName = OzoneConsts.BUCKET;
-  private OzoneClient clientStub;
   private ObjectStore objectStoreStub;
   private BucketEndpoint bucketEndpoint;
 
@@ -46,7 +45,7 @@ public class TestBucketDelete {
   public void setup() throws Exception {
 
     //Create client stub and object store stub.
-    clientStub = new OzoneClientStub();
+    OzoneClient clientStub = new OzoneClientStub();
     objectStoreStub = clientStub.getObjectStore();
 
     clientStub.getObjectStore().createS3Bucket(bucketName);

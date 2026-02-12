@@ -17,9 +17,11 @@
 
 package org.apache.hadoop.ozone.dn.scanner;
 
+import static org.apache.hadoop.hdds.HddsUtils.checksumToString;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.UNHEALTHY;
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.readChecksumFile;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.verifyAllDataChecksumsMatch;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -27,15 +29,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
+import org.apache.hadoop.hdds.scm.container.ContainerChecksums;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
-import org.apache.hadoop.ozone.container.common.utils.ContainerLogger;
+import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.TestContainerCorruptions;
 import org.apache.hadoop.ozone.container.ozoneimpl.BackgroundContainerDataScanner;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -46,9 +47,6 @@ import org.junit.jupiter.params.provider.EnumSource;
  */
 class TestBackgroundContainerDataScannerIntegration
     extends TestContainerScannerIntegrationAbstract {
-
-  private final LogCapturer logCapturer =
-      LogCapturer.log4j2(ContainerLogger.LOG_NAME);
 
   @BeforeAll
   static void init() throws Exception {
@@ -83,10 +81,12 @@ class TestBackgroundContainerDataScannerIntegration
     Container<?> container = getDnContainer(containerID);
     assertEquals(State.CLOSED, container.getContainerState());
     assertTrue(containerChecksumFileExists(containerID));
+    assertFalse(container.getContainerData().needsDataChecksum());
+    assertNotEquals(0, container.getContainerData().getDataChecksum());
 
     waitForScmToSeeReplicaState(containerID, CLOSED);
-    long initialReportedDataChecksum = getContainerReplica(containerID).getDataChecksum();
-
+    ContainerChecksums initialReportedChecksum = getContainerReplica(containerID).getChecksums();
+    assertNotEquals(ContainerChecksums.unknown(), initialReportedChecksum);
     corruption.applyTo(container);
 
     resumeScanner();
@@ -98,28 +98,36 @@ class TestBackgroundContainerDataScannerIntegration
 
     // Wait for SCM to get a report of the unhealthy replica with a different checksum than before.
     waitForScmToSeeReplicaState(containerID, UNHEALTHY);
-    long newReportedDataChecksum = getContainerReplica(containerID).getDataChecksum();
+    ContainerChecksums newReportedChecksum = getContainerReplica(containerID).getChecksums();
     if (corruption == TestContainerCorruptions.MISSING_METADATA_DIR ||
         corruption == TestContainerCorruptions.MISSING_CONTAINER_DIR) {
       // In these cases, the new tree will not be able to be written since it exists in the metadata directory.
       // When the tree write fails, the in-memory checksum should remain at its original value.
-      assertEquals(initialReportedDataChecksum, newReportedDataChecksum);
-      assertFalse(containerChecksumFileExists(containerID));
+      assertEquals(initialReportedChecksum, newReportedChecksum);
     } else {
-      assertNotEquals(initialReportedDataChecksum, newReportedDataChecksum);
+      assertNotEquals(initialReportedChecksum, newReportedChecksum);
       // Test that the scanner wrote updated checksum info to the disk.
-      assertTrue(containerChecksumFileExists(containerID));
-      ContainerProtos.ContainerChecksumInfo updatedChecksumInfo = readChecksumFile(container.getContainerData());
-      assertEquals(newReportedDataChecksum, updatedChecksumInfo.getContainerMerkleTree().getDataChecksum());
+      assertReplicaChecksumMatches(container, newReportedChecksum);
+      assertFalse(container.getContainerData().needsDataChecksum());
+      KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
+      verifyAllDataChecksumsMatch(containerData, getConf());
     }
 
     if (corruption == TestContainerCorruptions.TRUNCATED_BLOCK ||
         corruption == TestContainerCorruptions.CORRUPT_BLOCK) {
       // These errors will affect multiple chunks and result in multiple log messages.
-      corruption.assertLogged(containerID, logCapturer);
+      corruption.assertLogged(containerID, getContainerLogCapturer());
     } else {
       // Other corruption types will only lead to a single error.
-      corruption.assertLogged(containerID, 1, logCapturer);
+      corruption.assertLogged(containerID, 1, getContainerLogCapturer());
     }
+  }
+
+  private void assertReplicaChecksumMatches(
+      Container<?> container, ContainerChecksums expectedChecksum) throws Exception {
+    assertTrue(containerChecksumFileExists(container.getContainerData().getContainerID()));
+    long dataChecksumFromFile = readChecksumFile(container.getContainerData())
+        .getContainerMerkleTree().getDataChecksum();
+    assertEquals(checksumToString(expectedChecksum.getDataChecksum()), checksumToString(dataChecksumFromFile));
   }
 }

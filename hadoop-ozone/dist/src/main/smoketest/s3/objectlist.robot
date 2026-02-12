@@ -41,9 +41,9 @@ List objects with negative max-keys should fail
     ${result} =    Execute AWSS3APICli and checkrc    list-objects-v2 --bucket ${BUCKET} --max-keys -1    255
     Should Contain    ${result}    InvalidArgument
 
-List objects with zero max-keys should fail
-    ${result} =    Execute AWSS3APICli and checkrc    list-objects-v2 --bucket ${BUCKET} --max-keys 0    255
-    Should Contain    ${result}    InvalidArgument
+List objects with zero max-keys should not fail
+    ${result} =    Execute AWSS3APICli and checkrc    list-objects-v2 --bucket ${BUCKET} --max-keys 0    0
+    Should not Contain    ${result}    InvalidArgument
 
 List objects with max-keys exceeding config limit should not return more than limit
     Prepare Many Objects In Bucket    1100

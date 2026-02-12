@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.security.x509.certificate.authority.profile;
 import static org.bouncycastle.asn1.x509.KeyPurposeId.id_kp_clientAuth;
 import static org.bouncycastle.asn1.x509.KeyPurposeId.id_kp_serverAuth;
 
-import com.google.common.base.Preconditions;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.AbstractMap.SimpleEntry;
@@ -28,6 +27,7 @@ import java.util.Arrays;
 import java.util.BitSet;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.BiPredicate;
 import java.util.stream.Collectors;
@@ -261,7 +261,7 @@ public class DefaultProfile implements PKIProfile {
 
   @Override
   public boolean validateExtension(Extension extension) {
-    Preconditions.checkNotNull(extension, "Extension cannot be null");
+    Objects.requireNonNull(extension, "Extension cannot be null");
 
     if (!isSupportedExtension(extension)) {
       LOG.error("Unsupported Extension found: {} ",

@@ -265,7 +265,6 @@ Apache License 2.0
    ch.qos.reload4j:reload4j
    com.amazonaws:aws-java-sdk-core
    com.amazonaws:aws-java-sdk-kms
-   com.amazonaws:aws-java-sdk-logs
    com.amazonaws:aws-java-sdk-s3
    com.amazonaws:jmespath-java
    com.carrotsearch:hppc
@@ -299,13 +298,11 @@ Apache License 2.0
    com.jolbox:bonecp
    com.lmax:disruptor
    com.nimbusds:nimbus-jose-jwt
-   com.squareup.okhttp3:okhttp
-   com.squareup.okio:okio
+   com.squareup.okhttp3:okhttp-jvm
    com.squareup.okio:okio-jvm
    commons-beanutils:commons-beanutils
    commons-cli:commons-cli
    commons-codec:commons-codec
-   commons-collections:commons-collections
    commons-daemon:commons-daemon
    commons-digester:commons-digester
    commons-httpclient:commons-httpclient
@@ -326,10 +323,6 @@ Apache License 2.0
    io.grpc:grpc-protobuf-lite
    io.grpc:grpc-stub
    io.grpc:grpc-util
-   io.jaegertracing:jaeger-client
-   io.jaegertracing:jaeger-core
-   io.jaegertracing:jaeger-thrift
-   io.jaegertracing:jaeger-tracerresolver
    io.netty:netty-buffer
    io.netty:netty-codec
    io.netty:netty-codec-http
@@ -348,10 +341,19 @@ Apache License 2.0
    io.netty:netty-transport-native-unix-common
    io.opencensus:opencensus-api
    io.opencensus:opencensus-contrib-grpc-metrics
-   io.opentracing.contrib:opentracing-tracerresolver
-   io.opentracing:opentracing-api
-   io.opentracing:opentracing-noop
-   io.opentracing:opentracing-util
+   io.opentelemetry:opentelemetry-api
+   io.opentelemetry:opentelemetry-common
+   io.opentelemetry:opentelemetry-context
+   io.opentelemetry:opentelemetry-exporter-common
+   io.opentelemetry:opentelemetry-exporter-otlp-common
+   io.opentelemetry:opentelemetry-exporter-otlp
+   io.opentelemetry:opentelemetry-exporter-sender-okhttp
+   io.opentelemetry:opentelemetry-sdk
+   io.opentelemetry:opentelemetry-sdk-common
+   io.opentelemetry:opentelemetry-sdk-common-extension-autoconfigure-spi
+   io.opentelemetry:opentelemetry-sdk-logs
+   io.opentelemetry:opentelemetry-sdk-metrics
+   io.opentelemetry:opentelemetry-sdk-trace
    io.perfmark:perfmark-api
    io.prometheus:simpleclient
    io.prometheus:simpleclient_common
@@ -366,7 +368,10 @@ Apache License 2.0
    net.java.dev.jna:jna-platform
    org.apache.commons:commons-compress
    org.apache.commons:commons-configuration2
+   org.apache.commons:commons-collections4
+   org.apache.commons:commons-csv
    org.apache.commons:commons-lang3
+   org.apache.commons:commons-pool2
    org.apache.commons:commons-text
    org.apache.curator:curator-client
    org.apache.curator:curator-framework
@@ -378,10 +383,7 @@ Apache License 2.0
    org.apache.hadoop:hadoop-hdfs-client
    org.apache.hadoop:hadoop-shaded-guava
    org.apache.hadoop:hadoop-shaded-protobuf_3_25
-   org.apache.httpcomponents:httpasyncclient
    org.apache.httpcomponents:httpcore
-   org.apache.httpcomponents:httpcore-nio
-   org.apache.httpcomponents:httpmime
    org.apache.kerby:kerb-admin
    org.apache.kerby:kerb-client
    org.apache.kerby:kerb-common
@@ -399,11 +401,9 @@ Apache License 2.0
    org.apache.kerby:token-provider
    org.apache.logging.log4j:log4j-api
    org.apache.logging.log4j:log4j-core
-   org.apache.orc:orc-core
-   org.apache.orc:orc-shims
+   org.apache.ranger:ranger-audit-core
    org.apache.ranger:ranger-intg
    org.apache.ranger:ranger-plugin-classloader
-   org.apache.ranger:ranger-plugin-audit
    org.apache.ranger:ranger-plugin-common
    org.apache.ranger:ranger-plugin-cred
    org.apache.ratis:ratis-client
@@ -417,10 +417,8 @@ Apache License 2.0
    org.apache.ratis:ratis-shell
    org.apache.ratis:ratis-thirdparty-misc
    org.apache.ratis:ratis-tools
-   org.apache.thrift:libthrift
    org.apache.zookeeper:zookeeper
    org.apache.zookeeper:zookeeper-jute
-   org.eclipse.jetty:jetty-client
    org.eclipse.jetty:jetty-http
    org.eclipse.jetty:jetty-io
    org.eclipse.jetty:jetty-security
@@ -431,16 +429,14 @@ Apache License 2.0
    org.eclipse.jetty:jetty-webapp
    org.eclipse.jetty:jetty-xml
    org.javassist:javassist
+   org.jboss.weld.servlet:weld-servlet-shaded
    org.jetbrains:annotations
    org.jetbrains.kotlin:kotlin-stdlib
-   org.jetbrains.kotlin:kotlin-stdlib-common
-   org.jetbrains.kotlin:kotlin-stdlib-jdk7
-   org.jetbrains.kotlin:kotlin-stdlib-jdk8
-   org.jboss.weld.servlet:weld-servlet-shaded
    org.jheaps:jheaps
    org.jooq:jooq
    org.jooq:jooq-codegen
    org.jooq:jooq-meta
+   org.jspecify:jspecify
    org.rocksdb:rocksdbjni
    org.springframework:spring-beans
    org.springframework:spring-core
@@ -459,7 +455,6 @@ MIT
    org.bouncycastle:bcpkix-jdk18on
    org.bouncycastle:bcprov-jdk18on
    org.bouncycastle:bcutil-jdk18on
-   org.checkerframework:checker-qual
    org.codehaus.mojo:animal-sniffer-annotations
    org.slf4j:jcl-over-slf4j
    org.slf4j:slf4j-api

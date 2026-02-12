@@ -84,6 +84,7 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineNotFoundException;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer;
 import org.apache.hadoop.ozone.protocol.commands.CloseContainerCommand;
@@ -205,7 +206,8 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
    * @param replicaPendingOps The pendingOps instance
    */
   @SuppressWarnings("parameternumber")
-  public ReplicationManager(final ConfigurationSource conf,
+  public ReplicationManager(final ReplicationManagerConfiguration rmConf,
+             final ConfigurationSource conf,
              final ContainerManager containerManager,
              final PlacementPolicy ratisContainerPlacement,
              final PlacementPolicy ecContainerPlacement,
@@ -217,12 +219,13 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
              throws IOException {
     this.containerManager = containerManager;
     this.scmContext = scmContext;
-    this.rmConf = conf.getObject(ReplicationManagerConfiguration.class);
+    this.rmConf = rmConf;
     this.replicationServerConf =
         conf.getObject(ReplicationServer.ReplicationConfig.class);
     this.running = false;
     this.clock = clock;
-    this.containerReport = new ReplicationManagerReport();
+    this.containerReport = new ReplicationManagerReport(
+        rmConf.getContainerSampleLimit());
     this.eventPublisher = eventPublisher;
     this.waitTimeInMillis = conf.getTimeDuration(
         HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
@@ -362,7 +365,8 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     final long start = clock.millis();
     final List<ContainerInfo> containers =
         containerManager.getContainers();
-    ReplicationManagerReport report = new ReplicationManagerReport();
+    ReplicationManagerReport report = new ReplicationManagerReport(
+        rmConf.getContainerSampleLimit());
     ReplicationQueue newRepQueue = new ReplicationQueue();
     for (ContainerInfo c : containers) {
       if (!shouldRun()) {
@@ -688,13 +692,15 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       ReconstructECContainersCommand rcc = (ReconstructECContainersCommand) cmd;
       List<DatanodeDetails> targets = rcc.getTargetDatanodes();
       final ByteString targetIndexes = rcc.getMissingContainerIndexes();
+      long requiredSize = HddsServerUtil.requiredReplicationSpace(containerInfo.getUsedBytes());
       for (int i = 0; i < targetIndexes.size(); i++) {
-        containerReplicaPendingOps.scheduleAddReplica(
-            containerInfo.containerID(), targets.get(i), targetIndexes.byteAt(i), cmd, scmDeadlineEpochMs);
+        containerReplicaPendingOps.scheduleAddReplica(containerInfo.containerID(), targets.get(i),
+            targetIndexes.byteAt(i), cmd, scmDeadlineEpochMs, requiredSize, clock.millis());
       }
       getMetrics().incrEcReconstructionCmdsSentTotal();
     } else if (cmd.getType() == Type.replicateContainerCommand) {
       ReplicateContainerCommand rcc = (ReplicateContainerCommand) cmd;
+      long requiredSize = HddsServerUtil.requiredReplicationSpace(containerInfo.getUsedBytes());
 
       if (rcc.getTargetDatanode() == null) {
         /*
@@ -702,17 +708,15 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
         op's target Datanode should be the Datanode this command is being
         sent to.
          */
-        containerReplicaPendingOps.scheduleAddReplica(
-            containerInfo.containerID(),
-            targetDatanode, rcc.getReplicaIndex(), cmd, scmDeadlineEpochMs);
+        containerReplicaPendingOps.scheduleAddReplica(containerInfo.containerID(), targetDatanode,
+            rcc.getReplicaIndex(), cmd, scmDeadlineEpochMs, requiredSize, clock.millis());
       } else {
         /*
         This means the source will push replica to the target, so the op's
         target Datanode should be the Datanode the replica will be pushed to.
          */
-        containerReplicaPendingOps.scheduleAddReplica(
-            containerInfo.containerID(),
-            rcc.getTargetDatanode(), rcc.getReplicaIndex(), cmd, scmDeadlineEpochMs);
+        containerReplicaPendingOps.scheduleAddReplica(containerInfo.containerID(), rcc.getTargetDatanode(),
+            rcc.getReplicaIndex(), cmd, scmDeadlineEpochMs, requiredSize, clock.millis());
       }
 
       if (rcc.getReplicaIndex() > 0) {
@@ -850,6 +854,9 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       ReplicationQueue repQueue, ReplicationManagerReport report,
       boolean readOnly) throws ContainerNotFoundException {
     synchronized (containerInfo) {
+      // Reset health state to HEALTHY before processing this container
+      report.resetContainerHealthState();
+      
       ContainerID containerID = containerInfo.containerID();
       final boolean isEC = isEC(containerInfo.getReplicationConfig());
 
@@ -874,7 +881,10 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       if (!handled) {
         LOG.debug("Container {} had no actions after passing through the " +
             "check chain", containerInfo.containerID());
+        // Container remains HEALTHY (set at start of loop)
       }
+      // Apply final health state from report to container
+      containerInfo.setHealthState(report.getContainerHealthState());
       return handled;
     }
   }
@@ -1080,7 +1090,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     /**
      * The frequency in which ReplicationMonitor thread should run.
      */
-    @Config(key = "thread.interval",
+    @Config(key = "hdds.scm.replication.thread.interval",
         type = ConfigType.TIME,
         defaultValue = "300s",
         reconfigurable = true,
@@ -1095,7 +1105,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     /**
      * The frequency in which the Under Replicated queue is processed.
      */
-    @Config(key = "under.replicated.interval",
+    @Config(key = "hdds.scm.replication.under.replicated.interval",
         type = ConfigType.TIME,
         defaultValue = "30s",
         reconfigurable = true,
@@ -1108,7 +1118,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     /**
      * The frequency in which the Over Replicated queue is processed.
      */
-    @Config(key = "over.replicated.interval",
+    @Config(key = "hdds.scm.replication.over.replicated.interval",
         type = ConfigType.TIME,
         defaultValue = "30s",
         reconfigurable = true,
@@ -1122,7 +1132,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
      * Timeout for container replication & deletion command issued by
      * ReplicationManager.
      */
-    @Config(key = "event.timeout",
+    @Config(key = "hdds.scm.replication.event.timeout",
         type = ConfigType.TIME,
         defaultValue = "12m",
         reconfigurable = true,
@@ -1137,7 +1147,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
      * slightly less. This duration is the number of seconds to subtract from
      * the SCM deadline to give a datanode deadline.
      */
-    @Config(key = "event.timeout.datanode.offset",
+    @Config(key = "hdds.scm.replication.event.timeout.datanode.offset",
         type = ConfigType.TIME,
         defaultValue = "6m",
         reconfigurable = true,
@@ -1153,7 +1163,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
      * The number of container replica which must be available for a node to
      * enter maintenance.
      */
-    @Config(key = "maintenance.replica.minimum",
+    @Config(key = "hdds.scm.replication.maintenance.replica.minimum",
         type = ConfigType.INT,
         defaultValue = "2",
         reconfigurable = true,
@@ -1171,7 +1181,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
      * need to consider removing the "maintenance.replica.minimum" setting
      * and having both Ratis and EC use this new one.
      */
-    @Config(key = "maintenance.remaining.redundancy",
+    @Config(key = "hdds.scm.replication.maintenance.remaining.redundancy",
         type = ConfigType.INT,
         defaultValue = "1",
         reconfigurable = true,
@@ -1193,7 +1203,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     )
     private int maintenanceRemainingRedundancy = 1;
 
-    @Config(key = "push",
+    @Config(key = "hdds.scm.replication.push",
         type = ConfigType.BOOLEAN,
         defaultValue = "true",
         tags = { SCM, DATANODE },
@@ -1203,7 +1213,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     )
     private boolean push = true;
 
-    @Config(key = "datanode.replication.limit",
+    @Config(key = "hdds.scm.replication.datanode.replication.limit",
         type = ConfigType.INT,
         defaultValue = "20",
         reconfigurable = true,
@@ -1215,7 +1225,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     )
     private int datanodeReplicationLimit = 20;
 
-    @Config(key = "datanode.reconstruction.weight",
+    @Config(key = "hdds.scm.replication.datanode.reconstruction.weight",
         type = ConfigType.INT,
         defaultValue = "3",
         reconfigurable = true,
@@ -1227,7 +1237,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     )
     private int reconstructionCommandWeight = 3;
 
-    @Config(key = "datanode.delete.container.limit",
+    @Config(key = "hdds.scm.replication.datanode.delete.container.limit",
         type = ConfigType.INT,
         defaultValue = "40",
         reconfigurable = true,
@@ -1239,7 +1249,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     )
     private int datanodeDeleteLimit = 40;
 
-    @Config(key = "inflight.limit.factor",
+    @Config(key = "hdds.scm.replication.inflight.limit.factor",
         type = ConfigType.DOUBLE,
         defaultValue = "0.75",
         reconfigurable = true,
@@ -1256,6 +1266,18 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
             " may still provide some limit in extreme circumstances."
     )
     private double inflightReplicationLimitFactor = 0.75;
+
+    @Config(key = "hdds.scm.replication.container.sample.limit",
+        type = ConfigType.INT,
+        defaultValue = "100",
+        reconfigurable = true,
+        tags = { SCM },
+        description = "The number of containers to sample in each state per " +
+            "iteration of the replication manager. This is useful for " +
+            "debugging when Recon is not available. The samples are included " +
+            "in the ReplicationManagerReport for each lifecycle and health state."
+    )
+    private int containerSampleLimit = 100;
 
     public long getDatanodeTimeoutOffset() {
       return datanodeTimeoutOffset;
@@ -1339,6 +1361,14 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
 
     public boolean isPush() {
       return push;
+    }
+
+    public int getContainerSampleLimit() {
+      return containerSampleLimit;
+    }
+
+    public void setContainerSampleLimit(int sampleLimit) {
+      this.containerSampleLimit = sampleLimit;
     }
 
     @PostConstruct
@@ -1482,6 +1512,10 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     } catch (NodeNotFoundException e) {
       throw new IllegalStateException("Unable to find NodeStatus for " + dn, e);
     }
+  }
+
+  public NodeManager getNodeManager() {
+    return nodeManager;
   }
 
   private int getRemainingMaintenanceRedundancy(boolean isEC) {

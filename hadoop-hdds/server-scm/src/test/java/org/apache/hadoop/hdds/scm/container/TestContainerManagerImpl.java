@@ -82,7 +82,6 @@ public class TestContainerManagerImpl {
   private ContainerManager containerManager;
   private SCMHAManager scmhaManager;
   private SequenceIdGenerator sequenceIdGen;
-  private NodeManager nodeManager;
   private ContainerReplicaPendingOps pendingOpsMock;
   private PipelineManager pipelineManager;
 
@@ -97,12 +96,18 @@ public class TestContainerManagerImpl {
     final OzoneConfiguration conf = SCMTestUtils.getConf(testDir);
     dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
     scmhaManager = SCMHAManagerStub.getInstance(true);
-    nodeManager = new MockNodeManager(true, 10);
+    NodeManager nodeManager = new MockNodeManager(true, 10);
     sequenceIdGen = new SequenceIdGenerator(
         conf, scmhaManager, SCMDBDefinition.SEQUENCE_ID.getTable(dbStore));
-    pipelineManager = new MockPipelineManager(dbStore, scmhaManager, nodeManager);
+    PipelineManager base = new MockPipelineManager(dbStore, scmhaManager, nodeManager);
+    pipelineManager = spy(base);
+
+    // Default: allow allocation in tests unless a test overrides it.
+    doReturn(true).when(pipelineManager).hasEnoughSpace(any(Pipeline.class), anyLong());
+
     pipelineManager.createPipeline(RatisReplicationConfig.getInstance(
         ReplicationFactor.THREE));
+
     pendingOpsMock = mock(ContainerReplicaPendingOps.class);
     containerManager = new ContainerManagerImpl(conf,
         scmhaManager, sequenceIdGen, pipelineManager,
@@ -123,6 +128,8 @@ public class TestContainerManagerImpl {
     final ContainerInfo container = containerManager.allocateContainer(
         RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE), "admin");
+
+    assertNotNull(container);
     assertEquals(1, containerManager.getContainers().size());
     assertNotNull(containerManager.getContainer(
         container.containerID()));
@@ -134,6 +141,8 @@ public class TestContainerManagerImpl {
    */
   @Test
   public void testGetMatchingContainerReturnsNullWhenNotEnoughSpaceInDatanodes() throws IOException {
+    doReturn(false).when(pipelineManager).hasEnoughSpace(any(), anyLong());
+
     long sizeRequired = 256 * 1024 * 1024; // 256 MB
     Pipeline pipeline = pipelineManager.getPipelines().iterator().next();
     // MockPipelineManager#hasEnoughSpace always returns false

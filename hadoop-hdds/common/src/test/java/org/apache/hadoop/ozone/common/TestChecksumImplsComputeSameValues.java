@@ -35,8 +35,8 @@ import org.junit.jupiter.api.Test;
  */
 public class TestChecksumImplsComputeSameValues {
 
-  private int dataSize = 1024 * 1024 * 64;
-  private ByteBuffer data = ByteBuffer.allocate(dataSize);
+  private static final int DATA_SIZE = 1024 * 1024 * 64;
+  private ByteBuffer data = ByteBuffer.allocate(DATA_SIZE);
   private int[] bytesPerChecksum = {512, 1024, 2048, 4096, 32768, 1048576};
 
   @Test

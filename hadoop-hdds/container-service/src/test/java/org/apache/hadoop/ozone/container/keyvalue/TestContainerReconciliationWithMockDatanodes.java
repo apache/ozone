@@ -18,8 +18,10 @@
 package org.apache.hadoop.ozone.container.keyvalue;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.hdds.HddsUtils.checksumToString;
 import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
+import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.verifyAllDataChecksumsMatch;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.WRITE_STAGE;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
@@ -27,10 +29,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.Mockito.doThrow;
+import  static org.mockito.Mockito.spy;
 
 import java.io.File;
 import java.io.IOException;
@@ -58,7 +64,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.text.RandomStringGenerator;
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -70,6 +75,7 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChecksumData;
+import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
@@ -88,6 +94,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -120,6 +127,8 @@ public class TestContainerReconciliationWithMockDatanodes {
   private static final int CHUNK_LEN = 3 * (int) OzoneConsts.KB;
   private static final int CHUNKS_PER_BLOCK = 4;
   private static final int NUM_DATANODES = 3;
+
+  private static final String TEST_SCAN = "Test Scan";
 
   /**
    * Number of corrupt blocks and chunks.
@@ -159,12 +168,16 @@ public class TestContainerReconciliationWithMockDatanodes {
       // Use this fake host name to track the node through the test since it's easier to visualize than a UUID.
       dnDetails.setHostName("dn" + (i + 1));
       MockDatanode dn = new MockDatanode(dnDetails, containerDir);
+      // This will close the container and build a data checksum based on the chunk checksums in the metadata.
       dn.addContainerWithBlocks(CONTAINER_ID, 15);
       datanodes.add(dn);
     }
+    long dataChecksumFromMetadata = assertUniqueChecksumCount(CONTAINER_ID, datanodes, 1);
+    assertNotEquals(0, dataChecksumFromMetadata);
 
     datanodes.forEach(d -> d.scanContainer(CONTAINER_ID));
     healthyDataChecksum = assertUniqueChecksumCount(CONTAINER_ID, datanodes, 1);
+    assertEquals(dataChecksumFromMetadata, healthyDataChecksum);
     // Do not count the initial synchronous scan to build the merkle tree towards the scan count in the tests.
     // This lets each test run start counting the number of scans from zero.
     datanodes.forEach(MockDatanode::resetOnDemandScanCount);
@@ -187,14 +200,14 @@ public class TestContainerReconciliationWithMockDatanodes {
 
   @ParameterizedTest
   @MethodSource("corruptionValues")
-  public void testContainerReconciliation(int numBlocksToDelete, int numChunksToCorrupt) throws Exception {
+  public void testContainerReconciliation(int numBlocksToRemove, int numChunksToCorrupt) throws Exception {
     LOG.info("Healthy data checksum for container {} in this test is {}", CONTAINER_ID,
-        HddsUtils.checksumToString(healthyDataChecksum));
+        checksumToString(healthyDataChecksum));
     // Introduce corruption in each container on different replicas.
     List<MockDatanode> dnsToCorrupt = datanodes.stream().limit(2).collect(Collectors.toList());
 
-    dnsToCorrupt.get(0).introduceCorruption(CONTAINER_ID, numBlocksToDelete, numChunksToCorrupt, false);
-    dnsToCorrupt.get(1).introduceCorruption(CONTAINER_ID, numBlocksToDelete, numChunksToCorrupt, true);
+    dnsToCorrupt.get(0).introduceCorruption(CONTAINER_ID, numBlocksToRemove, numChunksToCorrupt, false);
+    dnsToCorrupt.get(1).introduceCorruption(CONTAINER_ID, numBlocksToRemove, numChunksToCorrupt, true);
     // Use synchronous on-demand scans to re-build the merkle trees after corruption.
     datanodes.forEach(d -> d.scanContainer(CONTAINER_ID));
     // Without reconciliation, checksums should be different because of the corruption.
@@ -211,7 +224,7 @@ public class TestContainerReconciliationWithMockDatanodes {
           .map(MockDatanode::getDnDetails)
           .filter(other -> !current.getDnDetails().equals(other))
           .collect(Collectors.toList());
-      current.reconcileContainer(dnClient, peers, CONTAINER_ID);
+      current.reconcileContainerSuccess(dnClient, peers, CONTAINER_ID);
     }
     // Reconciliation should have triggered a second on-demand scan for each replica. Wait for them to finish before
     // checking the results.
@@ -219,6 +232,106 @@ public class TestContainerReconciliationWithMockDatanodes {
     // After reconciliation, checksums should be the same for all containers.
     long repairedDataChecksum = assertUniqueChecksumCount(CONTAINER_ID, datanodes, 1);
     assertEquals(healthyDataChecksum, repairedDataChecksum);
+  }
+
+  /**
+   * Enum to represent different failure modes for container protocol calls.
+   */
+  public enum FailureLocation {
+    GET_CONTAINER_CHECKSUM_INFO("getContainerChecksumInfo"),
+    GET_BLOCK("getBlock"),
+    READ_CHUNK("readChunk");
+
+    private final String methodName;
+
+    FailureLocation(String methodName) {
+      this.methodName = methodName;
+    }
+
+    public String getMethodName() {
+      return methodName;
+    }
+  }
+
+  /**
+   * Provides test parameters for different failure modes.
+   */
+  public static Stream<Arguments> failureLocations() {
+    return Stream.of(
+        Arguments.of(FailureLocation.GET_CONTAINER_CHECKSUM_INFO),
+        Arguments.of(FailureLocation.GET_BLOCK),
+        Arguments.of(FailureLocation.READ_CHUNK)
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("failureLocations")
+  public void testContainerReconciliationWithPeerFailure(FailureLocation failureLocation) throws Exception {
+    LOG.info("Testing container reconciliation with peer failure in {} for container {}",
+        failureLocation.getMethodName(), CONTAINER_ID);
+
+    // Introduce corruption in the first datanode
+    MockDatanode corruptedNode = datanodes.get(0);
+    MockDatanode healthyNode1 = datanodes.get(1);
+    MockDatanode healthyNode2 = datanodes.get(2);
+    corruptedNode.introduceCorruption(CONTAINER_ID, 1, 1, false);
+
+    // Use synchronous on-demand scans to re-build the merkle trees after corruption.
+    datanodes.forEach(d -> d.scanContainer(CONTAINER_ID));
+
+    // Without reconciliation, checksums should be different.
+    assertUniqueChecksumCount(CONTAINER_ID, datanodes, 2);
+    waitForExpectedScanCount(1);
+
+    // Create a failing peer - we'll make the second datanode fail during the specified operation
+    DatanodeDetails failingPeerDetails = healthyNode1.getDnDetails();
+    // Mock the failure for the specific method based on the failure mode
+    mockContainerProtocolCalls(failureLocation, failingPeerDetails);
+
+    // Now reconcile the corrupted node with its peers (including the failing one)
+    List<DatanodeDetails> peers = Arrays.asList(failingPeerDetails, healthyNode2.getDnDetails());
+    corruptedNode.reconcileContainer(dnClient, peers, CONTAINER_ID);
+
+    // Wait for scan to complete - but this time we only expect the corrupted node to have a scan
+    // triggered by reconciliation, so we wait specifically for that one
+    try {
+      GenericTestUtils.waitFor(() -> corruptedNode.getOnDemandScanCount() == 2, 100, 5_000);
+    } catch (TimeoutException ex) {
+      LOG.warn("Timed out waiting for on-demand scan after reconciliation. Current count: {}",
+          corruptedNode.getOnDemandScanCount());
+    }
+
+    // The corrupted node should still be repaired because it was able to reconcile with the healthy peer
+    // even though one peer failed
+    long repairedDataChecksum = assertUniqueChecksumCount(CONTAINER_ID, datanodes, 1);
+    assertEquals(healthyDataChecksum, repairedDataChecksum);
+
+    // Restore the original mock behavior for other tests
+    mockContainerProtocolCalls();
+  }
+
+  @Test
+  public void testContainerReconciliationFailureContainerScan()
+      throws Exception {
+    // Use synchronous on-demand scans to re-build the merkle trees after corruption.
+    datanodes.forEach(d -> d.scanContainer(CONTAINER_ID));
+
+    // Each datanode should have had one on-demand scan during test setup, and a second one after corruption was
+    // introduced.
+    waitForExpectedScanCount(1);
+
+    for (MockDatanode current : datanodes) {
+      doThrow(IOException.class).when(current.getHandler().getChecksumManager()).read(any());
+      List<DatanodeDetails> peers = datanodes.stream()
+          .map(MockDatanode::getDnDetails)
+          .filter(other -> !current.getDnDetails().equals(other))
+          .collect(Collectors.toList());
+      // Reconciliation should fail for each datanode, since the checksum info cannot be retrieved.
+      assertThrows(IOException.class, () -> current.reconcileContainer(dnClient, peers, CONTAINER_ID));
+      Mockito.reset(current.getHandler().getChecksumManager());
+    }
+    // Even failure of Reconciliation should have triggered a second on-demand scan for each replica.
+    waitForExpectedScanCount(2);
   }
 
   /**
@@ -252,6 +365,11 @@ public class TestContainerReconciliationWithMockDatanodes {
   }
 
   private static void mockContainerProtocolCalls() {
+    // Mock network calls without injecting failures.
+    mockContainerProtocolCalls(null, null);
+  }
+
+  private static void mockContainerProtocolCalls(FailureLocation failureLocation, DatanodeDetails failingPeerDetails) {
     Map<DatanodeDetails, MockDatanode> dnMap = datanodes.stream()
         .collect(Collectors.toMap(MockDatanode::getDnDetails, Function.identity()));
 
@@ -263,6 +381,11 @@ public class TestContainerReconciliationWithMockDatanodes {
           Pipeline pipeline = xceiverClientSpi.getPipeline();
           assertEquals(1, pipeline.size());
           DatanodeDetails dn = pipeline.getFirstNode();
+
+          if (failureLocation == FailureLocation.GET_CONTAINER_CHECKSUM_INFO && dn.equals(failingPeerDetails)) {
+            throw new IOException("Simulated peer failure for testing in getContainerChecksumInfo");
+          }
+
           return dnMap.get(dn).getChecksumInfo(containerID);
         });
 
@@ -274,6 +397,11 @@ public class TestContainerReconciliationWithMockDatanodes {
           Pipeline pipeline = xceiverClientSpi.getPipeline();
           assertEquals(1, pipeline.size());
           DatanodeDetails dn = pipeline.getFirstNode();
+
+          if (failureLocation == FailureLocation.GET_BLOCK && dn.equals(failingPeerDetails)) {
+            throw new IOException("Simulated peer failure for testing in getBlock");
+          }
+
           return dnMap.get(dn).getBlock(blockID);
         });
 
@@ -287,6 +415,11 @@ public class TestContainerReconciliationWithMockDatanodes {
           Pipeline pipeline = xceiverClientSpi.getPipeline();
           assertEquals(1, pipeline.size());
           DatanodeDetails dn = pipeline.getFirstNode();
+
+          if (failureLocation == FailureLocation.READ_CHUNK && dn.equals(failingPeerDetails)) {
+            throw new IOException("Simulated peer failure for testing in readChunk");
+          }
+
           return dnMap.get(dn).readChunk(blockId, chunkInfo, checksumValidators);
         });
 
@@ -317,7 +450,8 @@ public class TestContainerReconciliationWithMockDatanodes {
 
       containerSet = newContainerSet();
       MutableVolumeSet volumeSet = createVolumeSet();
-      handler = ContainerTestUtils.getKeyValueHandler(conf, dnDetails.getUuidString(), containerSet, volumeSet);
+      handler = ContainerTestUtils.getKeyValueHandler(conf, dnDetails.getUuidString(), containerSet, volumeSet,
+          spy(new ContainerChecksumTreeManager(conf)));
       handler.setClusterID(CLUSTER_ID);
 
       ContainerController controller = new ContainerController(containerSet,
@@ -330,6 +464,10 @@ public class TestContainerReconciliationWithMockDatanodes {
 
     public DatanodeDetails getDnDetails() {
       return dnDetails;
+    }
+
+    public KeyValueHandler getHandler() {
+      return handler;
     }
 
     /**
@@ -350,18 +488,17 @@ public class TestContainerReconciliationWithMockDatanodes {
      */
     public long checkAndGetDataChecksum(long containerID) {
       KeyValueContainer container = getContainer(containerID);
+      KeyValueContainerData containerData = container.getContainerData();
       long dataChecksum = 0;
       try {
-        Optional<ContainerProtos.ContainerChecksumInfo> containerChecksumInfo =
-            handler.getChecksumManager().read(container.getContainerData());
-        assertTrue(containerChecksumInfo.isPresent());
-        dataChecksum = containerChecksumInfo.get().getContainerMerkleTree().getDataChecksum();
-        assertEquals(container.getContainerData().getDataChecksum(), dataChecksum);
+        ContainerProtos.ContainerChecksumInfo containerChecksumInfo = handler.getChecksumManager()
+            .read(containerData);
+        dataChecksum = containerChecksumInfo.getContainerMerkleTree().getDataChecksum();
+        verifyAllDataChecksumsMatch(containerData, conf);
       } catch (IOException ex) {
         fail("Failed to read container checksum from disk", ex);
       }
-      log.info("Retrieved data checksum {} from container {}", HddsUtils.checksumToString(dataChecksum),
-          containerID);
+      log.info("Retrieved data checksum {} from container {}", checksumToString(dataChecksum), containerID);
       return dataChecksum;
     }
 
@@ -420,7 +557,8 @@ public class TestContainerReconciliationWithMockDatanodes {
      * Triggers a synchronous scan of the container. This method will block until the scan completes.
      */
     public void scanContainer(long containerID) {
-      Optional<Future<?>> scanFuture = onDemandScanner.scanContainerWithoutGap(containerSet.getContainer(containerID));
+      Optional<Future<?>> scanFuture = onDemandScanner.scanContainerWithoutGap(containerSet.getContainer(containerID),
+          TEST_SCAN);
       assertTrue(scanFuture.isPresent());
 
       try {
@@ -438,14 +576,19 @@ public class TestContainerReconciliationWithMockDatanodes {
       onDemandScanner.getMetrics().resetNumContainersScanned();
     }
 
-    public void reconcileContainer(DNContainerOperationClient client, Collection<DatanodeDetails> peers,
+    public void reconcileContainerSuccess(DNContainerOperationClient client, Collection<DatanodeDetails> peers,
         long containerID) {
-      log.info("Beginning reconciliation on this mock datanode");
       try {
-        handler.reconcileContainer(client, containerSet.getContainer(containerID), peers);
+        reconcileContainer(client, peers, containerID);
       } catch (IOException ex) {
         fail("Container reconciliation failed", ex);
       }
+    }
+
+    public void reconcileContainer(DNContainerOperationClient client, Collection<DatanodeDetails> peers,
+        long containerID) throws IOException {
+      log.info("Beginning reconciliation on this mock datanode");
+      handler.reconcileContainer(client, containerSet.getContainer(containerID), peers);
     }
 
     /**
@@ -543,7 +686,7 @@ public class TestContainerReconciliationWithMockDatanodes {
      * 2. Corrupt chunks at an offset.
      * If revers is true, the blocks and chunks are deleted in reverse order.
      */
-    public void introduceCorruption(long containerID, int numBlocksToDelete, int numChunksToCorrupt, boolean reverse)
+    public void introduceCorruption(long containerID, int numBlocksToRemove, int numChunksToCorrupt, boolean reverse)
         throws IOException {
       KeyValueContainer container = getContainer(containerID);
       KeyValueContainerData containerData = container.getContainerData();
@@ -552,7 +695,7 @@ public class TestContainerReconciliationWithMockDatanodes {
            BatchOperation batch = handle.getStore().getBatchHandler().initBatchOperation()) {
         List<BlockData> blockDataList = getSortedBlocks(container);
         int size = blockDataList.size();
-        for (int i = 0; i < numBlocksToDelete; i++) {
+        for (int i = 0; i < numBlocksToRemove; i++) {
           BlockData blockData = reverse ? blockDataList.get(size - 1 - i) : blockDataList.get(i);
           File blockFile = TestContainerCorruptions.getBlock(container, blockData.getBlockID().getLocalID());
           Assertions.assertTrue(blockFile.delete());
@@ -563,7 +706,7 @@ public class TestContainerReconciliationWithMockDatanodes {
         handle.getStore().getBatchHandler().commitBatchOperation(batch);
         // Check that the correct number of blocks were deleted.
         blockDataList = getSortedBlocks(container);
-        assertEquals(numBlocksToDelete, size - blockDataList.size());
+        assertEquals(numBlocksToRemove, size - blockDataList.size());
       }
 
       // Corrupt chunks at an offset.

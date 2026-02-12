@@ -59,6 +59,12 @@ public class ListCodec implements Codec {
       final ListArgument listArgs = (ListArgument) ReflectionUtil
           .getMethod(ListArgument.class, "parseFrom", byte[].class)
           .invoke(null, (Object) value.toByteArray());
+
+      // proto2 required-equivalent check
+      if (!listArgs.hasType()) {
+        throw new InvalidProtocolBufferException("Missing ListArgument.type");
+      }
+
       final Class<?> dataType = ReflectionUtil.getClass(listArgs.getType());
       for (ByteString element : listArgs.getValueList()) {
         result.add(CodecFactory.getCodec(dataType)

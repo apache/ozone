@@ -91,7 +91,6 @@ public class ContainerBalancerTask implements Runnable {
   private long sizeScheduledForMoveInLatestIteration;
   // count actual size moved in bytes
   private long sizeActuallyMovedInLatestIteration;
-  private int iterations;
   private final List<DatanodeUsageInfo> overUtilizedNodes;
   private final List<DatanodeUsageInfo> underUtilizedNodes;
   private List<DatanodeUsageInfo> withinThresholdUtilizedNodes;
@@ -99,8 +98,6 @@ public class ContainerBalancerTask implements Runnable {
   private Set<String> includeNodes;
   private ContainerBalancerConfiguration config;
   private ContainerBalancerMetrics metrics;
-  private PlacementPolicyValidateProxy placementPolicyValidateProxy;
-  private NetworkTopology networkTopology;
   private double upperLimit;
   private double lowerLimit;
   private ContainerBalancerSelectionCriteria selectionCriteria;
@@ -156,8 +153,8 @@ public class ContainerBalancerTask implements Runnable {
     this.overUtilizedNodes = new ArrayList<>();
     this.underUtilizedNodes = new ArrayList<>();
     this.withinThresholdUtilizedNodes = new ArrayList<>();
-    this.placementPolicyValidateProxy = scm.getPlacementPolicyValidateProxy();
-    this.networkTopology = scm.getClusterMap();
+    PlacementPolicyValidateProxy placementPolicyValidateProxy = scm.getPlacementPolicyValidateProxy();
+    NetworkTopology networkTopology = scm.getClusterMap();
     this.nextIterationIndex = nextIterationIndex;
     this.containerToSourceMap = new HashMap<>();
     this.containerToTargetMap = new HashMap<>();
@@ -212,10 +209,10 @@ public class ContainerBalancerTask implements Runnable {
   }
 
   private void balance() {
-    this.iterations = config.getIterations();
-    if (this.iterations == -1) {
+    int iterations = config.getIterations();
+    if (iterations == -1) {
       //run balancer infinitely
-      this.iterations = Integer.MAX_VALUE;
+      iterations = Integer.MAX_VALUE;
     }
 
     // nextIterationIndex is the iteration that balancer should start from on
@@ -1066,7 +1063,7 @@ public class ContainerBalancerTask implements Runnable {
       return 0;
     }
     SCMNodeStat aggregatedStats = new SCMNodeStat(
-        0, 0, 0, 0, 0);
+        0, 0, 0, 0, 0, 0);
     for (DatanodeUsageInfo node : nodes) {
       aggregatedStats.add(node.getScmNodeStat());
     }

@@ -61,7 +61,7 @@ import org.apache.hadoop.hdds.scm.VersionInfo;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.common.Storage.StorageState;
@@ -101,7 +101,6 @@ public class TestEndPoint {
   private static File testDir;
   private static OzoneConfiguration ozoneConf;
   private static VolumeChoosingPolicy volumeChoosingPolicy;
-  private static DatanodeLayoutStorage layoutStorage;
   private static DatanodeDetails dnDetails;
 
   @TempDir
@@ -120,7 +119,7 @@ public class TestEndPoint {
     ozoneConf = SCMTestUtils.getConf(testDir);
     scmServerImpl = new ScmTestMock();
     dnDetails = randomDatanodeDetails();
-    layoutStorage = new DatanodeLayoutStorage(ozoneConf,
+    DatanodeLayoutStorage layoutStorage = new DatanodeLayoutStorage(ozoneConf,
         UUID.randomUUID().toString(),
         HDDSLayoutFeature.DATANODE_SCHEMA_V3.layoutVersion());
     layoutStorage.initialize();

@@ -33,6 +33,7 @@ import java.lang.reflect.Modifier;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -47,6 +48,7 @@ import org.apache.log4j.Layout;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
+import org.apache.ratis.util.function.CheckedSupplier;
 import org.junit.jupiter.api.Assertions;
 import org.mockito.Mockito;
 import org.slf4j.LoggerFactory;
@@ -80,6 +82,25 @@ public abstract class GenericTestUtils {
   }
 
   /**
+   * Waits for a condition specified by the given {@code check} to return {@code true}.
+   * If the condition throws an exception, the operation would be retried assuming the condition didn't get satisfied.
+   * The condition will be checked initially and then at intervals specified by
+   * {@code checkEveryMillis}, until the total time exceeds {@code waitForMillis}.
+   * If the condition is not satisfied within the allowed time, a {@link TimeoutException}
+   * is thrown. If interrupted while waiting, an {@link InterruptedException} is thrown.
+   */
+  public static <E extends Exception> void waitFor(CheckedSupplier<Boolean, E> check, int checkEveryMillis,
+      int waitForMillis) throws InterruptedException, TimeoutException {
+    waitFor((BooleanSupplier) () -> {
+      try {
+        return check.get();
+      } catch (Exception e) {
+        return false;
+      }
+    }, checkEveryMillis, waitForMillis);
+  }
+
+  /**
    * Wait for the specified test to return true. The test will be performed
    * initially and then every {@code checkEveryMillis} until at least
    * {@code waitForMillis} time has expired. If {@code check} is null or
@@ -98,7 +119,7 @@ public abstract class GenericTestUtils {
    */
   public static void waitFor(BooleanSupplier check, int checkEveryMillis,
       int waitForMillis) throws TimeoutException, InterruptedException {
-    Preconditions.checkNotNull(check, ERROR_MISSING_ARGUMENT);
+    Objects.requireNonNull(check, ERROR_MISSING_ARGUMENT);
     Preconditions.checkArgument(waitForMillis >= checkEveryMillis,
         ERROR_INVALID_ARGUMENT);
 

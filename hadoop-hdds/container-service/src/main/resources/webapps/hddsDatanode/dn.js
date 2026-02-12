@@ -30,10 +30,14 @@
                 .then(function (result) {
                     ctrl.dnmetrics = result.data.beans;
                     ctrl.dnmetrics.forEach(volume => {
-                 volume.Used = transform(volume.Used);
-                 volume.Available = transform(volume.Available);
+                 volume.OzoneCapacity = transform(volume.OzoneCapacity);
+                 volume.OzoneUsed = transform(volume.OzoneUsed);
+                 volume.OzoneAvailable = transform(volume.OzoneAvailable);
                  volume.Reserved = transform(volume.Reserved);
                  volume.TotalCapacity = transform(volume.TotalCapacity);
+                 volume.FilesystemCapacity = transform(volume.FilesystemCapacity);
+                 volume.FilesystemAvailable = transform(volume.FilesystemAvailable);
+                 volume.FilesystemUsed = transform(volume.FilesystemUsed);
                 })
                 });
 

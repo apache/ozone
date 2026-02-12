@@ -65,7 +65,7 @@ public class StorageVolumeChecker {
 
   private AsyncChecker<Boolean, VolumeCheckResult> delegateChecker;
 
-  private final StorageVolumeScannerMetrics metrics;
+  private final BackgroundVolumeScannerMetrics metrics;
 
   /**
    * Max allowed time for a disk check in milliseconds. If the check
@@ -105,7 +105,7 @@ public class StorageVolumeChecker {
   public StorageVolumeChecker(ConfigurationSource conf, Timer timer,
       String threadNamePrefix) {
 
-    metrics = StorageVolumeScannerMetrics.create();
+    metrics = BackgroundVolumeScannerMetrics.create();
 
     this.timer = timer;
 
@@ -441,7 +441,7 @@ public class StorageVolumeChecker {
   }
 
   @VisibleForTesting
-  public StorageVolumeScannerMetrics getMetrics() {
+  public BackgroundVolumeScannerMetrics getMetrics() {
     return metrics;
   }
 }

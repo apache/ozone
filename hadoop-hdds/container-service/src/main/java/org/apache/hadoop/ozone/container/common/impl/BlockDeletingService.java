@@ -210,6 +210,7 @@ public class BlockDeletingService extends BackgroundService {
       throws StorageContainerException {
 
     AtomicLong totalPendingBlockCount = new AtomicLong(0L);
+    AtomicLong totalPendingBlockBytes = new AtomicLong(0L);
     Map<Long, ContainerData> containerDataMap =
         ozoneContainer.getContainerSet().getContainerMap().entrySet().stream()
             .filter(e -> (checkPendingDeletionBlocks(
@@ -222,10 +223,12 @@ public class BlockDeletingService extends BackgroundService {
               totalPendingBlockCount
                   .addAndGet(
                       ContainerUtils.getPendingDeletionBlocks(containerData));
+              totalPendingBlockBytes.addAndGet(ContainerUtils.getPendingDeletionBytes(containerData));
               return containerData;
             }));
 
     metrics.setTotalPendingBlockCount(totalPendingBlockCount.get());
+    metrics.setTotalPendingBlockBytes(totalPendingBlockBytes.get());
     return deletionPolicy
         .chooseContainerForBlockDeletion(blockLimit, containerDataMap);
   }
@@ -238,8 +241,12 @@ public class BlockDeletingService extends BackgroundService {
       ContainerDeletionChoosingPolicy deletionPolicy) {
     if (!deletionPolicy
         .isValidContainerType(containerData.getContainerType())) {
+      LOG.debug("Container with type {} is not valid for block deletion.",
+          containerData.getContainerType());
       return false;
-    } else if (!containerData.isClosed()) {
+    } else if (!(containerData.isClosed() || containerData.isQuasiClosed())) {
+      LOG.info("Skipping block deletion for container {}. State: {} (only CLOSED or QUASI_CLOSED are allowed).",
+          containerData.getContainerID(), containerData.getState());
       return false;
     } else {
       if (ozoneContainer.getWriteChannel() instanceof XceiverServerRatis) {
@@ -268,11 +275,11 @@ public class BlockDeletingService extends BackgroundService {
               ratisServer.getMinReplicatedIndex(pipelineID);
           long containerBCSID = containerData.getBlockCommitSequenceId();
           if (minReplicatedIndex < containerBCSID) {
-            LOG.warn("Close Container log Index {} is not replicated across all"
-                    + " the servers in the pipeline {} as the min replicated "
-                    + "index is {}. Deletion is not allowed in this container "
-                    + "yet.", containerBCSID,
-                containerData.getOriginPipelineId(), minReplicatedIndex);
+            LOG.warn("Close Container log Index {} is not replicated across all "
+                    + "servers in the pipeline {} (min replicated index {}). "
+                    + "Deletion is not allowed yet.",
+                containerBCSID, containerData.getOriginPipelineId(),
+                minReplicatedIndex);
             return false;
           } else {
             return true;
@@ -283,7 +290,8 @@ public class BlockDeletingService extends BackgroundService {
           if (!ratisServer.isExist(pipelineID.getProtobuf())) {
             return true;
           } else {
-            LOG.info(ioe.getMessage());
+            LOG.info("Skipping deletes for container {} due to exception: {}",
+                containerData.getContainerID(), ioe.getMessage());
             return false;
           }
         }

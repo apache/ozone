@@ -103,13 +103,11 @@ public class TestIncrementalContainerReportHandler {
   private ContainerManager containerManager;
   private ContainerStateManager containerStateManager;
   private EventPublisher publisher;
-  private HDDSLayoutVersionManager versionManager;
   private SCMContext scmContext = SCMContext.emptyContext();
   private PipelineManager pipelineManager;
   @TempDir
   private File testDir;
   private DBStore dbStore;
-  private SCMHAManager scmhaManager;
 
   @BeforeEach
   public void setup() throws IOException, InvalidStateTransitionException,
@@ -121,13 +119,13 @@ public class TestIncrementalContainerReportHandler {
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
     EventQueue eventQueue = new EventQueue();
     SCMStorageConfig storageConfig = new SCMStorageConfig(conf);
-    this.versionManager = mock(HDDSLayoutVersionManager.class);
+    HDDSLayoutVersionManager versionManager = mock(HDDSLayoutVersionManager.class);
     when(versionManager.getMetadataLayoutVersion()).thenReturn(maxLayoutVersion());
     when(versionManager.getSoftwareLayoutVersion()).thenReturn(maxLayoutVersion());
     this.nodeManager =
         new SCMNodeManager(conf, storageConfig, eventQueue, clusterMap,
             scmContext, versionManager);
-    scmhaManager = SCMHAManagerStub.getInstance(true);
+    SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
     dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
 
     pipelineManager =
@@ -140,7 +138,7 @@ public class TestIncrementalContainerReportHandler {
         .setContainerStore(SCMDBDefinition.CONTAINERS.getTable(dbStore))
         .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
         .setContainerReplicaPendingOps(new ContainerReplicaPendingOps(
-            Clock.system(ZoneId.systemDefault())))
+            Clock.system(ZoneId.systemDefault()), null))
         .build();
 
     this.publisher = mock(EventPublisher.class);
@@ -167,9 +165,9 @@ public class TestIncrementalContainerReportHandler {
 
     doAnswer(invocation -> {
       containerStateManager
-          .updateContainerState(((ContainerID)invocation
+          .updateContainerStateWithSequenceId(((ContainerID)invocation
                   .getArguments()[0]).getProtobuf(),
-              (HddsProtos.LifeCycleEvent)invocation.getArguments()[1]);
+              (HddsProtos.LifeCycleEvent)invocation.getArguments()[1], 0L);
       return null;
     }).when(containerManager).updateContainerState(
         any(ContainerID.class),

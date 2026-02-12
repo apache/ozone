@@ -71,11 +71,11 @@ public class DBColumnFamilyDefinition<KEY, VALUE> {
         DBColumnFamilyDefinition::getName);
   }
 
-  public TypedTable<KEY, VALUE> getTable(DBStore db) throws RocksDatabaseException, CodecException {
+  public Table<KEY, VALUE> getTable(DBStore db) throws RocksDatabaseException, CodecException {
     return db.getTable(tableName, keyCodec, valueCodec);
   }
 
-  public TypedTable<KEY, VALUE> getTable(DBStore db, CacheType cacheType)
+  public Table<KEY, VALUE> getTable(DBStore db, CacheType cacheType)
       throws RocksDatabaseException, CodecException {
     return db.getTable(tableName, keyCodec, valueCodec, cacheType);
   }

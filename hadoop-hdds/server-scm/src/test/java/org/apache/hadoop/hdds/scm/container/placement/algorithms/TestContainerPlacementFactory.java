@@ -63,8 +63,6 @@ import org.junit.jupiter.api.Test;
  * Test for scm container placement factory.
  */
 public class TestContainerPlacementFactory {
-  // network topology cluster
-  private NetworkTopology cluster;
   // datanodes array list
   private List<DatanodeDetails> datanodes = new ArrayList<>();
   private List<DatanodeInfo> dnInfos = new ArrayList<>();
@@ -72,8 +70,6 @@ public class TestContainerPlacementFactory {
   private static final long STORAGE_CAPACITY = 100L;
   // configuration
   private OzoneConfiguration conf;
-  // node manager
-  private NodeManager nodeManager;
 
   @BeforeEach
   public void setup() {
@@ -91,7 +87,8 @@ public class TestContainerPlacementFactory {
     NodeSchema[] schemas = new NodeSchema[]
         {ROOT_SCHEMA, RACK_SCHEMA, LEAF_SCHEMA};
     NodeSchemaManager.getInstance().init(schemas, true);
-    cluster = new NetworkTopologyImpl(NodeSchemaManager.getInstance());
+    // network topology cluster
+    NetworkTopology cluster = new NetworkTopologyImpl(NodeSchemaManager.getInstance());
 
     // build datanodes, and network topology
     String rack = "/rack";
@@ -141,7 +138,8 @@ public class TestContainerPlacementFactory {
         new ArrayList<>(Arrays.asList(storage4)));
 
     // create mock node manager
-    nodeManager = mock(NodeManager.class);
+    // node manager
+    NodeManager nodeManager = mock(NodeManager.class);
     when(nodeManager.getNodes(NodeStatus.inServiceHealthy()))
         .thenReturn(new ArrayList<>(datanodes));
     for (DatanodeInfo dn: dnInfos) {

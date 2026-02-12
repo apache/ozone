@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.server.http;
 
-import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
@@ -66,7 +65,7 @@ public final class HttpConfig {
         OzoneConfigKeys.OZONE_HTTP_POLICY_DEFAULT);
     HttpConfig.Policy policy = HttpConfig.Policy.fromString(policyStr);
     if (policy == null) {
-      throw new HadoopIllegalArgumentException("Unrecognized value '"
+      throw new IllegalArgumentException("Unrecognized value '"
           + policyStr + "' for " + OzoneConfigKeys.OZONE_HTTP_POLICY_KEY);
     }
     conf.set(OzoneConfigKeys.OZONE_HTTP_POLICY_KEY, policy.name());

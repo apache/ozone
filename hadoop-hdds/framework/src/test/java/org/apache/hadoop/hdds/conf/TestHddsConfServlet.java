@@ -19,13 +19,13 @@ package org.apache.hadoop.hdds.conf;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Strings;
 import java.io.PrintWriter;
 import java.io.StringReader;
@@ -40,9 +40,10 @@ import javax.ws.rs.core.HttpHeaders;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import org.apache.hadoop.hdds.JsonTestUtils;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.hdds.server.http.HttpServer2;
+import org.apache.hadoop.hdds.utils.HttpServletUtils;
 import org.apache.hadoop.util.XMLUtils;
-import org.eclipse.jetty.util.ajax.JSON;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.w3c.dom.Document;
@@ -64,27 +65,8 @@ public class TestHddsConfServlet {
     TEST_PROPERTIES.put("test.key1", "value1");
     TEST_PROPERTIES.put("test.key2", "value2");
     TEST_PROPERTIES.put("test.key3", "value3");
-    TEST_FORMATS.put(HddsConfServlet.FORMAT_XML, "application/xml");
-    TEST_FORMATS.put(HddsConfServlet.FORMAT_JSON, "application/json");
-  }
-
-  @Test
-  public void testParseHeaders() throws Exception {
-    HashMap<String, String> verifyMap = new HashMap<String, String>();
-    verifyMap.put("text/plain", HddsConfServlet.FORMAT_XML);
-    verifyMap.put(null, HddsConfServlet.FORMAT_XML);
-    verifyMap.put("text/xml", HddsConfServlet.FORMAT_XML);
-    verifyMap.put("application/xml", HddsConfServlet.FORMAT_XML);
-    verifyMap.put("application/json", HddsConfServlet.FORMAT_JSON);
-
-    HttpServletRequest request = mock(HttpServletRequest.class);
-    for (Map.Entry<String, String> entry : verifyMap.entrySet()) {
-      String contenTypeActual = entry.getValue();
-      when(request.getHeader(HttpHeaders.ACCEPT))
-          .thenReturn(entry.getKey());
-      assertEquals(contenTypeActual,
-          HddsConfServlet.parseAcceptHeader(request));
-    }
+    TEST_FORMATS.put(HttpServletUtils.ResponseFormat.XML.toString(), "application/xml");
+    TEST_FORMATS.put(HttpServletUtils.ResponseFormat.JSON.toString(), "application/json");
   }
 
   @Test
@@ -114,24 +96,33 @@ public class TestHddsConfServlet {
     // cmd is getPropertyByTag
     result = getResultWithCmd(conf, "getPropertyByTag");
     assertThat(result).contains("ozone.test.test.key");
-    // cmd is illegal
-    getResultWithCmd(conf, "illegal");
+    // cmd is illegal - verify XML error response
+    result = getResultWithCmd(conf, "illegal");
+    String expectedXmlResult = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?>" +
+        "<error>illegal is not a valid command.</error>";
+    assertEquals(expectedXmlResult, result);
   }
 
   @Test
-  @SuppressWarnings("unchecked")
   public void testWriteJson() throws Exception {
     StringWriter sw = new StringWriter();
-    HddsConfServlet.writeResponse(getTestConf(), sw, "json", null);
+    PrintWriter pw = new PrintWriter(sw);
+    HttpServletResponse response = mock(HttpServletResponse.class);
+    when(response.getWriter()).thenReturn(pw);
+
+    OzoneConfiguration conf = getTestConf();
+    HttpServletUtils.writeResponse(response, HttpServletUtils.ResponseFormat.JSON,
+        out -> OzoneConfiguration.dumpConfiguration(conf, null, out),
+        IllegalArgumentException.class);
+
     String json = sw.toString();
     boolean foundSetting = false;
-    Object parsed = JSON.parse(json);
-    Object[] properties = ((Map<String, Object[]>) parsed).get("properties");
-    for (Object o : properties) {
-      Map<String, Object> propertyInfo = (Map<String, Object>) o;
-      String key = (String) propertyInfo.get("key");
-      String val = (String) propertyInfo.get("value");
-      String resource = (String) propertyInfo.get("resource");
+    JsonNode parsed = JsonUtils.readTree(json);
+    JsonNode properties = parsed.path("properties");
+    for (JsonNode propertyInfo : properties) {
+      String key = propertyInfo.path("key").asText();
+      String val = propertyInfo.path("value").asText();
+      String resource = propertyInfo.path("resource").asText();
       if (TEST_KEY.equals(key) && TEST_VAL.equals(val)
           && "programmatically".equals(resource)) {
         foundSetting = true;
@@ -143,7 +134,15 @@ public class TestHddsConfServlet {
   @Test
   public void testWriteXml() throws Exception {
     StringWriter sw = new StringWriter();
-    HddsConfServlet.writeResponse(getTestConf(), sw, "xml", null);
+    PrintWriter pw = new PrintWriter(sw);
+    HttpServletResponse response = mock(HttpServletResponse.class);
+    when(response.getWriter()).thenReturn(pw);
+
+    OzoneConfiguration conf = getTestConf();
+    HttpServletUtils.writeResponse(response, HttpServletUtils.ResponseFormat.XML,
+        out -> conf.writeXml(null, out),
+        IllegalArgumentException.class);
+
     String xml = sw.toString();
 
     DocumentBuilderFactory docBuilderFactory =
@@ -164,14 +163,6 @@ public class TestHddsConfServlet {
       }
     }
     assertTrue(foundSetting);
-  }
-
-  @Test
-  public void testBadFormat() throws Exception {
-    StringWriter sw = new StringWriter();
-    assertThrows(HddsConfServlet.BadFormatException.class,
-        () -> HddsConfServlet.writeResponse(getTestConf(), sw, "not a format", null));
-    assertEquals("", sw.toString());
   }
 
   private String getResultWithCmd(OzoneConfiguration conf, String cmd)
@@ -198,13 +189,7 @@ public class TestHddsConfServlet {
       when(response.getWriter()).thenReturn(pw);
       // response request
       service.doGet(request, response);
-      if (cmd.equals("illegal")) {
-        verify(response).sendError(
-            eq(HttpServletResponse.SC_NOT_FOUND),
-            eq("illegal is not a valid command."));
-      }
-      String result = sw.toString().trim();
-      return result;
+      return sw.toString().trim();
     } finally {
       if (sw != null) {
         sw.close();
@@ -263,11 +248,9 @@ public class TestHddsConfServlet {
           }
         } else {
           // if property name is not empty, and it's not in configuration
-          // expect proper error code and error message is set to the response
-          verify(response)
-              .sendError(
-                  eq(HttpServletResponse.SC_NOT_FOUND),
-                  eq("Property " + propertyName + " not found"));
+          // expect proper error code and error message in response
+          verify(response).setStatus(eq(HttpServletResponse.SC_NOT_FOUND));
+          assertThat(result).contains("Property " + propertyName + " not found");
         }
       }
     } finally {
@@ -303,7 +286,7 @@ public class TestHddsConfServlet {
   @ConfigGroup(prefix = "ozone.test")
   public static class OzoneTestConfig {
     @Config(
-        key = "test.key",
+        key = "ozone.test.test.key",
         defaultValue = "value1",
         type = ConfigType.STRING,
         description = "Test get config by tag",

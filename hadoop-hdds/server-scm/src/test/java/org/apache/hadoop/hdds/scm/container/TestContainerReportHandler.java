@@ -83,7 +83,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Test the behaviour of the ContainerReportHandler.
@@ -97,7 +96,6 @@ public class TestContainerReportHandler {
   @TempDir
   private File testDir;
   private DBStore dbStore;
-  private SCMHAManager scmhaManager;
   private PipelineManager pipelineManager;
 
   @BeforeEach
@@ -106,7 +104,7 @@ public class TestContainerReportHandler {
     nodeManager = new MockNodeManager(true, 10);
     containerManager = mock(ContainerManager.class);
     dbStore = DBStoreBuilder.createDBStore(conf, SCMDBDefinition.get());
-    scmhaManager = SCMHAManagerStub.getInstance(true);
+    SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
     pipelineManager =
         new MockPipelineManager(dbStore, scmhaManager, nodeManager);
     containerStateManager = ContainerStateManagerImpl.newBuilder()
@@ -116,7 +114,7 @@ public class TestContainerReportHandler {
         .setContainerStore(SCMDBDefinition.CONTAINERS.getTable(dbStore))
         .setSCMDBTransactionBuffer(scmhaManager.getDBTransactionBuffer())
         .setContainerReplicaPendingOps(new ContainerReplicaPendingOps(
-            Clock.system(ZoneId.systemDefault())))
+            Clock.system(ZoneId.systemDefault()), null))
         .build();
     publisher = mock(EventPublisher.class);
 
@@ -133,9 +131,9 @@ public class TestContainerReportHandler {
 
     doAnswer(invocation -> {
       containerStateManager
-          .updateContainerState(((ContainerID)invocation
+          .updateContainerStateWithSequenceId(((ContainerID)invocation
                   .getArguments()[0]).getProtobuf(),
-              (HddsProtos.LifeCycleEvent)invocation.getArguments()[1]);
+              (HddsProtos.LifeCycleEvent)invocation.getArguments()[1], 0L);
       return null;
     }).when(containerManager).updateContainerState(
         any(ContainerID.class),
@@ -203,6 +201,12 @@ public class TestContainerReportHandler {
         for (ContainerReplicaProto.State replicaState : replicaStates) {
           if (replicationType == HddsProtos.ReplicationType.EC &&
               replicaState.equals(ContainerReplicaProto.State.QUASI_CLOSED)) {
+            continue;
+          }
+          if (replicationType == HddsProtos.ReplicationType.RATIS &&
+              replicaState.equals(ContainerReplicaProto.State.CLOSED) &&
+              (containerState.equals(HddsProtos.LifeCycleState.DELETED) ||
+              containerState.equals(HddsProtos.LifeCycleState.DELETING))) {
             continue;
           }
           for (ContainerReplicaProto.State invalidState : invalidReplicaStates) {
@@ -1143,9 +1147,8 @@ public class TestContainerReportHandler {
         .getNumberOfKeys());
   }
 
-  @ParameterizedTest
-  @ValueSource(booleans = {false, true})
-  public void testStaleReplicaOfDeletedContainer(boolean isEmpty) throws NodeNotFoundException, IOException {
+  @Test
+  public void testStaleReplicaOfDeletedContainer() throws NodeNotFoundException, IOException {
     final ContainerReportHandler reportHandler = new ContainerReportHandler(nodeManager, containerManager);
 
     final Iterator<DatanodeDetails> nodeIterator = nodeManager.getNodes(
@@ -1162,18 +1165,13 @@ public class TestContainerReportHandler {
 
     final ContainerReportsProto containerReport = getContainerReportsProto(
         containerOne.containerID(), ContainerReplicaProto.State.CLOSED,
-        datanodeOne.getUuidString(), 0, isEmpty);
+        datanodeOne.getUuidString(), 0, true);
     final ContainerReportFromDatanode containerReportFromDatanode =
         new ContainerReportFromDatanode(datanodeOne, containerReport);
     reportHandler.onMessage(containerReportFromDatanode, publisher);
 
-    if (isEmpty) {
-      // Expect the replica to be deleted when it is empty
-      verify(publisher, times(1)).fireEvent(any(), any(CommandForDatanode.class));
-    } else {
-      // Expect the replica to stay when it is NOT empty
-      verify(publisher, times(0)).fireEvent(any(), any(CommandForDatanode.class));
-    }
+    // Expect the replica to be deleted when it is empty
+    verify(publisher, times(1)).fireEvent(any(), any(CommandForDatanode.class));
     assertEquals(1, containerManager.getContainerReplicas(containerOne.containerID()).size());
   }
 

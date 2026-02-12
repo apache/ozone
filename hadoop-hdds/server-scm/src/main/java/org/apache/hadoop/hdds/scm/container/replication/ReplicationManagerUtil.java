@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -34,7 +35,10 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -49,6 +53,15 @@ public final class ReplicationManagerUtil {
   private static final Logger LOG = LoggerFactory.getLogger(ReplicationManagerUtil.class);
 
   private ReplicationManagerUtil() {
+  }
+
+  private static String formatDatanodeDetails(List<DatanodeDetails> dns) {
+    if (dns == null) {
+      return "[]";
+    }
+    return dns.stream()
+        .map(dn -> String.format("%s[%s]", dn, dn.getPersistedOpState()))
+        .collect(Collectors.toList()).toString();
   }
 
   /**
@@ -98,8 +111,9 @@ public final class ReplicationManagerUtil {
       }
     }
     throw new SCMException(String.format("Placement Policy: %s did not return"
-            + " any nodes. Number of required Nodes %d, Data size Required: %d",
-        policy.getClass(), requiredNodes, dataSizeRequired),
+            + " any nodes. Number of required Nodes %d, Data size Required: %d. Container: %s, Used Nodes %s, " +
+            "Excluded Nodes: %s.", policy.getClass(), requiredNodes, dataSizeRequired, container,
+        formatDatanodeDetails(usedNodes), formatDatanodeDetails(excludedNodes)),
         SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE);
   }
 
@@ -174,6 +188,17 @@ public final class ReplicationManagerUtil {
           excludedNodes.add(r.getDatanodeDetails());
           continue;
         }
+        if (nodeStatus.isMaintenance() && nodeStatus.isDead()) {
+          // Dead maintenance nodes are removed from the network topology, so the topology logic can't find
+          // out their location and hence can't consider them for figuring out rack placement. So, we don't add them
+          // to the used nodes list. We also don't add them to excluded nodes, as the placement policy logic won't
+          // consider a node that's not in the topology anyway. In fact, adding it to excluded nodes will cause a
+          // problem if total nodes (in topology) + required nodes becomes less than excluded + used nodes.
+
+          // TODO: In the future, can the policy logic be changed to use the DatanodeDetails network location to figure
+          //  out  the rack?
+          continue;
+        }
       } catch (NodeNotFoundException e) {
         LOG.warn("Node {} not found in node manager.", r.getDatanodeDetails());
         // This should not happen, but if it does, just add the node to the
@@ -195,7 +220,54 @@ public final class ReplicationManagerUtil {
         excludedNodes.add(pending.getTarget());
       }
     }
+    excludeFullNodes(replicationManager, container, excludedNodes);
     return new ExcludedAndUsedNodes(excludedNodes, usedNodes);
+  }
+
+  private static void excludeFullNodes(ReplicationManager replicationManager,
+      ContainerInfo container, List<DatanodeDetails> excludedNodes) {
+    ContainerReplicaPendingOps pendingOps = replicationManager.getContainerReplicaPendingOps();
+    Map<DatanodeID, ContainerReplicaPendingOps.SizeAndTime>
+        containerSizeScheduled = pendingOps.getContainerSizeScheduled();
+    if (containerSizeScheduled == null || containerSizeScheduled.isEmpty()) {
+      return;
+    }
+
+    final long requiredSize = HddsServerUtil.requiredReplicationSpace(container.getUsedBytes());
+    NodeManager nodeManager = replicationManager.getNodeManager();
+
+    for (Map.Entry<DatanodeID, ContainerReplicaPendingOps.SizeAndTime> entry : containerSizeScheduled.entrySet()) {
+      DatanodeDetails dn = nodeManager.getNode(entry.getKey());
+      if (dn == null || excludedNodes.contains(dn)) {
+        continue;
+      }
+
+      SCMNodeMetric nodeMetric = nodeManager.getNodeStat(dn);
+      if (nodeMetric == null) {
+        continue;
+      }
+
+      long scheduledSize = 0;
+      ContainerReplicaPendingOps.SizeAndTime sizeAndTime = entry.getValue();
+      if (sizeAndTime != null) {
+        // Only consider sizes added in the last event timeout window
+        if (pendingOps.getClock().millis() - sizeAndTime.getLastUpdatedTime()
+            < replicationManager.getConfig().getEventTimeout()) {
+          scheduledSize = sizeAndTime.getSize();
+        } else {
+          LOG.debug("Expired op {} found while computing exclude nodes", entry);
+        }
+      }
+
+      SCMNodeStat scmNodeStat = nodeMetric.get();
+      if (scmNodeStat.getRemaining().get() - scmNodeStat.getFreeSpaceToSpare().get() - scheduledSize
+          < requiredSize) {
+        LOG.debug("Adding datanode {} to exclude list. Remaining: {}, freeSpaceToSpare: {}, scheduledSize: {}, " +
+            "requiredSize: {}. ContainerInfo: {}.", dn, scmNodeStat.getRemaining().get(),
+            scmNodeStat.getFreeSpaceToSpare().get(), scheduledSize, requiredSize, container);
+        excludedNodes.add(dn);
+      }
+    }
   }
 
   /**

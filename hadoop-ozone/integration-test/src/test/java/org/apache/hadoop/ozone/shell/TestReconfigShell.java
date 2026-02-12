@@ -98,7 +98,7 @@ public abstract class TestReconfigShell implements NonHATests.TestCase {
     String intervalFromXML = "2m"; //config value set in ozone-site.xml
     long intervalFromXMLInSeconds = TimeUnit.MINUTES.toSeconds(2); //120 seconds
 
-    reconfigurationHandler.reconfigurePropertyImpl(OZONE_DIR_DELETING_SERVICE_INTERVAL, initialInterval);
+    reconfigurationHandler.reconfigureProperty(OZONE_DIR_DELETING_SERVICE_INTERVAL, initialInterval);
     assertThat(reconfigurationHandler.getConf().get(OZONE_DIR_DELETING_SERVICE_INTERVAL)).isEqualTo(initialInterval);
 
     //Start the reconfiguration task

@@ -40,7 +40,6 @@ public class TestOzoneLockProvider {
       LoggerFactory.getLogger(TestOzoneLockProvider.class);
 
   private OzoneManager ozoneManager;
-  private OzoneLockStrategy ozoneLockStrategy;
 
   private boolean keyPathLockEnabled;
   private boolean enableFileSystemPaths;
@@ -77,8 +76,7 @@ public class TestOzoneLockProvider {
 
     when(ozoneManager.getOzoneLockProvider()).thenReturn(
         new OzoneLockProvider(keyPathLockEnabled, enableFileSystemPaths));
-    ozoneLockStrategy =
-        ozoneManager.getOzoneLockProvider().createLockStrategy(bucketLayout);
+    OzoneLockStrategy ozoneLockStrategy = ozoneManager.getOzoneLockProvider().createLockStrategy(bucketLayout);
 
     if (keyPathLockEnabled) {
       if (bucketLayout == BucketLayout.OBJECT_STORE) {

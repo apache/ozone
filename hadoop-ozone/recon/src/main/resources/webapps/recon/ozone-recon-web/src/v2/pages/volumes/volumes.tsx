@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import moment from 'moment';
 import { ValueType } from 'react-select/src/types';
 
@@ -28,10 +28,10 @@ import VolumesTable, { COLUMNS } from '@/v2/components/tables/volumesTable';
 import Search from '@/v2/components/search/search';
 
 import { showDataFetchError } from '@/utils/common';
-import { AutoReloadHelper } from '@/utils/autoReloadHelper';
-import { AxiosGetHelper, cancelRequests } from "@/utils/axiosRequestHelper";
 import { LIMIT_OPTIONS } from '@/v2/constants/limit.constants';
-import { useDebounce } from '@/v2/hooks/debounce.hook';
+import { useDebounce } from '@/v2/hooks/useDebounce';
+import { useApiData } from '@/v2/hooks/useAPIData.hook';
+import { useAutoReload } from '@/v2/hooks/useAutoReload.hook';
 
 import {
   Volume,
@@ -56,10 +56,12 @@ const SearchableColumnOpts = [
   }
 ]
 
+const DEFAULT_VOLUMES_RESPONSE: VolumesResponse = {
+  totalCount: 0,
+  volumes: []
+};
+
 const Volumes: React.FC<{}> = () => {
-
-  const cancelSignal = useRef<AbortController>();
-
   const defaultColumns = COLUMNS.map(column => ({
     label: column.title as string,
     value: column.key as string,
@@ -70,7 +72,6 @@ const Volumes: React.FC<{}> = () => {
     lastUpdated: 0,
     columnOptions: defaultColumns
   });
-  const [loading, setLoading] = useState<boolean>(false);
   const [currentRow, setCurrentRow] = useState<Volume | Record<string, never>>({});
   const [selectedColumns, setSelectedColumns] = useState<Option[]>(defaultColumns);
   const [selectedLimit, setSelectedLimit] = useState<Option>(LIMIT_OPTIONS[0]);
@@ -80,65 +81,39 @@ const Volumes: React.FC<{}> = () => {
 
   const debouncedSearch = useDebounce(searchTerm, 300);
 
-  const loadData = () => {
-    setLoading(true);
-    // Cancel any previous pending requests
-    cancelRequests([cancelSignal.current!]);
+  // Use the modern hooks pattern
+  const volumesData = useApiData<VolumesResponse>(
+    `/api/v1/volumes?limit=${selectedLimit.value}`,
+    DEFAULT_VOLUMES_RESPONSE,
+    {
+      retryAttempts: 2,
+      initialFetch: false,
+      onError: (error) => showDataFetchError(error)
+    }
+  );
 
-    const { request, controller } = AxiosGetHelper(
-      '/api/v1/volumes',
-      cancelSignal.current,
-      "",
-      { limit: selectedLimit.value }
-    );
-
-    cancelSignal.current = controller;
-    request.then(response => {
-      const volumesResponse: VolumesResponse = response.data;
-      const volumes: Volume[] = volumesResponse.volumes;
-      const data: Volume[] = volumes?.map(volume => {
-        return {
-          volume: volume.volume,
-          owner: volume.owner,
-          admin: volume.admin,
-          creationTime: volume.creationTime,
-          modificationTime: volume.modificationTime,
-          quotaInBytes: volume.quotaInBytes,
-          quotaInNamespace: volume.quotaInNamespace,
-          usedNamespace: volume.usedNamespace,
-          acls: volume.acls
-        };
-      }) ?? [];
+  // Process volumes data when it changes
+  useEffect(() => {
+    if (volumesData.data && volumesData.data.volumes) {
+      const volumes: Volume[] = volumesData.data.volumes.map(volume => ({
+        volume: volume.volume,
+        owner: volume.owner,
+        admin: volume.admin,
+        creationTime: volume.creationTime,
+        modificationTime: volume.modificationTime,
+        quotaInBytes: volume.quotaInBytes,
+        quotaInNamespace: volume.quotaInNamespace,
+        usedNamespace: volume.usedNamespace,
+        acls: volume.acls
+      }));
 
       setState({
         ...state,
-        data,
+        data: volumes,
         lastUpdated: Number(moment()),
       });
-      setLoading(false);
-    }).catch(error => {
-      setLoading(false);
-      showDataFetchError(error.toString());
-    });
-  };
-
-  let autoReloadHelper: AutoReloadHelper = new AutoReloadHelper(loadData);
-
-  useEffect(() => {
-    loadData();
-    autoReloadHelper.startPolling();
-
-    // Component will unmount
-    return (() => {
-      autoReloadHelper.stopPolling();
-      cancelRequests([cancelSignal.current!]);
-    })
-  }, []);
-
-  // If limit changes, load new data
-  useEffect(() => {
-    loadData();
-  }, [selectedLimit.value]);
+    }
+  }, [volumesData.data]);
 
   function handleColumnChange(selected: ValueType<Option, true>) {
     setSelectedColumns(selected as Option[]);
@@ -154,11 +129,17 @@ const Volumes: React.FC<{}> = () => {
     )
   }
 
-
   function handleAclLinkClick(volume: Volume) {
     setCurrentRow(volume);
     setShowPanel(true);
   }
+
+  // Create refresh function for auto-reload
+  const loadVolumesData = () => {
+    volumesData.refetch();
+  };
+
+  const autoReload = useAutoReload(loadVolumesData);
 
   const {
     data, lastUpdated,
@@ -170,10 +151,10 @@ const Volumes: React.FC<{}> = () => {
       <div className='page-header-v2'>
         Volumes
         <AutoReloadPanel
-          isLoading={loading}
+          isLoading={volumesData.loading}
           lastRefreshed={lastUpdated}
-          togglePolling={autoReloadHelper.handleAutoReloadToggle}
-          onReload={loadData}
+          togglePolling={autoReload.handleAutoReloadToggle}
+          onReload={loadVolumesData}
         />
       </div>
       <div className='data-container'>
@@ -209,7 +190,7 @@ const Volumes: React.FC<{}> = () => {
               }} />
           </div>
           <VolumesTable
-            loading={loading}
+            loading={volumesData.loading}
             data={data}
             handleAclClick={handleAclLinkClick}
             selectedColumns={selectedColumns}

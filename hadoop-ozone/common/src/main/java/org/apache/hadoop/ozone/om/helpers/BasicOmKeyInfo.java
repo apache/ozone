@@ -42,6 +42,7 @@ public final class BasicOmKeyInfo {
   private final boolean isFile;
   private final String eTag;
   private String ownerName;
+  private final boolean isEncrypted;
 
   private BasicOmKeyInfo(Builder b) {
     this.volumeName = b.volumeName;
@@ -54,6 +55,7 @@ public final class BasicOmKeyInfo {
     this.isFile = b.isFile;
     this.eTag = StringUtils.isNotEmpty(b.eTag) ? b.eTag : null;
     this.ownerName = b.ownerName;
+    this.isEncrypted = b.isEncrypted;
   }
 
   private BasicOmKeyInfo(OmKeyInfo b) {
@@ -67,6 +69,7 @@ public final class BasicOmKeyInfo {
     this.isFile = b.isFile();
     this.eTag = b.getMetadata().get(ETAG);
     this.ownerName = b.getOwnerName();
+    this.isEncrypted = b.getFileEncryptionInfo() != null;
   }
 
   public String getVolumeName() {
@@ -109,6 +112,10 @@ public final class BasicOmKeyInfo {
     return ownerName;
   }
 
+  public boolean isEncrypted() {
+    return isEncrypted;
+  }
+
   public long getReplicatedSize() {
     return QuotaUtil.getReplicatedSize(getDataSize(), replicationConfig);
   }
@@ -127,6 +134,7 @@ public final class BasicOmKeyInfo {
     private boolean isFile;
     private String eTag;
     private String ownerName;
+    private boolean isEncrypted;
 
     public Builder setVolumeName(String volumeName) {
       this.volumeName = volumeName;
@@ -178,6 +186,11 @@ public final class BasicOmKeyInfo {
       return this;
     }
 
+    public Builder setIsEncrypted(boolean isEncrypted) {
+      this.isEncrypted = isEncrypted;
+      return this;
+    }
+
     public BasicOmKeyInfo build() {
       return new BasicOmKeyInfo(this);
     }
@@ -189,7 +202,9 @@ public final class BasicOmKeyInfo {
         .setDataSize(dataSize)
         .setCreationTime(creationTime)
         .setModificationTime(modificationTime)
-        .setType(replicationConfig.getReplicationType());
+        .setIsFile(isFile)
+        .setType(replicationConfig.getReplicationType())
+        .setIsEncrypted(isEncrypted);
     if (ownerName != null) {
       builder.setOwnerName(ownerName);
     }
@@ -227,8 +242,14 @@ public final class BasicOmKeyInfo {
             basicKeyInfo.getFactor(),
             basicKeyInfo.getEcReplicationConfig()))
         .setETag(basicKeyInfo.getETag())
-        .setIsFile(!keyName.endsWith("/"))
-        .setOwnerName(basicKeyInfo.getOwnerName());
+        .setOwnerName(basicKeyInfo.getOwnerName())
+        .setIsEncrypted(basicKeyInfo.getIsEncrypted());
+
+    if (basicKeyInfo.hasIsFile()) {
+      builder.setIsFile(basicKeyInfo.getIsFile());
+    } else {
+      builder.setIsFile(!keyName.endsWith("/"));
+    }
 
     return builder.build();
   }
@@ -253,8 +274,14 @@ public final class BasicOmKeyInfo {
             basicKeyInfo.getFactor(),
             basicKeyInfo.getEcReplicationConfig()))
         .setETag(basicKeyInfo.getETag())
-        .setIsFile(!keyName.endsWith("/"))
-        .setOwnerName(basicKeyInfo.getOwnerName());
+        .setOwnerName(basicKeyInfo.getOwnerName())
+        .setIsEncrypted(basicKeyInfo.getIsEncrypted());
+
+    if (basicKeyInfo.hasIsFile()) {
+      builder.setIsFile(basicKeyInfo.getIsFile());
+    } else {
+      builder.setIsFile(!keyName.endsWith("/"));
+    }
 
     return builder.build();
   }
@@ -277,7 +304,8 @@ public final class BasicOmKeyInfo {
         replicationConfig.equals(basicOmKeyInfo.replicationConfig) &&
         Objects.equals(eTag, basicOmKeyInfo.eTag) &&
         isFile == basicOmKeyInfo.isFile &&
-        ownerName.equals(basicOmKeyInfo.ownerName);
+        ownerName.equals(basicOmKeyInfo.ownerName) &&
+        isEncrypted == basicOmKeyInfo.isEncrypted;
   }
 
   @Override

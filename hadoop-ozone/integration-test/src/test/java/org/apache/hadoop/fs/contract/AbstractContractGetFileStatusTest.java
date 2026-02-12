@@ -52,7 +52,6 @@ public abstract class AbstractContractGetFileStatusTest extends AbstractFSContra
   private static final PathFilter ALL_PATHS = new AllPathsFilter();
   private static final PathFilter NO_PATHS = new NoPathsFilter();
 
-  private Path testPath;
   private Path target;
 
   // the tree parameters. Kept small to avoid killing object store test
@@ -70,7 +69,7 @@ public abstract class AbstractContractGetFileStatusTest extends AbstractFSContra
     skipIfUnsupported(SUPPORTS_GETFILESTATUS);
 
     //delete the test directory
-    testPath = path("test");
+    Path testPath = path("test");
     target = new Path(testPath, "target");
   }
 

@@ -34,6 +34,8 @@
   <rule ref="category/java/bestpractices.xml/UseCollectionIsEmpty" />
   <rule ref="category/java/bestpractices.xml/SimplifiableTestAssertion" />
 
+  <rule ref="category/java/design.xml/SingularField" />
+
   <rule ref="category/java/performance.xml/AddEmptyString"/>
   <rule ref="category/java/performance.xml/AppendCharacterWithChar" />
   <rule ref="category/java/performance.xml/AvoidFileStream"/>
@@ -50,4 +52,6 @@
   </rule>
 
   <exclude-pattern>.*/generated-sources/.*</exclude-pattern>
+  <exclude-pattern>.*/generated-test-sources/.*</exclude-pattern>
+  <exclude-pattern>.*/org/apache/hadoop/.*_/.*</exclude-pattern>
 </ruleset>

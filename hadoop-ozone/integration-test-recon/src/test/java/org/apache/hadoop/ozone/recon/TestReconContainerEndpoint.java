@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
@@ -42,6 +43,8 @@ import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
+import org.apache.hadoop.ozone.recon.tasks.ReconTaskControllerImpl;
+import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,17 +54,19 @@ import org.junit.jupiter.api.Test;
  */
 public class TestReconContainerEndpoint {
 
-  private OzoneConfiguration conf;
   private MiniOzoneCluster cluster;
   private OzoneClient client;
   private ObjectStore store;
   private ReconService recon;
+  private TestReconOmMetaManagerUtils omMetaManagerUtils = new TestReconOmMetaManagerUtils();
 
   @BeforeEach
   public void init() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT,
         OMConfigKeys.OZONE_BUCKET_LAYOUT_FILE_SYSTEM_OPTIMIZED);
+    // Configure multiple task threads for concurrent task execution
+    conf.setInt("ozone.recon.task.thread.count", 6);
     recon = new ReconService(conf);
     cluster = MiniOzoneCluster.newBuilder(conf)
         .setNumDatanodes(3)
@@ -106,6 +111,14 @@ public class TestReconContainerEndpoint {
     OzoneManagerServiceProviderImpl impl = (OzoneManagerServiceProviderImpl)
         recon.getReconServer().getOzoneManagerServiceProvider();
     impl.syncDataFromOM();
+
+    // Wait for async event processing to complete
+    // Events are processed asynchronously, so wait for processing to finish
+    ReconTaskControllerImpl reconTaskController =
+        (ReconTaskControllerImpl) recon.getReconServer().getReconTaskController();
+    CompletableFuture<Void> completableFuture =
+        omMetaManagerUtils.waitForEventBufferEmpty(reconTaskController.getEventBuffer());
+    GenericTestUtils.waitFor(completableFuture::isDone, 100, 30000);
 
     //Search for the bucket from the bucket table and verify its FSO
     OmBucketInfo bucketInfo = cluster.getOzoneManager().getBucketInfo(volName, bucketName);
@@ -167,6 +180,14 @@ public class TestReconContainerEndpoint {
         (OzoneManagerServiceProviderImpl) recon.getReconServer()
             .getOzoneManagerServiceProvider();
     impl.syncDataFromOM();
+
+    // Wait for async event processing to complete
+    // Events are processed asynchronously, so wait for processing to finish
+    ReconTaskControllerImpl reconTaskController =
+        (ReconTaskControllerImpl) recon.getReconServer().getReconTaskController();
+    CompletableFuture<Void> completableFuture =
+        omMetaManagerUtils.waitForEventBufferEmpty(reconTaskController.getEventBuffer());
+    GenericTestUtils.waitFor(completableFuture::isDone, 100, 30000);
 
     // Search for the bucket from the bucket table and verify its OBS
     OmBucketInfo bucketInfo = cluster.getOzoneManager().getBucketInfo(volumeName, obsBucketName);

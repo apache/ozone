@@ -57,16 +57,14 @@ import org.junit.jupiter.params.provider.MethodSource;
  * ScmClient test-cases.
  */
 public class TestScmClient {
-  private ScmBlockLocationProtocol scmBlockLocationProtocol;
   private StorageContainerLocationProtocol containerLocationProtocol;
-  private OzoneConfiguration conf;
   private ScmClient scmClient;
 
   @BeforeEach
   public void setUp() {
-    scmBlockLocationProtocol = mock(ScmBlockLocationProtocol.class);
+    ScmBlockLocationProtocol scmBlockLocationProtocol = mock(ScmBlockLocationProtocol.class);
     containerLocationProtocol = mock(StorageContainerLocationProtocol.class);
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     scmClient = new ScmClient(scmBlockLocationProtocol,
         containerLocationProtocol, conf);
   }

@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.Mockito.any;
@@ -206,9 +207,8 @@ public class TestListInfoSubcommand {
     assertEquals(1, root.size(), "Expected 1 node in JSON output");
 
     JsonNode node = root.get(0);
-    assertTrue(node.has("datanodeDetails"), "Missing datanodeDetails");
     String opState = node.get("opState").asText();
-    String uuid = node.get("datanodeDetails").get("uuid").asText();
+    String uuid = node.get("id").asText();
 
     assertEquals("IN_SERVICE", opState, "Expected opState IN_SERVICE but got: " + opState);
     assertEquals(nodes.get(0).getNodeID().getUuid(), uuid,
@@ -278,6 +278,85 @@ public class TestListInfoSubcommand {
     validateOrderingFromTextOutput(textOutput, orderDirection);
   }
 
+  @ParameterizedTest(name = "{0} and {1} should be mutually exclusive")
+  @CsvSource({
+      "--most-used, --node-id",
+      "--most-used, --ip",
+      "--most-used, --hostname",
+      "--least-used, --node-id",
+      "--least-used, --ip",
+      "--least-used, --hostname"
+  })
+  public void testNodeSelectionAndUsageSortingAreMutuallyExclusive(String sortingFlag, String selectionFlag) {
+    CommandLine c = new CommandLine(cmd);
+    
+    List<HddsProtos.Node> nodes = getNodeDetails();
+    String nodeSelectionValue;
+    if ("--node-id".equals(selectionFlag)) {
+      nodeSelectionValue = nodes.get(0).getNodeID().getUuid();
+    } else if ("--ip".equals(selectionFlag)) {
+      nodeSelectionValue = "192.168.1.100";
+    } else {
+      nodeSelectionValue = "host-one";
+    } 
+    
+    CommandLine.MutuallyExclusiveArgsException thrown = assertThrows(
+        CommandLine.MutuallyExclusiveArgsException.class,
+        () -> c.parseArgs(sortingFlag, selectionFlag, nodeSelectionValue),
+        () -> String.format("Expected MutuallyExclusiveArgsException when combining %s and %s",
+            sortingFlag, selectionFlag)
+    );
+    
+    String expectedErrorMessagePart = "mutually exclusive";
+    assertTrue(thrown.getMessage().contains(expectedErrorMessagePart),
+        "Exception message should contain '" + expectedErrorMessagePart + "' but was: " + thrown.getMessage());
+  }
+
+  @Test
+  public void testVolumeCounters() throws Exception {
+    ScmClient scmClient = mock(ScmClient.class);
+    List<HddsProtos.Node> nodes = getNodeDetails();
+
+    // Create nodes with volume counts
+    List<HddsProtos.Node> nodesWithVolumeCounts = new ArrayList<>();
+    for (int i = 0; i < nodes.size(); i++) {
+      HddsProtos.Node originalNode = nodes.get(i);
+      HddsProtos.Node nodeWithVolumes = HddsProtos.Node.newBuilder(originalNode)
+          .setTotalVolumeCount(10 + i)
+          .setHealthyVolumeCount(8 + i)
+          .build();
+      nodesWithVolumeCounts.add(nodeWithVolumes);
+    }
+
+    when(scmClient.queryNode(any(), any(), any(), any())).thenReturn(nodesWithVolumeCounts);
+    when(scmClient.listPipelines()).thenReturn(new ArrayList<>());
+
+    // ----- JSON output test -----
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("--json");
+    cmd.execute(scmClient);
+    JsonNode root = mapper.readTree(outContent.toString(DEFAULT_ENCODING));
+    
+    assertTrue(root.isArray(), "JSON output should be an array");
+    assertEquals(4, root.size(), "Expected 4 nodes in JSON output");
+
+    for (JsonNode node : root) {
+      assertTrue(node.has("totalVolumeCount"), "JSON should include totalVolumeCount field");
+      assertTrue(node.has("healthyVolumeCount"), "JSON should include healthyVolumeCount field");
+    }
+
+    outContent.reset();
+    
+    // ----- Text output test -----
+    c = new CommandLine(cmd);
+    c.parseArgs();
+    cmd.execute(scmClient);
+    String output = outContent.toString(DEFAULT_ENCODING);
+    
+    assertTrue(output.contains("Total volume count:"), "Should display total volume count");
+    assertTrue(output.contains("Healthy volume count:"), "Should display healthy volume count");
+  }
+
   private void validateOrdering(JsonNode root, String orderDirection) {
     for (int i = 0; i < root.size() - 1; i++) {
       long usedCurrent = root.get(i).get("used").asLong();
@@ -330,8 +409,6 @@ public class TestListInfoSubcommand {
       dnd.setIpAddress("1.2.3." + i + 1);
       dnd.setNetworkLocation("/default");
       dnd.setNetworkName("host" + i);
-      dnd.addPorts(HddsProtos.Port.newBuilder()
-          .setName("ratis").setValue(5678).build());
       dnd.setUuid(UUID.randomUUID().toString());
 
       HddsProtos.Node.Builder builder  = HddsProtos.Node.newBuilder();

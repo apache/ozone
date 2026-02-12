@@ -58,7 +58,6 @@ public class TestNodeReportHandler implements EventPublisher {
   private static final Logger LOG = LoggerFactory
       .getLogger(TestNodeReportHandler.class);
   private NodeReportHandler nodeReportHandler;
-  private HDDSLayoutVersionManager versionManager;
   private SCMNodeManager nodeManager;
   @TempDir
   private File storagePath;
@@ -72,7 +71,7 @@ public class TestNodeReportHandler implements EventPublisher {
     when(storageConfig.getClusterID()).thenReturn("cluster1");
     NetworkTopology clusterMap = new NetworkTopologyImpl(conf);
 
-    this.versionManager = mock(HDDSLayoutVersionManager.class);
+    HDDSLayoutVersionManager versionManager = mock(HDDSLayoutVersionManager.class);
     when(versionManager.getMetadataLayoutVersion()).thenReturn(maxLayoutVersion());
     when(versionManager.getSoftwareLayoutVersion()).thenReturn(maxLayoutVersion());
     nodeManager =

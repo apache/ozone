@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.request.s3.multipart;
 
 import java.io.IOException;
+import java.util.Map;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -25,6 +26,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmFSOFile;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.request.file.OMFileRequest;
 import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadCommitPartResponse;
 import org.apache.hadoop.ozone.om.response.s3.multipart.S3MultipartUploadCommitPartResponseWithFSO;
@@ -67,13 +69,13 @@ public class S3MultipartUploadCommitPartRequestWithFSO
   @SuppressWarnings("checkstyle:ParameterNumber")
   protected S3MultipartUploadCommitPartResponse getOmClientResponse(
       OzoneManager ozoneManager,
-      OzoneManagerProtocolProtos.PartKeyInfo oldPartKeyInfo, String openKey,
+      Map<String, RepeatedOmKeyInfo> keyToDeleteMap, String openKey,
       OmKeyInfo omKeyInfo, String multipartKey,
       OmMultipartKeyInfo multipartKeyInfo,
-      OzoneManagerProtocolProtos.OMResponse build, OmBucketInfo omBucketInfo) {
+      OzoneManagerProtocolProtos.OMResponse build, OmBucketInfo omBucketInfo, long bucketId) {
 
     return new S3MultipartUploadCommitPartResponseWithFSO(build, multipartKey,
-        openKey, multipartKeyInfo, oldPartKeyInfo, omKeyInfo,
-        omBucketInfo, getBucketLayout());
+        openKey, multipartKeyInfo, keyToDeleteMap, omKeyInfo,
+        omBucketInfo, bucketId, getBucketLayout());
   }
 }

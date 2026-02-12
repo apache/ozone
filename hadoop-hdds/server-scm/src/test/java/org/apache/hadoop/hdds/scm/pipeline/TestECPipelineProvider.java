@@ -64,7 +64,6 @@ import org.junit.jupiter.api.Test;
 public class TestECPipelineProvider {
 
   private PipelineProvider provider;
-  private OzoneConfiguration conf;
   private NodeManager nodeManager = mock(NodeManager.class);
   private PipelineStateManager stateManager =
       mock(PipelineStateManager.class);
@@ -73,10 +72,10 @@ public class TestECPipelineProvider {
 
   @BeforeEach
   public void setup() throws IOException, NodeNotFoundException {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     provider = new ECPipelineProvider(
         nodeManager, stateManager, conf, placementPolicy);
-    this.containerSizeBytes = (long) this.conf.getStorageSize(
+    this.containerSizeBytes = (long) conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT,
         StorageUnit.BYTES);

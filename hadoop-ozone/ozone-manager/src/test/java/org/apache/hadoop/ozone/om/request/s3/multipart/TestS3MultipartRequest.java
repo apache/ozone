@@ -51,6 +51,7 @@ import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyLocation;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Part;
 import org.apache.hadoop.ozone.security.acl.OzoneNativeAuthorizer;
@@ -199,26 +200,43 @@ public class TestS3MultipartRequest {
   }
 
   /**
-   * Perform preExecute of Commit Multipart Upload request for given volume,
-   * bucket and keyName.
-   * @param volumeName
-   * @param bucketName
-   * @param keyName
-   * @param clientID
-   * @param multipartUploadID
-   * @param partNumber
+   * Perform preExecute of Commit Multipart Upload request.
+   * @param volumeName volume name.
+   * @param bucketName bucket name.
+   * @param keyName key name.
+   * @param clientID client ID.
+   * @param multipartUploadID multipart upload ID.
+   * @param partNumber part number.
    * @return OMRequest - returned from preExecute.
    */
   protected OMRequest doPreExecuteCommitMPU(
       String volumeName, String bucketName, String keyName,
       long clientID, String multipartUploadID, int partNumber)
       throws Exception {
+    return doPreExecuteCommitMPU(volumeName, bucketName, keyName, clientID, multipartUploadID,
+        partNumber, Collections.emptyList());
+  }
 
-    // Just set dummy size
-    long dataSize = 100L;
+  /**
+   * Perform preExecute of Commit Multipart Upload request.
+   * @param volumeName volume name.
+   * @param bucketName bucket name.
+   * @param keyName key name.
+   * @param clientID client ID.
+   * @param multipartUploadID multipart upload ID.
+   * @param partNumber part number.
+   * @param keyLocations key location info list.
+   * @return OMRequest - returned from preExecute.
+   */
+  protected OMRequest doPreExecuteCommitMPU(
+      String volumeName, String bucketName, String keyName,
+      long clientID, String multipartUploadID, int partNumber, List<KeyLocation> keyLocations)
+      throws Exception {
+
+    long dataSize = keyLocations.stream().mapToLong(KeyLocation::getLength).sum();
     OMRequest omRequest =
         OMRequestTestUtils.createCommitPartMPURequest(volumeName, bucketName,
-            keyName, clientID, dataSize, multipartUploadID, partNumber);
+            keyName, clientID, dataSize, multipartUploadID, partNumber, keyLocations);
     S3MultipartUploadCommitPartRequest s3MultipartUploadCommitPartRequest =
         getS3MultipartUploadCommitReq(omRequest);
 

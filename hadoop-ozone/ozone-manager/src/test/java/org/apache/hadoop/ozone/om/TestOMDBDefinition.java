@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBColumnFamilyDefinition;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
+import org.apache.hadoop.ozone.om.lock.OmReadOnlyLock;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -51,7 +52,7 @@ public class TestOMDBDefinition {
     final int countOmDefTables = columnFamilyDefinitions.size();
     List<String> missingDBDefTables = new ArrayList<>();
 
-    try (DBStore store = OmMetadataManagerImpl.loadDB(configuration, metaDir, -1)) {
+    try (DBStore store = OmMetadataManagerImpl.loadDB(configuration, metaDir, -1, new OmReadOnlyLock())) {
       // Get list of tables from the RocksDB Store
       final Collection<String> missingOmDBTables = new ArrayList<>(store.getTableNames().values());
       missingOmDBTables.remove("default");

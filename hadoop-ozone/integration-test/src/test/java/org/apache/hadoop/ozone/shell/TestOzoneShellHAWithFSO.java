@@ -28,10 +28,6 @@ import org.junit.jupiter.api.BeforeAll;
  */
 public class TestOzoneShellHAWithFSO extends TestOzoneShellHA {
 
-  /**
-   * Create a MiniOzoneCluster for testing with using distributed Ozone
-   * handler type.
-   */
   @BeforeAll
   @Override
   public void init() throws Exception {

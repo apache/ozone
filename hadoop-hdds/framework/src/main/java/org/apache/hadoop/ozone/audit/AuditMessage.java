@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.audit;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
 import java.util.function.Supplier;
 import org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
@@ -29,6 +30,7 @@ import org.apache.ratis.util.MemoizedSupplier;
 public final class AuditMessage implements Message {
 
   private static final long serialVersionUID = 1L;
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   private final transient Supplier<String> messageSupplier;
   private final String op;
@@ -99,6 +101,10 @@ public final class AuditMessage implements Message {
       return this;
     }
 
+    public Map<String, String> getParams() {
+      return params;
+    }
+
     public Builder withResult(AuditEventStatus result) {
       this.ret = result.getStatus();
       return this;
@@ -125,7 +131,19 @@ public final class AuditMessage implements Message {
       PerformanceStringBuilder performanceMap) {
     String perf = performanceMap != null
         ? " | perf=" + performanceMap.build() : "";
+    String params = formatParamsAsJson(paramsMap);
     return "user=" + userStr + " | ip=" + ipStr + " | " + "op=" + opStr
-        + " " + paramsMap + " | ret=" + retStr + perf;
+        + " " + params + " | ret=" + retStr + perf;
+  }
+
+  private String formatParamsAsJson(Map<String, String> paramsMap) {
+    if (paramsMap == null || paramsMap.isEmpty()) {
+      return "{}";
+    }
+    try {
+      return OBJECT_MAPPER.writeValueAsString(paramsMap);
+    } catch (Exception e) {
+      return paramsMap.toString();
+    }
   }
 }

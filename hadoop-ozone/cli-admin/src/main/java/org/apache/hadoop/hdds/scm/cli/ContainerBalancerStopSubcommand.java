@@ -34,7 +34,13 @@ public class ContainerBalancerStopSubcommand extends ScmSubcommand {
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     System.out.println("Sending stop command. Waiting for Container Balancer to stop...");
-    scmClient.stopContainerBalancer();
-    System.out.println("Container Balancer stopped.");
+    try {
+      scmClient.stopContainerBalancer();
+      System.out.println("Container Balancer stopped.");
+    } catch (IOException e) {
+      String msg = "Failed to stop Container Balancer";
+      System.err.println(msg);
+      throw e;
+    }
   }
 }

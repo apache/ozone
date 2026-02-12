@@ -24,12 +24,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
@@ -83,6 +85,23 @@ public class TestS3MultipartUploadCommitPartRequestWithFSO
     String fileName = OzoneFSUtils.getFileName(keyName);
     OMRequestTestUtils.addFileToKeyTable(true, false,
         fileName, omKeyInfo, clientID, txnLogId, omMetadataManager);
+  }
+
+  @Override
+  protected String addKeyToOpenKeyTable(String volumeName, String bucketName,
+      String keyName, long clientID, List<OmKeyLocationInfo> locationList) throws Exception {
+    long txnLogId = 0L;
+    OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName,
+            RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+            new OmKeyLocationInfoGroup(0L, locationList, true))
+        .setObjectID(parentID + 1)
+        .setParentObjectID(parentID)
+        .setUpdateID(txnLogId)
+        .build();
+    String fileName = OzoneFSUtils.getFileName(keyName);
+    OMRequestTestUtils.addFileToKeyTable(true, false,
+        fileName, omKeyInfo, clientID, txnLogId, omMetadataManager);
+    return getOpenKey(volumeName, bucketName, keyName, clientID);
   }
 
   @Override

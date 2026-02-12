@@ -30,6 +30,8 @@ public class ReplicationTask extends AbstractReplicationTask {
   private final ReplicateContainerCommand cmd;
   private final ContainerReplicator replicator;
   private final String debugString;
+  public static final String METRIC_NAME = "ContainerReplications";
+  public static final String METRIC_DESCRIPTION_SEGMENT = "container replications";
 
   /**
    * Counter for the transferred bytes.
@@ -66,12 +68,12 @@ public class ReplicationTask extends AbstractReplicationTask {
 
   @Override
   public String getMetricName() {
-    return "ContainerReplications";
+    return METRIC_NAME;
   }
 
   @Override
   public String getMetricDescriptionSegment() {
-    return "container replications";
+    return METRIC_DESCRIPTION_SEGMENT;
   }
 
   @Override

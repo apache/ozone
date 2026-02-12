@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.container.common.volume;
 
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.container.common.volume.HddsVolume.HDDS_VOLUME_DIR;
+import static org.apache.ozone.test.MetricsAsserts.assertGauge;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assumptions.assumeThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -35,6 +37,7 @@ import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
@@ -101,6 +104,13 @@ public class TestVolumeSet {
     return false;
   }
 
+  static void assertNumVolumes(MutableVolumeSet volumeSet, int expectedHealthyVolumes, int expectedFailedVolumes) {
+    MetricsRecordBuilder metricsRecords = getMetrics(volumeSet.getVolumeHealthMetrics());
+    assertGauge("TotalVolumes", expectedHealthyVolumes + expectedFailedVolumes, metricsRecords);
+    assertGauge("NumHealthyVolumes", expectedHealthyVolumes, metricsRecords);
+    assertGauge("NumFailedVolumes", expectedFailedVolumes, metricsRecords);
+  }
+
   @Test
   public void testVolumeSetInitialization() throws Exception {
 
@@ -113,12 +123,16 @@ public class TestVolumeSet {
         "VolumeSet not initialized correctly");
     assertTrue(checkVolumeExistsInVolumeSet(volume2),
         "VolumeSet not initialized correctly");
+
+    assertNumVolumes(volumeSet, 2, 0);
   }
 
   @Test
   public void testAddVolume() {
 
     assertEquals(2, volumeSet.getVolumesList().size());
+
+    assertNumVolumes(volumeSet, 2, 0);
 
     // Add a volume to VolumeSet
     String volume3 = baseDir.resolve("disk3").toString();
@@ -128,10 +142,13 @@ public class TestVolumeSet {
     assertEquals(3, volumeSet.getVolumesList().size());
     assertTrue(checkVolumeExistsInVolumeSet(volume3),
         "AddVolume did not add requested volume to VolumeSet");
+
+    assertNumVolumes(volumeSet, 3, 0);
   }
 
   @Test
   public void testFailVolume() throws Exception {
+    assertNumVolumes(volumeSet, 2, 0);
 
     //Fail a volume
     volumeSet.failVolume(HddsVolumeUtil.getHddsRoot(volume1));
@@ -148,16 +165,21 @@ public class TestVolumeSet {
 
     // Failed volume should not exist in VolumeMap
     assertThat(volumeSet.getVolumeMap()).doesNotContainKey(volume1);
+
+    assertNumVolumes(volumeSet, 1, 1);
   }
 
   @Test
   public void testRemoveVolume() throws Exception {
+    assertNumVolumes(volumeSet, 2, 0);
 
     assertEquals(2, volumeSet.getVolumesList().size());
 
     // Remove a volume from VolumeSet
     volumeSet.removeVolume(HddsVolumeUtil.getHddsRoot(volume1));
     assertEquals(1, volumeSet.getVolumesList().size());
+
+    assertNumVolumes(volumeSet, 1, 0);
 
     // Attempting to remove a volume which does not exist in VolumeSet should
     // log a warning.
@@ -167,10 +189,13 @@ public class TestVolumeSet {
     String expectedLogMessage = "Volume : " +
         HddsVolumeUtil.getHddsRoot(volume1) + " does not exist in VolumeSet";
     assertThat(logs.getOutput()).contains(expectedLogMessage);
+
+    assertNumVolumes(volumeSet, 1, 0);
   }
 
   @Test
   public void testVolumeInInconsistentState() throws Exception {
+    assertNumVolumes(volumeSet, 2, 0);
     assertEquals(2, volumeSet.getVolumesList().size());
 
     // Add a volume to VolumeSet
@@ -195,6 +220,7 @@ public class TestVolumeSet {
     assertFalse(checkVolumeExistsInVolumeSet(volume3), "AddVolume should fail" +
         " for an inconsistent volume");
 
+    assertNumVolumes(volumeSet, 2, 0);
     // Delete volume3
     File volume = new File(volume3);
     FileUtils.deleteDirectory(volume);
@@ -202,13 +228,14 @@ public class TestVolumeSet {
 
   @Test
   public void testShutdown() throws Exception {
+    assertNumVolumes(volumeSet, 2, 0);
     List<StorageVolume> volumesList = volumeSet.getVolumesList();
 
     volumeSet.shutdown();
 
     // Verify that volume usage can be queried during shutdown.
     for (StorageVolume volume : volumesList) {
-      assertThat(volume.getVolumeUsage()).isPresent();
+      assertThat(volume.getVolumeUsage()).isNotNull();
       volume.getCurrentUsage();
     }
   }
@@ -227,7 +254,7 @@ public class TestVolumeSet {
     assertEquals(1, volSet.getFailedVolumesList().size());
     assertEquals(readOnlyVolumePath, volSet.getFailedVolumesList().get(0)
         .getStorageDir());
-
+    assertNumVolumes(volSet, 1, 1);
     volSet.shutdown();
   }
 

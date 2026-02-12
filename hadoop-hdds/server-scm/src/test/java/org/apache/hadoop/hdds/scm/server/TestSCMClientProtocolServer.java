@@ -57,14 +57,13 @@ import org.junit.jupiter.api.io.TempDir;
  * servicing commands from the scm client.
  */
 public class TestSCMClientProtocolServer {
-  private OzoneConfiguration config;
   private SCMClientProtocolServer server;
   private StorageContainerManager scm;
   private StorageContainerLocationProtocolServerSideTranslatorPB service;
 
   @BeforeEach
   void setUp(@TempDir File testDir) throws Exception {
-    config = SCMTestUtils.getConf(testDir);
+    OzoneConfiguration config = SCMTestUtils.getConf(testDir);
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setSCMHAManager(SCMHAManagerStub.getInstance(true));
     configurator.setScmContext(SCMContext.emptyContext());

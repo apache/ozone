@@ -200,6 +200,8 @@ message Node {
     required DatanodeDetailsProto nodeID = 1;
     repeated NodeState nodeStates = 2;
     repeated NodeOperationalState nodeOperationalStates = 3;
+    optional int32 totalVolumeCount = 4;
+    optional int32 healthyVolumeCount = 5;
 }
 
 message NodePool {
@@ -207,14 +209,18 @@ message NodePool {
 }
 
 message DatanodeUsageInfoProto {
-    optional int64 capacity = 1;
-    optional int64 used = 2;
-    optional int64 remaining = 3;
+    optional int64 capacity = 1; // ozone capacity after subtracting reserved space from fs capacity
+    optional int64 used = 2; // space used by ozone as calculated by DU
+    optional int64 remaining = 3; // space available to ozone after adjusting reserved space
     optional DatanodeDetailsProto node = 4;
     optional int64 containerCount = 5;
     optional int64 committed = 6;
     optional int64 freeSpaceToSpare = 7;
     optional int64 pipelineCount = 8;
+    optional int64 reserved = 9;
+    // Raw filesystem stats
+    optional int64 fsCapacity = 10;
+    optional int64 fsAvailable = 11;
 }
 
 /**
@@ -476,6 +482,7 @@ message ReplicationManagerReportProto {
     required int64 timestamp = 1;
     repeated KeyIntValue stat = 2;
     repeated KeyContainerIDList statSample = 3;
+    optional int32 sampleLimit = 4 [default = 100];
 }
 
 message ContainerBalancerConfigurationProto {
@@ -510,6 +517,13 @@ message DeletedBlocksTransactionInfo {
     optional int64 containerID = 2;
     repeated int64 localID = 3;
     optional int32 count = 4;
+}
+
+message DeletedBlocksTransactionSummary {
+    optional uint64 totalTransactionCount = 1;
+    optional uint64 totalBlockCount = 2;
+    optional uint64 totalBlockSize = 3;
+    optional uint64 totalBlockReplicatedSize = 4;
 }
 
 message CompactionFileInfoProto {
@@ -549,4 +563,28 @@ message InnerNode {
     optional NodeTopology nodeTopology = 1;
     optional uint32 numOfLeaves = 2;
     repeated ChildrenMap childrenMap = 3;
+}
+
+message DiskBalancerConfigurationProto {
+    optional double threshold = 1;
+    optional uint64 diskBandwidthInMB = 2;
+    optional int32 parallelThread = 3;
+    optional bool stopAfterDiskEven = 4;
+}
+
+enum DiskBalancerRunningStatus {
+    RUNNING = 1;
+    STOPPED = 2;
+    PAUSED = 3;
+}
+
+message DatanodeDiskBalancerInfoProto {
+    required DatanodeDetailsProto node = 1;
+    required double currentVolumeDensitySum = 2;
+    optional DiskBalancerRunningStatus runningStatus = 3;
+    optional DiskBalancerConfigurationProto diskBalancerConf = 4;
+    optional uint64 successMoveCount = 5;
+    optional uint64 failureMoveCount = 6;
+    optional uint64 bytesToMove = 7;
+    optional uint64 bytesMoved = 8;
 }

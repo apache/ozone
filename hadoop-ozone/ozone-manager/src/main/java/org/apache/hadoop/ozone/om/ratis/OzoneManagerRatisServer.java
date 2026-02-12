@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.ozone.om.ratis;
 
-import static org.apache.hadoop.ipc.RpcConstants.DUMMY_CLIENT_ID;
-import static org.apache.hadoop.ipc.RpcConstants.INVALID_CALL_ID;
+import static org.apache.hadoop.ipc_.RpcConstants.DUMMY_CLIENT_ID;
+import static org.apache.hadoop.ipc_.RpcConstants.INVALID_CALL_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HA_PREFIX;
 import static org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils.createServerTlsConfig;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
@@ -34,9 +34,11 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -53,7 +55,7 @@ import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.ipc.ProtobufRpcEngine.Server;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine.Server;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -72,6 +74,7 @@ import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.grpc.GrpcConfigKeys;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.netty.NettyConfigKeys;
+import org.apache.ratis.proto.RaftProtos.RaftPeerRole;
 import org.apache.ratis.protocol.ClientId;
 import org.apache.ratis.protocol.ClientInvocationId;
 import org.apache.ratis.protocol.Message;
@@ -90,6 +93,7 @@ import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.RaftServerConfigKeys;
+import org.apache.ratis.server.RaftServerConfigKeys.Read;
 import org.apache.ratis.server.RetryCache;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.server.storage.RaftStorage;
@@ -122,6 +126,7 @@ public final class OzoneManagerRatisServer {
 
   private final ClientId clientId = ClientId.randomId();
   private static final AtomicLong CALL_ID_COUNTER = new AtomicLong();
+  private final Read.Option readOption;
 
   private static long nextCallId() {
     return CALL_ID_COUNTER.getAndIncrement() & Long.MAX_VALUE;
@@ -169,6 +174,8 @@ public final class OzoneManagerRatisServer {
     }
     this.omStateMachine = getStateMachine(conf);
 
+    this.readOption = RaftServerConfigKeys.Read.option(serverProperties);
+
     Parameters parameters = createServerTlsParameters(secConfig, certClient);
     this.server = RaftServer.newBuilder()
         .setServerId(this.raftPeerId)
@@ -206,10 +213,7 @@ public final class OzoneManagerRatisServer {
     InetSocketAddress ratisAddr = new InetSocketAddress(
         omNodeDetails.getInetAddress(), omNodeDetails.getRatisPort());
 
-    RaftPeer localRaftPeer = RaftPeer.newBuilder()
-        .setId(localRaftPeerId)
-        .setAddress(ratisAddr)
-        .build();
+    RaftPeer localRaftPeer = OzoneManagerRatisServer.createRaftPeer(omNodeDetails);
 
     // If OM is started in bootstrap mode, do not add peers to the RaftGroup.
     // Raft peers will be added after SetConfiguration transaction is
@@ -222,21 +226,7 @@ public final class OzoneManagerRatisServer {
       for (Map.Entry<String, OMNodeDetails> peerInfo : peerNodes.entrySet()) {
         String peerNodeId = peerInfo.getKey();
         OMNodeDetails peerNode = peerInfo.getValue();
-        RaftPeerId raftPeerId = RaftPeerId.valueOf(peerNodeId);
-        RaftPeer raftPeer;
-        if (peerNode.isHostUnresolved()) {
-          raftPeer = RaftPeer.newBuilder()
-              .setId(raftPeerId)
-              .setAddress(peerNode.getRatisHostPortStr())
-              .build();
-        } else {
-          InetSocketAddress peerRatisAddr = new InetSocketAddress(
-              peerNode.getInetAddress(), peerNode.getRatisPort());
-          raftPeer = RaftPeer.newBuilder()
-              .setId(raftPeerId)
-              .setAddress(peerRatisAddr)
-              .build();
-        }
+        RaftPeer raftPeer = OzoneManagerRatisServer.createRaftPeer(peerNode, peerNodeId);
 
         // Add other OM nodes belonging to the same OM service to the Ratis ring
         raftPeers.add(raftPeer);
@@ -254,11 +244,11 @@ public final class OzoneManagerRatisServer {
    * @return OMResponse - response returned to the client.
    * @throws ServiceException
    */
-  public OMResponse submitRequest(OMRequest omRequest) throws ServiceException {
+  public OMResponse submitRequest(OMRequest omRequest, boolean isWrite) throws ServiceException {
     // In prepare mode, only prepare and cancel requests are allowed to go
     // through.
     if (ozoneManager.getPrepareState().requestAllowed(omRequest.getCmdType())) {
-      RaftClientRequest raftClientRequest = createRaftRequest(omRequest);
+      RaftClientRequest raftClientRequest = createRaftRequest(omRequest, isWrite);
       RaftClientReply raftClientReply = submitRequestToRatis(raftClientRequest);
       return createOmResponse(omRequest, raftClientReply);
     } else {
@@ -292,10 +282,10 @@ public final class OzoneManagerRatisServer {
         () -> submitRequestToRatisImpl(raftClientRequest));
   }
 
-  private RaftClientRequest createRaftRequest(OMRequest omRequest) {
+  private RaftClientRequest createRaftRequest(OMRequest omRequest, boolean isWrite) {
     return captureLatencyNs(
         perfMetrics.getCreateRatisRequestLatencyNs(),
-        () -> createRaftRequestImpl(omRequest));
+        () -> createRaftRequestImpl(omRequest, isWrite));
   }
 
   /**
@@ -338,38 +328,25 @@ public final class OzoneManagerRatisServer {
    * Add new OM to the Ratis ring.
    */
   public void addOMToRatisRing(OMNodeDetails newOMNode) throws IOException {
-
-    Preconditions.checkNotNull(newOMNode);
+    Objects.requireNonNull(newOMNode, "newOMNode == null");
 
     String newOMNodeId = newOMNode.getNodeId();
-    RaftPeerId newOMRaftPeerId = RaftPeerId.valueOf(newOMNodeId);
-    InetSocketAddress newOMRatisAddr = new InetSocketAddress(
-        newOMNode.getHostAddress(), newOMNode.getRatisPort());
-    RaftPeer newRaftPeer = RaftPeer.newBuilder()
-        .setId(newOMRaftPeerId)
-        .setAddress(newOMRatisAddr)
-        .build();
+    RaftPeer newRaftPeer = OzoneManagerRatisServer.createRaftPeer(newOMNode);
 
     LOG.info("{}: Submitting SetConfiguration request to Ratis server to add" +
             " new OM peer {} to the Ratis group {}", ozoneManager.getOMNodeId(),
         newRaftPeer, raftGroup);
 
-    final List<RaftPeer> newPeersList = new ArrayList<>(raftPeerMap.values());
-    newPeersList.add(newRaftPeer);
+    List<RaftPeer> newPeersList = new ArrayList<>(getPeers(RaftPeerRole.FOLLOWER));
+    List<RaftPeer> newListenerList = new ArrayList<>(getPeers(RaftPeerRole.LISTENER));
 
-    SetConfigurationRequest request = new SetConfigurationRequest(clientId,
-        server.getId(), raftGroupId, nextCallId(), newPeersList);
-
-    RaftClientReply raftClientReply = server.setConfiguration(request);
-    if (raftClientReply.isSuccess()) {
-      LOG.info("Added OM {} to Ratis group {}.", newOMNodeId, raftGroupId);
+    if (newOMNode.isRatisListener()) {
+      newListenerList.add(newRaftPeer);
     } else {
-      LOG.error("Failed to add OM {} to Ratis group {}. Ratis " +
-              "SetConfiguration reply: {}", newOMNodeId, raftGroupId,
-          raftClientReply);
-      throw new IOException("Failed to add OM " + newOMNodeId + " to Ratis " +
-          "ring.");
+      newPeersList.add(newRaftPeer);
     }
+
+    updateRatisConfiguration(newPeersList, newListenerList, "add", newOMNodeId);
   }
 
   /**
@@ -377,32 +354,18 @@ public final class OzoneManagerRatisServer {
    */
   public void removeOMFromRatisRing(OMNodeDetails removeOMNode)
       throws IOException {
-    Preconditions.checkNotNull(removeOMNode);
+    Objects.requireNonNull(removeOMNode, "removeOMNode == null");
 
     String removeNodeId = removeOMNode.getNodeId();
     LOG.info("{}: Submitting SetConfiguration request to Ratis server to " +
             "remove OM peer {} from Ratis group {}", ozoneManager.getOMNodeId(),
         removeNodeId, raftGroup);
 
-    final List<RaftPeer> newPeersList = raftPeerMap.entrySet().stream()
-        .filter(e -> !e.getKey().equals(removeNodeId))
-        .map(Map.Entry::getValue)
-        .collect(Collectors.toList());
+    final List<RaftPeer> newPeersList = getPeers(RaftPeerRole.FOLLOWER, removeNodeId);
 
-    SetConfigurationRequest request = new SetConfigurationRequest(clientId,
-        server.getId(), raftGroupId, nextCallId(), newPeersList);
+    final List<RaftPeer> newListenersList = getPeers(RaftPeerRole.LISTENER, removeNodeId);
 
-    RaftClientReply raftClientReply = server.setConfiguration(request);
-    if (raftClientReply.isSuccess()) {
-      LOG.info("Removed OM {} from Ratis group {}.", removeNodeId,
-          raftGroupId);
-    } else {
-      LOG.error("Failed to remove OM {} from Ratis group {}. Ratis " +
-              "SetConfiguration reply: {}", removeNodeId, raftGroupId,
-          raftClientReply);
-      throw new IOException("Failed to remove OM " + removeNodeId + " from " +
-          "Ratis ring.");
-    }
+    updateRatisConfiguration(newPeersList, newListenersList, "remove", removeNodeId);
   }
 
   /**
@@ -410,6 +373,100 @@ public final class OzoneManagerRatisServer {
    */
   public Set<String> getPeerIds() {
     return Collections.unmodifiableSet(raftPeerMap.keySet());
+  }
+
+  public Set<String> getPeerIds(RaftPeerRole role) {
+    return raftPeerMap.entrySet().stream()
+        .filter(entry -> entry.getValue().getStartupRole() == role)
+        .map(Map.Entry::getKey)
+        .collect(Collectors.toSet());
+  }
+
+  public List<RaftPeer> getPeers() {
+    return new ArrayList<>(raftPeerMap.values());
+  }
+
+  public List<RaftPeer> getPeers(RaftPeerRole role) {
+    return raftPeerMap.values().stream()
+        .filter(raftPeer -> raftPeer.getStartupRole() == role)
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * Get peers by role, excluding a specific node ID.
+   * @param role the role to filter by
+   * @param excludeNodeId the node ID to exclude
+   * @return list of peers with the specified role, excluding the specified node
+   */
+  public List<RaftPeer> getPeers(RaftPeerRole role, String excludeNodeId) {
+    return raftPeerMap.entrySet().stream()
+        .filter(e -> !e.getKey().equals(excludeNodeId))
+        .map(Map.Entry::getValue)
+        .filter(peer -> peer.getStartupRole() == role)
+        .collect(Collectors.toList());
+  }
+
+  /**
+   * Helper method to update Ratis configuration with new peer lists.
+   * @param followers list of follower peers
+   * @param listeners list of listener peers
+   * @param operation description of the operation for logging
+   * @param nodeId the node ID being operated on
+   * @throws IOException if the configuration update fails
+   */
+  private void updateRatisConfiguration(List<RaftPeer> followers, List<RaftPeer> listeners,
+      String operation, String nodeId) throws IOException {
+    SetConfigurationRequest request = new SetConfigurationRequest(clientId,
+        server.getId(), raftGroupId, nextCallId(), followers, listeners);
+
+    RaftClientReply raftClientReply = server.setConfiguration(request);
+    if (raftClientReply.isSuccess()) {
+      LOG.info("{} OM {} in Ratis group {}.", operation, nodeId, raftGroupId);
+    } else {
+      LOG.error("Failed to {} OM {} in Ratis group {}. Ratis " +
+              "SetConfiguration reply: {}", operation.toLowerCase(), nodeId, raftGroupId,
+          raftClientReply);
+      throw new IOException("Failed to " + operation.toLowerCase() + " OM " + nodeId + " in " +
+          "Ratis ring.");
+    }
+  }
+
+  private static RaftPeer createRaftPeer(OMNodeDetails omNode) {
+    String nodeId = omNode.getNodeId();
+    RaftPeerId raftPeerId = RaftPeerId.valueOf(nodeId);
+    InetSocketAddress ratisAddr = new InetSocketAddress(
+        omNode.getHostAddress(), omNode.getRatisPort());
+    RaftPeerRole startRole = omNode.isRatisListener() ?
+        RaftPeerRole.LISTENER : RaftPeerRole.FOLLOWER;
+
+    return RaftPeer.newBuilder()
+        .setId(raftPeerId)
+        .setAddress(ratisAddr)
+        .setStartupRole(startRole)
+        .build();
+  }
+
+  /**
+   * Helper method to create a RaftPeer from OMNodeDetails, handling unresolved hosts.
+   * @param omNode the OM node details
+   * @param nodeId the node ID to use
+   * @return the created RaftPeer
+   */
+  private static RaftPeer createRaftPeer(OMNodeDetails omNode, String nodeId) {
+    RaftPeerId raftPeerId = RaftPeerId.valueOf(nodeId);
+    RaftPeer.Builder builder = RaftPeer.newBuilder()
+        .setId(raftPeerId)
+        .setStartupRole(omNode.isRatisListener() ? RaftPeerRole.LISTENER : RaftPeerRole.FOLLOWER);
+    
+    if (omNode.isHostUnresolved()) {
+      builder.setAddress(omNode.getRatisHostPortStr());
+    } else {
+      InetSocketAddress ratisAddr = new InetSocketAddress(
+          omNode.getInetAddress(), omNode.getRatisPort());
+      builder.setAddress(ratisAddr);
+    }
+    
+    return builder.build();
   }
 
   /**
@@ -426,15 +483,8 @@ public final class OzoneManagerRatisServer {
    * Add given node to list of RaftPeers.
    */
   public void addRaftPeer(OMNodeDetails omNodeDetails) {
-    InetSocketAddress newOMRatisAddr = new InetSocketAddress(
-        omNodeDetails.getHostAddress(), omNodeDetails.getRatisPort());
-
     String newNodeId = omNodeDetails.getNodeId();
-    RaftPeerId newPeerId = RaftPeerId.valueOf(newNodeId);
-    RaftPeer raftPeer = RaftPeer.newBuilder()
-        .setId(newPeerId)
-        .setAddress(newOMRatisAddr)
-        .build();
+    RaftPeer raftPeer = OzoneManagerRatisServer.createRaftPeer(omNodeDetails);
     raftPeerMap.put(newNodeId, raftPeer);
 
     LOG.info("Added OM {} to Ratis Peers list.", newNodeId);
@@ -455,7 +505,7 @@ public final class OzoneManagerRatisServer {
    * @return RaftClientRequest - Raft Client request which is submitted to
    * ratis server.
    */
-  private RaftClientRequest createRaftRequestImpl(OMRequest omRequest) {
+  private RaftClientRequest createRaftRequestImpl(OMRequest omRequest, boolean isWrite) {
     return RaftClientRequest.newBuilder()
         .setClientId(getClientId())
         .setServerId(server.getId())
@@ -464,7 +514,7 @@ public final class OzoneManagerRatisServer {
         .setMessage(
             Message.valueOf(
                 OMRatisHelper.convertRequestToByteString(omRequest)))
-        .setType(RaftClientRequest.writeRequestType())
+        .setType(isWrite ? RaftClientRequest.writeRequestType() : RaftClientRequest.readRequestType())
         .build();
   }
 
@@ -492,7 +542,11 @@ public final class OzoneManagerRatisServer {
     }
     //cache hit
     try {
-      return getOMResponse(cacheEntry.getReplyFuture().get());
+      RaftClientReply reply = cacheEntry.getReplyFuture().get();
+      if (!reply.isSuccess()) {
+        return null;
+      }
+      return getOMResponse(reply);
     } catch (ExecutionException ex) {
       throw new ServiceException(ex.getMessage(), ex);
     } catch (InterruptedException ex) {
@@ -567,7 +621,7 @@ public final class OzoneManagerRatisServer {
 
   private OMResponse getOMResponse(RaftClientReply reply) throws ServiceException {
     try {
-      return OMRatisHelper.getOMResponseFromRaftClientReply(reply);
+      return OMRatisHelper.getOMResponseFromRaftClientReply(reply, getLeaderId());
     } catch (IOException ex) {
       if (ex.getMessage() != null) {
         throw new ServiceException(ex.getMessage(), ex);
@@ -600,6 +654,10 @@ public final class OzoneManagerRatisServer {
   @VisibleForTesting
   public RaftServer.Division getServerDivision() {
     return serverDivision.get();
+  }
+
+  public boolean isLinearizableRead() {
+    return readOption == Read.Option.LINEARIZABLE;
   }
 
   /**
@@ -730,9 +788,6 @@ public final class OzoneManagerRatisServer {
     // Set the number of maximum cached segments
     RaftServerConfigKeys.Log.setSegmentCacheNumMax(properties, 2);
 
-    RaftServerConfigKeys.Write.setByteLimit(properties, SizeInBytes.valueOf((long) conf.getStorageSize(
-        OMConfigKeys.OZONE_OM_RATIS_PENDING_WRITE_BYTE_LIMIT,
-        OMConfigKeys.OZONE_OM_RATIS_PENDING_WRITE_BYTE_LIMIT_DEFAULT, StorageUnit.BYTES)));
     RaftServerConfigKeys.Write.setElementLimit(properties, conf.getInt(
         OMConfigKeys.OZONE_OM_RATIS_PENDING_WRITE_ELEMENT_LIMIT,
         OMConfigKeys.OZONE_OM_RATIS_PENDING_WRITE_NUM_LIMIT_DEFAULT));
@@ -849,6 +904,20 @@ public final class OzoneManagerRatisServer {
       return RaftServerStatus.LEADER_AND_READY;
     } else {
       return RaftServerStatus.LEADER_AND_NOT_READY;
+    }
+  }
+
+  @VisibleForTesting
+  public List<String> getCurrentListenersFromRaftConf() throws IOException {
+    try {
+      Collection<RaftPeer> currentListeners =
+          server.getDivision(raftGroupId).getRaftConf().getCurrentPeers(RaftPeerRole.LISTENER);
+      List<String> currentListenerList = new ArrayList<>();
+      currentListeners.forEach(e -> currentListenerList.add(e.getId().toString()));
+      return currentListenerList;
+    } catch (IOException e) {
+      // In this case we return not a leader.
+      throw new IOException("Failed to get peer information from Ratis.", e);
     }
   }
 

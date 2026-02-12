@@ -25,14 +25,9 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_PORT_KE
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_DNS_INTERFACE_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_DNS_NAMESERVER_KEY;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_HOST_NAME_KEY;
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_ADDRESS_KEY;
-import static org.apache.hadoop.hdds.recon.ReconConfigKeys.OZONE_RECON_DATANODE_PORT_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_DEFAULT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_CLIENT_PORT_KEY;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_DEFAULT;
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_PORT_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEFAULT_SERVICE_ID;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NAMES;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_SERVICE_IDS_KEY;
@@ -46,6 +41,7 @@ import jakarta.annotation.Nullable;
 import java.io.File;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.UndeclaredThrowableException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.file.Path;
@@ -60,7 +56,6 @@ import java.util.OptionalInt;
 import java.util.TreeMap;
 import java.util.UUID;
 import javax.management.ObjectName;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.ConfigRedactor;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
@@ -70,16 +65,20 @@ import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProtoOrBuilder;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.DatanodeBlockID;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
-import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.ipc.RemoteException;
-import org.apache.hadoop.ipc.RpcException;
-import org.apache.hadoop.ipc.RpcNoSuchMethodException;
-import org.apache.hadoop.ipc.RpcNoSuchProtocolException;
+import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.ipc_.RemoteException;
+import org.apache.hadoop.ipc_.RpcException;
+import org.apache.hadoop.ipc_.RpcNoSuchMethodException;
+import org.apache.hadoop.ipc_.RpcNoSuchProtocolException;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.net.DNS;
 import org.apache.hadoop.net.NetUtils;
@@ -88,6 +87,7 @@ import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.token.SecretManager;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
 import org.apache.ratis.util.SizeInBytes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -101,8 +101,8 @@ public final class HddsUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(HddsUtils.class);
 
-  public static final ByteString REDACTED =
-      ByteString.copyFromUtf8("<redacted>");
+  public static final String REDACTED_STRING = "<redacted>";
+  public static final ByteString REDACTED = ByteString.copyFromUtf8(REDACTED_STRING);
 
   private static final int ONE_MB = SizeInBytes.valueOf("1m").getSizeInt();
 
@@ -273,81 +273,6 @@ public final class HddsUtils {
   }
 
   /**
-   * Retrieve the socket addresses of all storage container managers.
-   *
-   * @return A collection of SCM addresses
-   * @throws IllegalArgumentException If the configuration is invalid
-   */
-  public static Collection<InetSocketAddress> getSCMAddressForDatanodes(
-      ConfigurationSource conf) {
-
-    // First check HA style config, if not defined fall back to OZONE_SCM_NAMES
-
-    if (getScmServiceId(conf) != null) {
-      List<SCMNodeInfo> scmNodeInfoList = SCMNodeInfo.buildNodeInfo(conf);
-      Collection<InetSocketAddress> scmAddressList =
-          new HashSet<>(scmNodeInfoList.size());
-      for (SCMNodeInfo scmNodeInfo : scmNodeInfoList) {
-        scmAddressList.add(
-            NetUtils.createSocketAddr(scmNodeInfo.getScmDatanodeAddress()));
-      }
-      return scmAddressList;
-    } else {
-      // fall back to OZONE_SCM_NAMES.
-      Collection<String> names =
-          conf.getTrimmedStringCollection(ScmConfigKeys.OZONE_SCM_NAMES);
-      if (names.isEmpty()) {
-        throw new IllegalArgumentException(ScmConfigKeys.OZONE_SCM_NAMES
-            + " need to be a set of valid DNS names or IP addresses."
-            + " Empty address list found.");
-      }
-
-      Collection<InetSocketAddress> addresses = new HashSet<>(names.size());
-      for (String address : names) {
-        Optional<String> hostname = getHostName(address);
-        if (!hostname.isPresent()) {
-          throw new IllegalArgumentException("Invalid hostname for SCM: "
-              + address);
-        }
-        int port = getHostPort(address)
-            .orElse(conf.getInt(OZONE_SCM_DATANODE_PORT_KEY,
-                OZONE_SCM_DATANODE_PORT_DEFAULT));
-        InetSocketAddress addr = NetUtils.createSocketAddr(hostname.get(),
-            port);
-        addresses.add(addr);
-      }
-
-      if (addresses.size() > 1) {
-        LOG.warn("When SCM HA is configured, configure {} appended with " +
-            "serviceId and nodeId. {} is deprecated.", OZONE_SCM_ADDRESS_KEY,
-            OZONE_SCM_NAMES);
-      }
-      return addresses;
-    }
-  }
-
-  /**
-   * Retrieve the socket addresses of recon.
-   *
-   * @return Recon address
-   * @throws IllegalArgumentException If the configuration is invalid
-   */
-  public static InetSocketAddress getReconAddresses(
-      ConfigurationSource conf) {
-    String name = conf.get(OZONE_RECON_ADDRESS_KEY);
-    if (StringUtils.isEmpty(name)) {
-      return null;
-    }
-    Optional<String> hostname = getHostName(name);
-    if (!hostname.isPresent()) {
-      throw new IllegalArgumentException("Invalid hostname for Recon: "
-          + name);
-    }
-    int port = getHostPort(name).orElse(OZONE_RECON_DATANODE_PORT_DEFAULT);
-    return NetUtils.createSocketAddr(hostname.get(), port);
-  }
-
-  /**
    * Returns the hostname for this datanode. If the hostname is not
    * explicitly configured in the given config, then it is determined
    * via the DNS class.
@@ -413,6 +338,7 @@ public final class HddsUtils {
     switch (proto.getCmdType()) {
     case ReadContainer:
     case ReadChunk:
+    case ReadBlock:
     case ListBlock:
     case GetBlock:
     case GetSmallFile:
@@ -463,8 +389,7 @@ public final class HddsUtils {
    * false if block token does not apply to the command.
    *
    */
-  public static boolean requireBlockToken(
-      ContainerProtos.Type cmdType) {
+  public static boolean requireBlockToken(Type cmdType) {
     switch (cmdType) {
     case DeleteBlock:
     case DeleteChunk:
@@ -474,6 +399,7 @@ public final class HddsUtils {
     case PutBlock:
     case PutSmallFile:
     case ReadChunk:
+    case ReadBlock:
     case WriteChunk:
     case FinalizeBlock:
       return true;
@@ -482,8 +408,7 @@ public final class HddsUtils {
     }
   }
 
-  public static boolean requireContainerToken(
-      ContainerProtos.Type cmdType) {
+  public static boolean requireContainerToken(Type cmdType) {
     switch (cmdType) {
     case CloseContainer:
     case CreateContainer:
@@ -503,7 +428,7 @@ public final class HddsUtils {
    * @return block ID.
    */
   public static BlockID getBlockID(ContainerCommandRequestProtoOrBuilder msg) {
-    ContainerProtos.DatanodeBlockID blockID = null;
+    DatanodeBlockID blockID = null;
     switch (msg.getCmdType()) {
     case DeleteBlock:
       if (msg.hasDeleteBlock()) {
@@ -548,6 +473,11 @@ public final class HddsUtils {
     case ReadChunk:
       if (msg.hasReadChunk()) {
         blockID = msg.getReadChunk().getBlockID();
+      }
+      break;
+    case ReadBlock:
+      if (msg.hasReadBlock()) {
+        blockID = msg.getReadBlock().getBlockID();
       }
       break;
     case WriteChunk:
@@ -625,10 +555,8 @@ public final class HddsUtils {
    *     ancestor of {@code path}
    */
   public static void validatePath(Path path, Path ancestor) {
-    Preconditions.checkNotNull(path,
-        "Path should not be null");
-    Preconditions.checkNotNull(ancestor,
-        "Ancestor should not be null");
+    Objects.requireNonNull(path, "Path should not be null");
+    Objects.requireNonNull(ancestor, "Ancestor should not be null");
     Preconditions.checkArgument(
         path.normalize().startsWith(ancestor.normalize()),
         "Path %s should be a descendant of %s", path, ancestor);
@@ -688,6 +616,9 @@ public final class HddsUtils {
     if (t instanceof RemoteException) {
       t = ((RemoteException) t).unwrapRemoteException();
     }
+    if (t instanceof UndeclaredThrowableException) {
+      t = ((UndeclaredThrowableException) t).getUndeclaredThrowable();
+    }
     while (t != null) {
       if (t instanceof RpcException ||
           t instanceof AccessControlException ||
@@ -727,42 +658,62 @@ public final class HddsUtils {
    * Remove binary data from request {@code msg}.  (May be incomplete, feel
    * free to add any missing cleanups.)
    */
-  public static ContainerProtos.ContainerCommandRequestProto processForDebug(
-      ContainerProtos.ContainerCommandRequestProto msg) {
-
+  public static String processForDebug(ContainerCommandRequestProto msg) {
     if (msg == null) {
       return null;
     }
 
-    if (msg.hasWriteChunk() || msg.hasPutSmallFile()) {
-      ContainerProtos.ContainerCommandRequestProto.Builder builder =
-          msg.toBuilder();
+    if (msg.hasWriteChunk() || msg.hasPutBlock() || msg.hasPutSmallFile()) {
+      final ContainerCommandRequestProto.Builder builder = msg.toBuilder();
       if (msg.hasWriteChunk()) {
-        builder.getWriteChunkBuilder().setData(REDACTED);
+        if (builder.getWriteChunkBuilder().hasData()) {
+          builder.getWriteChunkBuilder()
+              .setData(REDACTED);
+        }
+
+        if (builder.getWriteChunkBuilder().hasChunkData()) {
+          builder.getWriteChunkBuilder()
+              .getChunkDataBuilder()
+              .clearChecksumData();
+        }
+
+        if (builder.getWriteChunkBuilder().hasBlock()) {
+          builder.getWriteChunkBuilder()
+              .getBlockBuilder()
+              .getBlockDataBuilder()
+              .getChunksBuilderList()
+              .forEach(ContainerProtos.ChunkInfo.Builder::clearChecksumData);
+        }
       }
+
+      if (msg.hasPutBlock()) {
+        builder.getPutBlockBuilder()
+            .getBlockDataBuilder()
+            .getChunksBuilderList()
+            .forEach(ContainerProtos.ChunkInfo.Builder::clearChecksumData);
+      }
+
       if (msg.hasPutSmallFile()) {
         builder.getPutSmallFileBuilder().setData(REDACTED);
       }
-      return builder.build();
+      return TextFormat.shortDebugString(builder);
     }
 
-    return msg;
+    return TextFormat.shortDebugString(msg);
   }
 
   /**
    * Remove binary data from response {@code msg}.  (May be incomplete, feel
    * free to add any missing cleanups.)
    */
-  public static ContainerProtos.ContainerCommandResponseProto processForDebug(
-      ContainerProtos.ContainerCommandResponseProto msg) {
+  public static String processForDebug(ContainerCommandResponseProto msg) {
 
     if (msg == null) {
       return null;
     }
 
     if (msg.hasReadChunk() || msg.hasGetSmallFile()) {
-      ContainerProtos.ContainerCommandResponseProto.Builder builder =
-          msg.toBuilder();
+      final ContainerCommandResponseProto.Builder builder = msg.toBuilder();
       if (msg.hasReadChunk()) {
         if (msg.getReadChunk().hasData()) {
           builder.getReadChunkBuilder().setData(REDACTED);
@@ -784,10 +735,10 @@ public final class HddsUtils {
                   .addBuffers(REDACTED);
         }
       }
-      return builder.build();
+      return TextFormat.shortDebugString(builder);
     }
 
-    return msg;
+    return TextFormat.shortDebugString(msg);
   }
 
   /**
@@ -822,8 +773,7 @@ public final class HddsUtils {
    * Transform a protobuf UUID to Java UUID.
    */
   public static UUID fromProtobuf(HddsProtos.UUID uuid) {
-    Objects.requireNonNull(uuid,
-        "HddsProtos.UUID can't be null to transform to java UUID.");
+    Objects.requireNonNull(uuid, "HddsProtos.UUID can't be null to transform to java UUID.");
     return new UUID(uuid.getMostSigBits(), uuid.getLeastSigBits());
   }
 
@@ -831,8 +781,7 @@ public final class HddsUtils {
    * Transform a Java UUID to protobuf UUID.
    */
   public static HddsProtos.UUID toProtobuf(UUID uuid) {
-    Objects.requireNonNull(uuid,
-        "UUID can't be null to transform to protobuf UUID.");
+    Objects.requireNonNull(uuid, "UUID can't be null to transform to protobuf UUID.");
     return HddsProtos.UUID.newBuilder()
         .setMostSigBits(uuid.getMostSignificantBits())
         .setLeastSigBits(uuid.getLeastSignificantBits())

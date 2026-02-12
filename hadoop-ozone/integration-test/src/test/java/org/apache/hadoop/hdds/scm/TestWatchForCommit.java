@@ -25,7 +25,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import java.io.IOException;
 import java.io.OutputStream;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -77,6 +76,10 @@ import org.junit.jupiter.params.provider.EnumSource;
  */
 @Flaky("HDDS-5818")
 public class TestWatchForCommit {
+  private static final int CHUNK_SIZE = 100;
+  private static final int FLUSH_SIZE = 2 * CHUNK_SIZE;
+  private static final int MAX_FLUSH_SIZE = 2 * FLUSH_SIZE;
+  private static final int BLOCK_SIZE = 2 * MAX_FLUSH_SIZE;
 
   private MiniOzoneCluster cluster;
   private OzoneConfiguration conf;
@@ -85,27 +88,12 @@ public class TestWatchForCommit {
   private String volumeName;
   private String bucketName;
   private String keyString;
-  private int chunkSize;
-  private int flushSize;
-  private int maxFlushSize;
-  private int blockSize;
   private StorageContainerLocationProtocolClientSideTranslatorPB
       storageContainerLocationClient;
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   * <p>
-   * Ozone is made active by setting OZONE_ENABLED = true
-   *
-   * @throws IOException
-   */
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
-    chunkSize = 100;
-    flushSize = 2 * chunkSize;
-    maxFlushSize = 2 * flushSize;
-    blockSize = 2 * maxFlushSize;
 
     OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
     clientConfig.setStreamBufferFlushDelay(false);
@@ -138,10 +126,10 @@ public class TestWatchForCommit {
     conf.setTimeDuration(OZONE_SCM_STALENODE_INTERVAL, 30, TimeUnit.SECONDS);
 
     ClientConfigForTesting.newBuilder(StorageUnit.BYTES)
-        .setBlockSize(blockSize)
-        .setChunkSize(chunkSize)
-        .setStreamBufferFlushSize(flushSize)
-        .setStreamBufferMaxSize(maxFlushSize)
+        .setBlockSize(BLOCK_SIZE)
+        .setChunkSize(CHUNK_SIZE)
+        .setStreamBufferFlushSize(FLUSH_SIZE)
+        .setStreamBufferMaxSize(MAX_FLUSH_SIZE)
         .applyTo(conf);
 
     cluster = MiniOzoneCluster.newBuilder(conf)
@@ -161,10 +149,6 @@ public class TestWatchForCommit {
         .getStorageContainerLocationClient();
   }
 
-
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterEach
   public void shutdown() {
     IOUtils.closeQuietly(client);
@@ -181,7 +165,7 @@ public class TestWatchForCommit {
   public void testWatchForCommitWithKeyWrite() throws Exception {
     String keyName = getKeyName();
     OzoneOutputStream key = createKey(keyName, ReplicationType.RATIS, 0);
-    int dataLength = maxFlushSize + 50;
+    int dataLength = MAX_FLUSH_SIZE + 50;
     // write data more than 1 chunk
     byte[] data1 =
         ContainerTestHelper.getFixedLengthString(keyString, dataLength)
@@ -199,13 +183,13 @@ public class TestWatchForCommit {
     assertEquals(4, blockOutputStream.getBufferPool().getSize());
     // writtenDataLength as well flushedDataLength will be updated here
     assertEquals(dataLength, blockOutputStream.getWrittenDataLength());
-    assertEquals(maxFlushSize,
+    assertEquals(MAX_FLUSH_SIZE,
         blockOutputStream.getTotalDataFlushedLength());
     // since data equals to maxBufferSize is written, this will be a blocking
     // call and hence will wait for atleast flushSize worth of data to get
     // acked by all servers right here
     assertThat(blockOutputStream.getTotalAckDataLength())
-        .isGreaterThanOrEqualTo(flushSize);
+        .isGreaterThanOrEqualTo(FLUSH_SIZE);
     // watchForCommit will clean up atleast one entry from the map where each
     // entry corresponds to flushSize worth of data
     assertThat(blockOutputStream.getCommitIndex2flushedDataMap().size())

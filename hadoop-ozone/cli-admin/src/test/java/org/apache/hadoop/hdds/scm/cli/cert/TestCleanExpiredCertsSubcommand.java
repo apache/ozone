@@ -40,7 +40,6 @@ import org.junit.jupiter.api.Test;
 class TestCleanExpiredCertsSubcommand {
 
   private SCMSecurityProtocol scmSecurityProtocolMock;
-  private CleanExpiredCertsSubcommand cmd;
   private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
   private final ByteArrayOutputStream errContent = new ByteArrayOutputStream();
   private final PrintStream originalOut = System.out;
@@ -63,7 +62,7 @@ class TestCleanExpiredCertsSubcommand {
 
   @Test
   public void testCleaningOneCertificate() throws Exception {
-    cmd = new CleanExpiredCertsSubcommand();
+    CleanExpiredCertsSubcommand cmd = new CleanExpiredCertsSubcommand();
     KeyPair keyPair = CertificateTestUtils.aKeyPair(new OzoneConfiguration());
     X509Certificate cert = createSelfSignedCert(keyPair, "aCert");
     ArrayList<String> certPemList = new ArrayList<>();

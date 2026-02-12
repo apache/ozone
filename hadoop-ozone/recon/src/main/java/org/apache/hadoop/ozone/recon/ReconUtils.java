@@ -49,9 +49,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import javax.ws.rs.core.Response;
 import org.apache.commons.io.FileUtils;
@@ -74,7 +71,6 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
-import org.apache.hadoop.ozone.recon.api.ServiceNotReadyException;
 import org.apache.hadoop.ozone.recon.api.handlers.BucketHandler;
 import org.apache.hadoop.ozone.recon.api.handlers.EntityHandler;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
@@ -83,7 +79,6 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerReportQueue;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
-import org.apache.hadoop.util.Time;
 import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.apache.ozone.recon.schema.generated.tables.pojos.GlobalStats;
 import org.jooq.Configuration;
@@ -99,16 +94,17 @@ public class ReconUtils {
   private static Logger log = LoggerFactory.getLogger(
       ReconUtils.class);
 
-  private static AtomicBoolean rebuildTriggered = new AtomicBoolean(false);
-  private static final ExecutorService NSSUMMARY_REBUILD_EXECUTOR =
-      Executors.newSingleThreadExecutor(r -> {
-        Thread t = new Thread(r);
-        t.setName("RebuildNSSummaryThread");
-        t.setDaemon(true); // Optional: allows JVM to exit without waiting
-        return t;
-      });
-
   public ReconUtils() {
+  }
+
+  /**
+   * Get the current rebuild state of NSSummary tree.
+   * Delegates to NSSummaryTask's unified control mechanism.
+   *
+   * @return current RebuildState from NSSummaryTask
+   */
+  public static org.apache.hadoop.ozone.recon.tasks.NSSummaryTask.RebuildState getNSSummaryRebuildState() {
+    return org.apache.hadoop.ozone.recon.tasks.NSSummaryTask.getRebuildState();
   }
 
   public static File getReconScmDbDir(ConfigurationSource conf) {
@@ -183,7 +179,7 @@ public class ReconUtils {
 
   /**
    * Constructs the full path of a key from its OmKeyInfo using a bottom-up approach, starting from the leaf node.
-   *
+   * <p>
    * The method begins with the leaf node (the key itself) and recursively prepends parent directory names, fetched
    * via NSSummary objects, until reaching the parent bucket (parentId is -1). It effectively builds the path from
    * bottom to top, finally prepending the volume and bucket names to complete the full path. If the directory structure
@@ -192,39 +188,37 @@ public class ReconUtils {
    *
    * @param omKeyInfo The OmKeyInfo object for the key
    * @return The constructed full path of the key as a String, or an empty string if a rebuild is in progress and
-   *         the path cannot be constructed at this time.
+   * the path cannot be constructed at this time.
    * @throws IOException
    */
   public static String constructFullPath(OmKeyInfo omKeyInfo,
-                                         ReconNamespaceSummaryManager reconNamespaceSummaryManager,
-                                         ReconOMMetadataManager omMetadataManager)  throws IOException {
+                                         ReconNamespaceSummaryManager reconNamespaceSummaryManager) throws IOException {
     return constructFullPath(omKeyInfo.getKeyName(), omKeyInfo.getParentObjectID(), omKeyInfo.getVolumeName(),
-        omKeyInfo.getBucketName(), reconNamespaceSummaryManager, omMetadataManager);
+        omKeyInfo.getBucketName(), reconNamespaceSummaryManager);
   }
 
   /**
    * Constructs the full path of a key from its key name and parent ID using a bottom-up approach, starting from the
    * leaf node.
-   *
+   * <p>
    * The method begins with the leaf node (the key itself) and recursively prepends parent directory names, fetched
    * via NSSummary objects, until reaching the parent bucket (parentId is -1). It effectively builds the path from
    * bottom to top, finally prepending the volume and bucket names to complete the full path. If the directory structure
    * is currently being rebuilt (indicated by the rebuildTriggered flag), this method returns an empty string to signify
    * that path construction is temporarily unavailable.
    *
-   * @param keyName The name of the key
+   * @param keyName         The name of the key
    * @param initialParentId The parent ID of the key
-   * @param volumeName The name of the volume
-   * @param bucketName The name of the bucket
+   * @param volumeName      The name of the volume
+   * @param bucketName      The name of the bucket
    * @return The constructed full path of the key as a String, or an empty string if a rebuild is in progress and
-   *         the path cannot be constructed at this time.
+   * the path cannot be constructed at this time.
    * @throws IOException
    */
   public static String constructFullPath(String keyName, long initialParentId, String volumeName, String bucketName,
-                                         ReconNamespaceSummaryManager reconNamespaceSummaryManager,
-                                         ReconOMMetadataManager omMetadataManager) throws IOException {
+                                         ReconNamespaceSummaryManager reconNamespaceSummaryManager) throws IOException {
     StringBuilder fullPath = constructFullPathPrefix(initialParentId, volumeName, bucketName,
-        reconNamespaceSummaryManager, omMetadataManager);
+        reconNamespaceSummaryManager);
     if (fullPath.length() == 0) {
       return "";
     }
@@ -235,7 +229,7 @@ public class ReconUtils {
   /**
    * Constructs the prefix path to a key from its key name and parent ID using a bottom-up approach, starting from the
    * leaf node.
-   *
+   * <p>
    * The method begins with the leaf node (the key itself) and recursively prepends parent directory names, fetched
    * via NSSummary objects, until reaching the parent bucket (parentId is -1). It effectively builds the path from
    * bottom to top, finally prepending the volume and bucket names to complete the full path. If the directory structure
@@ -243,16 +237,16 @@ public class ReconUtils {
    * that path construction is temporarily unavailable.
    *
    * @param initialParentId The parent ID of the key
-   * @param volumeName The name of the volume
-   * @param bucketName The name of the bucket
+   * @param volumeName      The name of the volume
+   * @param bucketName      The name of the bucket
    * @return A StringBuilder containing the constructed prefix path of the key, or an empty string builder if a rebuild
-   *         is in progress.
+   * is in progress.
    * @throws IOException
    */
   public static StringBuilder constructFullPathPrefix(long initialParentId, String volumeName,
-      String bucketName, ReconNamespaceSummaryManager reconNamespaceSummaryManager,
-      ReconOMMetadataManager omMetadataManager) throws IOException {
+      String bucketName, ReconNamespaceSummaryManager reconNamespaceSummaryManager) throws IOException {
 
+    StringBuilder fullPath = new StringBuilder();
     long parentId = initialParentId;
     boolean isDirectoryPresent = false;
 
@@ -262,14 +256,8 @@ public class ReconUtils {
       if (nsSummary == null) {
         log.warn("NSSummary tree is currently being rebuilt or the directory could be in the progress of " +
             "deletion, returning empty string for path construction.");
-        throw new ServiceNotReadyException("Service is initializing. Please try again later.");
-      }
-      if (nsSummary.getParentId() == -1) {
-        if (rebuildTriggered.compareAndSet(false, true)) {
-          triggerRebuild(reconNamespaceSummaryManager, omMetadataManager);
-        }
-        log.warn("NSSummary tree is currently being rebuilt, returning empty string for path construction.");
-        throw new ServiceNotReadyException("Service is initializing. Please try again later.");
+        fullPath.setLength(0);
+        return fullPath;
       }
       // On the last pass, dir-name will be empty and parent will be zero, indicating the loop should end.
       if (!nsSummary.getDirName().isEmpty()) {
@@ -281,7 +269,6 @@ public class ReconUtils {
       isDirectoryPresent = true;
     }
 
-    StringBuilder fullPath = new StringBuilder();
     fullPath.append(volumeName).append(OM_KEY_PREFIX)
         .append(bucketName).append(OM_KEY_PREFIX);
 
@@ -398,21 +385,6 @@ public class ReconUtils {
       return prevKeyPrefix;
     }
     return prevKeyPrefix;
-  }
-
-  private static void triggerRebuild(ReconNamespaceSummaryManager reconNamespaceSummaryManager,
-                                     ReconOMMetadataManager omMetadataManager) {
-    NSSUMMARY_REBUILD_EXECUTOR.submit(() -> {
-      long startTime = Time.monotonicNow();
-      log.info("Rebuilding NSSummary tree...");
-      try {
-        reconNamespaceSummaryManager.rebuildNSSummaryTree(omMetadataManager);
-        long endTime = Time.monotonicNow();
-        log.info("NSSummary tree rebuild completed in {} ms.", endTime - startTime);
-      } catch (Throwable t) {
-        log.error("NSSummary tree rebuild failed.", t);
-      }
-    });
   }
 
   /**
@@ -874,5 +846,35 @@ public class ReconUtils {
       pathBuilder.append(OM_KEY_PREFIX).append(id);
     }
     return pathBuilder.toString();
+  }
+
+  public static Map<String, Object> getMetricsData(List<Map<String, Object>> metrics, String beanName) {
+    if (metrics == null || StringUtils.isEmpty(beanName)) {
+      return null;
+    }
+    for (Map<String, Object> item :metrics) {
+      if (beanName.equals(item.get("name"))) {
+        return item;
+      }
+    }
+    return null;
+  }
+
+  public static long extractLongMetricValue(Map<String, Object> metrics, String keyName) {
+    if (metrics == null || StringUtils.isEmpty(keyName)) {
+      return  -1;
+    }
+    Object value = metrics.get(keyName);
+    if (value instanceof Number) {
+      return ((Number) value).longValue();
+    }
+    if (value instanceof String) {
+      try {
+        return Long.parseLong((String) value);
+      } catch (NumberFormatException e) {
+        log.error("Failed to parse long value for key: {} with value: {}", keyName, value, e);
+      }
+    }
+    return -1;
   }
 }

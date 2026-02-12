@@ -24,7 +24,10 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.ProvisionException;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import javax.inject.Inject;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
@@ -39,6 +42,8 @@ import org.slf4j.LoggerFactory;
  * Provider for Recon's RDB.
  */
 public class ReconDBProvider {
+  private static final String STAGED_EXT = ".staged";
+  private static final String BACKUP_EXT = ".backup";
   private OzoneConfiguration configuration;
   private ReconUtils reconUtils;
   private DBStore dbStore;
@@ -54,20 +59,47 @@ public class ReconDBProvider {
     this.dbStore = provideReconDB();
   }
 
+  private ReconDBProvider(OzoneConfiguration configuration, ReconUtils reconUtils, DBStore dbStore) {
+    this.configuration = configuration;
+    this.reconUtils = reconUtils;
+    this.dbStore = dbStore;
+  }
+
+  public ReconDBProvider getStagedReconDBProvider() throws IOException {
+    File reconDbDir = reconUtils.getReconDbDir(configuration, OZONE_RECON_DB_DIR);
+    String stagedDbName = RECON_CONTAINER_KEY_DB + STAGED_EXT;
+    FileUtils.deleteDirectory(new File(reconDbDir, stagedDbName));
+    DBStore db = initializeDBStore(configuration, stagedDbName);
+    if (db == null) {
+      throw new ProvisionException("Unable to initialize staged recon container DBStore");
+    }
+    return new ReconDBProvider(configuration, reconUtils, db);
+  }
+
   public DBStore provideReconDB() {
     DBStore db;
-    File reconDbDir =
-            reconUtils.getReconDbDir(configuration, OZONE_RECON_DB_DIR);
-    File lastKnownContainerKeyDb =
-            reconUtils.getLastKnownDB(reconDbDir, RECON_CONTAINER_KEY_DB);
-    if (lastKnownContainerKeyDb != null) {
-      LOG.info("Last known Recon DB : {}",
-              lastKnownContainerKeyDb.getAbsolutePath());
-      db = initializeDBStore(configuration,
-              lastKnownContainerKeyDb.getName());
-    } else {
-      db = getNewDBStore(configuration);
+    try {
+      // handle recover of last known container as old format removing timestamp
+      File reconDbDir = reconUtils.getReconDbDir(configuration, OZONE_RECON_DB_DIR);
+      File lastKnownContainerKeyDb = reconUtils.getLastKnownDB(reconDbDir, RECON_CONTAINER_KEY_DB);
+      if (lastKnownContainerKeyDb != null) {
+        LOG.info("Last known Recon DB : {}", lastKnownContainerKeyDb.getAbsolutePath());
+        Files.move(lastKnownContainerKeyDb.toPath(), new File(reconDbDir, RECON_CONTAINER_KEY_DB).toPath(),
+            StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+      }
+      // if db does not exist, check if a backup exists and restore it. This can happen when replace with
+      // staged db fails and backup is not restored at that point of time.
+      if (!new File(reconDbDir, RECON_CONTAINER_KEY_DB).exists() &&
+          new File(reconDbDir, RECON_CONTAINER_KEY_DB + BACKUP_EXT).exists()) {
+        LOG.info("Recon DB backup found, restoring from backup.");
+        Files.move(new File(reconDbDir, RECON_CONTAINER_KEY_DB + BACKUP_EXT).toPath(),
+            new File(reconDbDir, RECON_CONTAINER_KEY_DB).toPath(),
+            StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+      }
+    } catch (IOException e) {
+      throw new ProvisionException("Unable to recover container DB path.", e);
     }
+    db = initializeDBStore(configuration, RECON_CONTAINER_KEY_DB);
     if (db == null) {
       throw new ProvisionException("Unable to provide instance of DBStore " +
               "store.");
@@ -92,11 +124,6 @@ public class ReconDBProvider {
     }
   }
 
-  static DBStore getNewDBStore(OzoneConfiguration configuration) {
-    String dbName = RECON_CONTAINER_KEY_DB + "_" + System.currentTimeMillis();
-    return initializeDBStore(configuration, dbName);
-  }
-
   private static DBStore initializeDBStore(OzoneConfiguration configuration,
                                            String dbName) {
     DBStore dbStore = null;
@@ -113,6 +140,31 @@ public class ReconDBProvider {
     if (this.dbStore != null) {
       dbStore.close();
       dbStore = null;
+    }
+  }
+
+  public void replaceStagedDb(ReconDBProvider stagedReconDBProvider) throws Exception {
+    File dbPath = dbStore.getDbLocation();
+    File stagedDbPath = stagedReconDBProvider.getDbStore().getDbLocation();
+    File backupPath = new File(dbPath.getAbsolutePath() + BACKUP_EXT);
+    stagedReconDBProvider.close();
+    try {
+      FileUtils.deleteDirectory(backupPath);
+      close();
+      Files.move(dbPath.toPath(), backupPath.toPath(), StandardCopyOption.ATOMIC_MOVE,
+          StandardCopyOption.REPLACE_EXISTING);
+      Files.move(stagedDbPath.toPath(), dbPath.toPath(), StandardCopyOption.ATOMIC_MOVE,
+          StandardCopyOption.REPLACE_EXISTING);
+      dbStore = initializeDBStore(configuration, dbPath.getName());
+    } catch (Exception e) {
+      if (dbStore == null) {
+        Files.move(dbPath.toPath(), stagedDbPath.toPath(), StandardCopyOption.ATOMIC_MOVE,
+            StandardCopyOption.REPLACE_EXISTING);
+        Files.move(backupPath.toPath(), dbPath.toPath(), StandardCopyOption.ATOMIC_MOVE,
+            StandardCopyOption.REPLACE_EXISTING);
+        dbStore = initializeDBStore(configuration, dbPath.getName());
+      }
+      throw e;
     }
   }
 }

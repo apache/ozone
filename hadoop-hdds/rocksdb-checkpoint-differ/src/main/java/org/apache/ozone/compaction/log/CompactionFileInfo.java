@@ -18,20 +18,16 @@
 package org.apache.ozone.compaction.log;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import java.util.Objects;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.ozone.rocksdb.util.SstFileInfo;
 import org.rocksdb.LiveFileMetaData;
 
 /**
  * Dao to keep SST file information in the compaction log.
  */
-public final class CompactionFileInfo {
-  private final String fileName;
-  private final String startKey;
-  private final String endKey;
-  private final String columnFamily;
+public final class CompactionFileInfo extends SstFileInfo {
   private boolean pruned;
 
   @VisibleForTesting
@@ -47,27 +43,8 @@ public final class CompactionFileInfo {
                             String endRange,
                             String columnFamily,
                             boolean pruned) {
-    this.fileName = fileName;
-    this.startKey = startRange;
-    this.endKey = endRange;
-    this.columnFamily = columnFamily;
+    super(fileName, startRange, endRange, columnFamily);
     this.pruned = pruned;
-  }
-
-  public String getFileName() {
-    return fileName;
-  }
-
-  public String getStartKey() {
-    return startKey;
-  }
-
-  public String getEndKey() {
-    return endKey;
-  }
-
-  public String getColumnFamily() {
-    return columnFamily;
   }
 
   public boolean isPruned() {
@@ -81,16 +58,16 @@ public final class CompactionFileInfo {
   public HddsProtos.CompactionFileInfoProto getProtobuf() {
     HddsProtos.CompactionFileInfoProto.Builder builder =
         HddsProtos.CompactionFileInfoProto.newBuilder()
-            .setFileName(fileName)
+            .setFileName(getFileName())
             .setPruned(pruned);
-    if (startKey != null) {
-      builder = builder.setStartKey(startKey);
+    if (getStartKey() != null) {
+      builder = builder.setStartKey(getStartKey());
     }
-    if (endKey != null) {
-      builder = builder.setEndKey(endKey);
+    if (getEndKey() != null) {
+      builder = builder.setEndKey(getEndKey());
     }
-    if (columnFamily != null) {
-      builder = builder.setColumnFamily(columnFamily);
+    if (getColumnFamily() != null) {
+      builder = builder.setColumnFamily(getColumnFamily());
     }
     return builder.build();
   }
@@ -117,8 +94,25 @@ public final class CompactionFileInfo {
 
   @Override
   public String toString() {
-    return String.format("fileName: '%s', startKey: '%s', endKey: '%s'," +
-        " columnFamily: '%s', isPruned: '%b'", fileName, startKey, endKey, columnFamily, pruned);
+    return String.format("%s, isPruned: '%b'", super.toString(), pruned);
+  }
+
+  @Override
+  public SstFileInfo copyObject() {
+    return new CompactionFileInfo(getFileName(), getStartKey(), getEndKey(), getColumnFamily(), pruned);
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (!(o instanceof CompactionFileInfo)) {
+      return false;
+    }
+    return super.equals(o) && pruned == ((CompactionFileInfo)o).pruned;
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(super.hashCode(), pruned);
   }
 
   /**
@@ -132,8 +126,7 @@ public final class CompactionFileInfo {
     private boolean pruned = false;
 
     public Builder(String fileName) {
-      Preconditions.checkNotNull(fileName, "FileName is required parameter.");
-      this.fileName = fileName;
+      this.fileName = Objects.requireNonNull(fileName, "FileName is required parameter.");
     }
 
     public Builder setStartRange(String startRange) {
@@ -179,26 +172,5 @@ public final class CompactionFileInfo {
       return new CompactionFileInfo(fileName, startRange, endRange,
           columnFamily, pruned);
     }
-  }
-
-  @Override
-  public boolean equals(Object o) {
-    if (this == o) {
-      return true;
-    }
-    if (!(o instanceof CompactionFileInfo)) {
-      return false;
-    }
-
-    CompactionFileInfo that = (CompactionFileInfo) o;
-    return Objects.equals(fileName, that.fileName) &&
-        Objects.equals(startKey, that.startKey) &&
-        Objects.equals(endKey, that.endKey) &&
-        Objects.equals(columnFamily, that.columnFamily);
-  }
-
-  @Override
-  public int hashCode() {
-    return Objects.hash(fileName, startKey, endKey, columnFamily);
   }
 }

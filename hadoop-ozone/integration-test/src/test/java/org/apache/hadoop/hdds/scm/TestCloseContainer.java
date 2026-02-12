@@ -34,7 +34,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -140,7 +139,7 @@ public class TestCloseContainer {
     // Checksum file exists after container close
     for (HddsDatanodeService hddsDatanode: hddsDatanodes) {
       GenericTestUtils.waitFor(() -> checkContainerCloseInDatanode(hddsDatanode, container), 100, 5000);
-      assertTrue(containerChecksumFileExists(hddsDatanode, container.getContainerID()));
+      GenericTestUtils.waitFor(() -> containerChecksumFileExists(hddsDatanode, container.getContainerID()), 100, 5000);
     }
 
     long originalSeq = container.getSequenceId();
@@ -197,7 +196,7 @@ public class TestCloseContainer {
     // Checksum file exists after container close
     for (HddsDatanodeService hddsDatanode: hddsDatanodes) {
       GenericTestUtils.waitFor(() -> checkContainerCloseInDatanode(hddsDatanode, container), 100, 5000);
-      assertTrue(containerChecksumFileExists(hddsDatanode, container.getContainerID()));
+      GenericTestUtils.waitFor(() -> containerChecksumFileExists(hddsDatanode, container.getContainerID()), 100, 5000);
     }
 
     for (ContainerReplica replica : getContainerReplicas(container)) {

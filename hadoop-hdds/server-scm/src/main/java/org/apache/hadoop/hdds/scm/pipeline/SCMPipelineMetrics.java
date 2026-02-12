@@ -58,13 +58,11 @@ public final class SCMPipelineMetrics implements MetricsSource {
   private @Metric MutableCounterLong numPipelineContainSameDatanodes;
   private @Metric MutableRate pipelineCreationLatencyNs;
   private final Map<PipelineID, MutableCounterLong> numBlocksAllocated;
-  private final Map<PipelineID, MutableCounterLong> numBytesWritten;
 
   /** Private constructor. */
   private SCMPipelineMetrics() {
     this.registry = new MetricsRegistry(SOURCE_NAME);
     numBlocksAllocated = new ConcurrentHashMap<>();
-    numBytesWritten = new ConcurrentHashMap<>();
   }
 
   /**
@@ -104,8 +102,6 @@ public final class SCMPipelineMetrics implements MetricsSource {
     numPipelineReportProcessingFailed.snapshot(recordBuilder, true);
     numPipelineContainSameDatanodes.snapshot(recordBuilder, true);
     pipelineCreationLatencyNs.snapshot(recordBuilder, true);
-    numBytesWritten
-        .forEach((pid, metric) -> metric.snapshot(recordBuilder, true));
     numBlocksAllocated
         .forEach((pid, metric) -> metric.snapshot(recordBuilder, true));
   }
@@ -114,7 +110,6 @@ public final class SCMPipelineMetrics implements MetricsSource {
     numBlocksAllocated.put(pipeline.getId(), new MutableCounterLong(Interns
         .info(getBlockAllocationMetricName(pipeline),
             "Number of blocks allocated in pipeline " + pipeline.getId()), 0L));
-    numBytesWritten.put(pipeline.getId(), bytesWrittenCounter(pipeline, 0L));
   }
 
   public static String getBlockAllocationMetricName(Pipeline pipeline) {
@@ -122,14 +117,8 @@ public final class SCMPipelineMetrics implements MetricsSource {
         .getReplicationConfig().toString() + "-" + pipeline.getId().getId();
   }
 
-  public static String getBytesWrittenMetricName(Pipeline pipeline) {
-    return "NumPipelineBytesWritten-" + pipeline.getType() + "-" + pipeline
-        .getReplicationConfig().toString() + "-" + pipeline.getId().getId();
-  }
-
   void removePipelineMetrics(PipelineID pipelineID) {
     numBlocksAllocated.remove(pipelineID);
-    numBytesWritten.remove(pipelineID);
   }
 
   /**
@@ -153,22 +142,6 @@ public final class SCMPipelineMetrics implements MetricsSource {
    */
   void incNumPipelineCreated() {
     numPipelineCreated.incr();
-  }
-
-  /**
-   * Increments the number of total bytes that write into the pipeline.
-   */
-  void incNumPipelineBytesWritten(Pipeline pipeline, long bytes) {
-    numBytesWritten.computeIfPresent(pipeline.getId(),
-        (k, v) -> bytesWrittenCounter(pipeline, bytes));
-  }
-
-  private static MutableCounterLong bytesWrittenCounter(
-      Pipeline pipeline, long bytes) {
-    return new MutableCounterLong(
-        Interns.info(getBytesWrittenMetricName(pipeline),
-            "Number of bytes written into pipeline " + pipeline.getId()),
-        bytes);
   }
 
   /**
@@ -215,5 +188,12 @@ public final class SCMPipelineMetrics implements MetricsSource {
 
   public void updatePipelineCreationLatencyNs(long startNanos) {
     pipelineCreationLatencyNs.add(Time.monotonicNowNanos() - startNanos);
+  }
+
+  /**
+   * Return number of blocks allocated across all pipelines.
+   */
+  public long getTotalNumBlocksAllocated() {
+    return numBlocksAllocated.values().stream().mapToLong(MutableCounterLong::value).sum();
   }
 }

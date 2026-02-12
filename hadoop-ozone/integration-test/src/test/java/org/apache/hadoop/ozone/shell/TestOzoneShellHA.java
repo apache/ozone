@@ -156,12 +156,6 @@ public class TestOzoneShellHA {
 
   private static OzoneConfiguration ozoneConfiguration;
 
-  /**
-   * Create a MiniOzoneCluster for testing with using distributed Ozone
-   * handler type.
-   *
-   * @throws Exception
-   */
   @BeforeAll
   public void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -236,7 +230,7 @@ public class TestOzoneShellHA {
     System.setErr(OLD_ERR);
   }
 
-  private void execute(GenericCli shell, String[] args) {
+  protected void execute(GenericCli shell, String[] args) {
     LOG.info("Executing OzoneShell command with args {}", Arrays.asList(args));
     CommandLine cmd = shell.getCmd();
 
@@ -353,7 +347,7 @@ public class TestOzoneShellHA {
   /**
    * Helper function to generate keys for testing shell command of keys.
    */
-  private void generateKeys(String volumeName, String bucketName,
+  protected void generateKeys(String volumeName, String bucketName,
                             String bucketLayout) {
     String[] args = new String[] {
         "volume", "create", "o3://" + omServiceId + volumeName};
@@ -378,7 +372,7 @@ public class TestOzoneShellHA {
   /**
    * Helper function to get nums of keys from info of listing command.
    */
-  private int getNumOfKeys() throws UnsupportedEncodingException {
+  protected int getNumOfKeys() throws UnsupportedEncodingException {
     return out.toString(DEFAULT_ENCODING).split("key").length - 1;
   }
 
@@ -2203,8 +2197,11 @@ public class TestOzoneShellHA {
   @Test
   public void testListAllKeys()
       throws Exception {
-    String volumeName = "vollst";
-    // Create volume vollst
+    testListAllKeysInternal("vollst");
+  }
+
+  protected void testListAllKeysInternal(String volumeName) throws Exception {
+    // Create volume
     String[] args = new String[] {
         "volume", "create", "o3://" + omServiceId +
           OZONE_URI_DELIMITER + volumeName};
@@ -2487,5 +2484,13 @@ public class TestOzoneShellHA {
     }
     return KMSClientProvider.SCHEME_NAME + "://" +
         kms.getKMSUrl().toExternalForm().replace("://", "@");
+  }
+
+  protected MiniOzoneHAClusterImpl getCluster() {
+    return cluster;
+  }
+
+  protected OzoneShell getOzoneShell() {
+    return ozoneShell;
   }
 }

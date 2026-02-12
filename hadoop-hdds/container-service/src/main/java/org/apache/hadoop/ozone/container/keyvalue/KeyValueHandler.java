@@ -46,6 +46,7 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getGetSmallFileResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getListBlockResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getPutFileResponseSuccess;
+import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadBlockResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadChunkResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getReadContainerResponse;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.getSuccessResponse;
@@ -55,14 +56,19 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.putBlockResponseSuccess;
 import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuilders.unsupportedRequest;
 import static org.apache.hadoop.hdds.scm.utils.ClientCommandsUtils.getReadChunkVersion;
+import static org.apache.hadoop.hdds.utils.IOUtils.roundUp;
 import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
 import static org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient.createSingleNodePipeline;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.DEFAULT_LAYOUT;
+import static org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion.FILE_PER_BLOCK;
+import static org.apache.ratis.util.Preconditions.assertSame;
+import static org.apache.ratis.util.Preconditions.assertTrue;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Striped;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
@@ -81,7 +87,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
-import java.util.Optional;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.locks.Lock;
@@ -90,21 +96,21 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.GetSmallFileRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.KeyValue;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFileRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -117,10 +123,12 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.io.BlockInputStreamFactoryImpl;
 import org.apache.hadoop.ozone.common.Checksum;
+import org.apache.hadoop.ozone.common.ChecksumData;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.common.ChunkBufferToByteString;
 import org.apache.hadoop.ozone.common.OzoneChecksumException;
@@ -162,6 +170,7 @@ import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -172,6 +181,7 @@ public class KeyValueHandler extends Handler {
 
   private static final Logger LOG = LoggerFactory.getLogger(
       KeyValueHandler.class);
+  private static final int STREAMING_BYTES_PER_CHUNK = 1024 * 64;
 
   private final BlockManager blockManager;
   private final ChunkManager chunkManager;
@@ -607,8 +617,13 @@ public class KeyValueHandler extends Handler {
       return malformedRequest(request);
     }
     try {
+      ContainerProtos.ContainerDataProto.State previousState = kvContainer.getContainerState();
       markContainerForClose(kvContainer);
       closeContainer(kvContainer);
+      if (previousState == RECOVERING) {
+        // trigger container scan for recovered containers, i.e., after EC reconstruction
+        containerSet.scanContainer(kvContainer.getContainerData().getContainerID(), "EC Reconstruction");
+      }
     } catch (StorageContainerException ex) {
       return ContainerUtils.logAndReturnError(LOG, ex, request);
     } catch (IOException ex) {
@@ -641,7 +656,7 @@ public class KeyValueHandler extends Handler {
 
       ContainerProtos.BlockData data = request.getPutBlock().getBlockData();
       BlockData blockData = BlockData.getFromProtoBuf(data);
-      Preconditions.checkNotNull(blockData);
+      Objects.requireNonNull(blockData, "blockData == null");
 
       boolean endOfBlock = false;
       if (!request.getPutBlock().hasEof() || request.getPutBlock().getEof()) {
@@ -704,7 +719,7 @@ public class KeyValueHandler extends Handler {
       checkContainerOpen(kvContainer);
       BlockID blockID = BlockID.getFromProtobuf(
           request.getFinalizeBlock().getBlockID());
-      Preconditions.checkNotNull(blockID);
+      Objects.requireNonNull(blockID, "blockID == null");
 
       LOG.info("Finalized Block request received {} ", blockID);
 
@@ -761,14 +776,33 @@ public class KeyValueHandler extends Handler {
     try {
       checksumTree = checksumManager.getContainerChecksumInfo(containerData);
     } catch (IOException ex) {
-      // For file not found or other inability to read the file, return an error to the client.
-      LOG.error("Error occurred when reading checksum file for container {}", containerData.getContainerID(), ex);
-      return ContainerCommandResponseProto.newBuilder()
-          .setCmdType(request.getCmdType())
-          .setTraceID(request.getTraceID())
-          .setResult(IO_EXCEPTION)
-          .setMessage(ex.getMessage())
-          .build();
+      // Only build from metadata if the file doesn't exist
+      if (ex instanceof FileNotFoundException) {
+        try {
+          LOG.info("Checksum tree file not found for container {}. Building merkle tree from container metadata.",
+              containerData.getContainerID());
+          ContainerProtos.ContainerChecksumInfo checksumInfo = updateAndGetContainerChecksumFromMetadata(kvContainer);
+          checksumTree = checksumInfo.toByteString();
+        } catch (IOException metadataEx) {
+          LOG.error("Failed to build merkle tree from metadata for container {}",
+              containerData.getContainerID(), metadataEx);
+          return ContainerCommandResponseProto.newBuilder()
+              .setCmdType(request.getCmdType())
+              .setTraceID(request.getTraceID())
+              .setResult(IO_EXCEPTION)
+              .setMessage("Failed to get or build merkle tree: " + metadataEx.getMessage())
+              .build();
+        }
+      } else {
+        // For other inability to read the file, return an error to the client.
+        LOG.error("Error occurred when reading checksum file for container {}", containerData.getContainerID(), ex);
+        return ContainerCommandResponseProto.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setTraceID(request.getTraceID())
+            .setResult(IO_EXCEPTION)
+            .setMessage(ex.getMessage())
+            .build();
+      }
     }
 
     return getGetContainerMerkleTreeResponse(request, checksumTree);
@@ -915,7 +949,7 @@ public class KeyValueHandler extends Handler {
           request.getReadChunk().getBlockID());
       ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(request.getReadChunk()
           .getChunkData());
-      Preconditions.checkNotNull(chunkInfo);
+      Objects.requireNonNull(chunkInfo, "chunkInfo == null");
       BlockUtils.verifyReplicaIdx(kvContainer, blockID);
       BlockUtils.verifyBCSId(kvContainer, blockID);
 
@@ -953,8 +987,7 @@ public class KeyValueHandler extends Handler {
           request);
     }
 
-    Preconditions.checkNotNull(data, "Chunk data is null");
-
+    Objects.requireNonNull(data, "data == null");
     return getReadChunkResponse(request, data, byteBufferToByteString);
   }
 
@@ -1012,7 +1045,7 @@ public class KeyValueHandler extends Handler {
       ContainerProtos.ChunkInfo chunkInfoProto = writeChunk.getChunkData();
 
       ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunkInfoProto);
-      Preconditions.checkNotNull(chunkInfo);
+      Objects.requireNonNull(chunkInfo,  "chunkInfo == null");
 
       ChunkBuffer data = null;
       if (dispatcherContext == null) {
@@ -1075,9 +1108,9 @@ public class KeyValueHandler extends Handler {
   public void writeChunkForClosedContainer(ChunkInfo chunkInfo, BlockID blockID,
                                            ChunkBuffer data, KeyValueContainer kvContainer)
       throws IOException {
-    Preconditions.checkNotNull(kvContainer);
-    Preconditions.checkNotNull(chunkInfo);
-    Preconditions.checkNotNull(data);
+    Objects.requireNonNull(kvContainer, "kvContainer == null");
+    Objects.requireNonNull(chunkInfo, "chunkInfo == null");
+    Objects.requireNonNull(data, "data == null");
     long writeChunkStartTime = Time.monotonicNowNanos();
     if (!checkContainerClose(kvContainer)) {
       throw new IOException("Container #" + kvContainer.getContainerData().getContainerID() +
@@ -1106,8 +1139,8 @@ public class KeyValueHandler extends Handler {
   public void putBlockForClosedContainer(KeyValueContainer kvContainer, BlockData blockData,
                                          long blockCommitSequenceId, boolean overwriteBscId)
       throws IOException {
-    Preconditions.checkNotNull(kvContainer);
-    Preconditions.checkNotNull(blockData);
+    Objects.requireNonNull(kvContainer, "kvContainer == null");
+    Objects.requireNonNull(blockData, "blockData == null");
     long startTime = Time.monotonicNowNanos();
 
     if (!checkContainerClose(kvContainer)) {
@@ -1151,11 +1184,11 @@ public class KeyValueHandler extends Handler {
 
       BlockData blockData = BlockData.getFromProtoBuf(
           putSmallFileReq.getBlock().getBlockData());
-      Preconditions.checkNotNull(blockData);
+      Objects.requireNonNull(blockData, "blockData == null");
 
       ContainerProtos.ChunkInfo chunkInfoProto = putSmallFileReq.getChunkInfo();
       ChunkInfo chunkInfo = ChunkInfo.getFromProtoBuf(chunkInfoProto);
-      Preconditions.checkNotNull(chunkInfo);
+      Objects.requireNonNull(chunkInfo, "chunkInfo == null");
 
       ChunkBuffer data = ChunkBuffer.wrap(
           putSmallFileReq.getData().asReadOnlyByteBufferList());
@@ -1319,24 +1352,24 @@ public class KeyValueHandler extends Handler {
   @Override
   public Container importContainer(ContainerData originalContainerData,
       final InputStream rawContainerStream,
-      final TarContainerPacker packer)
-      throws IOException {
-    Preconditions.checkState(originalContainerData instanceof
-        KeyValueContainerData, "Should be KeyValueContainerData instance");
-
-    KeyValueContainerData containerData = new KeyValueContainerData(
-        (KeyValueContainerData) originalContainerData);
-
-    KeyValueContainer container = new KeyValueContainer(containerData,
-        conf);
+      final TarContainerPacker packer) throws IOException {
+    KeyValueContainer container = createNewContainer(originalContainerData);
 
     HddsVolume targetVolume = originalContainerData.getVolume();
     populateContainerPathFields(container, targetVolume);
     container.importContainerData(rawContainerStream, packer);
-    ContainerLogger.logImported(containerData);
+    ContainerLogger.logImported(container.getContainerData());
     sendICR(container);
     return container;
+  }
 
+  @Override
+  public Container importContainer(ContainerData targetTempContainerData) throws IOException {
+    KeyValueContainer container = createNewContainer(targetTempContainerData);
+    HddsVolume targetVolume = targetTempContainerData.getVolume();
+    populateContainerPathFields(container, targetVolume);
+    container.importContainerData((KeyValueContainerData) targetTempContainerData);
+    return container;
   }
 
   @Override
@@ -1353,6 +1386,7 @@ public class KeyValueHandler extends Handler {
   public void markContainerForClose(Container container)
       throws IOException {
     container.writeLock();
+    boolean stateChanged = false;
     try {
       ContainerProtos.ContainerDataProto.State state =
           container.getContainerState();
@@ -1364,13 +1398,17 @@ public class KeyValueHandler extends Handler {
           ContainerLogger.logRecovered(container.getContainerData());
         }
         container.markContainerForClose();
+        stateChanged = true;
       }
     } finally {
       container.writeUnlock();
     }
-    updateContainerChecksumFromMetadataIfNeeded(container);
     ContainerLogger.logClosing(container.getContainerData());
-    sendICR(container);
+    if (stateChanged) {
+      sendICR(container);
+    } else {
+      sendDeferredICR(container);
+    }
   }
 
   @Override
@@ -1383,7 +1421,7 @@ public class KeyValueHandler extends Handler {
    * Write the merkle tree for this container using the existing checksum metadata only. The data is not read or
    * validated by this method, so it is expected to run quickly.
    * <p>
-   * If a checksum file already exists on the disk, this method will do nothing. The existing file would have either
+   * If a data checksum for the container already exists, this method does nothing. The existing value would have either
    * been made from the metadata or data itself so there is no need to recreate it from the metadata. This method
    * does not send an ICR with the updated checksum info.
    * <p>
@@ -1391,7 +1429,7 @@ public class KeyValueHandler extends Handler {
    * @param container The container which will have a tree generated.
    */
   private void updateContainerChecksumFromMetadataIfNeeded(Container container) {
-    if (ContainerChecksumTreeManager.checksumFileExist(container)) {
+    if (!container.getContainerData().needsDataChecksum()) {
       return;
     }
 
@@ -1409,7 +1447,8 @@ public class KeyValueHandler extends Handler {
    * This method does not send an ICR with the updated checksum info.
    * @param container - Container for which the container merkle tree needs to be updated.
    */
-  private ContainerProtos.ContainerChecksumInfo updateAndGetContainerChecksumFromMetadata(
+  @VisibleForTesting
+  public ContainerProtos.ContainerChecksumInfo updateAndGetContainerChecksumFromMetadata(
       KeyValueContainer container) throws IOException {
     ContainerMerkleTreeWriter merkleTree = new ContainerMerkleTreeWriter();
     try (DBHandle dbHandle = BlockUtils.getDB(container.getContainerData(), conf);
@@ -1429,30 +1468,40 @@ public class KeyValueHandler extends Handler {
 
   private ContainerProtos.ContainerChecksumInfo updateAndGetContainerChecksum(Container container,
       ContainerMerkleTreeWriter treeWriter, boolean sendICR) throws IOException {
-    ContainerData containerData = container.getContainerData();
+    KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
 
     // Attempt to write the new data checksum to disk. If persisting this fails, keep using the original data
     // checksum to prevent divergence from what SCM sees in the ICR vs what datanode peers will see when pulling the
     // merkle tree.
     long originalDataChecksum = containerData.getDataChecksum();
-    ContainerProtos.ContainerChecksumInfo updateChecksumInfo = checksumManager.writeContainerDataTree(containerData,
-        treeWriter);
+    boolean hadDataChecksum = !containerData.needsDataChecksum();
+    ContainerProtos.ContainerChecksumInfo updateChecksumInfo = checksumManager.updateTree(containerData, treeWriter);
     long updatedDataChecksum = updateChecksumInfo.getContainerMerkleTree().getDataChecksum();
 
     if (updatedDataChecksum != originalDataChecksum) {
       containerData.setDataChecksum(updatedDataChecksum);
-      String message =
-          "Container data checksum updated from " + checksumToString(originalDataChecksum) + " to " +
-              checksumToString(updatedDataChecksum);
+      try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
+        // This value is only used during the datanode startup. If the update fails, then it's okay as the merkle tree
+        // and in-memory checksum will still be the same. This will be updated the next time we update the tree.
+        // Either scanner or reconciliation will update the checksum.
+        dbHandle.getStore().getMetadataTable().put(containerData.getContainerDataChecksumKey(), updatedDataChecksum);
+      } catch (IOException e) {
+        LOG.error("Failed to update container data checksum in RocksDB for container {}. " +
+                "Leaving the original checksum in RocksDB: {}", containerData.getContainerID(),
+            checksumToString(originalDataChecksum), e);
+      }
+
       if (sendICR) {
         sendICR(container);
       }
-      if (ContainerChecksumTreeManager.hasContainerChecksumFile(containerData)) {
+
+      String message = "Container " + containerData.getContainerID() +  " data checksum updated from " +
+          checksumToString(originalDataChecksum) + " to " + checksumToString(updatedDataChecksum);
+      if (hadDataChecksum) {
         LOG.warn(message);
         ContainerLogger.logChecksumUpdated(containerData, originalDataChecksum);
       } else {
-        // If this is the first time the scanner has run with the feature to generate a checksum file, don't
-        // log a warning for the checksum update.
+        // If this is the first time the checksum is being generated, don't log a warning about updating the checksum.
         LOG.debug(message);
       }
     }
@@ -1463,9 +1512,8 @@ public class KeyValueHandler extends Handler {
   public void markContainerUnhealthy(Container container, ScanResult reason)
       throws IOException {
     container.writeLock();
-    long containerID = 0L;
+    long containerID = container.getContainerData().getContainerID();
     try {
-      containerID = container.getContainerData().getContainerID();
       if (container.getContainerState() == State.UNHEALTHY) {
         LOG.debug("Call to mark already unhealthy container {} as unhealthy",
             containerID);
@@ -1558,26 +1606,53 @@ public class KeyValueHandler extends Handler {
   }
 
   @Override
+  public void copyContainer(final Container container, Path destinationPath)
+      throws IOException {
+    final KeyValueContainer kvc = (KeyValueContainer) container;
+    kvc.copyContainerDirectory(destinationPath);
+  }
+
+  private KeyValueContainer createNewContainer(
+      ContainerData originalContainerData) {
+    Preconditions.checkState(originalContainerData instanceof
+        KeyValueContainerData, "Should be KeyValueContainerData instance");
+
+    KeyValueContainerData containerData = new KeyValueContainerData(
+        (KeyValueContainerData) originalContainerData);
+
+    return new KeyValueContainer(containerData, conf);
+  }
+
+  @Override
   public void deleteContainer(Container container, boolean force)
       throws IOException {
     deleteInternal(container, force);
   }
 
-  @SuppressWarnings("checkstyle:MethodLength")
   @Override
   public void reconcileContainer(DNContainerOperationClient dnClient, Container<?> container,
+      Collection<DatanodeDetails> peers) throws IOException {
+    long containerID = container.getContainerData().getContainerID();
+    try {
+      reconcileContainerInternal(dnClient, container, peers);
+    } finally {
+      // Trigger on demand scanner after reconciliation
+      containerSet.scanContainerWithoutGap(containerID,
+          "Container reconciliation");
+    }
+  }
+
+  @SuppressWarnings("checkstyle:MethodLength")
+  private void reconcileContainerInternal(DNContainerOperationClient dnClient, Container<?> container,
       Collection<DatanodeDetails> peers) throws IOException {
     KeyValueContainer kvContainer = (KeyValueContainer) container;
     KeyValueContainerData containerData = (KeyValueContainerData) container.getContainerData();
     long containerID = containerData.getContainerID();
 
     // Obtain the original checksum info before reconciling with any peers.
-    Optional<ContainerProtos.ContainerChecksumInfo> optionalChecksumInfo = checksumManager.read(containerData);
-    ContainerProtos.ContainerChecksumInfo originalChecksumInfo;
-    if (optionalChecksumInfo.isPresent()) {
-      originalChecksumInfo = optionalChecksumInfo.get();
-    } else {
-      // Try creating the checksum info from RocksDB metadata if it is not present.
+    ContainerProtos.ContainerChecksumInfo originalChecksumInfo = checksumManager.read(containerData);
+    if (!ContainerChecksumTreeManager.hasDataChecksum(originalChecksumInfo)) {
+      // Try creating the merkle tree from RocksDB metadata if it is not present.
       originalChecksumInfo = updateAndGetContainerChecksumFromMetadata(kvContainer);
     }
     // This holds our current most up-to-date checksum info that we are using for the container.
@@ -1588,114 +1663,135 @@ public class KeyValueHandler extends Handler {
     ByteBuffer chunkByteBuffer = ByteBuffer.allocate(chunkSize);
 
     for (DatanodeDetails peer : peers) {
-      long numMissingBlocksRepaired = 0;
-      long numCorruptChunksRepaired = 0;
-      long numMissingChunksRepaired = 0;
-      // This will be updated as we do repairs with this peer, then used to write the updated tree for the diff with the
-      // next peer.
-      ContainerMerkleTreeWriter updatedTreeWriter =
-          new ContainerMerkleTreeWriter(latestChecksumInfo.getContainerMerkleTree());
+      try {
+        long numMissingBlocksRepaired = 0;
+        long numCorruptChunksRepaired = 0;
+        long numMissingChunksRepaired = 0;
+        long numDivergedDeletedBlocksUpdated = 0;
 
-      LOG.info("Beginning reconciliation for container {} with peer {}. Current data checksum is {}",
-          containerID, peer, checksumToString(ContainerChecksumTreeManager.getDataChecksum(latestChecksumInfo)));
-      // Data checksum updated after each peer reconciles.
-      long start = Instant.now().toEpochMilli();
-      ContainerProtos.ContainerChecksumInfo peerChecksumInfo = dnClient.getContainerChecksumInfo(
-          containerID, peer);
-      if (peerChecksumInfo == null) {
-        LOG.warn("Cannot reconcile container {} with peer {} which has not yet generated a checksum",
-            containerID, peer);
-        continue;
-      }
+        LOG.info("Beginning reconciliation for container {} with peer {}. Current data checksum is {}",
+            containerID, peer, checksumToString(ContainerChecksumTreeManager.getDataChecksum(latestChecksumInfo)));
+        // Data checksum updated after each peer reconciles.
+        long start = Instant.now().toEpochMilli();
+        ContainerProtos.ContainerChecksumInfo peerChecksumInfo;
 
-      ContainerDiffReport diffReport = checksumManager.diff(latestChecksumInfo, peerChecksumInfo);
-      Pipeline pipeline = createSingleNodePipeline(peer);
 
-      // Handle missing blocks
-      for (ContainerProtos.BlockMerkleTree missingBlock : diffReport.getMissingBlocks()) {
-        long localID = missingBlock.getBlockID();
-        BlockID blockID = new BlockID(containerID, localID);
-        if (getBlockManager().blockExists(container, blockID)) {
-          LOG.warn("Cannot reconcile block {} in container {} which was previously reported missing but is now " +
-              "present. Our container merkle tree is stale.", localID, containerID);
-        } else {
+        // Data checksum updated after each peer reconciles.
+        peerChecksumInfo = dnClient.getContainerChecksumInfo(containerID, peer);
+        if (peerChecksumInfo == null) {
+          LOG.warn("Cannot reconcile container {} with peer {} which has not yet generated a checksum",
+              containerID, peer);
+          continue;
+        }
+
+        // This tree writer is initialized with our current persisted tree, then updated with the modifications done
+        // while reconciling with the peer. Once we finish reconciling with this peer, we will write the updated version
+        // back to the disk and pick it up as the starting point for reconciling with the next peer.
+        ContainerMerkleTreeWriter updatedTreeWriter =
+            new ContainerMerkleTreeWriter(latestChecksumInfo.getContainerMerkleTree());
+        ContainerDiffReport diffReport = checksumManager.diff(latestChecksumInfo, peerChecksumInfo);
+        Pipeline pipeline = createSingleNodePipeline(peer);
+
+        // Handle missing blocks
+        for (ContainerProtos.BlockMerkleTree missingBlock : diffReport.getMissingBlocks()) {
           try {
-            long chunksInBlockRetrieved = reconcileChunksPerBlock(kvContainer, pipeline, dnClient, localID,
-                missingBlock.getChunkMerkleTreeList(), updatedTreeWriter, chunkByteBuffer);
-            if (chunksInBlockRetrieved != 0) {
-              allBlocksUpdated.add(localID);
-              numMissingBlocksRepaired++;
+            long localID = missingBlock.getBlockID();
+            BlockID blockID = new BlockID(containerID, localID);
+            if (getBlockManager().blockExists(container, blockID)) {
+              LOG.warn("Cannot reconcile block {} in container {} which was previously reported missing but is now " +
+                  "present. Our container merkle tree is stale.", localID, containerID);
+            } else {
+              long chunksInBlockRetrieved = reconcileChunksPerBlock(kvContainer, pipeline, dnClient, localID,
+                  missingBlock.getChunkMerkleTreeList(), updatedTreeWriter, chunkByteBuffer);
+              if (chunksInBlockRetrieved != 0) {
+                allBlocksUpdated.add(localID);
+                numMissingBlocksRepaired++;
+              }
             }
           } catch (IOException e) {
             LOG.error("Error while reconciling missing block for block {} in container {}", missingBlock.getBlockID(),
+                  containerID, e);
+          }
+        }
+
+        // Handle missing chunks
+        for (Map.Entry<Long, List<ContainerProtos.ChunkMerkleTree>> entry : diffReport.getMissingChunks().entrySet()) {
+          long localID = entry.getKey();
+          try {
+            long missingChunksRepaired = reconcileChunksPerBlock(kvContainer, pipeline, dnClient, entry.getKey(),
+                entry.getValue(), updatedTreeWriter, chunkByteBuffer);
+            if (missingChunksRepaired != 0) {
+              allBlocksUpdated.add(localID);
+              numMissingChunksRepaired += missingChunksRepaired;
+            }
+          } catch (IOException e) {
+            LOG.error("Error while reconciling missing chunk for block {} in container {}", entry.getKey(),
                 containerID, e);
           }
         }
-      }
 
-      // Handle missing chunks
-      for (Map.Entry<Long, List<ContainerProtos.ChunkMerkleTree>> entry : diffReport.getMissingChunks().entrySet()) {
-        long localID = entry.getKey();
-        try {
-          long missingChunksRepaired = reconcileChunksPerBlock(kvContainer, pipeline, dnClient, entry.getKey(),
-              entry.getValue(), updatedTreeWriter, chunkByteBuffer);
-          if (missingChunksRepaired != 0) {
-            allBlocksUpdated.add(localID);
-            numMissingChunksRepaired += missingChunksRepaired;
+        // Handle corrupt chunks
+        for (Map.Entry<Long, List<ContainerProtos.ChunkMerkleTree>> entry : diffReport.getCorruptChunks().entrySet()) {
+          long localID = entry.getKey();
+          try {
+            long corruptChunksRepaired = reconcileChunksPerBlock(kvContainer, pipeline, dnClient, entry.getKey(),
+                entry.getValue(), updatedTreeWriter, chunkByteBuffer);
+            if (corruptChunksRepaired != 0) {
+              allBlocksUpdated.add(localID);
+              numCorruptChunksRepaired += corruptChunksRepaired;
+            }
+          } catch (IOException e) {
+            LOG.error("Error while reconciling corrupt chunk for block {} in container {}", entry.getKey(),
+                containerID, e);
           }
-        } catch (IOException e) {
-          LOG.error("Error while reconciling missing chunk for block {} in container {}", entry.getKey(),
-              containerID, e);
         }
-      }
 
-      // Handle corrupt chunks
-      for (Map.Entry<Long, List<ContainerProtos.ChunkMerkleTree>> entry : diffReport.getCorruptChunks().entrySet()) {
-        long localID = entry.getKey();
-        try {
-          long corruptChunksRepaired = reconcileChunksPerBlock(kvContainer, pipeline, dnClient, entry.getKey(),
-              entry.getValue(), updatedTreeWriter, chunkByteBuffer);
-          if (corruptChunksRepaired != 0) {
-            allBlocksUpdated.add(localID);
-            numCorruptChunksRepaired += corruptChunksRepaired;
+        // Merge block deletes from the peer that do not match our list of deleted blocks.
+        for (ContainerDiffReport.DeletedBlock deletedBlock : diffReport.getDivergedDeletedBlocks()) {
+          updatedTreeWriter.setDeletedBlock(deletedBlock.getBlockID(), deletedBlock.getDataChecksum());
+          numDivergedDeletedBlocksUpdated++;
+        }
+
+        // Based on repaired done with this peer, write the updated merkle tree to the container.
+        // This updated tree will be used when we reconcile with the next peer.
+        ContainerProtos.ContainerChecksumInfo previousChecksumInfo = latestChecksumInfo;
+        latestChecksumInfo = updateAndGetContainerChecksum(container, updatedTreeWriter, false);
+
+        // Log the results of reconciliation with this peer.
+        long duration = Instant.now().toEpochMilli() - start;
+        long previousDataChecksum = ContainerChecksumTreeManager.getDataChecksum(previousChecksumInfo);
+        long latestDataChecksum = ContainerChecksumTreeManager.getDataChecksum(latestChecksumInfo);
+        if (previousDataChecksum == latestDataChecksum) {
+          if (numCorruptChunksRepaired != 0 ||
+              numMissingBlocksRepaired != 0 ||
+              numMissingChunksRepaired != 0 ||
+              numDivergedDeletedBlocksUpdated != 0) {
+            // This condition should never happen.
+            LOG.error("Checksum of container was not updated but blocks were repaired.");
           }
-        } catch (IOException e) {
-          LOG.error("Error while reconciling corrupt chunk for block {} in container {}", entry.getKey(),
-              containerID, e);
+          LOG.info("Container {} reconciled with peer {}. Data checksum {} was not updated. Time taken: {} ms",
+              containerID, peer, checksumToString(previousDataChecksum), duration);
+        } else {
+          LOG.warn("Container {} reconciled with peer {}. Data checksum updated from {} to {}" +
+                  ".\nMissing blocks repaired: {}/{}\n" +
+                  "Missing chunks repaired: {}/{}\n" +
+                  "Corrupt chunks repaired:  {}/{}\n" +
+                  "Diverged deleted blocks updated:  {}/{}\n" +
+                  "Time taken: {} ms",
+              containerID, peer, checksumToString(previousDataChecksum), checksumToString(latestDataChecksum),
+              numMissingBlocksRepaired, diffReport.getNumMissingBlocks(),
+              numMissingChunksRepaired, diffReport.getNumMissingChunks(),
+              numCorruptChunksRepaired, diffReport.getNumCorruptChunks(),
+              numDivergedDeletedBlocksUpdated, diffReport.getNumdivergedDeletedBlocks(),
+              duration);
         }
+
+        ContainerLogger.logReconciled(container.getContainerData(), previousDataChecksum, peer);
+        successfulPeerCount++;
+      } catch (IOException ex) {
+        LOG.error("Failed to reconcile with peer {} for container #{}. Skipping to next peer.",
+            peer, containerID, ex);
       }
-
-      // Based on repaired done with this peer, write the updated merkle tree to the container.
-      // This updated tree will be used when we reconcile with the next peer.
-      ContainerProtos.ContainerChecksumInfo previousChecksumInfo = latestChecksumInfo;
-      latestChecksumInfo = updateAndGetContainerChecksum(container, updatedTreeWriter, false);
-
-      // Log the results of reconciliation with this peer.
-      long duration = Instant.now().toEpochMilli() - start;
-      long previousDataChecksum = ContainerChecksumTreeManager.getDataChecksum(previousChecksumInfo);
-      long latestDataChecksum = ContainerChecksumTreeManager.getDataChecksum(latestChecksumInfo);
-      if (previousDataChecksum == latestDataChecksum) {
-        if (numCorruptChunksRepaired != 0 || numMissingBlocksRepaired != 0 || numMissingChunksRepaired != 0) {
-          // This condition should never happen.
-          LOG.error("Checksum of container was not updated but blocks were repaired.");
-        }
-        LOG.info("Container {} reconciled with peer {}. Data checksum {} was not updated. Time taken: {} ms",
-            containerID, peer, checksumToString(previousDataChecksum), duration);
-      } else {
-        LOG.warn("Container {} reconciled with peer {}. Data checksum updated from {} to {}" +
-                ".\nMissing blocks repaired: {}/{}\n" +
-                "Missing chunks repaired: {}/{}\n" +
-                "Corrupt chunks repaired:  {}/{}\n" +
-                "Time taken: {} ms",
-            containerID, peer, checksumToString(previousDataChecksum), checksumToString(latestDataChecksum),
-            numMissingBlocksRepaired, diffReport.getMissingBlocks().size(),
-            numMissingChunksRepaired, diffReport.getMissingChunks().size(),
-            numCorruptChunksRepaired, diffReport.getCorruptChunks().size(),
-            duration);
-      }
-
-      ContainerLogger.logReconciled(container.getContainerData(), previousDataChecksum, peer);
-      successfulPeerCount++;
     }
 
     // Log a summary after reconciling with all peers.
@@ -1715,7 +1811,7 @@ public class KeyValueHandler extends Handler {
     }
 
     // Trigger on demand scanner, which will build the merkle tree based on the newly ingested data.
-    containerSet.scanContainerWithoutGap(containerID);
+    containerSet.scanContainerWithoutGap(containerID, "Container reconciliation");
     sendICR(container);
   }
 
@@ -1774,8 +1870,7 @@ public class KeyValueHandler extends Handler {
         .build();
     // Under construction is set here, during BlockInputStream#initialize() it is used to update the block length.
     blkInfo.setUnderConstruction(true);
-    try (BlockInputStream blockInputStream = (BlockInputStream) blockInputStreamFactory.create(
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+    try (BlockInputStream blockInputStream = blockInputStreamFactory.createBlockInputStream(
         blkInfo, pipeline, blockToken, dnClient.getXceiverClientManager(),
         null, conf.getObject(OzoneClientConfig.class))) {
       // Initialize the BlockInputStream. Gets the blockData from the peer, sets the block length and
@@ -1828,6 +1923,10 @@ public class KeyValueHandler extends Handler {
           chunkInfo.addMetadata(OzoneConsts.CHUNK_OVERWRITE, "true");
           writeChunkForClosedContainer(chunkInfo, blockID, chunkBuffer, container);
           localOffset2Chunk.put(chunkOffset, chunkInfoProto);
+          // Update the treeWriter to reflect the current state of blocks and chunks on disk after successful
+          // chunk writes. If putBlockForClosedContainer fails, the container scanner will later update the
+          // Merkle tree to resolve any discrepancies.
+          treeWriter.addChunks(localID, true, chunkInfoProto);
           if (LOG.isDebugEnabled()) {
             LOG.debug("Successfully ingested chunk at offset {} into block {} of container {} from peer {}",
                 chunkOffset, localID, containerID, peer);
@@ -1851,7 +1950,6 @@ public class KeyValueHandler extends Handler {
         List<ContainerProtos.ChunkInfo> allChunks = new ArrayList<>(localOffset2Chunk.values());
         localBlockData.setChunks(allChunks);
         putBlockForClosedContainer(container, localBlockData, maxBcsId, allChunksSuccessful);
-        treeWriter.addChunks(localID, true, allChunks);
         // Invalidate the file handle cache, so new read requests get the new file if one was created.
         chunkManager.finishWriteChunks(container, localBlockData);
       }
@@ -1975,6 +2073,152 @@ public class KeyValueHandler extends Handler {
   }
 
   @Override
+  public ContainerCommandResponseProto readBlock(
+      ContainerCommandRequestProto request, Container kvContainer,
+      RandomAccessFileChannel blockFile,
+      StreamObserver<ContainerCommandResponseProto> streamObserver) {
+
+    if (kvContainer.getContainerData().getLayoutVersion() != FILE_PER_BLOCK) {
+      return ContainerUtils.logAndReturnError(LOG,
+          new StorageContainerException("Only File Per Block is supported", IO_EXCEPTION), request);
+    }
+
+    ContainerCommandResponseProto responseProto = null;
+    if (!request.hasReadBlock()) {
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Malformed Read Block request. trace ID: {}", request.getTraceID());
+      }
+      return malformedRequest(request);
+    }
+    try {
+      readBlockImpl(request, blockFile, kvContainer, streamObserver, false);
+      // TODO metrics.incContainerBytesStats(Type.ReadBlock, readBlock.getLen());
+    } catch (StorageContainerException ex) {
+      responseProto = ContainerUtils.logAndReturnError(LOG, ex, request);
+    } catch (IOException ioe) {
+      final StorageContainerException sce = new StorageContainerException(
+          "Failed to readBlock " + request.getReadBlock(), ioe, IO_EXCEPTION);
+      responseProto = ContainerUtils.logAndReturnError(LOG, sce, request);
+    } catch (Exception e) {
+      final StorageContainerException sce = new StorageContainerException(
+          "Failed to readBlock " + request.getReadBlock(), e, CONTAINER_INTERNAL_ERROR);
+      LOG.error("", sce);
+      responseProto = ContainerUtils.logAndReturnError(LOG, sce, request);
+    }
+    return responseProto;
+  }
+
+  private void readBlockImpl(ContainerCommandRequestProto request, RandomAccessFileChannel blockFile,
+      Container kvContainer, StreamObserver<ContainerCommandResponseProto> streamObserver, boolean verifyChecksum)
+      throws IOException {
+    final ReadBlockRequestProto readBlock = request.getReadBlock();
+    int responseDataSize = readBlock.getResponseDataSize();
+    if (responseDataSize == 0) {
+      responseDataSize = 1 << 20;
+    }
+
+    final BlockID blockID = BlockID.getFromProtobuf(readBlock.getBlockID());
+    if (!blockFile.isOpen()) {
+      final File file = FILE_PER_BLOCK.getChunkFile(kvContainer.getContainerData(), blockID, "unused");
+      blockFile.open(file);
+    }
+
+    // This is a new api the block should always be checked.
+    BlockUtils.verifyReplicaIdx(kvContainer, blockID);
+    BlockUtils.verifyBCSId(kvContainer, blockID);
+
+    final BlockData blockData = getBlockManager().getBlock(kvContainer, blockID);
+    final List<ContainerProtos.ChunkInfo> chunkInfos = blockData.getChunks();
+    final int bytesPerChunk = Math.toIntExact(chunkInfos.get(0).getLen());
+    final ChecksumType checksumType = chunkInfos.get(0).getChecksumData().getType();
+    ChecksumData checksumData = null;
+    int bytesPerChecksum = STREAMING_BYTES_PER_CHUNK;
+    if (checksumType == ContainerProtos.ChecksumType.NONE) {
+      checksumData = new ChecksumData(checksumType, 0);
+    } else {
+      bytesPerChecksum = chunkInfos.get(0).getChecksumData().getBytesPerChecksum();
+    }
+    // We have to align the read to checksum boundaries, so whatever offset is requested, we have to move back to the
+    // previous checksum boundary.
+    // eg if bytesPerChecksum is 512, and the requested offset is 600, we have to move back to 512.
+    // If the checksum type is NONE, we don't have to do this, but using no checksums should be rare in practice and
+    // it simplifies the code to always do this.
+    final long offsetAlignment = readBlock.getOffset() % bytesPerChecksum;
+    long adjustedOffset = readBlock.getOffset() - offsetAlignment;
+
+    final ByteBuffer buffer = ByteBuffer.allocate(responseDataSize);
+    blockFile.position(adjustedOffset);
+    int totalDataLength = 0;
+    int numResponses = 0;
+    final long rounded = roundUp(readBlock.getLength() + offsetAlignment, bytesPerChecksum);
+    final long requiredLength = Math.min(rounded, blockData.getSize() - adjustedOffset);
+    LOG.debug("adjustedOffset {}, requiredLength {}, blockSize {}",
+        adjustedOffset, requiredLength, blockData.getSize());
+    for (boolean shouldRead = true; totalDataLength < requiredLength && shouldRead;) {
+      shouldRead = blockFile.read(buffer);
+      buffer.flip();
+      final int readLength = buffer.remaining();
+      if (readLength == 0) {
+        assertTrue(!shouldRead);
+        break;
+      }
+      assertTrue(readLength > 0, () -> "readLength = " + readLength + " <= 0");
+
+      if (checksumType != ContainerProtos.ChecksumType.NONE) {
+        final List<ByteString> checksums = getChecksums(adjustedOffset, readLength,
+            bytesPerChunk, bytesPerChecksum, chunkInfos);
+        LOG.debug("Read {} at adjustedOffset {}, readLength {}, bytesPerChunk {}, bytesPerChecksum {}",
+            readBlock, adjustedOffset, readLength, bytesPerChunk, bytesPerChecksum);
+        checksumData = new ChecksumData(checksumType, bytesPerChecksum, checksums);
+        if (verifyChecksum) {
+          Checksum.verifyChecksum(buffer.duplicate(), checksumData, 0);
+        }
+      }
+      final ContainerCommandResponseProto response = getReadBlockResponse(
+          request, checksumData, buffer, adjustedOffset);
+      final int dataLength = response.getReadBlock().getData().size();
+      LOG.debug("server onNext response {}: dataLength={}, numChecksums={}",
+          numResponses, dataLength, response.getReadBlock().getChecksumData().getChecksumsList().size());
+      streamObserver.onNext(response);
+      buffer.clear();
+
+      adjustedOffset += readLength;
+      totalDataLength += dataLength;
+      numResponses++;
+    }
+  }
+
+  static List<ByteString> getChecksums(long blockOffset, int readLength, int bytesPerChunk, int bytesPerChecksum,
+      final List<ContainerProtos.ChunkInfo> chunks) {
+    assertSame(0, blockOffset % bytesPerChecksum, "blockOffset % bytesPerChecksum");
+    final int numChecksums = 1 + (readLength - 1) / bytesPerChecksum;
+    final List<ByteString> checksums = new ArrayList<>(numChecksums);
+    for (int i = 0; i < numChecksums; i++) {
+      // As the checksums are stored "chunk by chunk", we need to figure out which chunk we start reading from,
+      // and its offset to pull out the correct checksum bytes for each read.
+      final int n = i * bytesPerChecksum;
+      final long offset = blockOffset + n;
+      final int c = Math.toIntExact(offset / bytesPerChunk);
+      final int chunkOffset = Math.toIntExact(offset % bytesPerChunk);
+      final int csi = chunkOffset / bytesPerChecksum;
+
+      assertTrue(c < chunks.size(),
+          () -> "chunkIndex = " + c + " >= chunk.size()" + chunks.size());
+      final ContainerProtos.ChunkInfo chunk = chunks.get(c);
+      if (c < chunks.size() - 1) {
+        assertSame(bytesPerChunk, chunk.getLen(), "bytesPerChunk");
+      }
+      final ContainerProtos.ChecksumData checksumDataProto = chunks.get(c).getChecksumData();
+      assertSame(bytesPerChecksum, checksumDataProto.getBytesPerChecksum(), "bytesPerChecksum");
+      final List<ByteString> checksumsList = checksumDataProto.getChecksumsList();
+      assertTrue(csi < checksumsList.size(),
+          () -> "checksumIndex = " + csi + " >= checksumsList.size()" + checksumsList.size());
+      checksums.add(checksumsList.get(csi));
+    }
+    return checksums;
+  }
+
+  @Override
   public void addFinalizedBlock(Container container, long localID) {
     KeyValueContainer keyValueContainer = (KeyValueContainer)container;
     keyValueContainer.getContainerData().addToFinalizedBlockSet(localID);
@@ -2012,7 +2256,7 @@ public class KeyValueHandler extends Handler {
       }
       if (nonZero) {
         LOG.error("blocks in rocksDB on container delete: {}",
-            stringBuilder.toString());
+            stringBuilder);
       }
     }
     return nonZero;
@@ -2022,7 +2266,7 @@ public class KeyValueHandler extends Handler {
     // List files left over
     File chunksPath = new
         File(container.getContainerData().getChunksPath());
-    Preconditions.checkArgument(chunksPath.isDirectory());
+    assertTrue(chunksPath.isDirectory(), () -> chunksPath + " is not a directory");
     boolean notEmpty = false;
     try (DirectoryStream<Path> dir
              = Files.newDirectoryStream(chunksPath.toPath())) {

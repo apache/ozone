@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -63,6 +65,7 @@ class TestContainerBalancerSubCommand {
   private static final Pattern WAITING_TO_STOP = Pattern.compile(
       "^Sending\\sstop\\scommand.\\sWaiting\\sfor\\sContainer\\sBalancer\\sto\\sstop...\\n" +
       "Container\\sBalancer\\sstopped.");
+  private static final Pattern STOP_FAILED = Pattern.compile("^Failed\\sto\\sstop\\sContainer\\sBalancer$");
 
   private static final String BALANCER_CONFIG_OUTPUT = "Container Balancer Configuration values:\n" +
       "Key                                                Value\n" +
@@ -434,6 +437,14 @@ class TestContainerBalancerSubCommand {
   }
 
   @Test
+  public void testContainerBalancerStopSubcommandInvalidState() throws IOException {
+    ScmClient scmClient = mock(ScmClient.class);
+    doThrow(IOException.class).when(scmClient).stopContainerBalancer();
+    assertThrows(IOException.class, () -> stopCmd.execute(scmClient));
+    assertThat(err.get()).containsPattern(STOP_FAILED);
+  }
+
+  @Test
   public void testContainerBalancerStartSubcommandWhenBalancerIsNotRunning()
       throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
@@ -460,9 +471,8 @@ class TestContainerBalancerSubCommand {
             .setStart(false)
             .setMessage("")
             .build());
-    startCmd.execute(scmClient);
-
-    assertThat(out.get()).containsPattern(FAILED_TO_START);
+    assertThrows(IOException.class, () -> startCmd.execute(scmClient));
+    assertThat(err.get()).containsPattern(FAILED_TO_START);
   }
 
 }

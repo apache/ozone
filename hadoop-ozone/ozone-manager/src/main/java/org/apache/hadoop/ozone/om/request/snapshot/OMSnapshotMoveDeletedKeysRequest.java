@@ -22,15 +22,14 @@ import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAP
 import java.io.IOException;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.utils.TransactionInfo;
-import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
-import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
+import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
+import org.apache.hadoop.ozone.om.request.key.OMKeyRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.snapshot.OMSnapshotMoveDeletedKeysResponse;
@@ -81,19 +80,19 @@ public class OMSnapshotMoveDeletedKeysRequest extends OMClientRequest {
       List<SnapshotMoveKeyInfos> reclaimKeysList = moveDeletedKeysRequest.getReclaimKeysList();
       List<HddsProtos.KeyValue> renamedKeysList = moveDeletedKeysRequest.getRenamedKeysList();
       List<String> movedDirs = moveDeletedKeysRequest.getDeletedDirsToMoveList();
-
-      // Update lastTransactionInfo for fromSnapshot and the nextSnapshot.
-      fromSnapshot.setLastTransactionInfo(TransactionInfo.valueOf(context.getTermIndex()).toByteString());
-      omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(fromSnapshot.getTableKey()),
-          CacheValue.get(context.getIndex(), fromSnapshot));
-      if (nextSnapshot != null) {
-        nextSnapshot.setLastTransactionInfo(TransactionInfo.valueOf(context.getTermIndex()).toByteString());
-        omMetadataManager.getSnapshotInfoTable().addCacheEntry(new CacheKey<>(nextSnapshot.getTableKey()),
-            CacheValue.get(context.getIndex(), nextSnapshot));
-      }
-      omClientResponse = new OMSnapshotMoveDeletedKeysResponse(
-          omResponse.build(), fromSnapshot, nextSnapshot,
-          nextDBKeysList, reclaimKeysList, renamedKeysList, movedDirs);
+      OmBucketInfo omBucketInfo = OMKeyRequest.getBucketInfo(omMetadataManager, snapshotInfo.getVolumeName(),
+          snapshotInfo.getBucketName());
+      OMSnapshotMoveUtils.updateCache(ozoneManager, fromSnapshot, nextSnapshot, context);
+      omClientResponse = new OMSnapshotMoveDeletedKeysResponse.Builder()
+          .setOmResponse(omResponse.build())
+          .setFromSnapshot(fromSnapshot)
+          .setNextSnapshot(nextSnapshot)
+          .setNextDBKeysList(nextDBKeysList)
+          .setReclaimKeysList(reclaimKeysList)
+          .setRenamedKeysList(renamedKeysList)
+          .setMovedDirs(movedDirs)
+          .setBucketId(omBucketInfo.getObjectID())
+          .build();
 
     } catch (IOException ex) {
       omClientResponse = new OMSnapshotMoveDeletedKeysResponse(

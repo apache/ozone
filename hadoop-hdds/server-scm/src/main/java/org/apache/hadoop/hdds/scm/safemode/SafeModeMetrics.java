@@ -17,10 +17,12 @@
 
 package org.apache.hadoop.hdds.scm.safemode;
 
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
+import org.apache.hadoop.metrics2.lib.MutableGaugeInt;
 import org.apache.hadoop.metrics2.lib.MutableGaugeLong;
 
 /**
@@ -51,6 +53,12 @@ public class SafeModeMetrics {
   private @Metric MutableCounterLong
       currentPipelinesWithAtleastOneReplicaReportedCount;
 
+  @Metric("Metric will be set to 1 if SCM is in SafeMode, otherwise 0") 
+  private MutableGaugeInt scmInSafeMode;
+  
+  @Metric private MutableGaugeLong numRequiredDatanodesThreshold;
+  @Metric private MutableCounterLong currentRegisteredDatanodesCount;
+
   public static SafeModeMetrics create() {
     final MetricsSystem ms = DefaultMetricsSystem.instance();
     return ms.register(SOURCE_NAME, "SCM Safemode Metrics", new SafeModeMetrics());
@@ -72,12 +80,25 @@ public class SafeModeMetrics {
     this.currentPipelinesWithAtleastOneReplicaReportedCount.incr();
   }
 
-  public void setNumContainerWithOneReplicaReportedThreshold(long val) {
-    this.numContainerWithOneReplicaReportedThreshold.set(val);
+  public void setNumContainerReportedThreshold(HddsProtos.ReplicationType type, long val) {
+    switch (type) {
+    case RATIS:
+      this.numContainerWithOneReplicaReportedThreshold.set(val);
+      break;
+    case EC:
+      this.numContainerWithECDataReplicaReportedThreshold.set(val);
+      break;
+    default:
+      throw new IllegalArgumentException("Unsupported replication type: " + type);
+    }
   }
 
-  public void setNumContainerWithECDataReplicaReportedThreshold(long val) {
-    this.numContainerWithECDataReplicaReportedThreshold.set(val);
+  public void setScmInSafeMode(boolean inSafeMode) {
+    this.scmInSafeMode.set(inSafeMode ? 1 : 0);
+  }
+
+  public void setNumRequiredDatanodesThreshold(long val) {
+    this.numRequiredDatanodesThreshold.set(val);
   }
 
   public void incCurrentContainersWithOneReplicaReportedCount() {
@@ -86,6 +107,10 @@ public class SafeModeMetrics {
 
   public void incCurrentContainersWithECDataReplicaReportedCount() {
     this.currentContainersWithECDataReplicaReportedCount.incr();
+  }
+
+  public void incCurrentRegisteredDatanodesCount() {
+    this.currentRegisteredDatanodesCount.incr();
   }
 
   MutableGaugeLong getNumHealthyPipelinesThreshold() {
@@ -115,6 +140,14 @@ public class SafeModeMetrics {
 
   MutableCounterLong getCurrentContainersWithOneReplicaReportedCount() {
     return currentContainersWithOneReplicaReportedCount;
+  }
+  
+  MutableCounterLong getCurrentRegisteredDatanodesCount() {
+    return currentRegisteredDatanodesCount;
+  }
+
+  MutableGaugeInt getScmInSafeMode() {
+    return scmInSafeMode;
   }
 
   public void unRegister() {

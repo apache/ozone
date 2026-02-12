@@ -83,17 +83,34 @@ public class ReconContainerMetadataManagerImpl
 
   private DBStore containerDbStore;
 
-  @Inject
   private Configuration sqlConfiguration;
 
-  @Inject
   private ReconOMMetadataManager omMetadataManager;
 
   @Inject
-  public ReconContainerMetadataManagerImpl(ReconDBProvider reconDBProvider,
-                                           Configuration sqlConfiguration) {
-    containerDbStore = reconDBProvider.getDbStore();
+  public ReconContainerMetadataManagerImpl(
+      ReconDBProvider reconDBProvider, Configuration sqlConfiguration, ReconOMMetadataManager omMetadataManager) {
+    this(reconDBProvider.getDbStore(), sqlConfiguration, omMetadataManager);
+  }
+
+  private ReconContainerMetadataManagerImpl(
+      DBStore reconDBStore, Configuration sqlConfiguration, ReconOMMetadataManager omMetadataManager) {
+    containerDbStore = reconDBStore;
     globalStatsDao = new GlobalStatsDao(sqlConfiguration);
+    this.sqlConfiguration = sqlConfiguration;
+    this.omMetadataManager = omMetadataManager;
+    initializeTables();
+  }
+
+  @Override
+  public ReconContainerMetadataManager getStagedReconContainerMetadataManager(
+      DBStore stagedReconDbStore) {
+    return new ReconContainerMetadataManagerImpl(stagedReconDbStore, sqlConfiguration, omMetadataManager);
+  }
+
+  @Override
+  public void reinitialize(ReconDBProvider reconDBProvider) {
+    containerDbStore = reconDBProvider.getDbStore();
     initializeTables();
   }
 
@@ -154,24 +171,6 @@ public class ReconContainerMetadataManagerImpl
 
   /**
    * Concatenate the containerID and Key Prefix using a delimiter and store the
-   * count into the container DB store.
-   *
-   * @param containerKeyPrefix the containerID, key-prefix tuple.
-   * @param count Count of the keys matching that prefix.
-   * @throws IOException on failure.
-   */
-  @Override
-  public void storeContainerKeyMapping(ContainerKeyPrefix containerKeyPrefix,
-                                       Integer count)
-      throws IOException {
-    containerKeyTable.put(containerKeyPrefix, count);
-    if (containerKeyPrefix.toKeyPrefixContainer() != null) {
-      keyContainerTable.put(containerKeyPrefix.toKeyPrefixContainer(), count);
-    }
-  }
-
-  /**
-   * Concatenate the containerID and Key Prefix using a delimiter and store the
    * count into a batch.
    *
    * @param batch the batch we store into
@@ -189,19 +188,6 @@ public class ReconContainerMetadataManagerImpl
       keyContainerTable.putWithBatch(batch,
           containerKeyPrefix.toKeyPrefixContainer(), count);
     }
-  }
-
-  /**
-   * Store the containerID -&gt; no. of keys count into the container DB store.
-   *
-   * @param containerID the containerID.
-   * @param count count of the keys within the given containerID.
-   * @throws IOException on failure.
-   */
-  @Override
-  public void storeContainerKeyCount(Long containerID, Long count)
-      throws IOException {
-    containerKeyCountTable.put(containerID, count);
   }
 
   /**

@@ -57,13 +57,12 @@ public class TestHeatMapInfo {
   private Path temporaryFolder;
 
   private boolean isSetupDone = false;
-  private ReconOMMetadataManager reconOMMetadataManager;
   private String auditRespStr;
   private HeatMapUtil heatMapUtil;
 
   @SuppressWarnings("checkstyle:methodlength")
   private void initializeInjector() throws Exception {
-    reconOMMetadataManager = getTestReconOmMetadataManager(
+    ReconOMMetadataManager reconOMMetadataManager = getTestReconOmMetadataManager(
         initializeNewOmMetadataManager(Files.createDirectory(
             temporaryFolder.resolve("JunitOmDBDir")).toFile()),
         Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());

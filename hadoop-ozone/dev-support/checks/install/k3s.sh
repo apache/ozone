@@ -17,7 +17,7 @@
 # This script installs K3S.
 # Requires _install_tool from _lib.sh.  Use `source` for both scripts, because it modifies $PATH.
 
-: ${K3S_VERSION:="v1.21.2+k3s1"}
+: ${K3S_VERSION:="v1.34.2+k3s1"}
 : ${KUBECONFIG:=/etc/rancher/k3s/k3s.yaml}
 
 _install_k3s() {

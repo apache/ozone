@@ -41,6 +41,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
@@ -52,6 +53,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.ContainerChecksums;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -225,7 +227,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
 
     List<UnhealthyContainers> unhealthyContainers =
         containerHealthSchemaManager.getUnhealthyContainers(
-            ALL_REPLICAS_BAD, 0, Integer.MAX_VALUE);
+            ALL_REPLICAS_BAD, 0L, Optional.empty(), Integer.MAX_VALUE);
     assertEquals(1, unhealthyContainers.size());
     assertEquals(2L,
         unhealthyContainers.get(0).getContainerId().longValue());
@@ -690,7 +692,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
           .setContainerState(s)
           .setContainerID(ContainerID.valueOf(containerId))
           .setSequenceId(1)
-          .setDataChecksum(1234L)
+          .setChecksums(ContainerChecksums.of(1234L, 0L))
           .build());
     }
     return replicas;
@@ -706,7 +708,7 @@ public class TestContainerHealthTask extends AbstractReconSqlDBTest {
           .setContainerState(s)
           .setContainerID(ContainerID.valueOf(containerId))
           .setSequenceId(1)
-          .setDataChecksum(checksum)
+          .setChecksums(ContainerChecksums.of(checksum, 0L))
           .build());
       checksum++;
     }

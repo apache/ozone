@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.container.ozoneimpl;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_ENABLED_DEFAULT;
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_WORKERS;
@@ -90,6 +92,9 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume.VolumeType;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolumeChecker;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerConfiguration;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerInfo;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerService;
 import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.StaleRecoveringContainerScrubbingService;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStoreImpl;
@@ -132,6 +137,7 @@ public class OzoneContainer {
   private final StaleRecoveringContainerScrubbingService
       recoveringContainerScrubbingService;
   private final GrpcTlsConfig tlsClientConfig;
+  private DiskBalancerService diskBalancerService;
   private final AtomicReference<InitializingStatus> initializingStatus;
   private final ReplicationServer replicationServer;
   private DatanodeDetails datanodeDetails;
@@ -156,6 +162,7 @@ public class OzoneContainer {
    * @throws DiskOutOfSpaceException
    * @throws IOException
    */
+  @SuppressWarnings("checkstyle:methodlength")
   public OzoneContainer(HddsDatanodeService hddsDatanodeService,
       DatanodeDetails datanodeDetails, ConfigurationSource conf,
       StateContext context, CertificateClient certClient,
@@ -197,26 +204,14 @@ public class OzoneContainer {
         OZONE_RECOVERING_CONTAINER_TIMEOUT,
         OZONE_RECOVERING_CONTAINER_TIMEOUT_DEFAULT, TimeUnit.MILLISECONDS);
     this.witnessedContainerMetadataStore = WitnessedContainerMetadataStoreImpl.get(conf);
-    containerSet = ContainerSet.newRwContainerSet(witnessedContainerMetadataStore.getContainerIdsTable(),
-        recoveringContainerTimeout);
+    containerSet = ContainerSet.newRwContainerSet(witnessedContainerMetadataStore, recoveringContainerTimeout);
     volumeSet.setGatherContainerUsages(this::gatherContainerUsages);
     metadataScanner = null;
 
     metrics = ContainerMetrics.create(conf);
     handlers = Maps.newHashMap();
 
-    IncrementalReportSender<Container> icrSender = container -> {
-      synchronized (containerSet) {
-        ContainerReplicaProto containerReport = container.getContainerReport();
-
-        IncrementalContainerReportProto icr = IncrementalContainerReportProto
-            .newBuilder()
-            .addReport(containerReport)
-            .build();
-        context.addIncrementalReport(icr);
-        context.getParent().triggerHeartbeat();
-      }
-    };
+    IncrementalReportSender<Container> icrSender = createIncrementalReportSender();
 
     checksumTreeManager = new ContainerChecksumTreeManager(config);
     for (ContainerType containerType : ContainerType.values()) {
@@ -271,6 +266,21 @@ public class OzoneContainer {
             datanodeDetails.threadNamePrefix(),
             checksumTreeManager,
             context.getParent().getReconfigurationHandler());
+
+    if (conf.getBoolean(HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY,
+        HDDS_DATANODE_DISK_BALANCER_ENABLED_DEFAULT)) {
+      Duration diskBalancerSvcInterval = conf.getObject(
+          DiskBalancerConfiguration.class).getDiskBalancerInterval();
+      Duration diskBalancerSvcTimeout = conf.getObject(
+          DiskBalancerConfiguration.class).getDiskBalancerTimeout();
+      diskBalancerService =
+          new DiskBalancerService(this, diskBalancerSvcInterval.toMillis(),
+              diskBalancerSvcTimeout.toMillis(), TimeUnit.MILLISECONDS, 1,
+              config);
+    } else {
+      diskBalancerService = null;
+      LOG.info("Disk Balancer is disabled.");
+    }
 
     Duration recoveringContainerScrubbingSvcInterval =
         dnConf.getRecoveringContainerScrubInterval();
@@ -351,7 +361,8 @@ public class OzoneContainer {
       for (Thread volumeThread : volumeThreads) {
         volumeThread.join();
       }
-      try (TableIterator<ContainerID, ContainerID> itr = containerSet.getContainerIdsTable().keyIterator()) {
+      try (TableIterator<ContainerID, ContainerID> itr
+               = getWitnessedContainerMetadataStore().getContainerCreateInfoTable().keyIterator()) {
         final Map<ContainerID, Long> containerIds = new HashMap<>();
         while (itr.hasNext()) {
           containerIds.put(itr.next(), 0L);
@@ -369,6 +380,36 @@ public class OzoneContainer {
 
     LOG.info("Build ContainerSet costs {}s",
         (Time.monotonicNow() - startTime) / 1000);
+  }
+
+  private IncrementalReportSender<Container> createIncrementalReportSender() {
+    return new IncrementalReportSender<Container>() {
+      private void sendICR(Container container, boolean immediate) throws StorageContainerException {
+        ContainerReplicaProto containerReport = container.getContainerReport();
+        IncrementalContainerReportProto icr = IncrementalContainerReportProto
+            .newBuilder()
+            .addReport(containerReport)
+            .build();
+        context.addIncrementalReport(icr);
+        if (immediate) {
+          context.getParent().triggerHeartbeat();
+        }
+      }
+
+      @Override
+      public void send(Container container) throws StorageContainerException {
+        synchronized (containerSet) {
+          sendICR(container, true); // Immediate
+        }
+      }
+
+      @Override
+      public void sendDeferred(Container container) throws StorageContainerException {
+        synchronized (containerSet) {
+          sendICR(container, false); // Deferred
+        }
+      }
+    };
   }
 
   /**
@@ -472,6 +513,11 @@ public class OzoneContainer {
     backgroundScanners.forEach(AbstractBackgroundContainerScanner::unpause);
   }
 
+  @VisibleForTesting
+  public OnDemandContainerScanner getOnDemandScanner() {
+    return onDemandScanner;
+  }
+
   /**
    * Starts serving requests to ozone container.
    *
@@ -528,6 +574,10 @@ public class OzoneContainer {
     writeChannel.start();
     readChannel.start();
     blockDeletingService.start();
+
+    if (diskBalancerService != null) {
+      diskBalancerService.start();
+    }
     recoveringContainerScrubbingService.start();
 
     initHddsVolumeContainer();
@@ -558,6 +608,9 @@ public class OzoneContainer {
       dbCompactionExecutorService.shutdown();
     }
     blockDeletingService.shutdown();
+    if (diskBalancerService != null) {
+      diskBalancerService.shutdown();
+    }
     recoveringContainerScrubbingService.shutdown();
     IOUtils.closeQuietly(metrics);
     ContainerMetrics.remove();
@@ -586,11 +639,13 @@ public class OzoneContainer {
 
   public Long gatherContainerUsages(HddsVolume storageVolume) {
     AtomicLong usages = new AtomicLong();
-    containerSet.getContainerMapIterator().forEachRemaining(e -> {
-      if (e.getValue().getContainerData().getVolume().getStorageID().equals(storageVolume.getStorageID())) {
-        usages.addAndGet(e.getValue().getContainerData().getBytesUsed());
+    Iterator<Long> containerIdIterator = storageVolume.getContainerIterator();
+    while (containerIdIterator.hasNext()) {
+      Container<?> container = containerSet.getContainer(containerIdIterator.next());
+      if (container != null) {
+        usages.addAndGet(container.getContainerData().getBytesUsed());
       }
-    });
+    }
     return usages.get();
   }
   /**
@@ -686,4 +741,18 @@ public class OzoneContainer {
     }
   }
 
+  public WitnessedContainerMetadataStore getWitnessedContainerMetadataStore() {
+    return witnessedContainerMetadataStore;
+  }
+
+  public DiskBalancerInfo getDiskBalancerInfo() {
+    if (diskBalancerService == null) {
+      return null;
+    }
+    return diskBalancerService.getDiskBalancerInfo();
+  }
+
+  public DiskBalancerService getDiskBalancerService() {
+    return diskBalancerService;
+  }
 }

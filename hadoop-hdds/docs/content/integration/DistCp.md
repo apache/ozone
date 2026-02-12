@@ -86,6 +86,8 @@ By specifying the appropriate checksum configuration or skipping the validation,
 
 When data resides in an HDFS encryption zone or Ozone encrypted buckets, the file checksum will not match. This is because the underlying block data differs due to the use of a new EDEK (Encryption Data Encryption Key) at the destination. In such cases, specify the `-skipcrccheck` parameter to avoid job failures.
 
+Note that `distcp` is supported between encrypted Ozone clusters starting with Ozone 2.0.
+
 For more information about using Hadoop DistCp, consult the [DistCp Guide](https://hadoop.apache.org/docs/current/hadoop-distcp/DistCp.html).
 
 ## Troubleshooting Common Issues

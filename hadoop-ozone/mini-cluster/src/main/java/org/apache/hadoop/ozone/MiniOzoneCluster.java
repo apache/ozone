@@ -26,12 +26,14 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.security.authentication.client.AuthenticationException;
 import org.apache.ratis.util.ExitUtils;
@@ -272,6 +274,18 @@ public interface MiniOzoneCluster extends AutoCloseable {
      * between the clusters created. */
     protected void prepareForNextBuild() {
       conf = new OzoneConfiguration(conf);
+
+      // Remove the extra configs set in configureSCM() and configureOM() so that MiniOzoneClusterProvider won't fail
+      conf.unset(ScmConfigKeys.OZONE_SCM_HA_RATIS_STORAGE_DIR);
+      conf.unset(ScmConfigKeys.OZONE_SCM_HA_RATIS_SNAPSHOT_DIR);
+      conf.unset(ScmConfigKeys.OZONE_SCM_DB_DIRS);
+      conf.unset(OzoneConfigKeys.OZONE_HTTP_BASEDIR);
+
+      conf.unset(OMConfigKeys.OZONE_OM_RATIS_STORAGE_DIR);
+      conf.unset(OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_DIR);
+      conf.unset(OMConfigKeys.OZONE_OM_DB_DIRS);
+      conf.unset(OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DB_DIR);
+
       setClusterId();
     }
 

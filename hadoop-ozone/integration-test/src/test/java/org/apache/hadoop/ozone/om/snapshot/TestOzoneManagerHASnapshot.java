@@ -345,10 +345,15 @@ public class TestOzoneManagerHASnapshot {
     String snapshotName = "snap-" + RandomStringUtils.secure().nextNumeric(10);
     createSnapshot(volumeName, bucketName, snapshotName);
 
-    store.deleteSnapshot(volumeName, bucketName, snapshotName);
-
+    // Wait for double buffer flush on follower to ensure that
+    // the key deletion and snapshot creation are flushed to the DB.
+    OzoneManagerDoubleBuffer omFollowerDoubleBuffer =
+        omFollower.getOmRatisServer().getOmStateMachine().getOzoneManagerDoubleBuffer();
+    omFollowerDoubleBuffer.awaitFlush();
     // Pause double buffer on follower node to accumulate all the key purge, snapshot delete and purge transactions.
-    omFollower.getOmRatisServer().getOmStateMachine().getOzoneManagerDoubleBuffer().stopDaemon();
+    omFollowerDoubleBuffer.stopDaemon();
+
+    store.deleteSnapshot(volumeName, bucketName, snapshotName);
 
     long keyDeleteServiceCount = omLeader.getKeyManager().getDeletingService().getRunCount().get();
     omLeader.getKeyManager().getDeletingService().resume();
@@ -367,15 +372,13 @@ public class TestOzoneManagerHASnapshot {
     String tableKey = SnapshotInfo.getTableKey(volumeName, bucketName, snapshotName);
     checkSnapshotIsPurgedFromDB(omLeader, tableKey);
 
-    // Resume the DoubleBuffer and flush the pending transactions.
-    OzoneManagerDoubleBuffer omDoubleBuffer =
-        omFollower.getOmRatisServer().getOmStateMachine().getOzoneManagerDoubleBuffer();
-    omDoubleBuffer.resume();
+    // Resume the DoubleBuffer on the follower and flush the pending transactions.
+    omFollowerDoubleBuffer.resume();
     CompletableFuture.supplyAsync(() -> {
-      omDoubleBuffer.flushTransactions();
+      omFollowerDoubleBuffer.flushTransactions();
       return null;
     });
-    omDoubleBuffer.awaitFlush();
+    omFollowerDoubleBuffer.awaitFlush();
     checkSnapshotIsPurgedFromDB(omFollower, tableKey);
   }
 
@@ -407,7 +410,7 @@ public class TestOzoneManagerHASnapshot {
 
     String tableKey = SnapshotInfo.getTableKey(volName, buckName, snapName);
     SnapshotInfo snapshotInfo = SnapshotUtils.getSnapshotInfo(cluster.getOMLeader(), tableKey);
-    String fileName = getSnapshotPath(cluster.getOMLeader().getConfiguration(), snapshotInfo);
+    String fileName = getSnapshotPath(cluster.getOMLeader().getConfiguration(), snapshotInfo, 0);
     File snapshotDir = new File(fileName);
     if (!RDBCheckpointUtils.waitForCheckpointDirectoryExist(snapshotDir)) {
       throw new IOException("Snapshot directory doesn't exist");

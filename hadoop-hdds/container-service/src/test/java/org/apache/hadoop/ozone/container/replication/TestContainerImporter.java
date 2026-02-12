@@ -28,7 +28,9 @@ import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -56,6 +58,7 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerDataYaml;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -70,6 +73,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.MockedStatic;
 
 /**
  * Test for {@link ContainerImporter}.
@@ -198,7 +202,20 @@ class TestContainerImporter {
     containerImporter.importContainer(containerId, tarFile.toPath(),
         targetVolume, NO_COMPRESSION);
 
-    verify(containerSet, atLeastOnce()).scanContainer(containerId);
+    verify(containerSet, atLeastOnce()).scanContainer(containerId, "Imported container");
+  }
+
+  @Test
+  public void testImportContainerFailureTriggersVolumeScan() throws Exception {
+    HddsVolume targetVolume = mock(HddsVolume.class);
+    try (MockedStatic<StorageVolumeUtil> mockedStatic = mockStatic(StorageVolumeUtil.class)) {
+      when(controllerMock.importContainer(any(ContainerData.class), any(), any())).thenThrow(new IOException());
+      // import the container
+      File tarFile = containerTarFile(containerId, containerData);
+      assertThrows(IOException.class, () -> containerImporter.importContainer(containerId, tarFile.toPath(),
+          targetVolume, NO_COMPRESSION));
+      mockedStatic.verify(() -> StorageVolumeUtil.onFailure(any()), times(1));
+    }
   }
 
   @Test

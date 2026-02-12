@@ -43,13 +43,11 @@ import org.slf4j.LoggerFactory;
 public class InitialConstraintUpgradeAction implements ReconUpgradeAction {
 
   private static final Logger LOG = LoggerFactory.getLogger(InitialConstraintUpgradeAction.class);
-  private DataSource dataSource;
   private DSLContext dslContext;
 
   @Override
   public void execute(DataSource source) throws SQLException {
-    dataSource = source;
-    try (Connection conn = dataSource.getConnection()) {
+    try (Connection conn = source.getConnection()) {
       if (!TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
         return;
       }
@@ -96,11 +94,6 @@ public class InitialConstraintUpgradeAction implements ReconUpgradeAction {
   @Override
   public UpgradeActionType getType() {
     return FINALIZE;
-  }
-
-  @VisibleForTesting
-  public void setDataSource(DataSource dataSource) {
-    this.dataSource = dataSource;
   }
 
   @VisibleForTesting

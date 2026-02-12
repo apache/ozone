@@ -377,7 +377,19 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
 
   @Override
   public void deleteWithBatch(BatchOperation batch, KEY key) throws CodecException {
-    rawTable.deleteWithBatch(batch, encodeKey(key));
+    if (supportCodecBuffer) {
+      CodecBuffer keyBuffer = null;
+      try {
+        keyBuffer = keyCodec.toDirectCodecBuffer(key);
+        // The buffers will be released after commit.
+        rawTable.deleteWithBatch(batch, keyBuffer);
+      } catch (Exception e) {
+        IOUtils.closeQuietly(keyBuffer);
+        throw e;
+      }
+    } else {
+      rawTable.deleteWithBatch(batch, encodeKey(key));
+    }
   }
 
   @Override
@@ -386,7 +398,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
-  public KeyValueIterator<KEY, VALUE> iterator(KEY prefix, KeyValueIterator.Type type)
+  public KeyValueIterator<KEY, VALUE> iterator(KEY prefix, IteratorType type)
       throws RocksDatabaseException, CodecException {
     if (supportCodecBuffer) {
       return newCodecBufferTableIterator(prefix, type);
@@ -481,7 +493,7 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     return cache;
   }
 
-  private RawIterator<CodecBuffer> newCodecBufferTableIterator(KEY prefix, KeyValueIterator.Type type)
+  private RawIterator<CodecBuffer> newCodecBufferTableIterator(KEY prefix, IteratorType type)
       throws RocksDatabaseException, CodecException {
     final CodecBuffer encoded = encodeKeyCodecBuffer(prefix);
     final CodecBuffer prefixBuffer;

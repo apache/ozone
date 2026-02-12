@@ -23,15 +23,15 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.ZoneId;
-import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
@@ -44,8 +44,10 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyClient;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.NettyMetrics;
+import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.HddsDatanodeStopService;
 import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
@@ -96,7 +98,8 @@ public class DatanodeStateMachine implements Closeable {
   private static final Logger LOG =
       LoggerFactory.getLogger(DatanodeStateMachine.class);
   private final ExecutorService executorService;
-  private final ExecutorService pipelineCommandExecutorService;
+  private final ExecutorService closePipelineCommandExecutorService;
+  private final ExecutorService createPipelineCommandExecutorService;
   private final ConfigurationSource conf;
   private final SCMConnectionManager connectionManager;
   private final ECReconstructionCoordinator ecReconstructionCoordinator;
@@ -142,7 +145,7 @@ public class DatanodeStateMachine implements Closeable {
    * @param certClient - Datanode Certificate client, required if security is
    *                     enabled
    */
-  @SuppressWarnings("checkstyle:ParameterNumber")
+  @SuppressWarnings({"checkstyle:ParameterNumber", "checkstyle:methodlength"})
   public DatanodeStateMachine(HddsDatanodeService hddsDatanodeService,
                               DatanodeDetails datanodeDetails,
                               ConfigurationSource conf,
@@ -203,7 +206,7 @@ public class DatanodeStateMachine implements Closeable {
         new SimpleContainerDownloader(conf, certClient));
     ContainerReplicator pushReplicator = new PushReplicator(conf,
         new OnDemandContainerReplicationSource(container.getController()),
-        new GrpcContainerUploader(conf, certClient)
+        new GrpcContainerUploader(conf, certClient, container.getController())
     );
 
     pullReplicatorWithMetrics = new MeasuredReplicator(pullReplicator, "pull");
@@ -236,15 +239,28 @@ public class DatanodeStateMachine implements Closeable {
     //  datanode clients.
     DNContainerOperationClient dnClient = new DNContainerOperationClient(conf, certClient, secretKeyClient);
 
-    ThreadFactory threadFactory = new ThreadFactoryBuilder()
-        .setNameFormat(threadNamePrefix + "PipelineCommandHandlerThread-%d")
+    // Create separate bounded executors for pipeline command handlers
+    ThreadFactory closePipelineThreadFactory = new ThreadFactoryBuilder()
+        .setNameFormat(threadNamePrefix + "ClosePipelineCommandHandlerThread-%d")
         .build();
-    pipelineCommandExecutorService = Executors
-        .newSingleThreadExecutor(threadFactory);
+    closePipelineCommandExecutorService = new ThreadPoolExecutor(
+        1, 1,
+        0L, TimeUnit.MILLISECONDS,
+        new LinkedBlockingQueue<>(dnConf.getCommandQueueLimit()),
+        closePipelineThreadFactory);
+
+    ThreadFactory createPipelineThreadFactory = new ThreadFactoryBuilder()
+        .setNameFormat(threadNamePrefix + "CreatePipelineCommandHandlerThread-%d")
+        .build();
+    createPipelineCommandExecutorService = new ThreadPoolExecutor(
+        1, 1,
+        0L, TimeUnit.MILLISECONDS,
+        new LinkedBlockingQueue<>(dnConf.getCommandQueueLimit()),
+        createPipelineThreadFactory);
 
     // When we add new handlers just adding a new handler here should do the
     // trick.
-    commandDispatcher = CommandDispatcher.newBuilder()
+    CommandDispatcher.Builder dispatcherBuilder = CommandDispatcher.newBuilder()
         .addHandler(new CloseContainerCommandHandler(
             dnConf.getContainerCloseThreads(),
             dnConf.getCommandQueueLimit(), threadNamePrefix))
@@ -257,18 +273,28 @@ public class DatanodeStateMachine implements Closeable {
             dnConf.getContainerDeleteThreads(), clock,
             dnConf.getCommandQueueLimit(), threadNamePrefix))
         .addHandler(new ClosePipelineCommandHandler(conf,
-            pipelineCommandExecutorService))
+            closePipelineCommandExecutorService))
         .addHandler(new CreatePipelineCommandHandler(conf,
-            pipelineCommandExecutorService))
-        .addHandler(new SetNodeOperationalStateCommandHandler(conf,
-            supervisor::nodeStateUpdated))
+            createPipelineCommandExecutorService))
         .addHandler(new FinalizeNewLayoutVersionCommandHandler())
         .addHandler(new RefreshVolumeUsageCommandHandler())
-        .addHandler(new ReconcileContainerCommandHandler(supervisor, dnClient))
+        .addHandler(new ReconcileContainerCommandHandler(supervisor, dnClient));
+
+    if (container.getDiskBalancerService() != null) {
+      dispatcherBuilder.addHandler(new SetNodeOperationalStateCommandHandler(
+          conf, supervisor::nodeStateUpdated,
+          container.getDiskBalancerService()::nodeStateUpdated));
+    } else {
+      dispatcherBuilder.addHandler(new SetNodeOperationalStateCommandHandler(
+          conf, supervisor::nodeStateUpdated, null));
+    }
+
+    dispatcherBuilder
         .setConnectionManager(connectionManager)
         .setContainer(container)
-        .setContext(context)
-        .build();
+        .setContext(context);
+
+    commandDispatcher = dispatcherBuilder.build();
 
     reportManager = ReportManager.newBuilder(conf)
         .setStateContext(context)
@@ -297,7 +323,7 @@ public class DatanodeStateMachine implements Closeable {
     int totalServerCount = 1;
 
     try {
-      totalServerCount += HddsUtils.getSCMAddressForDatanodes(conf).size();
+      totalServerCount += HddsServerUtil.getSCMAddressForDatanodes(conf).size();
     } catch (Exception e) {
       LOG.error("Fail to get scm addresses", e);
     }
@@ -436,7 +462,8 @@ public class DatanodeStateMachine implements Closeable {
     replicationSupervisorMetrics.unRegister();
     ecReconstructionMetrics.unRegister();
     executorServiceShutdownGraceful(executorService);
-    executorServiceShutdownGraceful(pipelineCommandExecutorService);
+    executorServiceShutdownGraceful(closePipelineCommandExecutorService);
+    executorServiceShutdownGraceful(createPipelineCommandExecutorService);
 
     if (connectionManager != null) {
       connectionManager.close();
@@ -603,23 +630,21 @@ public class DatanodeStateMachine implements Closeable {
    * (single) thread, or queues it in the handler where a thread pool executor
    * will process it. The total commands queued in the datanode is therefore
    * the sum those in the CommandQueue and the dispatcher queues.
-   * @return A map containing a count for each known command.
+   * @return EnumCounters containing a count for each known command.
    */
-  public Map<SCMCommandProto.Type, Integer> getQueuedCommandCount() {
-    // This is a "sparse map" - there is not guaranteed to be an entry for
-    // every command type
-    Map<SCMCommandProto.Type, Integer> commandQSummary =
+  public EnumCounters<SCMCommandProto.Type> getQueuedCommandCount() {
+    // Get command counts from StateContext command queue
+    EnumCounters<SCMCommandProto.Type> commandQSummary =
         context.getCommandQueueSummary();
-    // This map will contain an entry for every command type which is registered
+    // This EnumCounters will contain an entry for every command type which is registered
     // with the dispatcher, and that should be all command types the DN knows
-    // about. Any commands with nothing in the queue will return a count of
+    // about. Any commands with nothing in the queue will have a count of
     // zero.
-    Map<SCMCommandProto.Type, Integer> dispatcherQSummary =
+    EnumCounters<SCMCommandProto.Type> dispatcherQSummary =
         commandDispatcher.getQueuedCommandCount();
-    // Merge the "sparse" map into the fully populated one returning a count
+    // Merge the two EnumCounters into the fully populated one having a count
     // for all known command types.
-    commandQSummary.forEach((k, v)
-        -> dispatcherQSummary.merge(k, v, Integer::sum));
+    dispatcherQSummary.add(commandQSummary);
     return dispatcherQSummary;
   }
 
@@ -770,5 +795,29 @@ public class DatanodeStateMachine implements Closeable {
 
   public VolumeChoosingPolicy getVolumeChoosingPolicy() {
     return volumeChoosingPolicy;
+  }
+
+  /**
+   * Sets the next heartbeat time. Setting to current time will trigger HB immediately as will be less than time
+   * compared to Time.monotonicNow() when compared.
+   * @param time
+   */
+  public void setNextHB(long time) {
+    nextHB.set(time);
+  }
+
+  @VisibleForTesting
+  public ExecutorService getExecutorService() {
+    return executorService;
+  }
+
+  /**
+   * Resize the executor based on the number of active endpoint tasks.
+   */
+  public void resizeExecutor(int size) {
+    if (executorService instanceof ThreadPoolExecutor) {
+      ThreadPoolExecutor tpe = (ThreadPoolExecutor) executorService;
+      HddsServerUtil.setPoolSize(tpe, size, LOG);
+    }
   }
 }

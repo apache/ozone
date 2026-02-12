@@ -89,17 +89,10 @@ public class TestContainerBalancerTask {
   private static final Logger LOG =
       LoggerFactory.getLogger(TestContainerBalancerTask.class);
 
-  private ReplicationManager replicationManager;
   private MoveManager moveManager;
-  private ContainerManager containerManager;
   private ContainerBalancerTask containerBalancerTask;
-  private MockNodeManager mockNodeManager;
   private StorageContainerManager scm;
   private OzoneConfiguration conf;
-  private ReplicationManagerConfiguration rmConf;
-  private PlacementPolicy placementPolicy;
-  private PlacementPolicy ecPlacementPolicy;
-  private PlacementPolicyValidateProxy placementPolicyValidateProxy;
   private ContainerBalancerConfiguration balancerConfiguration;
   private List<DatanodeUsageInfo> nodesInCluster;
   private List<Double> nodeUtilizations;
@@ -112,7 +105,6 @@ public class TestContainerBalancerTask {
   private Map<String, ByteString> serviceToConfigMap = new HashMap<>();
   private static final ThreadLocalRandom RANDOM = ThreadLocalRandom.current();
 
-  private StatefulServiceStateManager serviceStateManager;
   static final long STORAGE_UNIT = OzoneConsts.GB;
 
   /**
@@ -122,11 +114,11 @@ public class TestContainerBalancerTask {
   public void setup(TestInfo testInfo) throws IOException, NodeNotFoundException,
       TimeoutException {
     conf = new OzoneConfiguration();
-    rmConf = new ReplicationManagerConfiguration();
+    ReplicationManagerConfiguration rmConf = new ReplicationManagerConfiguration();
     scm = mock(StorageContainerManager.class);
-    containerManager = mock(ContainerManager.class);
-    replicationManager = mock(ReplicationManager.class);
-    serviceStateManager = mock(StatefulServiceStateManagerImpl.class);
+    ContainerManager containerManager = mock(ContainerManager.class);
+    ReplicationManager replicationManager = mock(ReplicationManager.class);
+    StatefulServiceStateManager serviceStateManager = mock(StatefulServiceStateManagerImpl.class);
     SCMServiceManager scmServiceManager = mock(SCMServiceManager.class);
     moveManager = mock(MoveManager.class);
     when(moveManager.move(any(ContainerID.class),
@@ -151,17 +143,17 @@ public class TestContainerBalancerTask {
             .map(method -> new int[]{0, 0, 0, 0, 0, 1, 2, 3, 4, 5})
             .orElse(null);
     createCluster(sizeArray);
-    mockNodeManager = new MockNodeManager(datanodeToContainersMap);
+    MockNodeManager mockNodeManager = new MockNodeManager(datanodeToContainersMap);
 
     NetworkTopology clusterMap = mockNodeManager.getClusterNetworkTopologyMap();
 
-    placementPolicy = ContainerPlacementPolicyFactory
-        .getPolicy(conf, mockNodeManager, clusterMap, true,
-            SCMContainerPlacementMetrics.create());
-    ecPlacementPolicy = ContainerPlacementPolicyFactory.getECPolicy(
+    PlacementPolicy placementPolicy = ContainerPlacementPolicyFactory
+                                          .getPolicy(conf, mockNodeManager, clusterMap, true,
+                                              SCMContainerPlacementMetrics.create());
+    PlacementPolicy ecPlacementPolicy = ContainerPlacementPolicyFactory.getECPolicy(
         conf, mockNodeManager, clusterMap,
         true, SCMContainerPlacementMetrics.create());
-    placementPolicyValidateProxy = new PlacementPolicyValidateProxy(
+    PlacementPolicyValidateProxy placementPolicyValidateProxy = new PlacementPolicyValidateProxy(
         placementPolicy, ecPlacementPolicy);
 
     when(replicationManager
@@ -468,7 +460,7 @@ public class TestContainerBalancerTask {
       }
       SCMNodeStat stat = new SCMNodeStat(datanodeCapacity, datanodeUsedSpace,
           datanodeCapacity - datanodeUsedSpace, 0,
-          datanodeCapacity - datanodeUsedSpace - 1);
+          datanodeCapacity - datanodeUsedSpace - 1, 0);
       nodesInCluster.get(i).setScmNodeStat(stat);
     }
   }

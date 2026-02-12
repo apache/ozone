@@ -142,7 +142,6 @@ public class TestOmContainerLocationCache {
   private static final String VERSIONED_BUCKET_NAME = "versionedBucket1";
   private static final String VOLUME_NAME = "vol1";
   private static OzoneManager om;
-  private static RpcClient rpcClient;
   private static ObjectStore objectStore;
   private static XceiverClientGrpc mockDn1Protocol;
   private static XceiverClientGrpc mockDn2Protocol;
@@ -182,7 +181,7 @@ public class TestOmContainerLocationCache {
     ozoneClient = omTestManagers.getRpcClient();
     metadataManager = omTestManagers.getMetadataManager();
 
-    rpcClient = new RpcClient(conf, null) {
+    RpcClient rpcClient = new RpcClient(conf, null) {
       @Nonnull
       @Override
       protected XceiverClientFactory createXceiverClientFactory(

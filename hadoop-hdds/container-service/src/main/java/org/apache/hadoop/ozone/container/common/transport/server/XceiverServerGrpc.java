@@ -17,15 +17,14 @@
 
 package org.apache.hadoop.ozone.container.common.transport.server;
 
-import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import io.opentracing.Scope;
-import io.opentracing.Span;
-import io.opentracing.util.GlobalTracer;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.context.Scope;
 import java.io.IOException;
 import java.net.BindException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -77,7 +76,6 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
   private DatanodeDetails datanodeDetails;
   private ThreadPoolExecutor readExecutors;
   private EventLoopGroup eventLoopGroup;
-  private Class<? extends ServerChannel> channelType;
 
   /**
    * Constructs a Grpc server class.
@@ -87,7 +85,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
   public XceiverServerGrpc(DatanodeDetails datanodeDetails,
       ConfigurationSource conf,
       ContainerDispatcher dispatcher, CertificateClient caClient) {
-    Preconditions.checkNotNull(conf);
+    Objects.requireNonNull(conf, "conf == null");
 
     this.id = datanodeDetails.getID();
     this.datanodeDetails = datanodeDetails;
@@ -119,6 +117,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
             "ChunkReader-ELG-%d")
         .build();
 
+    Class<? extends ServerChannel> channelType;
     if (Epoll.isAvailable()) {
       eventLoopGroup = new EpollEventLoopGroup(poolSize / 10, factory);
       channelType = EpollServerSocketChannel.class;
@@ -222,7 +221,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
         .importAndCreateSpan(
             "XceiverServerGrpc." + request.getCmdType().name(),
             request.getTraceID());
-    try (Scope scope = GlobalTracer.get().activateSpan(span)) {
+    try (Scope ignore = span.makeCurrent()) {
       ContainerProtos.ContainerCommandResponseProto response =
           storageContainer.dispatch(request, null);
       if (response.getResult() != ContainerProtos.Result.SUCCESS) {
@@ -230,7 +229,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
             response.getResult());
       }
     } finally {
-      span.finish();
+      span.end();
     }
   }
 

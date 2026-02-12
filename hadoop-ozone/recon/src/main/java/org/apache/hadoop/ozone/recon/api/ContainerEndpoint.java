@@ -17,13 +17,13 @@
 
 package org.apache.hadoop.ozone.recon.api;
 
-import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_BATCH_NUMBER;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FETCH_COUNT;
 import static org.apache.hadoop.ozone.recon.ReconConstants.DEFAULT_FILTER_FOR_MISSING_CONTAINERS;
 import static org.apache.hadoop.ozone.recon.ReconConstants.PREV_CONTAINER_ID_DEFAULT_VALUE;
-import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_BATCH_PARAM;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_FILTER;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_LIMIT;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_MAX_CONTAINER_ID;
+import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_MIN_CONTAINER_ID;
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
 
 import java.io.IOException;
@@ -35,6 +35,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
@@ -284,7 +285,7 @@ public class ContainerEndpoint {
             keyMetadata.setVolume(omKeyInfo.getVolumeName());
             keyMetadata.setKey(omKeyInfo.getKeyName());
             keyMetadata.setCompletePath(ReconUtils.constructFullPath(omKeyInfo,
-                reconNamespaceSummaryManager, omMetadataManager));
+                reconNamespaceSummaryManager));
             keyMetadata.setCreationTime(
                 Instant.ofEpochMilli(omKeyInfo.getCreationTime()));
             keyMetadata.setModificationTime(
@@ -339,7 +340,7 @@ public class ContainerEndpoint {
   ) {
     List<MissingContainerMetadata> missingContainers = new ArrayList<>();
     containerHealthSchemaManager.getUnhealthyContainers(
-            UnHealthyContainerStates.MISSING, 0, limit)
+            UnHealthyContainerStates.MISSING, 0L, Optional.empty(), limit)
         .forEach(container -> {
           long containerID = container.getContainerId();
           try {
@@ -373,9 +374,12 @@ public class ContainerEndpoint {
    *              eg UNDER_REPLICATED, MIS_REPLICATED, OVER_REPLICATED or
    *              MISSING. Passing null returns all containers.
    * @param limit The limit of unhealthy containers to return.
-   * @param batchNum The batch number (like "page number") of results to return.
-   *                 Passing 1, will return records 1 to limit. 2 will return
-   *                 limit + 1 to 2 * limit, etc.
+   * @param maxContainerId Upper bound for container IDs to include (exclusive).
+   *                       When specified, returns containers with IDs less than this value
+   *                       in descending order. Use for backward pagination.
+   * @param minContainerId Lower bound for container IDs to include (exclusive).
+   *                       When maxContainerId is not specified, returns containers with IDs
+   *                       greater than this value in ascending order. Use for forward pagination.
    * @return {@link Response}
    */
   @GET
@@ -384,10 +388,11 @@ public class ContainerEndpoint {
       @PathParam("state") String state,
       @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
       int limit,
-      @DefaultValue(DEFAULT_BATCH_NUMBER)
-      @QueryParam(RECON_QUERY_BATCH_PARAM) int batchNum) {
-    int offset = Math.max(((batchNum - 1) * limit), 0);
-
+      @DefaultValue(PREV_CONTAINER_ID_DEFAULT_VALUE)
+      @QueryParam(RECON_QUERY_MAX_CONTAINER_ID) long maxContainerId,
+      @DefaultValue(PREV_CONTAINER_ID_DEFAULT_VALUE)
+      @QueryParam(RECON_QUERY_MIN_CONTAINER_ID) long minContainerId) {
+    Optional<Long> maxContainerIdOpt = maxContainerId > 0 ? Optional.of(maxContainerId) : Optional.empty();
     List<UnhealthyContainerMetadata> unhealthyMeta = new ArrayList<>();
     List<UnhealthyContainersSummary> summary;
     try {
@@ -401,7 +406,7 @@ public class ContainerEndpoint {
 
       summary = containerHealthSchemaManager.getUnhealthyContainersSummary();
       List<UnhealthyContainers> containers = containerHealthSchemaManager
-          .getUnhealthyContainers(internalState, offset, limit);
+          .getUnhealthyContainers(internalState, minContainerId, maxContainerIdOpt, limit);
 
       // Filtering out EMPTY_MISSING and NEGATIVE_SIZE containers from the response.
       // These container states are not being inserted into the database as they represent
@@ -434,6 +439,12 @@ public class ContainerEndpoint {
 
     UnhealthyContainersResponse response =
         new UnhealthyContainersResponse(unhealthyMeta);
+    if (!unhealthyMeta.isEmpty()) {
+      response.setFirstKey(unhealthyMeta.stream().map(UnhealthyContainerMetadata::getContainerID)
+          .min(Long::compareTo).orElse(0L));
+      response.setLastKey(unhealthyMeta.stream().map(UnhealthyContainerMetadata::getContainerID)
+          .max(Long::compareTo).orElse(0L));
+    }
     for (UnhealthyContainersSummary s : summary) {
       response.setSummaryCount(s.getContainerState(), s.getCount());
     }
@@ -445,9 +456,12 @@ public class ContainerEndpoint {
    * {@link org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata}
    * for all unhealthy containers.
    * @param limit The limit of unhealthy containers to return.
-   * @param batchNum The batch number (like "page number") of results to return.
-   *                 Passing 1, will return records 1 to limit. 2 will return
-   *                 limit + 1 to 2 * limit, etc.
+   * @param maxContainerId Upper bound for container IDs to include (exclusive).
+   *                       When specified, returns containers with IDs less than this value
+   *                       in descending order. Use for backward pagination.
+   * @param minContainerId Lower bound for container IDs to include (exclusive).
+   *                       When maxContainerId is not specified, returns containers with IDs
+   *                       greater than this value in ascending order. Use for forward pagination.
    * @return {@link Response}
    */
   @GET
@@ -455,9 +469,11 @@ public class ContainerEndpoint {
   public Response getUnhealthyContainers(
       @DefaultValue(DEFAULT_FETCH_COUNT) @QueryParam(RECON_QUERY_LIMIT)
       int limit,
-      @DefaultValue(DEFAULT_BATCH_NUMBER)
-      @QueryParam(RECON_QUERY_BATCH_PARAM) int batchNum) {
-    return getUnhealthyContainers(null, limit, batchNum);
+      @DefaultValue(PREV_CONTAINER_ID_DEFAULT_VALUE)
+      @QueryParam(RECON_QUERY_MAX_CONTAINER_ID) long maxContainerId,
+      @DefaultValue(PREV_CONTAINER_ID_DEFAULT_VALUE)
+      @QueryParam(RECON_QUERY_MIN_CONTAINER_ID) long minContainerId) {
+    return getUnhealthyContainers(null, limit, maxContainerId, minContainerId);
   }
 
   /**
@@ -643,11 +659,11 @@ public class ContainerEndpoint {
           }
         }
 
-        List<Pipeline> pipelines = new ArrayList<>();
         nonOMContainers.forEach(containerInfo -> {
           ContainerDiscrepancyInfo containerDiscrepancyInfo = new ContainerDiscrepancyInfo();
           containerDiscrepancyInfo.setContainerID(containerInfo.getContainerID());
           containerDiscrepancyInfo.setNumberOfKeys(0);
+          List<Pipeline> pipelines = new ArrayList<>();
           PipelineID pipelineID = null;
           try {
             pipelineID = containerInfo.getPipelineID();

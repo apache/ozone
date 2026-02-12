@@ -20,12 +20,19 @@ package org.apache.hadoop.ozone.s3.endpoint;
 import static org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.NO_SUCH_UPLOAD;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.validateSignatureHeader;
+import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapInQuotes;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.security.DigestInputStream;
+import java.security.MessageDigest;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import javax.xml.bind.DatatypeConverter;
 import org.apache.commons.lang3.tuple.Pair;
@@ -36,10 +43,14 @@ import org.apache.hadoop.ozone.client.io.KeyMetadataAware;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.s3.MultiDigestInputStream;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
+import org.apache.hadoop.ozone.s3.util.S3Utils;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.util.function.CheckedRunnable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,13 +71,14 @@ final class ObjectEndpointStreaming {
       OzoneBucket bucket, String keyPath,
       long length, ReplicationConfig replicationConfig,
       int chunkSize, Map<String, String> keyMetadata,
-      Map<String, String> tags,
-      DigestInputStream body, PerformanceStringBuilder perf)
+      Map<String, String> tags, MultiDigestInputStream body,
+      HttpHeaders headers, boolean isSignedPayload,
+      PerformanceStringBuilder perf)
       throws IOException, OS3Exception {
 
     try {
       return putKeyWithStream(bucket, keyPath,
-          length, chunkSize, replicationConfig, keyMetadata, tags, body, perf);
+          length, chunkSize, replicationConfig, keyMetadata, tags, body, headers, isSignedPayload, perf);
     } catch (IOException ex) {
       LOG.error("Exception occurred in PutObject", ex);
       if (ex instanceof OMException) {
@@ -98,21 +110,49 @@ final class ObjectEndpointStreaming {
       ReplicationConfig replicationConfig,
       Map<String, String> keyMetadata,
       Map<String, String> tags,
-      DigestInputStream body, PerformanceStringBuilder perf)
-      throws IOException {
+      MultiDigestInputStream body,
+      HttpHeaders headers,
+      boolean isSignedPayload,
+      PerformanceStringBuilder perf)
+      throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
+    final String amzContentSha256Header = validateSignatureHeader(headers, keyPath, isSignedPayload);
     long writeLen;
-    String eTag;
+    String md5Hash;
     try (OzoneDataStreamOutput streamOutput = bucket.createStreamKey(keyPath,
         length, replicationConfig, keyMetadata, tags)) {
       long metadataLatencyNs = METRICS.updatePutKeyMetadataStats(startNanos);
       writeLen = writeToStreamOutput(streamOutput, body, bufferSize, length);
-      eTag = DatatypeConverter.printHexBinary(body.getMessageDigest().digest())
+      md5Hash = DatatypeConverter.printHexBinary(body.getMessageDigest(OzoneConsts.MD5_HASH).digest())
           .toLowerCase();
       perf.appendMetaLatencyNanos(metadataLatencyNs);
-      ((KeyMetadataAware)streamOutput).getMetadata().put(OzoneConsts.ETAG, eTag);
+      ((KeyMetadataAware)streamOutput).getMetadata().put(OzoneConsts.ETAG, md5Hash);
+
+      List<CheckedRunnable<IOException>> preCommits = new ArrayList<>();
+      String clientContentMD5 = headers.getHeaderString(S3Consts.CHECKSUM_HEADER);
+      if (clientContentMD5 != null) {
+        CheckedRunnable<IOException> checkContentMD5Hook = () -> {
+          S3Utils.validateContentMD5(clientContentMD5, md5Hash, keyPath);
+        };
+        preCommits.add(checkContentMD5Hook);
+      }
+
+      // If sha256Digest exists, this request must validate x-amz-content-sha256
+      MessageDigest sha256Digest = body.getMessageDigest(OzoneConsts.FILE_HASH);
+      if (sha256Digest != null) {
+        final String actualSha256 = DatatypeConverter.printHexBinary(
+            sha256Digest.digest()).toLowerCase();
+        CheckedRunnable<IOException> checkSha256Hook = () -> {
+          if (!amzContentSha256Header.equals(actualSha256)) {
+            throw S3ErrorTable.newError(S3ErrorTable.X_AMZ_CONTENT_SHA256_MISMATCH, keyPath);
+          }
+        };
+        preCommits.add(checkSha256Hook);
+      }
+
+      streamOutput.getKeyDataStreamOutput().setPreCommits(preCommits);
     }
-    return Pair.of(eTag, writeLen);
+    return Pair.of(md5Hash, writeLen);
   }
 
   @SuppressWarnings("checkstyle:ParameterNumber")
@@ -161,7 +201,7 @@ final class ObjectEndpointStreaming {
   @SuppressWarnings("checkstyle:ParameterNumber")
   public static Response createMultipartKey(OzoneBucket ozoneBucket, String key,
       long length, int partNumber, String uploadID, int chunkSize,
-      DigestInputStream body, PerformanceStringBuilder perf)
+      MultiDigestInputStream body, PerformanceStringBuilder perf, HttpHeaders headers)
       throws IOException, OS3Exception {
     long startNanos = Time.monotonicNowNanos();
     String eTag;
@@ -172,7 +212,14 @@ final class ObjectEndpointStreaming {
         long putLength =
             writeToStreamOutput(streamOutput, body, chunkSize, length);
         eTag = DatatypeConverter.printHexBinary(
-            body.getMessageDigest().digest()).toLowerCase();
+            body.getMessageDigest(OzoneConsts.MD5_HASH).digest()).toLowerCase();
+        String clientContentMD5 = headers.getHeaderString(S3Consts.CHECKSUM_HEADER);
+        if (clientContentMD5 != null) {
+          CheckedRunnable<IOException> checkContentMD5Hook = () -> {
+            S3Utils.validateContentMD5(clientContentMD5, eTag, key);
+          };
+          streamOutput.getKeyDataStreamOutput().setPreCommits(Collections.singletonList(checkContentMD5Hook));
+        }
         ((KeyMetadataAware)streamOutput).getMetadata().put(OzoneConsts.ETAG, eTag);
         METRICS.incPutKeySuccessLength(putLength);
         perf.appendMetaLatencyNanos(metadataLatencyNs);
@@ -189,6 +236,8 @@ final class ObjectEndpointStreaming {
       }
       throw ex;
     }
-    return Response.ok().header(OzoneConsts.ETAG, eTag).build();
+    return Response.ok()
+        .header(HttpHeaders.ETAG, wrapInQuotes(eTag))
+        .build();
   }
 }

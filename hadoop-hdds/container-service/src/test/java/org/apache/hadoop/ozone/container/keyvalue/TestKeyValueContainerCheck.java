@@ -38,7 +38,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
@@ -197,12 +196,11 @@ public class TestKeyValueContainerCheck
     // Write the new tree into the container, as the scanner would do.
     ContainerChecksumTreeManager checksumManager = new ContainerChecksumTreeManager(conf);
     KeyValueContainerData containerData = container.getContainerData();
-    checksumManager.writeContainerDataTree(containerData, result.getDataTree());
     // This will read the corrupted tree from the disk, which represents the current state of the container, and
     // compare it against the original healthy tree. The diff we get back should match the failures we injected.
-    Optional<ContainerProtos.ContainerChecksumInfo> generatedChecksumInfo = checksumManager.read(containerData);
-    assertTrue(generatedChecksumInfo.isPresent());
-    ContainerDiffReport diffReport = checksumManager.diff(generatedChecksumInfo.get(), healthyChecksumInfo);
+    ContainerProtos.ContainerChecksumInfo generatedChecksumInfo =
+        checksumManager.updateTree(containerData, result.getDataTree());
+    ContainerDiffReport diffReport = checksumManager.diff(generatedChecksumInfo, healthyChecksumInfo);
 
     LOG.info("Diff of healthy container with actual container {}", diffReport);
 

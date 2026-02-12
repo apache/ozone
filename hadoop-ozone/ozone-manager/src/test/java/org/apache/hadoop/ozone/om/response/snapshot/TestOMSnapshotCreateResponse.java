@@ -18,10 +18,13 @@
 package org.apache.hadoop.ozone.om.response.snapshot;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.getSnapshotPath;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
@@ -37,9 +40,12 @@ import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
+import org.apache.hadoop.ozone.om.OmSnapshotManager;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateSnapshotResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -68,7 +74,13 @@ public class TestOMSnapshotCreateResponse {
     String fsPath = folder.getAbsolutePath();
     ozoneConfiguration.set(OMConfigKeys.OZONE_OM_DB_DIRS,
         fsPath);
-    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, null);
+    OzoneManager ozoneManager = mock(OzoneManager.class);
+    OmSnapshotManager omSnapshotManager = mock(OmSnapshotManager.class);
+    OmSnapshotLocalDataManager snapshotLocalDataManager = mock(OmSnapshotLocalDataManager.class);
+    when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
+    when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
+    when(omSnapshotManager.getSnapshotLocalDataManager()).thenReturn(snapshotLocalDataManager);
+    omMetadataManager = new OmMetadataManagerImpl(ozoneConfiguration, ozoneManager);
     batchOperation = omMetadataManager.getStore().initBatchOperation();
   }
 
@@ -77,6 +89,7 @@ public class TestOMSnapshotCreateResponse {
     if (batchOperation != null) {
       batchOperation.close();
     }
+    omMetadataManager.getStore().close();
   }
 
   @ParameterizedTest
@@ -102,6 +115,8 @@ public class TestOMSnapshotCreateResponse {
         addTestKeysToDeletedTable(volumeName, bucketName, numberOfKeys);
     Set<String> ddtSentinelKeys =
         addTestKeysToDeletedDirTable(volumeName, bucketName, numberOfKeys);
+    Set<String> srtSentinelKeys =
+        addTestKeysToSnapshotRenameTable(volumeName, bucketName, numberOfKeys);
 
     // commit to table
     OMSnapshotCreateResponse omSnapshotCreateResponse =
@@ -116,7 +131,7 @@ public class TestOMSnapshotCreateResponse {
     omMetadataManager.getStore().commitBatchOperation(batchOperation);
 
     // Confirm snapshot directory was created
-    String snapshotDir = getSnapshotPath(ozoneConfiguration, snapshotInfo);
+    String snapshotDir = getSnapshotPath(ozoneConfiguration, snapshotInfo, 0);
     assertTrue((new File(snapshotDir)).exists());
 
     // Confirm table has 1 entry
@@ -136,6 +151,7 @@ public class TestOMSnapshotCreateResponse {
     // Check deletedTable and deletedDirectoryTable clean up work as expected
     verifyEntriesLeftInDeletedTable(dtSentinelKeys);
     verifyEntriesLeftInDeletedDirTable(ddtSentinelKeys);
+    verifyEntriesLeftInSnapshotRenameTable(srtSentinelKeys);
   }
 
   private Set<String> addTestKeysToDeletedTable(String volumeName,
@@ -244,6 +260,43 @@ public class TestOMSnapshotCreateResponse {
     return sentinelKeys;
   }
 
+  private Set<String> addTestKeysToSnapshotRenameTable(String volumeName,
+                                                String bucketName,
+                                                int numberOfKeys)
+      throws IOException {
+
+    // Add snapshotRenameTable key entries that "surround" the snapshot scope
+    Set<String> sentinelKeys = new HashSet<>();
+    final String srtKeyPfx = omMetadataManager.getBucketKey(volumeName, bucketName);
+    final String srtBucketKey = omMetadataManager.getBucketKey(volumeName, bucketName) + OM_KEY_PREFIX;
+    final int offset = srtKeyPfx.length() - 1;
+    char bucketIdLastChar = srtKeyPfx.charAt(offset);
+
+    String srtBucketKeyBefore = srtKeyPfx.substring(0, offset) + (char) (bucketIdLastChar - 1) + OM_KEY_PREFIX;
+    for (int i = 0; i < 3; i++) {
+      String srtKey = srtBucketKeyBefore + "srtkey" + i + "a";
+      omMetadataManager.getSnapshotRenamedTable().put(srtKey, srtBucketKeyBefore + "srtkey" + i + "b");
+      sentinelKeys.add(srtKey);
+    }
+
+    String srtBucketKeyAfter = srtKeyPfx.substring(0, offset) + (char) (bucketIdLastChar + 1) + OM_KEY_PREFIX;
+    for (int i = 0; i < 3; i++) {
+      String srtKey = srtBucketKeyAfter + "srtkey" + i + "a";
+      omMetadataManager.getSnapshotRenamedTable().put(srtKey, srtBucketKeyAfter + "srtkey" + i + "b");
+      sentinelKeys.add(srtKey);
+    }
+
+    // Add key entries in the snapshot (bucket) scope
+    for (int i = 0; i < numberOfKeys; i++) {
+      String srtKey = srtBucketKey + "srtkey" + i + "a";
+      omMetadataManager.getSnapshotRenamedTable().put(srtKey, srtBucketKey + "srtkey" + i + "b");
+      // These are the keys that should be deleted.
+      // Thus not added to sentinelKeys list.
+    }
+
+    return sentinelKeys;
+  }
+
   private void verifyEntriesLeftInDeletedTable(Set<String> expectedKeys)
       throws IOException {
     // Only keys inside the snapshot scope would be deleted from deletedTable.
@@ -253,6 +306,12 @@ public class TestOMSnapshotCreateResponse {
   private void verifyEntriesLeftInDeletedDirTable(Set<String> expectedKeys)
       throws IOException {
     verifyEntriesLeftInTable(omMetadataManager.getDeletedDirTable(),
+        expectedKeys);
+  }
+
+  private void verifyEntriesLeftInSnapshotRenameTable(Set<String> expectedKeys)
+      throws IOException {
+    verifyEntriesLeftInTable(omMetadataManager.getSnapshotRenamedTable(),
         expectedKeys);
   }
 

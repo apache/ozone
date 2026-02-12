@@ -48,6 +48,7 @@ import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
+import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
@@ -60,18 +61,16 @@ import org.junit.jupiter.api.io.TempDir;
  * Unit test for ClusterStateEndpoint ContainerStateCounts.
  */
 public class TestClusterStateEndpoint extends AbstractReconSqlDBTest {
+
+  private static final long KEY_COUNT = 5L;
+
   @TempDir
   private Path temporaryFolder;
-  private OzoneStorageContainerManager ozoneStorageContainerManager;
-  private ContainerHealthSchemaManager containerHealthSchemaManager;
   private ClusterStateEndpoint clusterStateEndpoint;
   private ReconContainerManager reconContainerManager;
-  private ReconPipelineManager reconPipelineManager;
-  private ReconOMMetadataManager reconOMMetadataManager;
   private Pipeline pipeline;
   private PipelineID pipelineID;
   private OzoneConfiguration conf;
-  private long keyCount = 5L;
   private int count = 0;
   private static final int NUM_OPEN_CONTAINERS = 3;
   private static final int NUM_DELETED_CONTAINERS = 4;
@@ -83,7 +82,7 @@ public class TestClusterStateEndpoint extends AbstractReconSqlDBTest {
 
   @BeforeEach
   public void setUp() throws Exception {
-    reconOMMetadataManager = getTestReconOmMetadataManager(
+    ReconOMMetadataManager reconOMMetadataManager = getTestReconOmMetadataManager(
         initializeNewOmMetadataManager(Files.createDirectory(
             temporaryFolder.resolve("JunitOmDBDir")).toFile()),
         Files.createDirectory(temporaryFolder.resolve("NewDir")).toFile());
@@ -102,19 +101,21 @@ public class TestClusterStateEndpoint extends AbstractReconSqlDBTest {
             .addBinding(ClusterStateEndpoint.class)
             .addBinding(ContainerHealthSchemaManager.class)
             .build();
-    ozoneStorageContainerManager =
+    OzoneStorageContainerManager ozoneStorageContainerManager =
         reconTestInjector.getInstance(OzoneStorageContainerManager.class);
     reconContainerManager = (ReconContainerManager)
         ozoneStorageContainerManager.getContainerManager();
-    reconPipelineManager = (ReconPipelineManager)
-        ozoneStorageContainerManager.getPipelineManager();
-    containerHealthSchemaManager =
+    ReconPipelineManager reconPipelineManager = (ReconPipelineManager)
+                                                    ozoneStorageContainerManager.getPipelineManager();
+    ContainerHealthSchemaManager containerHealthSchemaManager =
         reconTestInjector.getInstance(ContainerHealthSchemaManager.class);
     GlobalStatsDao globalStatsDao = getDao(GlobalStatsDao.class);
+    ReconGlobalStatsManager reconGlobalStatsManager = 
+        reconTestInjector.getInstance(ReconGlobalStatsManager.class);
     conf = mock(OzoneConfiguration.class);
     clusterStateEndpoint =
-        new ClusterStateEndpoint(ozoneStorageContainerManager, globalStatsDao,
-            containerHealthSchemaManager, conf);
+        new ClusterStateEndpoint(ozoneStorageContainerManager, globalStatsDao, 
+            reconGlobalStatsManager, containerHealthSchemaManager, conf);
     pipeline = getRandomPipeline();
     pipelineID = pipeline.getId();
     reconPipelineManager.addPipeline(pipeline);
@@ -169,7 +170,7 @@ public class TestClusterStateEndpoint extends AbstractReconSqlDBTest {
                 HddsProtos.ReplicationFactor.THREE))
         .setState(state)
         .setOwner("owner1")
-        .setNumberOfKeys(keyCount)
+        .setNumberOfKeys(KEY_COUNT)
         .setPipelineID(pipelineID)
         .build();
   }
