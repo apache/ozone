@@ -1156,6 +1156,16 @@
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
+        <artifactId>ozone-cli-debug</artifactId>
+        <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
+        <artifactId>ozone-cli-repair</artifactId>
+        <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
         <artifactId>ozone-cli-shell</artifactId>
         <version>${ozone.version}</version>
       </dependency>
@@ -2012,6 +2022,13 @@
                     <reason>Use similar class from Apache Commons Lang</reason>
                     <bannedImports>
                       <bannedImport>org.eclipse.jetty.util.StringUtil</bannedImport>
+                    </bannedImports>
+                  </restrictImports>
+                  <restrictImports>
+                    <includeTestCode>true</includeTestCode>
+                    <reason>Avoid using private API</reason>
+                    <bannedImports>
+                      <bannedImport>io.netty.util.internal.**</bannedImport>
                     </bannedImports>
                   </restrictImports>
                 </rules>

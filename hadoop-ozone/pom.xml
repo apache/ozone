@@ -26,6 +26,8 @@
   <description>Apache Ozone Project</description>
   <modules>
     <module>cli-admin</module>
+    <module>cli-debug</module>
+    <module>cli-repair</module>
     <module>cli-shell</module>
     <module>client</module>
     <module>common</module>
