@@ -47,7 +47,7 @@ public class SafeModeMetrics {
 
   // Pipeline metrics for safemode
   private @Metric MutableGaugeLong numHealthyPipelinesThreshold;
-  private @Metric MutableCounterLong currentHealthyPipelinesCount;
+  private @Metric MutableGaugeLong currentHealthyPipelinesCount;
   private @Metric MutableGaugeLong
       numPipelinesWithAtleastOneReplicaReportedThreshold;
   private @Metric MutableCounterLong
@@ -68,8 +68,8 @@ public class SafeModeMetrics {
     this.numHealthyPipelinesThreshold.set(val);
   }
 
-  public void incCurrentHealthyPipelinesCount() {
-    this.currentHealthyPipelinesCount.incr();
+  public void setNumCurrentHealthyPipelines(long val) {
+    this.currentHealthyPipelinesCount.set(val);
   }
 
   public void setNumPipelinesWithAtleastOneReplicaReportedThreshold(long val) {
@@ -117,7 +117,7 @@ public class SafeModeMetrics {
     return numHealthyPipelinesThreshold;
   }
 
-  MutableCounterLong getCurrentHealthyPipelinesCount() {
+  MutableGaugeLong getCurrentHealthyPipelinesCount() {
     return currentHealthyPipelinesCount;
   }
 
