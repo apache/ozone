@@ -26,13 +26,10 @@ import jakarta.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
-import java.util.Queue;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import org.apache.commons.io.FileUtils;
@@ -110,11 +107,6 @@ public class HddsVolume extends StorageVolume {
   private final AtomicBoolean dbLoaded = new AtomicBoolean(false);
   private final AtomicBoolean dbLoadFailure = new AtomicBoolean(false);
 
-  private final int volumeTestCount;
-  private final int volumeTestFailureTolerance;
-  private AtomicInteger volumeTestFailureCount;
-  private Queue<Boolean> volumeTestResultQueue;
-
   /**
    * Builder for HddsVolume.
    */
@@ -147,11 +139,6 @@ public class HddsVolume extends StorageVolume {
       this.volumeInfoMetrics =
           new VolumeInfoMetrics(b.getVolumeRootStr(), this);
 
-      this.volumeTestCount = getDatanodeConfig().getVolumeIOTestCount();
-      this.volumeTestFailureTolerance = getDatanodeConfig().getVolumeIOFailureTolerance();
-      this.volumeTestFailureCount = new AtomicInteger(0);
-      this.volumeTestResultQueue = new LinkedList<>();
-
       initialize();
     } else {
       // Builder is called with failedVolume set, so create a failed volume
@@ -159,8 +146,6 @@ public class HddsVolume extends StorageVolume {
       this.setState(VolumeState.FAILED);
       volumeIOStats = null;
       volumeInfoMetrics = new VolumeInfoMetrics(b.getVolumeRootStr(), this);
-      this.volumeTestCount = 0;
-      this.volumeTestFailureTolerance = 0;
     }
 
     LOG.info("HddsVolume: {}", getReport());
@@ -322,38 +307,32 @@ public class HddsVolume extends StorageVolume {
 
   @VisibleForTesting
   public VolumeCheckResult checkDbHealth(File dbFile) throws InterruptedException {
-    if (volumeTestCount == 0) {
+    if (getIoTestCount() == 0) {
       return VolumeCheckResult.HEALTHY;
     }
 
-    final boolean isVolumeTestResultHealthy = true;
     try (ManagedOptions managedOptions = new ManagedOptions();
-         ManagedRocksDB ignored = ManagedRocksDB.openReadOnly(managedOptions, dbFile.toString())) {
-      volumeTestResultQueue.add(isVolumeTestResultHealthy);
+         ManagedRocksDB readOnlyDb = ManagedRocksDB.openReadOnly(managedOptions, dbFile.toString())) {
+      // Do nothing. Only check if rocksdb is accessible.
+      LOG.debug("Successfully opened the database at \"{}\" for HDDS volume {}.", dbFile, getStorageDir());
     } catch (Exception e) {
       if (Thread.currentThread().isInterrupted()) {
         throw new InterruptedException("Check of database for volume " + this + " interrupted.");
       }
       LOG.warn("Could not open Volume DB located at {}", dbFile, e);
-      volumeTestResultQueue.add(!isVolumeTestResultHealthy);
-      volumeTestFailureCount.incrementAndGet();
+      getIoTestSlidingWindow().add();
     }
 
-    if (volumeTestResultQueue.size() > volumeTestCount
-        && (Boolean.TRUE.equals(volumeTestResultQueue.poll()) != isVolumeTestResultHealthy)) {
-      volumeTestFailureCount.decrementAndGet();
-    }
-
-    if (volumeTestFailureCount.get() > volumeTestFailureTolerance) {
+    if (getIoTestSlidingWindow().isExceeded()) {
       LOG.error("Failed to open the database at \"{}\" for HDDS volume {}: " +
-              "the last {} runs encountered {} out of {} tolerated failures.",
-          dbFile, this, volumeTestResultQueue.size(), volumeTestFailureCount.get(), volumeTestFailureTolerance);
+              "encountered more than the {} tolerated failures.",
+          dbFile, this, getIoTestSlidingWindow().getWindowSize());
       return VolumeCheckResult.FAILED;
     }
 
     LOG.debug("Successfully opened the database at \"{}\" for HDDS volume {}: " +
-            "the last {} runs encountered {} out of {} tolerated failures",
-        dbFile, this, volumeTestResultQueue.size(), volumeTestFailureTolerance, volumeTestFailureTolerance);
+            "encountered {} out of {} tolerated failures",
+        dbFile, this, getIoTestSlidingWindow().getNumEventsInWindow(), getIoTestSlidingWindow().getWindowSize());
     return VolumeCheckResult.HEALTHY;
   }
 
