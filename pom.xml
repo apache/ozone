@@ -1027,6 +1027,11 @@
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
+        <artifactId>hdds-cli-common</artifactId>
+        <version>${hdds.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
         <artifactId>hdds-client</artifactId>
         <version>${hdds.version}</version>
       </dependency>
