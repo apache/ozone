@@ -2093,14 +2093,11 @@ public class KeyValueHandler extends Handler {
     try {
       final long startTime = Time.monotonicNow();
       final long bytesRead = readBlockImpl(request, blockFile, kvContainer, streamObserver, false);
-      long endTime = Time.monotonicNow();
       KeyValueContainerData containerData = (KeyValueContainerData) kvContainer
           .getContainerData();
       HddsVolume volume = containerData.getVolume();
       if (volume != null) {
-        volume.getVolumeIOStats().incReadTime(endTime - startTime);
-        volume.getVolumeIOStats().incReadOpCount();
-        volume.getVolumeIOStats().incReadBytes(bytesRead);
+        volume.getVolumeIOStats().recordReadOperation(startTime, bytesRead);
       }
       metrics.incContainerBytesStats(Type.ReadBlock, bytesRead);
     } catch (StorageContainerException ex) {
