@@ -342,7 +342,7 @@ const Capacity: React.FC<object> = () => {
             ),
             value: (
               omPendingDeletes.data.totalSize
-              + scmPendingDeletes.data.totalBlocksize
+              + scmPendingDeletes.data.totalReplicatedBlockSize
               + (dnPendingDeletes.data.totalPendingDeletionSize ?? 0)
             ),
             color: "#10073b"
@@ -367,10 +367,10 @@ const Capacity: React.FC<object> = () => {
               }]
             }, {
               title: 'STORAGE CONTAINER MANAGER',
-              size: scmPendingDeletes.data.totalBlocksize,
+              size: scmPendingDeletes.data.totalReplicatedBlockSize,
               breakdown: [{
                 label: 'BLOCKS',
-                value: scmPendingDeletes.data.totalBlocksize,
+                value: scmPendingDeletes.data.totalReplicatedBlockSize,
                 color: '#f4a233'
               }]
             }, {
