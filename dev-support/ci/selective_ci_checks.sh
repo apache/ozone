@@ -168,6 +168,7 @@ SOURCES_TRIGGERING_TESTS=(
     "^dev-support"
     "^hadoop-hdds"
     "^hadoop-ozone"
+    "^ozone-ui"
     "^pom.xml"
 )
 readonly SOURCES_TRIGGERING_TESTS
@@ -450,7 +451,7 @@ function check_needs_ui_lint() {
         "\\.tsx?$"
         "\\.jsx?$"
     )
-    filter_changed_files
+    filter_changed_files true
 
     if [[ ${match_count} != "0" ]]; then
         ui_lint_needed=true
