@@ -6879,9 +6879,9 @@
     },
     "usedSpaceBreakdown": {
         "openKeyBytes": {
-        "totalOpenKeyBytes": 19255266,
-        "openKeyAndFileBytes": 19255266,
-        "multipartOpenKeyBytes": 0
+          "totalOpenKeyBytes": 19255266,
+          "openKeyAndFileBytes": 19255266,
+          "multipartOpenKeyBytes": 0
         },
         "committedKeyBytes": 1249923,
         "preAllocatedContainerBytes": 1022024
