@@ -383,13 +383,13 @@ public class MutableVolumeSet implements VolumeSet {
     if (maxVolumeFailuresTolerated == StorageVolumeChecker.MAX_VOLUME_FAILURE_TOLERATED_LIMIT) {
       hasEnoughVolumes = !volumeMap.isEmpty();
     } else {
-      hasEnoughVolumes = volumeMap.values().size() <= maxVolumeFailuresTolerated;
+      hasEnoughVolumes = failedVolumeMap.size() <= maxVolumeFailuresTolerated;
     }
     if (!hasEnoughVolumes) {
       LOG.error("Not enough volumes in MutableVolumeSet. DatanodeUUID: {}, VolumeType: {}, " +
               "MaxVolumeFailuresTolerated: {}, ActiveVolumes: {}, FailedVolumes: {}",
           datanodeUuid, volumeType, maxVolumeFailuresTolerated,
-          volumeMap.values().size(), failedVolumeMap.values().size());
+          volumeMap.size(), failedVolumeMap.size());
     }
     return hasEnoughVolumes;
   }
