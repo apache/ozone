@@ -126,13 +126,29 @@ public class ClusterStateEndpoint {
     long fsUsed = 0;
     long fsAvailable = 0;
 
-    for (DatanodeInfo datanode : nodeManager.getAllNodes()) {
+    List<DatanodeInfo> datanodes = nodeManager.getAllNodes();
+    if (datanodes == null || datanodes.isEmpty()) {
+      LOG.warn("No datanodes available for filesystem usage calculation");
+      // Set to 0 or -1 to indicate unavailable
+    }
+    int reportedNodes = 0;
+    int totalNodes = datanodes.size();
+
+    for (DatanodeInfo datanode : datanodes) {
       SpaceUsageSource.Fixed fsUsage = nodeManager.getTotalFilesystemUsage(datanode);
       if (fsUsage != null) {
         fsCapacity += fsUsage.getCapacity();
         fsAvailable += fsUsage.getAvailable();
         fsUsed += fsUsage.getUsedSpace();
+        reportedNodes++;
+      } else {
+        LOG.debug("Datanode {} has not reported filesystem usage",
+            datanode.getUuid());
       }
+    }
+    if (reportedNodes < totalNodes) {
+      LOG.warn("Filesystem usage incomplete: {}/{} datanodes reported",
+          reportedNodes, totalNodes);
     }
 
     ClusterStorageReport storageReport = ClusterStorageReport.newBuilder()

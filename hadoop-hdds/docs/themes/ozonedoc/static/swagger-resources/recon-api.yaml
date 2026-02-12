@@ -1764,7 +1764,7 @@ components:
             - 0
             - 100
             - 40
-    StorageReport:
+    DataNodeStorageReport:
       type: object
       properties:
         datanodeUuid:
@@ -1908,7 +1908,7 @@ components:
                 type: number
                 example: 1605738400544
               storageReport:
-                $ref: "#/components/schemas/StorageReport"
+                $ref: "#/components/schemas/DataNodeStorageReport"
               pipelines:
                 type: array
                 items:
