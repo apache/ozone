@@ -125,30 +125,28 @@ public class ClusterStateEndpoint {
     long fsCapacity = 0;
     long fsUsed = 0;
     long fsAvailable = 0;
-
-    List<DatanodeInfo> datanodes = nodeManager.getAllNodes();
-    if (datanodes == null || datanodes.isEmpty()) {
-      LOG.warn("No datanodes available for filesystem usage calculation");
-      // Set to 0 or -1 to indicate unavailable
-    }
-    int reportedNodes = 0;
-    int totalNodes = datanodes.size();
-
-    for (DatanodeInfo datanode : datanodes) {
-      SpaceUsageSource.Fixed fsUsage = nodeManager.getTotalFilesystemUsage(datanode);
-      if (fsUsage != null) {
-        fsCapacity += fsUsage.getCapacity();
-        fsAvailable += fsUsage.getAvailable();
-        fsUsed += fsUsage.getUsedSpace();
-        reportedNodes++;
-      } else {
-        LOG.debug("Datanode {} has not reported filesystem usage",
-            datanode.getUuid());
+    List<DatanodeInfo> dataNodes = nodeManager.getAllNodes();
+    if (dataNodes == null || dataNodes.isEmpty()) {
+      LOG.warn("No dataNodes available for filesystem usage calculation");
+    } else {
+      int reportedNodes = 0;
+      int totalNodes = dataNodes.size();
+      for (DatanodeInfo datanode : dataNodes) {
+        SpaceUsageSource.Fixed fsUsage = nodeManager.getTotalFilesystemUsage(datanode);
+        if (fsUsage != null) {
+          fsCapacity += fsUsage.getCapacity();
+          fsAvailable += fsUsage.getAvailable();
+          fsUsed += fsUsage.getUsedSpace();
+          reportedNodes++;
+        } else {
+          LOG.debug("DataNode {} has not reported filesystem usage",
+              datanode.getUuidString());
+        }
       }
-    }
-    if (reportedNodes < totalNodes) {
-      LOG.warn("Filesystem usage incomplete: {}/{} datanodes reported",
-          reportedNodes, totalNodes);
+      if (reportedNodes < totalNodes) {
+        LOG.warn("Filesystem usage incomplete: {}/{} dataNodes reported",
+            reportedNodes, totalNodes);
+      }
     }
 
     ClusterStorageReport storageReport = ClusterStorageReport.newBuilder()
