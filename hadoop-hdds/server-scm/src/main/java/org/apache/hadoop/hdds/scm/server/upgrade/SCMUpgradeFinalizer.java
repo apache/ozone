@@ -18,12 +18,19 @@
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
 import java.io.IOException;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
+import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
+import org.apache.ratis.protocol.exceptions.NotLeaderException;
 
 /**
  * UpgradeFinalizer for the Storage Container Manager service.
@@ -102,8 +109,91 @@ public class SCMUpgradeFinalizer extends
         context.getFinalizationStateManager();
     if (!stateManager.crossedCheckpoint(
         FinalizationCheckpoint.FINALIZATION_COMPLETE)) {
+      waitForDatanodesToFinalize(context);
       stateManager.removeFinalizingMark();
     }
   }
 
+  /**
+   * Wait for all HEALTHY datanodes to complete finalization before finishing
+   * SCM finalization. This ensures that when the client receives a
+   * FINALIZATION_DONE status, all healthy datanodes have also finalized.
+   *
+   * A datanode is considered finalized when its metadata layout version (MLV)
+   * equals its software layout version (SLV), indicating it has completed
+   * processing all layout features.
+   *
+   * @param context The finalization context containing node manager reference
+   * @throws SCMException if waiting is interrupted or SCM loses leadership
+   * @throws NotLeaderException if SCM is no longer the leader
+   */
+  private void waitForDatanodesToFinalize(SCMUpgradeFinalizationContext context)
+      throws SCMException, NotLeaderException {
+    NodeManager nodeManager = context.getNodeManager();
+
+    LOG.info("Waiting for all HEALTHY datanodes to complete finalization " +
+        "before finishing SCM finalization.");
+
+    boolean allDatanodesFinalized = false;
+    while (!allDatanodesFinalized) {
+      // Break out of the wait and step down from driving finalization if this
+      // SCM is no longer the leader by throwing NotLeaderException.
+      context.getSCMContext().getTermOfLeader();
+
+      allDatanodesFinalized = true;
+      int totalHealthyNodes = 0;
+      int finalizedNodes = 0;
+      int unfinalizedNodes = 0;
+
+      for (DatanodeDetails dn : nodeManager.getAllNodes()) {
+        try {
+          // Only check HEALTHY nodes. STALE/DEAD nodes will be told to
+          // finalize when they recover.
+          if (nodeManager.getNodeStatus(dn).isHealthy()) {
+            totalHealthyNodes++;
+            DatanodeInfo datanodeInfo = nodeManager.getDatanodeInfo(dn);
+            if (datanodeInfo == null) {
+              LOG.warn("Could not get DatanodeInfo for {}, skipping in " +
+                  "finalization wait.", dn.getHostName());
+              continue;
+            }
+
+            LayoutVersionProto dnLayout = datanodeInfo.getLastKnownLayoutVersion();
+            int dnMlv = dnLayout.getMetadataLayoutVersion();
+            int dnSlv = dnLayout.getSoftwareLayoutVersion();
+
+            if (dnMlv < dnSlv) {
+              // Datanode has not yet finalized
+              allDatanodesFinalized = false;
+              unfinalizedNodes++;
+              LOG.debug("Datanode {} has not yet finalized: MLV={}, SLV={}",
+                  dn.getHostName(), dnMlv, dnSlv);
+            } else {
+              finalizedNodes++;
+            }
+          }
+        } catch (NodeNotFoundException e) {
+          // Node was removed while we were iterating. This is OK, skip it.
+          LOG.debug("Node {} not found while waiting for finalization, " +
+              "skipping.", dn);
+        }
+      }
+
+      if (!allDatanodesFinalized) {
+        LOG.info("Waiting for datanodes to finalize. Status: {}/{} healthy " +
+                "datanodes have finalized ({} remaining).",
+            finalizedNodes, totalHealthyNodes, unfinalizedNodes);
+        try {
+          Thread.sleep(5000);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw new SCMException("Interrupted while waiting for datanodes to " +
+              "finalize.", SCMException.ResultCodes.INTERNAL_ERROR);
+        }
+      } else {
+        LOG.info("All {} HEALTHY datanodes have completed finalization.",
+            totalHealthyNodes);
+      }
+    }
+  }
 }

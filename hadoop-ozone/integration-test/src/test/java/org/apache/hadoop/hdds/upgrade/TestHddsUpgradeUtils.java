@@ -128,9 +128,9 @@ public final class TestHddsUpgradeUtils {
       fail("Timeout waiting for Upgrade to complete on SCM.");
     }
 
-    // SCM will not return from finalization until there is at least one
-    // RATIS 3 pipeline. For this to exist, all three of our datanodes must
-    // be in the HEALTHY state.
+    // SCM will not return from finalization until all HEALTHY datanodes
+    // have completed their finalization (MLV == SLV). This ensures datanodes
+    // are ready to serve requests even though containers may remain OPEN.
     testDataNodesStateOnSCM(scm, numDatanodes, HEALTHY, HEALTHY_READONLY);
 
     int countContainers = 0;
@@ -138,7 +138,10 @@ public final class TestHddsUpgradeUtils {
       HddsProtos.LifeCycleState ciState = ci.getState();
       LOG.info("testPostUpgradeConditionsSCM: container state is {}",
           ciState.name());
-      assertTrue((ciState == HddsProtos.LifeCycleState.CLOSED) ||
+      // Containers can now be in any state since we no longer close pipelines
+      // during finalization. OPEN containers are permitted.
+      assertTrue((ciState == HddsProtos.LifeCycleState.OPEN) ||
+          (ciState == HddsProtos.LifeCycleState.CLOSED) ||
           (ciState == HddsProtos.LifeCycleState.CLOSING) ||
           (ciState == HddsProtos.LifeCycleState.DELETING) ||
           (ciState == HddsProtos.LifeCycleState.DELETED) ||
@@ -182,10 +185,12 @@ public final class TestHddsUpgradeUtils {
       ContainerProtos.ContainerDataProto.State... validClosedContainerStates) {
     List<ContainerProtos.ContainerDataProto.State> closeStates =
         Arrays.asList(validClosedContainerStates);
-    // Allow closed and quasi closed containers as valid closed containers by
-    // default.
+    // Allow closed, quasi closed, and OPEN containers as valid states by
+    // default. In the new finalization flow, containers are not forced to
+    // close, so OPEN containers are acceptable.
     if (closeStates.isEmpty()) {
-      closeStates = Arrays.asList(CLOSED, QUASI_CLOSED);
+      closeStates = Arrays.asList(CLOSED, QUASI_CLOSED,
+          ContainerProtos.ContainerDataProto.State.OPEN);
     }
 
     try {
@@ -217,7 +222,7 @@ public final class TestHddsUpgradeUtils {
           dnVersionManager.getMetadataLayoutVersion());
       assertThat(dnVersionManager.getMetadataLayoutVersion()).isGreaterThanOrEqualTo(1);
 
-      // Also verify that all the existing containers are closed.
+      // Verify containers are in acceptable states (OPEN is now allowed).
       for (Container<?> container :
           dsm.getContainer().getController().getContainers()) {
         assertTrue(closeStates.stream().anyMatch(
