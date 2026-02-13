@@ -38,14 +38,20 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmLifecycleConfiguration;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
+import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
+import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
+import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.response.lifecycle.OMLifecycleConfigurationSetResponse;
+import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.LifecycleConfiguration;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetLifecycleConfigurationRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetLifecycleConfigurationResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
+import org.apache.hadoop.ozone.request.validation.RequestProcessingPhase;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.slf4j.Logger;
@@ -196,5 +202,22 @@ public class OMLifecycleConfigurationSetRequest extends OMClientRequest {
           "in volume:{}", bucketName, volumeName, exception);
       return omClientResponse;
     }
+  }
+
+  @RequestFeatureValidator(
+      conditions = ValidationCondition.CLUSTER_NEEDS_FINALIZATION,
+      processingPhase = RequestProcessingPhase.PRE_PROCESS,
+      requestType = Type.SetLifecycleConfiguration
+  )
+  public static OMRequest disallowSetLifecycleConfigurationBeforeFinalization(
+      OMRequest req, ValidationContext ctx) throws OMException {
+    if (!ctx.versionManager()
+        .isAllowed(OMLayoutFeature.LIFECYCLE_SUPPORT)) {
+      throw new OMException("Cluster does not have the Lifecycle Support"
+          + " feature finalized yet. Rejecting the request to set lifecycle"
+          + " configuration. Please finalize the cluster upgrade and then try again.",
+          OMException.ResultCodes.NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
+    }
+    return req;
   }
 }
