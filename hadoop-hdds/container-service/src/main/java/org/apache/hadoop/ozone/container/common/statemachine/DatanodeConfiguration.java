@@ -309,7 +309,9 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       defaultValue = "60",
       type = ConfigType.LONG,
       tags = { DATANODE },
-      description = "Periodic disk check run interval in minutes."
+      description = "Periodic disk check run interval in minutes. " +
+          "A negative value disables periodic disk checks. " +
+          "A value of 0 is invalid and defaults to 60."
   )
   private long periodicDiskCheckIntervalMinutes =
       PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT;
@@ -602,13 +604,11 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       containerCloseThreads = CONTAINER_CLOSE_THREADS_DEFAULT;
     }
 
-    if (periodicDiskCheckIntervalMinutes < 1) {
-      LOG.warn(PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY +
-              " must be greater than zero and was set to {}. Defaulting to {}",
-          periodicDiskCheckIntervalMinutes,
+    if (periodicDiskCheckIntervalMinutes == 0) {
+      LOG.warn("{} must not be zero. Defaulting to {}",
+          PERIODIC_DISK_CHECK_INTERVAL_MINUTES_KEY,
           PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT);
-      periodicDiskCheckIntervalMinutes =
-          PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT;
+      periodicDiskCheckIntervalMinutes = PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT;
     }
 
     if (failedDataVolumesTolerated < -1) {
