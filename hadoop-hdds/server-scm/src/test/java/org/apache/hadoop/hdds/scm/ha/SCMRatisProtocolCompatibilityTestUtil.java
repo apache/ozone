@@ -17,19 +17,22 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
-import com.google.protobuf.ByteString;
-import org.apache.hadoop.hdds.protocol.proto.testing.Proto2SCMRatisProtocolForTesting;
-
-import java.nio.ByteBuffer;
-
 import static org.apache.hadoop.hdds.scm.ha.TestSCMRatisProtocolCompatibility.RANDOM;
 import static org.apache.hadoop.hdds.scm.ha.TestSCMRatisProtocolCompatibility.TYPES;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.google.protobuf.ByteString;
+import java.nio.ByteBuffer;
+import org.apache.hadoop.hdds.protocol.proto.testing.Proto2SCMRatisProtocolForTesting;
+
 /**
  * Tests proto2 to proto3 compatibility for SCMRatisProtocol.
  */
-public class SCMRatisProtocolCompatibilityTestUtil {
+public final class SCMRatisProtocolCompatibilityTestUtil {
+
+  private SCMRatisProtocolCompatibilityTestUtil() {
+  }
+
   static <T> ByteString randomValueProto2(Class<T> clazz) {
     if (clazz == String.class) {
       final int length = RANDOM.nextInt(3);
