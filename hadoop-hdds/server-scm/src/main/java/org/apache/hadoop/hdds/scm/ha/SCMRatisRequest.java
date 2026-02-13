@@ -113,9 +113,7 @@ public final class SCMRatisRequest {
     methodBuilder.addAllArgs(args);
     requestProtoBuilder.setMethod(methodBuilder.build());
     final SCMRatisRequestProto requestProto = requestProtoBuilder.build();
-    return Message.valueOf(
-        UnsafeByteOperations.unsafeWrap(
-            requestProto.toByteString().asReadOnlyByteBuffer()));
+    return Message.valueOf(requestProto.toByteString());
   }
 
   /**

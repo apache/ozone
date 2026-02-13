@@ -28,28 +28,12 @@ public class ByteStringCodec implements Codec {
   @Override
   public ByteString serialize(Object object)
       throws InvalidProtocolBufferException {
-    if (object instanceof ByteString) {
-      return (ByteString) object;
-    }
-    if (object instanceof com.google.protobuf.ByteString) {
-      com.google.protobuf.ByteString bs = (com.google.protobuf.ByteString) object;
-      return org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations
-          .unsafeWrap(bs.asReadOnlyByteBuffer());
-    }
     return (ByteString) object;
   }
 
   @Override
   public Object deserialize(Class<?> type, ByteString value)
       throws InvalidProtocolBufferException {
-    if (type == ByteString.class || ByteString.class.isAssignableFrom(type)) {
-      return value;
-    }
-    if (type == com.google.protobuf.ByteString.class
-        || com.google.protobuf.ByteString.class.isAssignableFrom(type)) {
-      return com.google.protobuf.UnsafeByteOperations
-          .unsafeWrap(value.asReadOnlyByteBuffer());
-    }
     return value;
   }
 }

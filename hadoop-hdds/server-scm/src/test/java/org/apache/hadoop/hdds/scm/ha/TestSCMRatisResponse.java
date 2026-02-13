@@ -37,6 +37,7 @@ import org.apache.ratis.protocol.exceptions.LeaderNotReadyException;
 import org.apache.ratis.protocol.exceptions.RaftException;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
+import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -108,8 +109,7 @@ public class TestSCMRatisResponse {
     RaftClientReply reply = mock(RaftClientReply.class);
     when(reply.isSuccess()).thenReturn(true);
     when(reply.getMessage()).thenReturn(Message.valueOf(
-        org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations
-            .unsafeWrap(proto.toByteString().asReadOnlyByteBuffer())));
+        UnsafeByteOperations.unsafeWrap(proto.toByteString().asReadOnlyByteBuffer())));
 
     InvalidProtocolBufferException ex = assertThrows(
         InvalidProtocolBufferException.class,
@@ -130,8 +130,7 @@ public class TestSCMRatisResponse {
     RaftClientReply reply = mock(RaftClientReply.class);
     when(reply.isSuccess()).thenReturn(true);
     when(reply.getMessage()).thenReturn(Message.valueOf(
-        org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations
-            .unsafeWrap(proto.toByteString().asReadOnlyByteBuffer())));
+        UnsafeByteOperations.unsafeWrap(proto.toByteString().asReadOnlyByteBuffer())));
 
     InvalidProtocolBufferException ex = assertThrows(
         InvalidProtocolBufferException.class,
