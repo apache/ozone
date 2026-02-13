@@ -396,6 +396,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         responseBuilder.setGetObjectTaggingResponse(getObjectTaggingResponse);
         break;
       case GetLifecycleConfiguration:
+        impl.checkLifecycleEnabled();
         GetLifecycleConfigurationResponse getLifecycleConfigurationResponse =
             infoLifecycleConfiguration(
                 request.getGetLifecycleConfigurationRequest());
@@ -403,6 +404,7 @@ public class OzoneManagerRequestHandler implements RequestHandler {
             getLifecycleConfigurationResponse);
         break;
       case GetLifecycleServiceStatus:
+        impl.checkLifecycleEnabled();
         GetLifecycleServiceStatusResponse getLifecycleServiceStatusResponse =
             impl.getLifecycleServiceStatus();
         responseBuilder.setGetLifecycleServiceStatusResponse(

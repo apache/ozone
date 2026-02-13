@@ -433,6 +433,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private static final int SHUTDOWN_HOOK_PRIORITY = 30;
   private final File omMetaDir;
   private boolean isAclEnabled;
+  private final boolean isLifecycleEnabled;
   private final boolean isSpnegoEnabled;
   private final SecurityConfig secConfig;
   private S3SecretManager s3SecretManager;
@@ -674,6 +675,9 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     if (secConfig.isBlockTokenEnabled()) {
       blockTokenMgr = createBlockTokenSecretManager();
     }
+
+    this.isLifecycleEnabled = conf.getBoolean(
+        OZONE_KEY_LIFECYCLE_SERVICE_ENABLED, OZONE_KEY_LIFECYCLE_SERVICE_ENABLED_DEFAULT);
 
     // Enable S3 multi-tenancy if config keys are set
     this.isS3MultiTenancyEnabled =
@@ -1093,6 +1097,24 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     throw new OMException("S3 multi-tenancy feature is not enabled. Please "
         + "set ozone.om.multitenancy.enabled to true and restart all OMs.",
         FEATURE_NOT_ENABLED);
+  }
+
+  /**
+   * Returns true if lifecycle is enabled; false otherwise.
+   */
+  public boolean isLifecycleEnabled() {
+    return isLifecycleEnabled;
+  }
+
+  /**
+   * Throws OMException FEATURE_NOT_ENABLED if lifecycle is not enabled.
+   */
+  public void checkLifecycleEnabled() throws OMException {
+    if (!isLifecycleEnabled()) {
+      throw new OMException("OM Lifecycle feature is not enabled. Please "
+          + "set ozone.om.lifecycle.service.enabled to true and restart all OMs.",
+          FEATURE_NOT_ENABLED);
+    }
   }
 
   /**
@@ -3199,8 +3221,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     KeyLifecycleService keyLifecycleService = keyManager.getKeyLifecycleService();
     if (keyLifecycleService == null) {
       return GetLifecycleServiceStatusResponse.newBuilder()
-          .setIsEnabled(getConfiguration().getBoolean(OZONE_KEY_LIFECYCLE_SERVICE_ENABLED,
-              OZONE_KEY_LIFECYCLE_SERVICE_ENABLED_DEFAULT))
+          .setIsEnabled(isLifecycleEnabled)
           .build();
     }
     return keyLifecycleService.status();
