@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
-import com.google.protobuf.ByteString;
-import com.google.protobuf.InvalidProtocolBufferException;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 
 /**
  * Codec interface to marshall/unmarshall data to/from {@link ByteString}.

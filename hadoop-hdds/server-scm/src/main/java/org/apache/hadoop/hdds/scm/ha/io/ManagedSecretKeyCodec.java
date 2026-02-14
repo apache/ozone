@@ -17,10 +17,11 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
-import com.google.protobuf.ByteString;
-import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
+import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 
 /**
  * A codec for {@link ManagedSecretKey} objects.
@@ -30,14 +31,20 @@ public class ManagedSecretKeyCodec implements Codec {
   public ByteString serialize(Object object)
       throws InvalidProtocolBufferException {
     ManagedSecretKey secretKey = (ManagedSecretKey) object;
-    return secretKey.toProtobuf().toByteString();
+    return UnsafeByteOperations.unsafeWrap(
+        secretKey.toProtobuf().toByteString().asReadOnlyByteBuffer());
   }
 
   @Override
   public Object deserialize(Class<?> type, ByteString value)
       throws InvalidProtocolBufferException {
-    SCMSecretKeyProtocolProtos.ManagedSecretKey message =
-        SCMSecretKeyProtocolProtos.ManagedSecretKey.parseFrom(value);
-    return ManagedSecretKey.fromProtobuf(message);
+    try {
+      SCMSecretKeyProtocolProtos.ManagedSecretKey message =
+          SCMSecretKeyProtocolProtos.ManagedSecretKey.parseFrom(
+              value.asReadOnlyByteBuffer());
+      return ManagedSecretKey.fromProtobuf(message);
+    } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+      throw new InvalidProtocolBufferException("Failed to deserialize value for " + type, e);
+    }
   }
 }

@@ -17,36 +17,34 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
-import com.google.protobuf.Message;
 import java.lang.reflect.InvocationTargetException;
 import org.apache.hadoop.hdds.scm.ha.ReflectionUtil;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
-import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
+import org.apache.ratis.thirdparty.com.google.protobuf.Message;
 
 /**
- * {@link Codec} implementation for non-shaded
- * {@link com.google.protobuf.Message} objects.
+ * {@link Codec} for {@link Message} objects.
  */
-public class GeneratedMessageCodec implements Codec {
+public class ScmGeneratedMessageCodec implements Codec {
 
   @Override
-  public ByteString serialize(Object object)
-      throws InvalidProtocolBufferException {
-    return UnsafeByteOperations.unsafeWrap(
-        ((Message) object).toByteString().asReadOnlyByteBuffer());
+  public ByteString serialize(Object object) throws InvalidProtocolBufferException {
+    return ((Message)object).toByteString();
   }
 
   @Override
-  public Object deserialize(Class<?> type, ByteString value)
+  public Message deserialize(Class<?> type, ByteString value)
       throws InvalidProtocolBufferException {
     try {
-      return ReflectionUtil.getMethod(type, "parseFrom", byte[].class)
+      return (Message) ReflectionUtil.getMethod(type,
+              "parseFrom", byte[].class)
           .invoke(null, (Object) value.toByteArray());
     } catch (NoSuchMethodException | IllegalAccessException
              | InvocationTargetException ex) {
       ex.printStackTrace();
-      throw new InvalidProtocolBufferException("Message cannot be decoded: " + ex.getMessage());
+      throw new InvalidProtocolBufferException(
+          "Message cannot be decoded: " + ex.getMessage());
     }
   }
 }

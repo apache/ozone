@@ -18,9 +18,9 @@
 package org.apache.hadoop.hdds.scm.ha.io;
 
 import com.google.common.primitives.Longs;
-import com.google.protobuf.ByteString;
-import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.ProtoUtils;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
+import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 
 /**
  * {@link Codec} for {@code Long} objects.
@@ -31,7 +31,7 @@ public class LongCodec implements Codec {
   public ByteString serialize(Object object)
       throws InvalidProtocolBufferException {
     // toByteArray returns a new array
-    return ProtoUtils.unsafeByteString(Longs.toByteArray((Long) object));
+    return UnsafeByteOperations.unsafeWrap(Longs.toByteArray((Long) object));
   }
 
   @Override
