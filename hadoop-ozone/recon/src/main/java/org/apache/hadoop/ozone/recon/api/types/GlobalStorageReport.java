@@ -29,33 +29,125 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  */
 public class GlobalStorageReport {
 
-  @JsonProperty("totalUsedSpace")
-  private long totalUsedSpace;
+  @JsonProperty("totalFileSystemCapacity")
+  private long totalFileSystemCapacity;
 
-  @JsonProperty("totalFreeSpace")
-  private long totalFreeSpace;
+  @JsonProperty("totalReservedSpace")
+  private long totalReservedSpace;
 
-  @JsonProperty("totalCapacity")
-  private long totalCapacity;
+  @JsonProperty("totalOzoneCapacity")
+  private long totalOzoneCapacity;
+
+  @JsonProperty("totalOzoneUsedSpace")
+  private long totalOzoneUsedSpace;
+
+  @JsonProperty("totalOzoneFreeSpace")
+  private long totalOzoneFreeSpace;
+
+  @JsonProperty("totalOzonePreAllocatedContainerSpace")
+  private long totalOzonePreAllocatedContainerSpace;
+
+  @JsonProperty("totalMinimumFreeSpace")
+  private long totalMinimumFreeSpace;
+
+  public long getTotalFileSystemCapacity() {
+    return totalFileSystemCapacity;
+  }
+
+  public long getTotalReservedSpace() {
+    return totalReservedSpace;
+  }
+
+  public long getTotalOzoneCapacity() {
+    return totalOzoneCapacity;
+  }
+
+  public long getTotalOzoneUsedSpace() {
+    return totalOzoneUsedSpace;
+  }
+
+  public long getTotalOzoneFreeSpace() {
+    return totalOzoneFreeSpace;
+  }
+
+  public long getTotalOzonePreAllocatedContainerSpace() {
+    return totalOzonePreAllocatedContainerSpace;
+  }
+
+  public long getTotalMinimumFreeSpace() {
+    return totalMinimumFreeSpace;
+  }
 
   public GlobalStorageReport() {
   }
 
-  public GlobalStorageReport(long totalUsedSpace, long totalFreeSpace, long totalCapacity) {
-    this.totalUsedSpace = totalUsedSpace;
-    this.totalFreeSpace = totalFreeSpace;
-    this.totalCapacity = totalCapacity;
+  public GlobalStorageReport(Builder builder) {
+    this.totalFileSystemCapacity = builder.totalReservedSpace + builder.totalOzoneCapacity;
+    this.totalReservedSpace = builder.totalReservedSpace;
+    this.totalOzoneCapacity = builder.totalOzoneCapacity;
+    this.totalOzoneUsedSpace = builder.totalOzoneUsedSpace;
+    this.totalOzoneFreeSpace = builder.totalOzoneFreeSpace;
+    this.totalOzonePreAllocatedContainerSpace = builder.totalOzonePreAllocatedContainerSpace;
+    this.totalMinimumFreeSpace = builder.totalMinimumFreeSpace;
   }
 
-  public long getTotalUsedSpace() {
-    return totalUsedSpace;
+  public static Builder newBuilder() {
+    return new Builder();
   }
 
-  public long getTotalFreeSpace() {
-    return totalFreeSpace;
-  }
+  /**
+   * Builder class for creating an instance of GlobalStorageReport.
+   * Provides a fluent interface to set various storage parameters.
+   */
+  public static final class Builder {
+    private long totalReservedSpace;
+    private long totalOzoneCapacity;
+    private long totalOzoneUsedSpace;
+    private long totalOzoneFreeSpace;
+    private long totalOzonePreAllocatedContainerSpace;
+    private long totalMinimumFreeSpace;
 
-  public long getTotalCapacity() {
-    return totalCapacity;
+    public Builder() {
+      totalReservedSpace = 0;
+      totalOzoneCapacity = 0;
+      totalOzoneUsedSpace = 0;
+      totalOzoneFreeSpace = 0;
+      totalOzonePreAllocatedContainerSpace = 0;
+      totalMinimumFreeSpace = 0;
+    }
+
+    public Builder setTotalReservedSpace(long totalReservedSpace) {
+      this.totalReservedSpace = totalReservedSpace;
+      return this;
+    }
+
+    public Builder setTotalOzoneCapacity(long totalOzoneCapacity) {
+      this.totalOzoneCapacity = totalOzoneCapacity;
+      return this;
+    }
+
+    public Builder setTotalOzoneUsedSpace(long totalOzoneUsedSpace) {
+      this.totalOzoneUsedSpace = totalOzoneUsedSpace;
+      return this;
+    }
+
+    public Builder setTotalOzoneFreeSpace(long totalOzoneFreeSpace) {
+      this.totalOzoneFreeSpace = totalOzoneFreeSpace;
+      return this;
+    }
+
+    public Builder setTotalOzonePreAllocatedContainerSpace(long totalOzonePreAllocatedContainerSpace) {
+      this.totalOzonePreAllocatedContainerSpace = totalOzonePreAllocatedContainerSpace;
+      return this;
+    }
+
+    public Builder setTotalMinimumFreeSpace(long totalMinimumFreeSpace) {
+      this.totalMinimumFreeSpace = totalMinimumFreeSpace;
+      return this;
+    }
+
+    public GlobalStorageReport build() {
+      return new GlobalStorageReport(this);
+    }
   }
 }
