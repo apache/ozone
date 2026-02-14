@@ -37,6 +37,7 @@ public class ByteStringCodec implements Codec {
   @Override
   public Object deserialize(Class<?> type, ByteString value)
       throws InvalidProtocolBufferException {
-    return com.google.protobuf.ByteString.copyFrom(value.toByteArray());
+    return com.google.protobuf.UnsafeByteOperations.
+        unsafeWrap(value.asReadOnlyByteBuffer());
   }
 }
