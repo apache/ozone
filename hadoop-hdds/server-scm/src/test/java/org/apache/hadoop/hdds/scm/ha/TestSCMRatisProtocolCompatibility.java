@@ -37,7 +37,7 @@ public class TestSCMRatisProtocolCompatibility {
   static final Random RANDOM = new Random();
   static final Class<?>[] TYPES = {String.class, Integer.class, byte[].class};
 
-  static <T> org.apache.ratis.thirdparty.com.google.protobuf.ByteString randomValueProto3(Class<T> clazz) {
+  static <T> ByteString randomValueProto3(Class<T> clazz) {
     if (clazz == String.class) {
       final int length = RANDOM.nextInt(3);
       final StringBuilder builder = new StringBuilder(length);
@@ -46,15 +46,15 @@ public class TestSCMRatisProtocolCompatibility {
       }
       final String string = builder.toString();
       assertEquals(length, string.length());
-      return org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFromUtf8(string);
+      return ByteString.copyFromUtf8(string);
     } else if (clazz == Integer.class) {
       final ByteBuffer buffer = ByteBuffer.allocate(4);
       buffer.putInt(RANDOM.nextInt());
-      return org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFrom(buffer.array());
+      return ByteString.copyFrom(buffer.array());
     } else if (clazz == byte[].class) {
       final byte[] bytes = new byte[RANDOM.nextInt(3)];
       RANDOM.nextBytes(bytes);
-      return org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFrom(bytes);
+      return ByteString.copyFrom(bytes);
     }
     throw new IllegalArgumentException("Unrecognized class " + clazz);
   }

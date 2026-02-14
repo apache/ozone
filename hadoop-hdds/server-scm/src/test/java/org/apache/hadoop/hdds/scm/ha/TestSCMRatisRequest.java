@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
+import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -105,8 +106,7 @@ public class TestSCMRatisRequest {
             .build();
 
     Message msg = Message.valueOf(
-        org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations
-            .unsafeWrap(proto.toByteString().asReadOnlyByteBuffer()));
+        UnsafeByteOperations.unsafeWrap(proto.toByteString().asReadOnlyByteBuffer()));
 
     InvalidProtocolBufferException ex = assertThrows(
         InvalidProtocolBufferException.class,
@@ -124,8 +124,7 @@ public class TestSCMRatisRequest {
             .build();
 
     Message msg = Message.valueOf(
-        org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations
-            .unsafeWrap(proto.toByteString().asReadOnlyByteBuffer()));
+        UnsafeByteOperations.unsafeWrap(proto.toByteString().asReadOnlyByteBuffer()));
 
     InvalidProtocolBufferException ex = assertThrows(
         InvalidProtocolBufferException.class,
@@ -145,8 +144,7 @@ public class TestSCMRatisRequest {
             .build();
 
     Message msg = Message.valueOf(
-        org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations
-            .unsafeWrap(proto.toByteString().asReadOnlyByteBuffer()));
+        UnsafeByteOperations.unsafeWrap(proto.toByteString().asReadOnlyByteBuffer()));
 
     InvalidProtocolBufferException ex = assertThrows(
         InvalidProtocolBufferException.class,
@@ -173,8 +171,7 @@ public class TestSCMRatisRequest {
             .build();
 
     Message msg = Message.valueOf(
-        org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations
-            .unsafeWrap(proto.toByteString().asReadOnlyByteBuffer()));
+        UnsafeByteOperations.unsafeWrap(proto.toByteString().asReadOnlyByteBuffer()));
 
     InvalidProtocolBufferException ex = assertThrows(
         InvalidProtocolBufferException.class,
@@ -201,8 +198,7 @@ public class TestSCMRatisRequest {
             .build();
 
     Message msg = Message.valueOf(
-        org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations
-            .unsafeWrap(proto.toByteString().asReadOnlyByteBuffer()));
+        UnsafeByteOperations.unsafeWrap(proto.toByteString().asReadOnlyByteBuffer()));
 
     InvalidProtocolBufferException ex = assertThrows(
         InvalidProtocolBufferException.class,

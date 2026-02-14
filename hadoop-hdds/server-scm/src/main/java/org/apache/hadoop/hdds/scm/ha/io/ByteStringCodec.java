@@ -19,21 +19,24 @@ package org.apache.hadoop.hdds.scm.ha.io;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
+import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 
 /**
- * A dummy codec that serializes a ByteString object to ByteString.
+ * {@link Codec} implementation for non-shaded
+ * {@link com.google.protobuf.ByteString} objects.
  */
 public class ByteStringCodec implements Codec {
 
   @Override
   public ByteString serialize(Object object)
       throws InvalidProtocolBufferException {
-    return (ByteString) object;
+    return UnsafeByteOperations.unsafeWrap(
+        ((com.google.protobuf.ByteString) object).asReadOnlyByteBuffer());
   }
 
   @Override
   public Object deserialize(Class<?> type, ByteString value)
       throws InvalidProtocolBufferException {
-    return value;
+    return com.google.protobuf.ByteString.copyFrom(value.toByteArray());
   }
 }

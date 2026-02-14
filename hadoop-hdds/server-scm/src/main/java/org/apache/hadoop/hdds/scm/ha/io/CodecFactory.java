@@ -48,7 +48,8 @@ public final class CodecFactory {
     codecs.put(Boolean.class, new BooleanCodec());
     codecs.put(BigInteger.class, new BigIntegerCodec());
     codecs.put(X509Certificate.class, new X509CertificateCodec());
-    codecs.put(ByteString.class, new ByteStringCodec());
+    codecs.put(com.google.protobuf.ByteString.class, new ByteStringCodec());
+    codecs.put(ByteString.class, new ScmByteStringCodec());
     codecs.put(ManagedSecretKey.class, new ManagedSecretKeyCodec());
   }
 
