@@ -28,9 +28,15 @@ type GlobalNamespace = {
 };
 
 type UsedSpaceBreakdown = {
-  openKeyBytes: number;
+  openKeyBytes: OpenKeyBytesInfo;
   committedKeyBytes: number;
   preAllocatedContainerBytes: number;
+};
+
+type OpenKeyBytesInfo = {
+  totalOpenKeyBytes: number;
+  openKeyAndFileBytes: number;
+  multipartOpenKeyBytes: number;
 };
 
 type DNPendingDeleteStat = {
