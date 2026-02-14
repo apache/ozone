@@ -59,7 +59,7 @@
     <commons-csv.version>1.14.1</commons-csv.version>
     <commons-daemon.version>1.4.0</commons-daemon.version>
     <commons-fileupload.version>1.6.0</commons-fileupload.version>
-    <commons-io.version>2.18.0</commons-io.version>
+    <commons-io.version>2.21.0</commons-io.version>
     <commons-lang3.version>3.18.0</commons-lang3.version>
     <commons-math3.version>3.6.1</commons-math3.version>
     <commons-net.version>3.12.0</commons-net.version>
