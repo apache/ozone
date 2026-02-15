@@ -108,6 +108,10 @@ public interface ChunkManager {
     // no-op
   }
 
+  default void syncChunks(Container container, BlockID blockID) throws IOException {
+    // no-op
+  }
+
   default String streamInit(Container container, BlockID blockID)
       throws StorageContainerException {
     return null;
