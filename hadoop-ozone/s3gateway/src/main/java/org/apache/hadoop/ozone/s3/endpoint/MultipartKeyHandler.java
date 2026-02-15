@@ -64,7 +64,6 @@ public class MultipartKeyHandler extends ObjectOperationHandler {
       Response response = listParts(context.getBucket(), keyPath, uploadId,
           partMarker, maxParts, perf);
       long opLatencyNs = getMetrics().updateListPartsSuccessStats(startNanos);
-      getMetrics().updateListPartsSuccessStats(startNanos);
       perf.appendOpLatencyNanos(opLatencyNs);
       return response;
 

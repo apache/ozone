@@ -499,6 +499,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       return responseBuilder.build();
 
     } catch (IOException | RuntimeException ex) {
+      getMetrics().updateGetKeyFailureStats(startNanos);
       throw ex;
     }
   }
