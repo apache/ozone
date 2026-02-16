@@ -149,7 +149,6 @@ public class TestVolumeSet {
 
     File newVolume = new File(volume3, HDDS_VOLUME_DIR);
     assertTrue(newVolume.mkdirs());
-    assertTrue(newVolume.exists());
     File dataDir = new File(newVolume, "chunks");
     assertTrue(dataDir.mkdirs());
     assertTrue(dataDir.exists());
@@ -163,8 +162,7 @@ public class TestVolumeSet {
     assertFalse(checkVolumeExistsInVolumeSet(volume3));
 
     assertNumVolumes(volumeSet, 2, 1);
-    File volume = new File(volume3);
-    FileUtils.deleteDirectory(volume);
+    FileUtils.deleteDirectory(new File(volume3));
   }
 
   @Test
