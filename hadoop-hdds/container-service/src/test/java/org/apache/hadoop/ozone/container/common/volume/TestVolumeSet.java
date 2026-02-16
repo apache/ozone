@@ -145,7 +145,7 @@ public class TestVolumeSet {
     assertNumVolumes(volumeSet, 2, 0);
     assertEquals(2, volumeSet.getVolumesList().size());
 
-    String volume3 = baseDir + "disk3";
+    String volume3 = baseDir.resolve("disk3").toString();
 
     File newVolume = new File(volume3, HDDS_VOLUME_DIR);
     assertTrue(newVolume.mkdirs());
