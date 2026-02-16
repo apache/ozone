@@ -407,11 +407,16 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
   static void writeHardlinkFile(OzoneConfiguration conf, Map<String, String> hardlinkFileMap,
       ArchiveOutputStream<TarArchiveEntry> archiveOutputStream) throws IOException {
     Path data = Files.createTempFile(DATA_PREFIX, DATA_SUFFIX);
-    Path metaDirPath = OMStorage.getOmDbDir(conf).toPath();
+    Path metaDirPath = OMStorage.getOmDbDir(conf).toPath()
+        .toAbsolutePath().normalize();
     StringBuilder sb = new StringBuilder();
 
     for (Map.Entry<String, String> entry : hardlinkFileMap.entrySet()) {
-      Path p = Paths.get(entry.getKey());
+      Path p = new File(entry.getKey()).toPath();
+      if (!p.isAbsolute()) {
+        p = metaDirPath.resolve(p);
+      }
+      p = p.toAbsolutePath().normalize();
       String fileId = entry.getValue();
       Path relativePath = metaDirPath.relativize(p);
       sb.append(relativePath).append('\t').append(fileId).append('\n');
