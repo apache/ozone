@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.diskbalancer;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -105,6 +106,8 @@ public class TestDefaultContainerChoosingPolicy {
     sourceVolume = createVolume("source-volume", 0.80);
     destVolume1 = createVolume("dest-volume1", 0.10);
     destVolume2 = createVolume("dest-volume2", 0.50);
+
+    CONF.set(HDDS_DATANODE_DIR_KEY, baseDir.resolve("defaultVolume").toString());
 
     // Create and spy on the volume set
     String datanodeUuid = UUID.randomUUID().toString();
