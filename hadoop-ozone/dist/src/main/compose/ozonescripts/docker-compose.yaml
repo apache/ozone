@@ -21,7 +21,6 @@ services:
          args:
             - OZONE_RUNNER_IMAGE
             - OZONE_RUNNER_VERSION
-      image: ozone-runner-scripts:${OZONE_RUNNER_VERSION}
       volumes:
         - ../..:/opt/hadoop
       ports:
@@ -34,7 +33,6 @@ services:
          args:
             - OZONE_RUNNER_IMAGE
             - OZONE_RUNNER_VERSION
-      image: ozone-runner-scripts:${OZONE_RUNNER_VERSION}
       volumes:
          - ../..:/opt/hadoop
       ports:
@@ -48,7 +46,6 @@ services:
          args:
             - OZONE_RUNNER_IMAGE
             - OZONE_RUNNER_VERSION
-      image: ozone-runner-scripts:${OZONE_RUNNER_VERSION}
       volumes:
          - ../..:/opt/hadoop
       ports:
