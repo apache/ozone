@@ -36,11 +36,12 @@ import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3StorageType;
+import org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder;
 
 /**
  * Handles MPU (Multipart Upload) non-POST operations for object key endpoint.
  */
-public class MultipartKeyHandler extends ObjectOperationHandler {
+class MultipartKeyHandler extends ObjectOperationHandler {
 
   @Override
   Response handleGetRequest(ObjectEndpoint.ObjectRequestContext context, String keyPath)
@@ -56,19 +57,18 @@ public class MultipartKeyHandler extends ObjectOperationHandler {
 
     final int maxParts = queryParams().getInt(QueryParams.MAX_PARTS, 1000);
     final String partNumberMarker = queryParams().get(QueryParams.PART_NUMBER_MARKER);
-    final long startNanos = context.getStartNanos();
     final AuditLogger.PerformanceStringBuilder perf = context.getPerf();
 
     try {
       int partMarker = parsePartNumberMarker(partNumberMarker);
       Response response = listParts(context.getBucket(), keyPath, uploadId,
           partMarker, maxParts, perf);
-      long opLatencyNs = getMetrics().updateListPartsSuccessStats(startNanos);
+      long opLatencyNs = getMetrics().updateListPartsSuccessStats(context.getStartNanos());
       perf.appendOpLatencyNanos(opLatencyNs);
       return response;
 
     } catch (IOException | RuntimeException ex) {
-      getMetrics().updateListPartsFailureStats(startNanos);
+      getMetrics().updateListPartsFailureStats(context.getStartNanos());
       throw ex;
     }
   }
@@ -85,29 +85,19 @@ public class MultipartKeyHandler extends ObjectOperationHandler {
 
     context.setAction(S3GAction.ABORT_MULTIPART_UPLOAD);
 
-    final long startNanos = context.getStartNanos();
     try {
       Response r = abortMultipartUpload(context.getVolume(),
           context.getBucketName(), keyPath, uploadId);
 
-      getMetrics().updateAbortMultipartUploadSuccessStats(startNanos);
+      getMetrics().updateAbortMultipartUploadSuccessStats(context.getStartNanos());
       return r;
 
     } catch (IOException | RuntimeException ex) {
-      getMetrics().updateAbortMultipartUploadFailureStats(startNanos);
+      getMetrics().updateAbortMultipartUploadFailureStats(context.getStartNanos());
       throw ex;
     }
   }
 
-  /**
-   * Abort multipart upload request.
-   * @param bucket
-   * @param key
-   * @param uploadId
-   * @return Response
-   * @throws IOException
-   * @throws OS3Exception
-   */
   private Response abortMultipartUpload(OzoneVolume volume, String bucket,
       String key, String uploadId) throws IOException, OS3Exception {
     try {
@@ -137,7 +127,7 @@ public class MultipartKeyHandler extends ObjectOperationHandler {
    */
   private Response listParts(OzoneBucket ozoneBucket, String key, String uploadId,
       int partNumberMarker, int maxParts,
-      org.apache.hadoop.ozone.audit.AuditLogger.PerformanceStringBuilder perf)
+      PerformanceStringBuilder perf)
       throws IOException, OS3Exception {
 
     ListPartsResponse resp = new ListPartsResponse();
