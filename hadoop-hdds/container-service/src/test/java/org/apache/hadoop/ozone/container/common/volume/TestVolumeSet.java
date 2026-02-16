@@ -151,7 +151,6 @@ public class TestVolumeSet {
     assertTrue(newVolume.mkdirs());
     File dataDir = new File(newVolume, "chunks");
     assertTrue(dataDir.mkdirs());
-    assertTrue(dataDir.exists());
 
     // Root dir is non-empty but version file is missing, so the volume should not be loaded.
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, conf.get(ScmConfigKeys.HDDS_DATANODE_DIR_KEY) + "," + volume3);
