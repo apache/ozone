@@ -22,7 +22,7 @@ import filesize from 'filesize';
 import Tooltip from 'antd/lib/tooltip';
 
 import { getCapacityPercent } from '@/utils/common';
-import type { StorageReport } from '@/v2/types/overview.types';
+import type { DatanodeStorageReport } from '@/v2/types/datanodeStorageReport.types';
 
 import './storageBar.less';
 
@@ -34,7 +34,7 @@ const size = filesize.partial({
 type StorageReportProps = {
   showMeta?: boolean;
   strokeWidth?: number;
-} & StorageReport
+} & DatanodeStorageReport
 
 
 const StorageBar: React.FC<StorageReportProps> = ({
@@ -42,26 +42,52 @@ const StorageBar: React.FC<StorageReportProps> = ({
   used = 0,
   remaining = 0,
   committed = 0,
+  filesystemCapacity,
+  filesystemUsed,
+  filesystemAvailable,
   showMeta = false,
   strokeWidth = 3
 }) => {
 
-  const nonOzoneUsed = capacity - remaining - used;
-  const totalUsed = capacity - remaining;
+  const hasFilesystemView = (filesystemCapacity ?? 0) > 0 &&
+    filesystemAvailable !== undefined &&
+    filesystemAvailable !== null;
+
+  const fsCap = hasFilesystemView ? (filesystemCapacity as number) : undefined;
+  const fsAvail = hasFilesystemView ? (filesystemAvailable as number) : undefined;
+  const fsUsed = hasFilesystemView
+    ? (filesystemUsed !== undefined ? filesystemUsed : (fsCap as number) - (fsAvail as number))
+    : undefined;
   const tooltip = (
     <>
       <table cellPadding={5}>
         <tbody>
+          {hasFilesystemView && (
+            <>
+              <tr>
+                <td>Filesystem Capacity</td>
+                <td><strong>{size(fsCap as number)}</strong></td>
+              </tr>
+              <tr>
+                <td>Filesystem Used</td>
+                <td><strong>{size(fsUsed as number)}</strong></td>
+              </tr>
+              <tr>
+                <td>Filesystem Available</td>
+                <td><strong>{size(fsAvail as number)}</strong></td>
+              </tr>
+            </>
+          )}
+          <tr>
+            <td>Ozone Capacity</td>
+            <td><strong>{size(capacity)}</strong></td>
+          </tr>
           <tr>
             <td>Ozone Used</td>
             <td><strong>{size(used)}</strong></td>
           </tr>
           <tr>
-            <td>Non Ozone Used</td>
-            <td><strong>{size(nonOzoneUsed)}</strong></td>
-          </tr>
-          <tr>
-            <td>Remaining</td>
+            <td>Ozone Available</td>
             <td><strong>{size(remaining)}</strong></td>
           </tr>
           <tr>
@@ -73,7 +99,7 @@ const StorageBar: React.FC<StorageReportProps> = ({
     </>
   );
 
-  const percentage = getCapacityPercent(totalUsed, capacity)
+  const percentage = getCapacityPercent((capacity - remaining), capacity)
 
   return (
       <Tooltip
@@ -82,7 +108,7 @@ const StorageBar: React.FC<StorageReportProps> = ({
         className='storage-cell-container-v2' >
         {(showMeta) &&
           <div>
-            {size(used + nonOzoneUsed)} / {size(capacity)}
+            {`${size(capacity - remaining)} / ${size(capacity)}`}
           </div>
         }
         <Progress

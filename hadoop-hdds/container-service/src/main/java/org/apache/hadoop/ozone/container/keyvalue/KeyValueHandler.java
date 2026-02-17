@@ -65,6 +65,7 @@ import static org.apache.ratis.util.Preconditions.assertSame;
 import static org.apache.ratis.util.Preconditions.assertTrue;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.Striped;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -95,7 +96,6 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
-import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -111,7 +111,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.PutSmallFi
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadBlockRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Type;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ByteStringConversion;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -1353,24 +1352,24 @@ public class KeyValueHandler extends Handler {
   @Override
   public Container importContainer(ContainerData originalContainerData,
       final InputStream rawContainerStream,
-      final TarContainerPacker packer)
-      throws IOException {
-    assertTrue(originalContainerData instanceof KeyValueContainerData,
-        () -> "Expected KeyValueContainerData but " + originalContainerData.getClass());
-
-    KeyValueContainerData containerData = new KeyValueContainerData(
-        (KeyValueContainerData) originalContainerData);
-
-    KeyValueContainer container = new KeyValueContainer(containerData,
-        conf);
+      final TarContainerPacker packer) throws IOException {
+    KeyValueContainer container = createNewContainer(originalContainerData);
 
     HddsVolume targetVolume = originalContainerData.getVolume();
     populateContainerPathFields(container, targetVolume);
     container.importContainerData(rawContainerStream, packer);
-    ContainerLogger.logImported(containerData);
+    ContainerLogger.logImported(container.getContainerData());
     sendICR(container);
     return container;
+  }
 
+  @Override
+  public Container importContainer(ContainerData targetTempContainerData) throws IOException {
+    KeyValueContainer container = createNewContainer(targetTempContainerData);
+    HddsVolume targetVolume = targetTempContainerData.getVolume();
+    populateContainerPathFields(container, targetVolume);
+    container.importContainerData((KeyValueContainerData) targetTempContainerData);
+    return container;
   }
 
   @Override
@@ -1604,6 +1603,24 @@ public class KeyValueHandler extends Handler {
     updateContainerChecksumFromMetadataIfNeeded(container);
     ContainerLogger.logClosed(container.getContainerData());
     sendICR(container);
+  }
+
+  @Override
+  public void copyContainer(final Container container, Path destinationPath)
+      throws IOException {
+    final KeyValueContainer kvc = (KeyValueContainer) container;
+    kvc.copyContainerDirectory(destinationPath);
+  }
+
+  private KeyValueContainer createNewContainer(
+      ContainerData originalContainerData) {
+    Preconditions.checkState(originalContainerData instanceof
+        KeyValueContainerData, "Should be KeyValueContainerData instance");
+
+    KeyValueContainerData containerData = new KeyValueContainerData(
+        (KeyValueContainerData) originalContainerData);
+
+    return new KeyValueContainer(containerData, conf);
   }
 
   @Override
@@ -1853,8 +1870,7 @@ public class KeyValueHandler extends Handler {
         .build();
     // Under construction is set here, during BlockInputStream#initialize() it is used to update the block length.
     blkInfo.setUnderConstruction(true);
-    try (BlockInputStream blockInputStream = (BlockInputStream) blockInputStreamFactory.create(
-        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+    try (BlockInputStream blockInputStream = blockInputStreamFactory.createBlockInputStream(
         blkInfo, pipeline, blockToken, dnClient.getXceiverClientManager(),
         null, conf.getObject(OzoneClientConfig.class))) {
       // Initialize the BlockInputStream. Gets the blockData from the peer, sets the block length and
@@ -2075,8 +2091,15 @@ public class KeyValueHandler extends Handler {
       return malformedRequest(request);
     }
     try {
-      readBlockImpl(request, blockFile, kvContainer, streamObserver, false);
-      // TODO metrics.incContainerBytesStats(Type.ReadBlock, readBlock.getLen());
+      final long startTime = Time.monotonicNow();
+      final long bytesRead = readBlockImpl(request, blockFile, kvContainer, streamObserver, false);
+      KeyValueContainerData containerData = (KeyValueContainerData) kvContainer
+          .getContainerData();
+      HddsVolume volume = containerData.getVolume();
+      if (volume != null) {
+        volume.getVolumeIOStats().recordReadOperation(startTime, bytesRead);
+      }
+      metrics.incContainerBytesStats(Type.ReadBlock, bytesRead);
     } catch (StorageContainerException ex) {
       responseProto = ContainerUtils.logAndReturnError(LOG, ex, request);
     } catch (IOException ioe) {
@@ -2092,7 +2115,7 @@ public class KeyValueHandler extends Handler {
     return responseProto;
   }
 
-  private void readBlockImpl(ContainerCommandRequestProto request, RandomAccessFileChannel blockFile,
+  private long readBlockImpl(ContainerCommandRequestProto request, RandomAccessFileChannel blockFile,
       Container kvContainer, StreamObserver<ContainerCommandResponseProto> streamObserver, boolean verifyChecksum)
       throws IOException {
     final ReadBlockRequestProto readBlock = request.getReadBlock();
@@ -2132,7 +2155,7 @@ public class KeyValueHandler extends Handler {
 
     final ByteBuffer buffer = ByteBuffer.allocate(responseDataSize);
     blockFile.position(adjustedOffset);
-    int totalDataLength = 0;
+    long totalDataLength = 0;
     int numResponses = 0;
     final long rounded = roundUp(readBlock.getLength() + offsetAlignment, bytesPerChecksum);
     final long requiredLength = Math.min(rounded, blockData.getSize() - adjustedOffset);
@@ -2170,6 +2193,7 @@ public class KeyValueHandler extends Handler {
       totalDataLength += dataLength;
       numResponses++;
     }
+    return totalDataLength;
   }
 
   static List<ByteString> getChecksums(long blockOffset, int readLength, int bytesPerChunk, int bytesPerChecksum,

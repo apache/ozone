@@ -124,27 +124,6 @@
   </build>
   <profiles>
     <profile>
-      <id>k8s-dev</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>io.fabric8</groupId>
-            <artifactId>docker-maven-plugin</artifactId>
-            <configuration>
-              <images>
-                <image>
-                  <name>${user.name}/ozone:${project.version}</name>
-                  <build>
-                    <dockerFileDir>${project.basedir}</dockerFileDir>
-                  </build>
-                </image>
-              </images>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
       <id>native-testing</id>
       <activation>
         <property>

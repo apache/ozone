@@ -27,6 +27,7 @@ import javax.ws.rs.core.MultivaluedHashMap;
 import javax.ws.rs.core.UriInfo;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.RequestIdentifier;
 import org.apache.hadoop.ozone.s3.signature.SignatureInfo;
 
@@ -97,22 +98,31 @@ public class EndpointBuilder<T extends EndpointBase> {
   public T build() {
     T endpoint = base != null ? base : constructor.get();
 
-    if (ozoneClient != null) {
-      endpoint.setClient(ozoneClient);
+    if (endpoint.getClient() == null) {
+      endpoint.setClient(getClient());
     }
 
     final OzoneConfiguration config = getConfig();
     endpoint.setOzoneConfiguration(config != null ? config : new OzoneConfiguration());
+
+    if (httpHeaders == null) {
+      httpHeaders = mock(HttpHeaders.class);
+    }
 
     endpoint.setContext(requestContext);
     endpoint.setHeaders(httpHeaders);
     endpoint.setRequestIdentifier(identifier);
     endpoint.setSignatureInfo(signatureInfo);
 
+    endpoint.initialization();
+
     return endpoint;
   }
 
   protected OzoneClient getClient() {
+    if (ozoneClient == null) {
+      ozoneClient = new OzoneClientStub();
+    }
     return ozoneClient;
   }
 
@@ -142,6 +152,10 @@ public class EndpointBuilder<T extends EndpointBase> {
 
   public static EndpointBuilder<BucketEndpoint> newBucketEndpointBuilder() {
     return new EndpointBuilder<>(BucketEndpoint::new);
+  }
+
+  public static EndpointBuilder<BucketAclHandler> newBucketAclHandlerBuilder() {
+    return new EndpointBuilder<>(BucketAclHandler::new);
   }
 
   public static EndpointBuilder<ObjectEndpoint> newObjectEndpointBuilder() {

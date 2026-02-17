@@ -322,8 +322,36 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
         {"bucket_underscore", "_bucket___multi_underscore_", "bucket_"};
     when(ozoneManager.isStrictS3()).thenReturn(false);
     for (String bucketName : nonS3CompliantBucketName) {
-      acceptBucketCreationHelper(volumeName, bucketName);
+      acceptFSOBucketCreationHelper(volumeName, bucketName);
     }
+  }
+
+  @Test
+  public void testNonS3BucketNameRejectedForObjectStoreWhenStrictDisabled()
+      throws Exception {
+
+    // strict mode disabled
+    ozoneManager.getConfiguration().setBoolean(
+        OMConfigKeys.OZONE_OM_NAMESPACE_STRICT_S3, false);
+
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = "bucket_with_underscore"; // non-S3-compliant
+    addCreateVolumeToTable(volumeName, omMetadataManager);
+
+    // Explicitly set bucket layout to OBJECT_STORE so the test doesn't depend on
+    // defaults or mocked OM behavior.
+    OzoneManagerProtocolProtos.BucketInfo.Builder bucketInfo =
+        newBucketInfoBuilder(bucketName, volumeName)
+            .setBucketLayout(
+                OzoneManagerProtocolProtos.BucketLayoutProto.OBJECT_STORE);
+
+    OMRequest originalRequest = newCreateBucketRequest(bucketInfo).build();
+    OMBucketCreateRequest req = new OMBucketCreateRequest(originalRequest);
+
+    OMException ex = assertThrows(OMException.class,
+        () -> req.preExecute(ozoneManager));
+
+    assertEquals(OMException.ResultCodes.INVALID_BUCKET_NAME, ex.getResult());
   }
 
   @ParameterizedTest
@@ -477,5 +505,15 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
             .setVolume(volumeName).setAdminName(UUID.randomUUID().toString())
             .setOwnerName(UUID.randomUUID().toString()).build();
     OMRequestTestUtils.addVolumeToOM(omMetadataManager, omVolumeArgs);
+  }
+
+  private void acceptFSOBucketCreationHelper(String volumeName, String bucketName)
+      throws Exception {
+    OzoneManagerProtocolProtos.BucketInfo.Builder bucketInfo =
+        newBucketInfoBuilder(bucketName, volumeName)
+            .setBucketLayout(OzoneManagerProtocolProtos.BucketLayoutProto.FILE_SYSTEM_OPTIMIZED);
+    OMBucketCreateRequest omBucketCreateRequest = doPreExecute(bucketInfo);
+    doValidateAndUpdateCache(volumeName, bucketName,
+        omBucketCreateRequest.getOmRequest());
   }
 }

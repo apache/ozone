@@ -460,7 +460,7 @@ public class TestContainerBalancerTask {
       }
       SCMNodeStat stat = new SCMNodeStat(datanodeCapacity, datanodeUsedSpace,
           datanodeCapacity - datanodeUsedSpace, 0,
-          datanodeCapacity - datanodeUsedSpace - 1);
+          datanodeCapacity - datanodeUsedSpace - 1, 0);
       nodesInCluster.get(i).setScmNodeStat(stat);
     }
   }

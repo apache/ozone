@@ -123,11 +123,33 @@ public final class SCMRatisRequest {
       throws InvalidProtocolBufferException {
     final SCMRatisRequestProto requestProto =
         SCMRatisRequestProto.parseFrom(message.getContent().toByteArray());
+
+    // proto2 required-equivalent checks
+    if (!requestProto.hasType()) {
+      throw new InvalidProtocolBufferException("Missing request type");
+    }
+    if (!requestProto.hasMethod()) {
+      throw new InvalidProtocolBufferException("Missing method");
+    }
+
     final Method method = requestProto.getMethod();
+
+    // proto2 required-equivalent checks
+    if (!method.hasName()) {
+      throw new InvalidProtocolBufferException("Missing method name");
+    }
+
     List<Object> args = new ArrayList<>();
     Class<?>[] parameterTypes = new Class[method.getArgsCount()];
     int paramCounter = 0;
     for (MethodArgument argument : method.getArgsList()) {
+      // proto2 required-equivalent checks
+      if (!argument.hasType()) {
+        throw new InvalidProtocolBufferException("Missing argument type");
+      }
+      if (!argument.hasValue()) {
+        throw new InvalidProtocolBufferException("Missing argument value");
+      }
       try {
         final Class<?> clazz = ReflectionUtil.getClass(argument.getType());
         parameterTypes[paramCounter++] = clazz;

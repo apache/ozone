@@ -31,6 +31,7 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Response;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
@@ -237,16 +238,23 @@ public class StorageDistributionEndpoint {
       long remaining = nodeStat.getRemaining() != null ? nodeStat.getRemaining().get() : 0L;
       long committed = nodeStat.getCommitted() != null ? nodeStat.getCommitted().get() : 0L;
       long minFreeSpace  = nodeStat.getFreeSpaceToSpare() != null ? nodeStat.getFreeSpaceToSpare().get() : 0L;
-
-      return DatanodeStorageReport.newBuilder()
+      long reservedSpace = nodeStat.getReserved() != null ? nodeStat.getReserved().get() : 0L;
+      SpaceUsageSource.Fixed fsUsage = nodeManager.getTotalFilesystemUsage(datanode);
+      DatanodeStorageReport.Builder builder = DatanodeStorageReport.newBuilder()
           .setCapacity(capacity)
           .setUsed(used)
           .setRemaining(remaining)
           .setCommitted(committed)
           .setMinimumFreeSpace(minFreeSpace)
+          .setReserved(reservedSpace)
           .setDatanodeUuid(datanode.getUuidString())
-          .setHostName(datanode.getHostName())
-          .build();
+          .setHostName(datanode.getHostName());
+      if (fsUsage != null) {
+        builder.setFilesystemCapacity(fsUsage.getCapacity())
+            .setFilesystemAvailable(fsUsage.getAvailable())
+            .setFilesystemUsed(fsUsage.getUsedSpace());
+      }
+      return builder.build();
     } catch (Exception e) {
       LOG.error("Error getting storage report for datanode: {}", datanode, e);
       return null; // Return null on any error

@@ -183,6 +183,12 @@ message StorageReportProto {
   optional uint64 committed = 8 [default = 0];
   optional uint64 freeSpaceToSpare = 9 [default = 0];
   optional uint64 reserved = 10;
+  /*
+   Raw filesystem stats (as reported by the local filesystem). These represent the real device
+   capacity/available, independent of Ozone's reserved-space adjustment.
+   */
+  optional uint64 fsCapacity = 11 [default = 0];
+  optional uint64 fsAvailable = 12 [default = 0];
 }
 
 message MetadataStorageReportProto {
@@ -338,7 +344,6 @@ message SCMCommandProto {
   optional RefreshVolumeUsageCommandProto refreshVolumeUsageCommandProto = 11;
   optional ReconstructECContainersCommandProto reconstructECContainersCommandProto = 12;
   optional ReconcileContainerCommandProto reconcileContainerCommandProto = 13;
-
 
   // If running upon Ratis, holds term of underlying RaftServer iff current
   // SCM is a leader. If running without Ratis, holds SCMContext.INVALID_TERM.

@@ -159,7 +159,7 @@ public abstract class AbstractNSSummaryTaskTest {
 
     List<NSSummary> result = new ArrayList<>();
     NSSummary staleNSSummary = new NSSummary();
-    RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
+    RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation();
     getReconNamespaceSummaryManager().batchStoreNSSummaries(rdbBatchOperation, -1L, staleNSSummary);
     getReconNamespaceSummaryManager().commitBatchOperation(rdbBatchOperation);
 

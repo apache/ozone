@@ -542,7 +542,11 @@ public final class OzoneManagerRatisServer {
     }
     //cache hit
     try {
-      return getOMResponse(cacheEntry.getReplyFuture().get());
+      RaftClientReply reply = cacheEntry.getReplyFuture().get();
+      if (!reply.isSuccess()) {
+        return null;
+      }
+      return getOMResponse(reply);
     } catch (ExecutionException ex) {
       throw new ServiceException(ex.getMessage(), ex);
     } catch (InterruptedException ex) {
@@ -617,7 +621,7 @@ public final class OzoneManagerRatisServer {
 
   private OMResponse getOMResponse(RaftClientReply reply) throws ServiceException {
     try {
-      return OMRatisHelper.getOMResponseFromRaftClientReply(reply);
+      return OMRatisHelper.getOMResponseFromRaftClientReply(reply, getLeaderId());
     } catch (IOException ex) {
       if (ex.getMessage() != null) {
         throw new ServiceException(ex.getMessage(), ex);

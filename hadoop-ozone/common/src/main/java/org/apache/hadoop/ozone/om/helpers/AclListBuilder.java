@@ -43,6 +43,19 @@ public final class AclListBuilder {
     return new AclListBuilder(list);
   }
 
+  /**
+   * Overload accepting List instead of ImmutableList for binary compatibility
+   * across different Guava versions (especially for Hadoop 2.x compatibility).
+   * This method can be removed when Hadoop 2.x support is dropped and all
+   * callers are guaranteed to use the same Guava version.
+   */
+  public static AclListBuilder of(List<OzoneAcl> list) {
+    if (list instanceof ImmutableList) {
+      return new AclListBuilder((ImmutableList<OzoneAcl>) list);
+    }
+    return copyOf(list);
+  }
+
   public static AclListBuilder copyOf(List<OzoneAcl> list) {
     return new AclListBuilder(list == null ? ImmutableList.of() : ImmutableList.copyOf(list));
   }

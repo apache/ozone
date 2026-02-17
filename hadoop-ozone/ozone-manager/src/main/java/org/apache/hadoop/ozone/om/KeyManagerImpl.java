@@ -138,7 +138,7 @@ import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.net.CachedDNSToSwitchMapping;
 import org.apache.hadoop.net.DNSToSwitchMapping;
-import org.apache.hadoop.net.TableMapping;
+import org.apache.hadoop.net.ScriptBasedMapping;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.common.BlockGroup;
@@ -362,7 +362,7 @@ public class KeyManagerImpl implements KeyManager {
     Class<? extends DNSToSwitchMapping> dnsToSwitchMappingClass =
         configuration.getClass(
             ScmConfigKeys.NET_TOPOLOGY_NODE_SWITCH_MAPPING_IMPL_KEY,
-            TableMapping.class, DNSToSwitchMapping.class);
+            ScriptBasedMapping.class, DNSToSwitchMapping.class);
     DNSToSwitchMapping newInstance = ReflectionUtils.newInstance(
         dnsToSwitchMappingClass, configuration);
     dnsToSwitchMapping =
@@ -376,6 +376,15 @@ public class KeyManagerImpl implements KeyManager {
    */
   public void startSnapshotSstFilteringService(OzoneConfiguration conf) {
     if (isSstFilteringSvcEnabled()) {
+      if (isDefragSvcEnabled()) {
+        LOG.info("SstFilteringService is disabled (despite configuration intending to enable it) " +
+            "because SnapshotDefragService is enabled. Defrag effectively performs filtering already.");
+        return;
+      }
+
+      LOG.info("SstFilteringService is enabled. Note SstFilteringService is " +
+          "deprecated in favor of SnapshotDefragService and may be removed in a future release.");
+
       long serviceInterval = conf.getTimeDuration(
           OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL,
           OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL_DEFAULT,
@@ -1721,19 +1730,14 @@ public class KeyManagerImpl implements KeyManager {
 
     String dir = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
     FileEncryptionInfo encInfo = getFileEncryptionInfo(bucketInfo);
-    return new OmKeyInfo.Builder()
-        .setVolumeName(keyInfo.getVolumeName())
-        .setBucketName(keyInfo.getBucketName())
+    return keyInfo.toBuilder()
         .setKeyName(dir)
         .setOmKeyLocationInfos(Collections.singletonList(
             new OmKeyLocationInfoGroup(0, new ArrayList<>())))
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
         .setDataSize(0)
-        .setReplicationConfig(keyInfo.getReplicationConfig())
         .setFileEncryptionInfo(encInfo)
-        .setAcls(keyInfo.getAcls())
-        .setOwnerName(keyInfo.getOwnerName())
         .build();
   }
 
