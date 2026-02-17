@@ -616,8 +616,7 @@ public class SnapshotDiffManager implements AutoCloseable {
         itemsFetched += 1;
       }
       // Next token
-      String nextTokenString = iterator.hasNext() ?
-          getIndexFromReportKey(StringCodec.get().fromPersistedFormat(iterator.next().getKey())) : null;
+      String nextTokenString = iterator.hasNext() ? getIndexFromReportKey(pageLastKey) : null;
 
       checkReportsIntegrity(snapDiffJob, pageLastKey, nextTokenString == null);
       return Pair.of(diffReportList, nextTokenString);
