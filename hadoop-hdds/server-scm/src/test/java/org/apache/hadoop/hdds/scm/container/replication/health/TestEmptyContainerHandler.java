@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container.replication.health;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSING;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.eq;
@@ -245,6 +246,42 @@ public class TestEmptyContainerHandler {
 
     // should return false because there is a non-empty replica
     assertAndVerify(request, false, 0, 0);
+  }
+
+  /**
+   * Tests that container state is NOT updated to DELETE when no replica
+   * has a matching sequence ID with the container.
+   */
+  @Test
+  public void testNoUpdateContainerStateWhenReplicaSequenceIdDoesNotMatch()
+      throws IOException {
+    long keyCount = 0L;
+    long bytesUsed = 0L;
+    long containerSequenceId = 100L;
+    // Create container with specific sequence ID
+    ContainerInfo containerInfo = ReplicationTestUtil.createContainerInfo(
+        ratisReplicationConfig, 1, CLOSED, containerSequenceId);
+    // Create replicas - all with 0 sequence IDs (none matching container)
+    Set<ContainerReplica> containerReplicas = ReplicationTestUtil
+        .createReplicas(containerInfo.containerID(),
+            ContainerReplicaProto.State.CLOSED, keyCount, bytesUsed,
+            0, 0, 0);
+    ContainerCheckRequest request = new ContainerCheckRequest.Builder()
+        .setPendingOps(Collections.emptyList())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
+        .setContainerInfo(containerInfo)
+        .setContainerReplicas(containerReplicas)
+        .build();
+    // Handler should return true but NOT update container state
+    // because no replica has matching sequence ID
+    assertTrue(emptyContainerHandler.handle(request));
+    verify(replicationManager, times(3)).sendDeleteCommand(
+        any(ContainerInfo.class), anyInt(),
+        any(DatanodeDetails.class), eq(false));
+    // updateContainerState should NOT be called when sequence IDs don't match
+    verify(replicationManager, times(0)).updateContainerState(
+        any(ContainerID.class),
+        any(HddsProtos.LifeCycleEvent.class));
   }
 
   /**
