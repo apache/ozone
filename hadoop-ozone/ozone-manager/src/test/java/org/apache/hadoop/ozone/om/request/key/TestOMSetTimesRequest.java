@@ -79,11 +79,11 @@ public class TestOMSetTimesRequest extends TestOMKeyRequest {
 
     OMKeySetTimesRequest setTimes = new OMKeySetTimesRequest(req, getBucketLayout()) {
       @Override
-      public void checkAcls(OzoneManager ozoneManager,
-                            OzoneObj.ResourceType resType,
-                            OzoneObj.StoreType storeType,
-                            IAccessAuthorizer.ACLType aclType,
-                            String vol, String bucket, String key) throws IOException {
+      public void checkAcls(OzoneManager ozoneManager, 
+          OzoneObj.ResourceType resType,
+          OzoneObj.StoreType storeType,
+          IAccessAuthorizer.ACLType aclType,
+          String vol, String bucket, String key) throws IOException 
         throw new OMException("denied", OMException.ResultCodes.PERMISSION_DENIED);
       }
     };
