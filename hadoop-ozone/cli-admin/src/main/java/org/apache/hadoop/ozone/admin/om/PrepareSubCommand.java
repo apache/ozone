@@ -40,7 +40,8 @@ import picocli.CommandLine;
  */
 @CommandLine.Command(
     name = "prepare",
-    description = "Deprecated. Kept for backward compatibility with older server versions.",
+    description = "Deprecated. This command is no longer required, but is kept for backward compatibility with older" +
+        " Ozone Managers.",
     hidden = true,
     mixinStandardHelpOptions = true,
     versionProvider = HddsVersionProvider.class

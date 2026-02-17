@@ -281,6 +281,7 @@ public final class OmUtils {
     case GetObjectTagging:
     case GetQuotaRepairStatus:
     case StartQuotaRepair:
+    // Prepare and CancelPrepare are now no-ops, but still produce responses for compatability.
     case Prepare:
     case CancelPrepare:
       return true;
