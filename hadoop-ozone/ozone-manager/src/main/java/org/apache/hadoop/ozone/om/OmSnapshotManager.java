@@ -959,8 +959,8 @@ public final class OmSnapshotManager implements AutoCloseable {
       return "";
     }
 
-    // Validate that token passed in the request is valid integer as of now.
-    // Later we can change it if we migrate to encrypted or cursor token.
+    // Validate that the token passed in the request matches the expected format:
+    // <diffTypePrefix><20-digit-padded-index>. Update this logic if the token format changes in the future.
     if (!token.matches("[0-9]+")) {
       throw new IOException("Passed token is invalid. " +
           "Resend the request with valid token returned in previous request.");
