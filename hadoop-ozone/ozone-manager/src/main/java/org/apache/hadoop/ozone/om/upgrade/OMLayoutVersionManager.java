@@ -27,8 +27,6 @@ import java.util.Set;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.upgrade.AbstractLayoutVersionManager;
-import org.apache.hadoop.ozone.upgrade.LayoutVersionInstanceFactory;
-import org.apache.hadoop.ozone.upgrade.VersionFactoryKey;
 import org.reflections.Reflections;
 import org.reflections.scanners.SubTypesScanner;
 import org.reflections.scanners.TypeAnnotationsScanner;
@@ -52,16 +50,12 @@ public final class OMLayoutVersionManager
       OM_CLASS_PACKAGE + ".request";
   public static final String OM_UPGRADE_CLASS_PACKAGE =
       OM_CLASS_PACKAGE + ".upgrade";
-  private LayoutVersionInstanceFactory<Class<? extends OMClientRequest>>
-      requestFactory;
 
   public OMLayoutVersionManager(int layoutVersion) throws OMException {
-    requestFactory = new LayoutVersionInstanceFactory<>();
     init(layoutVersion);
   }
 
   public OMLayoutVersionManager() throws IOException {
-    requestFactory = new LayoutVersionInstanceFactory<>();
     OMLayoutFeature[] features = OMLayoutFeature.values();
     init(features[features.length - 1].layoutVersion(), features);
   }
@@ -142,22 +136,9 @@ public final class OMLayoutVersionManager
     return validRequests;
   }
 
-  /**
-   * Given a type and version, get the corresponding request class type.
-   * @param type type string
-   * @return class type.
-   */
-  @Override
-  public Class<? extends OMClientRequest> getHandler(String type) {
-    VersionFactoryKey versionFactoryKey = new VersionFactoryKey.Builder()
-        .key(type).build();
-    return requestFactory.get(this, versionFactoryKey);
-  }
-
   @Override
   public void finalized(OMLayoutFeature layoutFeature) {
     super.finalized(layoutFeature);
-    requestFactory.finalizeFeature(layoutFeature);
   }
 
   public static int maxLayoutVersion() {

@@ -63,10 +63,6 @@
     </dependency>
     <dependency>
       <groupId>io.netty</groupId>
-      <artifactId>netty-common</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.netty</groupId>
       <artifactId>netty-handler</artifactId>
     </dependency>
     <dependency>
@@ -258,27 +254,4 @@
       </plugin>
     </plugins>
   </build>
-  <profiles>
-    <profile>
-      <id>k8s-dev</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>io.fabric8</groupId>
-            <artifactId>docker-maven-plugin</artifactId>
-            <configuration>
-              <images>
-                <image>
-                  <name>${user.name}/ozone:${project.version}</name>
-                  <build>
-                    <dockerFileDir>${project.basedir}</dockerFileDir>
-                  </build>
-                </image>
-              </images>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-  </profiles>
 </project>

@@ -153,7 +153,7 @@ public final class  ReconServerConfigKeys {
       "ozone.recon.nssummary.flush.db.max.threshold";
 
   public static final long
-      OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT = 150 * 1000L;
+      OZONE_RECON_NSSUMMARY_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT = 150 * 1000L * 2;
 
   public static final String
       OZONE_RECON_CONTAINER_KEY_FLUSH_TO_DB_MAX_THRESHOLD =

@@ -199,9 +199,7 @@ public class TestOMRatisSnapshots {
   @Test
   public void testInstallSnapshot(@TempDir Path tempDir) throws Exception {
     // Get the leader OM
-    String leaderOMNodeId = OmFailoverProxyUtil
-        .getFailoverProxyProvider(objectStore.getClientProxy())
-        .getCurrentProxyOMNodeId();
+    final String leaderOMNodeId = OmTestUtil.getCurrentOmProxyNodeId(objectStore);
 
     OzoneManager leaderOM = cluster.getOzoneManager(leaderOMNodeId);
 
@@ -394,9 +392,7 @@ public class TestOMRatisSnapshots {
   public void testInstallIncrementalSnapshot(@TempDir Path tempDir)
       throws Exception {
     // Get the leader OM
-    String leaderOMNodeId = OmFailoverProxyUtil
-        .getFailoverProxyProvider(objectStore.getClientProxy())
-        .getCurrentProxyOMNodeId();
+    final String leaderOMNodeId = OmTestUtil.getCurrentOmProxyNodeId(objectStore);
 
     OzoneManager leaderOM = cluster.getOzoneManager(leaderOMNodeId);
     OzoneManagerRatisServer leaderRatisServer = leaderOM.getOmRatisServer();
@@ -605,9 +601,7 @@ public class TestOMRatisSnapshots {
   @Unhealthy("HDDS-13300")
   public void testInstallIncrementalSnapshotWithFailure() throws Exception {
     // Get the leader OM
-    String leaderOMNodeId = OmFailoverProxyUtil
-        .getFailoverProxyProvider(objectStore.getClientProxy())
-        .getCurrentProxyOMNodeId();
+    final String leaderOMNodeId = OmTestUtil.getCurrentOmProxyNodeId(objectStore);
 
     OzoneManager leaderOM = cluster.getOzoneManager(leaderOMNodeId);
     OzoneManagerRatisServer leaderRatisServer = leaderOM.getOmRatisServer();
@@ -747,9 +741,7 @@ public class TestOMRatisSnapshots {
   @Test
   public void testInstallSnapshotWithClientWrite() throws Exception {
     // Get the leader OM
-    String leaderOMNodeId = OmFailoverProxyUtil
-        .getFailoverProxyProvider(objectStore.getClientProxy())
-        .getCurrentProxyOMNodeId();
+    final String leaderOMNodeId = OmTestUtil.getCurrentOmProxyNodeId(objectStore);
 
     OzoneManager leaderOM = cluster.getOzoneManager(leaderOMNodeId);
     OzoneManagerRatisServer leaderRatisServer = leaderOM.getOmRatisServer();
@@ -846,9 +838,7 @@ public class TestOMRatisSnapshots {
   @Test
   public void testInstallSnapshotWithClientRead() throws Exception {
     // Get the leader OM
-    String leaderOMNodeId = OmFailoverProxyUtil
-        .getFailoverProxyProvider(objectStore.getClientProxy())
-        .getCurrentProxyOMNodeId();
+    final String leaderOMNodeId = OmTestUtil.getCurrentOmProxyNodeId(objectStore);
 
     OzoneManager leaderOM = cluster.getOzoneManager(leaderOMNodeId);
     OzoneManagerRatisServer leaderRatisServer = leaderOM.getOmRatisServer();
@@ -933,9 +923,7 @@ public class TestOMRatisSnapshots {
   @Test
   public void testInstallOldCheckpointFailure() throws Exception {
     // Get the leader OM
-    String leaderOMNodeId = OmFailoverProxyUtil
-        .getFailoverProxyProvider(objectStore.getClientProxy())
-        .getCurrentProxyOMNodeId();
+    final String leaderOMNodeId = OmTestUtil.getCurrentOmProxyNodeId(objectStore);
 
     OzoneManager leaderOM = cluster.getOzoneManager(leaderOMNodeId);
 
@@ -996,9 +984,7 @@ public class TestOMRatisSnapshots {
   @Test
   public void testInstallCorruptedCheckpointFailure() throws Exception {
     // Get the leader OM
-    String leaderOMNodeId = OmFailoverProxyUtil
-        .getFailoverProxyProvider(objectStore.getClientProxy())
-        .getCurrentProxyOMNodeId();
+    final String leaderOMNodeId = OmTestUtil.getCurrentOmProxyNodeId(objectStore);
 
     OzoneManager leaderOM = cluster.getOzoneManager(leaderOMNodeId);
     OzoneManagerRatisServer leaderRatisServer = leaderOM.getOmRatisServer();

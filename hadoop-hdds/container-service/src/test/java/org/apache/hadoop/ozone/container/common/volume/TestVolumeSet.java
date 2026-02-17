@@ -37,10 +37,10 @@ import java.util.UUID;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
-import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -128,25 +128,6 @@ public class TestVolumeSet {
   }
 
   @Test
-  public void testAddVolume() {
-
-    assertEquals(2, volumeSet.getVolumesList().size());
-
-    assertNumVolumes(volumeSet, 2, 0);
-
-    // Add a volume to VolumeSet
-    String volume3 = baseDir.resolve("disk3").toString();
-    boolean success = volumeSet.addVolume(volume3);
-
-    assertTrue(success);
-    assertEquals(3, volumeSet.getVolumesList().size());
-    assertTrue(checkVolumeExistsInVolumeSet(volume3),
-        "AddVolume did not add requested volume to VolumeSet");
-
-    assertNumVolumes(volumeSet, 3, 0);
-  }
-
-  @Test
   public void testFailVolume() throws Exception {
     assertNumVolumes(volumeSet, 2, 0);
 
@@ -170,30 +151,6 @@ public class TestVolumeSet {
   }
 
   @Test
-  public void testRemoveVolume() throws Exception {
-    assertNumVolumes(volumeSet, 2, 0);
-
-    assertEquals(2, volumeSet.getVolumesList().size());
-
-    // Remove a volume from VolumeSet
-    volumeSet.removeVolume(HddsVolumeUtil.getHddsRoot(volume1));
-    assertEquals(1, volumeSet.getVolumesList().size());
-
-    assertNumVolumes(volumeSet, 1, 0);
-
-    // Attempting to remove a volume which does not exist in VolumeSet should
-    // log a warning.
-    LogCapturer logs = LogCapturer.captureLogs(MutableVolumeSet.class);
-    volumeSet.removeVolume(HddsVolumeUtil.getHddsRoot(volume1));
-    assertEquals(1, volumeSet.getVolumesList().size());
-    String expectedLogMessage = "Volume : " +
-        HddsVolumeUtil.getHddsRoot(volume1) + " does not exist in VolumeSet";
-    assertThat(logs.getOutput()).contains(expectedLogMessage);
-
-    assertNumVolumes(volumeSet, 1, 0);
-  }
-
-  @Test
   public void testVolumeInInconsistentState() throws Exception {
     assertNumVolumes(volumeSet, 2, 0);
     assertEquals(2, volumeSet.getVolumesList().size());
@@ -213,14 +170,15 @@ public class TestVolumeSet {
     // The new volume is in an inconsistent state as the root dir is
     // non-empty but the version file does not exist. Add Volume should
     // return false.
-    boolean success = volumeSet.addVolume(volume3);
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY, conf.get(ScmConfigKeys.HDDS_DATANODE_DIR_KEY) + "," + volume3);
+    volumeSet.shutdown();
+    initializeVolumeSet();
 
-    assertFalse(success);
     assertEquals(2, volumeSet.getVolumesList().size());
     assertFalse(checkVolumeExistsInVolumeSet(volume3), "AddVolume should fail" +
         " for an inconsistent volume");
 
-    assertNumVolumes(volumeSet, 2, 0);
+    assertNumVolumes(volumeSet, 2, 1);
     // Delete volume3
     File volume = new File(volume3);
     FileUtils.deleteDirectory(volume);

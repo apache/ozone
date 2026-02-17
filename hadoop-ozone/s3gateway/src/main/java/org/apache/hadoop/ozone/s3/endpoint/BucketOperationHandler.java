@@ -47,4 +47,24 @@ public interface BucketOperationHandler {
       throws IOException, OS3Exception {
     return null;
   }
+
+  /**
+   * Handle the bucket GET operation if this handler is responsible for it.
+   * The handler inspects the request (query parameters, headers, etc.) to determine
+   * if it should handle the request.
+   *
+   * @param bucketName the name of the bucket
+   * @return Response if this handler handles the request, null otherwise
+   * @throws IOException if an I/O error occurs
+   * @throws OS3Exception if an S3-specific error occurs
+   */
+  default Response handleGetRequest(String bucketName)
+      throws IOException, OS3Exception {
+    return null;
+  }
+
+  default Response handleDeleteRequest(String bucketName)
+      throws IOException, OS3Exception {
+    return null;
+  }
 }

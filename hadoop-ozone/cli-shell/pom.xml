@@ -77,6 +77,10 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-cli-common</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-client</artifactId>
     </dependency>
     <dependency>
@@ -121,6 +125,12 @@
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-filesystem</artifactId>
       <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-config</artifactId>
+      <type>test-jar</type>
+      <scope>test</scope>
     </dependency>
   </dependencies>
   <build>
