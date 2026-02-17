@@ -41,7 +41,7 @@ public class StateMachineReadyRule extends SafeModeExitRule<Boolean> {
   @Override
   protected boolean validate() {
     if (null != scmStateMachine) {
-      return scmStateMachine.isRefreshedAfterLeaderReady();
+      return scmStateMachine.getIsStateMachineReady();
     }
     // if no HA, always return true.
     return true;
@@ -58,7 +58,7 @@ public class StateMachineReadyRule extends SafeModeExitRule<Boolean> {
   @Override
   public String getStatusText() {
     return String.format("Refreshed SCM State Machine after leader ready: %s",
-        scmStateMachine != null ? scmStateMachine.isRefreshedAfterLeaderReady() : "NA");
+        scmStateMachine != null ? scmStateMachine.getIsStateMachineReady() : "NA");
   }
 
   @Override

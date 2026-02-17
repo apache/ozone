@@ -2320,7 +2320,7 @@
   </property>
   <property>
     <name>ozone.om.ratis.snapshot.max.total.sst.size</name>
-    <value>100000000</value>
+    <value>10737418240</value>
     <tag>OZONE, OM, RATIS</tag>
     <description>
       Max size of SST files in OM Ratis Snapshot tarball.
@@ -4867,8 +4867,8 @@
   </property>
   <property>
     <name>hdds.datanode.kerberos.principal</name>
-    <value/>
-    <tag>OZONE, DATANODE</tag>
+    <value>dn/_HOST@REALM</value>
+    <tag>OZONE, SECURITY, KERBEROS, DATANODE</tag>
     <description>
       The Datanode service principal. This is typically set to
       dn/_HOST@REALM.TLD. Each Datanode will substitute _HOST with its

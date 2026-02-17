@@ -46,12 +46,13 @@ import org.slf4j.LoggerFactory;
  */
 public final class DatabaseHelper {
 
+  private static final Logger LOG =
+      LoggerFactory.getLogger(DatabaseHelper.class);
+
   static {
     loadProperties();
   }
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(DatabaseHelper.class);
   private static Map<String, String> properties;
 
   private DatabaseHelper() {

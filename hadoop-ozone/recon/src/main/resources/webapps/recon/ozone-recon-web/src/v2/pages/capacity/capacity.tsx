@@ -103,13 +103,24 @@ const Capacity: React.FC<object> = () => {
     }
   }, [selectedDatanode, storageDistribution.data.dataNodeUsage]);
 
-  const loadDNData = () => {
+  const loadData = () => {
+    storageDistribution.refetch();
+    scmPendingDeletes.refetch();
+    omPendingDeletes.refetch();
     dnPendingDeletes.refetch();
     setState({
       isDNPending: dnPendingDeletes.data.status !== "FINISHED",
       lastUpdated: Number(moment())
     })
   }
+
+  const loadDNData = () => {
+    dnPendingDeletes.refetch();
+    setState({
+      isDNPending: dnPendingDeletes.data.status !== "FINISHED",
+      lastUpdated: Number(moment())
+    })
+  } 
 
   const autoReload = useAutoReload(loadDNData, PENDING_POLL_INTERVAL);
 
@@ -256,7 +267,7 @@ const Capacity: React.FC<object> = () => {
           isLoading={dnPendingDeletes.loading}
           lastRefreshed={state.lastUpdated}
           togglePolling={autoReload.handleAutoReloadToggle}
-          onReload={loadDNData} />
+          onReload={loadData} />
       </div>
       <div className='data-container'>
         <Typography.Title level={4} className='section-title'>Cluster</Typography.Title>

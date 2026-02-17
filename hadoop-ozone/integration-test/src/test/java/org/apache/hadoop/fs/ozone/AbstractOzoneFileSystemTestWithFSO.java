@@ -42,6 +42,7 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerDoubleBuffer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.MethodOrderer;
@@ -550,6 +551,46 @@ abstract class AbstractOzoneFileSystemTestWithFSO extends AbstractOzoneFileSyste
     assertThat(dirInfo.getCreationTime()).isGreaterThan(0);
     assertEquals(dirInfo.getCreationTime(), dirInfo.getModificationTime());
     return dirInfo.getObjectID();
+  }
+
+  /**
+   * Test to reproduce "Directory Not Empty" bug using public FileSystem API.
+   * Tests both checkSubDirectoryExists() and checkSubFileExists() paths.
+   * Creates child directory and file, deletes them, then tries to delete parent.
+   */
+  @Test
+  public void testDeleteParentAfterChildDeleted() throws Exception {
+    Path parent = new Path("/parent");
+    Path childDir = new Path(parent, "childDir");
+    Path childFile = new Path(parent, "childFile");
+
+    // Create parent directory
+    assertTrue(getFs().mkdirs(parent));
+    // Create child directory (tests checkSubDirectoryExists path)
+    assertTrue(getFs().mkdirs(childDir));
+    // Create child file (tests checkSubFileExists path)
+    ContractTestUtils.touch(getFs(), childFile);
+
+    // Pause double buffer to prevent flushing deleted entries to DB
+    // This makes the bug reproduce deterministically
+    OzoneManagerDoubleBuffer doubleBuffer = getCluster().getOzoneManager()
+        .getOmRatisServer().getOmStateMachine().getOzoneManagerDoubleBuffer();
+    doubleBuffer.pause();
+
+    try {
+      // Delete child directory
+      assertTrue(getFs().delete(childDir, false), "Child directory delete should succeed");
+      // Delete child file
+      assertTrue(getFs().delete(childFile, false), "Child file delete should succeed");
+
+      // Try to delete parent directory (should succeed but may fail with the bug)
+      // Without the fix, this fails because deleted children are still in DB
+      boolean parentDeleted = getFs().delete(parent, false);
+      assertTrue(parentDeleted, "Parent delete should succeed after children deleted");
+    } finally {
+      // Unpause double buffer to avoid affecting other tests
+      doubleBuffer.unpause();
+    }
   }
 
 }
