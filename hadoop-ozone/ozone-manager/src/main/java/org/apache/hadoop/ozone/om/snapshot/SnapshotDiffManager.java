@@ -572,7 +572,17 @@ public class SnapshotDiffManager implements AutoCloseable {
               + DIFF_TYPE_STRING_MAP.values().stream().map(String::valueOf).collect(Collectors.joining(","))));
     }
 
-    int idx = isBlank(index) ? 0 : Integer.parseInt(index.substring(1));
+    int idx;
+    if (isBlank(index)) {
+      idx = 0;
+    } else {
+      try {
+        idx = Integer.parseInt(index.substring(1));
+      } catch (NumberFormatException e) {
+        throw new IOException("Token " + index + " has invalid numeric part: " +
+            index.substring(1) + ". It should be a valid integer.", e);
+      }
+    }
     if (idx < 0 || idx > snapDiffJob.getTotalDiffEntries() || pageSize <= 0) {
       throw new IOException(String.format(
           "Index (given: %d) should be a number >= 0 and < totalDiffEntries: " +
