@@ -646,7 +646,7 @@ public class SnapshotDiffManager implements AutoCloseable {
                              final String largestPageIndex,
                              boolean lastPage) throws IOException {
     // For last page check last entry returned if the largest entry key equals the largest key stored in the job entry.
-    if (lastPage && !diffJob.getLargestEntryKey().equals(largestPageIndex)) {
+    if (lastPage && (diffJob.getLargestEntryKey() == null || !diffJob.getLargestEntryKey().equals(largestPageIndex))) {
       LOG.error("Expected last entry: {} but found " +
               "Largest Page entry: {}", diffJob.getLargestEntryKey(), largestPageIndex);
       updateJobStatus(diffJob.getJobId(), DONE, FAILED);
