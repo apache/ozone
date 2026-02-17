@@ -229,18 +229,14 @@ public class TestScmHAFinalization {
     // automatically once a leader is elected.
     cluster.waitForClusterToBeReady();
 
-    LOG.info("+++ point 1");
     finalizationFuture.get();
     TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
     // Once the leader tells the client finalization is complete, wait for all
     // followers to catch up so we can check their state.
-    LOG.info("+++ point 2");
     waitForScmsToFinalize(cluster.getStorageContainerManagersList());
 
-    LOG.info("+++ point 3");
     TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
         cluster.getStorageContainerManagersList(), 0, NUM_DATANODES);
-    LOG.info("+++ point 4");
     TestHddsUpgradeUtils.testPostUpgradeConditionsDataNodes(
         cluster.getHddsDatanodes(), 0, CLOSED);
   }
@@ -271,22 +267,17 @@ public class TestScmHAFinalization {
       }
     }
 
-    LOG.info("+++ point 1");
     // Wait for finalization from the client perspective.
     finalizationFuture.get();
     TestHddsUpgradeUtils.waitForFinalizationFromClient(scmClient, CLIENT_ID);
     // Wait for two running SCMs to finish finalization.
-    LOG.info("+++ point 2");
     waitForScmsToFinalize(activeScms);
 
-    LOG.info("+++ point 3");
     TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
         activeScms, 0, NUM_DATANODES);
-    LOG.info("+++ point 4");
     TestHddsUpgradeUtils.testPostUpgradeConditionsDataNodes(
         cluster.getHddsDatanodes(), 0, CLOSED);
 
-    LOG.info("+++ point 5");
     // Move SCM log index farther ahead to make sure a snapshot install
     // happens on the restarted SCM.
     for (int i = 0; i < 10; i++) {
@@ -297,7 +288,6 @@ public class TestScmHAFinalization {
           container.getContainerInfo().getContainerID());
     }
 
-    LOG.info("+++ point 6");
     cluster.startInactiveSCM(inactiveScm.getSCMNodeId());
     waitForScmToFinalize(inactiveScm);
 
