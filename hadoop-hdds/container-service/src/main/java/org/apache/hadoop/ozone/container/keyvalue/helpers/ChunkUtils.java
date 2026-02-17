@@ -233,11 +233,8 @@ public final class ChunkUtils {
     }
 
     // Increment volumeIO stats here.
-    long endTime = Time.monotonicNow();
     if (volume != null) {
-      volume.getVolumeIOStats().incReadTime(endTime - startTime);
-      volume.getVolumeIOStats().incReadOpCount();
-      volume.getVolumeIOStats().incReadBytes(bytesRead);
+      volume.getVolumeIOStats().recordReadOperation(startTime, bytesRead);
     }
 
     LOG.debug("Read {} bytes starting at offset {} from {}",

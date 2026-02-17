@@ -207,6 +207,7 @@ public class TestContainerMetrics {
       assertCounter("numReadChunk", 1L, containerMetrics);
       assertCounter("bytesWriteChunk", 1024L, containerMetrics);
       assertCounter("bytesReadChunk", 1024L, containerMetrics);
+      // bytesReadBlock is tested in TestKeyValueHandler.testReadBlockMetrics
 
       String sec = DFS_METRICS_PERCENTILES_INTERVALS + "s";
       Thread.sleep((DFS_METRICS_PERCENTILES_INTERVALS + 1) * 1000);
