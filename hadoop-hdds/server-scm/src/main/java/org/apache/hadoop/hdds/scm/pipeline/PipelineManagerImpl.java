@@ -259,7 +259,7 @@ public class PipelineManagerImpl implements PipelineManager {
   private void checkIfPipelineCreationIsAllowed(
       ReplicationConfig replicationConfig) throws IOException {
     if (!isPipelineCreationAllowed() && !factorOne(replicationConfig)) {
-      LOG.info("Pipeline creation is not allowed until safe mode prechecks " +
+      LOG.debug("Pipeline creation is not allowed until safe mode prechecks " +
           "complete");
       throw new IOException("Pipeline creation is not allowed as safe mode " +
           "prechecks have not yet passed");

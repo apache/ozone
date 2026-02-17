@@ -48,7 +48,7 @@ public class SCMUpgradeFinalizer extends
   }
 
   public SCMUpgradeFinalizer(HDDSLayoutVersionManager versionManager,
-                             UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor) {
+      UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor) {
     super(versionManager, executor);
   }
 
@@ -70,7 +70,7 @@ public class SCMUpgradeFinalizer extends
 
   @Override
   public void finalizeLayoutFeature(LayoutFeature lf,
-                                    SCMUpgradeFinalizationContext context) throws UpgradeException {
+      SCMUpgradeFinalizationContext context) throws UpgradeException {
     // Run upgrade actions, update VERSION file, and update layout version in
     // DB.
     try {
@@ -87,12 +87,12 @@ public class SCMUpgradeFinalizer extends
    * finalized to run its finalization actions, update the VERSION file, and
    * move the state of its in memory datanodes to healthy readonly.
    *
-   * @param lf      The layout feature that is being finalized.
+   * @param lf The layout feature that is being finalized.
    * @param context Supplier of objects needed to run the steps.
    * @throws UpgradeException
    */
   void replicatedFinalizationSteps(HDDSLayoutFeature lf,
-                                   SCMUpgradeFinalizationContext context) throws UpgradeException {
+      SCMUpgradeFinalizationContext context) throws UpgradeException {
     // Run upgrade actions and update VERSION file.
     super.finalizeLayoutFeature(lf,
         lf.scmAction(),
@@ -131,8 +131,7 @@ public class SCMUpgradeFinalizer extends
       throws SCMException, NotLeaderException {
     NodeManager nodeManager = context.getNodeManager();
 
-    LOG.info("Waiting for all HEALTHY datanodes to complete finalization " +
-        "before finishing SCM finalization.");
+    LOG.info("Waiting for all HEALTHY datanodes to complete finalization before finishing SCM finalization.");
 
     boolean allDatanodesFinalized = false;
     while (!allDatanodesFinalized) {
