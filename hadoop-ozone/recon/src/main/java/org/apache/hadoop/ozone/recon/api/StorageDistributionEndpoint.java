@@ -20,10 +20,8 @@ package org.apache.hadoop.ozone.recon.api;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 
-import java.io.BufferedWriter;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -34,17 +32,14 @@ import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
-import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import javax.ws.rs.core.StreamingOutput;
-import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.CSVPrinter;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeMetric;
 import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
+import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsServiceResponse;
 import org.apache.hadoop.ozone.recon.api.types.DatanodePendingDeletionMetrics;
@@ -128,9 +123,30 @@ public class StorageDistributionEndpoint {
     }
   }
 
+  /**
+   * Downloads the distribution of data node metrics in a CSV file format.
+   * This method collects metrics related to pending deletions and various storage statistics
+   * for each data node. If the metrics collection is still in progress, it returns an
+   * intermediate response. If the collection is complete and metrics data are available,
+   * it generates and streams a CSV file containing detailed statistics.
+   *
+   * The CSV includes the following headers: HostName, Datanode UUID, Filesystem Capacity,
+   * Filesystem Used Space, Filesystem Remaining Space, Ozone Capacity, Ozone Used Space,
+   * Ozone Remaining Space, PreAllocated Container Space, Reserved Space, Minimum Free
+   * Space, and Pending Block Size.
+   *
+   * @return A Response object. Depending on the state of metrics collection, this can be:
+   *         - An HTTP 202 (Accepted) response with a status and metrics data if the
+   *           collection is not yet complete.
+   *         - An HTTP 500 (Internal Server Error) if the metrics data is missing despite
+   *           the collection status being marked as finished.
+   *         - An HTTP 202 (Accepted) response containing a CSV file of data node metrics
+   *           if the collection is complete and valid metrics data are available.
+   */
   @GET
   @Path("/download")
-  public Response downloadDataNodeDistribution() {
+  public Response downloadDataNodeStorageDistribution() {
+
     DataNodeMetricsServiceResponse metricsResponse =
         dataNodeMetricsService.getCollectedMetrics(null);
 
@@ -157,54 +173,45 @@ public class StorageDistributionEndpoint {
                 DatanodeStorageReport::getDatanodeUuid,
                 Function.identity()));
 
-    StreamingOutput stream = output -> {
-      CSVFormat format = CSVFormat.DEFAULT.builder()
-          .setHeader(
-              "HostName",
-              "Datanode UUID",
-              "Capacity",
-              "Used Space",
-              "Remaining Space",
-              "Committed Space",
-              "Reserved Space",
-              "Minimum Free Space",
-              "Pending Block Size")
-          .build();
+    List<DataNodeStoragePendingDeletionView> data = pendingDeletionMetrics.stream()
+        .map(metric -> {
+          return new DataNodeStoragePendingDeletionView(metric, reportByUuid.get(metric.getDatanodeUuid()));
+        })
+        .filter(Objects::nonNull)
+        .collect(Collectors.toList());
 
-      try (CSVPrinter printer = new CSVPrinter(
-          new BufferedWriter(new OutputStreamWriter(output, StandardCharsets.UTF_8)),
-          format)) {
+    List<String> headers = Arrays.asList(
+        "HostName",
+        "Datanode UUID",
+        "Filesystem Capacity",
+        "Filesystem Used Space",
+        "Filesystem Remaining Space",
+        "Ozone Capacity",
+        "Ozone Used Space",
+        "Ozone Remaining Space",
+        "PreAllocated Container Space",
+        "Reserved Space",
+        "Minimum Free Space",
+        "Pending Block Size"
+    );
 
-        for (DatanodePendingDeletionMetrics metric : pendingDeletionMetrics) {
-          DatanodeStorageReport report = reportByUuid.get(metric.getDatanodeUuid());
-          if (report == null) {
-            continue; // skip if report is missing
-          }
+    List<Function<DataNodeStoragePendingDeletionView, Object>> columns =
+        Arrays.asList(
+            v -> v.getMetric() != null ? v.getMetric().getHostName() : "Unknown",
+            v -> v.getMetric() != null ? v.getMetric().getDatanodeUuid() : "Unknown",
+            v -> v.getReport() != null ? v.getReport().getFilesystemCapacity() : -1,
+            v -> v.getReport() != null ? v.getReport().getFilesystemUsed() : -1,
+            v -> v.getReport() != null ? v.getReport().getFilesystemAvailable() : -1,
+            v -> v.getReport() != null ? v.getReport().getCapacity() : -1,
+            v -> v.getReport() != null ? v.getReport().getUsed() : -1,
+            v -> v.getReport() != null ? v.getReport().getRemaining() : -1,
+            v -> v.getReport() != null ? v.getReport().getCommitted() : -1,
+            v -> v.getReport() != null ? v.getReport().getReserved() : -1,
+            v -> v.getReport() != null ? v.getReport().getMinimumFreeSpace() : -1,
+            v -> v.getReport() != null ? v.getMetric().getPendingBlockSize() : -1
+        );
 
-          printer.printRecord(
-              metric.getHostName(),
-              metric.getDatanodeUuid(),
-              report.getCapacity(),
-              report.getUsed(),
-              report.getRemaining(),
-              report.getCommitted(),
-              report.getReserved(),
-              report.getMinimumFreeSpace(),
-              metric.getPendingBlockSize()
-          );
-        }
-        printer.flush();
-      } catch (Exception e) {
-        LOG.error("Failed to stream CSV", e);
-        throw new WebApplicationException("Failed to generate CSV", e);
-      }
-    };
-
-    return Response.status(Response.Status.ACCEPTED)
-        .entity(stream)
-        .type("text/csv")
-        .header("Content-Disposition", "attachment; filename=\"datanode_storage_and_pending_deletion_stats.csv\"")
-        .build();
+    return ReconUtils.downloadCsv("datanode_storage_and_pending_deletion_stats.csv", headers, data, columns);
   }
 
   private GlobalStorageReport calculateGlobalStorageReport() {
@@ -351,6 +358,29 @@ public class StorageDistributionEndpoint {
     } catch (Exception e) {
       LOG.error("Error getting storage report for datanode: {}", datanode, e);
       return null; // Return null on any error
+    }
+  }
+
+  /**
+   * Represents a view that combines pending deletion metrics and storage report data
+   * for a specific Datanode. This view is used to encapsulate both metric and storage
+   * details for understanding the state of a datanode in terms of storage and pending deletions.
+   */
+  private static class DataNodeStoragePendingDeletionView {
+    private final DatanodePendingDeletionMetrics metric;
+    private final DatanodeStorageReport report;
+
+    DataNodeStoragePendingDeletionView(DatanodePendingDeletionMetrics metric, DatanodeStorageReport report) {
+      this.metric = metric;
+      this.report = report;
+    }
+
+    DatanodePendingDeletionMetrics getMetric() {
+      return metric;
+    }
+
+    DatanodeStorageReport getReport() {
+      return report;
     }
   }
 }
