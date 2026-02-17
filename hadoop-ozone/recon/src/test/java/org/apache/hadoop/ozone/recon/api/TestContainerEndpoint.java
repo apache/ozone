@@ -232,6 +232,7 @@ public class TestContainerEndpoint {
       // Clear shared state before subsequent tests to prevent data leakage
       ContainerKeyMapperHelper.clearSharedContainerCountMap();
       ReconConstants.resetTableTruncatedFlags();
+      reconContainerMetadataManager.reinitWithNewContainerDataFromOm(Collections.emptyMap());
 
       // Reinitialize container tables to clear RocksDB data
       reconContainerMetadataManager.reinitWithNewContainerDataFromOm(Collections.emptyMap());
