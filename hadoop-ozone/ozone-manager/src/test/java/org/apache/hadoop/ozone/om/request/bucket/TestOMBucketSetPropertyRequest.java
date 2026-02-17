@@ -29,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -104,8 +105,8 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
           OzoneObj.ResourceType resType,
           OzoneObj.StoreType storeType,
           IAccessAuthorizer.ACLType aclType,
-          String vol, String bucket, String key) throws IOException 
-                            String vol, String bucket, String key) throws java.io.IOException {
+          String vol, String bucket, String key) throws IOException
+      {
         throw new OMException("denied", OMException.ResultCodes.PERMISSION_DENIED);
       }
     };
