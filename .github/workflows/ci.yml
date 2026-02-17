@@ -50,6 +50,7 @@ jobs:
       needs-compose-tests: ${{ steps.selective-checks.outputs.needs-compose-tests }}
       needs-integration-tests: ${{ steps.selective-checks.outputs.needs-integration-tests }}
       needs-kubernetes-tests: ${{ steps.selective-checks.outputs.needs-kubernetes-tests }}
+      needs-ui-lint: ${{ steps.selective-checks.outputs.needs-ui-lint }}
       sha: ${{ steps.get-sha.outputs.sha }}
       # `env` context cannot be used when calling reusable workflow, so we need to convert these to `outputs`
       build-args: ${{ env.BUILD_ARGS }}
@@ -172,6 +173,18 @@ jobs:
       matrix:
         check: ${{ fromJson(needs.build-info.outputs.basic-checks) }}
       fail-fast: false
+
+  eslint:
+    needs:
+      - build-info
+    if: needs.build-info.outputs.needs-ui-lint == 'true'
+    uses: ./.github/workflows/check.yml
+    with:
+      needs-npm-cache: true
+      script: lint
+      sha: ${{ needs.build-info.outputs.sha }}
+      timeout-minutes: 15
+    secrets: inherit
 
   dependency:
     needs:
