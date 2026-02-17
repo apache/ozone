@@ -40,12 +40,11 @@ import java.io.IOException;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
+import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.StringJoiner;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -56,11 +55,9 @@ import org.apache.hadoop.ipc_.RemoteException;
 import org.apache.hadoop.ipc_.RpcNoSuchProtocolException;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OmUtils;
-import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
-import org.apache.hadoop.ozone.om.protocolPB.OMAdminProtocolPB;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoRequest;
@@ -82,23 +79,11 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
   private static final long SLOW_RESPONSE_SLEEP_TIME = TimeUnit.SECONDS.toMillis(2);
   private static final String OM_SERVICE_ID = "om-service-test1";
   private static final String NODE_ID_BASE_STR = "omNode-";
-  private static final String DUMMY_NODE_ADDR = "0.0.0.0:8080";
-  private OzoneConfiguration conf;
 
-  private HadoopRpcOMFollowerReadFailoverProxyProvider<OzoneManagerProtocolPB> proxyProvider;
+  private HadoopRpcOMFollowerReadFailoverProxyProvider proxyProvider;
   private OzoneManagerProtocolPB retryProxy;
   private String[] omNodeIds;
   private OMAnswer[] omNodeAnswers;
-
-  @Test
-  public void testWithNonClientProxy() throws Exception {
-    setupProxyProvider(2);
-    HadoopRpcOMFollowerReadFailoverProxyProvider<OMAdminProtocolPB> adminProxyProvider =
-        new HadoopRpcOMFollowerReadFailoverProxyProvider<>(conf,
-            UserGroupInformation.getCurrentUser(), OM_SERVICE_ID, OMAdminProtocolPB.class);
-    // follower read is only enabled for OzoneManagerProtocolPB and disabled otherwise
-    assertFalse(adminProxyProvider.isUseFollowerRead());
-  }
 
   @Test
   void testWriteOperationOnLeader() throws Exception {
@@ -360,13 +345,11 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
     omNodeIds = new String[omNodeCount];
     omNodeAnswers = new OMAnswer[omNodeCount];
     StringJoiner allNodeIds = new StringJoiner(",");
-    OzoneManagerProtocolPB[] proxies = new OzoneManagerProtocolPB[omNodeCount];
-    // Setup each OM node with the mocked proxy
-    Map<String, OzoneManagerProtocolPB> proxyMap = new HashMap<>();
+    final OzoneManagerProtocolPB[] proxies = new OzoneManagerProtocolPB[omNodeCount];
     for (int i = 0; i < omNodeCount; i++) {
       String nodeId = NODE_ID_BASE_STR + (i + 1); // 1-th indexed
       config.set(ConfUtils.addKeySuffixes(OZONE_OM_ADDRESS_KEY, OM_SERVICE_ID,
-          nodeId), DUMMY_NODE_ADDR);
+          nodeId),  "0.0.0.0:" + i);
       allNodeIds.add(nodeId);
       omNodeIds[i] = nodeId;
       omNodeAnswers[i] = new OMAnswer();
@@ -375,7 +358,6 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
           .when(proxies[i]).submitRequest(any(), any());
       doAnswer(omNodeAnswers[i].clientAnswer)
           .when(proxies[i]).submitRequest(any(), any());
-      proxyMap.put(nodeId, proxies[i]);
     }
     config.set(ConfUtils.addKeySuffixes(OZONE_OM_NODES_KEY, OM_SERVICE_ID),
         allNodeIds.toString());
@@ -389,19 +371,14 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
         new HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB>(config, UserGroupInformation.getCurrentUser(),
             OM_SERVICE_ID, OzoneManagerProtocolPB.class) {
           @Override
-          protected synchronized ProxyInfo<OzoneManagerProtocolPB> createOMProxyIfNeeded(
-              OMProxyInfo<OzoneManagerProtocolPB> omProxyInfo) {
-            if (omProxyInfo.proxy == null) {
-              omProxyInfo.proxy = proxyMap.get(omProxyInfo.getNodeId());
-            }
-            return omProxyInfo;
+          protected OzoneManagerProtocolPB createOMProxy(InetSocketAddress omAddress) {
+            return proxies[omAddress.getPort()];
           }
 
           @Override
-          protected void initOmProxiesFromConfigs(ConfigurationSource config, String omSvcId) throws IOException {
-            Map<String, OMProxyInfo<OzoneManagerProtocolPB>> omProxies = new HashMap<>();
-
-            List<String> omNodeIDList = new ArrayList<>();
+          protected List<OMProxyInfo<OzoneManagerProtocolPB>> initOmProxiesFromConfigs(
+              ConfigurationSource config, String omSvcId) {
+            List<OMProxyInfo<OzoneManagerProtocolPB>> omProxies = new ArrayList<>();
 
             Collection<String> activeOmNodeIds = OmUtils.getActiveOMNodeIds(config,
                 omSvcId);
@@ -416,16 +393,11 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
               }
 
               // ProxyInfo.proxy will be set during first time call to server.
-              OMProxyInfo<OzoneManagerProtocolPB> omProxyInfo = new OMProxyInfo<>(omSvcId, nodeId, rpcAddrStr);
+              final OMProxyInfo<OzoneManagerProtocolPB> omProxyInfo = OMProxyInfo.newInstance(
+                  null, omSvcId, nodeId, rpcAddrStr);
 
               if (omProxyInfo.getAddress() != null) {
-                // For a non-HA OM setup, nodeId might be null. If so, we assign it
-                // the default value
-                if (nodeId == null) {
-                  nodeId = OzoneConsts.OM_DEFAULT_NODE_ID;
-                }
-                omProxies.put(nodeId, omProxyInfo);
-                omNodeIDList.add(nodeId);
+                omProxies.add(omProxyInfo);
               } else {
                 LOG.error("Failed to create OM proxy for {} at address {}",
                     nodeId, rpcAddrStr);
@@ -439,14 +411,13 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
             }
             // By default, the omNodesInOrder is shuffled to reduce hotspot, but we can sort it here to
             // make it easier to test
-            Collections.sort(omNodeIDList);
-            initOmProxies(omProxies, omNodeIDList);
+            omProxies.sort(Comparator.comparing(OMProxyInfo::getNodeId));
+            return omProxies;
           }
         };
 
     // Wrap the leader-based failover proxy provider with follower read proxy provider
-    proxyProvider = new HadoopRpcOMFollowerReadFailoverProxyProvider<>(
-        OM_SERVICE_ID, OzoneManagerProtocolPB.class, underlyingProxyProvider);
+    proxyProvider = new HadoopRpcOMFollowerReadFailoverProxyProvider(underlyingProxyProvider);
     assertTrue(proxyProvider.isUseFollowerRead());
     // Wrap the follower read proxy provider in retry proxy to allow automatic failover
     retryProxy = (OzoneManagerProtocolPB) RetryProxy.create(
@@ -456,7 +427,6 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
     // This is currently added to prevent IllegalStateException in
     // Client#setCallIdAndRetryCount since it seems that callId is set but not unset properly
     RetryInvocationHandler.SET_CALL_ID_FOR_TEST.set(false);
-    conf = config;
   }
 
   private void doRead() throws Exception {

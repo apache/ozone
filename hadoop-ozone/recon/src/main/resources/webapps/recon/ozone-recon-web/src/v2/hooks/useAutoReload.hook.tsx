@@ -27,6 +27,7 @@ export function useAutoReload(
   const [isPolling, setIsPolling] = useState<boolean>(false);
   const refreshFunctionRef = useRef(refreshFunction);
   const lastPollCallRef = useRef<number>(0); // This is used to store the last time poll was called
+  const [intervalMs, setIntervalMs] = useState<number>(interval);
 
   // Update the ref when the function changes
   refreshFunctionRef.current = refreshFunction;
@@ -39,8 +40,10 @@ export function useAutoReload(
     }
   };
 
-  const startPolling = () => {
+  const startPolling = (customInterval?: number) => {
     stopPolling();
+    const effectiveInterval = customInterval ?? intervalMs;
+    setIntervalMs(effectiveInterval);
     const poll = () => {
       /**
        * Prevent any extra polling calls within 100ms of the last call,
@@ -53,7 +56,7 @@ export function useAutoReload(
         refreshFunctionRef.current();
         lastPollCallRef.current = Date.now();
       }
-      intervalRef.current = window.setTimeout(poll, interval);
+      intervalRef.current = window.setTimeout(poll, effectiveInterval);
     };
     poll();
     setIsPolling(true);

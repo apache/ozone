@@ -25,6 +25,10 @@
   <name>Apache Ozone HDDS Server Framework</name>
   <description>Apache Ozone Distributed Data Store Server Framework</description>
 
+  <properties>
+    <classpath.skip>false</classpath.skip>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>ch.qos.reload4j</groupId>
@@ -133,6 +137,10 @@
       <artifactId>commons-lang3</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-pool2</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-auth</artifactId>
     </dependency>
@@ -239,6 +247,10 @@
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.yaml</groupId>
+      <artifactId>snakeyaml</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>

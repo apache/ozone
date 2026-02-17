@@ -50,12 +50,6 @@ Method level annotation used to "disallow" an API if current layout version does
 ## @BelongsToLayoutVersion Annotation
 Annotation to mark an OM request class that it belongs to a specific Layout Version. Until that version is available post finalize, this request will not be supported. A newer version of an existing OM request can be created (by inheritance or a fully new class) and marked with a newer layout version. Until finalizing this layout version, the older request class is used. Post finalizing, the newer version of the request class is used.
 
-## LayoutVersionInstanceFactory<T>
-Generic factory which stores different instances of Type 'T' sharded by a key & version. A single key can be associated with different versions of 'T'.
-
-### Why does this class exist?
-A typical use case during upgrade is to have multiple versions of a class / method / object and choose them based  on the current layout version at runtime. Before finalizing, an older version is typically needed, and after finalization, a newer version is needed. This class serves this purpose in a generic way. For example, we can create a Factory to create multiple versions of OMRequests sharded by Request Type & Layout Version Supported.
-
 ## Upgrade Action (UpgradeActionOm & UpgradeActionHdds)
 Annotation to specify upgrade action run during specific upgrade phases. Each layout feature can optionally define an upgrade action for every supported phase. These are the supported phases of action callbacks.
 
