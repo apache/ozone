@@ -115,10 +115,8 @@ public final class OMClientRequestUtils {
 
   public static void validateVolumeName(String volumeName) throws IOException {
     if (StringUtils.isBlank(volumeName)) {
-      if (StringUtils.isBlank(volumeName)) {
-        throw new OMException("Invalid, volume name is empty",
-            OMException.ResultCodes.INVALID_VOLUME_NAME);
-      }
+      throw new OMException("Invalid, volume name is empty",
+          OMException.ResultCodes.INVALID_VOLUME_NAME);
     }
   }
 

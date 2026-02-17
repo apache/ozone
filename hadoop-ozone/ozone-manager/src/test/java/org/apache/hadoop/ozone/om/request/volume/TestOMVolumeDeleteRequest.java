@@ -70,9 +70,8 @@ public class TestOMVolumeDeleteRequest extends TestOMVolumeRequest {
           OzoneObj.ResourceType resType,
           OzoneObj.StoreType storeType,
           IAccessAuthorizer.ACLType aclType,
-          String vol, String bucket, String key) throws IOException 
-
-
+          String vol, String bucket, String key) throws IOException
+      {
         throw new OMException("denied", OMException.ResultCodes.PERMISSION_DENIED);
       }
     };
