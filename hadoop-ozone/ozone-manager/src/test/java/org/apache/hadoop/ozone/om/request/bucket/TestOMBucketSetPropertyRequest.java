@@ -100,10 +100,11 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
 
     OMBucketSetPropertyRequest req = new OMBucketSetPropertyRequest(originalRequest) {
       @Override
-      public void checkAcls(OzoneManager ozoneManager,
-                            OzoneObj.ResourceType resType,
-                            OzoneObj.StoreType storeType,
-                            IAccessAuthorizer.ACLType aclType,
+      public void checkAcls(OzoneManager ozoneManager, 
+          OzoneObj.ResourceType resType,
+          OzoneObj.StoreType storeType,
+          IAccessAuthorizer.ACLType aclType,
+          String vol, String bucket, String key) throws IOException 
                             String vol, String bucket, String key) throws java.io.IOException {
         throw new OMException("denied", OMException.ResultCodes.PERMISSION_DENIED);
       }
