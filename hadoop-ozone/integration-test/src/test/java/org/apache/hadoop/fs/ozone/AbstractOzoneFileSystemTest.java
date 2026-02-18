@@ -249,8 +249,9 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
     return cluster;
   }
 
-  public FileSystem getFs() {
-    return fs;
+  @Override
+  public OzoneFileSystem getFs() {
+    return o3fs;
   }
 
   public String getBucketName() {
@@ -961,12 +962,7 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
    */
   @Test
   public void testListStatusIteratorWithDir() throws Exception {
-    listStatusIteratorWithDir(ROOT, fs);
-  }
-
-  @Override
-  RemoteIterator<FileStatus> listStatusIterator(Path path) throws IOException {
-    return o3fs.listStatusIterator(path);
+    listStatusIteratorWithDir(ROOT);
   }
 
   /**

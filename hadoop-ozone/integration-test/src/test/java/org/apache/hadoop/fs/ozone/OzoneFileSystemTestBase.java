@@ -44,16 +44,11 @@ import org.apache.hadoop.ozone.client.OzoneKeyDetails;
  * Common test cases for Ozone file systems.
  */
 public abstract class OzoneFileSystemTestBase {
-
-  protected OzoneFileSystemTestBase() {
-    // no instances
-  }
-
   /**
    * Tests listStatusIterator operation on directory with different
    * numbers of child directories.
    */
-  protected void listStatusIteratorOnPageSize(OzoneConfiguration conf,
+  static void listStatusIteratorOnPageSize(OzoneConfiguration conf,
       String rootPath) throws IOException {
     final int pageSize = 32;
     int[] dirCounts = {
@@ -81,7 +76,7 @@ public abstract class OzoneFileSystemTestBase {
     }
   }
 
-  private void listStatusIterator(FileSystem subject,
+  private static void listStatusIterator(FileSystem subject,
       Path dir, Set<String> paths, int total) throws IOException {
     for (int i = paths.size(); i < total; i++) {
       Path p = new Path(dir, String.valueOf(i));
@@ -116,7 +111,7 @@ public abstract class OzoneFileSystemTestBase {
     }
   }
 
-  protected void listLocatedStatusForZeroByteFile(FileSystem fs, Path path) throws IOException {
+  static void listLocatedStatusForZeroByteFile(FileSystem fs, Path path) throws IOException {
     // create empty file
     ContractTestUtils.touch(fs, path);
 
@@ -149,7 +144,7 @@ public abstract class OzoneFileSystemTestBase {
     assertFalse(fileStatuses[0] instanceof LocatedFileStatus);
   }
 
-  protected void createKeyWithECReplicationConfig(Path root, OzoneConfiguration conf) throws IOException {
+  void createKeyWithECReplicationConfig(Path root, OzoneConfiguration conf) throws IOException {
     Path testKeyPath = new Path(root, "testKey");
     createKeyWithECReplicationConfiguration(conf, testKeyPath);
 
@@ -160,19 +155,20 @@ public abstract class OzoneFileSystemTestBase {
         key.getReplicationConfig().getReplication());
   }
 
-  protected void listStatusIteratorWithDir(Path root, FileSystem fs) throws Exception {
+  void listStatusIteratorWithDir(Path root) throws Exception {
     Path parent = new Path(root, "testListStatus");
     Path file1 = new Path(parent, "key1");
     Path file2 = new Path(parent, "key2");
+    FileSystem fs = getFs();
     try {
       // Iterator should have no items when dir is empty
-      RemoteIterator<FileStatus> it = listStatusIterator(root);
+      RemoteIterator<FileStatus> it = fs.listStatusIterator(root);
       assertFalse(it.hasNext());
 
       ContractTestUtils.touch(fs, file1);
       ContractTestUtils.touch(fs, file2);
       // Iterator should have an item when dir is not empty
-      it = listStatusIterator(root);
+      it = fs.listStatusIterator(root);
       while (it.hasNext()) {
         FileStatus fileStatus = it.next();
         assertNotNull(fileStatus);
@@ -180,7 +176,7 @@ public abstract class OzoneFileSystemTestBase {
       }
       // Iterator on a directory should return all subdirs along with
       // files, even if there exists a file and sub-dir with the same name.
-      it = listStatusIterator(parent);
+      it = fs.listStatusIterator(parent);
       int iCount = 0;
       while (it.hasNext()) {
         iCount++;
@@ -194,7 +190,7 @@ public abstract class OzoneFileSystemTestBase {
       Path file4 = new Path(parent, "dir1/key4");
       ContractTestUtils.touch(fs, file3);
       ContractTestUtils.touch(fs, file4);
-      it = listStatusIterator(parent);
+      it = fs.listStatusIterator(parent);
       iCount = 0;
 
       while (it.hasNext()) {
@@ -211,7 +207,7 @@ public abstract class OzoneFileSystemTestBase {
     }
   }
 
-  abstract RemoteIterator<FileStatus> listStatusIterator(Path path) throws IOException;
-
   abstract OzoneKeyDetails getKey(Path keyPath, boolean isDirectory) throws IOException;
+
+  abstract FileSystem getFs();
 }

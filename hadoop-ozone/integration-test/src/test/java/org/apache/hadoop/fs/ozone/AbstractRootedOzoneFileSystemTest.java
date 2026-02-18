@@ -212,8 +212,9 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
     fs.delete(volumePath, false);
   }
 
-  public FileSystem getFs() {
-    return fs;
+  @Override
+  public RootedOzoneFileSystem getFs() {
+    return ofs;
   }
 
   public Path getBucketPath() {
@@ -438,12 +439,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
    */
   @Test
   void testListStatusIteratorWithDir() throws Exception {
-    listStatusIteratorWithDir(bucketPath, fs);
-  }
-
-  @Override
-  RemoteIterator<FileStatus> listStatusIterator(Path path) throws IOException {
-    return ofs.listStatusIterator(path);
+    listStatusIteratorWithDir(bucketPath);
   }
 
   /**
