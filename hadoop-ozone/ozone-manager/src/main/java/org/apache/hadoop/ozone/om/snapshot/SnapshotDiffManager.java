@@ -583,7 +583,9 @@ public class SnapshotDiffManager implements AutoCloseable {
             index.substring(1) + ". It should be a valid integer.", e);
       }
     }
-    if (idx < 0 || idx > snapDiffJob.getTotalDiffEntries() || pageSize <= 0) {
+    if (idx < 0 ||
+        (snapDiffJob.getTotalDiffEntries() > 0 && idx >= snapDiffJob.getTotalDiffEntries()) ||
+        pageSize <= 0) {
       throw new IOException(String.format(
           "Index (given: %d) should be a number >= 0 and < totalDiffEntries: " +
               "%d. Page size (given: %d) should be a positive number > 0.",
