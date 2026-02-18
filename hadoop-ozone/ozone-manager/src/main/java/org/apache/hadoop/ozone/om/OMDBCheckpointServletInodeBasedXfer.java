@@ -534,9 +534,9 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
             filesWritten++;
             maxTotalSstSize.addAndGet(-fileSize);
             sstFilesToExclude.add(fileId);
-          } catch (NoSuchFileException e){
+          } catch (NoSuchFileException e) {
             logFileNoLongerExists(dbFile);
-            if (path != null && omdbArchiver.getHardLinkFileMap()!=null ) {
+            if (path != null && omdbArchiver.getHardLinkFileMap() != null) {
               omdbArchiver.getHardLinkFileMap().remove(path);
             }
           }
