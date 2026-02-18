@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.stream.Stream;
@@ -137,7 +138,12 @@ public final class Archiver {
     File link = tmpDir.resolve(entryName).toFile();
     long bytes = 0;
     try {
-      Files.createLink(link.toPath(), file.toPath());
+      try {
+        Files.createLink(link.toPath(), file.toPath());
+      } catch (NoSuchFileException noSuchFileException){
+        LOG.warn("Failed to include file {} in the tarball as the file doesn't exist", file.toPath());
+        return  0;
+      }
       TarArchiveEntry entry = archiveOutput.createArchiveEntry(link, entryName);
       archiveOutput.putArchiveEntry(entry);
       try (InputStream input = Files.newInputStream(link.toPath())) {

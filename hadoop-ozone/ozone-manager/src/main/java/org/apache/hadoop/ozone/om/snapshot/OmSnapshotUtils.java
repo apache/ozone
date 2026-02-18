@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import static org.apache.hadoop.hdds.utils.IOUtils.getINode;
 import static org.apache.hadoop.ozone.OzoneConsts.HARDLINK_SEPARATOR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
@@ -25,6 +28,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.FileTime;
@@ -41,6 +45,8 @@ public final class OmSnapshotUtils {
   public static final String DATA_PREFIX = "data";
   public static final String DATA_SUFFIX = "txt";
   public static final String PATH_SEPARATOR = "/";
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OmSnapshotUtils.class);
 
   private OmSnapshotUtils() { }
 
@@ -70,9 +76,15 @@ public final class OmSnapshotUtils {
    * @throws IOException if an I/O error occurs
    */
   public static String getFileInodeAndLastModifiedTimeString(Path file) throws IOException {
-    Object inode = getINode(file);
-    FileTime mTime = Files.getLastModifiedTime(file);
-    return String.format("%s-%s", inode, mTime.toMillis());
+    Object inode;
+    try {
+      inode = getINode(file);
+      FileTime mTime = Files.getLastModifiedTime(file);
+      return String.format("%s-%s", inode, mTime.toMillis());
+    } catch (NoSuchFileException noSuchFileException) {
+      LOG.warn("File {} not found.", file);
+      return "";
+    }
   }
 
   /**
