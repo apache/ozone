@@ -61,6 +61,7 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   public static final String FAILED_DB_VOLUMES_TOLERATED_KEY = "hdds.datanode.failed.db.volumes.tolerated";
   public static final String DISK_CHECK_MIN_GAP_KEY = "hdds.datanode.disk.check.min.gap";
   public static final String DISK_CHECK_TIMEOUT_KEY = "hdds.datanode.disk.check.timeout";
+  public static final String DISK_CHECK_SLIDING_WINDOW_TIMEOUT_KEY = "hdds.datanode.disk.check.sliding.window.timeout";
 
   // Minimum space should be left on volume.
   // Ex: If volume has 1000GB and minFreeSpace is configured as 10GB,
@@ -98,6 +99,8 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   static final Duration DISK_CHECK_MIN_GAP_DEFAULT = Duration.ofMinutes(10);
 
   static final Duration DISK_CHECK_TIMEOUT_DEFAULT = Duration.ofMinutes(10);
+
+  static final Duration DISK_CHECK_SLIDING_WINDOW_TIMEOUT_DEFAULT = Duration.ofMinutes(60);
 
   static final boolean CONTAINER_SCHEMA_V3_ENABLED_DEFAULT = true;
   static final long ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT = 32 * 1024 * 1024;
@@ -404,6 +407,16 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private Duration diskCheckTimeout = DISK_CHECK_TIMEOUT_DEFAULT;
 
+  @Config(key = "hdds.datanode.disk.check.sliding.window.timeout",
+      defaultValue = "60m",
+      type = ConfigType.TIME,
+      tags = {ConfigTag.DATANODE},
+      description = "Time interval after which a disk check"
+          + " failure result stored in the sliding window will expire."
+          + " Unit could be defined with postfix (ns,ms,s,m,h,d)."
+  )
+  private Duration diskCheckSlidingWindowTimeout = DISK_CHECK_SLIDING_WINDOW_TIMEOUT_DEFAULT;
+
   @Config(key = "hdds.datanode.chunk.data.validation.check",
       defaultValue = "false",
       type = ConfigType.BOOLEAN,
@@ -688,6 +701,13 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       diskCheckTimeout = DISK_CHECK_TIMEOUT_DEFAULT;
     }
 
+    if (diskCheckSlidingWindowTimeout.isNegative()) {
+      LOG.warn("{} must be greater than zero and was set to {}. Defaulting to {}",
+          DISK_CHECK_SLIDING_WINDOW_TIMEOUT_KEY, diskCheckSlidingWindowTimeout,
+          DISK_CHECK_SLIDING_WINDOW_TIMEOUT_DEFAULT);
+      diskCheckSlidingWindowTimeout = DISK_CHECK_SLIDING_WINDOW_TIMEOUT_DEFAULT;
+    }
+
     if (blockDeleteCommandWorkerInterval.isNegative()) {
       LOG.warn(BLOCK_DELETE_COMMAND_WORKER_INTERVAL +
           " must be greater than zero and was set to {}. Defaulting to {}",
@@ -905,6 +925,14 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   public void setDiskCheckTimeout(Duration duration) {
     diskCheckTimeout = duration;
+  }
+
+  public Duration getDiskCheckSlidingWindowTimeout() {
+    return diskCheckSlidingWindowTimeout;
+  }
+
+  public void setDiskCheckSlidingWindowTimeout(Duration duration) {
+    diskCheckSlidingWindowTimeout = duration;
   }
 
   public int getBlockDeleteThreads() {
