@@ -26,8 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 import java.io.IOException;
 import java.util.UUID;
@@ -99,17 +98,9 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
     OMRequest originalRequest = createSetBucketPropertyRequest(
         volumeName, bucketName, true, Long.MAX_VALUE);
 
-    OMBucketSetPropertyRequest req = new OMBucketSetPropertyRequest(originalRequest) {
-      @Override
-      public void checkAcls(OzoneManager ozoneManager, 
-          OzoneObj.ResourceType resType,
-          OzoneObj.StoreType storeType,
-          IAccessAuthorizer.ACLType aclType,
-          String vol, String bucket, String key) throws IOException
-      {
-        throw new OMException("denied", OMException.ResultCodes.PERMISSION_DENIED);
-      }
-    };
+    OMBucketSetPropertyRequest req = spy(new OMBucketSetPropertyRequest(originalRequest));
+    doThrow(new OMException("denied", OMException.ResultCodes.PERMISSION_DENIED))
+        .when(req).checkAcls(any(), any(), any(), any(), any(), any(), any());
 
     OMException e = assertThrows(OMException.class, () -> req.preExecute(ozoneManager));
     assertEquals(OMException.ResultCodes.PERMISSION_DENIED, e.getResult());

@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om.request.key;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 import java.io.IOException;
 import java.util.UUID;
@@ -77,17 +77,9 @@ public class TestOMSetTimesRequest extends TestOMKeyRequest {
 
     OMRequest req = createSetTimesKeyRequest(2000, 1000);
 
-    OMKeySetTimesRequest setTimes = new OMKeySetTimesRequest(req, getBucketLayout()) {
-      @Override
-      public void checkAcls(OzoneManager ozoneManager, 
-          OzoneObj.ResourceType resType,
-          OzoneObj.StoreType storeType,
-          IAccessAuthorizer.ACLType aclType,
-          String vol, String bucket, String key) throws IOException
-      {
-        throw new OMException("denied", OMException.ResultCodes.PERMISSION_DENIED);
-      }
-    };
+    OMKeySetTimesRequest setTimes = spy(new OMKeySetTimesRequest(req, getBucketLayout()));
+    doThrow(new OMException("denied", OMException.ResultCodes.PERMISSION_DENIED))
+        .when(setTimes).checkAcls(any(), any(), any(), any(), any(), any(), any());
 
     OMException e = assertThrows(OMException.class,
         () -> setTimes.preExecute(ozoneManager));
