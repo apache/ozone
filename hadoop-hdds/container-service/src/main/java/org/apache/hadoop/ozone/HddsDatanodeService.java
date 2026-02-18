@@ -401,12 +401,11 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
     MutableVolumeSet volumeSet =
         getDatanodeStateMachine().getContainer().getVolumeSet();
 
-    Map<String, StorageVolume> volumeMap = volumeSet.getVolumeMap();
+    List<StorageVolume> volumeList = volumeSet.getVolumesList();
 
-    for (Map.Entry<String, StorageVolume> entry : volumeMap.entrySet()) {
-      HddsVolume hddsVolume = (HddsVolume) entry.getValue();
-      boolean result = StorageVolumeUtil.checkVolume(hddsVolume, clusterId,
-          clusterId, conf, LOG, null);
+    for (StorageVolume storageVolume : volumeList) {
+      HddsVolume hddsVolume = (HddsVolume) storageVolume;
+      boolean result = StorageVolumeUtil.checkVolume(hddsVolume, clusterId, clusterId, conf, LOG, null);
       if (!result) {
         volumeSet.failVolume(hddsVolume.getHddsRootDir().getPath());
       }

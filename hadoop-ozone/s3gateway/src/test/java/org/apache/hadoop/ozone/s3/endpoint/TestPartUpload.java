@@ -162,10 +162,11 @@ public class TestPartUpload {
     MessageDigest sha256Digest = mock(MessageDigest.class);
     when(sha256Digest.getAlgorithm()).thenReturn("SHA-256");
     try (MockedStatic<IOUtils> ioutils = mockStatic(IOUtils.class);
-        MockedStatic<ObjectEndpointStreaming> streaming = mockStatic(ObjectEndpointStreaming.class)) {
+        MockedStatic<ObjectEndpointStreaming> streaming = mockStatic(ObjectEndpointStreaming.class);
+        MockedStatic<EndpointBase> endpoint = mockStatic(EndpointBase.class)) {
       // Add the mocked methods only during part upload
-      when(rest.getMD5DigestInstance()).thenReturn(messageDigest);
-      when(rest.getSha256DigestInstance()).thenReturn(sha256Digest);
+      endpoint.when(EndpointBase::getMD5DigestInstance).thenReturn(messageDigest);
+      endpoint.when(EndpointBase::getSha256DigestInstance).thenReturn(sha256Digest);
       if (enableDataStream) {
         streaming.when(() -> ObjectEndpointStreaming.createMultipartKey(any(), any(), anyLong(), anyInt(), any(),
                 anyInt(), any(), any(), any()))

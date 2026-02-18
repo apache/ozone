@@ -46,7 +46,7 @@ public class Hadoop27RpcTransport implements OmTransport {
   private final OzoneManagerProtocolPB rpcProxy;
 
   private final HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> omFailoverProxyProvider;
-  private HadoopRpcOMFollowerReadFailoverProxyProvider<OzoneManagerProtocolPB> followerReadFailoverProxyProvider;
+  private HadoopRpcOMFollowerReadFailoverProxyProvider followerReadFailoverProxyProvider;
 
   public Hadoop27RpcTransport(ConfigurationSource conf,
       UserGroupInformation ugi, String omServiceId) throws IOException {
@@ -68,9 +68,8 @@ public class Hadoop27RpcTransport implements OmTransport {
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT);
 
     if (followerReadEnabled) {
-      this.followerReadFailoverProxyProvider = new HadoopRpcOMFollowerReadFailoverProxyProvider<>(
-          omServiceId, OzoneManagerProtocolPB.class, omFailoverProxyProvider
-      );
+      this.followerReadFailoverProxyProvider =
+          new HadoopRpcOMFollowerReadFailoverProxyProvider(omFailoverProxyProvider);
       this.rpcProxy = OzoneManagerProtocolPB.newProxy(followerReadFailoverProxyProvider, maxFailovers);
     } else {
       // TODO: It should be possible to simply instantiate HadoopRpcOMFollowerReadFailoverProxyProvider
@@ -85,18 +84,7 @@ public class Hadoop27RpcTransport implements OmTransport {
   @Override
   public OMResponse submitRequest(OMRequest payload) throws IOException {
     try {
-      OMResponse omResponse =
-          rpcProxy.submitRequest(NULL_RPC_CONTROLLER, payload);
-
-      if (omResponse.hasLeaderOMNodeId() && omFailoverProxyProvider != null) {
-        String leaderOmId = omResponse.getLeaderOMNodeId();
-
-        // Failover to the OM node returned by OMResponse leaderOMNodeId if
-        // current proxy is not pointing to that node.
-        omFailoverProxyProvider.setNextOmProxy(leaderOmId);
-        omFailoverProxyProvider.performFailover(null);
-      }
-      return omResponse;
+      return rpcProxy.submitRequest(NULL_RPC_CONTROLLER, payload);
     } catch (ServiceException e) {
       OMNotLeaderException notLeaderException =
           HadoopRpcOMFailoverProxyProvider.getNotLeaderException(e);

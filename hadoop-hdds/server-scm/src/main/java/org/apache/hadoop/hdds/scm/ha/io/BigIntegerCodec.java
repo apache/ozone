@@ -17,9 +17,9 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
-import com.google.protobuf.ByteString;
-import com.google.protobuf.ProtoUtils;
 import java.math.BigInteger;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 
 /**
  * Codec for type BigInteger.
@@ -29,7 +29,7 @@ public class BigIntegerCodec implements Codec {
   @Override
   public ByteString serialize(Object object) {
     // BigInteger returns a new byte[].
-    return ProtoUtils.unsafeByteString(((BigInteger)object).toByteArray());
+    return UnsafeByteOperations.unsafeWrap(((BigInteger) object).toByteArray());
   }
 
   @Override
