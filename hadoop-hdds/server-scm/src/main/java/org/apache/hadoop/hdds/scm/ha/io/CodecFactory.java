@@ -17,9 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
-import com.google.protobuf.ByteString;
-import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.Message;
 import com.google.protobuf.ProtocolMessageEnum;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
@@ -29,6 +26,9 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.ClassUtils;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
+import org.apache.ratis.thirdparty.com.google.protobuf.Message;
 
 /**
  * Maps types to the corresponding {@link Codec} implementation.
@@ -38,7 +38,8 @@ public final class CodecFactory {
   private static Map<Class<?>, Codec> codecs = new HashMap<>();
 
   static {
-    codecs.put(Message.class, new GeneratedMessageCodec());
+    codecs.put(com.google.protobuf.Message.class, new GeneratedMessageCodec());
+    codecs.put(Message.class, new ScmGeneratedMessageCodec());
     codecs.put(ProtocolMessageEnum.class, new EnumCodec());
     codecs.put(List.class, new ListCodec());
     codecs.put(Integer.class, new IntegerCodec());
@@ -47,7 +48,8 @@ public final class CodecFactory {
     codecs.put(Boolean.class, new BooleanCodec());
     codecs.put(BigInteger.class, new BigIntegerCodec());
     codecs.put(X509Certificate.class, new X509CertificateCodec());
-    codecs.put(ByteString.class, new ByteStringCodec());
+    codecs.put(com.google.protobuf.ByteString.class, new ByteStringCodec());
+    codecs.put(ByteString.class, new ScmByteStringCodec());
     codecs.put(ManagedSecretKey.class, new ManagedSecretKeyCodec());
   }
 
