@@ -35,6 +35,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
@@ -507,7 +508,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         }
         String fileId = OmSnapshotUtils.getFileInodeAndLastModifiedTimeString(dbFile);
         if (fileId.isEmpty()) {
-          LOG.warn("Not writing DB file : {} to archive as it no longer exists", dbFile);
+          logFileNoLongerExists(dbFile);
           continue;
         }
         String path = dbFile.toFile().getAbsolutePath();
@@ -517,20 +518,31 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         }
         omdbArchiver.recordHardLinkMapping(path, fileId);
         if (!sstFilesToExclude.contains(fileId)) {
-          long fileSize = Files.size(dbFile);
-          if (maxTotalSstSize.get() - fileSize <= 0) {
-            return false;
+          try {
+            long fileSize = Files.size(dbFile);
+            if (maxTotalSstSize.get() - fileSize <= 0) {
+              return false;
+            }
+            bytesRecorded += omdbArchiver.recordFileEntry(dbFile.toFile(), fileId);
+            filesWritten++;
+            maxTotalSstSize.addAndGet(-fileSize);
+            sstFilesToExclude.add(fileId);
+          } catch (NoSuchFileException e){
+            logFileNoLongerExists(dbFile);
+            if (path != null && omdbArchiver.getHardLinkFileMap()!=null ) {
+              omdbArchiver.getHardLinkFileMap().remove(path);
+            }
           }
-          bytesRecorded += omdbArchiver.recordFileEntry(dbFile.toFile(), fileId);
-          filesWritten++;
-          maxTotalSstSize.addAndGet(-fileSize);
-          sstFilesToExclude.add(fileId);
         }
       }
     }
     LOG.info("Collected {} KB, #files {} to write to checkpoint tarball stream...",
         bytesRecorded / (1024), filesWritten);
     return true;
+  }
+
+  private void logFileNoLongerExists(Path dbFile) {
+    LOG.warn("Not writing DB file : {} to archive as it no longer exists", dbFile);
   }
 
   /**

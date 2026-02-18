@@ -140,7 +140,7 @@ public final class Archiver {
     try {
       try {
         Files.createLink(link.toPath(), file.toPath());
-      } catch (NoSuchFileException noSuchFileException){
+      } catch (NoSuchFileException noSuchFileException) {
         LOG.warn("Failed to include file {} in the tarball as the file doesn't exist", file.toPath());
         return  0;
       }

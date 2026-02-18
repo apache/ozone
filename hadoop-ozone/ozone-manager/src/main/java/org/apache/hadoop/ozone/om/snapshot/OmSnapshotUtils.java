@@ -17,9 +17,6 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import static org.apache.hadoop.hdds.utils.IOUtils.getINode;
 import static org.apache.hadoop.ozone.OzoneConsts.HARDLINK_SEPARATOR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
@@ -36,6 +33,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Ozone Manager Snapshot Utilities.
@@ -81,7 +80,7 @@ public final class OmSnapshotUtils {
       inode = getINode(file);
       FileTime mTime = Files.getLastModifiedTime(file);
       return String.format("%s-%s", inode, mTime.toMillis());
-    } catch (NoSuchFileException noSuchFileException) {
+    } catch (NoSuchFileException e) {
       LOG.warn("File {} not found.", file);
       return "";
     }

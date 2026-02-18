@@ -852,6 +852,44 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     }
   }
 
+
+  /**
+   * Verifies that when a file is deleted before/during transfer, the servlet
+   * gracefully skips it without failing (handles NoSuchFileException).
+   */
+  @Test
+  public void testCollectFilesFromDirSkipsDeletedFile() throws Exception {
+    OMDBCheckpointServletInodeBasedXfer servlet = new OMDBCheckpointServletInodeBasedXfer();
+    Path dbDir = Files.createTempDirectory(folder, "dbdir-");
+    Path sstFile1 = dbDir.resolve("file1.sst");
+    Path sstFile2 = dbDir.resolve("file2.sst");
+    Path sstFile3 = dbDir.resolve("file3.sst");
+    Files.write(sstFile1, "content1".getBytes(StandardCharsets.UTF_8));
+    Files.write(sstFile2, "content2".getBytes(StandardCharsets.UTF_8));
+    Files.write(sstFile3, "content3".getBytes(StandardCharsets.UTF_8));
+
+    // Delete file2 before transfer , same as pruner
+    Files.delete(sstFile2);
+    OMDBArchiver archiver = new OMDBArchiver();
+    Path tmpDir = folder.resolve("tmp-deleted-file-test");
+    Files.createDirectories(tmpDir);
+    archiver.setTmpDir(tmpDir);
+    OMDBArchiver archiverSpy = spy(archiver);
+
+    Set<String> sstFilesToExclude = new HashSet<>();
+    AtomicLong maxTotalSstSize = new AtomicLong(Long.MAX_VALUE);
+
+    doAnswer(invocation -> archiver.recordFileEntry(
+        invocation.getArgument(0), invocation.getArgument(1)))
+        .when(archiverSpy).recordFileEntry(any(), anyString());
+
+    boolean result = servlet.collectFilesFromDir(sstFilesToExclude, dbDir,
+        maxTotalSstSize, true, archiverSpy);
+
+    assertTrue(result);
+    verify(archiverSpy, times(2)).recordFileEntry(any(), anyString());
+  }
+
   private void writeDummyKeyToDeleteTableOfSnapshotDB(OzoneSnapshot snapshotToModify, String bucketName,
       String volumeName, String keyName)
       throws IOException {
