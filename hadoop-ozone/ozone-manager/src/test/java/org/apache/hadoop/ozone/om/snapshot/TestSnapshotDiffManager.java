@@ -822,7 +822,7 @@ public class TestSnapshotDiffManager {
 
     // Response should still be cancelled.
     snapshotDiffResponse = spy.getSnapshotDiffReport(volumeName, bucketName,
-        fromSnapshotName, toSnapshotName, "10", 0, false, false);
+        fromSnapshotName, toSnapshotName, "100000000000000000000", 0, false, false);
 
     assertEquals(JobStatus.CANCELLED,
         snapshotDiffResponse.getJobStatus());
@@ -963,7 +963,7 @@ public class TestSnapshotDiffManager {
     // SnapshotDiffReport
     SnapshotDiffResponse snapshotDiffResponse =
         spy.getSnapshotDiffReport(volumeName, bucketName, fromSnapshotName,
-            toSnapshotName, "10", 0, false, false);
+            toSnapshotName, "100000000000000000000", 0, false, false);
 
     assertEquals(SnapshotDiffResponse.JobStatus.IN_PROGRESS,
         snapshotDiffResponse.getJobStatus());
@@ -1262,7 +1262,7 @@ public class TestSnapshotDiffManager {
                                          String toSnapshotName) {
     try {
       return diffManager.getSnapshotDiffReport(VOLUME_NAME, BUCKET_NAME,
-          fromSnapshotName, toSnapshotName, "10", 1000, false, false);
+          fromSnapshotName, toSnapshotName, "100000000000000000000", 1000, false, false);
     } catch (IOException exception) {
       throw new RuntimeException(exception);
     }
@@ -1355,7 +1355,7 @@ public class TestSnapshotDiffManager {
     for (int i = 0; i < snapshotInfoList.size(); i++) {
       SnapshotDiffResponse snapshotDiffReport =
           spy.getSnapshotDiffReport(VOLUME_NAME, BUCKET_NAME,
-              snapshotInfo.getName(), snapshotInfoList.get(i).getName(), "10",
+              snapshotInfo.getName(), snapshotInfoList.get(i).getName(), "100000000000000000000",
               1000, false, false);
       SnapshotDiffJob diffJob = snapDiffJobs.get(i);
       if (diffJob.getStatus() == QUEUED) {
