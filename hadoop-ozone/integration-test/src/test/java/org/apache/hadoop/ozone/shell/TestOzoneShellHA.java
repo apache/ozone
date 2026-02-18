@@ -2479,10 +2479,10 @@ public class TestOzoneShellHA {
   }
 
   /**
-   * Test that prepare commands are deprecated but still work and don't block writes.
+   * Test that even though prepare commands are deprecated, they still succeed without blocking writes.
    */
   @Test
-  public void testPrepareCommandDoesNotBlockWrites() throws IOException {
+  public void testPrepareCommandNoOp() throws IOException {
     String volumeName = "vol-prepare-test";
     String bucketName = "bucket-prepare-test";
     
@@ -2498,8 +2498,8 @@ public class TestOzoneShellHA {
     out.reset();
     
     // Create bucket
-    args = new String[] {"bucket", "create", "o3://" + omServiceId + OZONE_URI_DELIMITER +
-        volumeName + OZONE_URI_DELIMITER + bucketName};
+    args = new String[] {"bucket", "create", "o3://" + omServiceId + OZONE_URI_DELIMITER + volumeName +
+            OZONE_URI_DELIMITER + bucketName};
     execute(ozoneShell, args);
     out.reset();
     

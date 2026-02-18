@@ -244,7 +244,8 @@ public class TestOzoneManagerRequestHandler {
   }
 
   /**
-   * Test to verify prepare-related requests return success as no-ops.
+   * Test to verify prepare-related requests return success as no-ops, since the Ozone Manager no longer supports this
+   * operation.
    */
   @Test
   public void testPrepareRequestsAreNoOps() {
@@ -307,7 +308,7 @@ public class TestOzoneManagerRequestHandler {
     Assertions.assertTrue(cancelPrepareResponse.getSuccess(), "CancelPrepare should return success");
     Assertions.assertTrue(cancelPrepareResponse.hasCancelPrepareResponse(),
         "CancelPrepare response should be present");
-    Assertions.assertEquals("Prepare is no longer required in this version",
+    Assertions.assertEquals("Cancel Prepare is no longer required in this version",
         cancelPrepareResponse.getMessage(), "CancelPrepare should return deprecation message");
   }
 }

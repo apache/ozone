@@ -105,8 +105,9 @@ public class OzoneManagerStarter extends GenericCli implements Callable<Void> {
   }
 
   /**
-   * This function implements a sub-command to allow the OM to be
+   * This function previously implemented a sub-command to allow the OM to be
    * Removed from prepare mode after an upgrade or downgrade.
+   * Since the Ozone Manager no longer requires prepare for upgrade, these flags are a no-op.
    */
   @CommandLine.Command(name = "--upgrade",
       aliases = "--downgrade",

@@ -1624,7 +1624,7 @@ message PrepareRequest {
 }
 
 /**
- * Deprecated. Prepare functionality has been removed.
+ * Deprecated. Prepare functionality has been removed and is now a no-op.
  */
 message PrepareRequestArgs {
     optional uint64 txnApplyWaitTimeoutSeconds = 1 [default = 300, deprecated = true];
@@ -1632,14 +1632,14 @@ message PrepareRequestArgs {
 }
 
 /**
- * Deprecated. Prepare functionality has been removed.
+ * Deprecated. Prepare functionality has been removed and is now a no-op.
  */
 message PrepareResponse {
     required uint64 txnID = 1 [deprecated = true];
 }
 
 /**
- * Deprecated. Prepare functionality has been removed.
+ * Deprecated. Prepare functionality has been removed and is now a no-op.
  */
 message PrepareStatusRequest {
     required uint64 txnID = 1 [deprecated = true];
@@ -1659,14 +1659,14 @@ message PrepareStatusResponse {
 }
 
 /**
- * Deprecated. Prepare functionality has been removed.
+ * Deprecated. Prepare functionality has been removed and is now a no-op.
  */
 message CancelPrepareRequest {
 
 }
 
 /**
- * Deprecated. Prepare functionality has been removed.
+ * Deprecated. Prepare functionality has been removed and is now a no-op.
  */
 message CancelPrepareResponse {
 

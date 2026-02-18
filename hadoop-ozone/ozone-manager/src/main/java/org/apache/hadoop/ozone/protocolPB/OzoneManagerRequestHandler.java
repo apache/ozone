@@ -303,7 +303,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         responseBuilder.setPrepareStatusResponse(prepareStatusResponse);
         break;
       case Prepare:
-        // Prepare is no longer functional but return success for backward compatibility
+        // Prepare functionality is no longer supported. An empty successful transaction is returned for compatibility
+        // with older clients and upgrade processes.
         PrepareResponse prepareResponse = PrepareResponse.newBuilder()
             .setTxnID(0)  // Dummy transaction ID
             .build();
@@ -311,11 +312,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         responseBuilder.setMessage("Prepare is no longer required in this version");
         break;
       case CancelPrepare:
-        // CancelPrepare is no longer functional but return success for backward compatibility
+        // Cancel Prepare functionality is no longer supported. An empty successful transaction is returned for
+        // compatibility with older clients and upgrade processes.
         CancelPrepareResponse cancelPrepareResponse = CancelPrepareResponse.newBuilder()
             .build();
         responseBuilder.setCancelPrepareResponse(cancelPrepareResponse);
-        responseBuilder.setMessage("Prepare is no longer required in this version");
+        responseBuilder.setMessage("Cancel Prepare is no longer required in this version");
         break;
       case GetS3VolumeContext:
         GetS3VolumeContextResponse s3VolumeContextResponse =
