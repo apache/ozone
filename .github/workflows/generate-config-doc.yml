@@ -48,11 +48,11 @@ jobs:
       
       - name: Generate configuration documentation
         run: |
-          python3 dev-support/ci/xml_to_md.py ozone-bin/extracted hadoop-hdds/docs/content/tools/Configurations.md
+          python3 dev-support/ci/xml_to_md.py ozone-bin/extracted Configurations.md
       
       - name: Upload generated documentation
         uses: actions/upload-artifact@v4
         with:
           name: config-documentation
-          path: hadoop-hdds/docs/content/tools/Configurations.md
+          path: Configurations.md
           retention-days: 7

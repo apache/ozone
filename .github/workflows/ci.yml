@@ -136,146 +136,6 @@ jobs:
     with:
       sha: ${{ needs.build-info.outputs.sha }}
 
-  update-ozone-config-doc:
-    needs:
-      - build-info
-      - generate-config-doc
-    # Run on master in apache/ozone, or any branch in forks for testing
-    # Skip automated commits (starting with [Auto]) to avoid loops
-    if: |
-      github.event_name == 'push' &&
-      !startsWith(github.event.head_commit.message, '[Auto]') &&
-      (github.repository == 'apache/ozone' && github.ref_name == 'master' ||
-       github.repository != 'apache/ozone')
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Extract JIRA ID from commit message
-        id: extract-jira-early
-        run: |
-          COMMIT_MSG=$(git log -1 --format='%s' ${{ github.sha }})
-          echo "Commit message: $COMMIT_MSG"
-          
-          JIRA_ID=$(echo "$COMMIT_MSG" | grep -oE '(HDDS|OZONE)-[0-9]+' | head -1 || echo "")
-          
-          if [ -n "$JIRA_ID" ]; then
-            echo "jira_id=$JIRA_ID" >> $GITHUB_OUTPUT
-            echo "Using JIRA ID: $JIRA_ID"
-          else
-            echo "jira_id=" >> $GITHUB_OUTPUT
-            echo "No JIRA ID found"
-          fi
-      
-      - name: Checkout project for documentation update
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.repository == 'apache/ozone' && github.ref_name == 'master' && needs.build-info.outputs.sha || 'master' }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Download generated documentation
-        uses: actions/download-artifact@v4
-        with:
-          name: config-documentation
-          path: .
-      
-      - name: Check if documentation changed
-        id: check-changes
-        run: |
-          # Move downloaded file to correct location
-          TARGET_FILE="hadoop-hdds/docs/content/tools/Configurations.md"
-          mv Configurations.md "$TARGET_FILE"
-          
-          # Check if file changed using git status
-          # This works whether the file is tracked, untracked, or modified
-          if git status --porcelain "$TARGET_FILE" | grep -q .; then
-            echo "changed=true" >> $GITHUB_OUTPUT
-            echo "Configurations.md has changed"
-          else
-            echo "changed=false" >> $GITHUB_OUTPUT
-            echo "No changes in Configurations.md"
-          fi
-      
-      - name: Commit and push changes
-        if: steps.check-changes.outputs.changed == 'true'
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email 'github-actions[bot]@users.noreply.github.com'
-          
-          # Use single branch name for all automated updates
-          BRANCH_NAME="automated-config-doc-update"
-          JIRA_ID="${{ steps.extract-jira-early.outputs.jira_id }}"
-          
-          # Create/reset branch at current commit
-          git checkout -B "$BRANCH_NAME"
-          echo "Created/reset branch $BRANCH_NAME at current commit"
-          
-          git add hadoop-hdds/docs/content/tools/Configurations.md
-          
-          # Commit message references the original commit that triggered this
-          COMMIT_MSG="[Auto] Update configuration documentation"
-          if [ -n "$JIRA_ID" ]; then
-            COMMIT_MSG="$JIRA_ID. $COMMIT_MSG"
-          fi
-          if [ "${{ github.repository }}" = "apache/ozone" ] && [ "${{ github.ref_name }}" = "master" ]; then
-            COMMIT_MSG="$COMMIT_MSG from ${{ github.sha }}"
-          else
-            COMMIT_MSG="$COMMIT_MSG (test run from ${{ github.ref_name }})"
-          fi
-          
-          git commit -m "$COMMIT_MSG"
-          
-          echo "Pushing $BRANCH_NAME to origin"
-          git push -f origin "$BRANCH_NAME"
-          
-          # For forks
-          if [ "${{ github.repository }}" != "apache/ozone" ]; then
-            echo "Branch created: $BRANCH_NAME"
-            echo "Repository: ${{ github.repository }}"
-            echo "View at: https://github.com/${{ github.repository }}/tree/$BRANCH_NAME"
-            echo "No PR created (only happens in apache/ozone)"
-            echo "JIRA ID: ${JIRA_ID:-none}"
-          fi
-      
-      - name: Create or update Pull Request
-        if: steps.check-changes.outputs.changed == 'true' && github.repository == 'apache/ozone' && github.ref_name == 'master'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          BRANCH_NAME="automated-config-doc-update"
-          REPO="${{ github.repository }}"
-          JIRA_ID="${{ steps.extract-jira-early.outputs.jira_id }}"
-          
-          # Generate PR body
-          dev-support/ci/pr_body_config_doc.sh \
-            "$REPO" \
-            "${{ github.workflow }}" \
-            "${{ github.run_id }}" \
-            "${{ github.ref_name }}" \
-            "${{ github.sha }}" \
-            "$JIRA_ID" > pr_body.txt
-          
-          # Check if PR already exists
-          EXISTING_PR=$(gh pr list --head "$BRANCH_NAME" --base master --json number --jq '.[0].number' || echo "")
-          
-          if [ -n "$EXISTING_PR" ]; then
-            echo "Updating existing PR #$EXISTING_PR"
-            gh pr edit "$EXISTING_PR" --body-file pr_body.txt
-          else
-            echo "Creating new PR"
-            TITLE="[Auto] Update configuration documentation"
-            if [ -n "$JIRA_ID" ]; then
-              TITLE="$JIRA_ID. $TITLE"
-            fi
-            gh pr create --base master --head "$BRANCH_NAME" \
-              --title "$TITLE" \
-              --body-file pr_body.txt
-          fi
-
   update-ozone-site-config-doc:
     needs:
       - build-info
@@ -289,33 +149,6 @@ jobs:
       !startsWith(github.event.head_commit.message, '[Auto]')
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Extract JIRA ID from commit message
-        id: extract-jira-early
-        run: |
-          COMMIT_MSG=$(git log -1 --format='%s' ${{ github.sha }})
-          echo "Commit message: $COMMIT_MSG"
-          
-          JIRA_ID=$(echo "$COMMIT_MSG" | grep -oE '(HDDS|OZONE)-[0-9]+' | head -1 || echo "")
-          
-          if [ -n "$JIRA_ID" ]; then
-            echo "jira_id=$JIRA_ID" >> $GITHUB_OUTPUT
-            echo "Using JIRA ID: $JIRA_ID"
-          else
-            echo "jira_id=" >> $GITHUB_OUTPUT
-            echo "No JIRA ID found"
-          fi
-      
-      - name: Checkout ozone repository for script access
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.build-info.outputs.sha }}
-      
       - name: Download generated documentation
         uses: actions/download-artifact@v4
         with:
@@ -340,12 +173,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ github.repository_owner }}/ozone-site
-          ref: 'HDDS-9225-website-v2'
+          ref: 'master'
           path: ozone-site
           token: ${{ secrets.OZONE_WEBSITE_BUILD }}
       
-      - name: Copy and commit documentation
+      - name: Check if documentation changed
         if: steps.check-site-repo.outputs.exists == 'true'
+        id: check-changes
         run: |
           cd ozone-site
           
@@ -353,20 +187,54 @@ jobs:
           TARGET_DIR=$(ls -d docs/*-administrator-guide/*-configuration 2>/dev/null | head -1)
           
           if [ -z "$TARGET_DIR" ]; then
+            echo "changed=false" >> $GITHUB_OUTPUT
             echo "Target directory not found, skipping"
             exit 0
           fi
           
-          echo "Copying to $TARGET_DIR/05-appendix.md"
-          cp ../Configurations.md "$TARGET_DIR/05-appendix.md"
+          TARGET_FILE="$TARGET_DIR/05-appendix.md"
+          echo "Checking against $TARGET_FILE"
+          
+          # Copy new file to target location
+          cp ../Configurations.md "$TARGET_FILE"
           
           # Check if file changed using git status
-          if git status --porcelain "$TARGET_DIR/05-appendix.md" | grep -q .; then
+          if git status --porcelain "$TARGET_FILE" | grep -q .; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "target_file=$TARGET_FILE" >> $GITHUB_OUTPUT
             echo "Configurations.md has changed in ozone-site"
           else
+            echo "changed=false" >> $GITHUB_OUTPUT
             echo "No changes in ozone-site documentation"
-            exit 0
           fi
+      
+      - name: Checkout ozone repository for script access
+        if: steps.check-changes.outputs.changed == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      
+      - name: Extract JIRA ID from commit message
+        if: steps.check-changes.outputs.changed == 'true'
+        id: extract-jira
+        run: |
+          COMMIT_MSG=$(git log -1 --format='%s' ${{ github.sha }})
+          echo "Commit message: $COMMIT_MSG"
+          
+          JIRA_ID=$(echo "$COMMIT_MSG" | grep -oE '(HDDS|OZONE)-[0-9]+' | head -1 || echo "")
+          
+          if [ -n "$JIRA_ID" ]; then
+            echo "jira_id=$JIRA_ID" >> $GITHUB_OUTPUT
+            echo "Using JIRA ID: $JIRA_ID"
+          else
+            echo "jira_id=" >> $GITHUB_OUTPUT
+            echo "No JIRA ID found"
+          fi
+      
+      - name: Commit and push changes
+        if: steps.check-changes.outputs.changed == 'true'
+        run: |
+          cd ozone-site
           
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
@@ -381,10 +249,11 @@ jobs:
           git checkout -B "$BRANCH_NAME"
           echo "Created/reset branch $BRANCH_NAME at current commit"
           
-          git add "$TARGET_DIR/05-appendix.md"
+          TARGET_FILE="${{ steps.check-changes.outputs.target_file }}"
+          git add "$TARGET_FILE"
           
           # Build commit message with JIRA ID if available
-          JIRA_ID="${{ steps.extract-jira-early.outputs.jira_id }}"
+          JIRA_ID="${{ steps.extract-jira.outputs.jira_id }}"
           COMMIT_MSG="[Auto] Update configuration documentation from ozone ${{ github.sha }}"
           if [ -n "$JIRA_ID" ]; then
             COMMIT_MSG="$JIRA_ID. $COMMIT_MSG"
@@ -396,21 +265,15 @@ jobs:
           git push -f origin "$BRANCH_NAME"
       
       - name: Create or update Pull Request in ozone-site
-        if: steps.check-site-repo.outputs.exists == 'true' && github.repository == 'apache/ozone'
+        if: steps.check-changes.outputs.changed == 'true' && github.repository == 'apache/ozone'
         env:
           GH_TOKEN: ${{ secrets.OZONE_WEBSITE_BUILD }}
         run: |
           cd ozone-site
           
-          # Check if there were changes
-          if ! git log origin/HDDS-9225-website-v2..HEAD --oneline | grep -q .; then
-            echo "No new commits, skipping PR"
-            exit 0
-          fi
-          
           BRANCH_NAME="automated-config-doc-update"
           REPO="${{ github.repository }}"
-          JIRA_ID="${{ steps.extract-jira-early.outputs.jira_id }}"
+          JIRA_ID="${{ steps.extract-jira.outputs.jira_id }}"
           
           # Generate PR body
           cd ..
@@ -426,7 +289,7 @@ jobs:
           
           # Check if PR already exists
           EXISTING_PR=$(gh pr list --repo "${{ github.repository_owner }}/ozone-site" \
-            --head "$BRANCH_NAME" --base HDDS-9225-website-v2 --json number --jq '.[0].number' || echo "")
+            --head "$BRANCH_NAME" --base master --json number --jq '.[0].number' || echo "")
           
           if [ -n "$EXISTING_PR" ]; then
             echo "Updating existing PR #$EXISTING_PR"
@@ -438,7 +301,7 @@ jobs:
               TITLE="$JIRA_ID. $TITLE"
             fi
             gh pr create --repo "${{ github.repository_owner }}/ozone-site" \
-              --base HDDS-9225-website-v2 --head "$BRANCH_NAME" \
+              --base master --head "$BRANCH_NAME" \
               --title "$TITLE" \
               --body-file pr_body.txt
           fi
