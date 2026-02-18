@@ -21,10 +21,12 @@ import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.P
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
 import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -48,6 +50,45 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
 
   public OMPrefixAclRequest(OMRequest omRequest) {
     super(omRequest);
+  }
+
+  @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    OMRequest omRequest = super.preExecute(ozoneManager);
+
+    // ACL check during preExecute
+    if (ozoneManager.getAclsEnabled()) {
+      try {
+        PrefixManagerImpl prefixManager =
+            (PrefixManagerImpl) ozoneManager.getPrefixManager();
+        OzoneObj resolvedPrefixObj = prefixManager.getResolvedPrefixObj(getOzoneObj());
+        prefixManager.validateOzoneObj(getOzoneObj());
+        validatePrefixPath(resolvedPrefixObj.getPath());
+
+        checkAcls(ozoneManager, OzoneObj.ResourceType.PREFIX,
+            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
+            resolvedPrefixObj.getVolumeName(), resolvedPrefixObj.getBucketName(),
+            resolvedPrefixObj.getPrefixName());
+      } catch (IOException ex) {
+        // Ensure audit log captures preExecute failures
+        Map<String, String> auditMap = new LinkedHashMap<>();
+        OzoneObj obj = getOzoneObj();
+        auditMap.putAll(obj.toAuditMap());
+        // Determine which action based on request type
+        OMAction action = OMAction.SET_ACL;
+        if (omRequest.hasAddAclRequest()) {
+          action = OMAction.ADD_ACL;
+        } else if (omRequest.hasRemoveAclRequest()) {
+          action = OMAction.REMOVE_ACL;
+        }
+        markForAudit(ozoneManager.getAuditLogger(),
+            buildAuditMessage(action, auditMap, ex,
+                omRequest.getUserInfo()));
+        throw ex;
+      }
+    }
+
+    return omRequest;
   }
 
   @Override
@@ -75,14 +116,6 @@ public abstract class OMPrefixAclRequest extends OMClientRequest {
       prefixManager.validateOzoneObj(getOzoneObj());
       validatePrefixPath(resolvedPrefixObj.getPath());
       prefixPath = resolvedPrefixObj.getPath();
-
-      // check Acl
-      if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.PREFIX,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
-            resolvedPrefixObj.getVolumeName(), resolvedPrefixObj.getBucketName(),
-            resolvedPrefixObj.getPrefixName());
-      }
 
       mergeOmLockDetails(omMetadataManager.getLock()
           .acquireWriteLock(PREFIX_LOCK, prefixPath));
