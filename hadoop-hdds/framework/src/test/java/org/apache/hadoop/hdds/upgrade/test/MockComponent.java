@@ -19,8 +19,6 @@ package org.apache.hadoop.hdds.upgrade.test;
 
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.DATANODE_SCHEMA_V2;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.INITIAL_VERSION;
-import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
-import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FIRST_UPGRADE_START;
 import static org.apache.hadoop.ozone.upgrade.UpgradeActionHdds.Component.DATANODE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeActionHdds.Component.SCM;
 
@@ -40,7 +38,7 @@ public class MockComponent {
   /**
    * Mock SCM Upgrade Action.
    */
-  @UpgradeActionHdds(type = ON_FINALIZE, feature = INITIAL_VERSION,
+  @UpgradeActionHdds(feature = INITIAL_VERSION,
       component = SCM)
   public static class MockScmUpgradeAction implements
       HDDSUpgradeAction<MockComponent> {
@@ -53,8 +51,7 @@ public class MockComponent {
   /**
    * Mock DN Upgrade Action.
    */
-  @UpgradeActionHdds(type = ON_FIRST_UPGRADE_START,
-      feature = DATANODE_SCHEMA_V2, component = DATANODE)
+  @UpgradeActionHdds(feature = DATANODE_SCHEMA_V2, component = DATANODE)
   public static class MockDnUpgradeAction implements
       HDDSUpgradeAction<MockComponent> {
     @Override
