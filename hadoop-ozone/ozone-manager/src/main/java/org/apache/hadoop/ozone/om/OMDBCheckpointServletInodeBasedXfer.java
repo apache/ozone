@@ -377,7 +377,14 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
     for (Path snapshotLocalPropertyYaml : snapshotLocalPropertyFiles) {
       File yamlFile = snapshotLocalPropertyYaml.toFile();
       omdbArchiver.recordHardLinkMapping(yamlFile.getAbsolutePath(), yamlFile.getName());
-      omdbArchiver.recordFileEntry(yamlFile, yamlFile.getName());
+      try {
+        omdbArchiver.recordFileEntry(yamlFile, yamlFile.getName());
+      } catch (NoSuchFileException e) {
+        logFileNoLongerExists(yamlFile.toPath());
+        if (omdbArchiver.getHardLinkFileMap() != null) {
+          omdbArchiver.getHardLinkFileMap().remove(yamlFile.getAbsolutePath());
+        }
+      }
     }
   }
 
