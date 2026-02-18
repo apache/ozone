@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.http.BaseHttpServer;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.s3.metrics.S3GatewayMetrics;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
@@ -108,8 +109,7 @@ public class Gateway extends GenericCli implements Callable<Void> {
 
   public void stop() throws Exception {
     LOG.info("Stopping Ozone S3 gateway");
-    httpServer.stop();
-    contentServer.stop();
+    IOUtils.closeQuietly(httpServer, contentServer);
     jvmPauseMonitor.stop();
     S3GatewayMetrics.unRegister();
   }
