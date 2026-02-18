@@ -17,23 +17,42 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
+import java.security.cert.X509Certificate;
+import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
+import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 
 /**
- * A dummy codec that serializes a ByteString object to ByteString.
+ * Codec for type X509Certificate.
  */
-public class ScmByteStringCodec implements ScmCodec {
-
+public class ScmX509CertificateCodec implements ScmCodec {
   @Override
   public ByteString serialize(Object object)
       throws InvalidProtocolBufferException {
-    return (ByteString) object;
+    try {
+      String certString =
+          CertificateCodec.getPEMEncodedString((X509Certificate) object);
+      // getBytes returns a new array
+      return UnsafeByteOperations.unsafeWrap(certString.getBytes(UTF_8));
+    } catch (Exception ex) {
+      throw new InvalidProtocolBufferException(
+          "X509Certificate cannot be decoded: " + ex.getMessage());
+    }
   }
 
   @Override
-  public Object deserialize(Class<?> type, ByteString value)
+  public Object deserialize(Class< ? > type, ByteString value)
       throws InvalidProtocolBufferException {
-    return value;
+    try {
+      String pemEncodedCert = new String(value.toByteArray(), UTF_8);
+      return CertificateCodec.getX509Certificate(pemEncodedCert);
+    } catch (Exception ex) {
+      throw new InvalidProtocolBufferException(
+          "X509Certificate cannot be decoded: " + ex.getMessage());
+    }
   }
 }
+

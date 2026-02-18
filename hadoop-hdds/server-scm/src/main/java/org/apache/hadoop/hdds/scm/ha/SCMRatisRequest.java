@@ -24,7 +24,7 @@ import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.Method;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.MethodArgument;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.SCMRatisRequestProto;
-import org.apache.hadoop.hdds.scm.ha.io.CodecFactory;
+import org.apache.hadoop.hdds.scm.ha.io.ScmCodecFactory;
 import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
@@ -105,7 +105,7 @@ public final class SCMRatisRequest {
       // This is done to avoid MethodNotFoundException in case if argument is
       // subclass type, where as method is defined with super class type.
       argBuilder.setType(parameterTypes[paramCounter++].getName());
-      argBuilder.setValue(CodecFactory.getCodec(argument.getClass())
+      argBuilder.setValue(ScmCodecFactory.getCodec(argument.getClass())
           .serialize(argument));
       args.add(argBuilder.build());
     }
@@ -152,7 +152,7 @@ public final class SCMRatisRequest {
       try {
         final Class<?> clazz = ReflectionUtil.getClass(argument.getType());
         parameterTypes[paramCounter++] = clazz;
-        args.add(CodecFactory.getCodec(clazz)
+        args.add(ScmCodecFactory.getCodec(clazz)
             .deserialize(clazz, argument.getValue()));
       } catch (ClassNotFoundException ex) {
         throw new InvalidProtocolBufferException(argument.getType() +
