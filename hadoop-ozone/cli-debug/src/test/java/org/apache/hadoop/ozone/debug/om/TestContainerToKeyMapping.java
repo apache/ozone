@@ -136,12 +136,12 @@ public class TestContainerToKeyMapping {
 
     // Check FSO key - should show only filename
     assertThat(output).contains("\"" + CONTAINER_ID_1 + "\"");
-    assertThat(output).contains("[fso] file1");
+    assertThat(output).contains("file1");
     assertThat(output).doesNotContain("/vol1/fso-bucket/dir1/file1");
 
     // Check OBS key - should also show only key name
     assertThat(output).contains("\"" + CONTAINER_ID_2 + "\"");
-    assertThat(output).contains("[obs] key1");
+    assertThat(output).contains("key1");
     assertThat(output).doesNotContain("/vol1/obs-bucket/key1");
   }
 
@@ -173,9 +173,7 @@ public class TestContainerToKeyMapping {
     // Check MPU parts in openKeys
     assertThat(output).contains("\"" + CONTAINER_ID_4 + "\"");
     assertThat(output).contains("\"openKeys\"");
-    assertThat(output).contains("[mpu-part-1]");
-    assertThat(output).contains("[mpu-part-2]");
-    assertThat(output).contains("mpuKey");
+    assertThat(output).contains("/vol1/obs-bucket/mpuKey");
   }
 
   @Test
@@ -188,8 +186,6 @@ public class TestContainerToKeyMapping {
     // Check MPU parts in openKeys
     assertThat(output).contains("\"" + CONTAINER_ID_4 + "\"");
     assertThat(output).contains("\"openKeys\"");
-    assertThat(output).contains("[mpu-part-1-obs]");
-    assertThat(output).contains("[mpu-part-2-obs]");
     assertThat(output).contains("mpuKey");
     // Should not contain full path
     assertThat(output).doesNotContain("/vol1/obs-bucket/mpuKey");

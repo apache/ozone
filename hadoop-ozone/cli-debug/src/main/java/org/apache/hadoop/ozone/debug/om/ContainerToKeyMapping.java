@@ -234,7 +234,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
         if (!keyContainers.isEmpty()) {
           // For FSO keys, reconstruct the full path
           // Or extract just the key name if onlyFileNames is true
-          String keyPath = onlyFileNames ? "[fso] " + keyInfo.getKeyName() :
+          String keyPath = onlyFileNames ? keyInfo.getKeyName() :
               reconstructFullPath(keyInfo, bucketVolMap, unreferencedCountMap, keyContainers);
           if (keyPath != null) {
             for (Long containerId : keyContainers) {
@@ -262,7 +262,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
         if (!keyContainers.isEmpty()) {
           // For OBS keys, use the database key directly (already in /volume/bucket/key format)
           // Or extract just the key name if onlyFileNames is true
-          String keyPath = onlyFileNames ? "[obs] " + keyInfo.getKeyName() : entry.getKey();
+          String keyPath = onlyFileNames ? keyInfo.getKeyName() : entry.getKey();
           for (Long containerId : keyContainers) {
             containerToKeysMap.get(containerId).add(keyPath);
           }
@@ -306,23 +306,14 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
     Set<Long> keyContainers = getKeyContainers(keyInfo, containerIds);
 
     if (!keyContainers.isEmpty()) {
-      OmKeyLocationInfoGroup locations = keyInfo.getLatestVersionLocations();
-      boolean isMpuKey = locations != null && locations.isMultipartKey();
-
       String keyPath;
       if (onlyFileNames) {
-        String bucketType = isFSO ? "fso" : "obs";
-        String prefix = isMpuKey ? "[mpu-" + bucketType + "] " : "[" + bucketType + "] ";
-        keyPath = prefix + keyInfo.getKeyName();
+        keyPath = keyInfo.getKeyName();
       } else {
         if (isFSO) {
           keyPath = reconstructFullPath(keyInfo, bucketVolMap, unreferencedCountMap, keyContainers);
-          if (keyPath != null && isMpuKey) {
-            keyPath = "[mpu] " + keyPath;
-          }
         } else {
-          String prefix = isMpuKey ? "[mpu] " : "";
-          keyPath = prefix + buildFullOBSPath(keyInfo);
+          keyPath = buildFullOBSPath(keyInfo);
         }
       }
 
@@ -349,26 +340,19 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
           Set<Long> keyContainers = getKeyContainers(partKey, containerIds);
 
           if (!keyContainers.isEmpty()) {
-            int partNumber = partKeyInfo.getPartNumber();
             // Check if this is FSO or OBS based on parentObjectID
             // FSO keys have parentObjectID > 0 pointing to parent directory
             // OBS keys have parentObjectID = 0
             boolean isOBS = partKey.getParentObjectID() == 0;
-            String bucketType = isOBS ? "obs" : "fso";
 
             String keyPath;
             if (onlyFileNames) {
-              String prefix = "[mpu-part-" + partNumber + "-" + bucketType + "] ";
-              keyPath = prefix + partKey.getKeyName();
+              keyPath = partKey.getKeyName();
             } else {
-              String prefix = "[mpu-part-" + partNumber + "] ";
               if (isOBS) {
-                keyPath = prefix + buildFullOBSPath(partKey);
+                keyPath = buildFullOBSPath(partKey);
               } else {
                 keyPath = reconstructFullPath(partKey, bucketVolMap, unreferencedCountMap, keyContainers);
-                if (keyPath != null) {
-                  keyPath = prefix + keyPath;
-                }
               }
             }
 
