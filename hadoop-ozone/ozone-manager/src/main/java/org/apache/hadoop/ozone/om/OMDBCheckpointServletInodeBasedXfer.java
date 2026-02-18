@@ -506,6 +506,10 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
           continue;
         }
         String fileId = OmSnapshotUtils.getFileInodeAndLastModifiedTimeString(dbFile);
+        if (fileId.isEmpty()) {
+          LOG.warn("Not writing DB file : {} to archive as it no longer exists", dbFile);
+          continue;
+        }
         String path = dbFile.toFile().getAbsolutePath();
         // if the file is in the om checkpoint dir, then we need to change the path to point to the OM DB.
         if (path.contains(OM_CHECKPOINT_DIR)) {
