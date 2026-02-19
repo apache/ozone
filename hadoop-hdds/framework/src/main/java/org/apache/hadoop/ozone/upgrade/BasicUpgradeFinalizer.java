@@ -247,6 +247,13 @@ public abstract class BasicUpgradeFinalizer
   public abstract void finalizeLayoutFeature(LayoutFeature lf, T context)
       throws UpgradeException;
 
+  public void finalizeLayoutFeatures(Iterable<LayoutFeature> features, T context)
+      throws UpgradeException {
+    for (LayoutFeature lf : features) {
+      finalizeLayoutFeature(lf, context);
+    }
+  }
+
   protected void finalizeLayoutFeature(LayoutFeature lf, Optional<?
       extends UpgradeAction> action, Storage storage)
       throws UpgradeException {

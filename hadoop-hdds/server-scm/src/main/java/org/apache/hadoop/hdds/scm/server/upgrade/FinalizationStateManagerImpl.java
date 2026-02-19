@@ -121,8 +121,10 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
   }
 
   @Override
-  public void finalizeLayoutFeature(Integer layoutVersion) throws IOException {
-    finalizeLayoutFeatureLocal(layoutVersion);
+  public void finalizeLayoutFeatures(Integer startLayoutVersion, Integer endLayoutersion) throws IOException {
+    for (int version = startLayoutVersion; version <= endLayoutersion; version++) {
+      finalizeLayoutFeatureLocal(version);
+    }
   }
 
   /**
