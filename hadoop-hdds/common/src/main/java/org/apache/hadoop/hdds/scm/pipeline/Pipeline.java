@@ -51,7 +51,6 @@ import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
 import org.apache.hadoop.hdds.utils.db.Proto2Codec;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.util.Time;
 import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -339,23 +338,6 @@ public final class Pipeline {
           String.format("Datanode=%s not part of pipeline=%s", dn, id));
     }
     nodeStatus.put(dn, System.currentTimeMillis());
-  }
-
-  public List<DatanodeDetails> removeAllFromNodeStatus() {
-    Iterator<DatanodeDetails> iterator = nodeStatus.keySet().iterator();
-    List<DatanodeDetails> keys = new ArrayList<>();
-    while (iterator.hasNext()) {
-      DatanodeDetails firstKey = iterator.next();
-      keys.add(firstKey);
-    }
-    for (DatanodeDetails dn : keys) {
-      nodeStatus.remove(dn);
-    }
-    return keys;
-  }
-
-  public void setInNodeStatus(List<DatanodeDetails> dd) {
-    nodeStatus.put(dd.get(0), Time.now());
   }
 
   public boolean isHealthy() {
