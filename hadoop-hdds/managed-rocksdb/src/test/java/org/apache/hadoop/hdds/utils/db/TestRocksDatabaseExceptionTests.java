@@ -27,12 +27,8 @@ import org.rocksdb.RocksDBException;
 /**
  * Tests for RocksDatabaseException.
  */
-public class TestRocksDatabaseException {
+public class TestRocksDatabaseExceptionTests {
 
-  /**
-   * When there's no space left on disk, RocksDB throws the following exception.
-   * `org.rocksdb.RocksDBException: While appending to file: /test-data/testdb/000008.log: No space left on device`
-   */
   @Test
   void testNoSpaceDetectedFromMessage() {
     IOException ioException = new IOException("Put Key failed",
@@ -43,9 +39,14 @@ public class TestRocksDatabaseException {
     assertTrue(RocksDatabaseException.isNoSpaceError(ioException));
   }
 
+  /**
+   * When there's no space left on disk, RocksDB throws something like the following.
+   * `org.rocksdb.RocksDBException: While appending to file: /test-data/testdb/000008.log: No space left on device`.
+   */
   @Test
   void testNoSpaceDetectedFromRocksCause() {
-    RocksDBException rocksCause = new RocksDBException("No space left on device");
+    RocksDBException rocksCause = new RocksDBException("org.rocksdb.RocksDBException: While appending to file: " +
+        "/test-data/testdb/000008.log: No space left on device");
     RocksDatabaseException dbException =
         new RocksDatabaseException("Failed to open DB", rocksCause);
 
