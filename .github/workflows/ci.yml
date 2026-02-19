@@ -28,7 +28,6 @@ on:
         required: false
 env:
   BUILD_ARGS: "-Pdist -Psrc -Dmaven.javadoc.skip=true -Drocks_tools_native"
-  # Minimum required Java version for running Ozone is defined in pom.xml (javac.version).
   TEST_JAVA_VERSION: 21 # JDK version used by CI build and tests; should match the JDK version in apache/ozone-runner image
   # MAVEN_ARGS and MAVEN_OPTS are duplicated in check.yml, please keep in sync
   MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml
@@ -134,11 +133,11 @@ jobs:
     if: needs.build-info.outputs.needs-compile == 'true'
     strategy:
       matrix:
-        java: [ 11, 17, 21 ]
+        java: [ 8, 11, 17 ]
         include:
           - os: ubuntu-24.04
-          - java: 8
-            os: macos-15-intel
+          - java: 21
+            os: macos-15
       fail-fast: false
     uses: ./.github/workflows/check.yml
     with:
@@ -147,7 +146,7 @@ jobs:
       ratis-args: ${{ inputs.ratis_args }}
       runner: ${{ matrix.os }}
       script: compile
-      script-args: "-Pdist -DskipRecon -Dmaven.javadoc.failOnWarnings=${{ matrix.java != 8 }} -Djavac.version=${{ matrix.java }}"
+      script-args: "-Pdist -DskipRecon -Dmaven.javadoc.failOnWarnings=${{ matrix.java != 8 }} -Dmaven.compiler.release=${{ matrix.java }}"
       sha: ${{ needs.build-info.outputs.sha }}
       split: ${{ matrix.java }}
       timeout-minutes: 45
@@ -203,6 +202,7 @@ jobs:
     needs:
       - build-info
       - build
+    if: needs.build-info.outputs.needs-compile == 'true'
     uses: ./.github/workflows/check.yml
     secrets: inherit
     with:

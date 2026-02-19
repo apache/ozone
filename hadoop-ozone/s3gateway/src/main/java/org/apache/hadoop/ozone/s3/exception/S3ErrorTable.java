@@ -160,6 +160,14 @@ public final class S3ErrorTable {
       "Access Denied", "User doesn't have permission to access this resource due to a " +
       "bucket ownership mismatch.", HTTP_FORBIDDEN);
 
+  public static final OS3Exception X_AMZ_CONTENT_SHA256_MISMATCH = new OS3Exception(
+      "XAmzContentSHA256Mismatch", "The provided 'x-amz-content-sha256' header does " +
+      "not match the computed hash.", HTTP_BAD_REQUEST);
+
+  public static final OS3Exception BAD_DIGEST = new OS3Exception(
+      "BadDigest", "The Content-MD5 or checksum value that you specified did not match what the server received.",
+      HTTP_BAD_REQUEST);
+
   private static Function<Exception, OS3Exception> generateInternalError =
       e -> new OS3Exception("InternalError", e.getMessage(), HTTP_INTERNAL_ERROR);
 

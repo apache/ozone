@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static software.amazon.awssdk.core.sync.RequestBody.fromString;
@@ -44,10 +45,10 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 import javax.xml.bind.DatatypeConverter;
@@ -56,7 +57,6 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -64,13 +64,15 @@ import org.apache.hadoop.ozone.client.BucketArgs;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.s3.MultiS3GatewayService;
 import org.apache.hadoop.ozone.s3.S3ClientFactory;
 import org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils;
 import org.apache.hadoop.ozone.s3.endpoint.S3Owner;
+import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ozone.test.NonHATests;
 import org.apache.ozone.test.OzoneTestBase;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -172,39 +174,28 @@ import software.amazon.awssdk.utils.IoUtils;
  *   - https://docs.aws.amazon.com/sdk-for-java/latest/developer-guide/crt-based-s3-client.html
  */
 @TestMethodOrder(MethodOrderer.MethodName.class)
-public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public abstract class AbstractS3SDKV2Tests extends OzoneTestBase implements NonHATests.TestCase {
 
-  private static MiniOzoneCluster cluster = null;
-  private static S3Client s3Client = null;
-  private static S3AsyncClient s3AsyncClient = null;
+  private MiniOzoneCluster cluster;
+  private S3Client s3Client;
+  private S3AsyncClient s3AsyncClient;
 
-  /**
-   * Create a MiniOzoneCluster with S3G enabled for testing.
-   * @param conf Configurations to start the cluster
-   * @throws Exception exception thrown when waiting for the cluster to be ready.
-   */
-  static void startCluster(OzoneConfiguration conf) throws Exception {
-    MultiS3GatewayService s3g = new MultiS3GatewayService(5);
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .addService(s3g)
-        .setNumDatanodes(5)
-        .build();
-    cluster.waitForClusterToBeReady();
-
-    S3ClientFactory s3Factory = new S3ClientFactory(s3g.getConf());
+  @BeforeAll
+  void createClient() throws Exception {
+    cluster = cluster();
+    S3ClientFactory s3Factory = new S3ClientFactory(cluster.getConf());
     s3Client = s3Factory.createS3ClientV2();
     s3AsyncClient = s3Factory.createS3AsyncClientV2();
   }
 
-  /**
-   * Shutdown the MiniOzoneCluster.
-   */
-  static void shutdownCluster() throws IOException {
+  @AfterAll
+  void closeClient() {
     if (s3Client != null) {
       s3Client.close();
     }
-    if (cluster != null) {
-      cluster.shutdown();
+    if (s3AsyncClient != null) {
+      s3AsyncClient.close();
     }
   }
 
@@ -243,6 +234,189 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
 
     assertEquals(content, objectBytes.asUtf8String());
     assertEquals("\"37b51d194a7513e45b56f6524f2d51f2\"", getObjectResponse.eTag());
+  }
+
+  @Test
+  public void testPutObjectEmpty() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    long initialAllocatedBlocks =
+        cluster.getStorageContainerManager().getPipelineManager()
+            .getMetrics().getTotalNumBlocksAllocated();
+
+    PutObjectResponse putObjectResponse = s3Client.putObject(b -> b
+            .bucket(bucketName)
+            .key(keyName),
+        RequestBody.fromString(content));
+
+    assertEquals("\"d41d8cd98f00b204e9800998ecf8427e\"", putObjectResponse.eTag());
+
+    // Verify via Ozone client that the key has no block locations
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      ObjectStore store = ozoneClient.getObjectStore();
+      OzoneVolume volume = store.getS3Volume();
+      OzoneBucket bucket = volume.getBucket(bucketName);
+
+      OzoneKeyDetails keyDetails = bucket.getKey(keyName);
+      assertNotNull(keyDetails);
+      assertEquals(0, keyDetails.getDataSize(),
+          "Empty S3 object should have dataSize of 0");
+      assertTrue(keyDetails.getOzoneKeyLocations().isEmpty(),
+          "Empty S3 object should have no block locations");
+    }
+
+    // createKey should skip block allocation if data size is 0
+    long currentAllocatedBlocks =
+        cluster.getStorageContainerManager().getPipelineManager().getMetrics().getTotalNumBlocksAllocated();
+    assertEquals(initialAllocatedBlocks, currentAllocatedBlocks);
+  }
+
+  @Test
+  public void testPutObjectWithMD5Header() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
+    byte[] md5Bytes = calculateDigest(new ByteArrayInputStream(contentBytes), 0, contentBytes.length);
+    String md5Base64 = Base64.getEncoder().encodeToString(md5Bytes);
+
+    PutObjectResponse putObjectResponse = s3Client.putObject(b -> b
+            .bucket(bucketName)
+            .key(keyName)
+            .contentMD5(md5Base64),
+        RequestBody.fromString(content));
+
+    assertEquals("\"37b51d194a7513e45b56f6524f2d51f2\"", putObjectResponse.eTag());
+
+    ResponseBytes<GetObjectResponse> objectBytes = s3Client.getObjectAsBytes(
+        b -> b.bucket(bucketName).key(keyName)
+    );
+    GetObjectResponse getObjectResponse = objectBytes.response();
+
+    assertEquals(content, objectBytes.asUtf8String());
+    assertEquals("\"37b51d194a7513e45b56f6524f2d51f2\"", getObjectResponse.eTag());
+  }
+
+  @Test
+  public void testPutObjectWithWrongMD5Header() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    // Use wrong content to calculate MD5
+    byte[] wrongContentBytes = "wrong".getBytes(StandardCharsets.UTF_8);
+    byte[] wrongMd5Bytes = calculateDigest(new ByteArrayInputStream(wrongContentBytes), 0, wrongContentBytes.length);
+    String wrongMd5Base64 = Base64.getEncoder().encodeToString(wrongMd5Bytes);
+
+    S3Exception exception = assertThrows(S3Exception.class, () -> s3Client.putObject(b -> b
+            .bucket(bucketName)
+            .key(keyName)
+            .contentMD5(wrongMd5Base64),
+        RequestBody.fromString(content)));
+
+    assertEquals(400, exception.statusCode());
+    assertEquals("BadDigest", exception.awsErrorDetails().errorCode());
+
+    // Verify the object was not uploaded
+    assertThrows(NoSuchKeyException.class, () -> s3Client.headObject(b -> b.bucket(bucketName).key(keyName)));
+  }
+
+  @Test
+  public void testMultipartUploadWithMD5Header() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    // Initiate multipart upload
+    CreateMultipartUploadResponse createResponse = s3Client.createMultipartUpload(b -> b
+        .bucket(bucketName)
+        .key(keyName));
+    String uploadId = createResponse.uploadId();
+
+    // Prepare part data
+    String part1Content = "part1data";
+    byte[] part1Bytes = part1Content.getBytes(StandardCharsets.UTF_8);
+    byte[] part1Md5Bytes = calculateDigest(new ByteArrayInputStream(part1Bytes), 0, part1Bytes.length);
+    String part1Md5Base64 = Base64.getEncoder().encodeToString(part1Md5Bytes);
+
+    // Upload part 1 with MD5
+    UploadPartResponse part1Response = s3Client.uploadPart(b -> b
+            .bucket(bucketName)
+            .key(keyName)
+            .uploadId(uploadId)
+            .partNumber(1)
+            .contentMD5(part1Md5Base64),
+        RequestBody.fromBytes(part1Bytes));
+
+    // Verify ETag
+    String expectedETag = DatatypeConverter.printHexBinary(part1Md5Bytes).toLowerCase();
+    assertEquals(expectedETag, stripQuotes(part1Response.eTag()));
+
+    // Complete multipart upload
+    CompletedPart completedPart = CompletedPart.builder()
+        .partNumber(1)
+        .eTag(part1Response.eTag())
+        .build();
+
+    s3Client.completeMultipartUpload(b -> b
+        .bucket(bucketName)
+        .key(keyName)
+        .uploadId(uploadId)
+        .multipartUpload(CompletedMultipartUpload.builder().parts(completedPart).build()));
+
+    // Verify object was uploaded
+    ResponseBytes<GetObjectResponse> objectBytes = s3Client.getObjectAsBytes(
+        b -> b.bucket(bucketName).key(keyName)
+    );
+    assertEquals(part1Content, objectBytes.asUtf8String());
+  }
+
+  @Test
+  public void testMultipartUploadPartWithWrongMD5Header() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(b -> b.bucket(bucketName));
+
+    // Initiate multipart upload
+    CreateMultipartUploadResponse createResponse = s3Client.createMultipartUpload(b -> b
+        .bucket(bucketName)
+        .key(keyName));
+    String uploadId = createResponse.uploadId();
+
+    // Prepare part data with wrong MD5
+    String partContent = "partdata";
+    byte[] partBytes = partContent.getBytes(StandardCharsets.UTF_8);
+
+    byte[] wrongMd5Bytes = calculateDigest(
+        new ByteArrayInputStream("wrongdata".getBytes(StandardCharsets.UTF_8)), 0, 9);
+    String wrongMd5Base64 = Base64.getEncoder().encodeToString(wrongMd5Bytes);
+
+    // Upload part with wrong MD5 should fail
+    S3Exception exception = assertThrows(S3Exception.class, () -> s3Client.uploadPart(b -> b
+            .bucket(bucketName)
+            .key(keyName)
+            .uploadId(uploadId)
+            .partNumber(1)
+            .contentMD5(wrongMd5Base64),
+        RequestBody.fromBytes(partBytes)));
+
+    assertEquals(400, exception.statusCode());
+    assertEquals("BadDigest", exception.awsErrorDetails().errorCode());
+
+    // Abort the multipart upload
+    s3Client.abortMultipartUpload(b -> b
+        .bucket(bucketName)
+        .key(keyName)
+        .uploadId(uploadId));
+
+    // Verify object was not created
+    assertThrows(NoSuchKeyException.class, () -> s3Client.headObject(b -> b.bucket(bucketName).key(keyName)));
   }
 
   @Test
@@ -461,7 +635,7 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
   @TestInstance(TestInstance.Lifecycle.PER_CLASS)
   class PresignedUrlTests {
     private static final String CONTENT = "bar";
-    private static final String BUCKET_NAME = "presigned-url-bucket";
+    private static final String BUCKET_NAME = "v2-presigned-url-bucket";
     private final SdkHttpClient sdkHttpClient = ApacheHttpClient.create();
     // The URL will expire in 10 minutes.
     private final Duration duration = Duration.ofMinutes(10);
@@ -656,6 +830,41 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
       ResponseInputStream<GetObjectResponse> object = s3Client.getObject(b -> b.bucket(BUCKET_NAME).key(keyName));
       actualContent = IoUtils.toUtf8String(object);
       assertEquals(CONTENT, actualContent);
+    }
+
+    @Test
+    public void testPresignedUrlPutSingleChunkWithWrongSha256() throws Exception {
+      final String keyName = getKeyName();
+
+      PutObjectRequest objectRequest = PutObjectRequest.builder().bucket(BUCKET_NAME).key(keyName).build();
+
+      PutObjectPresignRequest presignRequest = PutObjectPresignRequest.builder()
+          .signatureDuration(duration)
+          .putObjectRequest(objectRequest)
+          .build();
+
+      PresignedPutObjectRequest presignedRequest = presigner.presignPutObject(presignRequest);
+
+      Map<String, List<String>> headers = presignedRequest.signedHeaders();
+      List<String> sha256 = new ArrayList<>();
+      sha256.add("wrong-sha256-value");
+      headers.put(S3Consts.X_AMZ_CONTENT_SHA256, sha256);
+
+      // use http url connection
+      HttpURLConnection connection = null;
+      try {
+        connection = S3SDKTestUtils.openHttpURLConnection(presignedRequest.url(), "PUT",
+            headers, CONTENT.getBytes(StandardCharsets.UTF_8));
+        int responseCode = connection.getResponseCode();
+        assertEquals(400, responseCode, "PutObject presigned URL should return 400 because of wrong SHA256");
+      } finally {
+        if (connection != null) {
+          connection.disconnect();
+        }
+      }
+
+      // Verify the object was not uploaded
+      assertThrows(NoSuchKeyException.class, () -> s3Client.headObject(b -> b.bucket(BUCKET_NAME).key(keyName)));
     }
 
     @Test
@@ -1078,16 +1287,16 @@ public abstract class AbstractS3SDKV2Tests extends OzoneTestBase {
     return getBucketName("");
   }
 
-  private String getBucketName(String suffix) {
-    return (getTestName() + "bucket" + suffix).toLowerCase(Locale.ROOT);
+  private String getBucketName(String ignored) {
+    return uniqueObjectName();
   }
 
   private String getKeyName() {
     return getKeyName("");
   }
 
-  private String getKeyName(String suffix) {
-    return (getTestName() +  "key" + suffix).toLowerCase(Locale.ROOT);
+  private String getKeyName(String ignored) {
+    return uniqueObjectName();
   }
 
   private String multipartUpload(String bucketName, String key, File file, int partSize,

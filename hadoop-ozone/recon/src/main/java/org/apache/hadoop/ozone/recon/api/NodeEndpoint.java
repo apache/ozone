@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -45,6 +46,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.client.DecommissionUtils;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -173,14 +175,21 @@ public class NodeEndpoint {
   private DatanodeStorageReport getStorageReport(DatanodeDetails datanode) {
     SCMNodeStat nodeStat =
         nodeManager.getNodeStat(datanode).get();
-    DatanodeStorageReport storageReport = DatanodeStorageReport.newBuilder()
+    SpaceUsageSource.Fixed fsUsage = nodeManager.getTotalFilesystemUsage(datanode);
+    DatanodeStorageReport.Builder builder = DatanodeStorageReport.newBuilder()
         .setCapacity(nodeStat.getCapacity().get())
         .setUsed(nodeStat.getScmUsed().get())
         .setRemaining(nodeStat.getRemaining().get())
         .setCommitted(nodeStat.getCommitted().get())
-        .setMinimumFreeSpace(nodeStat.getFreeSpaceToSpare().get())
-        .build();
-    return storageReport;
+        .setReserved(nodeStat.getReserved().get())
+        .setMinimumFreeSpace(nodeStat.getFreeSpaceToSpare().get());
+
+    if (fsUsage != null) {
+      builder.setFilesystemCapacity(fsUsage.getCapacity())
+          .setFilesystemAvailable(fsUsage.getAvailable())
+          .setFilesystemUsed(fsUsage.getUsedSpace());
+    }
+    return builder.build();
   }
 
   /**
@@ -198,7 +207,7 @@ public class NodeEndpoint {
     List<DatanodeMetadata> removedDatanodes = new ArrayList<>();
     Map<String, String> failedNodeErrorResponseMap = new HashMap<>();
 
-    Preconditions.checkNotNull(uuids, "Datanode list argument should not be null");
+    Objects.requireNonNull(uuids, "Datanode list argument should not be null");
     Preconditions.checkArgument(!uuids.isEmpty(), "Datanode list argument should not be empty");
     try {
       for (String uuid : uuids) {
@@ -333,7 +342,7 @@ public class NodeEndpoint {
   public Response getDecommissionInfoForDatanode(@QueryParam("uuid") String uuid,
                                                  @QueryParam("ipAddress") String ipAddress) {
     if (StringUtils.isEmpty(uuid)) {
-      Preconditions.checkNotNull(ipAddress, "Either uuid or ipAddress of a datanode should be provided !!!");
+      Objects.requireNonNull(ipAddress, "Either uuid or ipAddress of a datanode should be provided !!!");
       Preconditions.checkArgument(!ipAddress.isEmpty(),
           "Either uuid or ipAddress of a datanode should be provided !!!");
     }

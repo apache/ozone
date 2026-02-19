@@ -176,6 +176,15 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   DatanodeUsageInfo getUsageInfo(DatanodeDetails dn);
 
   /**
+   * Get the datanode info of a specified datanode.
+   *
+   * @param dn the usage of which we want to get
+   * @return DatanodeInfo of the specified datanode
+   */
+  @Nullable
+  DatanodeInfo getDatanodeInfo(DatanodeDetails dn);
+
+  /**
    * Return the node stat of the specified datanode.
    * @param datanodeDetails DatanodeDetails.
    * @return node stat if it is live/stale, null if it is decommissioned or
@@ -361,9 +370,6 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   /** @return the datanode of the given id if it exists; otherwise, return null. */
   @Nullable DatanodeDetails getNode(@Nullable DatanodeID id);
 
-  @Nullable
-  DatanodeInfo getDatanodeInfo(DatanodeDetails datanodeDetails);
-
   /**
    * Given datanode address(Ipaddress or hostname), returns a list of
    * DatanodeDetails for the datanodes running at that address.
@@ -387,13 +393,9 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    */
   NetworkTopology getClusterNetworkTopologyMap();
 
-  int minHealthyVolumeNum(List <DatanodeDetails> dnList);
-
   int totalHealthyVolumeCount();
 
   int pipelineLimit(DatanodeDetails dn);
-
-  int minPipelineLimit(List<DatanodeDetails> dn);
 
   /**
    * Gets the peers in all the pipelines for the particular datnode.
@@ -418,4 +420,6 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   default void removeNode(DatanodeDetails datanodeDetails) throws NodeNotFoundException, IOException {
 
   }
+
+  int openContainerLimit(List<DatanodeDetails> datanodes);
 }

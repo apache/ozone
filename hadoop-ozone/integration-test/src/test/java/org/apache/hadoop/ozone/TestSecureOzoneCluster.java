@@ -39,6 +39,7 @@ import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigString
 import static org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig.ConfigStrings.HDDS_SCM_HTTP_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.hdds.security.x509.exception.CertificateException.ErrorCode.ROLLBACK_ERROR;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClient;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getValidInetsForCurrentHost;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
@@ -105,9 +106,6 @@ import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.client.ScmTopologyClient;
-import org.apache.hadoop.hdds.scm.ha.HASecurityUtils;
-import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
-import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
@@ -444,18 +442,10 @@ final class TestSecureOzoneCluster {
     Files.createDirectories(scmPath);
     conf.set(OZONE_METADATA_DIRS, scmPath.toString());
 
+    // Use scmInit to properly initialize SCM with all required directories
+    StorageContainerManager.scmInit(conf, clusterId);
     SCMStorageConfig scmStore = new SCMStorageConfig(conf);
-    scmStore.setClusterId(clusterId);
-    scmStore.setScmId(scmId);
-    scmStore.setSCMHAFlag(true);
-    HASecurityUtils.initializeSecurity(scmStore, conf,
-        InetAddress.getLocalHost().getHostName(), true);
-    scmStore.setPrimaryScmNodeId(scmId);
-    // writes the version file properties
-    scmStore.initialize();
-    SCMRatisServerImpl.initialize(clusterId, scmId,
-        SCMHANodeDetails.loadSCMHAConfig(conf, scmStore)
-                .getLocalNodeDetails(), conf);
+    scmId = scmStore.getScmId();
 
     /*
      * As all these processes run inside the same JVM, there are issues around
@@ -1449,8 +1439,7 @@ final class TestSecureOzoneCluster {
       CertificateSignRequest.Builder csrBuilder) throws IOException {
     DomainValidator validator = DomainValidator.getInstance();
     // Add all valid ips.
-    List<InetAddress> inetAddresses =
-        OzoneSecurityUtil.getValidInetsForCurrentHost();
+    List<InetAddress> inetAddresses = getValidInetsForCurrentHost();
     csrBuilder.addInetAddresses(inetAddresses, validator);
   }
 }

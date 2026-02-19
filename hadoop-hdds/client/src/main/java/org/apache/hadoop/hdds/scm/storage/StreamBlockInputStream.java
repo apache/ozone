@@ -22,6 +22,7 @@ import static org.apache.ratis.thirdparty.io.grpc.Status.Code.CANCELLED;
 import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -70,8 +71,10 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
   private final String name = "stream" + STREAM_ID.getAndIncrement();
   private final BlockID blockID;
   private final long blockLength;
-  private final int responseDataSize = 1 << 20; // 1 MB
-  private final long preReadSize = 32 << 20; // 32 MB
+  private final int responseDataSize;
+  private final long preReadSize;
+  private final Duration readTimeout;
+  private final long readTimeoutNanos;
   private final AtomicReference<Pipeline> pipelineRef = new AtomicReference<>();
   private final AtomicReference<Token<OzoneBlockTokenIdentifier>> tokenRef = new AtomicReference<>();
   private XceiverClientFactory xceiverClientFactory;
@@ -101,6 +104,10 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     this.verifyChecksum = config.isChecksumVerify();
     this.retryPolicy = getReadRetryPolicy(config);
     this.refreshFunction = refreshFunction;
+    this.preReadSize = config.getStreamReadPreReadSize();
+    this.responseDataSize = config.getStreamReadResponseDataSize();
+    this.readTimeout = config.getStreamReadTimeout();
+    this.readTimeoutNanos = readTimeout.toNanos();
   }
 
   @Override
@@ -328,6 +335,19 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     return name;
   }
 
+  public long getPreReadSize() {
+    return preReadSize;
+  }
+
+  public int getResponseDataSize() {
+    return responseDataSize;
+  }
+
+  /** Visible for testing: returns the configured streaming read timeout. */
+  public Duration getReadTimeout() {
+    return readTimeout;
+  }
+
   /**
    * Implementation of a StreamObserver used to received and buffer streaming GRPC reads.
    */
@@ -351,10 +371,9 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
       }
     }
 
-    ReadBlockResponseProto poll(int timeout, TimeUnit timeoutUnit) throws IOException {
-      final long timeoutNanos = timeoutUnit.toNanos(timeout);
+    ReadBlockResponseProto poll() throws IOException {
       final long startTime = System.nanoTime();
-      final long pollTimeoutNanos = Math.min(timeoutNanos / 10, 100_000_000);
+      final long pollTimeoutNanos = Math.min(readTimeoutNanos / 10, 100_000_000);
 
       while (true) {
         checkError();
@@ -374,9 +393,9 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
         }
 
         final long elapsedNanos = System.nanoTime() - startTime;
-        if (elapsedNanos >= timeoutNanos) {
+        if (elapsedNanos >= readTimeoutNanos) {
           setFailedAndThrow(new TimeoutIOException(
-              "Timed out " + timeout + " " + timeoutUnit + " waiting for response"));
+              "Timed out waiting for response after " + readTimeout));
           return null;
         }
       }
@@ -399,7 +418,7 @@ public class StreamBlockInputStream extends BlockExtendedInputStream {
     }
 
     ByteBuffer readFromQueue() throws IOException {
-      final ReadBlockResponseProto readBlock = poll(10, TimeUnit.SECONDS);
+      final ReadBlockResponseProto readBlock = poll();
       // The server always returns data starting from the last checksum boundary. Therefore if the reader position is
       // ahead of the position we received from the server, we need to adjust the buffer position accordingly.
       // If the reader position is behind

@@ -243,6 +243,12 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
+  @Nullable
+  public DatanodeInfo getDatanodeInfo(DatanodeDetails dn) {
+    return null;
+  }
+
+  @Override
   public SCMNodeMetric getNodeStat(DatanodeDetails datanodeDetails) {
     return null;
   }
@@ -348,12 +354,6 @@ public class SimpleMockNodeManager implements NodeManager {
     return null;
   }
 
-  @Nullable
-  @Override
-  public DatanodeInfo getDatanodeInfo(DatanodeDetails datanodeDetails) {
-    return null;
-  }
-
   @Override
   public List<DatanodeDetails> getNodesByAddress(String address) {
     return null;
@@ -362,11 +362,6 @@ public class SimpleMockNodeManager implements NodeManager {
   @Override
   public NetworkTopology getClusterNetworkTopologyMap() {
     return null;
-  }
-
-  @Override
-  public int minHealthyVolumeNum(List<DatanodeDetails> dnList) {
-    return 0;
   }
 
   @Override
@@ -380,8 +375,8 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
-  public int minPipelineLimit(List<DatanodeDetails> dn) {
-    return 0;
+  public int openContainerLimit(List<DatanodeDetails> datanodes) {
+    return 9;
   }
 
   @Override

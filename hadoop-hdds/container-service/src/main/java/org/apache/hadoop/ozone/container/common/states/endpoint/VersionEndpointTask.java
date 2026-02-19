@@ -115,7 +115,7 @@ public class VersionEndpointTask implements
     try {
       // If version file does not exist
       // create version file and also set scm ID or cluster ID.
-      for (StorageVolume volume : volumeSet.getVolumeMap().values()) {
+      for (StorageVolume volume : volumeSet.getVolumesList()) {
         boolean result = StorageVolumeUtil.checkVolume(volume,
             scmId, clusterId, configuration, LOG,
             ozoneContainer.getDbVolumeSet());

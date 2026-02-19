@@ -1155,7 +1155,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
    */
   protected OmKeyInfo wrapUncommittedBlocksAsPseudoKey(
       List<OmKeyLocationInfo> uncommitted, OmKeyInfo omKeyInfo) {
-    if (uncommitted.isEmpty()) {
+    if (uncommitted.isEmpty() || omKeyInfo.getDataSize() == 0) {
       return null;
     }
     LOG.debug("Detect allocated but uncommitted blocks {} in key {}.",

@@ -199,6 +199,9 @@ public final class OzoneConsts {
    */
   public static final String OZONE_SCM_DATANODE_ID_FILE_DEFAULT = "datanode.id";
 
+  public static final String
+      OZONE_SCM_DATANODE_DISK_BALANCER_INFO_FILE_DEFAULT = "diskBalancer.info";
+
   /**
    * The ServiceListJSONServlet context attribute where OzoneManager
    * instance gets stored.
@@ -564,6 +567,7 @@ public final class OzoneConsts {
    * the OMDBCheckpoint functions.
    */
   public static final String OM_SNAPSHOT_SEPARATOR = "-";
+  public static final String HARDLINK_SEPARATOR = "\t";
 
   private OzoneConsts() {
     // Never Constructed

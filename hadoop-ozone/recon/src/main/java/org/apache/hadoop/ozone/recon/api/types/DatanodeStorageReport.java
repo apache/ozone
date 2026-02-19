@@ -32,6 +32,10 @@ public final class DatanodeStorageReport {
   private long remaining;
   private long committed;
   private long minimumFreeSpace;
+  private long reserved;
+  private long filesystemCapacity;
+  private long filesystemUsed;
+  private long filesystemAvailable;
 
   public DatanodeStorageReport() {
   }
@@ -44,6 +48,11 @@ public final class DatanodeStorageReport {
     this.remaining = builder.remaining;
     this.committed = builder.committed;
     this.minimumFreeSpace = builder.minimumFreeSpace;
+    this.reserved = builder.reserved;
+    this.filesystemCapacity = builder.filesystemCapacity;
+    this.filesystemUsed = builder.filesystemUsed;
+    this.filesystemAvailable = builder.filesystemAvailable;
+    builder.validate();
   }
 
   public String getDatanodeUuid() {
@@ -74,6 +83,22 @@ public final class DatanodeStorageReport {
     return minimumFreeSpace;
   }
 
+  public long getReserved() {
+    return reserved;
+  }
+
+  public long getFilesystemCapacity() {
+    return filesystemCapacity;
+  }
+
+  public long getFilesystemUsed() {
+    return filesystemUsed;
+  }
+
+  public long getFilesystemAvailable() {
+    return filesystemAvailable;
+  }
+
   public static Builder newBuilder() {
     return new Builder();
   }
@@ -89,6 +114,10 @@ public final class DatanodeStorageReport {
     private long remaining = 0;
     private long committed = 0;
     private long minimumFreeSpace = 0;
+    private long reserved = 0;
+    private long filesystemCapacity = 0;
+    private long filesystemUsed = 0;
+    private long filesystemAvailable = 0;
 
     private static final Logger LOG =
         LoggerFactory.getLogger(Builder.class);
@@ -131,6 +160,26 @@ public final class DatanodeStorageReport {
       return this;
     }
 
+    public Builder setReserved(long reserved) {
+      this.reserved = reserved;
+      return this;
+    }
+
+    public Builder setFilesystemCapacity(long filesystemCapacity) {
+      this.filesystemCapacity = filesystemCapacity;
+      return this;
+    }
+
+    public Builder setFilesystemUsed(long filesystemUsed) {
+      this.filesystemUsed = filesystemUsed;
+      return this;
+    }
+
+    public Builder setFilesystemAvailable(long filesystemAvailable) {
+      this.filesystemAvailable = filesystemAvailable;
+      return this;
+    }
+
     public void validate() {
       Objects.requireNonNull(hostName, "hostName cannot be null");
 
@@ -146,6 +195,27 @@ public final class DatanodeStorageReport {
       if (committed < 0) {
         throw new IllegalArgumentException("committed cannot be negative");
       }
+
+      if (minimumFreeSpace < 0) {
+        throw new IllegalArgumentException("minimumFreeSpace cannot be negative");
+      }
+
+      if (reserved < 0) {
+        throw new IllegalArgumentException("reserved cannot be negative");
+      }
+
+      if (filesystemCapacity < 0) {
+        throw new IllegalArgumentException("filesystemCapacity cannot be negative");
+      }
+
+      if (filesystemAvailable < 0) {
+        throw new IllegalArgumentException("filesystemAvailable cannot be negative");
+      }
+
+      if (filesystemUsed < 0) {
+        throw new IllegalArgumentException("filesystemUsed cannot be negative");
+      }
+
       // Logical consistency checks
       if (used + remaining > capacity) {
         LOG.warn("Inconsistent storage report for {}: used({}) + remaining({}) > capacity({})",

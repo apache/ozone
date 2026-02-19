@@ -17,13 +17,11 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import com.google.common.base.Preconditions;
-import java.util.ArrayList;
-import java.util.LinkedList;
+import com.google.common.collect.ImmutableList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.CopyOnWriteArrayList;
+import net.jcip.annotations.Immutable;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
 import org.apache.hadoop.hdds.utils.db.DelegatedCodec;
@@ -36,6 +34,7 @@ import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.Persisted
  * can be extended for other OzFS optimizations in future.
  */
 // TODO: support Auditable interface
+@Immutable
 public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPrefixInfo> {
   private static final Codec<OmPrefixInfo> CODEC = new DelegatedCodec<>(
       Proto2Codec.get(PersistedPrefixInfo.getDefaultInstance()),
@@ -44,12 +43,12 @@ public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPre
       OmPrefixInfo.class);
 
   private final String name;
-  private final CopyOnWriteArrayList<OzoneAcl> acls;
+  private final ImmutableList<OzoneAcl> acls;
 
   private OmPrefixInfo(Builder b) {
     super(b);
-    name = b.name;
-    acls = new CopyOnWriteArrayList<>(b.acls);
+    this.name = b.name;
+    this.acls = b.acls.build();
   }
 
   public static Codec<OmPrefixInfo> getCodec() {
@@ -62,18 +61,6 @@ public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPre
    */
   public List<OzoneAcl> getAcls() {
     return acls;
-  }
-
-  public boolean addAcl(OzoneAcl acl) {
-    return OzoneAclUtil.addAcl(acls, acl);
-  }
-
-  public boolean removeAcl(OzoneAcl acl) {
-    return OzoneAclUtil.removeAcl(acls, acl);
-  }
-
-  public boolean setAcls(List<OzoneAcl> newAcls) {
-    return OzoneAclUtil.setAcl(acls, newAcls);
   }
 
   /**
@@ -89,8 +76,8 @@ public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPre
    *
    * @return Builder
    */
-  public static OmPrefixInfo.Builder newBuilder() {
-    return new OmPrefixInfo.Builder();
+  public static Builder newBuilder() {
+    return new Builder();
   }
 
   /**
@@ -98,34 +85,49 @@ public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPre
    */
   public static class Builder extends WithObjectID.Builder<OmPrefixInfo> {
     private String name;
-    private final List<OzoneAcl> acls;
+    private final AclListBuilder acls;
 
     public Builder() {
       //Default values
-      this.acls = new LinkedList<>();
+      this(AclListBuilder.empty());
+    }
+
+    private Builder(AclListBuilder acls) {
+      this.acls = acls;
     }
 
     public Builder(OmPrefixInfo obj) {
       super(obj);
-      setName(obj.name);
-      acls = new ArrayList<>(obj.getAcls());
+      this.acls = AclListBuilder.of(obj.acls);
+      this.name = obj.name;
     }
 
     public Builder setAcls(List<OzoneAcl> listOfAcls) {
-      if (listOfAcls != null) {
-        acls.addAll(listOfAcls);
-      }
+      acls.set(listOfAcls);
       return this;
+    }
+
+    public Builder addAcls(List<OzoneAcl> listOfAcls) {
+      acls.addAll(listOfAcls);
+      return this;
+    }
+
+    public Builder addAcl(OzoneAcl acl) {
+      acls.add(acl);
+      return this;
+    }
+
+    public Builder removeAcl(OzoneAcl acl) {
+      acls.remove(acl);
+      return this;
+    }
+
+    public boolean isAclsChanged() {
+      return acls.isChanged();
     }
 
     public Builder setName(String n) {
       this.name = n;
-      return this;
-    }
-
-    @Override
-    public OmPrefixInfo.Builder addMetadata(String key, String value) {
-      super.addMetadata(key, value);
       return this;
     }
 
@@ -151,7 +153,7 @@ public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPre
     @Override
     protected void validate() {
       super.validate();
-      Preconditions.checkNotNull(name);
+      Objects.requireNonNull(name, "name == null");
     }
 
     @Override
@@ -251,4 +253,3 @@ public final class OmPrefixInfo extends WithObjectID implements CopyObject<OmPre
     return new Builder(this);
   }
 }
-
