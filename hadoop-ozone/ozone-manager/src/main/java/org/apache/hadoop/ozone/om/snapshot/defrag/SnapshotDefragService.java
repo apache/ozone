@@ -45,6 +45,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.BackgroundService;
@@ -69,8 +70,10 @@ import org.apache.hadoop.hdds.utils.db.TableIterator;
 import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
+import org.apache.hadoop.ozone.om.OmSnapshotInternalMetrics;
 import org.apache.hadoop.ozone.om.OmSnapshotLocalData;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -134,6 +137,8 @@ public class SnapshotDefragService extends BackgroundService
   private final List<UUID> lockIds;
   private final CompositeDeltaDiffComputer deltaDiffComputer;
   private final Path differTmpDir;
+  private final OmSnapshotInternalMetrics snapshotMetrics;
+  private final OMPerformanceMetrics perfMetrics;
 
   public SnapshotDefragService(long interval, TimeUnit unit, long serviceTimeout,
       OzoneManager ozoneManager, OzoneConfiguration configuration) throws IOException {
@@ -166,6 +171,8 @@ public class SnapshotDefragService extends BackgroundService
       LOG.debug("Snapshot defragmentation diff status: {}", status);
     }, false, !isRocksToolsNativeLibAvailable());
     this.lockIds = new ArrayList<>(1);
+    this.snapshotMetrics = ozoneManager.getOmSnapshotIntMetrics();
+    this.perfMetrics = ozoneManager.getPerfMetrics();
   }
 
   @Override
@@ -266,6 +273,7 @@ public class SnapshotDefragService extends BackgroundService
   @VisibleForTesting
   void performFullDefragmentation(DBStore checkpointDBStore, TablePrefixInfo prefixInfo,
       Set<String> incrementalTables) throws IOException {
+    long tablesCompacted = 0;
     for (String table : incrementalTables) {
       Table<String, CodecBuffer> checkpointTable = checkpointDBStore.getTable(table, StringCodec.get(),
           CodecBufferCodec.get(true));
@@ -295,7 +303,9 @@ public class SnapshotDefragService extends BackgroundService
         compactRangeOptions.setChangeLevel(true);
         checkpointDBStore.compactTable(table, compactRangeOptions);
       }
+      tablesCompacted++;
     }
+    snapshotMetrics.incNumSnapshotFullDefragTablesCompacted(tablesCompacted);
   }
 
   /**
@@ -382,6 +392,7 @@ public class SnapshotDefragService extends BackgroundService
     // Map of delta files grouped on the basis of the tableName.
     Collection<Pair<Path, SstFileInfo>> allTableDeltaFiles = this.deltaDiffComputer.getDeltaFiles(
         previousSnapshotInfo, snapshotInfo, incrementalTables);
+    snapshotMetrics.incNumSnapshotIncDefragDeltaFilesProcessed(allTableDeltaFiles.size());
 
     Map<String, List<Path>> tableGroupedDeltaFiles = allTableDeltaFiles.stream()
         .collect(Collectors.groupingBy(pair -> pair.getValue().getColumnFamily(),
@@ -574,6 +585,38 @@ public class SnapshotDefragService extends BackgroundService
     }
   }
 
+  /**
+   * Logs disk space usage and SST file count for the given directory.
+   *
+   * @param label a descriptive label for the log message (e.g., "Before defrag", "After defrag")
+   * @param snapshotInfo the snapshot being defragmented
+   * @param dir the directory to inspect
+   */
+  private void logDirStats(String label, SnapshotInfo snapshotInfo, Path dir) {
+    try (Stream<Path> files = Files.list(dir)) {
+      long totalSize = 0;
+      long sstFileCount = 0;
+      long totalFileCount = 0;
+      java.util.Iterator<Path> it = files.iterator();
+      while (it.hasNext()) {
+        Path file = it.next();
+        if (Files.isRegularFile(file)) {
+          long fileSize = Files.size(file);
+          totalSize += fileSize;
+          totalFileCount++;
+          if (file.toString().endsWith(SST_FILE_EXTENSION)) {
+            sstFileCount++;
+          }
+        }
+      }
+      LOG.trace("{} snapshot {} (ID: {}): dir={}, totalFiles={}, sstFiles={}, diskUsage={} bytes",
+          label, snapshotInfo.getTableKey(), snapshotInfo.getSnapshotId(),
+          dir, totalFileCount, sstFileCount, totalSize);
+    } catch (IOException e) {
+      LOG.trace("Failed to collect directory stats for {}: {}", dir, e.getMessage());
+    }
+  }
+
   private void acquireContentLock(UUID snapshotID) throws IOException {
     lockIds.clear();
     lockIds.add(snapshotID);
@@ -591,10 +634,12 @@ public class SnapshotDefragService extends BackgroundService
     if (snapshotInfo.getSnapshotStatus() != SnapshotInfo.SnapshotStatus.SNAPSHOT_ACTIVE) {
       LOG.debug("Skipping defragmentation for non-active snapshot: {} (ID: {})",
           snapshotInfo.getName(), snapshotInfo.getSnapshotId());
+      snapshotMetrics.incNumSnapshotDefragSnapshotSkipped();
       return false;
     }
     Pair<Boolean, Integer> needsDefragVersionPair = needsDefragmentation(snapshotInfo);
     if (!needsDefragVersionPair.getLeft()) {
+      snapshotMetrics.incNumSnapshotDefragSnapshotSkipped();
       return false;
     }
     LOG.info("Defragmenting snapshot: {} (ID: {})", snapshotInfo.getTableKey(), snapshotInfo.getSnapshotId());
@@ -608,18 +653,37 @@ public class SnapshotDefragService extends BackgroundService
     Path checkpointLocation = checkpointMetadataManager.getStore().getDbLocation().toPath();
     try {
       DBStore checkpointDBStore = checkpointMetadataManager.getStore();
+      if (LOG.isTraceEnabled()) {
+        Path snapshotDbDir = OmSnapshotManager.getSnapshotPath(
+            ozoneManager.getMetadataManager(), snapshotId, needsDefragVersionPair.getValue());
+        logDirStats("Before defrag", snapshotInfo, snapshotDbDir);
+      }
       TablePrefixInfo prefixInfo = ozoneManager.getMetadataManager().getTableBucketPrefix(snapshotInfo.getVolumeName(),
           snapshotInfo.getBucketName());
       // If first snapshot in the chain perform full defragmentation.
-      if (snapshotInfo.getPathPreviousSnapshotId() == null) {
+      boolean isFullDefrag = snapshotInfo.getPathPreviousSnapshotId() == null;
+      long defragStart = Time.monotonicNow();
+      if (isFullDefrag) {
         LOG.info("Performing full defragmentation for snapshot: {} (ID: {})", snapshotInfo.getTableKey(),
             snapshotInfo.getSnapshotId());
-        performFullDefragmentation(checkpointDBStore, prefixInfo, COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT);
+        try {
+          performFullDefragmentation(checkpointDBStore, prefixInfo, COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT);
+          perfMetrics.setSnapshotDefragServiceFullLatencyMs(Time.monotonicNow() - defragStart);
+        } catch (IOException e) {
+          snapshotMetrics.incNumSnapshotFullDefragFails();
+          throw e;
+        }
       } else {
         LOG.info("Performing incremental defragmentation for snapshot: {} (ID: {})", snapshotInfo.getTableKey(),
             snapshotInfo.getSnapshotId());
-        performIncrementalDefragmentation(checkpointSnapshotInfo, snapshotInfo, needsDefragVersionPair.getValue(),
-            checkpointDBStore, prefixInfo, COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT);
+        try {
+          performIncrementalDefragmentation(checkpointSnapshotInfo, snapshotInfo, needsDefragVersionPair.getValue(),
+              checkpointDBStore, prefixInfo, COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT);
+          perfMetrics.setSnapshotDefragServiceIncLatencyMs(Time.monotonicNow() - defragStart);
+        } catch (IOException e) {
+          snapshotMetrics.incNumSnapshotIncDefragFails();
+          throw e;
+        }
       }
       int previousVersion;
       // Acquire Content lock on the snapshot to ensure the contents of the table doesn't get changed.
@@ -628,6 +692,9 @@ public class SnapshotDefragService extends BackgroundService
         // Ingestion of incremental tables KeyTable/FileTable/DirectoryTable done now we need to just reingest the
         // remaining tables from the original snapshot.
         ingestNonIncrementalTables(checkpointDBStore, snapshotInfo, prefixInfo, COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT);
+        if (LOG.isTraceEnabled()) {
+          logDirStats("After defrag", snapshotInfo, checkpointLocation);
+        }
         checkpointMetadataManager.close();
         checkpointMetadataManager = null;
         // Switch the snapshot DB location to the new version.
@@ -638,6 +705,12 @@ public class SnapshotDefragService extends BackgroundService
       }
       LOG.info("Completed defragmentation for snapshot: {} (ID: {}) in {} ms", snapshotInfo.getTableKey(),
           snapshotInfo.getSnapshotId(), Time.monotonicNow() - start);
+      snapshotMetrics.incNumSnapshotDefrag();
+      if (isFullDefrag) {
+        snapshotMetrics.incNumSnapshotFullDefrag();
+      } else {
+        snapshotMetrics.incNumSnapshotIncDefrag();
+      }
     } finally {
       if (checkpointMetadataManager != null) {
         checkpointMetadataManager.close();
@@ -684,6 +757,7 @@ public class SnapshotDefragService extends BackgroundService
           snapshotsDefraggedCount.getAndIncrement();
         }
       } catch (IOException e) {
+        snapshotMetrics.incNumSnapshotDefragFails();
         LOG.error("Exception while defragmenting snapshot: {}", snapshotId, e);
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
