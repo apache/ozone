@@ -17,23 +17,22 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
-import java.math.BigInteger;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 
 /**
- * Codec for type BigInteger.
+ * {@link ScmCodec} for {@code Boolean} objects.
  */
-public class BigIntegerCodec implements Codec {
+public class ScmBooleanCodec implements ScmCodec {
+  static final ByteString TRUE = ByteString.copyFromUtf8(Boolean.TRUE.toString());
+  static final ByteString FALSE = ByteString.copyFromUtf8(Boolean.FALSE.toString());
 
   @Override
   public ByteString serialize(Object object) {
-    // BigInteger returns a new byte[].
-    return UnsafeByteOperations.unsafeWrap(((BigInteger) object).toByteArray());
+    return ((Boolean) object) ? TRUE : FALSE;
   }
 
   @Override
-  public Object deserialize(Class< ? > type, ByteString value) {
-    return new BigInteger(value.toByteArray());
+  public Boolean deserialize(Class<?> type, ByteString value) {
+    return value.equals(TRUE) ? Boolean.TRUE : Boolean.FALSE;
   }
 }

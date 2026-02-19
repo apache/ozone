@@ -17,17 +17,27 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
+import com.google.common.primitives.Longs;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
+import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 
 /**
- * Codec interface to marshall/unmarshall data to/from {@link ByteString}.
+ * {@link ScmCodec} for {@code Long} objects.
  */
-public interface Codec {
+public class ScmLongCodec implements ScmCodec {
 
-  ByteString serialize(Object object) throws InvalidProtocolBufferException;
+  @Override
+  public ByteString serialize(Object object)
+      throws InvalidProtocolBufferException {
+    // toByteArray returns a new array
+    return UnsafeByteOperations.unsafeWrap(Longs.toByteArray((Long) object));
+  }
 
-  Object deserialize(Class<?> type, ByteString value)
-      throws InvalidProtocolBufferException;
+  @Override
+  public Object deserialize(Class<?> type, ByteString value)
+      throws InvalidProtocolBufferException {
+    return Longs.fromByteArray(value.toByteArray());
+  }
 
 }

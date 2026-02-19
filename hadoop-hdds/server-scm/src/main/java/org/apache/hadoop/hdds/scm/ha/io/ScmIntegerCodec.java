@@ -18,36 +18,24 @@
 package org.apache.hadoop.hdds.scm.ha.io;
 
 import com.google.common.primitives.Ints;
-import com.google.protobuf.ProtocolMessageEnum;
-import java.lang.reflect.InvocationTargetException;
-import org.apache.hadoop.hdds.scm.ha.ReflectionUtil;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 
 /**
- * {@link Codec} for {@link ProtocolMessageEnum} objects.
+ * Encodes/decodes an integer to a byte string.
  */
-public class EnumCodec implements Codec {
-
+public class ScmIntegerCodec implements ScmCodec {
   @Override
   public ByteString serialize(Object object)
       throws InvalidProtocolBufferException {
     // toByteArray returns a new array
-    return UnsafeByteOperations.unsafeWrap(Ints.toByteArray(((ProtocolMessageEnum) object).getNumber()));
+    return UnsafeByteOperations.unsafeWrap(Ints.toByteArray((Integer) object));
   }
 
   @Override
   public Object deserialize(Class<?> type, ByteString value)
       throws InvalidProtocolBufferException {
-    try {
-      return ReflectionUtil.getMethod(type, "valueOf", int.class)
-          .invoke(null, Ints.fromByteArray(
-              value.toByteArray()));
-    } catch (NoSuchMethodException | IllegalAccessException
-        | InvocationTargetException ex) {
-      throw new InvalidProtocolBufferException(
-          "Message cannot be decoded!" + ex.getMessage());
-    }
+    return Ints.fromByteArray(value.toByteArray());
   }
 }

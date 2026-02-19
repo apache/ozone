@@ -17,22 +17,23 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 
 /**
- * {@link Codec} for {@code Boolean} objects.
+ * {@link ScmCodec} for {@code String} objects.
  */
-public class BooleanCodec implements Codec {
-  static final ByteString TRUE = ByteString.copyFromUtf8(Boolean.TRUE.toString());
-  static final ByteString FALSE = ByteString.copyFromUtf8(Boolean.FALSE.toString());
-
+public class ScmStringCodec implements ScmCodec {
   @Override
   public ByteString serialize(Object object) {
-    return ((Boolean) object) ? TRUE : FALSE;
+    // getBytes returns a new array
+    return UnsafeByteOperations.unsafeWrap(((String) object).getBytes(UTF_8));
   }
 
   @Override
-  public Boolean deserialize(Class<?> type, ByteString value) {
-    return value.equals(TRUE) ? Boolean.TRUE : Boolean.FALSE;
+  public Object deserialize(Class<?> type, ByteString value) {
+    return new String(value.toByteArray(), UTF_8);
   }
 }

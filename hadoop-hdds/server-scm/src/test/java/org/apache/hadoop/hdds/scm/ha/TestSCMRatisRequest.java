@@ -26,7 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
-import org.apache.hadoop.hdds.scm.ha.io.ListCodec;
+import org.apache.hadoop.hdds.scm.ha.io.ScmListCodec;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -216,7 +216,7 @@ public class TestSCMRatisRequest {
             .addValue(ByteString.copyFromUtf8("x"))
             .build();
 
-    ListCodec codec = new ListCodec();
+    ScmListCodec codec = new ScmListCodec();
 
     InvalidProtocolBufferException ex = assertThrows(
         InvalidProtocolBufferException.class,
