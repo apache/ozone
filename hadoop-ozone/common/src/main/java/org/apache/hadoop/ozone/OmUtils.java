@@ -431,6 +431,8 @@ public final class OmUtils {
       // TODO: Remove once migrated to proto3 and mark fields in proto
       // as deprecated
     case FinalizeUpgrade:
+    case Prepare:
+    case CancelPrepare:
     case DeleteOpenKeys:
     case SetS3Secret:
     case RevokeS3Secret:
