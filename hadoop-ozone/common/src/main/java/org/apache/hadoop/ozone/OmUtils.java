@@ -174,28 +174,6 @@ public final class OmUtils {
   }
 
   /**
-   * Retrieve the socket address that should be used by clients to connect
-   * to OM.
-   * @param conf
-   * @return Target InetSocketAddress for the OM service endpoint.
-   */
-  public static InetSocketAddress getOmAddressForClients(
-      ConfigurationSource conf) {
-    final Optional<String> host = getHostNameFromConfigKeys(conf,
-        OZONE_OM_ADDRESS_KEY);
-
-    if (!host.isPresent()) {
-      throw new IllegalArgumentException(
-          OZONE_OM_ADDRESS_KEY + " must be defined. See" +
-              " https://wiki.apache.org/hadoop/Ozone#Configuration for" +
-              " details on configuring Ozone.");
-    }
-
-    return NetUtils.createSocketAddr(
-        host.get() + ":" + getOmRpcPort(conf));
-  }
-
-  /**
    * Returns true if OZONE_OM_SERVICE_IDS_KEY is defined and not empty.
    * @param conf Configuration
    * @return true if OZONE_OM_SERVICE_IDS_KEY is defined and not empty;
