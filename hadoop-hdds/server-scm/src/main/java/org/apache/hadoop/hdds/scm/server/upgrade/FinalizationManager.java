@@ -43,8 +43,6 @@ public interface FinalizationManager {
   BasicUpgradeFinalizer<SCMUpgradeFinalizationContext, HDDSLayoutVersionManager>
       getUpgradeFinalizer();
 
-  boolean crossedCheckpoint(FinalizationCheckpoint checkpoint);
-
   FinalizationCheckpoint getCheckpoint();
 
   void buildUpgradeContext(NodeManager nodeManager,
