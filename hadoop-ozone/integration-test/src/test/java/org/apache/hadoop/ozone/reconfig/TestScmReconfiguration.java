@@ -26,6 +26,7 @@ import java.time.Duration;
 import java.util.Set;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.conf.ReconfigurationException;
+import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.block.SCMBlockDeletingService;
@@ -49,6 +50,7 @@ public abstract class TestScmReconfiguration extends ReconfigurationTestBase {
     Set<String> expected = ImmutableSet.<String>builder()
         .add(OZONE_ADMINISTRATORS)
         .add(OZONE_READONLY_ADMINISTRATORS)
+        .add(HddsConfigKeys.HDDS_SCM_SAFEMODE_LOG_INTERVAL)
         .addAll(new ReplicationManagerConfiguration()
             .reconfigurableProperties())
         .addAll(new WritableECContainerProviderConfig()
@@ -63,7 +65,7 @@ public abstract class TestScmReconfiguration extends ReconfigurationTestBase {
   void adminUsernames() throws ReconfigurationException {
     final String newValue = RandomStringUtils.secure().nextAlphabetic(10);
 
-    getSubject().reconfigurePropertyImpl(OZONE_ADMINISTRATORS, newValue);
+    getSubject().reconfigureProperty(OZONE_ADMINISTRATORS, newValue);
 
     assertEquals(
         ImmutableSet.of(newValue, getCurrentUser()),
@@ -74,7 +76,7 @@ public abstract class TestScmReconfiguration extends ReconfigurationTestBase {
   void readOnlyAdminUsernames() throws ReconfigurationException {
     final String newValue = RandomStringUtils.secure().nextAlphabetic(10);
 
-    getSubject().reconfigurePropertyImpl(OZONE_READONLY_ADMINISTRATORS,
+    getSubject().reconfigureProperty(OZONE_READONLY_ADMINISTRATORS,
         newValue);
 
     assertEquals(
@@ -87,11 +89,22 @@ public abstract class TestScmReconfiguration extends ReconfigurationTestBase {
   void replicationInterval() throws ReconfigurationException {
     ReplicationManagerConfiguration config = replicationManagerConfig();
 
-    getSubject().reconfigurePropertyImpl(
+    getSubject().reconfigureProperty(
         "hdds.scm.replication.thread.interval",
         "120s");
 
     assertEquals(Duration.ofSeconds(120), config.getInterval());
+  }
+
+  @Test
+  void containerSampleLimit() throws ReconfigurationException {
+    ReplicationManagerConfiguration config = replicationManagerConfig();
+
+    getSubject().reconfigureProperty(
+        "hdds.scm.replication.container.sample.limit",
+        "120");
+
+    assertEquals(120, config.getContainerSampleLimit());
   }
 
   private ReplicationManagerConfiguration replicationManagerConfig() {
@@ -107,11 +120,24 @@ public abstract class TestScmReconfiguration extends ReconfigurationTestBase {
     int blockDeleteTXNum = blockDeletingService.getBlockDeleteTXNum();
     int newValue = blockDeleteTXNum + 1;
 
-    getSubject().reconfigurePropertyImpl(
+    getSubject().reconfigureProperty(
         "hdds.scm.block.deletion.per-interval.max",
         String.valueOf(newValue));
 
     assertEquals(newValue, blockDeletingService.getBlockDeleteTXNum());
+  }
+
+  @Test
+  void safeModeLogInterval() throws ReconfigurationException {
+
+    getSubject().reconfigurePropertyImpl(
+        HddsConfigKeys.HDDS_SCM_SAFEMODE_LOG_INTERVAL, "30s");
+
+    assertEquals(
+        "30s",
+        cluster().getStorageContainerManager()
+            .getConfiguration()
+            .get(HddsConfigKeys.HDDS_SCM_SAFEMODE_LOG_INTERVAL));
   }
 
 }

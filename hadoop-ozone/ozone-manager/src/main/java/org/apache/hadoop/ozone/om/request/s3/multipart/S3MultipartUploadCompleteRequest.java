@@ -26,6 +26,7 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -463,6 +464,7 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
 
     OmKeyInfo omKeyInfo = getOmKeyInfoFromKeyTable(ozoneKey, keyName,
             omMetadataManager);
+    OmKeyInfo.Builder builder;
     if (omKeyInfo == null) {
       // This is a newly added key, it does not have any versions.
       OmKeyLocationInfoGroup keyLocationInfoGroup = new
@@ -473,32 +475,20 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
               keyName, omMetadataManager);
 
       // A newly created key, this is the first version.
-      OmKeyInfo.Builder builder =
-          new OmKeyInfo.Builder().setVolumeName(volumeName)
-          .setBucketName(bucketName).setKeyName(dbOpenKeyInfo.getKeyName())
+      builder = dbOpenKeyInfo.toBuilder()
+          .setVolumeName(volumeName)
+          .setBucketName(bucketName)
           .setReplicationConfig(ReplicationConfig.fromProto(
               partKeyInfo.getType(), partKeyInfo.getFactor(),
               partKeyInfo.getEcReplicationConfig()))
           .setCreationTime(keyArgs.getModificationTime())
           .setModificationTime(keyArgs.getModificationTime())
           .setDataSize(dataSize)
-          .setFileEncryptionInfo(dbOpenKeyInfo.getFileEncryptionInfo())
           .setOmKeyLocationInfos(
               Collections.singletonList(keyLocationInfoGroup))
-          .setAcls(dbOpenKeyInfo.getAcls())
-          .addAllMetadata(dbOpenKeyInfo.getMetadata())
           .addMetadata(OzoneConsts.ETAG,
               multipartUploadedKeyHash(partKeyInfoMap))
-          .setOwnerName(keyArgs.getOwnerName())
-          .addAllTags(dbOpenKeyInfo.getTags());
-      // Check if db entry has ObjectID. This check is required because
-      // it is possible that between multipart key uploads and complete,
-      // we had an upgrade.
-      if (dbOpenKeyInfo.getObjectID() != 0) {
-        builder.setObjectID(dbOpenKeyInfo.getObjectID());
-      }
-      updatePrefixFSOInfo(dbOpenKeyInfo, builder);
-      omKeyInfo = builder.build();
+          .setOwnerName(keyArgs.getOwnerName());
     } else {
       OmKeyInfo dbOpenKeyInfo = getOmKeyInfoFromOpenKeyTable(multipartOpenKey,
           keyName, omMetadataManager);
@@ -519,22 +509,18 @@ public class S3MultipartUploadCompleteRequest extends OMKeyRequest {
       omKeyInfo.setModificationTime(keyArgs.getModificationTime());
       omKeyInfo.setDataSize(dataSize);
       omKeyInfo.setReplicationConfig(dbOpenKeyInfo.getReplicationConfig());
+      final String multipartHash = multipartUploadedKeyHash(partKeyInfoMap);
+      builder = omKeyInfo.toBuilder();
       if (dbOpenKeyInfo.getMetadata() != null) {
-        omKeyInfo.setMetadata(dbOpenKeyInfo.getMetadata());
+        // make modifiable because ETAG needs to be added
+        builder.setMetadata(new LinkedHashMap<>(dbOpenKeyInfo.getMetadata()));
       }
-      omKeyInfo.getMetadata().put(OzoneConsts.ETAG,
-          multipartUploadedKeyHash(partKeyInfoMap));
+      builder.addMetadata(OzoneConsts.ETAG, multipartHash);
       if (dbOpenKeyInfo.getTags() != null) {
-        omKeyInfo.setTags(dbOpenKeyInfo.getTags());
+        builder.setTags(dbOpenKeyInfo.getTags());
       }
     }
-    omKeyInfo.setUpdateID(trxnLogIndex);
-    return omKeyInfo;
-  }
-
-  protected void updatePrefixFSOInfo(OmKeyInfo dbOpenKeyInfo,
-      OmKeyInfo.Builder builder) {
-    // FSO is disabled. Do nothing.
+    return builder.setUpdateID(trxnLogIndex).build();
   }
 
   protected String getDBOzoneKey(OMMetadataManager omMetadataManager,

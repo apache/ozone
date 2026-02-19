@@ -114,10 +114,10 @@ public class TestReplicationManagerUtil {
     DatanodeDetails pendingAdd = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails pendingDelete = MockDatanodeDetails.randomDatanodeDetails();
     List<ContainerReplicaOp> pending = new ArrayList<>();
-    pending.add(ContainerReplicaOp.create(
-        ContainerReplicaOp.PendingOpType.ADD, pendingAdd, 0));
-    pending.add(ContainerReplicaOp.create(
-        ContainerReplicaOp.PendingOpType.DELETE, pendingDelete, 0));
+    pending.add(new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.ADD, pendingAdd, 0, null, Long.MAX_VALUE, 0));
+    pending.add(new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.DELETE, pendingDelete, 0, null, Long.MAX_VALUE, 0));
 
     when(replicationManager.getNodeStatus(any())).thenAnswer(
         invocation -> {
@@ -203,10 +203,10 @@ public class TestReplicationManagerUtil {
     DatanodeDetails pendingAdd = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails pendingDelete = MockDatanodeDetails.randomDatanodeDetails();
     List<ContainerReplicaOp> pending = new ArrayList<>();
-    pending.add(ContainerReplicaOp.create(
-        ContainerReplicaOp.PendingOpType.ADD, pendingAdd, 0));
-    pending.add(ContainerReplicaOp.create(
-        ContainerReplicaOp.PendingOpType.DELETE, pendingDelete, 0));
+    pending.add(new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.ADD, pendingAdd, 0, null, Long.MAX_VALUE, 0));
+    pending.add(new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.DELETE, pendingDelete, 0, null, Long.MAX_VALUE, 0));
 
     when(replicationManager.getNodeStatus(any())).thenAnswer(
         invocation -> {
@@ -286,10 +286,10 @@ public class TestReplicationManagerUtil {
     DatanodeDetails pendingAdd = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails pendingDelete = MockDatanodeDetails.randomDatanodeDetails();
     List<ContainerReplicaOp> pending = new ArrayList<>();
-    pending.add(ContainerReplicaOp.create(
-        ContainerReplicaOp.PendingOpType.ADD, pendingAdd, 0));
-    pending.add(ContainerReplicaOp.create(
-        ContainerReplicaOp.PendingOpType.DELETE, pendingDelete, 0));
+    pending.add(new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.ADD, pendingAdd, 0, null, Long.MAX_VALUE, 0));
+    pending.add(new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.DELETE, pendingDelete, 0, null, Long.MAX_VALUE, 0));
 
     // set up mocks such ContainerReplicaPendingOps returns the containerSizeScheduled map
     ReplicationManagerConfiguration rmConf = new ReplicationManagerConfiguration();
@@ -317,13 +317,13 @@ public class TestReplicationManagerUtil {
     when(replicationManager.getNodeManager()).thenReturn(nodeManagerMock);
     doReturn(fullDn).when(nodeManagerMock).getNode(fullDn.getID());
     doReturn(new SCMNodeMetric(50 * oneGb, 20 * oneGb, 30 * oneGb, 5 * oneGb,
-        20 * oneGb)).when(nodeManagerMock).getNodeStat(fullDn);
+        20 * oneGb, 0)).when(nodeManagerMock).getNodeStat(fullDn);
     doReturn(spaceAvailableDn).when(nodeManagerMock).getNode(spaceAvailableDn.getID());
     doReturn(new SCMNodeMetric(50 * oneGb, 10 * oneGb, 40 * oneGb, 5 * oneGb,
-        20 * oneGb)).when(nodeManagerMock).getNodeStat(spaceAvailableDn);
+        20 * oneGb, 0)).when(nodeManagerMock).getNodeStat(spaceAvailableDn);
     doReturn(expiredOpDn).when(nodeManagerMock).getNode(expiredOpDn.getID());
     doReturn(new SCMNodeMetric(50 * oneGb, 20 * oneGb, 30 * oneGb, 5 * oneGb,
-        20 * oneGb)).when(nodeManagerMock).getNodeStat(expiredOpDn);
+        20 * oneGb, 0)).when(nodeManagerMock).getNodeStat(expiredOpDn);
 
     when(replicationManager.getNodeStatus(any())).thenAnswer(
         invocation -> {

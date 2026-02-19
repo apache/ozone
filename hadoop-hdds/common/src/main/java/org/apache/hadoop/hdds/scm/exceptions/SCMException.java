@@ -29,7 +29,7 @@ public class SCMException extends IOException {
    * Constructs an {@code SCMException} with {@code null}
    * as its result code. <p>
    * Required for Unwrapping {@code RemoteException}. Used by
-   * {@link org.apache.hadoop.ipc.RemoteException#unwrapRemoteException()}
+   * {@link org.apache.hadoop.ipc_.RemoteException#unwrapRemoteException()}
    */
   public SCMException(String message) {
     super(message);

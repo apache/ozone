@@ -57,6 +57,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -103,6 +104,7 @@ class TestReplicationManagerIntegration {
   private NodeManager nodeManager;
   private ContainerManager containerManager;
   private ReplicationManager replicationManager;
+  private ReplicationManagerConfiguration replicationConf;
   private StorageContainerManager scm;
   private OzoneClient client;
   private ContainerOperationClient scmClient;
@@ -133,7 +135,7 @@ class TestReplicationManagerIntegration {
     conf.set(OZONE_SCM_PIPELINE_SCRUB_INTERVAL, "2s");
     conf.set(OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, "5s");
 
-    ReplicationManagerConfiguration replicationConf = conf.getObject(ReplicationManagerConfiguration.class);
+    replicationConf = conf.getObject(ReplicationManagerConfiguration.class);
     replicationConf.setInterval(Duration.ofSeconds(1));
     replicationConf.setUnderReplicatedInterval(Duration.ofMillis(100));
     replicationConf.setOverReplicatedInterval(Duration.ofMillis(100));
@@ -307,11 +309,11 @@ class TestReplicationManagerIntegration {
     waitForDnToReachOpState(nodeManager, decomDn, DECOMMISSIONED);
 
     assertEquals(HEALTHY_REPLICA_NUM + 1, containerManager.getContainerReplicas(containerId).size());
-    ReplicationManagerReport report = new ReplicationManagerReport();
+    ReplicationManagerReport report = new ReplicationManagerReport(replicationConf.getContainerSampleLimit());
     replicationManager.checkContainerStatus(containerInfo, report);
-    assertEquals(0, report.getStat(ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    assertEquals(0, report.getStat(ReplicationManagerReport.HealthState.MIS_REPLICATED));
-    assertEquals(0, report.getStat(ReplicationManagerReport.HealthState.OVER_REPLICATED));
+    assertEquals(0, report.getStat(ContainerHealthState.UNDER_REPLICATED));
+    assertEquals(0, report.getStat(ContainerHealthState.MIS_REPLICATED));
+    assertEquals(0, report.getStat(ContainerHealthState.OVER_REPLICATED));
   }
 
   @Test
@@ -354,10 +356,10 @@ class TestReplicationManagerIntegration {
     waitForDnToReachOpState(nodeManager, secondMaintenanceDn, IN_MAINTENANCE);
 
     assertEquals(HEALTHY_REPLICA_NUM + 2, containerManager.getContainerReplicas(containerId).size());
-    ReplicationManagerReport report = new ReplicationManagerReport();
+    ReplicationManagerReport report = new ReplicationManagerReport(replicationConf.getContainerSampleLimit());
     replicationManager.checkContainerStatus(containerInfo, report);
-    assertEquals(0, report.getStat(ReplicationManagerReport.HealthState.UNDER_REPLICATED));
-    assertEquals(0, report.getStat(ReplicationManagerReport.HealthState.MIS_REPLICATED));
-    assertEquals(0, report.getStat(ReplicationManagerReport.HealthState.OVER_REPLICATED));
+    assertEquals(0, report.getStat(ContainerHealthState.UNDER_REPLICATED));
+    assertEquals(0, report.getStat(ContainerHealthState.MIS_REPLICATED));
+    assertEquals(0, report.getStat(ContainerHealthState.OVER_REPLICATED));
   }
 }

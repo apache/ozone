@@ -151,7 +151,7 @@ public class TestReconTasks {
             .allocateContainer(RatisReplicationConfig.getInstance(ONE), "test");
     long containerID = containerInfo.getContainerID();
 
-    try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
+    try (RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation()) {
       reconContainerMetadataManager
           .batchStoreContainerKeyCounts(rdbBatchOperation, containerID, 2L);
       reconContainerMetadataManager.commitBatchOperation(rdbBatchOperation);
@@ -267,7 +267,7 @@ public class TestReconTasks {
 
     // Now add a container to key mapping count as 3. This data is used to
     // identify if container is empty in terms of keys mapped to container.
-    try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
+    try (RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation()) {
       reconContainerMetadataManager
           .batchStoreContainerKeyCounts(rdbBatchOperation, containerID, 3L);
       reconContainerMetadataManager.commitBatchOperation(rdbBatchOperation);
@@ -305,7 +305,7 @@ public class TestReconTasks {
 
     // Now remove keys from container. This data is used to
     // identify if container is empty in terms of keys mapped to container.
-    try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
+    try (RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation()) {
       reconContainerMetadataManager
           .batchStoreContainerKeyCounts(rdbBatchOperation, containerID, 0L);
       reconContainerMetadataManager.commitBatchOperation(rdbBatchOperation);

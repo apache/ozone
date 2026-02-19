@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertStatus;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.delete;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import java.io.IOException;
@@ -24,6 +26,7 @@ import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
+import org.apache.http.HttpStatus;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -32,7 +35,7 @@ import org.junit.jupiter.api.Test;
 public class TestObjectDelete {
 
   @Test
-  public void delete() throws IOException, OS3Exception {
+  void testDelete() throws IOException, OS3Exception {
     //GIVEN
     OzoneClient client = new OzoneClientStub();
     client.getObjectStore().createS3Bucket("b1");
@@ -47,7 +50,7 @@ public class TestObjectDelete {
         .build();
 
     //WHEN
-    rest.delete("b1", "key1", null, null);
+    assertStatus(HttpStatus.SC_NO_CONTENT, () -> delete(rest, "b1", "key1"));
 
     //THEN
     assertFalse(bucket.listKeys("").hasNext(),

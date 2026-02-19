@@ -19,19 +19,19 @@ package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_SST_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.SNAPSHOT_SST_DELETING_LIMIT_PER_TASK_DEFAULT;
-import static org.apache.hadoop.ozone.om.lock.FlatResource.SNAPSHOT_DB_LOCK;
-import static org.apache.hadoop.ozone.om.snapshot.SnapshotUtils.getColumnFamilyToKeyPrefixMap;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.BOOTSTRAP_LOCK;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_DB_LOCK;
 
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.BackgroundService;
@@ -42,10 +42,14 @@ import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
+import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
+import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,7 +87,7 @@ public class SstFilteringService extends BackgroundService
 
   private AtomicBoolean running;
 
-  private final BootstrapStateHandler.Lock lock = new BootstrapStateHandler.Lock();
+  private final BootstrapStateHandler.Lock lock;
 
   public static boolean isSstFiltered(OzoneConfiguration ozoneConfiguration, SnapshotInfo snapshotInfo) {
     Path sstFilteredFile = Paths.get(OmSnapshotManager.getSnapshotPath(ozoneConfiguration,
@@ -101,6 +105,10 @@ public class SstFilteringService extends BackgroundService
             SNAPSHOT_SST_DELETING_LIMIT_PER_TASK_DEFAULT);
     snapshotFilteredCount = new AtomicLong(0);
     running = new AtomicBoolean(false);
+    IOzoneManagerLock ozoneManagerLock = ozoneManager.getMetadataManager().getLock();
+    Function<Boolean, UncheckedAutoCloseable> lockSupplier = (readLock) ->
+        ozoneManagerLock.acquireLock(BOOTSTRAP_LOCK, getServiceName(), readLock);
+    this.lock = new BootstrapStateHandler.Lock(lockSupplier);
   }
 
   @Override
@@ -123,6 +131,32 @@ public class SstFilteringService extends BackgroundService
 
     private boolean isSnapshotDeleted(SnapshotInfo snapshotInfo) {
       return snapshotInfo == null || snapshotInfo.getSnapshotStatus() == SnapshotInfo.SnapshotStatus.SNAPSHOT_DELETED;
+    }
+
+    /**
+     * Checks if the snapshot has been defragged.
+     * @param snapshotInfo snapshotInfo
+     * @return true if the snapshot has been defragged, false otherwise
+     */
+    private boolean isSnapshotDefragged(SnapshotInfo snapshotInfo) {
+      try {
+        OmSnapshotManager omSnapshotManager = ozoneManager.getOmSnapshotManager();
+        if (omSnapshotManager == null) {
+          return false;
+        }
+        OmSnapshotLocalDataManager localDataManager = omSnapshotManager.getSnapshotLocalDataManager();
+        if (localDataManager == null) {
+          return false;
+        }
+        try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider provider =
+                 localDataManager.getOmSnapshotLocalData(snapshotInfo)) {
+          // If snapshot local data version is not 0, it means the snapshot has been defragged
+          return provider.getVersion() > 0;
+        }
+      } catch (IOException e) {
+        LOG.debug("Error checking if snapshot {} is defragged", snapshotInfo.getSnapshotId(), e);
+        return false;
+      }
     }
 
     /**
@@ -180,15 +214,19 @@ public class SstFilteringService extends BackgroundService
               continue;
             }
 
+            // Skip defragged snapshots as defrag already performs filtering
+            if (isSnapshotDefragged(snapshotInfo)) {
+              LOG.debug("Skipping SST filtering for defragged snapshot: {}", snapShotTableKey);
+              continue;
+            }
+
             LOG.debug("Processing snapshot {} to filter relevant SST Files",
                 snapShotTableKey);
+            TablePrefixInfo bucketPrefixInfo =
+                ozoneManager.getMetadataManager().getTableBucketPrefix(snapshotInfo.getVolumeName(),
+                snapshotInfo.getBucketName());
 
-            Map<String, String> columnFamilyNameToPrefixMap =
-                getColumnFamilyToKeyPrefixMap(ozoneManager.getMetadataManager(),
-                    snapshotInfo.getVolumeName(),
-                    snapshotInfo.getBucketName());
-
-            try (
+            try (UncheckedAutoCloseable lock = getBootstrapStateLock().acquireReadLock();
                 UncheckedAutoCloseableSupplier<OmSnapshot> snapshotMetadataReader =
                     snapshotManager.get().getActiveSnapshot(
                         snapshotInfo.getVolumeName(),
@@ -198,10 +236,8 @@ public class SstFilteringService extends BackgroundService
               RDBStore rdbStore = (RDBStore) omSnapshot.getMetadataManager()
                   .getStore();
               RocksDatabase db = rdbStore.getDb();
-              try (BootstrapStateHandler.Lock lock = getBootstrapStateLock()
-                  .lock()) {
-                db.deleteFilesNotMatchingPrefix(columnFamilyNameToPrefixMap);
-              }
+              db.deleteFilesNotMatchingPrefix(bucketPrefixInfo);
+
               markSSTFilteredFlagForSnapshot(snapshotInfo);
               snapshotLimit--;
               snapshotFilteredCount.getAndIncrement();

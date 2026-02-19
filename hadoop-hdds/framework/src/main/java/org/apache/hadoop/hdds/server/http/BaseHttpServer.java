@@ -63,7 +63,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Base class for HTTP server of the Ozone related components.
  */
-public abstract class BaseHttpServer {
+public abstract class BaseHttpServer implements AutoCloseable {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(BaseHttpServer.class);
@@ -341,6 +341,11 @@ public abstract class BaseHttpServer {
     if (httpServer != null) {
       httpServer.stop();
     }
+  }
+
+  @Override
+  public void close() throws Exception {
+    stop();
   }
 
   /**

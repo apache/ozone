@@ -30,7 +30,6 @@
     <maven.javadoc.skip>true</maven.javadoc.skip>
     <!-- no tests in this module so far -->
     <maven.test.skip>true</maven.test.skip>
-    <protobuf.version>${protobuf3.version}</protobuf.version>
   </properties>
 
   <dependencies>
@@ -94,6 +93,10 @@
     <dependency>
       <groupId>io.netty</groupId>
       <artifactId>netty-transport-native-unix-common</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-cli-common</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
@@ -255,7 +258,6 @@
                 <restrictImports>
                   <reason>Only selected annotation processors are enabled, see configuration of maven-compiler-plugin.</reason>
                   <bannedImports>
-                    <bannedImport>org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator</bannedImport>
                     <bannedImport>org.apache.hadoop.hdds.scm.metadata.Replicate</bannedImport>
                     <bannedImport>org.kohsuke.MetaInfServices</bannedImport>
                   </bannedImports>

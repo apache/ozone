@@ -93,13 +93,13 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     this.writableContainerFactory = scm.getWritableContainerFactory();
 
     mxBean = MBeans.register("BlockManager", "BlockManagerImpl", this);
-    metrics = ScmBlockDeletingServiceMetrics.create();
+    metrics = ScmBlockDeletingServiceMetrics.create(this);
 
     // SCM block deleting transaction log and deleting service.
     deletedBlockLog = new DeletedBlockLogImpl(conf,
         scm,
         scm.getContainerManager(),
-        scm.getScmHAManager().getDBTransactionBuffer(),
+        scm.getScmHAManager().asSCMHADBTransactionBuffer(),
         metrics);
 
 
@@ -220,9 +220,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
       throw new SCMException("SafeModePrecheck failed for deleteBlocks",
           SCMException.ResultCodes.SAFE_MODE_EXCEPTION);
     }
-    Map<Long, List<Long>> containerBlocks = new HashMap<>();
-    // TODO: track the block size info so that we can reclaim the container
-    // TODO: used space when the block is deleted.
+    Map<Long, List<DeletedBlock>> containerBlocks = new HashMap<>();
     for (BlockGroup bg : keyBlocksInfoList) {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Deleting blocks {}",
@@ -232,10 +230,10 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
         BlockID block = deletedBlock.getBlockID();
         long containerID = block.getContainerID();
         if (containerBlocks.containsKey(containerID)) {
-          containerBlocks.get(containerID).add(block.getLocalID());
+          containerBlocks.get(containerID).add(deletedBlock);
         } else {
-          List<Long> item = new ArrayList<>();
-          item.add(block.getLocalID());
+          List<DeletedBlock> item = new ArrayList<>();
+          item.add(deletedBlock);
           containerBlocks.put(containerID, item);
         }
       }

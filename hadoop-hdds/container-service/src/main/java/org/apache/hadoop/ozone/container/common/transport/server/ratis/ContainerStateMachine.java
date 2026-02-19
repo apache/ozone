@@ -582,7 +582,8 @@ public class ContainerStateMachine extends BaseStateMachine {
     try {
       validateLongRunningWrite();
     } catch (StorageContainerException e) {
-      return completeExceptionally(e);
+      ContainerCommandResponseProto result = ContainerUtils.logAndReturnError(LOG, e, requestProto);
+      return CompletableFuture.completedFuture(result::toByteString);
     }
     final WriteChunkRequestProto write = requestProto.getWriteChunk();
     RaftServer server = ratisServer.getServer();
@@ -631,8 +632,11 @@ public class ContainerStateMachine extends BaseStateMachine {
             // see the stateMachine is marked unhealthy by other parallel thread
             unhealthyContainers.add(write.getBlockID().getContainerID());
             stateMachineHealthy.set(false);
-            raftFuture.completeExceptionally(e);
-            throw e;
+            StorageContainerException sce = new StorageContainerException("Failed to write chunk data",
+                e, ContainerProtos.Result.CONTAINER_INTERNAL_ERROR);
+            ContainerCommandResponseProto result = ContainerUtils.logAndReturnError(LOG, sce, requestProto);
+            raftFuture.complete(result::toByteString);
+            return result;
           } finally {
             // Remove the future once it finishes execution from the
             writeChunkFutureMap.remove(entryIndex);
@@ -657,8 +661,6 @@ public class ContainerStateMachine extends BaseStateMachine {
         // After concurrent flushes are allowed on the same key, chunk file inconsistencies can happen and
         // that should not crash the pipeline.
         && r.getResult() != ContainerProtos.Result.CHUNK_FILE_INCONSISTENCY) {
-      StorageContainerException sce =
-          new StorageContainerException(r.getMessage(), r.getResult());
       LOG.error(getGroupId() + ": writeChunk writeStateMachineData failed: blockId" +
           write.getBlockID() + " logIndex " + entryIndex + " chunkName " +
           write.getChunkData().getChunkName() + " Error message: " +
@@ -669,7 +671,7 @@ public class ContainerStateMachine extends BaseStateMachine {
       // handling the entry for the write chunk in cache.
       stateMachineHealthy.set(false);
       unhealthyContainers.add(write.getBlockID().getContainerID());
-      raftFuture.completeExceptionally(sce);
+      raftFuture.complete(r::toByteString);
     } else {
       metrics.incNumBytesWrittenCount(
           requestProto.getWriteChunk().getChunkData().getLen());
@@ -876,9 +878,7 @@ public class ContainerStateMachine extends BaseStateMachine {
     }
 
     // assert that the response has data in it.
-    Preconditions
-        .checkNotNull(data, "read chunk data is null for chunk: %s",
-            chunkInfo);
+    Objects.requireNonNull(data, () -> "data == null for " + TextFormat.shortDebugString(chunkInfo));
     Preconditions.checkState(data.size() == chunkInfo.getLen(),
         "read chunk len=%s does not match chunk expected len=%s for chunk:%s",
         data.size(), chunkInfo.getLen(), chunkInfo);

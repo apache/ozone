@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
@@ -412,6 +413,12 @@ public interface ScmClient extends Closeable {
   void transferLeadership(String newLeaderId) throws IOException;
 
   /**
+   * Get deleted block summary.
+   * @throws IOException
+   */
+  DeletedBlocksTransactionSummary getDeletedBlockSummary() throws IOException;
+
+  /**
    * Get usage information of datanode by address or uuid.
    *
    * @param address datanode address String
@@ -455,4 +462,5 @@ public interface ScmClient extends Closeable {
    * @throws IOException On error
    */
   void reconcileContainer(long containerID) throws IOException;
+
 }

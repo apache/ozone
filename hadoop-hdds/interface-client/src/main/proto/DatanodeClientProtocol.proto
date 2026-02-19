@@ -31,83 +31,63 @@ option java_generate_equals_and_hash = true;
 package hadoop.hdds.datanode;
 
 /**
- * Commands that are used to manipulate the state of containers on a datanode.
- *
- * These commands allow us to work against the datanode - from
- * StorageContainer Manager as well as clients.
- *
- *  1. CreateContainer - This call is usually made by Storage Container
- *     manager, when we need to create a new container on a given datanode.
- *
- *  2. ReadContainer - Allows end user to stat a container. For example
- *     this allows us to return the metadata of a container.
- *
- *  3. UpdateContainer - Updates a container metadata.
-
- *  4. DeleteContainer - This call is made to delete a container.
- *
- *  5. ListContainer - Returns the list of containers on this
- *     datanode. This will be used by tests and tools.
- *
- *  6. PutBlock - Given a valid container, creates a block.
- *
- *  7. GetBlock - Allows user to read the metadata of a block.
- *
- *  8. DeleteBlock - Deletes a given block.
- *
- *  9. ListBlock - Returns a list of blocks that are present inside
- *      a given container.
- *
- *  10. ReadChunk - Allows us to read a chunk.
- *
- *  11. DeleteChunk - Delete an unused chunk.
- *
- *  12. WriteChunk - Allows us to write a chunk
- *
- *  13. ListChunk - Given a Container/Block returns the list of Chunks.
- *
- *  14. CompactChunk - Re-writes a chunk based on Offsets.
- *
- *  15. PutSmallFile - A single RPC that combines both putBlock and WriteChunk.
- *
- *  16. GetSmallFile - A single RPC that combines both getBlock and ReadChunk.
- *
- *  17. CloseContainer - Closes an open container and makes it immutable.
- *
- *  18. CopyContainer - Copies a container from a remote machine.
- *
- *  19. FinalizeBlock - Finalize block request from client.
+ Commands that are used to manipulate the state of containers on a datanode.
+ These commands allow us to work against the datanode from clients.
  */
-
 enum Type {
+  // This call is usually made by clients who will create a container
+  // which does not already exist with the first chunk write to that container.
   CreateContainer = 1;
+  // Allows end user to stat a container. For example this allows us to return the metadata of a container.
   ReadContainer = 2;
+  // Updates a container metadata.
   UpdateContainer = 3;
+  // This call is made to delete a container.
   DeleteContainer = 4;
+  // Returns the list of containers on this datanode. This will be used by tests and tools.
   ListContainer = 5;
 
+  // Given a valid container, creates a block.
   PutBlock = 6;
+  // Allows user to read the metadata of a block.
   GetBlock = 7;
+  // Deletes a given block.
   DeleteBlock = 8;
+  // Returns a list of blocks that are present inside a given container.
   ListBlock = 9;
 
+  // Allows us to read a chunk.
   ReadChunk = 10;
+  // Delete an unused chunk.
   DeleteChunk = 11;
+  // Allows us to write a chunk.
   WriteChunk = 12;
+  // Given a Container/Block returns the list of Chunks.
   ListChunk = 13;
+  // Re-writes a chunk based on Offsets.
   CompactChunk = 14;
 
-  /** Combines Block and Chunk Operation into Single RPC. */
+  // A single RPC that combines both putBlock and WriteChunk.
   PutSmallFile = 15;
+  // A single RPC that combines both getBlock and ReadChunk.
   GetSmallFile = 16;
+  // Closes an open container and makes it immutable.
   CloseContainer = 17;
+  // Returns the committed length of a block.
   GetCommittedBlockLength = 18;
 
+  // Initializes a stream for writing data.
   StreamInit = 19;
+  // Writes data to an initialized stream.
   StreamWrite = 20;
+  // Finalize block request from client.
   FinalizeBlock = 21;
+  // Echo request for testing and debugging purposes.
   Echo = 22;
+  // Retrieves checksum information for a container.
   GetContainerChecksumInfo = 23;
+  // Allows us to read a block
+  ReadBlock = 24;
 }
 
 
@@ -218,6 +198,7 @@ message ContainerCommandRequestProto {
   optional   FinalizeBlockRequestProto finalizeBlock = 25;
   optional   EchoRequestProto echo = 26;
   optional   GetContainerChecksumInfoRequestProto getContainerChecksumInfo = 27;
+  optional   ReadBlockRequestProto readBlock = 28;
 }
 
 message ContainerCommandResponseProto {
@@ -250,6 +231,7 @@ message ContainerCommandResponseProto {
   optional   FinalizeBlockResponseProto finalizeBlock = 22;
   optional   EchoResponseProto echo = 23;
   optional   GetContainerChecksumInfoResponseProto getContainerChecksumInfo = 24;
+  optional   ReadBlockResponseProto readBlock = 25;
 }
 
 message ContainerDataProto {
@@ -391,6 +373,19 @@ message ListBlockRequestProto {
 
 message ListBlockResponseProto {
   repeated BlockData blockData = 1;
+}
+
+message ReadBlockRequestProto {
+  required DatanodeBlockID blockID = 1;
+  required uint64 offset = 2;
+  optional uint64 length = 3;
+  optional uint32 responseDataSize = 4;
+}
+
+message ReadBlockResponseProto {
+  required ChecksumData checksumData = 1;
+  required uint64 offset = 2;
+  required bytes data = 3;
 }
 
 message EchoRequestProto {

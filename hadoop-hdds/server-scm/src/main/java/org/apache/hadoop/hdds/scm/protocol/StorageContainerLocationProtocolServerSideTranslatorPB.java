@@ -30,7 +30,6 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProt
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.ListPipelines;
 import static org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol.ADMIN_COMMAND_TYPE;
 
-import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
@@ -83,6 +82,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainersOnDecomNodeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainersOnDecomNodeResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetDeletedBlocksTxnSummaryRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetDeletedBlocksTxnSummaryResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetFailedDeletedBlocksTxnRequestProto;
@@ -183,7 +184,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   private static final String ROLE_TYPE = "SCM";
 
   private OzoneProtocolMessageDispatcher<ScmContainerLocationRequest,
-      ScmContainerLocationResponse, ProtocolMessageEnum>
+      ScmContainerLocationResponse, StorageContainerLocationProtocolProtos.Type>
       dispatcher;
 
   /**
@@ -196,7 +197,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   public StorageContainerLocationProtocolServerSideTranslatorPB(
       StorageContainerLocationProtocol impl,
       StorageContainerManager scm,
-      ProtocolMessageMetrics<ProtocolMessageEnum> protocolMetrics)
+      ProtocolMessageMetrics<StorageContainerLocationProtocolProtos.Type> protocolMetrics)
       throws IOException {
     this.impl = impl;
     this.scm = scm;
@@ -712,6 +713,14 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
                   getResetDeletedBlockRetryCount(
                       request.getResetDeletedBlockRetryCountRequest()))
               .build();
+      case GetDeletedBlocksTransactionSummary:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setGetDeletedBlocksTxnSummaryResponse(
+                getDeletedBlocksTxnSummary(
+                    request.getGetDeletedBlocksTxnSummaryRequest()))
+            .build();
       case TransferLeadership:
         return ScmContainerLocationResponse.newBuilder()
               .setCmdType(request.getCmdType())
@@ -1344,6 +1353,18 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
         .build();
   }
 
+  public GetDeletedBlocksTxnSummaryResponseProto getDeletedBlocksTxnSummary(
+      GetDeletedBlocksTxnSummaryRequestProto request) throws IOException {
+    HddsProtos.DeletedBlocksTransactionSummary summary = impl.getDeletedBlockSummary();
+    if (summary == null) {
+      return GetDeletedBlocksTxnSummaryResponseProto.newBuilder().build();
+    } else {
+      return GetDeletedBlocksTxnSummaryResponseProto.newBuilder()
+          .setSummary(summary)
+          .build();
+    }
+  }
+
   public TransferLeadershipResponseProto transferScmLeadership(
       TransferLeadershipRequestProto request) throws IOException {
     String newLeaderId = request.getNewLeaderId();
@@ -1354,7 +1375,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   public DecommissionScmResponseProto decommissionScm(
       DecommissionScmRequestProto request) throws IOException {
     return impl.decommissionScm(
-        request.getScmId());
+            request.getScmId());
   }
 
   public GetMetricsResponseProto getMetrics(GetMetricsRequestProto request) throws IOException {
@@ -1365,4 +1386,5 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     impl.reconcileContainer(request.getContainerID());
     return ReconcileContainerResponseProto.getDefaultInstance();
   }
+
 }

@@ -44,7 +44,7 @@ import java.security.KeyPair;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
-import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.Calendar;
 import java.util.Date;
@@ -186,7 +186,7 @@ public class TestRootCARotationManager {
             String.format("%02d", date.getSeconds()));
 
     X509Certificate cert = generateX509Cert(ozoneConfig,
-        LocalDateTime.now(), Duration.ofSeconds(35));
+        ZonedDateTime.now(), Duration.ofSeconds(35));
     scmCertClient.setCACertificate(cert);
 
     rootCARotationManager = new RootCARotationManager(scm);
@@ -218,7 +218,7 @@ public class TestRootCARotationManager {
             String.format("%02d", date.getSeconds()));
 
     X509Certificate cert = generateX509Cert(ozoneConfig,
-        LocalDateTime.now(), Duration.ofSeconds(35));
+        ZonedDateTime.now(), Duration.ofSeconds(35));
     scmCertClient.setCACertificate(cert);
 
     rootCARotationManager = new RootCARotationManager(scm);
@@ -249,7 +249,7 @@ public class TestRootCARotationManager {
             String.format("%02d", date.getSeconds()));
 
     X509Certificate cert = generateX509Cert(ozoneConfig,
-        LocalDateTime.now(), Duration.ofSeconds(90));
+        ZonedDateTime.now(), Duration.ofSeconds(90));
     scmCertClient.setCACertificate(cert);
     CertificateCodec certCodec = new CertificateCodec(securityConfig,
         "scm/sub-ca");
@@ -303,11 +303,11 @@ public class TestRootCARotationManager {
   }
 
   private X509Certificate generateX509Cert(
-      OzoneConfiguration conf, LocalDateTime startDate,
+      OzoneConfiguration conf, ZonedDateTime startDate,
       Duration certLifetime) throws Exception {
     KeyPair keyPair = KeyStoreTestUtil.generateKeyPair("RSA");
-    LocalDateTime start = startDate == null ? LocalDateTime.now() : startDate;
-    LocalDateTime end = start.plus(certLifetime);
+    ZonedDateTime start = startDate == null ? ZonedDateTime.now() : startDate;
+    ZonedDateTime end = start.plus(certLifetime);
     return
         SelfSignedCertificate.newBuilder()
             .setBeginDate(start)

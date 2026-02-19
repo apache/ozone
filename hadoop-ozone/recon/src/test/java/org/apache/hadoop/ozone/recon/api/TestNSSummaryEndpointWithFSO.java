@@ -76,7 +76,6 @@ import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
-import org.apache.hadoop.ozone.recon.common.CommonUtils;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
@@ -124,14 +123,13 @@ import org.junit.jupiter.api.io.TempDir;
  * This is a test for the Rest APIs only. We have tested NSSummaryTask before,
  * so there is no need to test process() on DB's updates
  */
-public class TestNSSummaryEndpointWithFSO {
+public class TestNSSummaryEndpointWithFSO extends NSSummaryTests {
   @TempDir
   private Path temporaryFolder;
 
   private ReconOMMetadataManager reconOMMetadataManager;
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private NSSummaryEndpoint nsSummaryEndpoint;
-  private CommonUtils commonUtils;
 
   private static final String TEST_PATH_UTILITY =
           "/vol1/buck1/a/b/c/d/e/file1.txt";
@@ -433,10 +431,8 @@ public class TestNSSummaryEndpointWithFSO {
     populateVolumeThree();
     setUpMultiBlockReplicatedKeys();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
-        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
-            reconOMMetadataManager, 10);
+        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager, reconOMMetadataManager, 10, 5, 20, 2000);
     nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
-    commonUtils = new CommonUtils();
   }
 
   @Test
@@ -452,20 +448,20 @@ public class TestNSSummaryEndpointWithFSO {
   @Test
   public void testGetBasicInfoRoot() throws Exception {
     // Test root basics
-    commonUtils.testNSSummaryBasicInfoRoot(
+    testNSSummaryBasicInfoRoot(
         nsSummaryEndpoint, reconOMMetadataManager);
   }
 
   @Test
   public void testGetBasicInfoVol() throws Exception {
     // Test volume basics
-    commonUtils.testNSSummaryBasicInfoVolume(nsSummaryEndpoint);
+    testNSSummaryBasicInfoVolume(nsSummaryEndpoint);
   }
 
   @Test
   public void testGetBasicInfoBucketOne() throws Exception {
     // Test bucket 1's basics
-    commonUtils.testNSSummaryBasicInfoBucketOne(
+    testNSSummaryBasicInfoBucketOne(
         BucketLayout.FILE_SYSTEM_OPTIMIZED,
         nsSummaryEndpoint);
   }
@@ -473,7 +469,7 @@ public class TestNSSummaryEndpointWithFSO {
   @Test
   public void testGetBasicInfoBucketTwo() throws Exception {
     // Test bucket 2's basics
-    commonUtils.testNSSummaryBasicInfoBucketTwo(
+    testNSSummaryBasicInfoBucketTwo(
         BucketLayout.FILE_SYSTEM_OPTIMIZED,
         nsSummaryEndpoint);
   }
@@ -481,19 +477,19 @@ public class TestNSSummaryEndpointWithFSO {
   @Test
   public void testGetBasicInfoDir() throws Exception {
     // Test intermediate directory basics
-    commonUtils.testNSSummaryBasicInfoDir(nsSummaryEndpoint);
+    testNSSummaryBasicInfoDir(nsSummaryEndpoint);
   }
 
   @Test
   public void testGetBasicInfoNoPath() throws Exception {
     // Test invalid path
-    commonUtils.testNSSummaryBasicInfoNoPath(nsSummaryEndpoint);
+    testNSSummaryBasicInfoNoPath(nsSummaryEndpoint);
   }
 
   @Test
   public void testGetBasicInfoKey() throws Exception {
     // Test key
-    commonUtils.testNSSummaryBasicInfoKey(nsSummaryEndpoint);
+    testNSSummaryBasicInfoKey(nsSummaryEndpoint);
   }
 
   @Test
@@ -1576,6 +1572,6 @@ public class TestNSSummaryEndpointWithFSO {
 
   private static SCMNodeStat getMockSCMRootStat() {
     return new SCMNodeStat(ROOT_QUOTA, ROOT_DATA_SIZE,
-        ROOT_QUOTA - ROOT_DATA_SIZE, 0, ROOT_QUOTA - ROOT_DATA_SIZE - 1);
+        ROOT_QUOTA - ROOT_DATA_SIZE, 0, ROOT_QUOTA - ROOT_DATA_SIZE - 1, 0);
   }
 }

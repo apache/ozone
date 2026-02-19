@@ -45,7 +45,6 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
-import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult.EmptyTaskResult;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -140,21 +139,51 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
       String snapTableKey, UUID expectedPreviousSnapshotId) throws IOException {
     long startTime = Time.monotonicNow();
     Pair<Pair<Integer, Long>, Boolean> purgeResult = Pair.of(Pair.of(0, 0L), false);
+    
+    // Filter out empty files (files with no blocks) before sending to SCM
+    Map<String, PurgedKey> nonEmptyKeyBlocksList = keyBlocksList.entrySet().stream()
+        .filter(entry -> entry.getValue().getBlockGroup() != null && 
+                         entry.getValue().getBlockGroup().getDeletedBlocks() != null &&
+                         !entry.getValue().getBlockGroup().getDeletedBlocks().isEmpty())
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    
     if (LOG.isDebugEnabled()) {
-      LOG.debug("Send {} key(s) to SCM: {}",
-          keyBlocksList.size(), keyBlocksList);
+      LOG.debug("Send {} key(s) to SCM (filtered {} empty keys): {}",
+          nonEmptyKeyBlocksList.size(), keyBlocksList.size() - nonEmptyKeyBlocksList.size(), nonEmptyKeyBlocksList);
     } else if (LOG.isInfoEnabled()) {
       int logSize = 10;
-      if (keyBlocksList.size() < logSize) {
-        logSize = keyBlocksList.size();
+      if (nonEmptyKeyBlocksList.size() < logSize) {
+        logSize = nonEmptyKeyBlocksList.size();
       }
       LOG.info("Send {} key(s) to SCM, first {} keys: {}",
-          keyBlocksList.size(), logSize, keyBlocksList.entrySet().stream().limit(logSize)
+          nonEmptyKeyBlocksList.size(), logSize, nonEmptyKeyBlocksList.entrySet().stream().limit(logSize)
               .map(Map.Entry::getValue).collect(Collectors.toSet()));
     }
-    List<DeleteBlockGroupResult> blockDeletionResults =
-        scmClient.deleteKeyBlocks(keyBlocksList.values().stream()
-            .map(PurgedKey::getBlockGroup).collect(Collectors.toList()));
+    List<DeleteBlockGroupResult> blockDeletionResults;
+    if (nonEmptyKeyBlocksList.isEmpty()) {
+      // Skip SCM call if all files are empty
+      blockDeletionResults = new ArrayList<>();
+      LOG.info("Skipping SCM call as all {} keys are empty", keyBlocksList.size());
+    } else {
+      blockDeletionResults =
+          scmClient.deleteKeyBlocks(nonEmptyKeyBlocksList.values().stream()
+              .map(PurgedKey::getBlockGroup).collect(Collectors.toList()));
+    }
+
+    if (keyBlocksList.size() != nonEmptyKeyBlocksList.size()) {
+      // Add successful results for empty files (no need to send to SCM)
+      Map<String, PurgedKey> emptyKeyBlocksList = keyBlocksList.entrySet().stream()
+          .filter(entry -> !nonEmptyKeyBlocksList.containsKey(entry.getKey()))
+          .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+      for (PurgedKey emptyKey : emptyKeyBlocksList.values()) {
+        // Create a successful result for empty files
+        DeleteBlockGroupResult emptyFileResult = new DeleteBlockGroupResult(
+            emptyKey.getBlockGroup().getGroupID(), new ArrayList<>());
+        blockDeletionResults.add(emptyFileResult);
+      }
+    }
+
     LOG.info("{} BlockGroup deletion are acked by SCM in {} ms",
         keyBlocksList.size(), Time.monotonicNow() - startTime);
     if (blockDeletionResults != null) {
@@ -387,7 +416,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         bucketPurgeKeysSizeMap.values().stream().map(BucketPurgeSize::toProtobuf)
             .forEach(requestBuilder::addBucketPurgeKeysSize);
         bucketPurgeKeysSizeMap.clear();
-        purgeSuccess = submitPurgeRequest(snapTableKey, purgeSuccess, requestBuilder);
+        purgeSuccess = submitPurgeRequest(purgeSuccess, requestBuilder);
         requestBuilder = getPurgeKeysRequest(snapTableKey, expectedPreviousSnapshotId);
         currSize = baseSize;
       }
@@ -418,19 +447,18 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
     return requestBuilder;
   }
 
-  private boolean submitPurgeRequest(String snapTableKey, boolean purgeSuccess,
-      PurgeKeysRequest.Builder requestBuilder) {
+  private boolean submitPurgeRequest(boolean purgeSuccess, PurgeKeysRequest.Builder requestBuilder) {
 
     OzoneManagerProtocolProtos.OMRequest omRequest =
         OzoneManagerProtocolProtos.OMRequest.newBuilder().setCmdType(OzoneManagerProtocolProtos.Type.PurgeKeys)
             .setPurgeKeysRequest(requestBuilder.build()).setClientId(getClientId().toString()).build();
 
-    try (Lock lock = snapTableKey != null ? getBootstrapStateLock().lock() : null) {
+    try {
       OzoneManagerProtocolProtos.OMResponse omResponse = submitRequest(omRequest);
       if (omResponse != null) {
         purgeSuccess = purgeSuccess && omResponse.getSuccess();
       }
-    } catch (ServiceException | InterruptedException e) {
+    } catch (ServiceException e) {
       LOG.error("PurgeKey request failed in batch. Will retry at next run.", e);
       purgeSuccess = false;
       // Continue to next batch instead of returning immediately
@@ -466,9 +494,9 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
   }
 
   @Override
-  public BackgroundTaskQueue getTasks() {
+  public DeletingServiceTaskQueue getTasks() {
     resetMetrics();
-    BackgroundTaskQueue queue = new BackgroundTaskQueue();
+    DeletingServiceTaskQueue queue = new DeletingServiceTaskQueue();
     queue.add(new KeyDeletingTask(null));
     if (deepCleanSnapshots) {
       Iterator<UUID> iterator = null;

@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
+import org.apache.hadoop.hdds.scm.container.ContainerChecksums;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManagerImpl;
@@ -282,7 +283,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
     boolean flushToDB = false;
     long bcsId = replica.getSequenceId() != null ? replica.getSequenceId() : -1;
     String state = replica.getState().toString();
-    long dataChecksum = replica.getDataChecksum();
+    ContainerChecksums checksums = replica.getChecksums();
 
     // If replica doesn't exist in in-memory map, add to DB and add to map
     if (replicaLastSeenMap == null) {
@@ -290,7 +291,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
       replicaHistoryMap.putIfAbsent(id,
           new ConcurrentHashMap<UUID, ContainerReplicaHistory>() {{
             put(uuid, new ContainerReplicaHistory(uuid, currTime, currTime,
-                bcsId, state, dataChecksum));
+                bcsId, state, checksums));
           }});
       flushToDB = true;
     } else {
@@ -300,18 +301,19 @@ public class ReconContainerManager extends ContainerManagerImpl {
         // New Datanode
         replicaLastSeenMap.put(uuid,
             new ContainerReplicaHistory(uuid, currTime, currTime, bcsId,
-                state, dataChecksum));
+                state, checksums));
         flushToDB = true;
       } else {
         // if the object exists, only update the last seen time & bcsId fields
         ts.setLastSeenTime(currTime);
         ts.setBcsId(bcsId);
         ts.setState(state);
+        ts.setChecksums(checksums);
       }
     }
 
     if (flushToDB) {
-      upsertContainerHistory(id, uuid, currTime, bcsId, state, dataChecksum);
+      upsertContainerHistory(id, uuid, currTime, bcsId, state, checksums);
     }
   }
 
@@ -328,7 +330,6 @@ public class ReconContainerManager extends ContainerManagerImpl {
     final DatanodeDetails dnInfo = replica.getDatanodeDetails();
     final UUID uuid = dnInfo.getUuid();
     String state = replica.getState().toString();
-    long dataChecksum = replica.getDataChecksum();
 
     final Map<UUID, ContainerReplicaHistory> replicaLastSeenMap =
         replicaHistoryMap.get(id);
@@ -337,7 +338,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
       if (ts != null) {
         // Flush to DB, then remove from in-memory map
         upsertContainerHistory(id, uuid, ts.getLastSeenTime(), ts.getBcsId(),
-            state, dataChecksum);
+            state, ts.getChecksums());
         replicaLastSeenMap.remove(uuid);
       }
     }
@@ -439,7 +440,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
   }
 
   public void upsertContainerHistory(long containerID, UUID uuid, long time,
-                                     long bcsId, String state, long dataChecksum) {
+                                     long bcsId, String state, ContainerChecksums checksums) {
     Map<UUID, ContainerReplicaHistory> tsMap;
     try {
       tsMap = cdbServiceProvider.getContainerReplicaHistory(containerID);
@@ -447,12 +448,12 @@ public class ReconContainerManager extends ContainerManagerImpl {
       if (ts == null) {
         // New entry
         tsMap.put(uuid, new ContainerReplicaHistory(uuid, time, time, bcsId,
-            state, dataChecksum));
+            state, checksums));
       } else {
         // Entry exists, update last seen time and put it back to DB.
         ts.setLastSeenTime(time);
         ts.setState(state);
-        ts.setDataChecksum(dataChecksum);
+        ts.setChecksums(checksums);
       }
       cdbServiceProvider.storeContainerReplicaHistory(containerID, tsMap);
     } catch (IOException e) {

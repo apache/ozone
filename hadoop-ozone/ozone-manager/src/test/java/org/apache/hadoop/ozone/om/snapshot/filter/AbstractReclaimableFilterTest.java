@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.om.snapshot.filter;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
-import static org.apache.hadoop.ozone.om.lock.FlatResource.SNAPSHOT_GC_LOCK;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_GC_LOCK;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyList;
@@ -52,6 +52,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.ozone.om.BucketManager;
 import org.apache.hadoop.ozone.om.KeyManager;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -162,10 +163,11 @@ public abstract class AbstractReclaimableFilterTest {
   }
 
   private void mockOzoneManager(BucketLayout bucketLayout) throws IOException {
-    OMMetadataManager metadataManager = mock(OMMetadataManager.class);
+    OmMetadataManagerImpl metadataManager = mock(OmMetadataManagerImpl.class);
     BucketManager bucketManager = mock(BucketManager.class);
     when(ozoneManager.getMetadataManager()).thenReturn(metadataManager);
     when(ozoneManager.getBucketManager()).thenReturn(bucketManager);
+    when(metadataManager.getSnapshotChainManager()).thenReturn(snapshotChainManager);
     long volumeCount = 0;
     for (String volume : volumes) {
       when(metadataManager.getVolumeId(eq(volume))).thenReturn(volumeCount);

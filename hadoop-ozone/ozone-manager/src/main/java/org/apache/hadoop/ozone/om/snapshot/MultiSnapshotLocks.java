@@ -67,8 +67,10 @@ public class MultiSnapshotLocks {
         lock.acquireReadLocks(resource, keys);
     if (omLockDetails.isLockAcquired()) {
       objectLocks.addAll(keys);
+      this.lockDetails = OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED;
+    } else {
+      this.lockDetails = OMLockDetails.EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
     }
-    this.lockDetails = omLockDetails;
     return omLockDetails;
   }
 
@@ -78,6 +80,8 @@ public class MultiSnapshotLocks {
     } else {
       lockDetails = lock.releaseReadLocks(resource, this.objectLocks);
     }
+    this.lockDetails = lockDetails.isLockAcquired() ? OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED :
+        OMLockDetails.EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
     this.objectLocks.clear();
   }
 

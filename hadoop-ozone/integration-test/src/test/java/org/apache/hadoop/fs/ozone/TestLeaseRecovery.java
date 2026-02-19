@@ -42,7 +42,6 @@ import java.net.ConnectException;
 import java.util.LinkedList;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -95,8 +94,6 @@ import org.slf4j.event.Level;
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class TestLeaseRecovery extends OzoneTestBase {
-
-  private static final AtomicInteger FILE_COUNTER = new AtomicInteger();
 
   private MiniOzoneCluster cluster;
 
@@ -176,7 +173,7 @@ public class TestLeaseRecovery extends OzoneTestBase {
 
   @BeforeEach
   void beforeEach() throws Exception {
-    file = new Path(dir, "file-" + getTestName() + "-" + FILE_COUNTER.incrementAndGet());
+    file = new Path(dir, uniqueObjectName());
     fs = (RootedOzoneFileSystem) FileSystem.get(conf);
   }
 
@@ -266,7 +263,7 @@ public class TestLeaseRecovery extends OzoneTestBase {
     OzoneBucket obsBucket = TestDataUtil.createVolumeAndBucket(client,
         "vol2", "obs", BucketLayout.OBJECT_STORE);
     String obsDir = OZONE_ROOT + obsBucket.getVolumeName() + OZONE_URI_DELIMITER + obsBucket.getName();
-    Path obsFile = new Path(obsDir, "file" + getTestName() + FILE_COUNTER.incrementAndGet());
+    Path obsFile = new Path(obsDir, uniqueObjectName());
 
     assertThrows(IllegalArgumentException.class, () -> fs.recoverLease(obsFile));
   }

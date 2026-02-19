@@ -18,22 +18,18 @@
 package org.apache.hadoop.ozone.om.response.snapshot;
 
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_INFO_TABLE;
-import static org.apache.hadoop.ozone.om.lock.FlatResource.SNAPSHOT_DB_LOCK;
 
 import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager;
@@ -95,10 +91,9 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
       if (snapshotInfo == null) {
         continue;
       }
-
+      OmSnapshotManager omSnapshotManager = metadataManager.getOzoneManager().getOmSnapshotManager();
       // Remove and close snapshot's RocksDB instance from SnapshotCache.
-      ((OmMetadataManagerImpl) omMetadataManager).getOzoneManager().getOmSnapshotManager()
-          .invalidateCacheEntry(snapshotInfo.getSnapshotId());
+      omSnapshotManager.invalidateCacheEntry(snapshotInfo.getSnapshotId());
       // Remove the snapshot from snapshotId to snapshotTableKey map.
       ((OmMetadataManagerImpl) omMetadataManager).getSnapshotChainManager()
           .removeFromSnapshotIdToTable(snapshotInfo.getSnapshotId());
@@ -109,7 +104,8 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
       // snapshot purged txn is flushed to rocksdb.
       updateLocalData(snapshotLocalDataManager, snapshotInfo);
       // Delete Snapshot checkpoint directory.
-      deleteCheckpointDirectory(snapshotLocalDataManager, omMetadataManager, snapshotInfo);
+
+      omSnapshotManager.deleteSnapshotCheckpointDirectories(snapshotInfo.getSnapshotId(), -1);
       // Delete snapshotInfo from the table.
       omMetadataManager.getSnapshotInfoTable().deleteWithBatch(batchOperation, dbKey);
     }
@@ -130,34 +126,6 @@ public class OMSnapshotPurgeResponse extends OMClientResponse {
     try (WritableOmSnapshotLocalDataProvider snap = localDataManager.getWritableOmSnapshotLocalData(snapshotInfo)) {
       snap.setTransactionInfo(this.transactionInfo);
       snap.commit();
-    }
-  }
-
-  /**
-   * Deletes the checkpoint directory for a snapshot.
-   */
-  private void deleteCheckpointDirectory(OmSnapshotLocalDataManager snapshotLocalDataManager,
-      OMMetadataManager omMetadataManager, SnapshotInfo snapshotInfo) throws IOException {
-    // Acquiring write lock to avoid race condition with sst filtering service which creates a sst filtered file
-    // inside the snapshot directory. Any operation apart which doesn't create/delete files under this snapshot
-    // directory can run in parallel along with this operation.
-    OMLockDetails omLockDetails = omMetadataManager.getLock()
-        .acquireWriteLock(SNAPSHOT_DB_LOCK, snapshotInfo.getSnapshotId().toString());
-    boolean acquiredSnapshotLock = omLockDetails.isLockAcquired();
-    if (acquiredSnapshotLock) {
-      try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataMetaProvider snapMetaProvider =
-               snapshotLocalDataManager.getOmSnapshotLocalDataMeta(snapshotInfo)) {
-        Path snapshotDirPath = OmSnapshotManager.getSnapshotPath(omMetadataManager, snapshotInfo,
-            snapMetaProvider.getMeta().getVersion());
-        try {
-          FileUtils.deleteDirectory(snapshotDirPath.toFile());
-        } catch (IOException ex) {
-          LOG.error("Failed to delete snapshot directory {} for snapshot {}",
-              snapshotDirPath, snapshotInfo.getTableKey(), ex);
-        } finally {
-          omMetadataManager.getLock().releaseWriteLock(SNAPSHOT_DB_LOCK, snapshotInfo.getSnapshotId().toString());
-        }
-      }
     }
   }
 

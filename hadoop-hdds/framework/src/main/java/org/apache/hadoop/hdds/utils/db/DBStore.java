@@ -46,7 +46,7 @@ public interface DBStore extends UncheckedAutoCloseable, BatchOperationHandler {
   Table<byte[], byte[]> getTable(String name) throws RocksDatabaseException;
 
   /** The same as getTable(name, keyCodec, valueCodec, CacheType.PARTIAL_CACHE). */
-  default <KEY, VALUE> TypedTable<KEY, VALUE> getTable(String name, Codec<KEY> keyCodec, Codec<VALUE> valueCodec)
+  default <KEY, VALUE> Table<KEY, VALUE> getTable(String name, Codec<KEY> keyCodec, Codec<VALUE> valueCodec)
       throws RocksDatabaseException, CodecException {
     return getTable(name, keyCodec, valueCodec, CacheType.PARTIAL_CACHE);
   }
@@ -60,7 +60,7 @@ public interface DBStore extends UncheckedAutoCloseable, BatchOperationHandler {
    * @param cacheType - cache type
    * @return - Table Store
    */
-  <KEY, VALUE> TypedTable<KEY, VALUE> getTable(
+  <KEY, VALUE> Table<KEY, VALUE> getTable(
       String name, Codec<KEY> keyCodec, Codec<VALUE> valueCodec, TableCache.CacheType cacheType)
       throws RocksDatabaseException, CodecException;
 
@@ -146,6 +146,12 @@ public interface DBStore extends UncheckedAutoCloseable, BatchOperationHandler {
   Map<Integer, String> getTableNames();
 
   /**
+   * Drop the specific table.
+   * @param tableName - Name of the table to truncate.
+   */
+  void dropTable(String tableName) throws RocksDatabaseException;
+
+  /**
    * Get data written to DB since a specific sequence number.
    */
   DBUpdatesWrapper getUpdatesSince(long sequenceNumber)
@@ -162,4 +168,6 @@ public interface DBStore extends UncheckedAutoCloseable, BatchOperationHandler {
    * @return true if the DB is closed.
    */
   boolean isClosed();
+
+  String getSnapshotsParentDir();
 }

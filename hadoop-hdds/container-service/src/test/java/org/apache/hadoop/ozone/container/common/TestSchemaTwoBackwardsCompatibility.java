@@ -304,7 +304,7 @@ public class TestSchemaTwoBackwardsCompatibility {
           db.getStore().getBatchHandler().commitBatchOperation(batch);
 
           cData.updateDeleteTransactionId(txn.getTxID());
-          cData.incrPendingDeletionBlocks(BLOCKS_PER_TXN);
+          cData.incrPendingDeletionBlocks(BLOCKS_PER_TXN, 256);
         }
       }
     }

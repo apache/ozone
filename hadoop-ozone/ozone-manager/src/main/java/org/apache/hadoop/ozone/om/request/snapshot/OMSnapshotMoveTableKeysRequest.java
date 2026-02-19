@@ -80,22 +80,21 @@ public class OMSnapshotMoveTableKeysRequest extends OMClientRequest {
     UUID fromSnapshotID = fromProtobuf(moveTableKeysRequest.getFromSnapshotID());
     SnapshotInfo fromSnapshot = SnapshotUtils.getSnapshotInfo(ozoneManager,
         snapshotChainManager, fromSnapshotID);
-    String bucketKeyPrefix = omMetadataManager.getBucketKeyPrefix(fromSnapshot.getVolumeName(),
-        fromSnapshot.getBucketName());
-    String bucketKeyPrefixFSO = omMetadataManager.getBucketKeyPrefixFSO(fromSnapshot.getVolumeName(),
-        fromSnapshot.getBucketName());
+
 
     Set<String> keys = new HashSet<>();
     List<SnapshotMoveKeyInfos> deletedKeys = new ArrayList<>(moveTableKeysRequest.getDeletedKeysList().size());
 
     //validate deleted key starts with bucket prefix.[/<volName>/<bucketName>/]
+    String deletedTablePrefix = omMetadataManager.getTableBucketPrefix(omMetadataManager.getDeletedTable().getName(),
+        fromSnapshot.getVolumeName(), fromSnapshot.getBucketName());
     for (SnapshotMoveKeyInfos deletedKey : moveTableKeysRequest.getDeletedKeysList()) {
       // Filter only deleted keys with at least one keyInfo per key.
       if (!deletedKey.getKeyInfosList().isEmpty()) {
         deletedKeys.add(deletedKey);
-        if (!deletedKey.getKey().startsWith(bucketKeyPrefix)) {
+        if (!deletedKey.getKey().startsWith(deletedTablePrefix)) {
           OMException ex = new OMException("Deleted Key: " + deletedKey + " doesn't start with prefix "
-              + bucketKeyPrefix, OMException.ResultCodes.INVALID_KEY_NAME);
+              + deletedTablePrefix, OMException.ResultCodes.INVALID_KEY_NAME);
           if (LOG.isDebugEnabled()) {
             AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.SNAPSHOT_MOVE_TABLE_KEYS,
                 null, ex));
@@ -117,14 +116,17 @@ public class OMSnapshotMoveTableKeysRequest extends OMClientRequest {
     }
 
     keys.clear();
+    String renamedTablePrefix = omMetadataManager.getTableBucketPrefix(
+        omMetadataManager.getSnapshotRenamedTable().getName(), fromSnapshot.getVolumeName(),
+        fromSnapshot.getBucketName());
     List<HddsProtos.KeyValue> renamedKeysList = new ArrayList<>(moveTableKeysRequest.getRenamedKeysList().size());
     //validate rename key starts with bucket prefix.[/<volName>/<bucketName>/]
     for (HddsProtos.KeyValue renamedKey : moveTableKeysRequest.getRenamedKeysList()) {
       if (renamedKey.hasKey() && renamedKey.hasValue()) {
         renamedKeysList.add(renamedKey);
-        if (!renamedKey.getKey().startsWith(bucketKeyPrefix)) {
+        if (!renamedKey.getKey().startsWith(renamedTablePrefix)) {
           OMException ex = new OMException("Rename Key: " + renamedKey + " doesn't start with prefix "
-              + bucketKeyPrefix, OMException.ResultCodes.INVALID_KEY_NAME);
+              + renamedTablePrefix, OMException.ResultCodes.INVALID_KEY_NAME);
           if (LOG.isDebugEnabled()) {
             AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.SNAPSHOT_MOVE_TABLE_KEYS,
                 null, ex));
@@ -147,15 +149,17 @@ public class OMSnapshotMoveTableKeysRequest extends OMClientRequest {
     keys.clear();
 
     // Filter only deleted dirs with only one keyInfo per key.
+    String deletedDirTablePrefix = omMetadataManager.getTableBucketPrefix(
+        omMetadataManager.getDeletedDirTable().getName(), fromSnapshot.getVolumeName(), fromSnapshot.getBucketName());
     List<SnapshotMoveKeyInfos> deletedDirs = new ArrayList<>(moveTableKeysRequest.getDeletedDirsList().size());
     //validate deleted key starts with bucket FSO path prefix.[/<volId>/<bucketId>/]
     for (SnapshotMoveKeyInfos deletedDir : moveTableKeysRequest.getDeletedDirsList()) {
       // Filter deleted directories with exactly one keyInfo per key.
       if (deletedDir.getKeyInfosList().size() == 1) {
         deletedDirs.add(deletedDir);
-        if (!deletedDir.getKey().startsWith(bucketKeyPrefixFSO)) {
+        if (!deletedDir.getKey().startsWith(deletedDirTablePrefix)) {
           OMException ex = new OMException("Deleted dir: " + deletedDir + " doesn't start with prefix " +
-              bucketKeyPrefixFSO, OMException.ResultCodes.INVALID_KEY_NAME);
+              deletedDirTablePrefix, OMException.ResultCodes.INVALID_KEY_NAME);
           if (LOG.isDebugEnabled()) {
             AUDIT.logWriteFailure(ozoneManager.buildAuditMessageForFailure(OMSystemAction.SNAPSHOT_MOVE_TABLE_KEYS,
                 null, ex));

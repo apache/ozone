@@ -77,7 +77,6 @@ import org.apache.hadoop.ozone.recon.api.types.DUResponse;
 import org.apache.hadoop.ozone.recon.api.types.FileSizeDistributionResponse;
 import org.apache.hadoop.ozone.recon.api.types.QuotaUsageResponse;
 import org.apache.hadoop.ozone.recon.api.types.ResponseStatus;
-import org.apache.hadoop.ozone.recon.common.CommonUtils;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
@@ -125,14 +124,13 @@ import org.junit.jupiter.api.io.TempDir;
  * This is a test for the Rest APIs only. We have tested NSSummaryTask before,
  * so there is no need to test process() on DB's updates
  */
-public class TestNSSummaryEndpointWithLegacy {
+public class TestNSSummaryEndpointWithLegacy extends NSSummaryTests {
   @TempDir
   private Path temporaryFolder;
 
   private ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private ReconOMMetadataManager reconOMMetadataManager;
   private NSSummaryEndpoint nsSummaryEndpoint;
-  private CommonUtils commonUtils;
 
   private static final String TEST_PATH_UTILITY =
       "/vol1/buck1/a/b/c/d/e/file1.txt";
@@ -437,7 +435,6 @@ public class TestNSSummaryEndpointWithLegacy {
         new NSSummaryTaskWithLegacy(reconNamespaceSummaryManager, 
                                     reconOMMetadataManager, conf, 10);
     nsSummaryTaskWithLegacy.reprocessWithLegacy(reconOMMetadataManager);
-    commonUtils = new CommonUtils();
   }
 
   @Test
@@ -452,20 +449,20 @@ public class TestNSSummaryEndpointWithLegacy {
 
   @Test
   public void testGetBasicInfoRoot() throws Exception {
-    commonUtils.testNSSummaryBasicInfoRoot(
+    testNSSummaryBasicInfoRoot(
         nsSummaryEndpoint, reconOMMetadataManager);
   }
 
   @Test
   public void testGetBasicInfoVol() throws Exception {
     // Test volume basics
-    commonUtils.testNSSummaryBasicInfoVolume(nsSummaryEndpoint);
+    testNSSummaryBasicInfoVolume(nsSummaryEndpoint);
   }
 
   @Test
   public void testGetBasicInfoBucketOne() throws Exception {
     // Test bucket 1's basics
-    commonUtils.testNSSummaryBasicInfoBucketOne(
+    testNSSummaryBasicInfoBucketOne(
         BucketLayout.LEGACY,
         nsSummaryEndpoint);
   }
@@ -473,7 +470,7 @@ public class TestNSSummaryEndpointWithLegacy {
   @Test
   public void testGetBasicInfoBucketTwo() throws Exception {
     // Test bucket 2's basics
-    commonUtils.testNSSummaryBasicInfoBucketTwo(
+    testNSSummaryBasicInfoBucketTwo(
         BucketLayout.LEGACY,
         nsSummaryEndpoint);
   }
@@ -481,19 +478,19 @@ public class TestNSSummaryEndpointWithLegacy {
   @Test
   public void testGetBasicInfoDir() throws Exception {
     // Test intermediate directory basics
-    commonUtils.testNSSummaryBasicInfoDir(nsSummaryEndpoint);
+    testNSSummaryBasicInfoDir(nsSummaryEndpoint);
   }
 
   @Test
   public void testGetBasicInfoNoPath() throws Exception {
     // Test invalid path
-    commonUtils.testNSSummaryBasicInfoNoPath(nsSummaryEndpoint);
+    testNSSummaryBasicInfoNoPath(nsSummaryEndpoint);
   }
 
   @Test
   public void testGetBasicInfoKey() throws Exception {
     // Test key
-    commonUtils.testNSSummaryBasicInfoKey(nsSummaryEndpoint);
+    testNSSummaryBasicInfoKey(nsSummaryEndpoint);
   }
 
   @Test
@@ -1489,6 +1486,6 @@ public class TestNSSummaryEndpointWithLegacy {
 
   private static SCMNodeStat getMockSCMRootStat() {
     return new SCMNodeStat(ROOT_QUOTA, ROOT_DATA_SIZE, 
-        ROOT_QUOTA - ROOT_DATA_SIZE, 0, ROOT_QUOTA - ROOT_DATA_SIZE - 1);
+        ROOT_QUOTA - ROOT_DATA_SIZE, 0, ROOT_QUOTA - ROOT_DATA_SIZE - 1, 0);
   }
 }

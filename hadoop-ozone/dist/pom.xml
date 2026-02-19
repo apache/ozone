@@ -28,7 +28,8 @@
     <docker.hadoop.image>ghcr.io/apache/hadoop</docker.hadoop.image>
     <!-- suffix appended to Hadoop version to get Docker image version -->
     <docker.hadoop.image.flavor>-lean</docker.hadoop.image.flavor>
-    <docker.ozone-runner.version>20250625-2-jdk21</docker.ozone-runner.version>
+    <docker.ozone-runner.client.version>20260207-1-jdk8</docker.ozone-runner.client.version>
+    <docker.ozone-runner.version>20260206-2-jdk21</docker.ozone-runner.version>
     <docker.ozone-testkr5b.image>ghcr.io/apache/ozone-testkrb5:20241129-1</docker.ozone-testkr5b.image>
     <docker.ozone.image>apache/ozone</docker.ozone.image>
     <!-- suffix appended to Ozone version to get Docker image version; only used in xcompat test, to avoid old centos-based images -->
@@ -38,7 +39,7 @@
     <!-- no tests in this module so far -->
     <maven.test.skip>true</maven.test.skip>
     <!-- rpm usage-->
-    <rpm.targetArch>noarch</rpm.targetArch>
+    <rpm.needArch>true</rpm.needArch>
   </properties>
 
   <dependencies>
@@ -65,6 +66,16 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-cli-admin</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-cli-debug</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-cli-repair</artifactId>
       <scope>runtime</scope>
     </dependency>
     <dependency>
@@ -203,22 +214,6 @@
             </configuration>
           </execution>
           <execution>
-            <id>copy-and-filter-dockerfile</id>
-            <goals>
-              <goal>copy-resources</goal>
-            </goals>
-            <phase>compile</phase>
-            <configuration>
-              <outputDirectory>${project.build.directory}</outputDirectory>
-              <resources>
-                <resource>
-                  <directory>src/main/docker</directory>
-                  <filtering>true</filtering>
-                </resource>
-              </resources>
-            </configuration>
-          </execution>
-          <execution>
             <id>copy-k8s</id>
             <goals>
               <goal>copy-resources</goal>
@@ -271,11 +266,6 @@
         <dependency>
           <groupId>org.apache.ozone</groupId>
           <artifactId>ozone-filesystem-hadoop3</artifactId>
-          <scope>runtime</scope>
-        </dependency>
-        <dependency>
-          <groupId>org.apache.ozone</groupId>
-          <artifactId>ozone-filesystem-hadoop3-client</artifactId>
           <scope>runtime</scope>
         </dependency>
       </dependencies>
@@ -372,54 +362,6 @@
       </build>
     </profile>
 
-    <profile>
-      <id>docker-build</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>io.fabric8</groupId>
-            <artifactId>docker-maven-plugin</artifactId>
-            <configuration>
-              <images>
-                <image>
-                  <name>${docker.image}</name>
-                  <build>
-                    <dockerFileDir>${project.build.directory}/ozone-${project.version}</dockerFileDir>
-                  </build>
-                </image>
-              </images>
-            </configuration>
-            <executions>
-              <execution>
-                <goals>
-                  <goal>build</goal>
-                </goals>
-                <phase>package</phase>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
-      <id>docker-push</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>io.fabric8</groupId>
-            <artifactId>docker-maven-plugin</artifactId>
-            <executions>
-              <execution>
-                <goals>
-                  <goal>push</goal>
-                </goals>
-                <phase>package</phase>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
     <profile>
       <id>dist</id>
       <build>
@@ -605,16 +547,17 @@
             <configuration>
               <name>ozone</name>
               <version>${project.version}</version>
-              <release>1</release>
+              <release>${rpm.release}%{?dist}</release>
               <license>Apache License, Version 2.0</license>
               <summary>Ozone RPM package</summary>
               <group>Applications/Engineering</group>
-              <targetArch>${rpm.targetArch}</targetArch>
               <targetOS>linux</targetOS>
+              <needarch>${rpm.needArch}</needarch>
               <postinstallScriptlet>
                 <scriptFile>${basedir}/src/main/package/rpm/postinstall.sh</scriptFile>
               </postinstallScriptlet>
               <requires>
+                <require>java-headless &gt;= 1:1.8.0</require>
                 <require>ncurses</require>
               </requires>
 

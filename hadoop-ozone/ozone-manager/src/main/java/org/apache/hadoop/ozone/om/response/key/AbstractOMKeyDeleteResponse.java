@@ -77,9 +77,9 @@ public abstract class AbstractOMKeyDeleteResponse extends OmKeyResponse {
       // if RepeatedOMKeyInfo structure is null, we create a new instance,
       // if it is not null, then we simply add to the list and store this
       // instance in deletedTable.
-      omKeyInfo.setCommittedKeyDeletedFlag(isCommittedKey);
-      RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(bucketId,
-          omKeyInfo, omKeyInfo.getUpdateID()
+      omKeyInfo = omKeyInfo.withCommittedKeyDeletedFlag(isCommittedKey);
+      RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
+          bucketId, omKeyInfo, omKeyInfo.getUpdateID()
       );
       String delKeyName = omMetadataManager.getOzoneDeletePathKey(
           omKeyInfo.getObjectID(), keyName);
@@ -124,9 +124,9 @@ public abstract class AbstractOMKeyDeleteResponse extends OmKeyResponse {
       // if RepeatedOMKeyInfo structure is null, we create a new instance,
       // if it is not null, then we simply add to the list and store this
       // instance in deletedTable.
-      omKeyInfo.setCommittedKeyDeletedFlag(isCommittedKey);
-      RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(bucketId,
-          omKeyInfo, omKeyInfo.getUpdateID()
+      omKeyInfo = omKeyInfo.withCommittedKeyDeletedFlag(isCommittedKey);
+      RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
+          bucketId, omKeyInfo, omKeyInfo.getUpdateID()
       );
       omMetadataManager.getDeletedTable().putWithBatch(
           batchOperation, deleteKeyName, repeatedOmKeyInfo);

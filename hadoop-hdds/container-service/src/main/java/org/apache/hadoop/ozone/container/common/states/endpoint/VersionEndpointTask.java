@@ -17,9 +17,9 @@
 
 package org.apache.hadoop.ozone.container.common.states.endpoint;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.BindException;
+import java.util.Objects;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMVersionResponseProto;
@@ -75,10 +75,8 @@ public class VersionEndpointTask implements
           String scmId = response.getValue(OzoneConsts.SCM_ID);
           String clusterId = response.getValue(OzoneConsts.CLUSTER_ID);
 
-          Preconditions.checkNotNull(scmId,
-              "Reply from SCM: scmId cannot be null");
-          Preconditions.checkNotNull(clusterId,
-              "Reply from SCM: clusterId cannot be null");
+          Objects.requireNonNull(scmId, "scmId == null");
+          Objects.requireNonNull(clusterId, "clusterId == null");
 
           // Check DbVolumes, format DbVolume at first register time.
           checkVolumeSet(ozoneContainer.getDbVolumeSet(), scmId, clusterId);
@@ -117,7 +115,7 @@ public class VersionEndpointTask implements
     try {
       // If version file does not exist
       // create version file and also set scm ID or cluster ID.
-      for (StorageVolume volume : volumeSet.getVolumeMap().values()) {
+      for (StorageVolume volume : volumeSet.getVolumesList()) {
         boolean result = StorageVolumeUtil.checkVolume(volume,
             scmId, clusterId, configuration, LOG,
             ozoneContainer.getDbVolumeSet());

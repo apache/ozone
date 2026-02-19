@@ -123,4 +123,11 @@ public final class StringUtils {
     charVal[lastIdx] += 1;
     return String.valueOf(charVal);
   }
+
+  public static String getFirstNChars(String str, int n) {
+    if (str == null || str.length() < n) {
+      return str;
+    }
+    return str.substring(0, n);
+  }
 }

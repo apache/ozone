@@ -17,10 +17,10 @@
 
 package org.apache.hadoop.ozone.protocol.commands;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
@@ -124,7 +124,7 @@ public class CreatePipelineCommand
 
   public static CreatePipelineCommand getFromProtobuf(
       CreatePipelineCommandProto createPipelineProto) {
-    Preconditions.checkNotNull(createPipelineProto);
+    Objects.requireNonNull(createPipelineProto, "createPipelineProto == null");
     return new CreatePipelineCommand(createPipelineProto.getCmdId(),
         PipelineID.getFromProtobuf(createPipelineProto.getPipelineID()),
         createPipelineProto.getType(), createPipelineProto.getFactor(),

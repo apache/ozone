@@ -90,6 +90,10 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-cli-common</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-client</artifactId>
       <!-- <scope>test</scope> but transitive via hdds-container-service -->
     </dependency>
@@ -263,7 +267,6 @@
                 <restrictImports>
                   <reason>Only selected annotation processors are enabled, see configuration of maven-compiler-plugin.</reason>
                   <bannedImports>
-                    <bannedImport>org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator</bannedImport>
                     <bannedImport>org.kohsuke.MetaInfServices</bannedImport>
                   </bannedImports>
                 </restrictImports>
@@ -308,6 +311,22 @@
         <configuration>
           <excludeFilterFile>${basedir}/dev-support/findbugsExcludeFile.xml</excludeFilterFile>
         </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.xolstice.maven.plugins</groupId>
+        <artifactId>protobuf-maven-plugin</artifactId>
+        <configuration>
+          <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
+        </configuration>
+        <executions>
+          <execution>
+            <id>compile-test-protobuf</id>
+            <goals>
+              <goal>test-compile</goal>
+            </goals>
+            <phase>generate-test-sources</phase>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>

@@ -31,7 +31,6 @@ import static org.apache.hadoop.fs.StorageStatistics.CommonStatisticNames.OP_OPE
 import static org.apache.hadoop.fs.contract.ContractTestUtils.assertHasPathCapabilities;
 import static org.apache.hadoop.fs.ozone.Constants.LISTING_PAGE_SIZE;
 import static org.apache.hadoop.fs.ozone.Constants.OZONE_DEFAULT_USER;
-import static org.apache.hadoop.fs.ozone.OzoneFileSystemTests.createKeyWithECReplicationConfiguration;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
@@ -134,7 +133,7 @@ import org.slf4j.event.Level;
  * Ozone file system tests that are not covered by contract tests.
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-abstract class AbstractOzoneFileSystemTest {
+abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
 
   private static final float TRASH_INTERVAL = 0.05f; // 3 seconds
 
@@ -250,8 +249,9 @@ abstract class AbstractOzoneFileSystemTest {
     return cluster;
   }
 
-  public FileSystem getFs() {
-    return fs;
+  @Override
+  public OzoneFileSystem getFs() {
+    return o3fs;
   }
 
   public String getBucketName() {
@@ -412,14 +412,6 @@ abstract class AbstractOzoneFileSystemTest {
   }
 
   @Test
-  public void testOzoneFsServiceLoader() throws IOException {
-    assumeFalse(FILE_SYSTEM_OPTIMIZED.equals(getBucketLayout()));
-
-    assertEquals(OzoneFileSystem.class,
-        FileSystem.getFileSystemClass(OzoneConsts.OZONE_URI_SCHEME, null));
-  }
-
-  @Test
   public void testCreateDoesNotAddParentDirKeys() throws Exception {
     Path grandparent = new Path("/testCreateDoesNotAddParentDirKeys");
     Path parent = new Path(grandparent, "parent");
@@ -444,14 +436,7 @@ abstract class AbstractOzoneFileSystemTest {
   @Test
   public void testCreateKeyWithECReplicationConfig() throws Exception {
     Path root = new Path("/" + volumeName + "/" + bucketName);
-    Path testKeyPath = new Path(root, "testKey");
-    createKeyWithECReplicationConfiguration(cluster.getConf(), testKeyPath);
-
-    OzoneKeyDetails key = getKey(testKeyPath, false);
-    assertEquals(HddsProtos.ReplicationType.EC,
-        key.getReplicationConfig().getReplicationType());
-    assertEquals("rs-3-2-1024k",
-        key.getReplicationConfig().getReplication());
+    createKeyWithECReplicationConfig(root, cluster.getConf());
   }
 
   @Test
@@ -977,54 +962,7 @@ abstract class AbstractOzoneFileSystemTest {
    */
   @Test
   public void testListStatusIteratorWithDir() throws Exception {
-    Path parent = new Path(ROOT, "testListStatus");
-    Path file1 = new Path(parent, "key1");
-    Path file2 = new Path(parent, "key2");
-    try {
-      // Iterator should have no items when dir is empty
-      RemoteIterator<FileStatus> it = o3fs.listStatusIterator(ROOT);
-      assertFalse(it.hasNext());
-
-      ContractTestUtils.touch(fs, file1);
-      ContractTestUtils.touch(fs, file2);
-      // Iterator should have an item when dir is not empty
-      it = o3fs.listStatusIterator(ROOT);
-      while (it.hasNext()) {
-        FileStatus fileStatus = it.next();
-        assertNotNull(fileStatus);
-        assertEquals(fileStatus.getPath().toUri().getPath(), parent.toString(), "Parent path doesn't match");
-      }
-      // Iterator on a directory should return all subdirs along with
-      // files, even if there exists a file and sub-dir with the same name.
-      it = o3fs.listStatusIterator(parent);
-      int iCount = 0;
-      while (it.hasNext()) {
-        iCount++;
-        FileStatus fileStatus = it.next();
-        assertNotNull(fileStatus);
-      }
-      assertEquals(2, iCount, "Iterator did not return all the file status");
-      // Iterator should return file status for only the
-      // immediate children of a directory.
-      Path file3 = new Path(parent, "dir1/key3");
-      Path file4 = new Path(parent, "dir1/key4");
-      ContractTestUtils.touch(fs, file3);
-      ContractTestUtils.touch(fs, file4);
-      it = o3fs.listStatusIterator(parent);
-      iCount = 0;
-
-      while (it.hasNext()) {
-        iCount++;
-        FileStatus fileStatus = it.next();
-        assertNotNull(fileStatus);
-      }
-      assertEquals(3, iCount, "Iterator did not return file status " +
-          "of all the children of the directory");
-
-    } finally {
-      // Cleanup
-      fs.delete(parent, true);
-    }
+    listStatusIteratorWithDir(ROOT);
   }
 
   /**
@@ -1062,7 +1000,7 @@ abstract class AbstractOzoneFileSystemTest {
 
   @Test
   public void testListStatusIteratorOnPageSize() throws Exception {
-    OzoneFileSystemTests.listStatusIteratorOnPageSize(cluster.getConf(),
+    listStatusIteratorOnPageSize(cluster.getConf(),
         "/" + volumeName + "/" + bucketName);
   }
 
@@ -1497,7 +1435,8 @@ abstract class AbstractOzoneFileSystemTest {
     assertThat(exception.getMessage()).contains("Wrong FS");
   }
 
-  private OzoneKeyDetails getKey(Path keyPath, boolean isDirectory)
+  @Override
+  protected OzoneKeyDetails getKey(Path keyPath, boolean isDirectory)
       throws IOException {
     String key = o3fs.pathToKey(keyPath);
     if (isDirectory) {
@@ -1888,7 +1827,7 @@ abstract class AbstractOzoneFileSystemTest {
   @Test
   public void testProcessingDetails() throws IOException, InterruptedException {
     final Logger log = LoggerFactory.getLogger(
-        "org.apache.hadoop.ipc.ProcessingDetails");
+        "org.apache.hadoop.ipc_.ProcessingDetails");
     GenericTestUtils.setLogLevel(log, Level.DEBUG);
     GenericTestUtils.LogCapturer logCapturer =
         GenericTestUtils.LogCapturer.captureLogs(log);
@@ -2141,6 +2080,15 @@ abstract class AbstractOzoneFileSystemTest {
     FileStatus[] fileStatuses = fs.listStatus(path.getParent());
     assertEquals(1, fileStatuses.length);
     assertFalse(fileStatuses[0] instanceof LocatedFileStatus);
+  }
+
+  @Test
+  public void testOzoneManagerListLocatedStatusForZeroByteFile() throws IOException {
+    String directory = RandomStringUtils.secure().nextAlphanumeric(5);
+    String filePath = RandomStringUtils.secure().nextAlphanumeric(5);
+    Path path = createPath("/" + directory + "/" + filePath);
+
+    listLocatedStatusForZeroByteFile(fs, path);
   }
 
   @Test

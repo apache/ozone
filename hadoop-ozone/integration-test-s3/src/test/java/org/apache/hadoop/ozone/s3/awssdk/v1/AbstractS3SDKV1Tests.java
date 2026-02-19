@@ -25,6 +25,7 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.stripQuotes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -89,12 +90,12 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -106,22 +107,22 @@ import org.apache.hadoop.hdds.client.OzoneQuota;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
-import org.apache.hadoop.ozone.s3.MultiS3GatewayService;
 import org.apache.hadoop.ozone.s3.S3ClientFactory;
 import org.apache.hadoop.ozone.s3.awssdk.S3SDKTestUtils;
 import org.apache.hadoop.ozone.s3.endpoint.S3Owner;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ozone.test.NonHATests;
 import org.apache.ozone.test.OzoneTestBase;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
@@ -143,7 +144,8 @@ import org.junit.jupiter.params.provider.ValueSource;
  *
  */
 @TestMethodOrder(MethodOrderer.MethodName.class)
-public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonHATests.TestCase {
 
   // server-side limitation
   private static final int MAX_UPLOADS_LIMIT = 1000;
@@ -201,39 +203,14 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
    *   - UploadObjectKMSKey.java
    */
 
-  private static MiniOzoneCluster cluster = null;
-  private static AmazonS3 s3Client = null;
+  private MiniOzoneCluster cluster;
+  private AmazonS3 s3Client;
 
-  /**
-   * Create a MiniOzoneCluster with S3G enabled for testing.
-   * @param conf Configurations to start the cluster
-   * @throws Exception exception thrown when waiting for the cluster to be ready.
-   */
-  static void startCluster(OzoneConfiguration conf) throws Exception {
-    MultiS3GatewayService s3g = new MultiS3GatewayService(5);
-    cluster = MiniOzoneCluster.newBuilder(conf)
-        .addService(s3g)
-        .setNumDatanodes(5)
-        .build();
-    cluster.waitForClusterToBeReady();
-    s3Client = new S3ClientFactory(s3g.getConf()).createS3Client();
-  }
-
-  /**
-   * Shutdown the MiniOzoneCluster.
-   */
-  static void shutdownCluster() throws IOException {
-    if (cluster != null) {
-      cluster.shutdown();
-    }
-  }
-
-  public static void setCluster(MiniOzoneCluster cluster) {
-    AbstractS3SDKV1Tests.cluster = cluster;
-  }
-
-  public static MiniOzoneCluster getCluster() {
-    return AbstractS3SDKV1Tests.cluster;
+  @BeforeAll
+  void createClient() {
+    cluster = cluster();
+    s3Client = new S3ClientFactory(cluster.getConf())
+        .createS3Client();
   }
 
   @Test
@@ -401,6 +378,163 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
   }
 
   @Test
+  public void testPutObjectWithMD5Header() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(bucketName);
+
+    byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
+    byte[] md5Bytes = calculateDigest(new ByteArrayInputStream(contentBytes), 0, contentBytes.length);
+    String md5Base64 = Base64.getEncoder().encodeToString(md5Bytes);
+
+    InputStream is = new ByteArrayInputStream(contentBytes);
+    ObjectMetadata objectMetadata = new ObjectMetadata();
+    objectMetadata.setContentMD5(md5Base64);
+    objectMetadata.setContentLength(contentBytes.length);
+
+    PutObjectResult putObjectResult = s3Client.putObject(bucketName, keyName, is, objectMetadata);
+    assertEquals("37b51d194a7513e45b56f6524f2d51f2", putObjectResult.getETag());
+
+    S3Object object = s3Client.getObject(bucketName, keyName);
+    assertEquals(content.length(), object.getObjectMetadata().getContentLength());
+    assertEquals("37b51d194a7513e45b56f6524f2d51f2", object.getObjectMetadata().getETag());
+  }
+
+  @Test
+  public void testPutObjectWithWrongMD5Header() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(bucketName);
+
+    // Use wrong content to calculate MD5
+    byte[] wrongContentBytes = "wrong".getBytes(StandardCharsets.UTF_8);
+    byte[] wrongMd5Bytes = calculateDigest(new ByteArrayInputStream(wrongContentBytes), 0, wrongContentBytes.length);
+    String wrongMd5Base64 = Base64.getEncoder().encodeToString(wrongMd5Bytes);
+
+    byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
+    InputStream is = new ByteArrayInputStream(contentBytes);
+    ObjectMetadata objectMetadata = new ObjectMetadata();
+    objectMetadata.setContentMD5(wrongMd5Base64);
+    objectMetadata.setContentLength(contentBytes.length);
+
+    AmazonServiceException ase = assertThrows(AmazonServiceException.class,
+        () -> s3Client.putObject(bucketName, keyName, is, objectMetadata));
+
+    assertEquals(ErrorType.Client, ase.getErrorType());
+    assertEquals(400, ase.getStatusCode());
+    assertEquals("BadDigest", ase.getErrorCode());
+
+    // Verify the object was not uploaded
+    assertFalse(s3Client.doesObjectExist(bucketName, keyName));
+  }
+
+  @Test
+  public void testMultipartUploadWithMD5Header() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(bucketName);
+
+    // Initiate multipart upload
+    InitiateMultipartUploadRequest initRequest = new InitiateMultipartUploadRequest(bucketName, keyName);
+    InitiateMultipartUploadResult initResponse = s3Client.initiateMultipartUpload(initRequest);
+    String uploadId = initResponse.getUploadId();
+
+    // Prepare part data
+    String part1Content = "part1data";
+    byte[] part1Bytes = part1Content.getBytes(StandardCharsets.UTF_8);
+    byte[] part1Md5Bytes = calculateDigest(new ByteArrayInputStream(part1Bytes), 0, part1Bytes.length);
+    String part1Md5Base64 = Base64.getEncoder().encodeToString(part1Md5Bytes);
+
+    // Upload part 1 with MD5
+    InputStream part1InputStream = new ByteArrayInputStream(part1Bytes);
+    ObjectMetadata metadata = new ObjectMetadata();
+    metadata.setContentMD5(part1Md5Base64);
+    metadata.setContentLength(part1Bytes.length);
+
+    UploadPartRequest uploadRequest = new UploadPartRequest()
+        .withBucketName(bucketName)
+        .withKey(keyName)
+        .withUploadId(uploadId)
+        .withPartNumber(1)
+        .withInputStream(part1InputStream)
+        .withPartSize(part1Bytes.length)
+        .withObjectMetadata(metadata);
+
+    UploadPartResult uploadResult = s3Client.uploadPart(uploadRequest);
+
+    // Verify ETag
+    String expectedETag = DatatypeConverter.printHexBinary(part1Md5Bytes).toLowerCase();
+    assertEquals(expectedETag, uploadResult.getPartETag().getETag());
+
+    // Complete multipart upload
+    List<PartETag> partETags = new ArrayList<>();
+    partETags.add(uploadResult.getPartETag());
+
+    CompleteMultipartUploadRequest completeRequest = new CompleteMultipartUploadRequest(
+        bucketName, keyName, uploadId, partETags);
+    s3Client.completeMultipartUpload(completeRequest);
+
+    // Verify object was uploaded
+    S3Object object = s3Client.getObject(bucketName, keyName);
+    try (S3ObjectInputStream s3is = object.getObjectContent();
+         ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
+      IOUtils.copy(s3is, bos);
+      assertEquals(part1Content, bos.toString("UTF-8"));
+    }
+  }
+
+  @Test
+  public void testMultipartUploadPartWithWrongMD5Header() throws Exception {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    s3Client.createBucket(bucketName);
+
+    // Initiate multipart upload
+    InitiateMultipartUploadRequest initRequest = new InitiateMultipartUploadRequest(bucketName, keyName);
+    InitiateMultipartUploadResult initResponse = s3Client.initiateMultipartUpload(initRequest);
+    String uploadId = initResponse.getUploadId();
+
+    // Prepare part data with wrong MD5
+    String partContent = "partdata";
+    byte[] partBytes = partContent.getBytes(StandardCharsets.UTF_8);
+
+    byte[] wrongMd5Bytes = calculateDigest(
+        new ByteArrayInputStream("wrongdata".getBytes(StandardCharsets.UTF_8)), 0, 9);
+    String wrongMd5Base64 = Base64.getEncoder().encodeToString(wrongMd5Bytes);
+
+    // Upload part with wrong MD5 should fail
+    InputStream partInputStream = new ByteArrayInputStream(partBytes);
+    ObjectMetadata metadata = new ObjectMetadata();
+    metadata.setContentMD5(wrongMd5Base64);
+    metadata.setContentLength(partBytes.length);
+
+    UploadPartRequest uploadRequest = new UploadPartRequest()
+        .withBucketName(bucketName)
+        .withKey(keyName)
+        .withUploadId(uploadId)
+        .withPartNumber(1)
+        .withInputStream(partInputStream)
+        .withPartSize(partBytes.length)
+        .withObjectMetadata(metadata);
+
+    AmazonServiceException ase = assertThrows(AmazonServiceException.class,
+        () -> s3Client.uploadPart(uploadRequest));
+
+    assertEquals(ErrorType.Client, ase.getErrorType());
+    assertEquals(400, ase.getStatusCode());
+    assertEquals("BadDigest", ase.getErrorCode());
+
+    // Abort the multipart upload
+    AbortMultipartUploadRequest abortRequest = new AbortMultipartUploadRequest(bucketName, keyName, uploadId);
+    s3Client.abortMultipartUpload(abortRequest);
+
+    // Verify object was not created
+    assertFalse(s3Client.doesObjectExist(bucketName, keyName));
+  }
+
+  @Test
   public void testPutDoubleSlashPrefixObject() throws IOException {
     final String bucketName = getBucketName();
     final String keyName = "//dir1";
@@ -426,16 +560,39 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
   }
 
   @Test
-  public void testPutObjectEmpty() {
+  public void testPutObjectEmpty() throws Exception {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
     final String content = "";
     s3Client.createBucket(bucketName);
 
+    long initialAllocatedBlocks =
+        cluster.getStorageContainerManager().getPipelineManager()
+            .getMetrics().getTotalNumBlocksAllocated();
+
     InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
 
     PutObjectResult putObjectResult = s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
     assertEquals("d41d8cd98f00b204e9800998ecf8427e", putObjectResult.getETag());
+
+    // Verify via Ozone client that the key has no block locations
+    try (OzoneClient ozoneClient = cluster.newClient()) {
+      ObjectStore store = ozoneClient.getObjectStore();
+      OzoneVolume volume = store.getS3Volume();
+      OzoneBucket bucket = volume.getBucket(bucketName);
+
+      OzoneKeyDetails keyDetails = bucket.getKey(keyName);
+      assertNotNull(keyDetails);
+      assertEquals(0, keyDetails.getDataSize(),
+          "Empty S3 object should have dataSize of 0");
+      assertTrue(keyDetails.getOzoneKeyLocations().isEmpty(),
+          "Empty S3 object should have no block locations");
+    }
+
+    // createKey should skip block allocation if data size is 0
+    long currentAllocatedBlocks =
+        cluster.getStorageContainerManager().getPipelineManager().getMetrics().getTotalNumBlocksAllocated();
+    assertEquals(initialAllocatedBlocks, currentAllocatedBlocks);
   }
 
   @Test
@@ -1075,7 +1232,7 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
   @Nested
   @TestInstance(TestInstance.Lifecycle.PER_CLASS)
   class PresignedUrlTests {
-    private static final String BUCKET_NAME = "presigned-url-bucket";
+    private static final String BUCKET_NAME = "v1-presigned-url-bucket";
     private static final String CONTENT = "bar";
     // Set the presigned URL to expire after one hour.
     private final Date expiration = Date.from(Instant.now().plusMillis(1000 * 60 * 60));
@@ -1176,6 +1333,41 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
           connection.disconnect();
         }
       }
+    }
+
+    @Test
+    public void testPresignedUrlPutSingleChunkWithWrongSha256() throws Exception {
+      final String keyName = getKeyName();
+
+      // Test PutObjectRequest presigned URL
+      GeneratePresignedUrlRequest generatePresignedUrlRequest =
+          new GeneratePresignedUrlRequest(BUCKET_NAME, keyName).withMethod(HttpMethod.PUT).withExpiration(expiration);
+      URL presignedUrl = s3Client.generatePresignedUrl(generatePresignedUrlRequest);
+
+      Map<String, List<String>> headers = new HashMap<>();
+      List<String> sha256Value = new ArrayList<>();
+      sha256Value.add("wrong-sha256-value");
+      headers.put("x-amz-content-sha256", sha256Value);
+
+      HttpURLConnection connection = null;
+      try {
+        connection = S3SDKTestUtils.openHttpURLConnection(presignedUrl, "PUT",
+            headers, CONTENT.getBytes(StandardCharsets.UTF_8));
+        int responseCode = connection.getResponseCode();
+        assertEquals(400, responseCode, "PutObject presigned URL should return 400 because of wrong SHA256");
+      } finally {
+        if (connection != null) {
+          connection.disconnect();
+        }
+      }
+
+      // Verify the object was not uploaded
+      AmazonServiceException ase = assertThrows(AmazonServiceException.class,
+          () -> s3Client.getObject(BUCKET_NAME, keyName));
+
+      assertEquals(ErrorType.Client, ase.getErrorType());
+      assertEquals(404, ase.getStatusCode());
+      assertEquals("NoSuchKey", ase.getErrorCode());
     }
 
     @Test
@@ -1449,16 +1641,16 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase {
     return getBucketName("");
   }
 
-  private String getBucketName(String suffix) {
-    return (getTestName() + "bucket" + suffix).toLowerCase(Locale.ROOT);
+  private String getBucketName(String ignored) {
+    return uniqueObjectName();
   }
 
   private String getKeyName() {
     return getKeyName("");
   }
 
-  private String getKeyName(String suffix) {
-    return (getTestName() +  "key" + suffix).toLowerCase(Locale.ROOT);
+  private String getKeyName(String ignored) {
+    return uniqueObjectName();
   }
 
   private String multipartUpload(String bucketName, String key, File file, long partSize, String contentType,

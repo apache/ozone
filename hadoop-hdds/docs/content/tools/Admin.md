@@ -115,7 +115,7 @@ Client ID		Creation time	Hsync'ed	Open File Path
 111726338152071171	1704808626588	No		/volume-lof/buck1/-9223372036854774527/key2
 
 To get the next batch of open keys, run:
-  ozone admin om lof -id=om-service-test1 --length=3 --prefix=/volume-lof/buck1 --start=/-9223372036854775552/-9223372036854775040/-9223372036854774527/key2/111726338152071171
+  ozone admin om lof --service-id=om-service-test1 --length=3 --prefix=/volume-lof/buck1 --start=/-9223372036854775552/-9223372036854775040/-9223372036854774527/key2/111726338152071171
 ```
 
 - In JSON, list open files (keys) under bucket `/volumelof/buck1` with a batch size of 3:
@@ -183,21 +183,24 @@ This command only works on Ozone Manager HA clusters.
 
 ```bash
 $ ozone admin om snapshot defrag --help
-Usage: ozone admin om snapshot defrag [-hV] [--no-wait] [--node-id=<nodeId>]
-                                      [-id=<omServiceId>]
+Usage: ozone admin om snapshot defrag [-hV] [--no-wait] [--verbose]
+                                      [--node-id=<nodeId>]
+                                      [--service-id=<serviceID>]
 Triggers the Snapshot Defragmentation Service to run immediately. This command
-manually initiates the snapshot defragmentation process which compacts
-snapshot data and removes fragmentation to improve storage efficiency. This
-command works only on OzoneManager HA cluster.
-  -h, --help                Show this help message and exit.
-      --no-wait             Do not wait for the defragmentation task to
-                              complete. The command will return immediately
-                              after triggering the task.
-      --node-id=<nodeId>    NodeID of the OM to trigger snapshot
-                              defragmentation on.
-  -id, --service-id=<omServiceId>
-                            Ozone Manager Service ID
-  -V, --version             Print version information and exit.
+manually initiates the snapshot defragmentation process which compacts snapshot
+data and removes fragmentation to improve storage efficiency. This command
+works only on OzoneManager HA cluster.
+  -h, --help               Show this help message and exit.
+      --no-wait            Do not wait for the defragmentation task to
+                             complete. The command will return immediately
+                             after triggering the task.
+      --node-id=<nodeId>   NodeID of the OM to trigger snapshot defragmentation
+                             on.
+      --service-id, --om-service-id=<serviceID>
+                           Ozone Manager Service ID.
+  -V, --version            Print version information and exit.
+      --verbose            More verbose output. Show the stack trace of the
+                             errors.
 ```
 
 ### Example usages

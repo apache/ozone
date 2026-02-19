@@ -19,10 +19,10 @@ package org.apache.hadoop.ozone.freon;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERVAL_DEFAULT;
-import static org.apache.hadoop.hdds.HddsUtils.getReconAddresses;
-import static org.apache.hadoop.hdds.HddsUtils.getSCMAddressForDatanodes;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_TIMEOUT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_RPC_TIMEOUT_DEFAULT;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getReconAddressForDatanodes;
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getSCMAddressForDatanodes;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmHeartbeatInterval;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmRpcRetryCount;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmRpcRetryInterval;
@@ -76,8 +76,8 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
+import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.common.Storage;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
@@ -430,7 +430,7 @@ public class DatanodeSimulator implements Callable<Void>, FreonSubcommand {
       scmClients.put(address, createScmClient(address));
     }
 
-    reconAddress = getReconAddresses(conf);
+    reconAddress = getReconAddressForDatanodes(conf);
     reconClient = createReconClient(reconAddress);
 
     heartbeatScheduler = Executors.newScheduledThreadPool(threadCount);

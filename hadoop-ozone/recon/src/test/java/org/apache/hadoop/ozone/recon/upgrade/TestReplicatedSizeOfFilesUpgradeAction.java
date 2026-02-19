@@ -88,9 +88,4 @@ public class TestReplicatedSizeOfFilesUpgradeAction {
       assertEquals("Failed to rebuild NSSummary during upgrade", thrown.getMessage());
     }
   }
-
-  @Test
-  public void testGetTypeReturnsFinalize() {
-    assertEquals(ReconUpgradeAction.UpgradeActionType.FINALIZE, upgradeAction.getType());
-  }
 }

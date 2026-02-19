@@ -34,10 +34,11 @@ import java.nio.file.Path;
 import java.util.UUID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
-import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
+import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -78,6 +79,11 @@ public class TestOMClientRequestWithUserInfo {
     when(ozoneManager.getMetrics()).thenReturn(omMetrics);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
     when(ozoneManager.getConfiguration()).thenReturn(ozoneConfiguration);
+
+    // mock OmConfig to avoid NPE in OMBucketCreateRequest.preExecute
+    OmConfig omConfig = mock(OmConfig.class);
+    when(omConfig.isFileSystemPathEnabled()).thenReturn(false);
+    when(ozoneManager.getConfig()).thenReturn(omConfig);
 
     // Mock version manager to avoid NPE in preExecute
     OMLayoutVersionManager versionManager = mock(OMLayoutVersionManager.class);
