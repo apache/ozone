@@ -604,7 +604,7 @@ public class SnapshotDefragService extends BackgroundService
           long fileSize = Files.size(file);
           totalSize += fileSize;
           totalFileCount++;
-          if (file.getFileName().toString().endsWith(SST_FILE_EXTENSION)) {
+          if (file.toString().endsWith(SST_FILE_EXTENSION)) {
             sstFileCount++;
           }
         }
@@ -654,7 +654,9 @@ public class SnapshotDefragService extends BackgroundService
     try {
       DBStore checkpointDBStore = checkpointMetadataManager.getStore();
       if (LOG.isTraceEnabled()) {
-        logDirStats("Before defrag", snapshotInfo, checkpointLocation);
+        Path snapshotDbDir = OmSnapshotManager.getSnapshotPath(
+            ozoneManager.getMetadataManager(), snapshotId, needsDefragVersionPair.getValue());
+        logDirStats("Before defrag", snapshotInfo, snapshotDbDir);
       }
       TablePrefixInfo prefixInfo = ozoneManager.getMetadataManager().getTableBucketPrefix(snapshotInfo.getVolumeName(),
           snapshotInfo.getBucketName());
