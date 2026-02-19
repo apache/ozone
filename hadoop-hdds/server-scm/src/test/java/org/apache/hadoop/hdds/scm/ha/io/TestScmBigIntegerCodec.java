@@ -35,8 +35,7 @@ public class TestScmBigIntegerCodec {
     BigInteger bigInteger = BigInteger.valueOf(100);
     ByteString byteString = scmBigIntegerCodec.serialize(bigInteger);
 
-    BigInteger actual =
-        (BigInteger) scmBigIntegerCodec.deserialize(BigInteger.class, byteString);
+    BigInteger actual = scmBigIntegerCodec.deserialize(BigInteger.class, byteString);
     assertEquals(bigInteger, actual);
   }
 }

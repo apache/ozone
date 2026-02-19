@@ -28,7 +28,7 @@ import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferExce
 /**
  * {@link ScmCodec} for {@link List} objects.
  */
-public class ScmListCodec implements ScmCodec {
+public class ScmListCodec implements ScmCodec<Object> {
 
   @Override
   public ByteString serialize(Object object)

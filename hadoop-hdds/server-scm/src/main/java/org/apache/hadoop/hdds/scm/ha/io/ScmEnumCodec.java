@@ -28,7 +28,7 @@ import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 /**
  * {@link ScmCodec} for {@link ProtocolMessageEnum} objects.
  */
-public class ScmEnumCodec implements ScmCodec {
+public class ScmEnumCodec implements ScmCodec<Object>  {
 
   @Override
   public ByteString serialize(Object object)
