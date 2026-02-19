@@ -90,8 +90,10 @@ import org.apache.hadoop.hdds.utils.db.StringInMemoryTestTable;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
+import org.apache.hadoop.ozone.om.OmSnapshotInternalMetrics;
 import org.apache.hadoop.ozone.om.OmSnapshotLocalData;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -150,6 +152,12 @@ public class TestSnapshotDefragService {
 
   private DeltaFileComputer deltaFileComputer;
 
+  @Mock
+  private OmSnapshotInternalMetrics snapshotMetrics;
+
+  @Mock
+  private OMPerformanceMetrics perfMetrics;
+
   @TempDir
   private Path tempDir;
   private OzoneConfiguration configuration;
@@ -170,6 +178,8 @@ public class TestSnapshotDefragService {
     when(ozoneManager.isRunning()).thenReturn(true);
     when(ozoneManager.getVersionManager()).thenReturn(versionManager);
     when(ozoneManager.getOmRatisServer()).thenReturn(mock(OzoneManagerRatisServer.class));
+    when(ozoneManager.getOmSnapshotIntMetrics()).thenReturn(snapshotMetrics);
+    when(ozoneManager.getPerfMetrics()).thenReturn(perfMetrics);
 
     when(omSnapshotManager.getSnapshotLocalDataManager()).thenReturn(snapshotLocalDataManager);
     when(metadataManager.getLock()).thenReturn(omLock);
@@ -340,6 +350,7 @@ public class TestSnapshotDefragService {
         assertEquals(dummyTableValues, nonCompactedTable.getValue().getMap());
       }
     }
+    verify(snapshotMetrics).incNumSnapshotFullDefragTablesCompacted(2L);
   }
 
   @Test
@@ -810,6 +821,7 @@ public class TestSnapshotDefragService {
           }
         }
       }
+      verify(snapshotMetrics).incNumSnapshotIncDefragDeltaFilesProcessed(3L);
     }
   }
 
@@ -822,6 +834,21 @@ public class TestSnapshotDefragService {
       mockedStatic.when(() -> SnapshotUtils.getSnapshotInfo(eq(ozoneManager), eq(chainManager),
           eq(snapshotInfo.getSnapshotId()))).thenReturn(snapshotInfo);
       assertFalse(defragService.checkAndDefragSnapshot(chainManager, snapshotInfo.getSnapshotId()));
+      verify(snapshotMetrics).incNumSnapshotDefragSnapshotSkipped();
+    }
+  }
+
+  @Test
+  public void testCheckAndDefragAlreadyDefraggedSnapshot() throws IOException {
+    SnapshotInfo snapshotInfo = createMockSnapshotInfo(UUID.randomUUID(), "vol1", "bucket1", "snap1");
+    SnapshotChainManager chainManager = mock(SnapshotChainManager.class);
+    SnapshotDefragService spyDefragService = Mockito.spy(defragService);
+    try (MockedStatic<SnapshotUtils> mockedStatic = Mockito.mockStatic(SnapshotUtils.class)) {
+      mockedStatic.when(() -> SnapshotUtils.getSnapshotInfo(eq(ozoneManager), eq(chainManager),
+          eq(snapshotInfo.getSnapshotId()))).thenReturn(snapshotInfo);
+      doReturn(Pair.of(false, 0)).when(spyDefragService).needsDefragmentation(eq(snapshotInfo));
+      assertFalse(spyDefragService.checkAndDefragSnapshot(chainManager, snapshotInfo.getSnapshotId()));
+      verify(snapshotMetrics).incNumSnapshotDefragSnapshotSkipped();
     }
   }
 
@@ -921,6 +948,15 @@ public class TestSnapshotDefragService {
       verifier.verify(spyDefragService).atomicSwitchSnapshotDB(eq(snapshotInfo.getSnapshotId()),
           eq(checkpointPath.toPath()));
       verifier.verify(omSnapshotManager).deleteSnapshotCheckpointDirectories(eq(snapshotInfo.getSnapshotId()), eq(20));
+      // Verify metrics
+      verify(snapshotMetrics).incNumSnapshotDefrag();
+      if (previousSnapshotExists) {
+        verify(snapshotMetrics).incNumSnapshotIncDefrag();
+        verify(perfMetrics).setSnapshotDefragServiceIncLatencyMs(Mockito.anyLong());
+      } else {
+        verify(snapshotMetrics).incNumSnapshotFullDefrag();
+        verify(perfMetrics).setSnapshotDefragServiceFullLatencyMs(Mockito.anyLong());
+      }
     }
   }
 
