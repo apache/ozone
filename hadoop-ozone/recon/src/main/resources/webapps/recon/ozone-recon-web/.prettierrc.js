@@ -15,14 +15,12 @@
 * limitations under the License.
 */
 
-const config = {
+module.exports = {
   semi: true,
   tabWidth: 2,
   printWidth: 100,
   singleQuote: true,
-  trailingComma: "es5",
+  trailingComma: 'es5',
   jsxSingleQuote: true,
   bracketSpacing: true,
 };
-
-export default config;

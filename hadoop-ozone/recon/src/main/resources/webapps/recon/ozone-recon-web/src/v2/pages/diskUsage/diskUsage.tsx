@@ -18,17 +18,14 @@
 
 import React, { useRef, useState } from 'react';
 import { AxiosError } from 'axios';
-import {
-  Alert, Button, Tooltip
-} from 'antd';
-import {
-  InfoCircleFilled, ReloadOutlined,
-} from '@ant-design/icons';
+import { Alert, Button, Tooltip } from 'antd';
+import { InfoCircleFilled, ReloadOutlined } from '@ant-design/icons';
 import { ValueType } from 'react-select';
 
 import DUMetadata from '@/v2/components/duMetadata/duMetadata';
 import DUPieChart from '@/v2/components/plots/duPieChart';
 import SingleSelect, { Option } from '@/v2/components/select/singleSelect';
+
 import DUBreadcrumbNav from '@/v2/components/duBreadcrumbNav/duBreadcrumbNav';
 import { showDataFetchError } from '@/utils/common';
 import { AxiosGetHelper, cancelRequests } from '@/utils/axiosRequestHelper';
@@ -42,10 +39,10 @@ const LIMIT_OPTIONS: Option[] = [
   { label: '10', value: '10' },
   { label: '15', value: '15' },
   { label: '20', value: '20' },
-  { label: '30', value: '30' }
-]
+  { label: '30', value: '30' },
+];
 
-const DiskUsage: React.FC<{}> = () => {
+const DiskUsage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [limit, setLimit] = useState<Option>(LIMIT_OPTIONS[1]);
   const [duResponse, setDUResponse] = useState<DUResponse>({
@@ -55,7 +52,7 @@ const DiskUsage: React.FC<{}> = () => {
     size: 0,
     sizeWithReplica: 0,
     subPaths: [],
-    sizeDirectKey: 0
+    sizeDirectKey: 0,
   });
 
   const cancelPieSignal = useRef<AbortController>();
@@ -68,21 +65,23 @@ const DiskUsage: React.FC<{}> = () => {
     );
     cancelPieSignal.current = controller;
 
-    request.then(response => {
-      const duResponse: DUResponse = response.data;
-      const status = duResponse.status;
-      if (status === 'PATH_NOT_FOUND') {
-        setLoading(false);
-        showDataFetchError(`Invalid Path: ${path}`);
-        return;
-      }
+    request
+      .then((response) => {
+        const duResponse: DUResponse = response.data;
+        const status = duResponse.status;
+        if (status === 'PATH_NOT_FOUND') {
+          setLoading(false);
+          showDataFetchError(`Invalid Path: ${path}`);
+          return;
+        }
 
-      setDUResponse(duResponse);
-      setLoading(false);
-    }).catch(error => {
-      setLoading(false);
-      showDataFetchError((error as AxiosError).toString());
-    });
+        setDUResponse(duResponse);
+        setLoading(false);
+      })
+      .catch((error) => {
+        setLoading(false);
+        showDataFetchError((error as AxiosError).toString());
+      });
   }
 
   function handleLimitChange(selected: ValueType<Option, false>) {
@@ -91,43 +90,44 @@ const DiskUsage: React.FC<{}> = () => {
 
   React.useEffect(() => {
     //On mount load default data
-    loadData(duResponse.path)
+    loadData(duResponse.path);
 
-    return (() => {
+    return () => {
       cancelRequests([cancelPieSignal.current!]);
-    })
+    };
   }, []);
 
   return (
     <>
-      <div className='page-header-v2'>
-        Disk Usage
-      </div>
+      <div className='page-header-v2'>Disk Usage</div>
       <div className='data-container'>
         <Alert
           className='du-alert-message'
-          message="Additional block size is added to small entities, for better visibility.
-            Please refer to pie-chart details for exact size information."
-          type="info"
+          message='Additional block size is added to small entities, for better visibility.
+            Please refer to pie-chart details for exact size information.'
+          type='info'
           icon={<InfoCircleFilled />}
           showIcon={true}
-          closable={false} />
+          closable={false}
+        />
         <div className='content-div'>
           <div
             style={{
               display: 'flex',
               justifyContent: 'space-between',
-            }}>
+            }}
+          >
             <DUBreadcrumbNav
               path={duResponse.path}
               subPaths={duResponse.subPaths}
-              updateHandler={loadData} />
-            <Tooltip
-              title="Click to reload Disk Usage data">
+              updateHandler={loadData}
+            />
+            <Tooltip title='Click to reload Disk Usage data'>
               <Button
                 type='primary'
                 icon={<ReloadOutlined />}
-                onClick={() => loadData(duResponse.path)} />
+                onClick={() => loadData(duResponse.path)}
+              />
             </Tooltip>
           </div>
           <div className='du-table-header-section'>
@@ -135,7 +135,8 @@ const DiskUsage: React.FC<{}> = () => {
               options={LIMIT_OPTIONS}
               defaultValue={limit}
               placeholder='Limit'
-              onChange={handleLimitChange} />
+              onChange={handleLimitChange}
+            />
           </div>
           <div className='du-content'>
             <DUPieChart
@@ -145,13 +146,15 @@ const DiskUsage: React.FC<{}> = () => {
               subPathCount={duResponse.subPathCount}
               subPaths={duResponse.subPaths}
               sizeWithReplica={duResponse.sizeWithReplica}
-              size={duResponse.size} />
+              size={duResponse.size}
+              onDrillDown={loadData}
+            />
             <DUMetadata path={duResponse.path} />
           </div>
         </div>
       </div>
     </>
   );
-}
+};
 
 export default DiskUsage;

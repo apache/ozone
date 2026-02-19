@@ -16,9 +16,9 @@
  * limitations under the License.
  */
 
-import React, { useRef, useEffect } from "react";
+import { useRef, useEffect } from 'react';
 import { init, getInstanceByDom } from 'echarts';
-import type { CSSProperties } from "react";
+import type { CSSProperties } from 'react';
 import type { EChartsOption, ECharts, SetOptionOpts } from 'echarts';
 
 export interface EChartProps {
@@ -27,10 +27,10 @@ export interface EChartProps {
   settings?: SetOptionOpts;
   loading?: boolean;
   theme?: 'light';
-  onClick?: () => any | void;
+  onClick?: (_params: unknown) => void;
   eventHandler?: {
-    name: string,
-    handler: (arg0: any) => void
+    name: string;
+    handler: (_arg0: unknown) => void;
   };
 }
 
@@ -41,7 +41,7 @@ const EChart = ({
   loading,
   theme,
   onClick,
-  eventHandler
+  eventHandler,
 }: EChartProps): JSX.Element => {
   const chartRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -63,12 +63,12 @@ const EChart = ({
     function resizeChart() {
       chart?.resize();
     }
-    window.addEventListener("resize", resizeChart);
+    window.addEventListener('resize', resizeChart);
 
     // Return cleanup function
     return () => {
       chart?.dispose();
-      window.removeEventListener("resize", resizeChart);
+      window.removeEventListener('resize', resizeChart);
     };
   }, [theme]);
 
@@ -96,7 +96,7 @@ const EChart = ({
     }
   }, [loading, theme]); // If we switch theme we should put chart in loading mode, and also if loading changes i.e completes then hide loader
 
-  return <div ref={chartRef} style={{ width: "50vw", height: "25vh", margin: 'auto', ...style }} />;
-}
+  return <div ref={chartRef} style={{ width: '50vw', height: '25vh', margin: 'auto', ...style }} />;
+};
 
 export default EChart;

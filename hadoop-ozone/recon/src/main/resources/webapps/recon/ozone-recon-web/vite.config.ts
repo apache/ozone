@@ -24,66 +24,65 @@ import { resolve } from 'path';
 import react from '@vitejs/plugin-react-swc';
 
 function pathResolve(dir: string) {
-  return resolve(__dirname, '.', dir)
+  return resolve(__dirname, '.', dir);
 }
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
     react({
-      devTarget: "es2015" //SWC by default bypasses the build target, set dev target explicitly
+      devTarget: 'es2015', //SWC by default bypasses the build target, set dev target explicitly
     }),
-    splitVendorChunkPlugin()
+    splitVendorChunkPlugin(),
   ],
   build: {
-    target: "es2015",
+    target: 'es2015',
     outDir: 'build',
     rollupOptions: {
       output: {
         chunkFileNames: 'static/js/[name]-[hash].js',
         entryFileNames: 'static/js/[name]-[hash].js',
         assetFileNames: (assetInfo) => {
-          const extName = assetInfo.name!.split(".")[1];
-          if (/css/.test(extName)){
-            return `static/css/[name]-[hash].${extName}`
+          const extName = assetInfo.name!.split('.')[1];
+          if (/css/.test(extName)) {
+            return `static/css/[name]-[hash].${extName}`;
+          } else {
+            return `static/media/[name]-[hash].${extName}`;
           }
-          else {
-            return `static/media/[name]-[hash].${extName}`
-          }
-        }
-      }
-    }
+        },
+      },
+    },
   },
   server: {
     proxy: {
-      "/api": {
-        target: "http://localhost:9888"
-      }
-    }
+      '/api': {
+        target: 'http://anisimov-adh-2.ru-central1.internal:9888',
+      },
+    },
   },
   resolve: {
     alias: {
-      "@": pathResolve('src'),
-      "@tests": pathResolve('src/__tests__')
-    }
+      '@': pathResolve('src'),
+      '@tests': pathResolve('src/__tests__'),
+    },
   },
   css: {
     preprocessorOptions: {
       less: {
         javascriptEnabled: true,
-        math: "always",
+        math: 'always',
         relativeUrls: true,
         modifyVars: {
-          '@primary-color': '#1DA57A'
-        }
-      }
-    }
+          '@primary-color': '#1DA57A',
+        },
+      },
+    },
   },
   test: {
     globals: true,
     environment: 'jsdom',
     setupFiles: 'src/__tests__/vitest.setup.ts',
-    include: ["src/__tests__/**/*.test.tsx"],
-    reporters: ['verbose']
-  }
+    include: ['src/__tests__/**/*.test.tsx'],
+    reporters: ['verbose'],
+  },
 });

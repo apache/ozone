@@ -31,12 +31,12 @@ type PieChartProps = {
   subPathCount: number;
   sizeWithReplica: number;
   loading: boolean;
-}
+  onDrillDown?: (_path: string) => void;
+};
 
 //-------Constants---------//
 const OTHER_PATH_NAME = 'Other Objects';
 const MIN_BLOCK_SIZE = 0.05;
-
 
 //----------Component---------//
 const DUPieChart: React.FC<PieChartProps> = ({
@@ -46,23 +46,23 @@ const DUPieChart: React.FC<PieChartProps> = ({
   subPaths,
   subPathCount,
   sizeWithReplica,
-  loading
+  loading,
+  onDrillDown,
 }) => {
-
-  const [subpathSize, setSubpathSize]  = React.useState<number>(0);
+  const [subpathSize, setSubpathSize] = React.useState<number>(0);
 
   function getSubpathSize(subpaths: DUSubpath[]): number {
     const subpathSize = subpaths
       .map((subpath) => subpath.size)
       .reduce((acc, curr) => acc + curr, 0);
     // If there is no subpaths, then the size will be total size of path
-    return (subPaths.length === 0) ? size : subpathSize;
+    return subPaths.length === 0 ? size : subpathSize;
   }
 
   function updatePieData() {
     /**
      * We need to calculate the size of "Other objects" in two cases:
-     * 
+     *
      *  1) If we have more subpaths listed, than the limit.
      *  2) If the limit is set to the maximum limit (30) and we have any number of subpaths.
      *     In this case we won't necessarily have "Other objects", but we check if the
@@ -87,11 +87,9 @@ const DUPieChart: React.FC<PieChartProps> = ({
       subpaths.push({
         path: OTHER_PATH_NAME,
         size: remainingSize,
-        sizeWithReplica: (sizeWithReplica === -1)
-          ? -1
-          : sizeWithReplica - remainingSize,
-        isKey: false
-      })
+        sizeWithReplica: sizeWithReplica === -1 ? -1 : sizeWithReplica - remainingSize,
+        isKey: false,
+      });
     }
 
     if (subPathCount === 0 || subpaths.length === 0) {
@@ -101,28 +99,22 @@ const DUPieChart: React.FC<PieChartProps> = ({
       percentage = ['100.00'];
       sizeStr = [byteToSize(size, 1)];
     } else {
-      pathLabels = subpaths.map(subpath => {
+      pathLabels = subpaths.map((subpath) => {
         const subpathName = subpath.path.split('/').pop() ?? '';
         // Diferentiate keys by removing trailing slash
-        return (subpath.isKey || subpathName === OTHER_PATH_NAME)
-          ? subpathName
-          : subpathName + '/';
+        return subpath.isKey || subpathName === OTHER_PATH_NAME ? subpathName : subpathName + '/';
       });
 
       let values: number[] = [0];
       if (size > 0) {
-        values = subpaths.map(
-          subpath => (subpath.size / size)
-        );
+        values = subpaths.map((subpath) => subpath.size / size);
       }
       const valueClone = structuredClone(values);
-      valuesWithMinBlockSize = valueClone?.map(
-        (val: number) => (val > 0)
-          ? val + MIN_BLOCK_SIZE
-          : val
+      valuesWithMinBlockSize = valueClone?.map((val: number) =>
+        val > 0 ? val + MIN_BLOCK_SIZE : val
       );
 
-      percentage = values.map(value => (value * 100).toFixed(2));
+      percentage = values.map((value) => (value * 100).toFixed(2));
       sizeStr = subpaths.map((subpath) => byteToSize(subpath.size, 1));
     }
 
@@ -131,8 +123,8 @@ const DUPieChart: React.FC<PieChartProps> = ({
         value: key,
         name: pathLabels[idx],
         size: sizeStr[idx],
-        percentage: percentage[idx]
-      }
+        percentage: percentage[idx],
+      };
     });
   }
 
@@ -146,26 +138,24 @@ const DUPieChart: React.FC<PieChartProps> = ({
     title: {
       text: `${byteToSize(subpathSize, 1)} /  ${byteToSize(size, 1)}`,
       left: 'center',
-      top: '95%'
+      top: '95%',
     },
     tooltip: {
       trigger: 'item',
       formatter: ({ dataIndex, name, color }) => {
         const nameEl = `<strong style='color: ${color}'>${name}</strong><br>`;
-        const dataEl = `Total Data Size: ${pieData[dataIndex]['size']}<br>`
-        const percentageEl = `Percentage: ${pieData[dataIndex]['percentage']} %`
-        return `${nameEl}${dataEl}${percentageEl}`
-      }
+        const dataEl = `Total Data Size: ${pieData[dataIndex]['size']}<br>`;
+        const percentageEl = `Percentage: ${pieData[dataIndex]['percentage']} %`;
+        return `${nameEl}${dataEl}${percentageEl}`;
+      },
     },
     legend: {
       top: '10%',
       orient: 'vertical',
       left: '0%',
-      width: '80%'
+      width: '80%',
     },
-    grid: {
-
-    },
+    grid: {},
     series: [
       {
         type: 'pie',
@@ -173,39 +163,54 @@ const DUPieChart: React.FC<PieChartProps> = ({
         data: pieData.map((value) => {
           return {
             value: value.value,
-            name: value.name
-          }
+            name: value.name,
+          };
         }),
         emphasis: {
           itemStyle: {
             shadowBlur: 10,
             shadowOffsetX: 0,
-            shadowColor: 'rgba(0, 0, 0, 0.5)'
-          }
-        }
-      }
-    ]
+            shadowColor: 'rgba(0, 0, 0, 0.5)',
+          },
+        },
+      },
+    ],
   };
 
-  const handleLegendChange = ({selected}: {selected: Record<string, boolean>}) => {
+  const handlePieClick = React.useCallback(
+    (e: { name: string }) => {
+      if (!onDrillDown || subPathCount === 0) return;
+
+      const subPath = e.name;
+      if (subPath === OTHER_PATH_NAME) return;
+
+      const fullPath = path === '/' ? `/${subPath}` : `${path}/${subPath}`;
+      onDrillDown(fullPath);
+    },
+    [path, subPathCount, onDrillDown]
+  );
+
+  const handleLegendChange = ({ selected }: { selected: Record<string, boolean> }) => {
     const filteredPath = subPaths.filter((value) => {
       // In case of any leading '/' remove them and add a / at end
       // to make it similar to legend
       const splitPath = value.path?.split('/');
-      const pathName = splitPath[splitPath.length - 1] ?? '' + ((value.isKey) ? '' : '/');
+      const pathName = splitPath[splitPath.length - 1] ?? '' + (value.isKey ? '' : '/');
       return selected[pathName];
-    })
+    });
     const newSize = getSubpathSize(filteredPath);
     setSubpathSize(newSize);
-  }
+  };
 
   return (
     <EChart
       loading={loading}
       option={eChartsOptions}
       style={{ flex: '1 3 80%', height: '50vh' }}
-      eventHandler={{name: 'legendselectchanged', handler: handleLegendChange}}/>
+      onClick={onDrillDown ? handlePieClick : undefined}
+      eventHandler={{ name: 'legendselectchanged', handler: handleLegendChange }}
+    />
   );
-}
+};
 
 export default DUPieChart;

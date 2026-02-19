@@ -38,16 +38,16 @@
   "/keys/open/summary": "/keysOpenSummary",
   "/keys/deletePending/summary": "/keysdeletePendingSummary",
 
-  "/containers/mismatch?&missingIn=OM" : "/omMismatch",
-  "/containers/mismatch?limit=*&missingIn=OM" : "/omMismatch",
+  "/containers/mismatch?&missingIn=OM": "/omMismatch",
+  "/containers/mismatch?limit=*&missingIn=OM": "/omMismatch",
 
-  "/containers/mismatch?&missingIn=SCM" : "/scmMismatch",
-  "/containers/mismatch?limit=*&missingIn=SCM" : "/scmMismatch",
+  "/containers/mismatch?&missingIn=SCM": "/scmMismatch",
+  "/containers/mismatch?limit=*&missingIn=SCM": "/scmMismatch",
 
   "/keys/open?includeFso=false&includeNonFso=true&limit=*": "/nonFSO",
   "/keys/open?includeFso=true&includeNonFso=false&limit=*": "/fso",
 
-  "/keys/deletePending?limit=*" : "/keydeletePending",
+  "/keys/deletePending?limit=*": "/keydeletePending",
 
   "/containers/mismatch/deleted?limit=*": "/deleted",
   "/keys/deletePending/dirs?limit=*": "/dirdeletePending",
