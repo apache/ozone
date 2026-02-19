@@ -25,6 +25,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -87,9 +88,9 @@ public abstract class TestOzoneManagerRestInterface implements NonHATests.TestCa
     assertEquals(server.getHttpAddress().getPort(),
         omInfo.getPort(ServicePort.Type.HTTP));
 
-    assertTrue(getScmAddressForClients(conf).iterator().hasNext());
-    InetSocketAddress scmAddress =
-        getScmAddressForClients(conf).iterator().next();
+    Iterator<InetSocketAddress> scmAddressIterator = getScmAddressForClients(conf).iterator();
+    assertTrue(scmAddressIterator.hasNext());
+    InetSocketAddress scmAddress = scmAddressIterator.next();
     ServiceInfo scmInfo = serviceMap.get(HddsProtos.NodeType.SCM);
 
     assertEquals(scmAddress.getHostName(), scmInfo.getHostname());
