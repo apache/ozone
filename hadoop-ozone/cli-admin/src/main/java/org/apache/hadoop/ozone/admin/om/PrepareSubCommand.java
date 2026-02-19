@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.admin.om;
 
-import static org.apache.hadoop.ozone.OmUtils.getOmHostsFromConfig;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus.PREPARE_COMPLETED;
 
 import java.io.IOException;
@@ -25,10 +24,12 @@ import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.ozone.OmUtils;
+import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
@@ -104,9 +105,11 @@ public class PrepareSubCommand implements Callable<Void> {
         "with Transaction Id : [" + prepareTxnId + "].");
 
     Map<String, Boolean> omPreparedStatusMap = new HashMap<>();
-    Set<String> omHosts = getOmHostsFromConfig(
-        parent.getParent().getOzoneConf(), omServiceOption.getServiceID());
-    omHosts.forEach(h -> omPreparedStatusMap.put(h, false));
+    OzoneConfiguration conf = parent.getParent().getOzoneConf();
+    OmUtils.getAllOMHAAddresses(conf, omServiceOption.getServiceID(), false)
+        .stream()
+        .map(OMNodeDetails::getRpcAddressString)
+        .forEach(addr -> omPreparedStatusMap.put(addr, false));
     Duration pTimeout = Duration.of(prepareTimeOut, ChronoUnit.SECONDS);
     Duration pInterval = Duration.of(prepareCheckInterval, ChronoUnit.SECONDS);
 
@@ -121,10 +124,9 @@ public class PrepareSubCommand implements Callable<Void> {
       for (Map.Entry<String, Boolean> e : omPreparedStatusMap.entrySet()) {
         if (!e.getValue()) {
           String omHost = e.getKey();
-          try (OzoneManagerProtocol singleOmClient =
-                    parent.createOmClient(omServiceOption.getServiceID(), omHost, false)) {
-            PrepareStatusResponse response =
-                singleOmClient.getOzoneManagerPrepareStatus(prepareTxnId);
+          try (OzoneManagerProtocol singleOmClient = parent.createOmClient(omServiceOption.getServiceID(), omHost,
+              false)) {
+            PrepareStatusResponse response = singleOmClient.getOzoneManagerPrepareStatus(prepareTxnId);
             PrepareStatus status = response.getStatus();
             System.out.println("OM : [" + omHost + "], Prepare " +
                 "Status : [" + status.name() + "], Current Transaction Id : [" +
