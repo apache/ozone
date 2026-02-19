@@ -47,7 +47,7 @@ type CapacityState = {
 
 const Capacity: React.FC<object> = () => {
   const PENDING_POLL_INTERVAL = 5 * 1000;
-  const DN_CSV_DOWNLOAD_URL = '/api/v1/pendingDeletion/download';
+  const DN_CSV_DOWNLOAD_URL = '/api/v1/storageDistribution/download';
   const DN_STATUS_URL = '/api/v1/pendingDeletion?component=dn';
   const DOWNLOAD_POLL_TIMEOUT_MS = 10 * 60 * 1000;
 
@@ -103,13 +103,24 @@ const Capacity: React.FC<object> = () => {
     }
   }, [selectedDatanode, storageDistribution.data.dataNodeUsage]);
 
-  const loadDNData = () => {
+  const loadData = () => {
+    storageDistribution.refetch();
+    scmPendingDeletes.refetch();
+    omPendingDeletes.refetch();
     dnPendingDeletes.refetch();
     setState({
       isDNPending: dnPendingDeletes.data.status !== "FINISHED",
       lastUpdated: Number(moment())
     })
   }
+
+  const loadDNData = () => {
+    dnPendingDeletes.refetch();
+    setState({
+      isDNPending: dnPendingDeletes.data.status !== "FINISHED",
+      lastUpdated: Number(moment())
+    })
+  } 
 
   const autoReload = useAutoReload(loadDNData, PENDING_POLL_INTERVAL);
 
@@ -256,7 +267,7 @@ const Capacity: React.FC<object> = () => {
           isLoading={dnPendingDeletes.loading}
           lastRefreshed={state.lastUpdated}
           togglePolling={autoReload.handleAutoReloadToggle}
-          onReload={loadDNData} />
+          onReload={loadData} />
       </div>
       <div className='data-container'>
         <Typography.Title level={4} className='section-title'>Cluster</Typography.Title>
@@ -331,7 +342,7 @@ const Capacity: React.FC<object> = () => {
             ),
             value: (
               omPendingDeletes.data.totalSize
-              + scmPendingDeletes.data.totalBlocksize
+              + scmPendingDeletes.data.totalReplicatedBlockSize
               + (dnPendingDeletes.data.totalPendingDeletionSize ?? 0)
             ),
             color: "#10073b"
@@ -356,10 +367,10 @@ const Capacity: React.FC<object> = () => {
               }]
             }, {
               title: 'STORAGE CONTAINER MANAGER',
-              size: scmPendingDeletes.data.totalBlocksize,
+              size: scmPendingDeletes.data.totalReplicatedBlockSize,
               breakdown: [{
                 label: 'BLOCKS',
-                value: scmPendingDeletes.data.totalBlocksize,
+                value: scmPendingDeletes.data.totalReplicatedBlockSize,
                 color: '#f4a233'
               }]
             }, {
