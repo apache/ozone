@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.container.upgrade;
 
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.FINALIZATION_IN_PROGRESS;
-
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
@@ -34,11 +32,6 @@ public class DataNodeUpgradeFinalizer extends
 
   public DataNodeUpgradeFinalizer(HDDSLayoutVersionManager versionManager) {
     super(versionManager);
-  }
-
-  @Override
-  public void preFinalizeUpgrade(DatanodeStateMachine dsm) {
-    getVersionManager().setUpgradeState(FINALIZATION_IN_PROGRESS);
   }
 
   @Override
