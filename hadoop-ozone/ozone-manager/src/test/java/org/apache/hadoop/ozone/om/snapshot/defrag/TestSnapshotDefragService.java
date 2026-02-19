@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.BOOTSTRAP_LOCK;
 import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_DB_CONTENT_LOCK;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -81,6 +82,7 @@ import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.InMemoryTestTable;
+import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.RDBSstFileWriter;
 import org.apache.hadoop.hdds.utils.db.RocksDBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
@@ -850,6 +852,117 @@ public class TestSnapshotDefragService {
       assertFalse(spyDefragService.checkAndDefragSnapshot(chainManager, snapshotInfo.getSnapshotId()));
       verify(snapshotMetrics).incNumSnapshotDefragSnapshotSkipped();
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testCheckAndDefragSnapshotFailure(boolean previousSnapshotExists) throws IOException {
+    // Test metrics numSnapshotFullDefragFails and numSnapshotIncDefragFails
+
+    SnapshotInfo snapshotInfo = createMockSnapshotInfo(UUID.randomUUID(), "vol1", "bucket1", "snap2");
+    SnapshotInfo previousSnapshotInfo;
+    if (previousSnapshotExists) {
+      previousSnapshotInfo = createMockSnapshotInfo(UUID.randomUUID(), "vol1", "bucket1", "snap1");
+      snapshotInfo.setPathPreviousSnapshotId(previousSnapshotInfo.getSnapshotId());
+    } else {
+      previousSnapshotInfo = null;
+    }
+
+    SnapshotChainManager chainManager = mock(SnapshotChainManager.class);
+    try (MockedStatic<SnapshotUtils> mockedStatic = Mockito.mockStatic(SnapshotUtils.class)) {
+      mockedStatic.when(() -> SnapshotUtils.getSnapshotInfo(eq(ozoneManager), eq(chainManager),
+          eq(snapshotInfo.getSnapshotId()))).thenReturn(snapshotInfo);
+      if (previousSnapshotExists) {
+        mockedStatic.when(() -> SnapshotUtils.getSnapshotInfo(eq(ozoneManager), eq(chainManager),
+            eq(previousSnapshotInfo.getSnapshotId()))).thenReturn(previousSnapshotInfo);
+      }
+      SnapshotDefragService spyDefragService = Mockito.spy(defragService);
+      doReturn(Pair.of(true, 10)).when(spyDefragService).needsDefragmentation(eq(snapshotInfo));
+      OmMetadataManagerImpl checkpointMetadataManager = mock(OmMetadataManagerImpl.class);
+      File checkpointPath = tempDir.resolve("checkpoint").toAbsolutePath().toFile();
+      DBStore checkpointDBStore = mock(DBStore.class);
+      SnapshotInfo checkpointSnapshotInfo = previousSnapshotExists ? previousSnapshotInfo : snapshotInfo;
+      when(checkpointMetadataManager.getStore()).thenReturn(checkpointDBStore);
+      when(checkpointDBStore.getDbLocation()).thenReturn(checkpointPath);
+      doReturn(checkpointMetadataManager).when(spyDefragService).createCheckpoint(eq(checkpointSnapshotInfo),
+          eq(COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT));
+      TablePrefixInfo prefixInfo = new TablePrefixInfo(Collections.emptyMap());
+      when(metadataManager.getTableBucketPrefix(eq(snapshotInfo.getVolumeName()), eq(snapshotInfo.getBucketName())))
+          .thenReturn(prefixInfo);
+
+      // Make the defrag operation throw IOException
+      IOException defragException = new IOException("Defrag failed");
+      if (previousSnapshotExists) {
+        Mockito.doThrow(defragException).when(spyDefragService).performIncrementalDefragmentation(
+            eq(previousSnapshotInfo), eq(snapshotInfo), eq(10), eq(checkpointDBStore), eq(prefixInfo),
+            eq(COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT));
+      } else {
+        Mockito.doThrow(defragException).when(spyDefragService).performFullDefragmentation(
+            eq(checkpointDBStore), eq(prefixInfo), eq(COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT));
+      }
+
+      IOException thrown = org.junit.jupiter.api.Assertions.assertThrows(IOException.class,
+          () -> spyDefragService.checkAndDefragSnapshot(chainManager, snapshotInfo.getSnapshotId()));
+      assertEquals(defragException, thrown);
+
+      // Verify specific failure metric was incremented
+      if (previousSnapshotExists) {
+        verify(snapshotMetrics).incNumSnapshotIncDefragFails();
+      } else {
+        verify(snapshotMetrics).incNumSnapshotFullDefragFails();
+      }
+      // Verify success metrics were NOT incremented
+      verify(snapshotMetrics, Mockito.never()).incNumSnapshotDefrag();
+      verify(snapshotMetrics, Mockito.never()).incNumSnapshotFullDefrag();
+      verify(snapshotMetrics, Mockito.never()).incNumSnapshotIncDefrag();
+      // Verify checkpoint was closed in finally block
+      verify(checkpointMetadataManager).close();
+    }
+  }
+
+  @Test
+  public void testTriggerSnapshotDefragOnceFailure() throws IOException, InterruptedException {
+    // Test metric numSnapshotDefragFails
+
+    UUID snapshotId = UUID.randomUUID();
+    SnapshotDefragService spyDefragService = Mockito.spy(defragService);
+    SnapshotChainManager chainManager = mock(SnapshotChainManager.class);
+    when(metadataManager.getSnapshotChainManager()).thenReturn(chainManager);
+    when(chainManager.iterator(false)).thenReturn(
+        Collections.singletonList(snapshotId).iterator());
+
+    // Enable the service to run
+    spyDefragService.resume();
+
+    // Mock bootstrap lock to return a no-op closeable
+    when(omLock.acquireLock(eq(BOOTSTRAP_LOCK), anyString(), eq(true)))
+        .thenReturn(new UncheckedAutoCloseableSupplier<OMLockDetails>() {
+          @Override
+          public OMLockDetails get() {
+            return OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED;
+          }
+
+          @Override
+          public void close() {
+          }
+        });
+
+    // Stub checkAndDefragSnapshot to throw IOException
+    Mockito.doThrow(new IOException("Defrag failed")).when(spyDefragService)
+        .checkAndDefragSnapshot(eq(chainManager), eq(snapshotId));
+
+    try (MockedStatic<ManagedRawSSTFileReader> mockedNativeLib =
+             Mockito.mockStatic(ManagedRawSSTFileReader.class)) {
+      mockedNativeLib.when(ManagedRawSSTFileReader::tryLoadLibrary).thenReturn(true);
+
+      // triggerSnapshotDefragOnce catches the IOException internally
+      assertTrue(spyDefragService.triggerSnapshotDefragOnce());
+    }
+
+    // Verify the general failure metric was incremented in the outer catch
+    verify(snapshotMetrics).incNumSnapshotDefragFails();
+    // Verify the snapshot was not counted as defragged
+    assertEquals(0, spyDefragService.getSnapshotsDefraggedCount().get());
   }
 
   @ParameterizedTest
