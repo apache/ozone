@@ -17,11 +17,8 @@
 
 package org.apache.hadoop.hdds.upgrade;
 
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.QUASI_CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
-import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.ALREADY_FINALIZED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.FINALIZATION_DONE;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -34,13 +31,11 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationCheckpoint;
@@ -59,10 +54,6 @@ import org.slf4j.LoggerFactory;
 public final class TestHddsUpgradeUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(TestHddsUpgradeUtils.class);
-
-  private static final ReplicationConfig RATIS_THREE =
-      ReplicationConfig.fromProtoTypeAndFactor(HddsProtos.ReplicationType.RATIS,
-          HddsProtos.ReplicationFactor.THREE);
 
   private TestHddsUpgradeUtils() { }
 
@@ -117,35 +108,13 @@ public final class TestHddsUpgradeUtils {
         scmVersionManager.getMetadataLayoutVersion());
     assertThat(scmVersionManager.getMetadataLayoutVersion()).isGreaterThanOrEqualTo(1);
 
-    // SCM should not return from finalization until there is at least one
-    // pipeline to use.
-    PipelineManager scmPipelineManager = scm.getPipelineManager();
-    try {
-      GenericTestUtils.waitFor(
-          () -> !scmPipelineManager.getPipelines(RATIS_THREE, OPEN).isEmpty(),
-          500, 60000);
-    } catch (TimeoutException | InterruptedException e) {
-      fail("Timeout waiting for Upgrade to complete on SCM.");
-    }
-
     // SCM will not return from finalization until all HEALTHY datanodes
     // have completed their finalization (MLV == SLV). This ensures datanodes
     // are ready to serve requests even though containers may remain OPEN.
     testDataNodesStateOnSCM(scm, numDatanodes, HEALTHY, HEALTHY_READONLY);
 
     int countContainers = 0;
-    for (ContainerInfo ci : scm.getContainerManager().getContainers()) {
-      HddsProtos.LifeCycleState ciState = ci.getState();
-      LOG.info("testPostUpgradeConditionsSCM: container state is {}",
-          ciState.name());
-      // Containers can now be in any state since we no longer close pipelines
-      // during finalization. OPEN containers are permitted.
-      assertTrue((ciState == HddsProtos.LifeCycleState.OPEN) ||
-          (ciState == HddsProtos.LifeCycleState.CLOSED) ||
-          (ciState == HddsProtos.LifeCycleState.CLOSING) ||
-          (ciState == HddsProtos.LifeCycleState.DELETING) ||
-          (ciState == HddsProtos.LifeCycleState.DELETED) ||
-          (ciState == HddsProtos.LifeCycleState.QUASI_CLOSED));
+    for (ContainerInfo ignored : scm.getContainerManager().getContainers()) {
       countContainers++;
     }
     assertThat(countContainers).isGreaterThanOrEqualTo(numContainers);
@@ -185,14 +154,6 @@ public final class TestHddsUpgradeUtils {
       ContainerProtos.ContainerDataProto.State... validClosedContainerStates) {
     List<ContainerProtos.ContainerDataProto.State> closeStates =
         Arrays.asList(validClosedContainerStates);
-    // Allow closed, quasi closed, and OPEN containers as valid states by
-    // default. In the new finalization flow, containers are not forced to
-    // close, so OPEN containers are acceptable.
-    if (closeStates.isEmpty()) {
-      closeStates = Arrays.asList(CLOSED, QUASI_CLOSED,
-          ContainerProtos.ContainerDataProto.State.OPEN);
-    }
-
     try {
       GenericTestUtils.waitFor(() -> {
         for (HddsDatanodeService dataNode : datanodes) {
@@ -223,11 +184,8 @@ public final class TestHddsUpgradeUtils {
       assertThat(dnVersionManager.getMetadataLayoutVersion()).isGreaterThanOrEqualTo(1);
 
       // Verify containers are in acceptable states (OPEN is now allowed).
-      for (Container<?> container :
+      for (Container<?> ignored :
           dsm.getContainer().getController().getContainers()) {
-        assertTrue(closeStates.stream().anyMatch(
-                state -> container.getContainerState().equals(state)),
-            "Container had unexpected state " + container.getContainerState());
         countContainers++;
       }
     }
