@@ -68,7 +68,7 @@ public class TestAckMissingContainerSubcommand {
     AckMissingSubcommand cmd = new AckMissingSubcommand();
     new CommandLine(cmd).parseArgs("1");
     cmd.execute(scmClient);
-    verify(scmClient, times(1)).acknowledgeMissingContainer(1L);
+    verify(scmClient, times(1)).setAckMissingContainer(1L, true);
 
     String output = outContent.toString(DEFAULT_ENCODING);
     assertThat(output).contains("Acknowledged container: 1");
@@ -100,20 +100,21 @@ public class TestAckMissingContainerSubcommand {
     UnackMissingSubcommand cmd = new UnackMissingSubcommand();
     new CommandLine(cmd).parseArgs("1");
     cmd.execute(scmClient);
-    verify(scmClient, times(1)).unacknowledgeMissingContainer(1L);
+    verify(scmClient, times(1)).setAckMissingContainer(1L, false);
 
     String output = outContent.toString(DEFAULT_ENCODING);
     assertThat(output).contains("Unacknowledged container: 1");
   }
 
   private ContainerInfo mockContainer(long containerID, boolean ackMissing) {
+    ContainerHealthState healthState = ackMissing ? 
+        ContainerHealthState.ACK_MISSING : ContainerHealthState.MISSING;
     return new ContainerInfo.Builder()
         .setContainerID(containerID)
         .setState(OPEN)
-        .setHealthState(ContainerHealthState.MISSING)
+        .setHealthState(healthState)
         .setReplicationConfig(RatisReplicationConfig.getInstance(ONE))
         .setNumberOfKeys(1)
-        .setAckMissing(ackMissing)
         .build();
   }
 }

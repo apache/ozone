@@ -271,7 +271,6 @@ message ContainerInfoProto {
     optional ReplicationFactor replicationFactor  = 10;
     required ReplicationType replicationType  = 11;
     optional ECReplicationConfig ecReplicationConfig = 12;
-    optional bool ackMissing = 13;
 }
 
 message ContainerWithPipeline {

@@ -68,9 +68,8 @@ public class ClosingContainerHandler extends AbstractCheck {
     boolean forceClose = containerInfo.getReplicationConfig()
         .getReplicationType() != ReplicationType.RATIS;
 
-    // Don't report MISSING if container is acknowledged or empty (will be handled by other handlers)
-    if (request.getContainerReplicas().isEmpty() && !containerInfo.isAckMissing() &&
-        containerInfo.getNumberOfKeys() > 0) {
+    // Report MISSING only for containers with no replicas and keys > 0
+    if (request.getContainerReplicas().isEmpty() && containerInfo.getNumberOfKeys() > 0) {
       request.getReport().incrementAndSample(ContainerHealthState.MISSING, containerInfo);
     }
 

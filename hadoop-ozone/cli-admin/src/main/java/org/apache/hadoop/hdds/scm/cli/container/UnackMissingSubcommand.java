@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import picocli.CommandLine;
 
@@ -51,12 +52,12 @@ public class UnackMissingSubcommand extends ScmSubcommand {
     for (Long id : ids) {
       try {
         ContainerInfo containerInfo = scmClient.getContainer(id);
-        if (!containerInfo.isAckMissing()) {
+        if (containerInfo.getHealthState() != ContainerHealthState.ACK_MISSING) {
           err().println("Cannot unacknowledge container " + id + ": " +
               "Only acknowledged missing containers can be unacknowledged.");
           continue;
         }
-        scmClient.unacknowledgeMissingContainer(id);
+        scmClient.setAckMissingContainer(id, false);
         out().println("Unacknowledged container: " + id);
       } catch (IOException e) {
         err().println("Failed to unacknowledge container " + id + ": " + e.getMessage());

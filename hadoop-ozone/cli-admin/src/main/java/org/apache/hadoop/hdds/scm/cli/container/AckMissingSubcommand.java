@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerListResult;
 import picocli.CommandLine;
@@ -52,7 +53,7 @@ public class AckMissingSubcommand extends ScmSubcommand {
       // List acknowledged containers
       ContainerListResult result = scmClient.listContainer(1, Integer.MAX_VALUE);
       for (ContainerInfo info : result.getContainerInfoList()) {
-        if (info.isAckMissing()) {
+        if (info.getHealthState() == ContainerHealthState.ACK_MISSING) {
           out().println(info.getContainerID());
         }
       }
@@ -75,7 +76,7 @@ public class AckMissingSubcommand extends ScmSubcommand {
             continue;
           }
           
-          scmClient.acknowledgeMissingContainer(id);
+          scmClient.setAckMissingContainer(id, true);
           out().println("Acknowledged container: " + id);
         } catch (IOException e) {
           err().println("Failed to acknowledge container " + id + ": " + e.getMessage());

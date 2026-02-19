@@ -50,7 +50,6 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.AcknowledgeMissingContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ActivatePipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ClosePipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoRequestProto;
@@ -116,6 +115,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationRequest;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationRequest.Builder;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationResponse;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SetAckMissingContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SingleNodeQueryRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SingleNodeQueryResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerRequestProto;
@@ -126,7 +126,6 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopContainerBalancerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StopReplicationManagerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.UnacknowledgeMissingContainerRequestProto;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.ScmInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -1244,20 +1243,12 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public void acknowledgeMissingContainer(long containerID) throws IOException {
-    AcknowledgeMissingContainerRequestProto request = AcknowledgeMissingContainerRequestProto.newBuilder()
+  public void setAckMissingContainer(long containerID, boolean acknowledge) 
+      throws IOException {
+    SetAckMissingContainerRequestProto request = SetAckMissingContainerRequestProto.newBuilder()
         .setContainerID(containerID)
+        .setAcknowledge(acknowledge)
         .build();
-    submitRequest(Type.AcknowledgeMissingContainer,
-        builder -> builder.setAcknowledgeMissingContainerRequest(request));
-  }
-
-  @Override
-  public void unacknowledgeMissingContainer(long containerID) throws IOException {
-    UnacknowledgeMissingContainerRequestProto request = UnacknowledgeMissingContainerRequestProto.newBuilder()
-        .setContainerID(containerID)
-        .build();
-    submitRequest(Type.UnacknowledgeMissingContainer,
-        builder -> builder.setUnacknowledgeMissingContainerRequest(request));
+    submitRequest(Type.SetAckMissingContainer, builder -> builder.setSetAckMissingContainerRequest(request));
   }
 }

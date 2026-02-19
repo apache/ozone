@@ -600,12 +600,7 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
-  public void acknowledgeMissingContainer(long containerId) throws IOException {
-    storageContainerLocationClient.acknowledgeMissingContainer(containerId);
-  }
-
-  @Override
-  public void unacknowledgeMissingContainer(long containerId) throws IOException {
-    storageContainerLocationClient.unacknowledgeMissingContainer(containerId);
+  public void setAckMissingContainer(long containerId, boolean acknowledge) throws IOException {
+    storageContainerLocationClient.setAckMissingContainer(containerId, acknowledge);
   }
 }

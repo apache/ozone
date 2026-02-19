@@ -87,8 +87,7 @@ message ScmContainerLocationRequest {
   optional ContainerBalancerStatusInfoRequestProto containerBalancerStatusInfoRequest = 48;
   optional ReconcileContainerRequestProto reconcileContainerRequest = 49;
   optional GetDeletedBlocksTxnSummaryRequestProto getDeletedBlocksTxnSummaryRequest = 50;
-  optional AcknowledgeMissingContainerRequestProto acknowledgeMissingContainerRequest = 51;
-  optional UnacknowledgeMissingContainerRequestProto unacknowledgeMissingContainerRequest = 52;
+  optional SetAckMissingContainerRequestProto setAckMissingContainerRequest = 51;
 }
 
 message ScmContainerLocationResponse {
@@ -147,8 +146,7 @@ message ScmContainerLocationResponse {
   optional ContainerBalancerStatusInfoResponseProto containerBalancerStatusInfoResponse = 48;
   optional ReconcileContainerResponseProto reconcileContainerResponse = 49;
   optional GetDeletedBlocksTxnSummaryResponseProto getDeletedBlocksTxnSummaryResponse = 50;
-  optional AcknowledgeMissingContainerResponseProto acknowledgeMissingContainerResponse = 51;
-  optional UnacknowledgeMissingContainerResponseProto unacknowledgeMissingContainerResponse = 52;
+  optional SetAckMissingContainerResponseProto setAckMissingContainerResponse = 51;
 
   enum Status {
     OK = 1;
@@ -206,8 +204,7 @@ enum Type {
   GetContainerBalancerStatusInfo = 44;
   ReconcileContainer = 45;
   GetDeletedBlocksTransactionSummary = 46;
-  AcknowledgeMissingContainer = 47;
-  UnacknowledgeMissingContainer = 48;
+  SetAckMissingContainer = 47;
 }
 
 /**
@@ -701,18 +698,12 @@ message ReconcileContainerRequestProto {
 message ReconcileContainerResponseProto {
 }
 
-message AcknowledgeMissingContainerRequestProto {
-  required int64 containerID = 1;
+message SetAckMissingContainerRequestProto {
+  optional int64 containerID = 1;
+  optional bool acknowledge = 2;
 }
 
-message AcknowledgeMissingContainerResponseProto {
-}
-
-message UnacknowledgeMissingContainerRequestProto {
-  required int64 containerID = 1;
-}
-
-message UnacknowledgeMissingContainerResponseProto {
+message SetAckMissingContainerResponseProto {
 }
 
 /**
