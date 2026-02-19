@@ -32,7 +32,7 @@ import java.util.UUID;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.ozone.OzoneFileSystemTests;
+import org.apache.hadoop.fs.ozone.OzoneFileSystemTestUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageSize;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -107,7 +107,7 @@ public abstract class TestHadoopDirTreeGenerator implements NonHATests.TestCase 
     // verify the directory structure
     LOG.info("Started verifying the directory structure...");
     OzoneConfiguration conf = new OzoneConfiguration(cluster().getConf());
-    OzoneFileSystemTests.setPageSize(conf, PAGE_SIZE);
+    OzoneFileSystemTestUtils.setPageSize(conf, PAGE_SIZE);
     try (FileSystem fileSystem = FileSystem.get(URI.create(rootPath), conf)) {
       Path rootDir = new Path(rootPath.concat("/"));
       // verify root path details
