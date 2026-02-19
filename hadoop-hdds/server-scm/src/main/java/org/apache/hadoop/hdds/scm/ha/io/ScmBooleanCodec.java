@@ -22,13 +22,13 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 /**
  * {@link ScmCodec} for {@code Boolean} objects.
  */
-public class ScmBooleanCodec implements ScmCodec {
+public class ScmBooleanCodec implements ScmCodec<Boolean> {
   static final ByteString TRUE = ByteString.copyFromUtf8(Boolean.TRUE.toString());
   static final ByteString FALSE = ByteString.copyFromUtf8(Boolean.FALSE.toString());
 
   @Override
-  public ByteString serialize(Object object) {
-    return ((Boolean) object) ? TRUE : FALSE;
+  public ByteString serialize(Boolean object) {
+    return object ? TRUE : FALSE;
   }
 
   @Override
