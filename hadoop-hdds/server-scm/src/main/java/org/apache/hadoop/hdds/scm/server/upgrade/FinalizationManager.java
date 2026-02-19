@@ -43,8 +43,6 @@ public interface FinalizationManager {
   BasicUpgradeFinalizer<SCMUpgradeFinalizationContext, HDDSLayoutVersionManager>
       getUpgradeFinalizer();
 
-  void runPrefinalizeStateActions() throws IOException;
-
   boolean crossedCheckpoint(FinalizationCheckpoint checkpoint);
 
   FinalizationCheckpoint getCheckpoint();

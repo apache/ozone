@@ -40,6 +40,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OM
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.OMNodeInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.TriggerSnapshotDefragRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerAdminProtocolProtos.TriggerSnapshotDefragResponse;
+import org.apache.hadoop.util.StringUtils;
 
 /**
  * This class is the server-side translator that forwards requests received on
@@ -104,7 +105,7 @@ public class OMAdminProtocolServerSideImpl implements OMAdminProtocolPB {
     } catch (IOException ex) {
       return DecommissionOMResponse.newBuilder()
           .setSuccess(false)
-          .setErrorMsg(ex.getMessage())
+          .setErrorMsg(ex.getMessage() == null ? StringUtils.stringifyException(ex) : ex.getMessage())
           .build();
     }
 
@@ -120,10 +121,10 @@ public class OMAdminProtocolServerSideImpl implements OMAdminProtocolPB {
       // check if table exists. IOException is thrown if table is not found.
       ozoneManager.getMetadataManager().getStore().getTable(compactRequest.getColumnFamily());
       ozoneManager.compactOMDB(compactRequest.getColumnFamily());
-    } catch (Exception ex) {
+    } catch (IOException ex) {
       return CompactResponse.newBuilder()
           .setSuccess(false)
-          .setErrorMsg(ex.getMessage())
+          .setErrorMsg(ex.getMessage() == null ? StringUtils.stringifyException(ex) : ex.getMessage())
           .build();
     }
 
@@ -141,10 +142,10 @@ public class OMAdminProtocolServerSideImpl implements OMAdminProtocolPB {
           .setSuccess(true)
           .setResult(result)
           .build();
-    } catch (Exception ex) {
+    } catch (IOException ex) {
       return TriggerSnapshotDefragResponse.newBuilder()
           .setSuccess(false)
-          .setErrorMsg(ex.getMessage())
+          .setErrorMsg(ex.getMessage() == null ? StringUtils.stringifyException(ex) : ex.getMessage())
           .build();
     }
   }

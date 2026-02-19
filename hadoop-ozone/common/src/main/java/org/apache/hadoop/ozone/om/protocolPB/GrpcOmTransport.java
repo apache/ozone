@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.net.InetAddress;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +42,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
@@ -70,6 +72,8 @@ public class GrpcOmTransport implements OmTransport {
       LoggerFactory.getLogger(GrpcOmTransport.class);
 
   private static final String CLIENT_NAME = "GrpcOmTransport";
+  private static final int SHUTDOWN_WAIT_INTERVAL = 100;
+  private static final int SHUTDOWN_MAX_WAIT_SECONDS = 5;
   private final AtomicBoolean isRunning = new AtomicBoolean(false);
 
   // gRPC specific
@@ -126,8 +130,7 @@ public class GrpcOmTransport implements OmTransport {
       return;
     }
 
-    List<String> nodes = omFailoverProxyProvider.getGrpcOmNodeIDList();
-    for (String nodeId : nodes) {
+    for (String nodeId : omFailoverProxyProvider.getOMProxyMap().getNodeIds()) {
       String hostaddr = omFailoverProxyProvider.getGrpcProxyAddress(nodeId);
       HostAndPort hp = HostAndPort.fromString(hostaddr);
 
@@ -296,16 +299,36 @@ public class GrpcOmTransport implements OmTransport {
   }
 
   public void shutdown() {
-    for (Map.Entry<String, ManagedChannel> entry : channels.entrySet()) {
-      ManagedChannel channel = entry.getValue();
+    for (ManagedChannel channel : channels.values()) {
       channel.shutdown();
+    }
+
+    final long maxWaitNanos = TimeUnit.SECONDS.toNanos(SHUTDOWN_MAX_WAIT_SECONDS);
+    long deadline = System.nanoTime() + maxWaitNanos;
+    List<ManagedChannel> nonTerminated = new ArrayList<>(channels.values());
+
+    while (!nonTerminated.isEmpty() && System.nanoTime() < deadline) {
+      nonTerminated.removeIf(ManagedChannel::isTerminated);
+      if (nonTerminated.isEmpty()) {
+        break;
+      }
       try {
-        channel.awaitTermination(5, TimeUnit.SECONDS);
-      } catch (Exception e) {
-        LOG.error("failed to shutdown OzoneManagerServiceGrpc channel {} : {}",
-            entry.getKey(), e);
+        Thread.sleep(SHUTDOWN_WAIT_INTERVAL);
+      } catch (InterruptedException e) {
+        LOG.error("Interrupted while waiting for channels to terminate", e);
+        Thread.currentThread().interrupt();
+        break;
       }
     }
+
+    if (!nonTerminated.isEmpty()) {
+      List<String> failedChannels = channels.entrySet().stream()
+          .filter(e -> !e.getValue().isTerminated())
+          .map(Map.Entry::getKey)
+          .collect(Collectors.toList());
+      LOG.warn("Channels {} did not terminate within timeout.", failedChannels);
+    }
+
     LOG.info("{}: stopped", CLIENT_NAME);
   }
 
@@ -337,8 +360,7 @@ public class GrpcOmTransport implements OmTransport {
 
   @VisibleForTesting
   public void startClient(ManagedChannel testChannel) throws IOException {
-    List<String> nodes = omFailoverProxyProvider.getGrpcOmNodeIDList();
-    for (String nodeId : nodes) {
+    for (String nodeId : omFailoverProxyProvider.getOMProxyMap().getNodeIds()) {
       String hostaddr = omFailoverProxyProvider.getGrpcProxyAddress(nodeId);
 
       clients.put(hostaddr,

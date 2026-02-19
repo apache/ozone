@@ -2132,8 +2132,15 @@ public class KeyValueHandler extends Handler {
       return malformedRequest(request);
     }
     try {
-      readBlockImpl(request, blockFile, kvContainer, streamObserver, false);
-      // TODO metrics.incContainerBytesStats(Type.ReadBlock, readBlock.getLen());
+      final long startTime = Time.monotonicNow();
+      final long bytesRead = readBlockImpl(request, blockFile, kvContainer, streamObserver, false);
+      KeyValueContainerData containerData = (KeyValueContainerData) kvContainer
+          .getContainerData();
+      HddsVolume volume = containerData.getVolume();
+      if (volume != null) {
+        volume.getVolumeIOStats().recordReadOperation(startTime, bytesRead);
+      }
+      metrics.incContainerBytesStats(Type.ReadBlock, bytesRead);
     } catch (StorageContainerException ex) {
       responseProto = ContainerUtils.logAndReturnError(LOG, ex, request);
     } catch (IOException ioe) {
@@ -2149,7 +2156,7 @@ public class KeyValueHandler extends Handler {
     return responseProto;
   }
 
-  private void readBlockImpl(ContainerCommandRequestProto request, RandomAccessFileChannel blockFile,
+  private long readBlockImpl(ContainerCommandRequestProto request, RandomAccessFileChannel blockFile,
       Container kvContainer, StreamObserver<ContainerCommandResponseProto> streamObserver, boolean verifyChecksum)
       throws IOException {
     final ReadBlockRequestProto readBlock = request.getReadBlock();
@@ -2189,7 +2196,7 @@ public class KeyValueHandler extends Handler {
 
     final ByteBuffer buffer = ByteBuffer.allocate(responseDataSize);
     blockFile.position(adjustedOffset);
-    int totalDataLength = 0;
+    long totalDataLength = 0;
     int numResponses = 0;
     final long rounded = roundUp(readBlock.getLength() + offsetAlignment, bytesPerChecksum);
     final long requiredLength = Math.min(rounded, blockData.getSize() - adjustedOffset);
@@ -2227,6 +2234,7 @@ public class KeyValueHandler extends Handler {
       totalDataLength += dataLength;
       numResponses++;
     }
+    return totalDataLength;
   }
 
   static List<ByteString> getChecksums(long blockOffset, int readLength, int bytesPerChunk, int bytesPerChecksum,

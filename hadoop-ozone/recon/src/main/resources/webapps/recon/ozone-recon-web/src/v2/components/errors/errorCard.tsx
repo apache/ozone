@@ -22,7 +22,7 @@ import { DisconnectOutlined } from "@ant-design/icons"
 import { Card } from 'antd';
 
 type ErrorCardProps = {
-  title: string;
+  title: string | React.ReactNode;
   compact?: boolean;
 };
 

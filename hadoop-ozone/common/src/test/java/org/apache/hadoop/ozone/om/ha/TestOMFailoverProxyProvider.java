@@ -23,6 +23,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -30,6 +32,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
 import java.util.StringJoiner;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
@@ -167,9 +171,29 @@ public class TestOMFailoverProxyProvider {
                  UserGroupInformation.getCurrentUser(), OM_SERVICE_ID,
                  OzoneManagerProtocolPB.class)) {
       // Verify listener node is not included in proxy map
-      assertTrue(providerWithListeners.getOMProxyMap().containsKey(NODE_ID_BASE_STR + 1));
-      assertTrue(providerWithListeners.getOMProxyMap().containsKey(NODE_ID_BASE_STR + 3));
-      assertFalse(providerWithListeners.getOMProxyMap().containsKey(listenerNode));
+      assertNotNull(providerWithListeners.getOMProxyMap().get(NODE_ID_BASE_STR + 1));
+      assertNotNull(providerWithListeners.getOMProxyMap().get(NODE_ID_BASE_STR + 3));
+      assertNull(providerWithListeners.getOMProxyMap().get(listenerNode));
+    }
+  }
+
+  @Test
+  public void testOMProxyMap() {
+    final String serviceID = "service0";
+    final List<OMProxyInfo<Integer>> list = new ArrayList<>();
+    for (int i = 0; i < numNodes; i++) {
+      list.add(OMProxyInfo.newInstance(i, serviceID, "node" + i, "0.0.0.0:800" + i));
+    }
+
+    for (int i = 0; i < 9; i++) {
+      Collections.shuffle(list);
+      final OMProxyInfo.OrderedMap<Integer> map = new OMProxyInfo.OrderedMap<>(list);
+      final Iterator<String> m = map.getNodeIds().iterator();
+      for (OMProxyInfo<Integer> info : list) {
+        assertTrue(m.hasNext());
+        assertEquals(info.getNodeId(), m.next());
+      }
+      assertFalse(m.hasNext());
     }
   }
 

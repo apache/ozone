@@ -254,7 +254,18 @@ public class ContainerSet implements Iterable<Container<?>> {
     } else {
       LOG.debug("Container with container Id {} is updated to containerMap",
           containerId);
-      return containerMap.put(containerId, container);
+      Container<?> oldContainer = containerMap.put(containerId, container);
+      HddsVolume volume = container.getContainerData().getVolume();
+      if (volume != null) {
+        volume.addContainer(container.getContainerData().getContainerID());
+      }
+      if (oldContainer != null) {
+        volume = oldContainer.getContainerData().getVolume();
+        if (volume != null) {
+          volume.removeContainer(oldContainer.getContainerData().getContainerID());
+        }
+      }
+      return oldContainer;
     }
   }
 
@@ -446,7 +457,7 @@ public class ContainerSet implements Iterable<Container<?>> {
     while (containerIdIterator.hasNext()) {
       Long containerId = containerIdIterator.next();
       Container<?> container = containerMap.get(containerId);
-      if (container != null) {
+      if (container != null && container.getContainerData().getVolume() == volume) {
         containers.add(container);
       }
     }

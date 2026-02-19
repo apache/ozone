@@ -2320,7 +2320,7 @@
   </property>
   <property>
     <name>ozone.om.ratis.snapshot.max.total.sst.size</name>
-    <value>100000000</value>
+    <value>10737418240</value>
     <tag>OZONE, OM, RATIS</tag>
     <description>
       Max size of SST files in OM Ratis Snapshot tarball.
@@ -3139,6 +3139,13 @@
       to contact OM. Wait time increases linearly if same OM is retried
       again. If retrying on multiple OMs proxies in round robin fashion, the
       wait time is introduced after all the OM proxies have been attempted once.
+    </description>
+  </property>
+  <property>
+    <name>ozone.client.follower.read.enabled</name>
+    <value>false</value>
+    <description>
+      Enable client to read from OM followers.
     </description>
   </property>
   <property>
@@ -4860,8 +4867,8 @@
   </property>
   <property>
     <name>hdds.datanode.kerberos.principal</name>
-    <value/>
-    <tag>OZONE, DATANODE</tag>
+    <value>dn/_HOST@REALM</value>
+    <tag>OZONE, SECURITY, KERBEROS, DATANODE</tag>
     <description>
       The Datanode service principal. This is typically set to
       dn/_HOST@REALM.TLD. Each Datanode will substitute _HOST with its

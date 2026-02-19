@@ -488,6 +488,11 @@ public final class OzoneConfigKeys {
   public static final long OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT =
       2000;
 
+  // Ozone Client Follower Read
+  public static final String OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY =
+      "ozone.client.follower.read.enabled";
+  public static final boolean OZONE_CLIENT_FOLLOWER_READ_ENABLED_DEFAULT = false;
+
   public static final String OZONE_FREON_HTTP_ENABLED_KEY =
       "ozone.freon.http.enabled";
   public static final String OZONE_FREON_HTTP_BIND_HOST_KEY =
