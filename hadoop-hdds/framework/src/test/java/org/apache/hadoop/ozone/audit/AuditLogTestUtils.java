@@ -52,7 +52,7 @@ public final class AuditLogTestUtils {
       throws InterruptedException, TimeoutException {
     waitFor(
         () -> auditLogContains(action.getAction(), eventStatus.getStatus()),
-        1000, 100000);
+        1000, 10000);
   }
 
   public static boolean auditLogContains(String... strings) {
