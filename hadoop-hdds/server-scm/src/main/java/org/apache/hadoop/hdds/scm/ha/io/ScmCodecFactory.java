@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
-import com.google.protobuf.ProtocolMessageEnum;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
@@ -40,7 +39,6 @@ public final class ScmCodecFactory {
   static {
     codecs.put(com.google.protobuf.Message.class, new ScmNonShadedGeneratedMessageCodec());
     codecs.put(Message.class, new ScmGeneratedMessageCodec());
-    codecs.put(ProtocolMessageEnum.class, new ScmEnumCodec());
     codecs.put(List.class, new ScmListCodec());
     codecs.put(Integer.class, new ScmIntegerCodec());
     codecs.put(Long.class, new ScmLongCodec());
