@@ -54,8 +54,12 @@ public class RocksDbPersistentList<E> implements PersistentList<E> {
       byte[] rawValue = codecRegistry.asRawData(entry);
       db.get().put(columnFamilyHandle, rawKey, rawValue);
       return true;
-    } catch (IOException | RocksDBException exception) {
-      throw SnapshotStorageException.fromRocksDB("append list entry", toRocks(exception));
+    } catch (RocksDBException exception) {
+      throw SnapshotStorageException.fromRocksDB(
+          "add list entry", exception);
+    } catch (IOException exception) {
+      throw SnapshotStorageException.fromIO(
+          "serialize list entry", exception);
     }
   }
 
@@ -73,8 +77,12 @@ public class RocksDbPersistentList<E> implements PersistentList<E> {
       byte[] rawKey = codecRegistry.asRawData(index);
       byte[] rawValue = db.get().get(columnFamilyHandle, rawKey);
       return codecRegistry.asObject(rawValue, entryType);
-    } catch (IOException | RocksDBException exception) {
-      throw SnapshotStorageException.fromRocksDB("read list entry", toRocks(exception));
+    } catch (RocksDBException exception) {
+      throw SnapshotStorageException.fromRocksDB(
+          "read list entry", exception);
+    } catch (IOException exception) {
+      throw SnapshotStorageException.fromIO(
+          "deserialize list entry", exception);
     }
   }
 
@@ -97,7 +105,8 @@ public class RocksDbPersistentList<E> implements PersistentList<E> {
         try {
           return codecRegistry.asObject(rawKey, entryType);
         } catch (IOException exception) {
-          throw SnapshotStorageException.fromIO("deserialize list entry", exception);
+          throw SnapshotStorageException.fromIO(
+              "deserialize list entry", exception);
         }
       }
 
@@ -106,15 +115,5 @@ public class RocksDbPersistentList<E> implements PersistentList<E> {
         managedRocksIterator.close();
       }
     };
-  }
-
-  private RocksDBException toRocks(Exception e) {
-    if (e instanceof RocksDBException) {
-      return (RocksDBException) e;
-    }
-    if (e.getCause() instanceof RocksDBException) {
-      return (RocksDBException) e.getCause();
-    }
-    return new RocksDBException(e);
   }
 }
