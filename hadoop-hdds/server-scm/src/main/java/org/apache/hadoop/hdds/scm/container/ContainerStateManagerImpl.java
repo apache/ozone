@@ -551,6 +551,34 @@ public final class ContainerStateManagerImpl
     }
   }
 
+  @Override
+  public void updateContainerInfo(HddsProtos.ContainerInfoProto updatedInfoProto)
+      throws IOException {
+    ContainerInfo updatedInfo = ContainerInfo.fromProtobuf(updatedInfoProto);
+    ContainerID containerID = updatedInfo.containerID();
+    
+    try (AutoCloseableLock ignored = writeLock(containerID)) {
+      final ContainerInfo currentInfo = containers.getContainerInfo(containerID);
+      if (currentInfo == null) {
+        throw new ContainerNotFoundException(containerID);
+      }
+      
+      // Only persist ACK_MISSING health state changes
+      // Other health states are dynamic and computed by ReplicationManager
+      ContainerHealthState newHealthState = updatedInfo.getHealthState();
+      if (newHealthState == ContainerHealthState.ACK_MISSING) {
+        currentInfo.setHealthState(ContainerHealthState.ACK_MISSING);
+        LOG.debug("Persisting ACK_MISSING state for container: {}", containerID);
+      } else if (currentInfo.getHealthState() == ContainerHealthState.ACK_MISSING) {
+        currentInfo.setHealthState(null);
+        LOG.debug("Clearing ACK_MISSING state for container: {}, new state: {}",
+            containerID, newHealthState);
+      }
+      transactionBuffer.addToBuffer(containerStore, containerID, currentInfo);
+      LOG.debug("Updated container info for container: {}, healthState={}", containerID, currentInfo.getHealthState());
+    }
+  }
+
   private AutoCloseableLock readLock() {
     return AutoCloseableLock.acquire(lock.readLock());
   }
