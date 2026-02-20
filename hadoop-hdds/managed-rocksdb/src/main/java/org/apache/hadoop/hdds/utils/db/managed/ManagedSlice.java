@@ -47,4 +47,9 @@ public class ManagedSlice extends Slice {
       leakTracker.close();
     }
   }
+
+  @Override
+  public boolean isOwningHandle() {
+    return super.isOwningHandle();
+  }
 }
