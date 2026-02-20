@@ -25,7 +25,6 @@ import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.metadata.Replicate;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -72,27 +71,6 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
     // Move the upgrade status according to this checkpoint. This is sent
     // back to the client if they query for the current upgrade status.
     versionManager.setUpgradeState(checkpoint.getStatus());
-
-    // Check whether this checkpoint change requires us to move node state.
-    // If this is necessary, it must be done before unfreezing pipeline
-    // creation to make sure nodes are not added to pipelines based on
-    // outdated layout information.
-    // This operation is not idempotent.
-    if (checkpoint == FinalizationCheckpoint.MLV_EQUALS_SLV) {
-      upgradeContext.getNodeManager().forceNodesToHealthyReadOnly();
-    }
-
-    // Check whether this checkpoint change requires us to freeze pipeline
-    // creation. These are idempotent operations.
-    PipelineManager pipelineManager = upgradeContext.getPipelineManager();
-    if (FinalizationManager.shouldCreateNewPipelines(checkpoint) &&
-        pipelineManager.isPipelineCreationFrozen()) {
-      pipelineManager.resumePipelineCreation();
-    } else if (!FinalizationManager.shouldCreateNewPipelines(checkpoint) &&
-          !pipelineManager.isPipelineCreationFrozen()) {
-      pipelineManager.freezePipelineCreation();
-    }
-
     // Set the checkpoint in the SCM context so other components can read it.
     upgradeContext.getSCMContext().setFinalizationCheckpoint(checkpoint);
   }

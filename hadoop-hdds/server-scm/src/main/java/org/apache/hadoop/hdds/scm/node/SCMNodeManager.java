@@ -1958,12 +1958,6 @@ public class SCMNodeManager implements NodeManager {
     return scmLayoutVersionManager;
   }
 
-  @VisibleForTesting
-  @Override
-  public void forceNodesToHealthyReadOnly() {
-    nodeStateManager.forceNodesToHealthyReadOnly();
-  }
-
   private ReentrantReadWriteLock.WriteLock writeLock() {
     return lock.writeLock();
   }

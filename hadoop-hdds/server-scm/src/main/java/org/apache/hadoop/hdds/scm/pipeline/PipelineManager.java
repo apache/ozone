@@ -181,18 +181,6 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
       throws RocksDatabaseException, DuplicatedPipelineIdException, CodecException;
 
   /**
-   * Ask pipeline manager to not create any new pipelines.
-   */
-  void freezePipelineCreation();
-
-  /**
-   * Ask pipeline manager to resume creating new pipelines.
-   */
-  void resumePipelineCreation();
-
-  boolean isPipelineCreationFrozen();
-
-  /**
    * Acquire read lock.
    */
   void acquireReadLock();

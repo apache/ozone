@@ -288,16 +288,6 @@ public class MockPipelineManager implements PipelineManager {
   }
 
   @Override
-  public void freezePipelineCreation() {
-
-  }
-
-  @Override
-  public void resumePipelineCreation() {
-
-  }
-
-  @Override
   public void close() {
   }
 
@@ -324,11 +314,6 @@ public class MockPipelineManager implements PipelineManager {
   @Override
   public void releaseWriteLock() {
 
-  }
-
-  @Override
-  public boolean isPipelineCreationFrozen() {
-    return false;
   }
 
   @Override
