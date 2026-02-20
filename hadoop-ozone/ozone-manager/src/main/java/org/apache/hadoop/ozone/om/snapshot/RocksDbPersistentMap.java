@@ -60,8 +60,7 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
       byte[] rawValue = db.get().get(columnFamilyHandle, rawKey);
       return codecRegistry.asObject(rawValue, valueType);
     } catch (IOException | RocksDBException exception) {
-      // TODO: [SNAPSHOT] Fail gracefully.
-      throw new RuntimeException(exception);
+      throw SnapshotStorageException.fromRocksDB("read map entry", toRocks(exception));
     }
   }
 
@@ -72,8 +71,7 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
       byte[] rawValue = codecRegistry.asRawData(value);
       db.get().put(columnFamilyHandle, rawKey, rawValue);
     } catch (IOException | RocksDBException exception) {
-      // TODO: [SNAPSHOT] Fail gracefully.
-      throw new RuntimeException(exception);
+      throw SnapshotStorageException.fromRocksDB("write map entry", toRocks(exception));
     }
   }
 
@@ -83,8 +81,7 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
       byte[] rawKey = codecRegistry.asRawData(key);
       db.get().delete(columnFamilyHandle, rawKey);
     } catch (IOException | RocksDBException exception) {
-      // TODO: [SNAPSHOT] Fail gracefully.
-      throw new RuntimeException(exception);
+      throw SnapshotStorageException.fromRocksDB("delete map entry", toRocks(exception));
     }
   }
 
@@ -111,10 +108,9 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
       } else {
         upperBoundSlice = null;
       }
-    } catch (IOException exception) {
-      // TODO: [SNAPSHOT] Fail gracefully.
-      throw new RuntimeException(exception);
-    }
+      } catch (IOException exception) {
+        throw SnapshotStorageException.fromIO("deserialize map entry", exception);
+      }
 
     iterator = ManagedRocksIterator.managed(
         db.get().newIterator(columnFamilyHandle, readOptions));
@@ -165,16 +161,26 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
       }
 
       @Override
-      public void close() {
-        iterator.close();
-        readOptions.close();
-        if (upperBoundSlice != null) {
-          upperBoundSlice.close();
-        }
-        if (lowerBoundSlice != null) {
-          lowerBoundSlice.close();
-        }
+    public void close() {
+      iterator.close();
+      readOptions.close();
+      if (upperBoundSlice != null) {
+        upperBoundSlice.close();
       }
-    };
+      if (lowerBoundSlice != null) {
+        lowerBoundSlice.close();
+      }
+    }
+  };
+}
+
+  private RocksDBException toRocks(Exception e) {
+    if (e instanceof RocksDBException) {
+      return (RocksDBException) e;
+    }
+    if (e.getCause() instanceof RocksDBException) {
+      return (RocksDBException) e.getCause();
+    }
+    return new RocksDBException(e);
   }
 }

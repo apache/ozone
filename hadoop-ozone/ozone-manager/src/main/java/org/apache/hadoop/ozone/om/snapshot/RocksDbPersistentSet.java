@@ -52,8 +52,7 @@ public class RocksDbPersistentSet<E> implements PersistentSet<E> {
       byte[] rawValue = codecRegistry.asRawData(emptyByteArray);
       db.get().put(columnFamilyHandle, rawKey, rawValue);
     } catch (IOException | RocksDBException exception) {
-      // TODO: [SNAPSHOT] Fail gracefully.
-      throw new RuntimeException(exception);
+      throw SnapshotStorageException.fromRocksDB("add set entry", toRocks(exception));
     }
   }
 
@@ -76,15 +75,24 @@ public class RocksDbPersistentSet<E> implements PersistentSet<E> {
         try {
           return codecRegistry.asObject(rawKey, entryType);
         } catch (IOException exception) {
-          // TODO: [SNAPSHOT] Fail gracefully.
-          throw new RuntimeException(exception);
+          throw SnapshotStorageException.fromIO("deserialize set entry", exception);
         }
       }
 
       @Override
-      public void close() {
-        managedRocksIterator.close();
-      }
-    };
+    public void close() {
+      managedRocksIterator.close();
+    }
+  };
+}
+
+  private RocksDBException toRocks(Exception e) {
+    if (e instanceof RocksDBException) {
+      return (RocksDBException) e;
+    }
+    if (e.getCause() instanceof RocksDBException) {
+      return (RocksDBException) e.getCause();
+    }
+    return new RocksDBException(e);
   }
 }

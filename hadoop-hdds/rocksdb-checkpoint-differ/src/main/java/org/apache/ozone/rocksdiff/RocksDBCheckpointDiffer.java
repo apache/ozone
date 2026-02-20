@@ -573,8 +573,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
     try {
       activeRocksDB.get().put(compactionLogTableCFHandle, key, value);
     } catch (RocksDBException exception) {
-      // TODO: Revisit exception handling before merging the PR.
-      throw new RuntimeException(exception);
+      throw new RocksDBCheckpointDifferException("Failed to persist compaction log entry", exception);
     }
     return key;
   }
@@ -968,8 +967,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
           // Clear output in case of error. Expect fall back to full diff
           sameFiles.clear();
           differentFiles.clear();
-          // TODO: Revisit error handling here. Use custom exception?
-          throw new RuntimeException(errorMsg);
+          throw new RocksDBCheckpointDifferException(errorMsg);
         }
 
         final Set<CompactionNode> nextLevel = new HashSet<>();
@@ -1143,8 +1141,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
 
       }
     } catch (InvalidProtocolBufferException exception) {
-      // TODO: Handle this properly before merging the PR.
-      throw new RuntimeException(exception);
+      throw new RocksDBCheckpointDifferException("Failed to parse compaction log entry", exception);
     }
     return Pair.of(compactionNodes, keysToRemove);
   }
@@ -1156,8 +1153,7 @@ public class RocksDBCheckpointDiffer implements AutoCloseable,
         activeRocksDB.get().delete(compactionLogTableCFHandle, key);
       }
     } catch (RocksDBException exception) {
-      // TODO Handle exception properly before merging the PR.
-      throw new RuntimeException(exception);
+      throw new RocksDBCheckpointDifferException("Failed to delete compaction log entries", exception);
     }
   }
 
