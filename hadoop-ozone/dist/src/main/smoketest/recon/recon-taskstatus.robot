@@ -28,7 +28,7 @@ Suite Setup         Get Security Enabled From Config
 ${BASE_URL}               http://recon:9888
 ${TASK_STATUS_ENDPOINT}   ${BASE_URL}/api/v1/task/status
 ${TRIGGER_SYNC_ENDPOINT}  ${BASE_URL}/api/v1/triggerdbsync/om
-${TASK_NAME_1}            ContainerHealthTask
+${TASK_NAME_1}            ContainerHealthTaskV2
 ${TASK_NAME_2}            OmDeltaRequest
 ${BUCKET}                 testbucket
 ${VOLUME}                 testvolume
