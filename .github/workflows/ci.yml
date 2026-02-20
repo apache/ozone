@@ -123,6 +123,18 @@ jobs:
       with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
     secrets: inherit
 
+  generate-config-doc:
+    needs:
+      - build-info
+      - build
+    if: |
+      needs.build-info.outputs.needs-build == 'true' &&
+      (github.repository != 'apache/ozone' || github.event_name == 'pull_request' ||
+       (github.event_name == 'push' && github.ref_name == 'master'))
+    uses: ./.github/workflows/generate-config-doc.yml
+    with:
+      sha: ${{ needs.build-info.outputs.sha }}
+
   compile:
     needs:
       - build-info
