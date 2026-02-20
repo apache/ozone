@@ -35,7 +35,6 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
@@ -49,9 +48,7 @@ import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -77,7 +74,6 @@ import org.apache.hadoop.ozone.recon.api.types.MissingContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersSummary;
-import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManagerV2;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
@@ -85,9 +81,7 @@ import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.util.SeekableIterator;
-import org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinitionV2;
-import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -105,11 +99,9 @@ public class ContainerEndpoint {
 
   private final ReconContainerManager containerManager;
   private final PipelineManager pipelineManager;
-  private final ContainerHealthSchemaManager containerHealthSchemaManager;
   private final ContainerHealthSchemaManagerV2 containerHealthSchemaManagerV2;
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private final OzoneStorageContainerManager reconSCM;
-  private final OzoneConfiguration ozoneConfiguration;
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerEndpoint.class);
   private BucketLayout layout = BucketLayout.DEFAULT;
@@ -148,18 +140,14 @@ public class ContainerEndpoint {
 
   @Inject
   public ContainerEndpoint(OzoneStorageContainerManager reconSCM,
-                           ContainerHealthSchemaManager containerHealthSchemaManager,
                            ContainerHealthSchemaManagerV2 containerHealthSchemaManagerV2,
-                           OzoneConfiguration ozoneConfiguration,
                            ReconNamespaceSummaryManager reconNamespaceSummaryManager,
                            ReconContainerMetadataManager reconContainerMetadataManager,
                            ReconOMMetadataManager omMetadataManager) {
     this.containerManager =
         (ReconContainerManager) reconSCM.getContainerManager();
     this.pipelineManager = reconSCM.getPipelineManager();
-    this.containerHealthSchemaManager = containerHealthSchemaManager;
     this.containerHealthSchemaManagerV2 = containerHealthSchemaManagerV2;
-    this.ozoneConfiguration = ozoneConfiguration;
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.reconSCM = reconSCM;
     this.reconContainerMetadataManager = reconContainerMetadataManager;
@@ -349,8 +337,9 @@ public class ContainerEndpoint {
       int limit
   ) {
     List<MissingContainerMetadata> missingContainers = new ArrayList<>();
-    containerHealthSchemaManager.getUnhealthyContainers(
-            UnHealthyContainerStates.MISSING, 0L, Optional.empty(), limit)
+    containerHealthSchemaManagerV2.getUnhealthyContainers(
+            ContainerSchemaDefinitionV2.UnHealthyContainerStates.MISSING,
+            0L, 0L, limit)
         .forEach(container -> {
           long containerID = container.getContainerId();
           try {
@@ -402,84 +391,7 @@ public class ContainerEndpoint {
       @QueryParam(RECON_QUERY_MAX_CONTAINER_ID) long maxContainerId,
       @DefaultValue(PREV_CONTAINER_ID_DEFAULT_VALUE)
       @QueryParam(RECON_QUERY_MIN_CONTAINER_ID) long minContainerId) {
-
-    // Check feature flag to determine which implementation to use
-    boolean useV2 = ozoneConfiguration.getBoolean(
-        ReconConfigKeys.OZONE_RECON_CONTAINER_HEALTH_USE_SCM_REPORT,
-        ReconConfigKeys.OZONE_RECON_CONTAINER_HEALTH_USE_SCM_REPORT_DEFAULT);
-
-    if (useV2) {
-      return getUnhealthyContainersV2(state, limit, maxContainerId, minContainerId);
-    } else {
-      return getUnhealthyContainersV1(state, limit, maxContainerId, minContainerId);
-    }
-  }
-
-  /**
-   * V1 implementation - reads from UNHEALTHY_CONTAINERS table.
-   */
-  private Response getUnhealthyContainersV1(
-      String state,
-      int limit,
-      long maxContainerId,
-      long minContainerId) {
-    Optional<Long> maxContainerIdOpt = maxContainerId > 0 ? Optional.of(maxContainerId) : Optional.empty();
-    List<UnhealthyContainerMetadata> unhealthyMeta = new ArrayList<>();
-    List<UnhealthyContainersSummary> summary;
-    try {
-      UnHealthyContainerStates internalState = null;
-
-      if (state != null) {
-        // If an invalid state is passed in, this will throw
-        // illegalArgumentException and fail the request
-        internalState = UnHealthyContainerStates.valueOf(state);
-      }
-
-      summary = containerHealthSchemaManager.getUnhealthyContainersSummary();
-      List<UnhealthyContainers> containers = containerHealthSchemaManager
-          .getUnhealthyContainers(internalState, minContainerId, maxContainerIdOpt, limit);
-
-      // Filtering out EMPTY_MISSING and NEGATIVE_SIZE containers from the response.
-      // These container states are not being inserted into the database as they represent
-      // edge cases that are not critical to track as unhealthy containers.
-      List<UnhealthyContainers> filteredContainers = containers.stream()
-          .filter(container -> !container.getContainerState()
-              .equals(UnHealthyContainerStates.EMPTY_MISSING.toString())
-              && !container.getContainerState()
-              .equals(UnHealthyContainerStates.NEGATIVE_SIZE.toString()))
-          .collect(Collectors.toList());
-
-      for (UnhealthyContainers c : filteredContainers) {
-        long containerID = c.getContainerId();
-        ContainerInfo containerInfo =
-            containerManager.getContainer(ContainerID.valueOf(containerID));
-        long keyCount = containerInfo.getNumberOfKeys();
-        UUID pipelineID = containerInfo.getPipelineID().getId();
-        List<ContainerHistory> datanodes =
-            containerManager.getLatestContainerHistory(containerID,
-                containerInfo.getReplicationConfig().getRequiredNodes());
-        unhealthyMeta.add(new UnhealthyContainerMetadata(
-            c, datanodes, pipelineID, keyCount));
-      }
-    } catch (IOException ex) {
-      throw new WebApplicationException(ex,
-          Response.Status.INTERNAL_SERVER_ERROR);
-    } catch (IllegalArgumentException e) {
-      throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
-    }
-
-    UnhealthyContainersResponse response =
-        new UnhealthyContainersResponse(unhealthyMeta);
-    if (!unhealthyMeta.isEmpty()) {
-      response.setFirstKey(unhealthyMeta.stream().map(UnhealthyContainerMetadata::getContainerID)
-          .min(Long::compareTo).orElse(0L));
-      response.setLastKey(unhealthyMeta.stream().map(UnhealthyContainerMetadata::getContainerID)
-          .max(Long::compareTo).orElse(0L));
-    }
-    for (UnhealthyContainersSummary s : summary) {
-      response.setSummaryCount(s.getContainerState(), s.getCount());
-    }
-    return Response.ok(response).build();
+    return getUnhealthyContainersV2(state, limit, maxContainerId, minContainerId);
   }
 
   /**
@@ -523,18 +435,17 @@ public class ContainerEndpoint {
             containerManager.getLatestContainerHistory(containerID,
                 containerInfo.getReplicationConfig().getRequiredNodes());
 
-        // Create UnhealthyContainers POJO from V2 record for response
-        UnhealthyContainers v1Container = new UnhealthyContainers();
-        v1Container.setContainerId(c.getContainerId());
-        v1Container.setContainerState(c.getContainerState());
-        v1Container.setInStateSince(c.getInStateSince());
-        v1Container.setExpectedReplicaCount(c.getExpectedReplicaCount());
-        v1Container.setActualReplicaCount(c.getActualReplicaCount());
-        v1Container.setReplicaDelta(c.getReplicaDelta());
-        v1Container.setReason(c.getReason());
-
         unhealthyMeta.add(new UnhealthyContainerMetadata(
-            v1Container, datanodes, pipelineID, keyCount));
+            c.getContainerId(),
+            c.getContainerState(),
+            c.getInStateSince(),
+            c.getExpectedReplicaCount(),
+            c.getActualReplicaCount(),
+            c.getReplicaDelta(),
+            c.getReason(),
+            datanodes,
+            pipelineID,
+            keyCount));
       }
     } catch (IOException ex) {
       throw new WebApplicationException(ex,

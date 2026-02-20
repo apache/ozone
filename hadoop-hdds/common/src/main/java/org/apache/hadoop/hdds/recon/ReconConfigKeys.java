@@ -78,18 +78,6 @@ public final class ReconConfigKeys {
       = "ozone.recon.task.safemode.wait.threshold";
 
   /**
-   * Configuration key to enable SCM-based container health reporting.
-   * When true, Recon uses ContainerHealthTaskV2 which leverages SCM's
-   * ReplicationManager.checkContainerStatus() as the single source of truth.
-   * When false (default), Recon uses the legacy ContainerHealthTask
-   * implementation.
-   */
-  public static final String OZONE_RECON_CONTAINER_HEALTH_USE_SCM_REPORT =
-      "ozone.recon.container.health.use.scm.report";
-  public static final boolean
-      OZONE_RECON_CONTAINER_HEALTH_USE_SCM_REPORT_DEFAULT = false;
-
-  /**
    * This class contains constants for Recon related configuration keys used in
    * SCM and Datanode.
    * Never constructed.

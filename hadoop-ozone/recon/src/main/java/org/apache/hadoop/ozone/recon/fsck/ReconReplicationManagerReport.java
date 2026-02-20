@@ -22,7 +22,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiConsumer;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 
 /**
@@ -50,11 +53,17 @@ import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 public class ReconReplicationManagerReport extends ReplicationManagerReport {
 
   // Captures ALL containers per health state (no SAMPLE_LIMIT restriction)
-  private final Map<HealthState, List<ContainerID>> allContainersByState =
+  private final Map<ContainerHealthState, List<ContainerID>> allContainersByState =
       new HashMap<>();
 
   // Captures containers with REPLICA_MISMATCH (Recon-specific, not in SCM's HealthState)
   private final List<ContainerID> replicaMismatchContainers = new ArrayList<>();
+
+  public ReconReplicationManagerReport() {
+    // Recon keeps a full per-state list in allContainersByState below.
+    // Disable base sampling map to avoid duplicate tracking.
+    super(0);
+  }
 
   /**
    * Override to capture ALL containers, not just first 100 samples.
@@ -65,14 +74,14 @@ public class ReconReplicationManagerReport extends ReplicationManagerReport {
    * @param container The container ID to record
    */
   @Override
-  public void incrementAndSample(HealthState stat, ContainerID container) {
-    // Call parent to maintain aggregate counts and samples (limited to 100)
+  public void incrementAndSample(ContainerHealthState stat, ContainerInfo container) {
+    // Call parent to maintain aggregate counts.
     super.incrementAndSample(stat, container);
 
     // Capture ALL containers for Recon (no SAMPLE_LIMIT restriction)
     allContainersByState
         .computeIfAbsent(stat, k -> new ArrayList<>())
-        .add(container);
+        .add(container.containerID());
   }
 
   /**
@@ -84,7 +93,7 @@ public class ReconReplicationManagerReport extends ReplicationManagerReport {
    * @return List of all container IDs with the specified health state,
    *         or empty list if none
    */
-  public List<ContainerID> getAllContainers(HealthState stat) {
+  public List<ContainerID> getAllContainers(ContainerHealthState stat) {
     return allContainersByState.getOrDefault(stat, Collections.emptyList());
   }
 
@@ -94,7 +103,7 @@ public class ReconReplicationManagerReport extends ReplicationManagerReport {
    *
    * @return Immutable map of HealthState to list of container IDs
    */
-  public Map<HealthState, List<ContainerID>> getAllContainersByState() {
+  public Map<ContainerHealthState, List<ContainerID>> getAllContainersByState() {
     return Collections.unmodifiableMap(allContainersByState);
   }
 
@@ -106,17 +115,8 @@ public class ReconReplicationManagerReport extends ReplicationManagerReport {
    * @param stat The health state to query
    * @return Number of containers captured for this state
    */
-  public int getAllContainersCount(HealthState stat) {
+  public int getAllContainersCount(ContainerHealthState stat) {
     return allContainersByState.getOrDefault(stat, Collections.emptyList()).size();
-  }
-
-  /**
-   * Clear all captured containers. Useful for resetting the report
-   * for a new processing cycle.
-   */
-  public void clearAllContainers() {
-    allContainersByState.clear();
-    replicaMismatchContainers.clear();
   }
 
   /**
@@ -145,5 +145,14 @@ public class ReconReplicationManagerReport extends ReplicationManagerReport {
    */
   public int getReplicaMismatchCount() {
     return replicaMismatchContainers.size();
+  }
+
+  /**
+   * Iterate through all unhealthy containers captured from SCM health states.
+   */
+  public void forEachContainerByState(
+      BiConsumer<ContainerHealthState, ContainerID> consumer) {
+    allContainersByState.forEach(
+        (state, containers) -> containers.forEach(container -> consumer.accept(state, container)));
   }
 }

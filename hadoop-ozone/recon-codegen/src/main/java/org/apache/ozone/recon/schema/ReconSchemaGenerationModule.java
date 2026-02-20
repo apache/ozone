@@ -32,7 +32,6 @@ public class ReconSchemaGenerationModule extends AbstractModule {
     Multibinder<ReconSchemaDefinition> schemaBinder =
         Multibinder.newSetBinder(binder(), ReconSchemaDefinition.class);
     schemaBinder.addBinding().to(UtilizationSchemaDefinition.class);
-    schemaBinder.addBinding().to(ContainerSchemaDefinition.class);
     schemaBinder.addBinding().to(ContainerSchemaDefinitionV2.class);
     schemaBinder.addBinding().to(ReconTaskSchemaDefinition.class);
     schemaBinder.addBinding().to(StatsSchemaDefinition.class);

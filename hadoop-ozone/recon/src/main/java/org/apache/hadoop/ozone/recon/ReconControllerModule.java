@@ -42,7 +42,6 @@ import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransportFactory;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.recon.heatmap.HeatMapServiceImpl;
-import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManagerV2;
 import org.apache.hadoop.ozone.recon.persistence.DataSourceConfiguration;
 import org.apache.hadoop.ozone.recon.persistence.JooqPersistenceModule;
@@ -79,7 +78,6 @@ import org.apache.ozone.recon.schema.generated.tables.daos.ContainerCountBySizeD
 import org.apache.ozone.recon.schema.generated.tables.daos.FileCountBySizeDao;
 import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
-import org.apache.ozone.recon.schema.generated.tables.daos.UnhealthyContainersDao;
 import org.apache.ozone.recon.schema.generated.tables.daos.UnhealthyContainersV2Dao;
 import org.apache.ratis.protocol.ClientId;
 import org.jooq.Configuration;
@@ -104,7 +102,6 @@ public class ReconControllerModule extends AbstractModule {
         .to(ReconOmMetadataManagerImpl.class);
     bind(OMMetadataManager.class).to(ReconOmMetadataManagerImpl.class);
 
-    bind(ContainerHealthSchemaManager.class).in(Singleton.class);
     bind(ContainerHealthSchemaManagerV2.class).in(Singleton.class);
     bind(ReconContainerMetadataManager.class)
         .to(ReconContainerMetadataManagerImpl.class).in(Singleton.class);
@@ -165,7 +162,6 @@ public class ReconControllerModule extends AbstractModule {
         ImmutableList.of(
             FileCountBySizeDao.class,
             ReconTaskStatusDao.class,
-            UnhealthyContainersDao.class,
             UnhealthyContainersV2Dao.class,
             GlobalStatsDao.class,
             ClusterGrowthDailyDao.class,

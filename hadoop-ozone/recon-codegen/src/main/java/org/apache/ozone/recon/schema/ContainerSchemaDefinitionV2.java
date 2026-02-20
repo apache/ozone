@@ -104,6 +104,8 @@ public class ContainerSchemaDefinitionV2 implements ReconSchemaDefinition {
     UNDER_REPLICATED,     // From SCM ReplicationManager
     OVER_REPLICATED,      // From SCM ReplicationManager
     MIS_REPLICATED,       // From SCM ReplicationManager
-    REPLICA_MISMATCH      // Computed locally by Recon (SCM doesn't track checksums)
+    REPLICA_MISMATCH,     // Computed locally by Recon (SCM doesn't track checksums)
+    EMPTY_MISSING,        // Kept for API compatibility with legacy clients
+    NEGATIVE_SIZE         // Kept for API compatibility with legacy clients
   }
 }

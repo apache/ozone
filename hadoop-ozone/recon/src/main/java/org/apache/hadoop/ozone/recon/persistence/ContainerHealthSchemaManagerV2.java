@@ -21,6 +21,7 @@ import static org.apache.ozone.recon.schema.ContainerSchemaDefinitionV2.UNHEALTH
 import static org.apache.ozone.recon.schema.generated.tables.UnhealthyContainersV2Table.UNHEALTHY_CONTAINERS_V2;
 import static org.jooq.impl.DSL.count;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import java.sql.Connection;
@@ -44,13 +45,12 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Manager for UNHEALTHY_CONTAINERS_V2 table used by ContainerHealthTaskV2.
- * This is independent from ContainerHealthSchemaManager to allow both
- * implementations to run in parallel.
  */
 @Singleton
 public class ContainerHealthSchemaManagerV2 {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerHealthSchemaManagerV2.class);
+  private static final int BATCH_INSERT_CHUNK_SIZE = 1000;
 
   private final UnhealthyContainersV2Dao unhealthyContainersV2Dao;
   private final ContainerSchemaDefinitionV2 containerSchemaDefinitionV2;
@@ -81,26 +81,27 @@ public class ContainerHealthSchemaManagerV2 {
     DSLContext dslContext = containerSchemaDefinitionV2.getDSLContext();
 
     try {
-      // Try batch insert first (optimal path - single SQL statement)
+      // Try batch insert first in chunks to keep memory/transaction pressure bounded.
       dslContext.transaction(configuration -> {
         DSLContext txContext = configuration.dsl();
 
-        // Build batch insert using VALUES clause
-        List<UnhealthyContainersV2Record> records = new ArrayList<>();
-        for (UnhealthyContainerRecordV2 rec : recs) {
-          UnhealthyContainersV2Record record = txContext.newRecord(UNHEALTHY_CONTAINERS_V2);
-          record.setContainerId(rec.getContainerId());
-          record.setContainerState(rec.getContainerState());
-          record.setInStateSince(rec.getInStateSince());
-          record.setExpectedReplicaCount(rec.getExpectedReplicaCount());
-          record.setActualReplicaCount(rec.getActualReplicaCount());
-          record.setReplicaDelta(rec.getReplicaDelta());
-          record.setReason(rec.getReason());
-          records.add(record);
+        for (int from = 0; from < recs.size(); from += BATCH_INSERT_CHUNK_SIZE) {
+          int to = Math.min(from + BATCH_INSERT_CHUNK_SIZE, recs.size());
+          List<UnhealthyContainersV2Record> records = new ArrayList<>(to - from);
+          for (int i = from; i < to; i++) {
+            UnhealthyContainerRecordV2 rec = recs.get(i);
+            UnhealthyContainersV2Record record = txContext.newRecord(UNHEALTHY_CONTAINERS_V2);
+            record.setContainerId(rec.getContainerId());
+            record.setContainerState(rec.getContainerState());
+            record.setInStateSince(rec.getInStateSince());
+            record.setExpectedReplicaCount(rec.getExpectedReplicaCount());
+            record.setActualReplicaCount(rec.getActualReplicaCount());
+            record.setReplicaDelta(rec.getReplicaDelta());
+            record.setReason(rec.getReason());
+            records.add(record);
+          }
+          txContext.batchInsert(records).execute();
         }
-
-        // Execute true batch insert (single INSERT statement with multiple VALUES)
-        txContext.batchInsert(records).execute();
       });
 
       LOG.debug("Batch inserted {} unhealthy container records", recs.size());
@@ -151,43 +152,11 @@ public class ContainerHealthSchemaManagerV2 {
   }
 
   /**
-   * Delete a specific unhealthy container record from V2 table.
-   */
-  public void deleteUnhealthyContainer(long containerId, Object state) {
-    DSLContext dslContext = containerSchemaDefinitionV2.getDSLContext();
-    try {
-      String stateStr = (state instanceof UnHealthyContainerStates)
-          ? ((UnHealthyContainerStates) state).toString()
-          : state.toString();
-      dslContext.deleteFrom(UNHEALTHY_CONTAINERS_V2)
-          .where(UNHEALTHY_CONTAINERS_V2.CONTAINER_ID.eq(containerId))
-          .and(UNHEALTHY_CONTAINERS_V2.CONTAINER_STATE.eq(stateStr))
-          .execute();
-      LOG.debug("Deleted container {} with state {} from V2 table", containerId, state);
-    } catch (Exception e) {
-      LOG.error("Failed to delete container {} from V2 table", containerId, e);
-    }
-  }
-
-  /**
-   * Delete all records for a specific container (all states).
-   */
-  public void deleteAllStatesForContainer(long containerId) {
-    DSLContext dslContext = containerSchemaDefinitionV2.getDSLContext();
-    try {
-      int deleted = dslContext.deleteFrom(UNHEALTHY_CONTAINERS_V2)
-          .where(UNHEALTHY_CONTAINERS_V2.CONTAINER_ID.eq(containerId))
-          .execute();
-      LOG.debug("Deleted {} records for container {} from V2 table", deleted, containerId);
-    } catch (Exception e) {
-      LOG.error("Failed to delete all states for container {} from V2 table", containerId, e);
-    }
-  }
-
-  /**
    * Batch delete SCM-tracked states for multiple containers.
-   * This deletes MISSING, UNDER_REPLICATED, OVER_REPLICATED, MIS_REPLICATED
-   * for all containers in the list in a single transaction.
+   * This deletes all states generated from SCM/Recon health scans:
+   * MISSING, EMPTY_MISSING, UNDER_REPLICATED, OVER_REPLICATED,
+   * MIS_REPLICATED and NEGATIVE_SIZE for all containers in the list in a
+   * single transaction.
    * REPLICA_MISMATCH is NOT deleted as it's tracked locally by Recon.
    *
    * @param containerIds List of container IDs to delete states for
@@ -203,43 +172,17 @@ public class ContainerHealthSchemaManagerV2 {
           .where(UNHEALTHY_CONTAINERS_V2.CONTAINER_ID.in(containerIds))
           .and(UNHEALTHY_CONTAINERS_V2.CONTAINER_STATE.in(
               UnHealthyContainerStates.MISSING.toString(),
+              UnHealthyContainerStates.EMPTY_MISSING.toString(),
               UnHealthyContainerStates.UNDER_REPLICATED.toString(),
               UnHealthyContainerStates.OVER_REPLICATED.toString(),
-              UnHealthyContainerStates.MIS_REPLICATED.toString()))
+              UnHealthyContainerStates.MIS_REPLICATED.toString(),
+              UnHealthyContainerStates.NEGATIVE_SIZE.toString()))
           .execute();
       LOG.debug("Batch deleted {} SCM-tracked state records for {} containers",
           deleted, containerIds.size());
     } catch (Exception e) {
       LOG.error("Failed to batch delete SCM states for {} containers", containerIds.size(), e);
       throw new RuntimeException("Failed to batch delete SCM states", e);
-    }
-  }
-
-  /**
-   * Batch delete REPLICA_MISMATCH state for multiple containers.
-   * This is separate from batchDeleteSCMStatesForContainers because
-   * REPLICA_MISMATCH is tracked locally by Recon, not by SCM.
-   *
-   * @param containerIds List of container IDs to delete REPLICA_MISMATCH for
-   */
-  public void batchDeleteReplicaMismatchForContainers(List<Long> containerIds) {
-    if (containerIds == null || containerIds.isEmpty()) {
-      return;
-    }
-
-    DSLContext dslContext = containerSchemaDefinitionV2.getDSLContext();
-    try {
-      int deleted = dslContext.deleteFrom(UNHEALTHY_CONTAINERS_V2)
-          .where(UNHEALTHY_CONTAINERS_V2.CONTAINER_ID.in(containerIds))
-          .and(UNHEALTHY_CONTAINERS_V2.CONTAINER_STATE.eq(
-              UnHealthyContainerStates.REPLICA_MISMATCH.toString()))
-          .execute();
-      LOG.debug("Batch deleted {} REPLICA_MISMATCH records for {} containers",
-          deleted, containerIds.size());
-    } catch (Exception e) {
-      LOG.error("Failed to batch delete REPLICA_MISMATCH for {} containers",
-          containerIds.size(), e);
-      throw new RuntimeException("Failed to batch delete REPLICA_MISMATCH", e);
     }
   }
 
@@ -321,6 +264,7 @@ public class ContainerHealthSchemaManagerV2 {
   /**
    * Clear all records from V2 table (for testing).
    */
+  @VisibleForTesting
   public void clearAllUnhealthyContainerRecords() {
     DSLContext dslContext = containerSchemaDefinitionV2.getDSLContext();
     try {

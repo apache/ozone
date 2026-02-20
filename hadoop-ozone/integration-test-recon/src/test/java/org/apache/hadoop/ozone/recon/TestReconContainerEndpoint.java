@@ -39,9 +39,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.recon.api.ContainerEndpoint;
 import org.apache.hadoop.ozone.recon.api.types.KeyMetadata;
 import org.apache.hadoop.ozone.recon.api.types.KeysResponse;
-import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
-import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskControllerImpl;
 import org.apache.ozone.test.GenericTestUtils;
@@ -215,18 +213,13 @@ public class TestReconContainerEndpoint {
   private Response getContainerEndpointResponse(long containerId) {
     OzoneStorageContainerManager reconSCM =
         recon.getReconServer().getReconStorageContainerManager();
-    ReconContainerManager reconContainerManager =
-        (ReconContainerManager) reconSCM.getContainerManager();
-    ContainerHealthSchemaManager containerHealthSchemaManager =
-        reconContainerManager.getContainerSchemaManager();
     ReconOMMetadataManager omMetadataManagerInstance =
         (ReconOMMetadataManager)
             recon.getReconServer().getOzoneManagerServiceProvider()
                 .getOMMetadataManagerInstance();
     ContainerEndpoint containerEndpoint =
-        new ContainerEndpoint(reconSCM, containerHealthSchemaManager,
+        new ContainerEndpoint(reconSCM,
             null, // ContainerHealthSchemaManagerV2 - not needed for this test
-            new OzoneConfiguration(), // OzoneConfiguration
             recon.getReconServer().getReconNamespaceSummaryManager(),
             recon.getReconServer().getReconContainerMetadataManager(),
             omMetadataManagerInstance);

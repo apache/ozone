@@ -18,11 +18,11 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 /**
- * A class which extents ReplicationQueue and does nothing. This is used when
+ * A class which extends ReplicationQueue and does nothing. This is used when
  * checking containers in a read-only mode, where we don't want to queue them
  * for replication.
  */
-public class NullReplicationQueue extends ReplicationQueue {
+public class NoOpsReplicationQueue extends ReplicationQueue {
 
   @Override
   public void enqueue(ContainerHealthResult.UnderReplicatedHealthResult

@@ -50,7 +50,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
-import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManagerV2;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
@@ -67,7 +66,6 @@ public class ReconContainerManager extends ContainerManagerImpl {
       LoggerFactory.getLogger(ReconContainerManager.class);
   private final StorageContainerServiceProvider scmClient;
   private final PipelineManager pipelineManager;
-  private final ContainerHealthSchemaManager containerHealthSchemaManager;
   private final ContainerHealthSchemaManagerV2 containerHealthSchemaManagerV2;
   private final ReconContainerMetadataManager cdbServiceProvider;
   private final Table<DatanodeID, DatanodeDetails> nodeDB;
@@ -83,7 +81,6 @@ public class ReconContainerManager extends ContainerManagerImpl {
       Table<ContainerID, ContainerInfo> containerStore,
       PipelineManager pipelineManager,
       StorageContainerServiceProvider scm,
-      ContainerHealthSchemaManager containerHealthSchemaManager,
       ContainerHealthSchemaManagerV2 containerHealthSchemaManagerV2,
       ReconContainerMetadataManager reconContainerMetadataManager,
       SCMHAManager scmhaManager,
@@ -94,7 +91,6 @@ public class ReconContainerManager extends ContainerManagerImpl {
         pendingOps);
     this.scmClient = scm;
     this.pipelineManager = pipelineManager;
-    this.containerHealthSchemaManager = containerHealthSchemaManager;
     this.containerHealthSchemaManagerV2 = containerHealthSchemaManagerV2;
     this.cdbServiceProvider = reconContainerMetadataManager;
     this.nodeDB = ReconSCMDBDefinition.NODES.getTable(store);
@@ -342,11 +338,6 @@ public class ReconContainerManager extends ContainerManagerImpl {
         replicaLastSeenMap.remove(uuid);
       }
     }
-  }
-
-  @VisibleForTesting
-  public ContainerHealthSchemaManager getContainerSchemaManager() {
-    return containerHealthSchemaManager;
   }
 
   @VisibleForTesting

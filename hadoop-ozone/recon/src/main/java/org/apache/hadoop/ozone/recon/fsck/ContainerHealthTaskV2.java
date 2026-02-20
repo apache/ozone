@@ -18,13 +18,8 @@
 package org.apache.hadoop.ozone.recon.fsck;
 
 import javax.inject.Inject;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.PlacementPolicy;
-import org.apache.hadoop.hdds.scm.container.ContainerManager;
-import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManagerV2;
 import org.apache.hadoop.ozone.recon.scm.ReconScmTask;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
-import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
 import org.slf4j.Logger;
@@ -37,7 +32,7 @@ import org.slf4j.LoggerFactory;
  * <ul>
  *   <li>Uses Recon's local ReplicationManager (not RPC to SCM)</li>
  *   <li>Calls processAll() once to check all containers in batch</li>
- *   <li>ReplicationManager uses stub PendingOps (NullContainerReplicaPendingOps)</li>
+ *   <li>ReplicationManager uses stub PendingOps (NoOpsContainerReplicaPendingOps)</li>
  *   <li>No false positives despite stub - health determination ignores pending ops</li>
  *   <li>All database operations handled inside ReconReplicationManager</li>
  * </ul>
@@ -52,7 +47,7 @@ import org.slf4j.LoggerFactory;
  * </ul>
  *
  * @see ReconReplicationManager
- * @see NullContainerReplicaPendingOps
+ * @see NoOpsContainerReplicaPendingOps
  */
 public class ContainerHealthTaskV2 extends ReconScmTask {
 
@@ -63,13 +58,7 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
   private final long interval;
 
   @Inject
-  @SuppressWarnings("checkstyle:ParameterNumber")
   public ContainerHealthTaskV2(
-      ContainerManager containerManager,
-      ContainerHealthSchemaManagerV2 schemaManagerV2,
-      PlacementPolicy placementPolicy,
-      ReconContainerMetadataManager reconContainerMetadataManager,
-      OzoneConfiguration conf,
       ReconTaskConfig reconTaskConfig,
       ReconTaskStatusUpdaterManager taskStatusUpdaterManager,
       ReconStorageContainerManagerFacade reconScm) {

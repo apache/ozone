@@ -20,9 +20,8 @@ package org.apache.hadoop.ozone.recon.fsck;
 import java.io.IOException;
 import java.time.Clock;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -32,8 +31,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport.HealthState;
-import org.apache.hadoop.hdds.scm.container.replication.NullReplicationQueue;
+import org.apache.hadoop.hdds.scm.container.replication.NoOpsReplicationQueue;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationQueue;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -50,7 +48,7 @@ import org.slf4j.LoggerFactory;
  *
  * <p><b>Key Differences from SCM:</b></p>
  * <ol>
- *   <li>Uses NullContainerReplicaPendingOps stub (no pending operations tracking)</li>
+ *   <li>Uses NoOpsContainerReplicaPendingOps stub (no pending operations tracking)</li>
  *   <li>Overrides processAll() to capture ALL container health states (no 100-sample limit)</li>
  *   <li>Stores results in Recon's UNHEALTHY_CONTAINERS_V2 table</li>
  *   <li>Does not issue replication commands (read-only monitoring)</li>
@@ -68,7 +66,7 @@ import org.slf4j.LoggerFactory;
  * Since Recon only needs Phase 1 (health determination) and doesn't issue commands,
  * the stub PendingOps does not cause false positives.</p>
  *
- * @see NullContainerReplicaPendingOps
+ * @see NoOpsContainerReplicaPendingOps
  * @see ReconReplicationManagerReport
  */
 public class ReconReplicationManager extends ReplicationManager {
@@ -79,34 +77,123 @@ public class ReconReplicationManager extends ReplicationManager {
   private final ContainerHealthSchemaManagerV2 healthSchemaManager;
   private final ContainerManager containerManager;
 
-  @SuppressWarnings("checkstyle:ParameterNumber")
+  /**
+   * Immutable wiring context for ReconReplicationManager initialization.
+   */
+  public static final class InitContext {
+    private final ReplicationManagerConfiguration rmConf;
+    private final ConfigurationSource conf;
+    private final ContainerManager containerManager;
+    private final PlacementPolicy ratisContainerPlacement;
+    private final PlacementPolicy ecContainerPlacement;
+    private final EventPublisher eventPublisher;
+    private final SCMContext scmContext;
+    private final NodeManager nodeManager;
+    private final Clock clock;
+
+    private InitContext(Builder builder) {
+      this.rmConf = builder.rmConf;
+      this.conf = builder.conf;
+      this.containerManager = builder.containerManager;
+      this.ratisContainerPlacement = builder.ratisContainerPlacement;
+      this.ecContainerPlacement = builder.ecContainerPlacement;
+      this.eventPublisher = builder.eventPublisher;
+      this.scmContext = builder.scmContext;
+      this.nodeManager = builder.nodeManager;
+      this.clock = builder.clock;
+    }
+
+    public static Builder newBuilder() {
+      return new Builder();
+    }
+
+    /**
+     * Builder for creating {@link InitContext} instances.
+     */
+    public static final class Builder {
+      private ReplicationManagerConfiguration rmConf;
+      private ConfigurationSource conf;
+      private ContainerManager containerManager;
+      private PlacementPolicy ratisContainerPlacement;
+      private PlacementPolicy ecContainerPlacement;
+      private EventPublisher eventPublisher;
+      private SCMContext scmContext;
+      private NodeManager nodeManager;
+      private Clock clock;
+
+      private Builder() {
+      }
+
+      public Builder setRmConf(ReplicationManagerConfiguration rmConf) {
+        this.rmConf = rmConf;
+        return this;
+      }
+
+      public Builder setConf(ConfigurationSource conf) {
+        this.conf = conf;
+        return this;
+      }
+
+      public Builder setContainerManager(ContainerManager containerManager) {
+        this.containerManager = containerManager;
+        return this;
+      }
+
+      public Builder setRatisContainerPlacement(PlacementPolicy ratisContainerPlacement) {
+        this.ratisContainerPlacement = ratisContainerPlacement;
+        return this;
+      }
+
+      public Builder setEcContainerPlacement(PlacementPolicy ecContainerPlacement) {
+        this.ecContainerPlacement = ecContainerPlacement;
+        return this;
+      }
+
+      public Builder setEventPublisher(EventPublisher eventPublisher) {
+        this.eventPublisher = eventPublisher;
+        return this;
+      }
+
+      public Builder setScmContext(SCMContext scmContext) {
+        this.scmContext = scmContext;
+        return this;
+      }
+
+      public Builder setNodeManager(NodeManager nodeManager) {
+        this.nodeManager = nodeManager;
+        return this;
+      }
+
+      public Builder setClock(Clock clock) {
+        this.clock = clock;
+        return this;
+      }
+
+      public InitContext build() {
+        return new InitContext(this);
+      }
+    }
+  }
+
   public ReconReplicationManager(
-      ReplicationManagerConfiguration rmConf,
-      ConfigurationSource conf,
-      ContainerManager containerManager,
-      PlacementPolicy ratisContainerPlacement,
-      PlacementPolicy ecContainerPlacement,
-      EventPublisher eventPublisher,
-      SCMContext scmContext,
-      NodeManager nodeManager,
-      Clock clock,
+      InitContext initContext,
       ContainerHealthSchemaManagerV2 healthSchemaManager) throws IOException {
 
     // Call parent with stub PendingOps (proven to not cause false positives)
     super(
-        rmConf,
-        conf,
-        containerManager,
-        ratisContainerPlacement,
-        ecContainerPlacement,
-        eventPublisher,
-        scmContext,
-        nodeManager,
-        clock,
-        new NullContainerReplicaPendingOps(clock, rmConf)
+        initContext.rmConf,
+        initContext.conf,
+        initContext.containerManager,
+        initContext.ratisContainerPlacement,
+        initContext.ecContainerPlacement,
+        initContext.eventPublisher,
+        initContext.scmContext,
+        initContext.nodeManager,
+        initContext.clock,
+        new NoOpsContainerReplicaPendingOps(initContext.clock, initContext.rmConf)
     );
 
-    this.containerManager = containerManager;
+    this.containerManager = initContext.containerManager;
     this.healthSchemaManager = healthSchemaManager;
   }
 
@@ -145,7 +232,7 @@ public class ReconReplicationManager extends ReplicationManager {
    * </ul>
    * </p>
    *
-   * <p>This matches the legacy ContainerHealthTask logic:
+   * <p>This uses checksum mismatch logic:
    * {@code replicas.stream().map(ContainerReplica::getDataChecksum).distinct().count() != 1}
    * </p>
    *
@@ -185,7 +272,7 @@ public class ReconReplicationManager extends ReplicationManager {
    * <p><b>Differences from SCM's processAll():</b></p>
    * <ul>
    *   <li>Uses ReconReplicationManagerReport (captures all containers)</li>
-   *   <li>Uses NullReplicationQueue (doesn't enqueue commands)</li>
+   *   <li>Uses NoOpsReplicationQueue (doesn't enqueue commands)</li>
    *   <li>Adds REPLICA_MISMATCH detection (not done by SCM)</li>
    *   <li>Stores results in database instead of just keeping in-memory report</li>
    * </ul>
@@ -198,7 +285,7 @@ public class ReconReplicationManager extends ReplicationManager {
 
     // Use extended report that captures ALL containers, not just 100 samples
     final ReconReplicationManagerReport report = new ReconReplicationManagerReport();
-    final ReplicationQueue nullQueue = new NullReplicationQueue();
+    final ReplicationQueue nullQueue = new NoOpsReplicationQueue();
 
     // Get all containers (same as parent)
     final List<ContainerInfo> containers = containerManager.getContainers();
@@ -257,84 +344,90 @@ public class ReconReplicationManager extends ReplicationManager {
     long currentTime = System.currentTimeMillis();
     List<UnhealthyContainerRecordV2> recordsToInsert = new ArrayList<>();
     List<Long> containerIdsToDelete = new ArrayList<>();
+    final int[] missingCount = {0};
+    final int[] underRepCount = {0};
+    final int[] overRepCount = {0};
+    final int[] misRepCount = {0};
+    final int[] emptyMissingCount = {0};
+    final int[] negativeSizeCount = {0};
+    Set<Long> negativeSizeRecorded = new HashSet<>();
 
-    // Get all containers per health state (not just 100 samples)
-    Map<HealthState, List<ContainerID>> containersByState =
-        report.getAllContainersByState();
+    report.forEachContainerByState((state, cid) -> {
+      try {
+        switch (state) {
+        case MISSING:
+          ContainerInfo missingContainer = containerManager.getContainer(cid);
+          if (isEmptyMissing(missingContainer)) {
+            emptyMissingCount[0]++;
+            int missingExpected = missingContainer.getReplicationConfig().getRequiredNodes();
+            recordsToInsert.add(createRecord(missingContainer,
+                UnHealthyContainerStates.EMPTY_MISSING, currentTime, missingExpected, 0,
+                "Container has no replicas and no keys"));
+            break;
+          }
+          missingCount[0]++;
+          int nonEmptyMissingExpected =
+              missingContainer.getReplicationConfig().getRequiredNodes();
+          recordsToInsert.add(createRecord(missingContainer,
+              UnHealthyContainerStates.MISSING, currentTime, nonEmptyMissingExpected, 0,
+              "No replicas available"));
+          break;
+        case UNDER_REPLICATED:
+          underRepCount[0]++;
+          ContainerInfo underRepContainer = containerManager.getContainer(cid);
+          Set<ContainerReplica> underReplicas = containerManager.getContainerReplicas(cid);
+          int underRepExpected = underRepContainer.getReplicationConfig().getRequiredNodes();
+          int underRepActual = underReplicas.size();
+          recordsToInsert.add(createRecord(underRepContainer,
+              UnHealthyContainerStates.UNDER_REPLICATED, currentTime,
+              underRepExpected, underRepActual,
+              "Insufficient replicas"));
+          addNegativeSizeRecordIfNeeded(underRepContainer, currentTime, underRepActual, recordsToInsert,
+              negativeSizeRecorded, negativeSizeCount);
+          break;
+        case OVER_REPLICATED:
+          overRepCount[0]++;
+          ContainerInfo overRepContainer = containerManager.getContainer(cid);
+          Set<ContainerReplica> overReplicas = containerManager.getContainerReplicas(cid);
+          int overRepExpected = overRepContainer.getReplicationConfig().getRequiredNodes();
+          int overRepActual = overReplicas.size();
+          recordsToInsert.add(createRecord(overRepContainer,
+              UnHealthyContainerStates.OVER_REPLICATED, currentTime,
+              overRepExpected, overRepActual,
+              "Excess replicas"));
+          addNegativeSizeRecordIfNeeded(overRepContainer, currentTime, overRepActual, recordsToInsert,
+              negativeSizeRecorded, negativeSizeCount);
+          break;
+        case MIS_REPLICATED:
+          misRepCount[0]++;
+          ContainerInfo misRepContainer = containerManager.getContainer(cid);
+          Set<ContainerReplica> misReplicas = containerManager.getContainerReplicas(cid);
+          int misRepExpected = misRepContainer.getReplicationConfig().getRequiredNodes();
+          int misRepActual = misReplicas.size();
+          recordsToInsert.add(createRecord(misRepContainer,
+              UnHealthyContainerStates.MIS_REPLICATED, currentTime, misRepExpected, misRepActual,
+              "Placement policy violated"));
+          addNegativeSizeRecordIfNeeded(misRepContainer, currentTime, misRepActual, recordsToInsert,
+              negativeSizeRecorded, negativeSizeCount);
+          break;
+        default:
+          break;
+        }
+      } catch (ContainerNotFoundException e) {
+        LOG.warn("Container {} not found when processing {} state", cid, state, e);
+      }
+    });
 
-    LOG.info("Processing health states: MISSING={}, UNDER_REPLICATED={}, " +
-            "OVER_REPLICATED={}, MIS_REPLICATED={}, REPLICA_MISMATCH={}",
-        report.getAllContainersCount(HealthState.MISSING),
-        report.getAllContainersCount(HealthState.UNDER_REPLICATED),
-        report.getAllContainersCount(HealthState.OVER_REPLICATED),
-        report.getAllContainersCount(HealthState.MIS_REPLICATED),
+    LOG.info("Processing health states: MISSING={}, EMPTY_MISSING={}, " +
+            "UNDER_REPLICATED={}, OVER_REPLICATED={}, MIS_REPLICATED={}, " +
+            "NEGATIVE_SIZE={}, REPLICA_MISMATCH={}",
+        missingCount[0],
+        emptyMissingCount[0],
+        underRepCount[0],
+        overRepCount[0],
+        misRepCount[0],
+        negativeSizeCount[0],
         report.getReplicaMismatchCount());
-
-    // Process MISSING containers
-    List<ContainerID> missingContainers =
-        containersByState.getOrDefault(HealthState.MISSING, Collections.emptyList());
-    for (ContainerID cid : missingContainers) {
-      try {
-        ContainerInfo container = containerManager.getContainer(cid);
-        int expected = container.getReplicationConfig().getRequiredNodes();
-        recordsToInsert.add(createRecord(container,
-            UnHealthyContainerStates.MISSING, currentTime, expected, 0,
-            "No replicas available"));
-      } catch (ContainerNotFoundException e) {
-        LOG.warn("Container {} not found when processing MISSING state", cid, e);
-      }
-    }
-
-    // Process UNDER_REPLICATED containers
-    List<ContainerID> underRepContainers =
-        containersByState.getOrDefault(HealthState.UNDER_REPLICATED, Collections.emptyList());
-    for (ContainerID cid : underRepContainers) {
-      try {
-        ContainerInfo container = containerManager.getContainer(cid);
-        Set<ContainerReplica> replicas = containerManager.getContainerReplicas(cid);
-        int expected = container.getReplicationConfig().getRequiredNodes();
-        int actual = replicas.size();
-        recordsToInsert.add(createRecord(container,
-            UnHealthyContainerStates.UNDER_REPLICATED, currentTime, expected, actual,
-            "Insufficient replicas"));
-      } catch (ContainerNotFoundException e) {
-        LOG.warn("Container {} not found when processing UNDER_REPLICATED state", cid, e);
-      }
-    }
-
-    // Process OVER_REPLICATED containers
-    List<ContainerID> overRepContainers =
-        containersByState.getOrDefault(HealthState.OVER_REPLICATED, Collections.emptyList());
-    for (ContainerID cid : overRepContainers) {
-      try {
-        ContainerInfo container = containerManager.getContainer(cid);
-        Set<ContainerReplica> replicas = containerManager.getContainerReplicas(cid);
-        int expected = container.getReplicationConfig().getRequiredNodes();
-        int actual = replicas.size();
-        recordsToInsert.add(createRecord(container,
-            UnHealthyContainerStates.OVER_REPLICATED, currentTime, expected, actual,
-            "Excess replicas"));
-      } catch (ContainerNotFoundException e) {
-        LOG.warn("Container {} not found when processing OVER_REPLICATED state", cid, e);
-      }
-    }
-
-    // Process MIS_REPLICATED containers
-    List<ContainerID> misRepContainers =
-        containersByState.getOrDefault(HealthState.MIS_REPLICATED, Collections.emptyList());
-    for (ContainerID cid : misRepContainers) {
-      try {
-        ContainerInfo container = containerManager.getContainer(cid);
-        Set<ContainerReplica> replicas = containerManager.getContainerReplicas(cid);
-        int expected = container.getReplicationConfig().getRequiredNodes();
-        int actual = replicas.size();
-        recordsToInsert.add(createRecord(container,
-            UnHealthyContainerStates.MIS_REPLICATED, currentTime, expected, actual,
-            "Placement policy violated"));
-      } catch (ContainerNotFoundException e) {
-        LOG.warn("Container {} not found when processing MIS_REPLICATED state", cid);
-      }
-    }
 
     // Process REPLICA_MISMATCH containers (Recon-specific)
     List<ContainerID> replicaMismatchContainers = report.getReplicaMismatchContainers();
@@ -364,11 +457,37 @@ public class ReconReplicationManager extends ReplicationManager {
     LOG.info("Inserting {} unhealthy container records", recordsToInsert.size());
     healthSchemaManager.insertUnhealthyContainerRecords(recordsToInsert);
 
-    LOG.info("Stored {} MISSING, {} UNDER_REPLICATED, {} OVER_REPLICATED, " +
-            "{} MIS_REPLICATED, {} REPLICA_MISMATCH",
-        missingContainers.size(), underRepContainers.size(),
-        overRepContainers.size(), misRepContainers.size(),
+    LOG.info("Stored {} MISSING, {} EMPTY_MISSING, {} UNDER_REPLICATED, " +
+            "{} OVER_REPLICATED, {} MIS_REPLICATED, {} NEGATIVE_SIZE, " +
+            "{} REPLICA_MISMATCH",
+        missingCount[0], emptyMissingCount[0], underRepCount[0],
+        overRepCount[0], misRepCount[0], negativeSizeCount[0],
         replicaMismatchContainers.size());
+  }
+
+  private boolean isEmptyMissing(ContainerInfo container) {
+    return container.getNumberOfKeys() == 0;
+  }
+
+  private boolean isNegativeSize(ContainerInfo container) {
+    return container.getUsedBytes() < 0;
+  }
+
+  private void addNegativeSizeRecordIfNeeded(
+      ContainerInfo container,
+      long currentTime,
+      int actualReplicaCount,
+      List<UnhealthyContainerRecordV2> recordsToInsert,
+      Set<Long> negativeSizeRecorded,
+      int[] negativeSizeCount) {
+    if (isNegativeSize(container)
+        && negativeSizeRecorded.add(container.getContainerID())) {
+      int expected = container.getReplicationConfig().getRequiredNodes();
+      recordsToInsert.add(createRecord(container,
+          UnHealthyContainerStates.NEGATIVE_SIZE, currentTime, expected, actualReplicaCount,
+          "Container reports negative usedBytes"));
+      negativeSizeCount[0]++;
+    }
   }
 
   /**

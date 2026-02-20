@@ -25,16 +25,29 @@ import static org.mockito.Mockito.when;
 import java.time.Clock;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationQueue;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManagerV2;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinitionV2;
+import org.apache.ozone.recon.schema.ContainerSchemaDefinitionV2.UnHealthyContainerStates;
 import org.apache.ozone.recon.schema.generated.tables.daos.UnhealthyContainersV2Dao;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -80,18 +93,67 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
     when(scmContext.isInSafeMode()).thenReturn(false);
 
     // Create ReconReplicationManager
-    reconRM = new ReconReplicationManager(
-        new ReplicationManager.ReplicationManagerConfiguration(),
-        new OzoneConfiguration(),
-        containerManager,
-        placementPolicy,
-        placementPolicy,
-        new EventQueue(),
-        scmContext,
-        nodeManager,
-        Clock.system(ZoneId.systemDefault()),
-        schemaManagerV2
-    );
+    ReconReplicationManager.InitContext initContext =
+        ReconReplicationManager.InitContext.newBuilder()
+            .setRmConf(new ReplicationManager.ReplicationManagerConfiguration())
+            .setConf(new OzoneConfiguration())
+            .setContainerManager(containerManager)
+            .setRatisContainerPlacement(placementPolicy)
+            .setEcContainerPlacement(placementPolicy)
+            .setEventPublisher(new EventQueue())
+            .setScmContext(scmContext)
+            .setNodeManager(nodeManager)
+            .setClock(Clock.system(ZoneId.systemDefault()))
+            .build();
+
+    reconRM = new ReconReplicationManager(initContext, schemaManagerV2);
+  }
+
+  @Test
+  public void testProcessAllStoresEmptyMissingAndNegativeSizeRecords()
+      throws Exception {
+    final long emptyMissingContainerId = 101L;
+    final long negativeSizeContainerId = 202L;
+
+    ContainerInfo emptyMissingContainer = mockContainerInfo(
+        emptyMissingContainerId, 0, 1024L, 3);
+    ContainerInfo negativeSizeContainer = mockContainerInfo(
+        negativeSizeContainerId, 7, -1L, 3);
+    List<ContainerInfo> containers = new ArrayList<>();
+    containers.add(emptyMissingContainer);
+    containers.add(negativeSizeContainer);
+
+    Set<ContainerReplica> emptyReplicas = Collections.emptySet();
+    Set<ContainerReplica> underReplicatedReplicas = new HashSet<>();
+    underReplicatedReplicas.add(mock(ContainerReplica.class));
+    underReplicatedReplicas.add(mock(ContainerReplica.class));
+
+    when(containerManager.getContainers()).thenReturn(containers);
+    when(containerManager.getContainer(ContainerID.valueOf(emptyMissingContainerId)))
+        .thenReturn(emptyMissingContainer);
+    when(containerManager.getContainer(ContainerID.valueOf(negativeSizeContainerId)))
+        .thenReturn(negativeSizeContainer);
+    when(containerManager.getContainerReplicas(ContainerID.valueOf(emptyMissingContainerId)))
+        .thenReturn(emptyReplicas);
+    when(containerManager.getContainerReplicas(ContainerID.valueOf(negativeSizeContainerId)))
+        .thenReturn(underReplicatedReplicas);
+
+    // Deterministically inject health states for this test to verify DB writes.
+    reconRM = createStateInjectingReconRM(
+        emptyMissingContainerId, negativeSizeContainerId);
+    reconRM.processAll();
+
+    List<ContainerHealthSchemaManagerV2.UnhealthyContainerRecordV2> emptyMissing =
+        schemaManagerV2.getUnhealthyContainers(
+            UnHealthyContainerStates.EMPTY_MISSING, 0, 0, 100);
+    assertEquals(1, emptyMissing.size());
+    assertEquals(emptyMissingContainerId, emptyMissing.get(0).getContainerId());
+
+    List<ContainerHealthSchemaManagerV2.UnhealthyContainerRecordV2> negativeSize =
+        schemaManagerV2.getUnhealthyContainers(
+            UnHealthyContainerStates.NEGATIVE_SIZE, 0, 0, 100);
+    assertEquals(1, negativeSize.size());
+    assertEquals(negativeSizeContainerId, negativeSize.get(0).getContainerId());
   }
 
   @Test
@@ -169,5 +231,63 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
     schemaManagerV2.insertUnhealthyContainerRecords(new ArrayList<>());
 
     // No assertion needed - just verify no exceptions thrown
+  }
+
+  private ContainerInfo mockContainerInfo(long containerId, long numberOfKeys,
+      long usedBytes, int requiredNodes) {
+    ContainerInfo containerInfo = mock(ContainerInfo.class);
+    ReplicationConfig replicationConfig = mock(ReplicationConfig.class);
+
+    when(containerInfo.getContainerID()).thenReturn(containerId);
+    when(containerInfo.containerID()).thenReturn(ContainerID.valueOf(containerId));
+    when(containerInfo.getNumberOfKeys()).thenReturn(numberOfKeys);
+    when(containerInfo.getUsedBytes()).thenReturn(usedBytes);
+    when(containerInfo.getReplicationConfig()).thenReturn(replicationConfig);
+    when(containerInfo.getState()).thenReturn(HddsProtos.LifeCycleState.CLOSED);
+    when(replicationConfig.getRequiredNodes()).thenReturn(requiredNodes);
+    return containerInfo;
+  }
+
+  private ReconReplicationManager createStateInjectingReconRM(
+      long emptyMissingContainerId,
+      long negativeSizeContainerId) throws Exception {
+    PlacementPolicy placementPolicy = mock(PlacementPolicy.class);
+    SCMContext scmContext = mock(SCMContext.class);
+    NodeManager nodeManager = mock(NodeManager.class);
+    when(scmContext.isLeader()).thenReturn(true);
+    when(scmContext.isInSafeMode()).thenReturn(false);
+
+    ReconReplicationManager.InitContext initContext =
+        ReconReplicationManager.InitContext.newBuilder()
+            .setRmConf(new ReplicationManager.ReplicationManagerConfiguration())
+            .setConf(new OzoneConfiguration())
+            .setContainerManager(containerManager)
+            .setRatisContainerPlacement(placementPolicy)
+            .setEcContainerPlacement(placementPolicy)
+            .setEventPublisher(new EventQueue())
+            .setScmContext(scmContext)
+            .setNodeManager(nodeManager)
+            .setClock(Clock.system(ZoneId.systemDefault()))
+            .build();
+
+    return new ReconReplicationManager(initContext, schemaManagerV2) {
+      @Override
+      protected boolean processContainer(ContainerInfo containerInfo,
+          ReplicationQueue repQueue, ReplicationManagerReport report,
+          boolean readOnly) {
+        ReconReplicationManagerReport reconReport =
+            (ReconReplicationManagerReport) report;
+        if (containerInfo.getContainerID() == emptyMissingContainerId) {
+          reconReport.incrementAndSample(ContainerHealthState.MISSING, containerInfo);
+          return true;
+        }
+        if (containerInfo.getContainerID() == negativeSizeContainerId) {
+          reconReport.incrementAndSample(
+              ContainerHealthState.UNDER_REPLICATED, containerInfo);
+          return true;
+        }
+        return false;
+      }
+    };
   }
 }

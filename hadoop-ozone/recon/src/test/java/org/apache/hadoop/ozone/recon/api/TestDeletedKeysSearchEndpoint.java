@@ -44,7 +44,6 @@ import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
-import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
@@ -100,7 +99,6 @@ public class TestDeletedKeysSearchEndpoint extends AbstractReconSqlDBTest {
             .addBinding(StorageContainerServiceProvider.class,
                 mock(StorageContainerServiceProviderImpl.class))
             .addBinding(OMDBInsightEndpoint.class)
-            .addBinding(ContainerHealthSchemaManager.class)
             .build();
     omdbInsightEndpoint = reconTestInjector.getInstance(OMDBInsightEndpoint.class);
     populateOMDB();

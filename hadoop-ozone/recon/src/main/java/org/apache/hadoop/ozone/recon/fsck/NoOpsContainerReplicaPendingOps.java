@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
 /**
- * Null implementation of ContainerReplicaPendingOps for Recon's
+ * No-op implementation of ContainerReplicaPendingOps for Recon's
  * local ReplicationManager.
  *
  * <p>This stub always returns empty pending operations because Recon does not
@@ -40,9 +40,9 @@ import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
  * deduplication (Phase 2), which Recon doesn't need since it doesn't enqueue
  * commands.</p>
  */
-public class NullContainerReplicaPendingOps extends ContainerReplicaPendingOps {
+public class NoOpsContainerReplicaPendingOps extends ContainerReplicaPendingOps {
 
-  public NullContainerReplicaPendingOps(Clock clock,
+  public NoOpsContainerReplicaPendingOps(Clock clock,
       ReplicationManager.ReplicationManagerConfiguration rmConf) {
     super(clock, rmConf);
   }
@@ -63,16 +63,19 @@ public class NullContainerReplicaPendingOps extends ContainerReplicaPendingOps {
   /**
    * No-op since Recon doesn't add pending operations.
    */
+  @Override
   public void scheduleAddReplica(ContainerID containerID, DatanodeDetails target,
-      SCMCommand<?> command, int replicaIndex, long containerSize) {
+      int replicaIndex, SCMCommand<?> command, long deadlineEpochMillis,
+      long containerSize, long scheduledEpochMillis) {
     // No-op - Recon doesn't send commands
   }
 
   /**
    * No-op since Recon doesn't add pending operations.
    */
+  @Override
   public void scheduleDeleteReplica(ContainerID containerID, DatanodeDetails target,
-      SCMCommand<?> command, int replicaIndex) {
+      int replicaIndex, SCMCommand<?> command, long deadlineEpochMillis) {
     // No-op - Recon doesn't send commands
   }
 
@@ -106,10 +109,4 @@ public class NullContainerReplicaPendingOps extends ContainerReplicaPendingOps {
     return 0L;
   }
 
-  /**
-   * Always returns 0 since Recon has no pending operations.
-   */
-  public long getTotalScheduledBytes(DatanodeDetails datanode) {
-    return 0L;
-  }
 }
