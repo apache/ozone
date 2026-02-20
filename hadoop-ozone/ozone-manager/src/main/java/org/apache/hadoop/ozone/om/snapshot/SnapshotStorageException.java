@@ -17,8 +17,7 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
-import java.io.UncheckedIOException;
-import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
+import java.io.IOException;
 import org.rocksdb.RocksDBException;
 
 /**
@@ -30,15 +29,49 @@ public class SnapshotStorageException extends RuntimeException {
     super(message, cause);
   }
 
-  public static SnapshotStorageException fromRocksDB(String op,
-                                                      RocksDBException e) {
-    return new SnapshotStorageException("Failed to " + op,
-        new RocksDatabaseException("Failed to " + op, e));
+  /**
+   * A supplier that may throw {@link RocksDBException} or {@link IOException}.
+   */
+  @FunctionalInterface
+  public interface CheckedSupplier<T> {
+    T get() throws RocksDBException, IOException;
   }
 
-  public static SnapshotStorageException fromIO(String op,
-                                                java.io.IOException e) {
-    return new SnapshotStorageException("Failed to " + op,
-        new UncheckedIOException(e));
+  /**
+   * A runnable that may throw {@link RocksDBException} or {@link IOException}.
+   */
+  @FunctionalInterface
+  public interface CheckedRunnable {
+    void run() throws RocksDBException, IOException;
+  }
+
+  /**
+   * Execute a supplier that may throw checked exceptions, wrapping any
+   * {@link RocksDBException} or {@link IOException} in a
+   * {@link SnapshotStorageException}.
+   */
+  public static <T> T wrap(String op, CheckedSupplier<T> supplier) {
+    try {
+      return supplier.get();
+    } catch (RocksDBException e) {
+      throw new SnapshotStorageException(op, e);
+    } catch (IOException e) {
+      throw new SnapshotStorageException(op, e);
+    }
+  }
+
+  /**
+   * Execute a runnable that may throw checked exceptions, wrapping any
+   * {@link RocksDBException} or {@link IOException} in a
+   * {@link SnapshotStorageException}.
+   */
+  public static void wrap(String op, CheckedRunnable runnable) {
+    try {
+      runnable.run();
+    } catch (RocksDBException e) {
+      throw new SnapshotStorageException(op, e);
+    } catch (IOException e) {
+      throw new SnapshotStorageException(op, e);
+    }
   }
 }
