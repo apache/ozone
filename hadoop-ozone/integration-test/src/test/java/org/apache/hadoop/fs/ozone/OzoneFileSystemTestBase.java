@@ -17,11 +17,8 @@
 
 package org.apache.hadoop.fs.ozone;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_LISTING_PAGE_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_OFS_URI_SCHEME;
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_SCHEME;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -39,35 +36,19 @@ import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RemoteIterator;
 import org.apache.hadoop.fs.contract.ContractTestUtils;
-import org.apache.hadoop.hdds.conf.ConfigurationTarget;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.ratis.util.Preconditions;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.client.OzoneKeyDetails;
 
 /**
  * Common test cases for Ozone file systems.
  */
-public final class OzoneFileSystemTests {
-
-  private OzoneFileSystemTests() {
-    // no instances
-  }
-
-  /**
-   * Set file system listing page size.  Also disable the file system cache to
-   * ensure new {@link FileSystem} instance reflects the updated page size.
-   */
-  public static void setPageSize(ConfigurationTarget conf, int pageSize) {
-    Preconditions.assertTrue(pageSize > 0, () -> "pageSize=" + pageSize + " <= 0");
-    conf.setInt(OZONE_FS_LISTING_PAGE_SIZE, pageSize);
-    conf.setBoolean(String.format("fs.%s.impl.disable.cache", OZONE_URI_SCHEME), true);
-    conf.setBoolean(String.format("fs.%s.impl.disable.cache", OZONE_OFS_URI_SCHEME), true);
-  }
-
+public abstract class OzoneFileSystemTestBase {
   /**
    * Tests listStatusIterator operation on directory with different
    * numbers of child directories.
    */
-  public static void listStatusIteratorOnPageSize(OzoneConfiguration conf,
+  static void listStatusIteratorOnPageSize(OzoneConfiguration conf,
       String rootPath) throws IOException {
     final int pageSize = 32;
     int[] dirCounts = {
@@ -79,7 +60,7 @@ public final class OzoneFileSystemTests {
         pageSize + pageSize
     };
     OzoneConfiguration config = new OzoneConfiguration(conf);
-    setPageSize(config, pageSize);
+    OzoneFileSystemTestUtils.setPageSize(config, pageSize);
     URI uri = FileSystem.getDefaultUri(config);
     try (FileSystem subject = FileSystem.get(uri, config)) {
       Path dir = new Path(Objects.requireNonNull(rootPath),
@@ -117,7 +98,7 @@ public final class OzoneFileSystemTests {
     assertEquals(total, iCount);
   }
 
-  static void createKeyWithECReplicationConfiguration(OzoneConfiguration inputConf, Path keyPath)
+  private void createKeyWithECReplicationConfiguration(OzoneConfiguration inputConf, Path keyPath)
       throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration(inputConf);
     conf.set(OZONE_REPLICATION, "rs-3-2-1024k");
@@ -130,7 +111,7 @@ public final class OzoneFileSystemTests {
     }
   }
 
-  public static void listLocatedStatusForZeroByteFile(FileSystem fs, Path path) throws IOException {
+  static void listLocatedStatusForZeroByteFile(FileSystem fs, Path path) throws IOException {
     // create empty file
     ContractTestUtils.touch(fs, path);
 
@@ -162,4 +143,71 @@ public final class OzoneFileSystemTests {
     assertEquals(1, fileStatuses.length);
     assertFalse(fileStatuses[0] instanceof LocatedFileStatus);
   }
+
+  void createKeyWithECReplicationConfig(Path root, OzoneConfiguration conf) throws IOException {
+    Path testKeyPath = new Path(root, "testKey");
+    createKeyWithECReplicationConfiguration(conf, testKeyPath);
+
+    OzoneKeyDetails key = getKey(testKeyPath, false);
+    assertEquals(HddsProtos.ReplicationType.EC,
+        key.getReplicationConfig().getReplicationType());
+    assertEquals("rs-3-2-1024k",
+        key.getReplicationConfig().getReplication());
+  }
+
+  void listStatusIteratorWithDir(Path root) throws Exception {
+    Path parent = new Path(root, "testListStatus");
+    Path file1 = new Path(parent, "key1");
+    Path file2 = new Path(parent, "key2");
+    FileSystem fs = getFs();
+    try {
+      // Iterator should have no items when dir is empty
+      RemoteIterator<FileStatus> it = fs.listStatusIterator(root);
+      assertFalse(it.hasNext());
+
+      ContractTestUtils.touch(fs, file1);
+      ContractTestUtils.touch(fs, file2);
+      // Iterator should have an item when dir is not empty
+      it = fs.listStatusIterator(root);
+      while (it.hasNext()) {
+        FileStatus fileStatus = it.next();
+        assertNotNull(fileStatus);
+        assertEquals(fileStatus.getPath().toUri().getPath(), parent.toString(), "Parent path doesn't match");
+      }
+      // Iterator on a directory should return all subdirs along with
+      // files, even if there exists a file and sub-dir with the same name.
+      it = fs.listStatusIterator(parent);
+      int iCount = 0;
+      while (it.hasNext()) {
+        iCount++;
+        FileStatus fileStatus = it.next();
+        assertNotNull(fileStatus);
+      }
+      assertEquals(2, iCount, "Iterator did not return all the file status");
+      // Iterator should return file status for only the
+      // immediate children of a directory.
+      Path file3 = new Path(parent, "dir1/key3");
+      Path file4 = new Path(parent, "dir1/key4");
+      ContractTestUtils.touch(fs, file3);
+      ContractTestUtils.touch(fs, file4);
+      it = fs.listStatusIterator(parent);
+      iCount = 0;
+
+      while (it.hasNext()) {
+        iCount++;
+        FileStatus fileStatus = it.next();
+        assertNotNull(fileStatus);
+      }
+      assertEquals(3, iCount, "Iterator did not return file status " +
+          "of all the children of the directory");
+
+    } finally {
+      // Cleanup
+      fs.delete(parent, true);
+    }
+  }
+
+  abstract OzoneKeyDetails getKey(Path keyPath, boolean isDirectory) throws IOException;
+
+  abstract FileSystem getFs();
 }

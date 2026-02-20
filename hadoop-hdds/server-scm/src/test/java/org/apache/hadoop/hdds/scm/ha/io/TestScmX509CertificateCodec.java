@@ -52,8 +52,7 @@ public class TestScmX509CertificateCodec {
     ScmX509CertificateCodec scmX509CertificateCodec = new ScmX509CertificateCodec();
     ByteString byteString = scmX509CertificateCodec.serialize(x509Certificate);
 
-    X509Certificate actual = (X509Certificate)
-        scmX509CertificateCodec.deserialize(X509Certificate.class, byteString);
+    X509Certificate actual = scmX509CertificateCodec.deserialize(X509Certificate.class, byteString);
 
     assertEquals(x509Certificate, actual);
 

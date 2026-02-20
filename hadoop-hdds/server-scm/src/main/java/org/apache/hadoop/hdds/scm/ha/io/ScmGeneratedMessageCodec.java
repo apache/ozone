@@ -26,7 +26,7 @@ import org.apache.ratis.thirdparty.com.google.protobuf.Message;
 /**
  * {@link ScmCodec} for {@link Message} objects.
  */
-public class ScmGeneratedMessageCodec implements ScmCodec {
+public class ScmGeneratedMessageCodec implements ScmCodec<Object> {
 
   @Override
   public ByteString serialize(Object object) throws InvalidProtocolBufferException {

@@ -28,7 +28,7 @@ import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
  * {@link ScmCodec} implementation for non-shaded
  * {@link com.google.protobuf.Message} objects.
  */
-public class ScmNonShadedGeneratedMessageCodec implements ScmCodec {
+public class ScmNonShadedGeneratedMessageCodec implements ScmCodec<Object> {
 
   @Override
   public ByteString serialize(Object object)
