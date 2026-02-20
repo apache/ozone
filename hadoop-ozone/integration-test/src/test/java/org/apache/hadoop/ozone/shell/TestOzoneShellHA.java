@@ -130,7 +130,7 @@ import picocli.CommandLine.RunLast;
 @TestMethodOrder(OrderAnnotation.class)
 public class TestOzoneShellHA {
 
-  protected static final Logger LOG =
+  private static final Logger LOG =
       LoggerFactory.getLogger(TestOzoneShellHA.class);
 
   private static final String DEFAULT_ENCODING = UTF_8.name();
