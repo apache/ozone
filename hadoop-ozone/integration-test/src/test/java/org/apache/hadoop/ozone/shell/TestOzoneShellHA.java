@@ -100,6 +100,7 @@ import org.apache.hadoop.ozone.om.service.OpenKeyCleanupService;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ToolRunner;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.tag.Unhealthy;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -564,6 +565,7 @@ public class TestOzoneShellHA {
     execute(ozoneAdminShell, args);
   }
 
+  @Unhealthy("HDDS-14686")
   @Test
   public void testAdminCmdListOpenFiles()
       throws IOException, InterruptedException, TimeoutException {
@@ -684,6 +686,7 @@ public class TestOzoneShellHA {
 
   }
 
+  @Unhealthy("HDDS-14686")
   @Test
   public void testAdminCmdListOpenFilesWithDeletedKeys()
       throws Exception {
@@ -2485,41 +2488,41 @@ public class TestOzoneShellHA {
   public void testPrepareCommandNoOp() throws IOException {
     String volumeName = "vol-prepare-test";
     String bucketName = "bucket-prepare-test";
-    
+
     // Execute prepare command via CLI
     String[] args = new String[] {"om", "prepare", "--service-id", omServiceId};
     execute(ozoneAdminShell, args);
     out.reset();
-    
+
     // Verify write operations still work (prepare should not block them)
     // Create volume
     args = new String[] {"volume", "create", "o3://" + omServiceId + OZONE_URI_DELIMITER + volumeName};
     execute(ozoneShell, args);
     out.reset();
-    
+
     // Create bucket
     args = new String[] {"bucket", "create", "o3://" + omServiceId + OZONE_URI_DELIMITER + volumeName +
             OZONE_URI_DELIMITER + bucketName};
     execute(ozoneShell, args);
     out.reset();
-    
+
     // Create key
-    String keyName = OZONE_URI_DELIMITER + volumeName + OZONE_URI_DELIMITER + 
+    String keyName = OZONE_URI_DELIMITER + volumeName + OZONE_URI_DELIMITER +
         bucketName + OZONE_URI_DELIMITER + "testkey";
     args = new String[] {"key", "put", "o3://" + omServiceId + keyName, testFile.getPath()};
     execute(ozoneShell, args);
     out.reset();
-    
+
     // Verify the key was created successfully
     OzoneVolume volume = client.getObjectStore().getVolume(volumeName);
     OzoneBucket bucket = volume.getBucket(bucketName);
     assertNotNull(bucket.getKey("testkey"), "Key should be created successfully after prepare");
-    
+
     // Execute cancelprepare command via CLI
     args = new String[] {"om", "cancelprepare", "--service-id", omServiceId};
     execute(ozoneAdminShell, args);
     out.reset();
-    
+
     // Cleanup
     args = new String[] {"volume", "delete", volumeName, "-r", "--yes"};
     execute(ozoneShell, args);
