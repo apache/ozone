@@ -17,15 +17,17 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import static org.apache.hadoop.hdds.scm.ha.SCMRatisProtocolCompatibilityTestUtil.proto2Request;
+import static org.apache.hadoop.hdds.scm.ha.SCMRatisProtocolCompatibilityTestUtil.randomProto2SCMRatisResponseProto;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.google.protobuf.ByteString;
-import com.google.protobuf.TextFormat;
 import java.nio.ByteBuffer;
 import java.util.Random;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.protocol.proto.testing.Proto2SCMRatisProtocolForTesting;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -35,7 +37,7 @@ public class TestSCMRatisProtocolCompatibility {
   static final Random RANDOM = new Random();
   static final Class<?>[] TYPES = {String.class, Integer.class, byte[].class};
 
-  static <T> ByteString randomValue(Class<T> clazz) {
+  static <T> ByteString randomValueProto3(Class<T> clazz) {
     if (clazz == String.class) {
       final int length = RANDOM.nextInt(3);
       final StringBuilder builder = new StringBuilder(length);
@@ -57,51 +59,20 @@ public class TestSCMRatisProtocolCompatibility {
     throw new IllegalArgumentException("Unrecognized class " + clazz);
   }
 
-  static Proto2SCMRatisProtocolForTesting.MethodArgument randomProto2MethodArgument() {
-    final Class<?> type = TYPES[RANDOM.nextInt(TYPES.length)];
-    return Proto2SCMRatisProtocolForTesting.MethodArgument.newBuilder()
-        .setType(type.getName())
-        .setValue(randomValue(type))
-        .build();
-  }
-
   static SCMRatisProtocol.MethodArgument randomProto3MethodArgument() {
     final Class<?> type = TYPES[RANDOM.nextInt(TYPES.length)];
     return SCMRatisProtocol.MethodArgument.newBuilder()
             .setType(type.getName())
-            .setValue(randomValue(type))
+            .setValue(randomValueProto3(type))
             .build();
-  }
-
-  static Proto2SCMRatisProtocolForTesting.SCMRatisResponseProto randomProto2SCMRatisResponseProto() {
-    final Class<?> type = TYPES[RANDOM.nextInt(TYPES.length)];
-    return Proto2SCMRatisProtocolForTesting.SCMRatisResponseProto.newBuilder()
-        .setType(type.getName())
-        .setValue(randomValue(type))
-        .build();
   }
 
   static SCMRatisProtocol.SCMRatisResponseProto randomProto3SCMRatisResponseProto() {
     final Class<?> type = TYPES[RANDOM.nextInt(TYPES.length)];
     return SCMRatisProtocol.SCMRatisResponseProto.newBuilder()
             .setType(type.getName())
-            .setValue(randomValue(type))
+            .setValue(randomValueProto3(type))
             .build();
-  }
-
-  static Proto2SCMRatisProtocolForTesting.SCMRatisRequestProto proto2Request(
-      String name, Proto2SCMRatisProtocolForTesting.RequestType type, int numArgs) {
-    // Build request using proto2 (test-only schema)
-    final Proto2SCMRatisProtocolForTesting.Method.Builder b = Proto2SCMRatisProtocolForTesting.Method.newBuilder()
-        .setName(name);
-    for (int i = 0; i < numArgs; i++) {
-      b.addArgs(randomProto2MethodArgument());
-    }
-
-    return Proto2SCMRatisProtocolForTesting.SCMRatisRequestProto.newBuilder()
-        .setType(type)
-        .setMethod(b)
-        .build();
   }
 
   static SCMRatisProtocol.SCMRatisRequestProto proto3Request(
@@ -155,20 +126,24 @@ public class TestSCMRatisProtocolCompatibility {
     }
 
     assertEquals(proto2.toString(), proto3.toString());
-    assertEquals(TextFormat.shortDebugString(proto2), TextFormat.shortDebugString(proto3));
+    assertShortDebugString(proto2, proto3);
     assertEquals(proto2, Proto2SCMRatisProtocolForTesting.SCMRatisRequestProto.parseFrom(proto3.toByteArray()));
+  }
+
+  private static void assertByteStringEquals(com.google.protobuf.ByteString proto2, ByteString proto3) {
+    assertEquals(UnsafeByteOperations.unsafeWrap(proto2.asReadOnlyByteBuffer()), proto3);
   }
 
   static void assertMethodArgument(Proto2SCMRatisProtocolForTesting.MethodArgument proto2,
       SCMRatisProtocol.MethodArgument proto3) {
-    assertEquals(proto2.getValue(), proto3.getValue());
     assertEquals(proto2.getType(), proto3.getType());
+    assertByteStringEquals(proto2.getValue(), proto3.getValue());
   }
 
   static void assertSCMRatisResponseProto(Proto2SCMRatisProtocolForTesting.SCMRatisResponseProto proto2,
       SCMRatisProtocol.SCMRatisResponseProto proto3) {
-    assertEquals(proto2.getValue(), proto3.getValue());
     assertEquals(proto2.getType(), proto3.getType());
+    assertByteStringEquals(proto2.getValue(), proto3.getValue());
   }
 
   /**
@@ -195,7 +170,7 @@ public class TestSCMRatisProtocolCompatibility {
     assertSCMRatisResponseProto(proto2, proto3);
 
     assertEquals(proto2.toString(), proto3.toString());
-    assertEquals(TextFormat.shortDebugString(proto2), TextFormat.shortDebugString(proto3));
+    assertShortDebugString(proto2, proto3);
     assertEquals(proto2, Proto2SCMRatisProtocolForTesting.SCMRatisResponseProto.parseFrom(proto3.toByteArray()));
   }
 
@@ -246,11 +221,12 @@ public class TestSCMRatisProtocolCompatibility {
 
     for (int i = 0; i < numArgs; i++) {
       assertEquals(proto3.getMethod().getArgs(i).getType(), proto2.getMethod().getArgs(i).getType());
-      assertEquals(proto3.getMethod().getArgs(i).getValue(), proto2.getMethod().getArgs(i).getValue());
+      assertByteStringEquals(proto2.getMethod().getArgs(i).getValue(),
+          proto3.getMethod().getArgs(i).getValue());
     }
 
     assertEquals(proto2.toString(), proto3.toString());
-    assertEquals(TextFormat.shortDebugString(proto2), TextFormat.shortDebugString(proto3));
+    assertShortDebugString(proto2, proto3);
     assertEquals(proto3, SCMRatisProtocol.SCMRatisRequestProto.parseFrom(proto2.toByteArray()));
   }
 
@@ -268,10 +244,16 @@ public class TestSCMRatisProtocolCompatibility {
             Proto2SCMRatisProtocolForTesting.SCMRatisResponseProto.parseFrom(proto3.toByteArray());
 
     assertEquals(proto3.getType(), proto2.getType());
-    assertEquals(proto3.getValue(), proto2.getValue());
+    assertByteStringEquals(proto2.getValue(), proto3.getValue());
 
     assertEquals(proto2.toString(), proto3.toString());
-    assertEquals(TextFormat.shortDebugString(proto2), TextFormat.shortDebugString(proto3));
+    assertShortDebugString(proto2, proto3);
     assertEquals(proto3, SCMRatisProtocol.SCMRatisResponseProto.parseFrom(proto2.toByteArray()));
+  }
+
+  private static void assertShortDebugString(com.google.protobuf.MessageOrBuilder proto2,
+      org.apache.ratis.thirdparty.com.google.protobuf.MessageOrBuilder proto3) {
+    assertEquals(com.google.protobuf.TextFormat.shortDebugString(proto2),
+        org.apache.ratis.thirdparty.com.google.protobuf.TextFormat.shortDebugString(proto3));
   }
 }

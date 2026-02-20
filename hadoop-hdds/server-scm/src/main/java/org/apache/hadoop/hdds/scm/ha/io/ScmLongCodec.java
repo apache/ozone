@@ -17,25 +17,24 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
-import com.google.common.primitives.Ints;
-import com.google.protobuf.ByteString;
-import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.ProtoUtils;
+import com.google.common.primitives.Longs;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 
 /**
- * Encodes/decodes an integer to a byte string.
+ * {@link ScmCodec} for {@code Long} objects.
  */
-public class IntegerCodec implements Codec {
+public class ScmLongCodec implements ScmCodec<Long> {
+
   @Override
-  public ByteString serialize(Object object)
-      throws InvalidProtocolBufferException {
+  public ByteString serialize(Long object) {
     // toByteArray returns a new array
-    return ProtoUtils.unsafeByteString(Ints.toByteArray((Integer) object));
+    return UnsafeByteOperations.unsafeWrap(Longs.toByteArray(object));
   }
 
   @Override
-  public Object deserialize(Class<?> type, ByteString value)
-      throws InvalidProtocolBufferException {
-    return Ints.fromByteArray(value.toByteArray());
+  public Long deserialize(Class<?> type, ByteString value) {
+    return Longs.fromByteArray(value.toByteArray());
   }
+
 }

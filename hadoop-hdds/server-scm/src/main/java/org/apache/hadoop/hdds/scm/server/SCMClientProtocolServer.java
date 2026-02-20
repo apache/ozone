@@ -119,6 +119,7 @@ import org.apache.hadoop.ozone.audit.SCMAction;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.util.StringUtils;
 import org.apache.ratis.grpc.GrpcTlsConfig;
 import org.apache.ratis.protocol.RaftGroup;
 import org.apache.ratis.protocol.RaftPeer;
@@ -1619,7 +1620,7 @@ public class SCMClientProtocolServer implements
     } catch (IOException ex) {
       decommissionScmResponseBuilder
           .setSuccess(false)
-          .setErrorMsg(ex.getMessage());
+          .setErrorMsg(ex.getMessage() == null ? StringUtils.stringifyException(ex) : ex.getMessage());
       AUDIT.logWriteFailure(buildAuditMessageForFailure(
           SCMAction.DECOMMISSION_SCM, auditMap, ex));
     }

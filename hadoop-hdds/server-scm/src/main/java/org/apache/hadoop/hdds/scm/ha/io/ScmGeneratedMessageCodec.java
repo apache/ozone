@@ -17,38 +17,34 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
-import com.google.common.primitives.Ints;
-import com.google.protobuf.ByteString;
-import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.ProtoUtils;
-import com.google.protobuf.ProtocolMessageEnum;
 import java.lang.reflect.InvocationTargetException;
 import org.apache.hadoop.hdds.scm.ha.ReflectionUtil;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
+import org.apache.ratis.thirdparty.com.google.protobuf.Message;
 
 /**
- * {@link Codec} for {@link ProtocolMessageEnum} objects.
+ * {@link ScmCodec} for {@link Message} objects.
  */
-public class EnumCodec implements Codec {
+public class ScmGeneratedMessageCodec implements ScmCodec<Object> {
 
   @Override
-  public ByteString serialize(Object object)
-      throws InvalidProtocolBufferException {
-    // toByteArray returns a new array
-    return ProtoUtils.unsafeByteString(Ints.toByteArray(
-        ((ProtocolMessageEnum) object).getNumber()));
+  public ByteString serialize(Object object) throws InvalidProtocolBufferException {
+    return ((Message)object).toByteString();
   }
 
   @Override
-  public Object deserialize(Class<?> type, ByteString value)
+  public Message deserialize(Class<?> type, ByteString value)
       throws InvalidProtocolBufferException {
     try {
-      return ReflectionUtil.getMethod(type, "valueOf", int.class)
-          .invoke(null, Ints.fromByteArray(
-              value.toByteArray()));
+      return (Message) ReflectionUtil.getMethod(type,
+              "parseFrom", byte[].class)
+          .invoke(null, (Object) value.toByteArray());
     } catch (NoSuchMethodException | IllegalAccessException
-        | InvocationTargetException ex) {
+             | InvocationTargetException ex) {
+      ex.printStackTrace();
       throw new InvalidProtocolBufferException(
-          "Message cannot be decoded!" + ex.getMessage());
+          "Message cannot be decoded: " + ex.getMessage());
     }
   }
 }

@@ -15,18 +15,20 @@
  * limitations under the License.
  */
 
-package com.google.protobuf;
+package org.apache.hadoop.hdds.scm.ha.io;
 
-/** Utilities for unshaded protobuf. */
-public final class ProtoUtils {
-  /**
-   * Similar to {@link ByteString#copyFrom(byte[])} except that this method does not copy.
-   * This method is safe only if the content of the array remains unchanged.
-   * Otherwise, it violates the immutability of {@link ByteString}.
-   */
-  public static ByteString unsafeByteString(byte[] array) {
-    return array != null && array.length > 0 ? ByteString.wrap(array) : ByteString.EMPTY;
-  }
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 
-  private ProtoUtils() { }
+/**
+ * To serialize/deserialize Java objects to/from protobuf ByteString for SCM HA.
+ *
+ * @param <T>
+ */
+public interface ScmCodec<T> {
+
+  ByteString serialize(T object) throws InvalidProtocolBufferException;
+
+  T deserialize(Class<?> type, ByteString value) throws InvalidProtocolBufferException;
+
 }

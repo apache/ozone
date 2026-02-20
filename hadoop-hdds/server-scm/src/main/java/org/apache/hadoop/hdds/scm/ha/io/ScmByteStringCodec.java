@@ -17,23 +17,20 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-
-import com.google.protobuf.ByteString;
-import com.google.protobuf.ProtoUtils;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 /**
- * {@link Codec} for {@code String} objects.
+ * A dummy codec that serializes a ByteString object to ByteString.
  */
-public class StringCodec implements Codec {
+public class ScmByteStringCodec implements ScmCodec<ByteString> {
+
   @Override
-  public ByteString serialize(Object object) {
-    // getBytes returns a new array
-    return ProtoUtils.unsafeByteString(((String) object).getBytes(UTF_8));
+  public ByteString serialize(ByteString object) {
+    return object;
   }
 
   @Override
-  public Object deserialize(Class<?> type, ByteString value) {
-    return new String(value.toByteArray(), UTF_8);
+  public ByteString deserialize(Class<?> type, ByteString value) {
+    return value;
   }
 }

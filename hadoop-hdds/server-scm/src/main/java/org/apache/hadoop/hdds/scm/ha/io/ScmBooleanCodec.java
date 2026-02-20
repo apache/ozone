@@ -17,18 +17,18 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
-import com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 
 /**
- * {@link Codec} for {@code Boolean} objects.
+ * {@link ScmCodec} for {@code Boolean} objects.
  */
-public class BooleanCodec implements Codec {
+public class ScmBooleanCodec implements ScmCodec<Boolean> {
   static final ByteString TRUE = ByteString.copyFromUtf8(Boolean.TRUE.toString());
   static final ByteString FALSE = ByteString.copyFromUtf8(Boolean.FALSE.toString());
 
   @Override
-  public ByteString serialize(Object object) {
-    return ((Boolean) object) ? TRUE : FALSE;
+  public ByteString serialize(Boolean object) {
+    return object ? TRUE : FALSE;
   }
 
   @Override
