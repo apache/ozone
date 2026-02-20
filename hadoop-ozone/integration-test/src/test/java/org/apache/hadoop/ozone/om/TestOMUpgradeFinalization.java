@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
 import static org.apache.hadoop.ozone.om.OMUpgradeTestUtils.waitForFinalization;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager.maxLayoutVersion;
+import static org.apache.ozone.test.GenericTestUtils.waitFor;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -28,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
@@ -36,7 +38,9 @@ import org.apache.hadoop.ozone.audit.AuditLogTestUtils;
 import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.om.ratis.OzoneManagerStateMachine;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
+import org.apache.ratis.util.LifeCycle;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -61,7 +65,7 @@ class TestOMUpgradeFinalization {
   }
 
   @Test
-  void testOMUpgradeFinalizationWithOneOMDown() throws Exception {
+  void testOMUpgradeFinalizationFromSnapshot() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     try (MiniOzoneHAClusterImpl cluster = newCluster(conf)) {
       cluster.waitForClusterToBeReady();
@@ -83,7 +87,24 @@ class TestOMUpgradeFinalization {
         AuditLogTestUtils.verifyAuditLog(OMAction.UPGRADE_FINALIZE, AuditEventStatus.SUCCESS);
 
         waitForFinalization(omClient);
+
+        // TODO need to purge follower logs to test snapshot install
+
+
         cluster.restartOzoneManager(downedOM, true);
+
+        // Wait for the downed OM to finish installing a snapshot.
+        OzoneManagerStateMachine omStateMachine = downedOM.getOmRatisServer()
+            .getOmStateMachine();
+        try {
+          waitFor(() -> omStateMachine.getLifeCycleState().isPausingOrPaused(),
+              1000, 60000);
+        } catch (TimeoutException timeEx) {
+          assertEquals(LifeCycle.State.RUNNING,
+              omStateMachine.getLifeCycle().getCurrentState());
+        }
+        waitFor(() -> !omStateMachine.getLifeCycle().getCurrentState()
+            .isPausingOrPaused(), 1000, 60000);
 
         assertEquals(maxLayoutVersion(),
             downedOM.getVersionManager().getMetadataLayoutVersion());
