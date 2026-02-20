@@ -43,6 +43,7 @@ import javax.ws.rs.core.Response;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.ozone.audit.S3GAction;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
@@ -86,6 +87,7 @@ public class S3STSEndpoint extends S3STSEndpointBase {
   private static final String INTERNAL_FAILURE = "InternalFailure";
   private static final String ACCESS_DENIED = "AccessDenied";
   private static final String INVALID_CLIENT_TOKEN_ID = "InvalidClientTokenId";
+  private static final String UNSUPPORTED_OPERATION = "UnsupportedOperation";
 
   @Inject
   private RequestIdentifier requestIdentifier;
@@ -223,6 +225,11 @@ public class S3STSEndpoint extends S3STSEndpointBase {
     }
 
     try {
+      if (LOG.isDebugEnabled() && StringUtils.isNotEmpty(awsIamSessionPolicy)) {
+        LOG.debug(
+            "AssumeRole requestId={} received Policy(len={}): {}", requestId, awsIamSessionPolicy.length(),
+            awsIamSessionPolicy);
+      }
       S3STSUtils.validateSessionPolicy(awsIamSessionPolicy);
     } catch (OMException e) {
       validationErrors.add(e.getMessage());
@@ -274,6 +281,15 @@ public class S3STSEndpoint extends S3STSEndpointBase {
           throw new OSTSException(
               INVALID_CLIENT_TOKEN_ID, "The security token included in the request is invalid.",
               FORBIDDEN.getStatusCode());
+        }
+        if (omException.getResult() == OMException.ResultCodes.NOT_SUPPORTED_OPERATION ||
+            omException.getResult() == OMException.ResultCodes.FEATURE_NOT_ENABLED) {
+          throw new OSTSException(
+              UNSUPPORTED_OPERATION, omException.getMessage(), NOT_IMPLEMENTED.getStatusCode());
+        }
+        if (omException.getResult() == OMException.ResultCodes.INVALID_REQUEST) {
+          throw new OSTSException(
+              VALIDATION_ERROR, omException.getMessage(), BAD_REQUEST.getStatusCode());
         }
       }
       throw new OSTSException(

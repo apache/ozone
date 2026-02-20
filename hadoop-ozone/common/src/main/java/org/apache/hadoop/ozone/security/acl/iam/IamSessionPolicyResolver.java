@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.security.acl.iam;
 
 import static java.util.Collections.singleton;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.CREATE;
@@ -62,9 +63,9 @@ import org.apache.hadoop.ozone.security.acl.OzoneObjInfo;
  * The only supported ResourceArn has prefix arn:aws:s3::: - all others will throw
  * OMException with NOT_SUPPORTED_OPERATION.
  * <p>
- * The only supported Condition operator is StringEquals - all others will throw
+ * The only supported Condition operators are StringEquals and StringLike - all others will throw
  * OMException with NOT_SUPPORTED_OPERATION.  Furthermore, only one Condition is supported in a
- * statement.  The value StringEquals is case-sensitive per the
+ * statement.  The value for both StringEquals and StringLike is case-sensitive per the
  * <a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_condition_operators.html">
  * AWS spec</a>.
  * <p>
@@ -94,6 +95,8 @@ public final class IamSessionPolicyResolver {
 
   // Used to group actions into s3:Get*, s3:Put*, s3:List*, s3:Delete*, s3:Create*
   private static final String[] S3_ACTION_PREFIXES = {"s3:Get", "s3:Put", "s3:List", "s3:Delete", "s3:Create"};
+
+  private static final String ERROR_PREFIX = "IAM session policy: ";
 
   @VisibleForTesting
   static final Map<String, Set<S3Action>> S3_ACTION_MAP_CI = buildCaseInsensitiveS3ActionMap();
@@ -166,18 +169,19 @@ public final class IamSessionPolicyResolver {
   private static void validateInputParameters(String policyJson, String volumeName,
       AuthorizerType authorizerType) throws OMException {
     if (StringUtils.isBlank(policyJson)) {
-      throw new OMException("The IAM session policy JSON is required", INVALID_REQUEST);
+      throw new OMException(ERROR_PREFIX + "The IAM session policy JSON is required", INTERNAL_ERROR);
     }
 
     if (StringUtils.isBlank(volumeName)) {
-      throw new OMException("The volume name is required", INVALID_REQUEST);
+      throw new OMException(ERROR_PREFIX + "The volume name is required", INTERNAL_ERROR);
     }
 
     Objects.requireNonNull(authorizerType, "The authorizer type is required");
 
     if (policyJson.length() > MAX_JSON_LENGTH) {
-      throw new OMException("Invalid policy JSON - exceeds maximum length of " +
-          MAX_JSON_LENGTH + " characters", INVALID_REQUEST);
+      throw new OMException(
+          ERROR_PREFIX + "Invalid policy JSON - exceeds maximum length of " + MAX_JSON_LENGTH + " characters",
+          INVALID_REQUEST);
     }
   }
 
@@ -189,12 +193,13 @@ public final class IamSessionPolicyResolver {
     try {
       root = MAPPER.readTree(policyJson);
     } catch (Exception e) {
-      throw new OMException("Invalid policy JSON (most likely JSON structure is incorrect)", e, INVALID_REQUEST);
+      throw new OMException(
+          ERROR_PREFIX + "Invalid policy JSON (most likely JSON structure is incorrect)", e, INVALID_REQUEST);
     }
 
     final JsonNode statementsNode = root.path("Statement");
     if (statementsNode.isMissingNode()) {
-      throw new OMException("Invalid policy JSON - missing Statement", INVALID_REQUEST);
+      throw new OMException(ERROR_PREFIX + "Invalid policy JSON - missing Statement", INVALID_REQUEST);
     }
 
     final Set<JsonNode> statements = new HashSet<>();
@@ -216,16 +221,16 @@ public final class IamSessionPolicyResolver {
       if (effectNode.isTextual()) {
         final String effect = effectNode.asText();
         if (!"Allow".equals(effect)) {
-          throw new OMException("Unsupported Effect - " + effect, NOT_SUPPORTED_OPERATION);
+          throw new OMException(ERROR_PREFIX + "Unsupported Effect - " + effect, NOT_SUPPORTED_OPERATION);
         }
         return;
       }
 
       throw new OMException(
-          "Invalid Effect in JSON policy (must be a String) - " + effectNode, INVALID_REQUEST);
+          ERROR_PREFIX + "Invalid Effect in JSON policy (must be a String) - " + effectNode, INVALID_REQUEST);
     }
 
-    throw new OMException("Effect is missing from JSON policy", INVALID_REQUEST);
+    throw new OMException(ERROR_PREFIX + "Effect is missing from JSON policy", INVALID_REQUEST);
   }
 
   /**
@@ -265,32 +270,34 @@ public final class IamSessionPolicyResolver {
     final JsonNode cond = stmt.get("Condition");
     if (cond != null && !cond.isMissingNode() && !cond.isNull()) {
       if (cond.size() != 1) {
-        throw new OMException("Only one Condition is supported", NOT_SUPPORTED_OPERATION);
+        throw new OMException(ERROR_PREFIX + "Only one Condition is supported", NOT_SUPPORTED_OPERATION);
       }
 
       if (!cond.isObject()) {
         throw new OMException(
-            "Invalid Condition (must have operator StringEquals " + "and key name s3:prefix) - " +
-            cond, INVALID_REQUEST);
+            ERROR_PREFIX + "Invalid Condition (must have operator StringEquals or StringLike " +
+            "and key name s3:prefix) - " + cond, INVALID_REQUEST);
       }
 
       final String operator = cond.fieldNames().next();
-      if (!"StringEquals".equals(operator)) {
-        throw new OMException("Unsupported Condition operator - " + operator, NOT_SUPPORTED_OPERATION);
+      if (!"StringEquals".equals(operator) && !"StringLike".equals(operator)) {
+        throw new OMException(ERROR_PREFIX + "Unsupported Condition operator - " + operator, NOT_SUPPORTED_OPERATION);
       }
 
-      final JsonNode operatorValue = cond.get("StringEquals");
+      final JsonNode operatorValue = cond.get(operator);
       if ("null".equals(operatorValue.asText())) {
-        throw new OMException("Missing Condition operator - StringEquals", INVALID_REQUEST);
+        throw new OMException(
+            ERROR_PREFIX + "Missing Condition operator value for " + operator, INVALID_REQUEST);
       }
 
       if (!operatorValue.isObject()) {
-        throw new OMException("Invalid Condition operator value structure - " + operatorValue, INVALID_REQUEST);
+        throw new OMException(
+            ERROR_PREFIX + "Invalid Condition operator value structure - " + operatorValue, INVALID_REQUEST);
       }
 
       final String keyName = operatorValue.fieldNames().hasNext() ? operatorValue.fieldNames().next() : null;
       if (!"s3:prefix".equalsIgnoreCase(keyName)) {
-        throw new OMException("Unsupported Condition key name - " + keyName, NOT_SUPPORTED_OPERATION);
+        throw new OMException(ERROR_PREFIX + "Unsupported Condition key name - " + keyName, NOT_SUPPORTED_OPERATION);
       }
 
       prefixes = readStringOrArray(operatorValue.get(keyName));
@@ -356,7 +363,8 @@ public final class IamSessionPolicyResolver {
       throws OMException {
     if (authorizerType == AuthorizerType.NATIVE && bucket.contains("*")) {
       throw new OMException(
-          "Wildcard bucket patterns are not supported for Ozone native authorizer", NOT_SUPPORTED_OPERATION);
+          ERROR_PREFIX + "Wildcard bucket patterns are not supported for Ozone native authorizer",
+          NOT_SUPPORTED_OPERATION);
     }
   }
 
@@ -374,7 +382,7 @@ public final class IamSessionPolicyResolver {
       Set<String> resources) throws OMException {
     final Set<ResourceSpec> resourceSpecs = new HashSet<>();
     if (resources.isEmpty()) {
-      throw new OMException("No Resource(s) found in policy", INVALID_REQUEST);
+      throw new OMException(ERROR_PREFIX + "No Resource(s) found in policy", INVALID_REQUEST);
     }
     for (String resource : resources) {
       if ("*".equals(resource)) {
@@ -384,12 +392,12 @@ public final class IamSessionPolicyResolver {
       }
 
       if (!resource.startsWith(AWS_S3_ARN_PREFIX)) {
-        throw new OMException("Unsupported Resource Arn - " + resource, NOT_SUPPORTED_OPERATION);
+        throw new OMException(ERROR_PREFIX + "Unsupported Resource Arn - " + resource, NOT_SUPPORTED_OPERATION);
       }
 
       final String suffix = resource.substring(AWS_S3_ARN_PREFIX.length());
       if (suffix.isEmpty()) {
-        throw new OMException("Invalid Resource Arn - " + resource, INVALID_REQUEST);
+        throw new OMException(ERROR_PREFIX + "Invalid Resource Arn - " + resource, INVALID_REQUEST);
       }
 
       ResourceSpec spec = parseResourceSpec(suffix);
@@ -404,8 +412,8 @@ public final class IamSessionPolicyResolver {
           spec = ResourceSpec.objectPrefix(spec.bucket, specPrefixExceptLastChar);
         } else {
           throw new OMException(
-              "Wildcard prefix patterns are not supported for Ozone native authorizer if wildcard is not at the end",
-              NOT_SUPPORTED_OPERATION);
+              ERROR_PREFIX + "Wildcard prefix patterns are not supported for Ozone native authorizer if " +
+              "wildcard is not at the end", NOT_SUPPORTED_OPERATION);
         }
       }
       resourceSpecs.add(spec);

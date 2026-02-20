@@ -601,12 +601,25 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
                 "Bucket:" + obj.getBucketName() + " " : "";
         String keyName = obj.getKeyName() != null ?
                 "Key:" + obj.getKeyName() : "";
+        // For STS tokens, make clear that the user is using an assumed role, otherwise the access denied
+        // message could be confusing
+        String user = normalizedRequestContext.getClientUgi().getShortUserName();
+        final STSTokenIdentifier stsTokenIdentifier = OzoneManager.getStsTokenIdentifier();
+        if (stsTokenIdentifier != null) {
+          final StringBuilder builder = new StringBuilder(user);
+          builder.append(" (STS assumed role arn = ");
+          builder.append(stsTokenIdentifier.getRoleArn());
+          builder.append(", tempAccessKeyId = ");
+          builder.append(stsTokenIdentifier.getTempAccessKeyId());
+          builder.append(')');
+          user = builder.toString();
+        }
         log.warn("User {} doesn't have {} permission to access {} {}{}{}",
-            normalizedRequestContext.getClientUgi().getShortUserName(),
+            user,
             normalizedRequestContext.getAclRights(),
             obj.getResourceType(), volumeName, bucketName, keyName);
         throw new OMException(
-            "User " + normalizedRequestContext.getClientUgi().getShortUserName() +
+            "User " + user +
             " doesn't have " + normalizedRequestContext.getAclRights() +
             " permission to access " + obj.getResourceType() + " " +
             volumeName  + bucketName + keyName, ResultCodes.PERMISSION_DENIED);

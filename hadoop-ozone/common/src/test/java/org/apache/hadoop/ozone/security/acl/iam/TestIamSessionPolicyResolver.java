@@ -69,12 +69,13 @@ public class TestIamSessionPolicyResolver {
         "    \"Effect\": \"Allow\",\n" +
         "    \"Action\": \"s3:ListBucket\",\n" +
         "    \"Resource\": \"arn:aws:s3:::b\",\n" +
-        "    \"Condition\": { \"StringLike\": { \"s3:prefix\": \"x/*\" } }\n" +
+        "    \"Condition\": { \"StringNotEqualsIgnoreCase\": { \"s3:prefix\": \"x/*\" } }\n" +
         "  }]\n" +
         "}";
 
     expectResolveThrowsForBothAuthorizers(
-        json, "Unsupported Condition operator - StringLike", NOT_SUPPORTED_OPERATION);
+        json, "IAM session policy: Unsupported Condition operator - StringNotEqualsIgnoreCase",
+        NOT_SUPPORTED_OPERATION);
   }
 
   @Test
@@ -89,7 +90,7 @@ public class TestIamSessionPolicyResolver {
         "}";
 
     expectResolveThrowsForBothAuthorizers(
-        json, "Unsupported Condition key name - aws:SourceArn", NOT_SUPPORTED_OPERATION);
+        json, "IAM session policy: Unsupported Condition key name - aws:SourceArn", NOT_SUPPORTED_OPERATION);
   }
 
   @Test
@@ -103,7 +104,7 @@ public class TestIamSessionPolicyResolver {
         "}";
 
     expectResolveThrowsForBothAuthorizers(
-        json, "Unsupported Effect - Deny", NOT_SUPPORTED_OPERATION);
+        json, "IAM session policy: Unsupported Effect - Deny", NOT_SUPPORTED_OPERATION);
   }
 
   @Test
@@ -118,7 +119,7 @@ public class TestIamSessionPolicyResolver {
         "}";
 
     expectResolveThrowsForBothAuthorizers(
-        json, "Invalid policy JSON - missing Statement", INVALID_REQUEST);
+        json, "IAM session policy: Invalid policy JSON - missing Statement", INVALID_REQUEST);
   }
 
   @Test
@@ -132,7 +133,7 @@ public class TestIamSessionPolicyResolver {
         "}";
 
     expectResolveThrowsForBothAuthorizers(
-        json, "Invalid Effect in JSON policy (must be a String) - [\"Allow\"]",
+        json, "IAM session policy: Invalid Effect in JSON policy (must be a String) - [\"Allow\"]",
         INVALID_REQUEST);
   }
 
@@ -146,7 +147,7 @@ public class TestIamSessionPolicyResolver {
         "}";
 
     expectResolveThrowsForBothAuthorizers(
-        json, "Effect is missing from JSON policy", INVALID_REQUEST);
+        json, "IAM session policy: Effect is missing from JSON policy", INVALID_REQUEST);
   }
 
   @Test
@@ -174,7 +175,7 @@ public class TestIamSessionPolicyResolver {
         "}";
 
     expectResolveThrowsForBothAuthorizers(
-        json, "Only one Condition is supported", NOT_SUPPORTED_OPERATION);
+        json, "IAM session policy: Only one Condition is supported", NOT_SUPPORTED_OPERATION);
   }
 
   @Test
@@ -191,7 +192,7 @@ public class TestIamSessionPolicyResolver {
         "}";
 
     expectResolveThrowsForBothAuthorizers(
-        json, "Invalid Condition (must have operator StringEquals and key name " +
+        json, "IAM session policy: Invalid Condition (must have operator StringEquals or StringLike and key name " +
         "s3:prefix) - [\"RandomCondition\"]", INVALID_REQUEST);
   }
 
@@ -207,7 +208,8 @@ public class TestIamSessionPolicyResolver {
         "}";
 
     expectResolveThrowsForBothAuthorizers(
-        json, "Missing Condition operator - StringEquals", INVALID_REQUEST);
+        json, "IAM session policy: Missing Condition operator value for StringEquals",
+        INVALID_REQUEST);
   }
 
   @Test
@@ -222,7 +224,7 @@ public class TestIamSessionPolicyResolver {
         "}";
 
     expectResolveThrowsForBothAuthorizers(
-        json, "Invalid Condition operator value structure - [{\"s3:prefix\":\"folder/\"}]",
+        json, "IAM session policy: Invalid Condition operator value structure - [{\"s3:prefix\":\"folder/\"}]",
         INVALID_REQUEST);
   }
 
@@ -231,7 +233,7 @@ public class TestIamSessionPolicyResolver {
     final String invalidJson = "{[{{}]\"\"";
 
     expectResolveThrowsForBothAuthorizers(
-        invalidJson, "Invalid policy JSON (most likely JSON structure is incorrect)",
+        invalidJson, "IAM session policy: Invalid policy JSON (most likely JSON structure is incorrect)",
         INVALID_REQUEST);
   }
 
@@ -240,7 +242,7 @@ public class TestIamSessionPolicyResolver {
     final String json = createJsonStringLargerThan2048Characters();
 
     expectResolveThrowsForBothAuthorizers(
-        json, "Invalid policy JSON - exceeds maximum length of 2048 characters", INVALID_REQUEST);
+        json, "IAM session policy: Invalid policy JSON - exceeds maximum length of 2048 characters", INVALID_REQUEST);
   }
 
   @Test
@@ -282,7 +284,7 @@ public class TestIamSessionPolicyResolver {
         "}";
 
     expectResolveThrowsForBothAuthorizers(
-        json, "Unsupported Effect - aLLOw", NOT_SUPPORTED_OPERATION);
+        json, "IAM session policy: Unsupported Effect - aLLOw", NOT_SUPPORTED_OPERATION);
   }
 
   @Test
@@ -434,7 +436,8 @@ public class TestIamSessionPolicyResolver {
   public void testValidateAndCategorizeResourcesWithWildcard() throws OMException {
     expectOMExceptionWithCode(
         () -> validateAndCategorizeResources(NATIVE, Collections.singleton("*")),
-        "Wildcard bucket patterns are not supported for Ozone native authorizer", NOT_SUPPORTED_OPERATION);
+        "IAM session policy: Wildcard bucket patterns are not supported for Ozone native authorizer",
+        NOT_SUPPORTED_OPERATION);
 
     final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
         RANGER, Collections.singleton("*"));
@@ -463,7 +466,7 @@ public class TestIamSessionPolicyResolver {
 
     expectOMExceptionWithCode(
         () -> validateAndCategorizeResources(NATIVE, Collections.singleton("arn:aws:s3:::my-bucket*")),
-        "Wildcard bucket patterns are not supported for Ozone native authorizer",
+        "IAM session policy: Wildcard bucket patterns are not supported for Ozone native authorizer",
         NOT_SUPPORTED_OPERATION);
 
     final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
@@ -478,7 +481,7 @@ public class TestIamSessionPolicyResolver {
 
     expectOMExceptionWithCode(
         () -> validateAndCategorizeResources(NATIVE, Collections.singleton("arn:aws:s3:::*/myKey.txt")),
-        "Wildcard bucket patterns are not supported for Ozone native authorizer",
+        "IAM session policy: Wildcard bucket patterns are not supported for Ozone native authorizer",
         NOT_SUPPORTED_OPERATION);
 
     final Set<IamSessionPolicyResolver.ResourceSpec> resultRanger = validateAndCategorizeResources(
@@ -490,7 +493,7 @@ public class TestIamSessionPolicyResolver {
   public void testValidateAndCategorizeResourcesWithBucketWildcardAndObjectWildcard() throws OMException {
     expectOMExceptionWithCode(
         () -> validateAndCategorizeResources(NATIVE, Collections.singleton("arn:aws:s3:::*/*")),
-        "Wildcard bucket patterns are not supported for Ozone native authorizer",
+        "IAM session policy: Wildcard bucket patterns are not supported for Ozone native authorizer",
         NOT_SUPPORTED_OPERATION);
 
     final IamSessionPolicyResolver.ResourceSpec expectedResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
@@ -592,8 +595,8 @@ public class TestIamSessionPolicyResolver {
   public void testValidateAndCategorizeResourcesWithBucketAndObjectPrefixWildcardNotAtEnd() throws OMException {
     expectOMExceptionWithCode(
         () -> validateAndCategorizeResources(NATIVE, Collections.singleton("arn:aws:s3:::bucket3/*.log")),
-        "Wildcard prefix patterns are not supported for Ozone native authorizer if wildcard is not " +
-        "at the end", NOT_SUPPORTED_OPERATION);
+        "IAM session policy: Wildcard prefix patterns are not supported for Ozone native authorizer " +
+          "if wildcard is not at the end", NOT_SUPPORTED_OPERATION);
 
     final IamSessionPolicyResolver.ResourceSpec expectedRangerResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
         S3ResourceType.OBJECT_PREFIX_WILDCARD, "bucket3", "*.log", null);
@@ -606,8 +609,8 @@ public class TestIamSessionPolicyResolver {
   public void testValidateAndCategorizeResourcesWithBucketAndObjectPrefixWildcardNotAtEndWithPath() throws OMException {
     expectOMExceptionWithCode(
         () -> validateAndCategorizeResources(NATIVE, Collections.singleton("arn:aws:s3:::bucket/a/q/*.ps")),
-        "Wildcard prefix patterns are not supported for Ozone native authorizer if wildcard is not " +
-        "at the end", NOT_SUPPORTED_OPERATION);
+        "IAM session policy: Wildcard prefix patterns are not supported for Ozone native authorizer if " +
+        "wildcard is not at the end", NOT_SUPPORTED_OPERATION);
 
     final IamSessionPolicyResolver.ResourceSpec expectedRangerResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
         S3ResourceType.OBJECT_PREFIX_WILDCARD, "bucket", "a/q/*.ps", null);
@@ -621,8 +624,8 @@ public class TestIamSessionPolicyResolver {
       throws OMException {
     expectOMExceptionWithCode(
         () -> validateAndCategorizeResources(NATIVE, Collections.singleton("arn:aws:s3:::bucket3/*key*")),
-        "Wildcard prefix patterns are not supported for Ozone native authorizer if wildcard is not " +
-            "at the end", NOT_SUPPORTED_OPERATION);
+        "IAM session policy: Wildcard prefix patterns are not supported for Ozone native authorizer " +
+            "if wildcard is not at the end", NOT_SUPPORTED_OPERATION);
 
     final IamSessionPolicyResolver.ResourceSpec expectedRangerResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
         S3ResourceType.OBJECT_PREFIX_WILDCARD, "bucket3", "*key*", null);
@@ -636,8 +639,8 @@ public class TestIamSessionPolicyResolver {
       throws OMException {
     expectOMExceptionWithCode(
         () -> validateAndCategorizeResources(NATIVE, Collections.singleton("arn:aws:s3:::bucket3/a/b/t/*key*")),
-        "Wildcard prefix patterns are not supported for Ozone native authorizer if wildcard is not " +
-            "at the end", NOT_SUPPORTED_OPERATION);
+        "IAM session policy: Wildcard prefix patterns are not supported for Ozone native authorizer " +
+            "if wildcard is not at the end", NOT_SUPPORTED_OPERATION);
 
     final IamSessionPolicyResolver.ResourceSpec expectedRangerResourceSpec = new IamSessionPolicyResolver.ResourceSpec(
         S3ResourceType.OBJECT_PREFIX_WILDCARD, "bucket3", "a/b/t/*key*", null);
@@ -668,28 +671,30 @@ public class TestIamSessionPolicyResolver {
     final String invalidArn = "arn:aws:ec2:::bucket";
     expectOMExceptionWithCode(
         () -> validateAndCategorizeResources(NATIVE, Collections.singleton(invalidArn)),
-        "Unsupported Resource Arn - " + invalidArn, NOT_SUPPORTED_OPERATION);
+        "IAM session policy: Unsupported Resource Arn - " + invalidArn, NOT_SUPPORTED_OPERATION);
     expectOMExceptionWithCode(
         () -> validateAndCategorizeResources(RANGER, Collections.singleton(invalidArn)),
-        "Unsupported Resource Arn - " + invalidArn, NOT_SUPPORTED_OPERATION);
+        "IAM session policy: Unsupported Resource Arn - " + invalidArn, NOT_SUPPORTED_OPERATION);
   }
 
   @Test
   public void testValidateAndCategorizeResourcesWithArnWithNoBucketThrows() {
     expectOMExceptionWithCode(
         () -> validateAndCategorizeResources(NATIVE, Collections.singleton("arn:aws:s3:::")),
-        "Invalid Resource Arn - arn:aws:s3:::", INVALID_REQUEST);
+        "IAM session policy: Invalid Resource Arn - arn:aws:s3:::", INVALID_REQUEST);
     expectOMExceptionWithCode(
         () -> validateAndCategorizeResources(RANGER, Collections.singleton("arn:aws:s3:::")),
-        "Invalid Resource Arn - arn:aws:s3:::", INVALID_REQUEST);
+        "IAM session policy: Invalid Resource Arn - arn:aws:s3:::", INVALID_REQUEST);
   }
 
   @Test
   public void testValidateAndCategorizeResourcesWithNoResourcesThrows() {
     expectOMExceptionWithCode(
-        () -> validateAndCategorizeResources(NATIVE, emptySet()), "No Resource(s) found in policy", INVALID_REQUEST);
+        () -> validateAndCategorizeResources(NATIVE, emptySet()), "IAM session policy: No Resource(s) found in policy",
+        INVALID_REQUEST);
     expectOMExceptionWithCode(
-        () -> validateAndCategorizeResources(RANGER, emptySet()), "No Resource(s) found in policy", INVALID_REQUEST);
+        () -> validateAndCategorizeResources(RANGER, emptySet()), "IAM session policy: No Resource(s) found in policy",
+        INVALID_REQUEST);
   }
 
   @Test
@@ -1431,7 +1436,7 @@ public class TestIamSessionPolicyResolver {
         "}";
 
     expectResolveThrowsForBothAuthorizers(
-        json, "Unsupported Resource Arn - " +
+        json, "IAM session policy: Unsupported Resource Arn - " +
         "arn:aws:dynamodb:us-east-2:123456789012:table/example-table", NOT_SUPPORTED_OPERATION);
   }
 
@@ -1583,7 +1588,7 @@ public class TestIamSessionPolicyResolver {
 
     // Wildcards in middle of object resource are not supported for Native authorizer
     expectResolveThrows(
-        json, NATIVE, "Wildcard prefix patterns are not supported for Ozone native " +
+        json, NATIVE, "IAM session policy: Wildcard prefix patterns are not supported for Ozone native " +
         "authorizer if wildcard is not at the end", NOT_SUPPORTED_OPERATION);
 
     final Set<OzoneGrant> resolvedFromRangerAuthorizer = resolve(json, VOLUME, RANGER);
@@ -1920,7 +1925,7 @@ public class TestIamSessionPolicyResolver {
         "}";
 
     expectResolveThrowsForBothAuthorizers(
-        json, "Invalid Resource Arn - arn:aws:s3:::", INVALID_REQUEST);
+        json, "IAM session policy: Invalid Resource Arn - arn:aws:s3:::", INVALID_REQUEST);
   }
 
   private static void expectIllegalArgumentException(Runnable runnable, String expectedMessage) {
@@ -2029,7 +2034,8 @@ public class TestIamSessionPolicyResolver {
       resolve(json, VOLUME, NATIVE);
       throw new AssertionError("Expected exception not thrown");
     } catch (OMException ex) {
-      assertThat(ex.getMessage()).isEqualTo("Wildcard bucket patterns are not supported for Ozone native authorizer");
+      assertThat(ex.getMessage()).isEqualTo(
+          "IAM session policy: Wildcard bucket patterns are not supported for Ozone native authorizer");
       assertThat(ex.getResult()).isEqualTo(NOT_SUPPORTED_OPERATION);
     }
   }
