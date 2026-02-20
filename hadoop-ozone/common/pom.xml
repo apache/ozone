@@ -152,12 +152,6 @@
     </dependency>
     <!-- Test dependencies -->
     <dependency>
-      <!-- until HDDS-12460 is soft-reverted -->
-      <groupId>commons-io</groupId>
-      <artifactId>commons-io</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
       <groupId>io.grpc</groupId>
       <artifactId>grpc-inprocess</artifactId>
       <scope>test</scope>
