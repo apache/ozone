@@ -53,15 +53,15 @@ Presently Ozone has several overheads when uploading large files via Multipart u
 3. GC pressure grows with the size of the object (HDDS-10611).
 
 #### a) Deserialization overhead
-| Operation | Current |
-| :--- | :--- |
+| Operation     | Current                                                 |
+|:--------------|:--------------------------------------------------------|
 | Commit part N | Read + deserialize whole OmMultipartKeyInfo (N-1 parts) |
 
 #### b) WAL overhead
 Assuming one MPU part info object takes ~1.5KB.
 
-| Scenario | Current WAL |
-| :--- | :--- |
+| Scenario    | Current WAL                     |
+|:------------|:--------------------------------|
 | 1,000 parts | ~733 MB (1+2+...+1000) × 1.5 KB |
 
 #### c) GC pressure
@@ -110,11 +110,11 @@ message MultipartPartInfo {
 ```
 
 ### Comparison: V0 (legacy) vs V1
-| Metric | Current (V0) | Split-Table (V1) |
-| :--- | :--- | :--- |
-| **Commit part N** | Read + deserialize whole list | Read Metadata (~200B) + write single PartKeyInfo |
-| **1,000 parts WAL** | ~733 MB | ~1.5 MB (or ~600KB with optimized info) |
-| **GC Pressure** | Large short-lived objects | Small metadata + single-part objects |
+| Metric              | Current (V0)                  | Split-Table (V1)                                 |
+|:--------------------|:------------------------------|:-------------------------------------------------|
+| **Commit part N**   | Read + deserialize whole list | Read Metadata (~200B) + write single PartKeyInfo |
+| **1,000 parts WAL** | ~733 MB                       | ~1.5 MB (or ~600KB with optimized info)          |
+| **GC Pressure**     | Large short-lived objects     | Small metadata + single-part objects             |
 
 ---
 
@@ -126,9 +126,9 @@ Reuse the existing table but introduce a new `multipartPartsTable`.
   * V0: Key → `OmMultipartKeyInfo` { parts inline }
   * V1: Key → `OmMultipartKeyInfo` { empty list, schemaVersion: 1 }
 * **multipartPartsTable (RocksDB) [V1 only]:**
-  * `/uploadId/part1` → `PartKeyInfo`
-  * `/uploadId/part2` → `PartKeyInfo`
-  * `/uploadId/part3` → `PartKeyInfo`
+  * `/uploadId/part00001` → `PartKeyInfo`
+  * `/uploadId/part00002` → `PartKeyInfo`
+  * `/uploadId/part00003` → `PartKeyInfo`
 
 
 ```protobuf
@@ -199,14 +199,14 @@ OmMultipartKeyInfo {
 #### MultipartPartsTable – 10 rows:
 
 ```text
-Key:   /vol1/bucket1/mp_file1/abc123-uuid-456/part1
+Key:   /vol1/bucket1/mp_file1/abc123-uuid-456/part00001
 Value: PartKeyInfo { partName: ".../part1", partNumber: 1, partKeyInfo: KeyInfo{blocks, size,...} }
 
-Key:   /vol1/bucket1/mp_file1/abc123-uuid-456/part2
+Key:   /vol1/bucket1/mp_file1/abc123-uuid-456/part00002
 Value: PartKeyInfo { partName: ".../part2", partNumber: 2, partKeyInfo: KeyInfo{...} }
 ...
 ...
-Key:   /vol1/bucket1/mp_file1/abc123-uuid-456/part10
+Key:   /vol1/bucket1/mp_file1/abc123-uuid-456/part00010
 Value: PartKeyInfo { partName: ".../part10", partNumber: 10, partKeyInfo: KeyInfo{...} }
 ```
 
@@ -234,14 +234,6 @@ message MultipartMetadataInfo {
 #### Storage Layout Overview
 
 * **multipartInfoTable (RocksDB):**
-  * V0: Key → `OmMultipartKeyInfo` { parts inline }
-  * V1: Key → `OmMultipartKeyInfo` { empty list, schemaVersion: 1 }
-* **multipartPartsTable (RocksDB) [V1 only]:**
-  * `/uploadId/part1` → `PartKeyInfo`
-  * `/uploadId/part2` → `PartKeyInfo`
-  * `/uploadId/part3` → `PartKeyInfo`
-
-* **multipartInfoTable (RocksDB):**
   * V0: `/vol/bucket/key/uploadId` → `OmMultipartKeyInfo { partKeyInfoList: [...] }`
 
 
@@ -250,9 +242,9 @@ message MultipartMetadataInfo {
 
 
 * **multipartPartsTable (RocksDB) [v1 only]**
-  * `/vol/bucket/key/uploadId/part1`  → `PartKeyInfo` 
-  * `/vol/bucket/key/uploadId/part2`  → PartKeyInfo 
-  * `/vol/bucket/key/uploadId/part3`  → PartKeyInfo 
+  * `/vol/bucket/key/uploadId/part00001`  → `PartKeyInfo` 
+  * `/vol/bucket/key/uploadId/part00002`  → `PartKeyInfo` 
+  * `/vol/bucket/key/uploadId/part00003`  → `PartKeyInfo`
   * `...`
 
 #### multipartMetadataInfo Table – 1 row
