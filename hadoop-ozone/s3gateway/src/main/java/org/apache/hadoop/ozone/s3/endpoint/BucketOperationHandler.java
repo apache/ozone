@@ -43,7 +43,7 @@ abstract class BucketOperationHandler extends EndpointBase {
    * @throws IOException if an I/O error occurs
    * @throws OS3Exception if an S3-specific error occurs
    */
-  Response handlePutRequest(String bucketName, InputStream body)
+  Response handlePutRequest(S3RequestContext context, String bucketName, InputStream body)
       throws IOException, OS3Exception {
     return null;
   }
@@ -53,17 +53,18 @@ abstract class BucketOperationHandler extends EndpointBase {
    * The handler inspects the request (query parameters, headers, etc.) to determine
    * if it should handle the request.
    *
+   * @param context
    * @param bucketName the name of the bucket
    * @return Response if this handler handles the request, null otherwise
    * @throws IOException if an I/O error occurs
    * @throws OS3Exception if an S3-specific error occurs
    */
-  Response handleGetRequest(String bucketName)
+  Response handleGetRequest(S3RequestContext context, String bucketName)
       throws IOException, OS3Exception {
     return null;
   }
 
-  Response handleDeleteRequest(String bucketName)
+  Response handleDeleteRequest(S3RequestContext context, String bucketName)
       throws IOException, OS3Exception {
     return null;
   }

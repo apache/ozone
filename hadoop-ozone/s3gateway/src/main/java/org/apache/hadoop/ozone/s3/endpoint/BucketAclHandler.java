@@ -45,7 +45,6 @@ import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
-import org.apache.hadoop.util.Time;
 import org.apache.http.HttpStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -75,15 +74,14 @@ public class BucketAclHandler extends BucketOperationHandler {
    * see: https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketAcl.html
    */
   @Override
-  Response handleGetRequest(String bucketName)
+  Response handleGetRequest(S3RequestContext context, String bucketName)
       throws IOException, OS3Exception {
 
     if (!shouldHandle()) {
       return null;  // Not responsible for this request
     }
 
-    long startNanos = Time.monotonicNowNanos();
-    S3GAction s3GAction = S3GAction.GET_ACL;
+    context.setAction(S3GAction.GET_ACL);
 
     try {
       OzoneBucket bucket = getBucket(bucketName);
@@ -107,12 +105,12 @@ public class BucketAclHandler extends BucketOperationHandler {
       result.setAclList(
           new S3BucketAcl.AccessControlList(grantList));
 
-      getMetrics().updateGetAclSuccessStats(startNanos);
-      auditReadSuccess(s3GAction);
+      getMetrics().updateGetAclSuccessStats(context.getStartNanos());
+      auditReadSuccess(context.getAction());
       return Response.ok(result, MediaType.APPLICATION_XML_TYPE).build();
     } catch (OMException ex) {
-      getMetrics().updateGetAclFailureStats(startNanos);
-      auditReadFailure(s3GAction, ex);
+      getMetrics().updateGetAclFailureStats(context.getStartNanos());
+      auditReadFailure(context.getAction(), ex);
       if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
       } else if (isAccessDenied(ex)) {
@@ -121,8 +119,8 @@ public class BucketAclHandler extends BucketOperationHandler {
         throw newError(S3ErrorTable.INTERNAL_ERROR, bucketName, ex);
       }
     } catch (OS3Exception ex) {
-      getMetrics().updateGetAclFailureStats(startNanos);
-      auditReadFailure(s3GAction, ex);
+      getMetrics().updateGetAclFailureStats(context.getStartNanos());
+      auditReadFailure(context.getAction(), ex);
       throw ex;
     }
   }
@@ -133,15 +131,14 @@ public class BucketAclHandler extends BucketOperationHandler {
    * see: https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketAcl.html
    */
   @Override
-  Response handlePutRequest(String bucketName, InputStream body)
+  Response handlePutRequest(S3RequestContext context, String bucketName, InputStream body)
       throws IOException, OS3Exception {
 
     if (!shouldHandle()) {
       return null;  // Not responsible for this request
     }
 
-    long startNanos = Time.monotonicNowNanos();
-    S3GAction s3GAction = S3GAction.PUT_ACL;
+    context.setAction(S3GAction.PUT_ACL);
 
     String grantReads = getHeaders().getHeaderString(S3Acl.GRANT_READ);
     String grantWrites = getHeaders().getHeaderString(S3Acl.GRANT_WRITE);
@@ -226,13 +223,13 @@ public class BucketAclHandler extends BucketOperationHandler {
         volume.addAcl(acl);
       }
 
-      getMetrics().updatePutAclSuccessStats(startNanos);
-      auditWriteSuccess(s3GAction);
+      getMetrics().updatePutAclSuccessStats(context.getStartNanos());
+      auditWriteSuccess(context.getAction());
       return Response.status(HttpStatus.SC_OK).build();
 
     } catch (OMException exception) {
-      getMetrics().updatePutAclFailureStats(startNanos);
-      auditWriteFailure(s3GAction, exception);
+      getMetrics().updatePutAclFailureStats(context.getStartNanos());
+      auditWriteFailure(context.getAction(), exception);
       if (exception.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, exception);
       } else if (isAccessDenied(exception)) {
@@ -240,8 +237,8 @@ public class BucketAclHandler extends BucketOperationHandler {
       }
       throw exception;
     } catch (OS3Exception ex) {
-      getMetrics().updatePutAclFailureStats(startNanos);
-      auditWriteFailure(s3GAction, ex);
+      getMetrics().updatePutAclFailureStats(context.getStartNanos());
+      auditWriteFailure(context.getAction(), ex);
       throw ex;
     }
   }
