@@ -297,11 +297,10 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    * @param cmdType type of the request
    */
   private OMRequest.Builder createOMRequest(Type cmdType) {
-    OMRequest.Builder builder = OMRequest.newBuilder()
+    return OMRequest.newBuilder()
         .setCmdType(cmdType)
         .setVersion(ClientVersion.CURRENT_VERSION)
         .setClientId(clientID);
-    return builder;
   }
 
   /**
