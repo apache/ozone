@@ -59,8 +59,12 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
       byte[] rawKey = codecRegistry.asRawData(key);
       byte[] rawValue = db.get().get(columnFamilyHandle, rawKey);
       return codecRegistry.asObject(rawValue, valueType);
-    } catch (IOException | RocksDBException exception) {
-      throw SnapshotStorageException.fromRocksDB("read map entry", toRocks(exception));
+    } catch (RocksDBException exception) {
+      throw SnapshotStorageException.fromRocksDB(
+          "read map entry", exception);
+    } catch (IOException exception) {
+      throw SnapshotStorageException.fromIO(
+          "deserialize map entry", exception);
     }
   }
 
@@ -70,8 +74,12 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
       byte[] rawKey = codecRegistry.asRawData(key);
       byte[] rawValue = codecRegistry.asRawData(value);
       db.get().put(columnFamilyHandle, rawKey, rawValue);
-    } catch (IOException | RocksDBException exception) {
-      throw SnapshotStorageException.fromRocksDB("write map entry", toRocks(exception));
+    } catch (RocksDBException exception) {
+      throw SnapshotStorageException.fromRocksDB(
+          "write map entry", exception);
+    } catch (IOException exception) {
+      throw SnapshotStorageException.fromIO(
+          "serialize map entry", exception);
     }
   }
 
@@ -80,8 +88,12 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
     try {
       byte[] rawKey = codecRegistry.asRawData(key);
       db.get().delete(columnFamilyHandle, rawKey);
-    } catch (IOException | RocksDBException exception) {
-      throw SnapshotStorageException.fromRocksDB("delete map entry", toRocks(exception));
+    } catch (RocksDBException exception) {
+      throw SnapshotStorageException.fromRocksDB(
+          "delete map entry", exception);
+    } catch (IOException exception) {
+      throw SnapshotStorageException.fromIO(
+          "serialize map key", exception);
     }
   }
 
@@ -108,9 +120,10 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
       } else {
         upperBoundSlice = null;
       }
-      } catch (IOException exception) {
-        throw SnapshotStorageException.fromIO("deserialize map entry", exception);
-      }
+    } catch (IOException exception) {
+      throw SnapshotStorageException.fromIO(
+          "serialize map iterator bound", exception);
+    }
 
     iterator = ManagedRocksIterator.managed(
         db.get().newIterator(columnFamilyHandle, readOptions));
@@ -135,8 +148,8 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
           key = codecRegistry.asObject(iterator.get().key(), keyType);
           value = codecRegistry.asObject(iterator.get().value(), valueType);
         } catch (IOException exception) {
-          // TODO: [SNAPSHOT] Fail gracefully.
-          throw new RuntimeException(exception);
+          throw SnapshotStorageException.fromIO(
+              "deserialize map entry", exception);
         }
 
         // Move iterator to the next.
@@ -161,26 +174,16 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
       }
 
       @Override
-    public void close() {
-      iterator.close();
-      readOptions.close();
-      if (upperBoundSlice != null) {
-        upperBoundSlice.close();
+      public void close() {
+        iterator.close();
+        readOptions.close();
+        if (upperBoundSlice != null) {
+          upperBoundSlice.close();
+        }
+        if (lowerBoundSlice != null) {
+          lowerBoundSlice.close();
+        }
       }
-      if (lowerBoundSlice != null) {
-        lowerBoundSlice.close();
-      }
-    }
-  };
-}
-
-  private RocksDBException toRocks(Exception e) {
-    if (e instanceof RocksDBException) {
-      return (RocksDBException) e;
-    }
-    if (e.getCause() instanceof RocksDBException) {
-      return (RocksDBException) e.getCause();
-    }
-    return new RocksDBException(e);
+    };
   }
 }
