@@ -55,8 +55,7 @@ public class RocksDbPersistentList<E> implements PersistentList<E> {
       db.get().put(columnFamilyHandle, rawKey, rawValue);
       return true;
     } catch (IOException | RocksDBException exception) {
-      // TODO: [SNAPSHOT] Fail gracefully.
-      throw new RuntimeException(exception);
+      throw SnapshotStorageException.fromRocksDB("append list entry", toRocks(exception));
     }
   }
 
@@ -75,8 +74,7 @@ public class RocksDbPersistentList<E> implements PersistentList<E> {
       byte[] rawValue = db.get().get(columnFamilyHandle, rawKey);
       return codecRegistry.asObject(rawValue, entryType);
     } catch (IOException | RocksDBException exception) {
-      // TODO: [SNAPSHOT] Fail gracefully.
-      throw new RuntimeException(exception);
+      throw SnapshotStorageException.fromRocksDB("read list entry", toRocks(exception));
     }
   }
 
@@ -99,8 +97,7 @@ public class RocksDbPersistentList<E> implements PersistentList<E> {
         try {
           return codecRegistry.asObject(rawKey, entryType);
         } catch (IOException exception) {
-          // TODO: [SNAPSHOT] Fail gracefully.
-          throw new RuntimeException(exception);
+          throw SnapshotStorageException.fromIO("deserialize list entry", exception);
         }
       }
 
@@ -109,5 +106,15 @@ public class RocksDbPersistentList<E> implements PersistentList<E> {
         managedRocksIterator.close();
       }
     };
+  }
+
+  private RocksDBException toRocks(Exception e) {
+    if (e instanceof RocksDBException) {
+      return (RocksDBException) e;
+    }
+    if (e.getCause() instanceof RocksDBException) {
+      return (RocksDBException) e.getCause();
+    }
+    return new RocksDBException(e);
   }
 }
