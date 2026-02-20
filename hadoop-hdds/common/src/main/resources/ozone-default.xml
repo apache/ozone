@@ -4507,19 +4507,6 @@
   </property>
 
   <property>
-    <name>ozone.recon.container.health.use.scm.report</name>
-    <value>false</value>
-    <tag>OZONE, MANAGEMENT, RECON</tag>
-    <description>
-      Feature flag to enable ContainerHealthTaskV2 which uses SCM's ReplicationManager
-      as the single source of truth for container health states. When enabled, V2 task
-      will sync container health states directly from SCM instead of computing them locally.
-      This provides more accurate and consistent container health reporting.
-      Default is false (uses legacy implementation).
-    </description>
-  </property>
-
-  <property>
     <name>ozone.om.snapshot.compaction.dag.max.time.allowed</name>
     <value>30d</value>
     <tag>OZONE, OM</tag>
