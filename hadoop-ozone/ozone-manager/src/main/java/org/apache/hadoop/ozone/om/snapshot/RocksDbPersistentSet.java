@@ -17,13 +17,11 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
-import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.ozone.util.ClosableIterator;
 import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.RocksDBException;
 
 /**
  * Persistent set backed by RocksDB.
@@ -47,17 +45,12 @@ public class RocksDbPersistentSet<E> implements PersistentSet<E> {
 
   @Override
   public void add(E entry) {
-    try {
-      byte[] rawKey = codecRegistry.asRawData(entry);
-      byte[] rawValue = codecRegistry.asRawData(emptyByteArray);
-      db.get().put(columnFamilyHandle, rawKey, rawValue);
-    } catch (RocksDBException exception) {
-      throw SnapshotStorageException.fromRocksDB(
-          "add set entry", exception);
-    } catch (IOException exception) {
-      throw SnapshotStorageException.fromIO(
-          "serialize set entry", exception);
-    }
+    SnapshotStorageException.wrap(
+        "Failed to add set entry", () -> {
+          byte[] rawKey = codecRegistry.asRawData(entry);
+          byte[] rawValue = codecRegistry.asRawData(emptyByteArray);
+          db.get().put(columnFamilyHandle, rawKey, rawValue);
+        });
   }
 
   @Override
@@ -76,12 +69,9 @@ public class RocksDbPersistentSet<E> implements PersistentSet<E> {
       public E next() {
         byte[] rawKey = managedRocksIterator.get().key();
         managedRocksIterator.get().next();
-        try {
-          return codecRegistry.asObject(rawKey, entryType);
-        } catch (IOException exception) {
-          throw SnapshotStorageException.fromIO(
-              "deserialize set entry", exception);
-        }
+        return SnapshotStorageException.wrap(
+            "Failed to deserialize set entry",
+            () -> codecRegistry.asObject(rawKey, entryType));
       }
 
       @Override

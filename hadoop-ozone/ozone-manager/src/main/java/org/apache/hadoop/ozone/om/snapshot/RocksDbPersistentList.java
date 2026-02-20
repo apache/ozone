@@ -17,13 +17,11 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
-import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.ozone.util.ClosableIterator;
 import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.RocksDBException;
 
 /**
  * Persistent list backed by RocksDB.
@@ -49,18 +47,13 @@ public class RocksDbPersistentList<E> implements PersistentList<E> {
 
   @Override
   public boolean add(E entry) {
-    try {
-      byte[] rawKey = codecRegistry.asRawData(currentIndex++);
-      byte[] rawValue = codecRegistry.asRawData(entry);
-      db.get().put(columnFamilyHandle, rawKey, rawValue);
-      return true;
-    } catch (RocksDBException exception) {
-      throw SnapshotStorageException.fromRocksDB(
-          "add list entry", exception);
-    } catch (IOException exception) {
-      throw SnapshotStorageException.fromIO(
-          "serialize list entry", exception);
-    }
+    return SnapshotStorageException.wrap(
+        "Failed to append list entry", () -> {
+          byte[] rawKey = codecRegistry.asRawData(currentIndex++);
+          byte[] rawValue = codecRegistry.asRawData(entry);
+          db.get().put(columnFamilyHandle, rawKey, rawValue);
+          return true;
+        });
   }
 
   @Override
@@ -73,17 +66,12 @@ public class RocksDbPersistentList<E> implements PersistentList<E> {
 
   @Override
   public E get(int index) {
-    try {
-      byte[] rawKey = codecRegistry.asRawData(index);
-      byte[] rawValue = db.get().get(columnFamilyHandle, rawKey);
-      return codecRegistry.asObject(rawValue, entryType);
-    } catch (RocksDBException exception) {
-      throw SnapshotStorageException.fromRocksDB(
-          "read list entry", exception);
-    } catch (IOException exception) {
-      throw SnapshotStorageException.fromIO(
-          "deserialize list entry", exception);
-    }
+    return SnapshotStorageException.wrap(
+        "Failed to read list entry", () -> {
+          byte[] rawKey = codecRegistry.asRawData(index);
+          byte[] rawValue = db.get().get(columnFamilyHandle, rawKey);
+          return codecRegistry.asObject(rawValue, entryType);
+        });
   }
 
   @Override
@@ -102,12 +90,9 @@ public class RocksDbPersistentList<E> implements PersistentList<E> {
       public E next() {
         byte[] rawKey = managedRocksIterator.get().value();
         managedRocksIterator.get().next();
-        try {
-          return codecRegistry.asObject(rawKey, entryType);
-        } catch (IOException exception) {
-          throw SnapshotStorageException.fromIO(
-              "deserialize list entry", exception);
-        }
+        return SnapshotStorageException.wrap(
+            "Failed to deserialize list entry",
+            () -> codecRegistry.asObject(rawKey, entryType));
       }
 
       @Override
