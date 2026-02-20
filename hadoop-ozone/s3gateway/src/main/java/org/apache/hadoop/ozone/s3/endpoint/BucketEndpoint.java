@@ -507,7 +507,7 @@ public class BucketEndpoint extends EndpointBase {
     addHandler(new BucketCrudHandler());
   }
 
-  private <T extends EndpointBase & BucketOperationHandler> void addHandler(T handler) {
+  private void addHandler(BucketOperationHandler handler) {
     copyDependenciesTo(handler);
     handlers.add(handler);
   }

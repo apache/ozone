@@ -57,7 +57,7 @@ import org.slf4j.LoggerFactory;
  * This handler extends EndpointBase to inherit all required functionality
  * (configuration, headers, request context, audit logging, metrics, etc.).
  */
-public class BucketAclHandler extends EndpointBase implements BucketOperationHandler {
+public class BucketAclHandler extends BucketOperationHandler {
 
   private static final Logger LOG = LoggerFactory.getLogger(BucketAclHandler.class);
 
@@ -75,7 +75,7 @@ public class BucketAclHandler extends EndpointBase implements BucketOperationHan
    * see: https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketAcl.html
    */
   @Override
-  public Response handleGetRequest(String bucketName)
+  Response handleGetRequest(String bucketName)
       throws IOException, OS3Exception {
 
     if (!shouldHandle()) {
@@ -133,7 +133,7 @@ public class BucketAclHandler extends EndpointBase implements BucketOperationHan
    * see: https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketAcl.html
    */
   @Override
-  public Response handlePutRequest(String bucketName, InputStream body)
+  Response handlePutRequest(String bucketName, InputStream body)
       throws IOException, OS3Exception {
 
     if (!shouldHandle()) {

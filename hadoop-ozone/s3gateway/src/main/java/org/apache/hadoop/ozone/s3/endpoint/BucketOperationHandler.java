@@ -30,7 +30,7 @@ import org.apache.hadoop.ozone.s3.exception.OS3Exception;
  * Implementations should extend EndpointBase to inherit all required functionality
  * (configuration, headers, request context, audit logging, metrics, etc.).
  */
-public interface BucketOperationHandler {
+abstract class BucketOperationHandler extends EndpointBase {
 
   /**
    * Handle the bucket PUT operation if this handler is responsible for it.
@@ -43,7 +43,7 @@ public interface BucketOperationHandler {
    * @throws IOException if an I/O error occurs
    * @throws OS3Exception if an S3-specific error occurs
    */
-  default Response handlePutRequest(String bucketName, InputStream body)
+  Response handlePutRequest(String bucketName, InputStream body)
       throws IOException, OS3Exception {
     return null;
   }
@@ -58,12 +58,12 @@ public interface BucketOperationHandler {
    * @throws IOException if an I/O error occurs
    * @throws OS3Exception if an S3-specific error occurs
    */
-  default Response handleGetRequest(String bucketName)
+  Response handleGetRequest(String bucketName)
       throws IOException, OS3Exception {
     return null;
   }
 
-  default Response handleDeleteRequest(String bucketName)
+  Response handleDeleteRequest(String bucketName)
       throws IOException, OS3Exception {
     return null;
   }

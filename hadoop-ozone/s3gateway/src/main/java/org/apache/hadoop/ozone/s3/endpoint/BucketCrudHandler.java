@@ -43,7 +43,7 @@ import org.apache.http.HttpStatus;
  * This handler extends EndpointBase to inherit all required functionality
  * (configuration, headers, request context, audit logging, metrics, etc.).
  */
-public class BucketCrudHandler extends EndpointBase implements BucketOperationHandler {
+public class BucketCrudHandler extends BucketOperationHandler {
 
   /**
    * Handle only plain PUT bucket (create bucket), not subresources.
@@ -58,7 +58,7 @@ public class BucketCrudHandler extends EndpointBase implements BucketOperationHa
    * Handle PUT /{bucket} for bucket creation.
    */
   @Override
-  public Response handlePutRequest(String bucketName, InputStream body)
+  Response handlePutRequest(String bucketName, InputStream body)
       throws IOException, OS3Exception {
 
     if (!shouldHandle()) {
@@ -91,7 +91,7 @@ public class BucketCrudHandler extends EndpointBase implements BucketOperationHa
    * Handle DELETE /{bucket} for bucket deletion.
    */
   @Override
-  public Response handleDeleteRequest(String bucketName)
+  Response handleDeleteRequest(String bucketName)
       throws IOException, OS3Exception {
 
     if (!shouldHandle()) {
