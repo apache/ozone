@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.recon.persistence;
 
-import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME;
+import static org.apache.ozone.recon.schema.ContainerSchemaDefinitionV2.UNHEALTHY_CONTAINERS_V2_TABLE_NAME;
 import static org.apache.ozone.recon.schema.SchemaVersionTableDefinition.SCHEMA_VERSION_TABLE_NAME;
 import static org.apache.ozone.recon.schema.SqlDbUtils.TABLE_EXISTS_CHECK;
 import static org.apache.ozone.recon.schema.SqlDbUtils.listAllTables;
@@ -189,7 +189,7 @@ public class TestSchemaVersionTableDefinition extends AbstractReconSqlDBTest {
     dropTable(connection, SCHEMA_VERSION_TABLE_NAME);
     if (listAllTables(connection).isEmpty()) {
       createTable(connection, GLOBAL_STATS_TABLE_NAME);
-      createTable(connection, UNHEALTHY_CONTAINERS_TABLE_NAME);
+      createTable(connection, UNHEALTHY_CONTAINERS_V2_TABLE_NAME);
     }
 
     // Initialize the schema
@@ -231,7 +231,7 @@ public class TestSchemaVersionTableDefinition extends AbstractReconSqlDBTest {
     if (listAllTables(connection).isEmpty()) {
       // Create necessary tables to simulate the cluster state
       createTable(connection, GLOBAL_STATS_TABLE_NAME);
-      createTable(connection, UNHEALTHY_CONTAINERS_TABLE_NAME);
+      createTable(connection, UNHEALTHY_CONTAINERS_V2_TABLE_NAME);
       // Create the schema version table
       createSchemaVersionTable(connection);
     }

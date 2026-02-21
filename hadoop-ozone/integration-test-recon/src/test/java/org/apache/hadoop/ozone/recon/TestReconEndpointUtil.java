@@ -42,7 +42,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
-import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
+import org.apache.ozone.recon.schema.ContainerSchemaDefinitionV2;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -81,7 +81,7 @@ public final class TestReconEndpointUtil {
   }
 
   public static UnhealthyContainersResponse getUnhealthyContainersFromRecon(
-      OzoneConfiguration conf, ContainerSchemaDefinition.UnHealthyContainerStates containerState)
+      OzoneConfiguration conf, ContainerSchemaDefinitionV2.UnHealthyContainerStates containerState)
       throws JsonProcessingException {
     StringBuilder urlBuilder = new StringBuilder();
     urlBuilder.append(getReconWebAddress(conf))

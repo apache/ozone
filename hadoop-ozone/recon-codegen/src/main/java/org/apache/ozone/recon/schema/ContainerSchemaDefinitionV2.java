@@ -33,14 +33,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Class used to create tables that are required for tracking containers.
+ * Schema definition for ContainerHealthTaskV2 - uses SCM as source of truth.
+ * This is independent from the legacy ContainerSchemaDefinition to allow
+ * both implementations to run in parallel during migration.
  */
 @Singleton
-public class ContainerSchemaDefinition implements ReconSchemaDefinition {
-  private static final Logger LOG = LoggerFactory.getLogger(ContainerSchemaDefinition.class);
+public class ContainerSchemaDefinitionV2 implements ReconSchemaDefinition {
+  private static final Logger LOG = LoggerFactory.getLogger(ContainerSchemaDefinitionV2.class);
 
-  public static final String UNHEALTHY_CONTAINERS_TABLE_NAME =
-      "UNHEALTHY_CONTAINERS";
+  public static final String UNHEALTHY_CONTAINERS_V2_TABLE_NAME =
+      "UNHEALTHY_CONTAINERS_V2";
 
   private static final String CONTAINER_ID = "container_id";
   private static final String CONTAINER_STATE = "container_state";
@@ -48,7 +50,7 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
   private DSLContext dslContext;
 
   @Inject
-  ContainerSchemaDefinition(DataSource dataSource) {
+  ContainerSchemaDefinitionV2(DataSource dataSource) {
     this.dataSource = dataSource;
   }
 
@@ -56,17 +58,17 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
   public void initializeSchema() throws SQLException {
     Connection conn = dataSource.getConnection();
     dslContext = DSL.using(conn);
-    if (!TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
-      LOG.info("UNHEALTHY_CONTAINERS is missing creating new one.");
-      createUnhealthyContainersTable();
+    if (!TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_V2_TABLE_NAME)) {
+      LOG.info("UNHEALTHY_CONTAINERS_V2 is missing, creating new one.");
+      createUnhealthyContainersV2Table();
     }
   }
 
   /**
-   * Create the Missing Containers table.
+   * Create the UNHEALTHY_CONTAINERS_V2 table for V2 task.
    */
-  private void createUnhealthyContainersTable() {
-    dslContext.createTableIfNotExists(UNHEALTHY_CONTAINERS_TABLE_NAME)
+  private void createUnhealthyContainersV2Table() {
+    dslContext.createTableIfNotExists(UNHEALTHY_CONTAINERS_V2_TABLE_NAME)
         .column(CONTAINER_ID, SQLDataType.BIGINT.nullable(false))
         .column(CONTAINER_STATE, SQLDataType.VARCHAR(16).nullable(false))
         .column("in_state_since", SQLDataType.BIGINT.nullable(false))
@@ -74,14 +76,14 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
         .column("actual_replica_count", SQLDataType.INTEGER.nullable(false))
         .column("replica_delta", SQLDataType.INTEGER.nullable(false))
         .column("reason", SQLDataType.VARCHAR(500).nullable(true))
-        .constraint(DSL.constraint("pk_container_id")
+        .constraint(DSL.constraint("pk_container_id_v2")
             .primaryKey(CONTAINER_ID, CONTAINER_STATE))
-        .constraint(DSL.constraint(UNHEALTHY_CONTAINERS_TABLE_NAME + "ck1")
+        .constraint(DSL.constraint(UNHEALTHY_CONTAINERS_V2_TABLE_NAME + "_ck1")
             .check(field(name(CONTAINER_STATE))
                 .in(UnHealthyContainerStates.values())))
         .execute();
-    dslContext.createIndex("idx_container_state")
-        .on(DSL.table(UNHEALTHY_CONTAINERS_TABLE_NAME), DSL.field(name(CONTAINER_STATE)))
+    dslContext.createIndex("idx_container_state_v2")
+        .on(DSL.table(UNHEALTHY_CONTAINERS_V2_TABLE_NAME), DSL.field(name(CONTAINER_STATE)))
         .execute();
   }
 
@@ -94,17 +96,16 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
   }
 
   /**
-   * ENUM describing the allowed container states which can be stored in the
-   * unhealthy containers table.
+   * ENUM describing the allowed container states in V2 table.
+   * V2 uses SCM's ReplicationManager as the source of truth.
    */
   public enum UnHealthyContainerStates {
-    MISSING,
-    EMPTY_MISSING,
-    UNDER_REPLICATED,
-    OVER_REPLICATED,
-    MIS_REPLICATED,
-    ALL_REPLICAS_BAD,
-    NEGATIVE_SIZE, // Added new state to track containers with negative sizes
-    REPLICA_MISMATCH
+    MISSING,              // From SCM ReplicationManager
+    UNDER_REPLICATED,     // From SCM ReplicationManager
+    OVER_REPLICATED,      // From SCM ReplicationManager
+    MIS_REPLICATED,       // From SCM ReplicationManager
+    REPLICA_MISMATCH,     // Computed locally by Recon (SCM doesn't track checksums)
+    EMPTY_MISSING,        // Kept for API compatibility with legacy clients
+    NEGATIVE_SIZE         // Kept for API compatibility with legacy clients
   }
 }

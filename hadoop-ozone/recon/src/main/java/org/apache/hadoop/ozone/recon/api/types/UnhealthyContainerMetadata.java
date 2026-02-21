@@ -23,7 +23,6 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
-import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainers;
 
 /**
  * Metadata object that represents an unhealthy Container.
@@ -61,15 +60,18 @@ public class UnhealthyContainerMetadata {
   @XmlElement(name = "replicas")
   private List<ContainerHistory> replicas;
 
-  public UnhealthyContainerMetadata(UnhealthyContainers rec,
-      List<ContainerHistory> replicas, UUID pipelineID, long keyCount) {
-    this.containerID = rec.getContainerId();
-    this.containerState = rec.getContainerState();
-    this.unhealthySince = rec.getInStateSince();
-    this.actualReplicaCount = rec.getActualReplicaCount();
-    this.expectedReplicaCount = rec.getExpectedReplicaCount();
-    this.replicaDeltaCount = rec.getReplicaDelta();
-    this.reason = rec.getReason();
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  public UnhealthyContainerMetadata(long containerID, String containerState,
+      long unhealthySince, long expectedReplicaCount, long actualReplicaCount,
+      long replicaDeltaCount, String reason, List<ContainerHistory> replicas,
+      UUID pipelineID, long keyCount) {
+    this.containerID = containerID;
+    this.containerState = containerState;
+    this.unhealthySince = unhealthySince;
+    this.actualReplicaCount = actualReplicaCount;
+    this.expectedReplicaCount = expectedReplicaCount;
+    this.replicaDeltaCount = replicaDeltaCount;
+    this.reason = reason;
     this.replicas = replicas;
     this.pipelineID = pipelineID;
     this.keys = keyCount;

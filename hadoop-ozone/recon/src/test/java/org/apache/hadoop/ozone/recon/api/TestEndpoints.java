@@ -123,7 +123,7 @@ import org.apache.hadoop.ozone.recon.api.types.VolumeObjectDBInfo;
 import org.apache.hadoop.ozone.recon.api.types.VolumesResponse;
 import org.apache.hadoop.ozone.recon.common.ReconTestUtils;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
-import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManagerV2;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
@@ -280,7 +280,7 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
             .addBinding(VolumeEndpoint.class)
             .addBinding(BucketEndpoint.class)
             .addBinding(MetricsServiceProviderFactory.class)
-            .addBinding(ContainerHealthSchemaManager.class)
+            .addBinding(ContainerHealthSchemaManagerV2.class)
             .addBinding(UtilizationEndpoint.class)
             .addBinding(ReconUtils.class, reconUtilsMock)
             .addBinding(StorageContainerLocationProtocol.class, mockScmClient)
@@ -309,11 +309,11 @@ public class TestEndpoints extends AbstractReconSqlDBTest {
     omTableInsightTask =
         new OmTableInsightTask(reconGlobalStatsManager,
             reconOMMetadataManager);
-    ContainerHealthSchemaManager containerHealthSchemaManager =
-        reconTestInjector.getInstance(ContainerHealthSchemaManager.class);
+    ContainerHealthSchemaManagerV2 containerHealthSchemaManagerV2 =
+        reconTestInjector.getInstance(ContainerHealthSchemaManagerV2.class);
     clusterStateEndpoint =
         new ClusterStateEndpoint(reconScm, reconGlobalStatsManager,
-            containerHealthSchemaManager, mock(OzoneConfiguration.class));
+            containerHealthSchemaManagerV2, mock(OzoneConfiguration.class));
     containerSizeCountTask = reconScm.getContainerSizeCountTask();
     MetricsServiceProviderFactory metricsServiceProviderFactory =
         reconTestInjector.getInstance(MetricsServiceProviderFactory.class);
