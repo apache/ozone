@@ -63,16 +63,39 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
-
+    SetVolumePropertyRequest setVolumePropertyRequest =
+        getOmRequest().getSetVolumePropertyRequest();
+    // In production this will never happen, this request will be called only
+    // when we have quota in bytes is set in setVolumePropertyRequest.
+    if (!setVolumePropertyRequest.hasQuotaInBytes() &&
+        !setVolumePropertyRequest.hasQuotaInNamespace()) {
+      /* Added this for the safer side if someone uses these API's directly
+       * in future.
+       * https://github.com/apache/hadoop/pull/884#discussion_r292679484
+       * */
+      throw new OMException("OMVolumeSetQuotaRequest must contains " +
+          "QuotaInBytes or QuotaInNamespace",
+          OMException.ResultCodes.INVALID_REQUEST);
+    }
     long modificationTime = Time.now();
     SetVolumePropertyRequest.Builder setPropertyRequestBuilde = getOmRequest()
         .getSetVolumePropertyRequest().toBuilder()
         .setModificationTime(modificationTime);
 
-    return getOmRequest().toBuilder()
+    final OMRequest omRequest = getOmRequest()
+        .toBuilder()
         .setSetVolumePropertyRequest(setPropertyRequestBuilde)
         .setUserInfo(getUserInfo())
         .build();
+    setOmRequest(omRequest);
+    String volume = omRequest.getSetVolumePropertyRequest().getVolumeName();
+    // check Acl
+    if (ozoneManager.getAclsEnabled()) {
+      checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
+          OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE, volume,
+          null, null);
+    }
+    return getOmRequest();
   }
 
   @Override
@@ -86,13 +109,6 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
-
-    if (!setVolumePropertyRequest.hasQuotaInBytes()
-        && !setVolumePropertyRequest.hasQuotaInNamespace()) {
-      omResponse.setStatus(OzoneManagerProtocolProtos.Status.INVALID_REQUEST)
-          .setSuccess(false);
-      return new OMVolumeSetQuotaResponse(omResponse.build());
-    }
 
     String volume = setVolumePropertyRequest.getVolumeName();
     OMMetrics omMetrics = ozoneManager.getMetrics();
@@ -109,13 +125,6 @@ public class OMVolumeSetQuotaRequest extends OMVolumeRequest {
     boolean acquireVolumeLock = false;
     OMClientResponse omClientResponse = null;
     try {
-      // check Acl
-      if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE, volume,
-            null, null);
-      }
-
       mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
           VOLUME_LOCK, volume));
       acquireVolumeLock = getOmLockDetails().isLockAcquired();

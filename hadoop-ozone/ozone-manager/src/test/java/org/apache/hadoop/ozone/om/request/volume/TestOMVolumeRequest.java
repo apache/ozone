@@ -109,4 +109,18 @@ public class TestOMVolumeRequest {
         .setCmdType(OzoneManagerProtocolProtos.Type.CreateVolume)
         .setCreateVolumeRequest(createVolumeRequest).build();
   }
+
+  static OMRequest createDeleteVolumeRequest(String volumeName) {
+    OzoneManagerProtocolProtos.DeleteVolumeRequest deleteVolumeRequest =
+        OzoneManagerProtocolProtos.DeleteVolumeRequest.newBuilder()
+            .setVolumeName(volumeName)
+            .build();
+
+    return OMRequest.newBuilder()
+        .setClientId(UUID.randomUUID().toString())
+        .setCmdType(OzoneManagerProtocolProtos.Type.DeleteVolume)
+        .setDeleteVolumeRequest(deleteVolumeRequest)
+        .build();
+  }
+
 }
