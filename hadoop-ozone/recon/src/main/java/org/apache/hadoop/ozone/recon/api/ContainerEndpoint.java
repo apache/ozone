@@ -27,6 +27,7 @@ import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_MIN_CONTA
 import static org.apache.hadoop.ozone.recon.ReconConstants.RECON_QUERY_PREVKEY;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -424,31 +425,11 @@ public class ContainerEndpoint {
       List<ContainerHealthSchemaManagerV2.UnhealthyContainerRecordV2> v2Containers =
           containerHealthSchemaManagerV2.getUnhealthyContainers(v2State, minContainerId, maxContainerId, limit);
 
-      // Convert V2 records to response format
-      for (ContainerHealthSchemaManagerV2.UnhealthyContainerRecordV2 c : v2Containers) {
-        long containerID = c.getContainerId();
-        ContainerInfo containerInfo =
-            containerManager.getContainer(ContainerID.valueOf(containerID));
-        long keyCount = containerInfo.getNumberOfKeys();
-        UUID pipelineID = containerInfo.getPipelineID().getId();
-        List<ContainerHistory> datanodes =
-            containerManager.getLatestContainerHistory(containerID,
-                containerInfo.getReplicationConfig().getRequiredNodes());
-
-        unhealthyMeta.add(new UnhealthyContainerMetadata(
-            c.getContainerId(),
-            c.getContainerState(),
-            c.getInStateSince(),
-            c.getExpectedReplicaCount(),
-            c.getActualReplicaCount(),
-            c.getReplicaDelta(),
-            c.getReason(),
-            datanodes,
-            pipelineID,
-            keyCount));
-      }
-    } catch (IOException ex) {
-      throw new WebApplicationException(ex,
+      unhealthyMeta = v2Containers.stream()
+          .map(this::toUnhealthyMetadata)
+          .collect(Collectors.toList());
+    } catch (UncheckedIOException ex) {
+      throw new WebApplicationException(ex.getCause(),
           Response.Status.INTERNAL_SERVER_ERROR);
     } catch (IllegalArgumentException e) {
       throw new WebApplicationException(e, Response.Status.BAD_REQUEST);
@@ -466,6 +447,33 @@ public class ContainerEndpoint {
       response.setSummaryCount(s.getContainerState(), s.getCount());
     }
     return Response.ok(response).build();
+  }
+
+  private UnhealthyContainerMetadata toUnhealthyMetadata(
+      ContainerHealthSchemaManagerV2.UnhealthyContainerRecordV2 record) {
+    try {
+      long containerID = record.getContainerId();
+      ContainerInfo containerInfo =
+          containerManager.getContainer(ContainerID.valueOf(containerID));
+      long keyCount = containerInfo.getNumberOfKeys();
+      UUID pipelineID = containerInfo.getPipelineID().getId();
+      List<ContainerHistory> datanodes =
+          containerManager.getLatestContainerHistory(containerID,
+              containerInfo.getReplicationConfig().getRequiredNodes());
+      return new UnhealthyContainerMetadata(
+          record.getContainerId(),
+          record.getContainerState(),
+          record.getInStateSince(),
+          record.getExpectedReplicaCount(),
+          record.getActualReplicaCount(),
+          record.getReplicaDelta(),
+          record.getReason(),
+          datanodes,
+          pipelineID,
+          keyCount);
+    } catch (IOException ioEx) {
+      throw new UncheckedIOException(ioEx);
+    }
   }
 
   /**

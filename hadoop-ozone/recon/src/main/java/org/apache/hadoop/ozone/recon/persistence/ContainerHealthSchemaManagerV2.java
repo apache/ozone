@@ -81,28 +81,7 @@ public class ContainerHealthSchemaManagerV2 {
     DSLContext dslContext = containerSchemaDefinitionV2.getDSLContext();
 
     try {
-      // Try batch insert first in chunks to keep memory/transaction pressure bounded.
-      dslContext.transaction(configuration -> {
-        DSLContext txContext = configuration.dsl();
-
-        for (int from = 0; from < recs.size(); from += BATCH_INSERT_CHUNK_SIZE) {
-          int to = Math.min(from + BATCH_INSERT_CHUNK_SIZE, recs.size());
-          List<UnhealthyContainersV2Record> records = new ArrayList<>(to - from);
-          for (int i = from; i < to; i++) {
-            UnhealthyContainerRecordV2 rec = recs.get(i);
-            UnhealthyContainersV2Record record = txContext.newRecord(UNHEALTHY_CONTAINERS_V2);
-            record.setContainerId(rec.getContainerId());
-            record.setContainerState(rec.getContainerState());
-            record.setInStateSince(rec.getInStateSince());
-            record.setExpectedReplicaCount(rec.getExpectedReplicaCount());
-            record.setActualReplicaCount(rec.getActualReplicaCount());
-            record.setReplicaDelta(rec.getReplicaDelta());
-            record.setReason(rec.getReason());
-            records.add(record);
-          }
-          txContext.batchInsert(records).execute();
-        }
-      });
+      batchInsertInChunks(dslContext, recs);
 
       LOG.debug("Batch inserted {} unhealthy container records", recs.size());
 
@@ -110,45 +89,82 @@ public class ContainerHealthSchemaManagerV2 {
       // Batch insert failed (likely duplicate key) - fall back to insert-or-update per record
       LOG.warn("Batch insert failed, falling back to individual insert-or-update for {} records",
           recs.size(), e);
-
-      try (Connection connection = containerSchemaDefinitionV2.getDataSource().getConnection()) {
-        connection.setAutoCommit(false);
-        try {
-          for (UnhealthyContainerRecordV2 rec : recs) {
-            UnhealthyContainersV2 jooqRec = new UnhealthyContainersV2(
-                rec.getContainerId(),
-                rec.getContainerState(),
-                rec.getInStateSince(),
-                rec.getExpectedReplicaCount(),
-                rec.getActualReplicaCount(),
-                rec.getReplicaDelta(),
-                rec.getReason());
-
-            try {
-              unhealthyContainersV2Dao.insert(jooqRec);
-            } catch (DataAccessException insertEx) {
-              // Duplicate key - update existing record
-              unhealthyContainersV2Dao.update(jooqRec);
-            }
-          }
-          connection.commit();
-        } catch (Exception innerEx) {
-          connection.rollback();
-          LOG.error("Transaction rolled back during fallback insert", innerEx);
-          throw innerEx;
-        } finally {
-          connection.setAutoCommit(true);
-        }
-      } catch (Exception fallbackEx) {
-        LOG.error("Failed to insert {} records even with fallback", recs.size(), fallbackEx);
-        throw new RuntimeException("Recon failed to insert " + recs.size() +
-            " unhealthy container records.", fallbackEx);
-      }
+      fallbackInsertOrUpdate(recs);
     } catch (Exception e) {
       LOG.error("Failed to batch insert records into {}", UNHEALTHY_CONTAINERS_V2_TABLE_NAME, e);
       throw new RuntimeException("Recon failed to insert " + recs.size() +
           " unhealthy container records.", e);
     }
+  }
+
+  private void batchInsertInChunks(DSLContext dslContext,
+      List<UnhealthyContainerRecordV2> recs) {
+    dslContext.transaction(configuration -> {
+      DSLContext txContext = configuration.dsl();
+      List<UnhealthyContainersV2Record> records =
+          new ArrayList<>(BATCH_INSERT_CHUNK_SIZE);
+
+      for (int from = 0; from < recs.size(); from += BATCH_INSERT_CHUNK_SIZE) {
+        int to = Math.min(from + BATCH_INSERT_CHUNK_SIZE, recs.size());
+        records.clear();
+        for (int i = from; i < to; i++) {
+          records.add(toJooqRecord(txContext, recs.get(i)));
+        }
+        txContext.batchInsert(records).execute();
+      }
+    });
+  }
+
+  private void fallbackInsertOrUpdate(List<UnhealthyContainerRecordV2> recs) {
+    try (Connection connection = containerSchemaDefinitionV2.getDataSource().getConnection()) {
+      connection.setAutoCommit(false);
+      try {
+        for (UnhealthyContainerRecordV2 rec : recs) {
+          UnhealthyContainersV2 jooqRec = toJooqPojo(rec);
+          try {
+            unhealthyContainersV2Dao.insert(jooqRec);
+          } catch (DataAccessException insertEx) {
+            // Duplicate key - update existing record
+            unhealthyContainersV2Dao.update(jooqRec);
+          }
+        }
+        connection.commit();
+      } catch (Exception innerEx) {
+        connection.rollback();
+        LOG.error("Transaction rolled back during fallback insert", innerEx);
+        throw innerEx;
+      } finally {
+        connection.setAutoCommit(true);
+      }
+    } catch (Exception fallbackEx) {
+      LOG.error("Failed to insert {} records even with fallback", recs.size(), fallbackEx);
+      throw new RuntimeException("Recon failed to insert " + recs.size() +
+          " unhealthy container records.", fallbackEx);
+    }
+  }
+
+  private UnhealthyContainersV2Record toJooqRecord(DSLContext txContext,
+      UnhealthyContainerRecordV2 rec) {
+    UnhealthyContainersV2Record record = txContext.newRecord(UNHEALTHY_CONTAINERS_V2);
+    record.setContainerId(rec.getContainerId());
+    record.setContainerState(rec.getContainerState());
+    record.setInStateSince(rec.getInStateSince());
+    record.setExpectedReplicaCount(rec.getExpectedReplicaCount());
+    record.setActualReplicaCount(rec.getActualReplicaCount());
+    record.setReplicaDelta(rec.getReplicaDelta());
+    record.setReason(rec.getReason());
+    return record;
+  }
+
+  private UnhealthyContainersV2 toJooqPojo(UnhealthyContainerRecordV2 rec) {
+    return new UnhealthyContainersV2(
+        rec.getContainerId(),
+        rec.getContainerState(),
+        rec.getInStateSince(),
+        rec.getExpectedReplicaCount(),
+        rec.getActualReplicaCount(),
+        rec.getReplicaDelta(),
+        rec.getReason());
   }
 
   /**

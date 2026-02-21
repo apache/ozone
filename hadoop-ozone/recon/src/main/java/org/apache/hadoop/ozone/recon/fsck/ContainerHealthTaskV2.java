@@ -18,10 +18,12 @@
 package org.apache.hadoop.ozone.recon.fsck;
 
 import javax.inject.Inject;
+import org.apache.hadoop.ozone.recon.metrics.ContainerHealthTaskV2Metrics;
 import org.apache.hadoop.ozone.recon.scm.ReconScmTask;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,6 +58,7 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
 
   private final ReconStorageContainerManagerFacade reconScm;
   private final long interval;
+  private final ContainerHealthTaskV2Metrics metrics;
 
   @Inject
   public ContainerHealthTaskV2(
@@ -65,6 +68,7 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
     super(taskStatusUpdaterManager);
     this.reconScm = reconScm;
     this.interval = reconTaskConfig.getMissingContainerTaskInterval().toMillis();
+    this.metrics = ContainerHealthTaskV2Metrics.create();
     LOG.info("Initialized ContainerHealthTaskV2 with Local ReplicationManager, interval={}ms",
         interval);
   }
@@ -72,12 +76,13 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
   @Override
   protected void run() {
     while (canRun()) {
+      long cycleStart = Time.monotonicNow();
       try {
         initializeAndRunTask();
-
-        // Wait before next run using configured interval
-        synchronized (this) {
-          wait(interval);
+        long elapsed = Time.monotonicNow() - cycleStart;
+        long sleepMs = Math.max(0, interval - elapsed);
+        if (sleepMs > 0) {
+          Thread.sleep(sleepMs);
         }
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
@@ -101,6 +106,7 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
    */
   @Override
   protected void runTask() throws Exception {
+    long start = Time.monotonicNow();
     LOG.info("ContainerHealthTaskV2 starting - using local ReplicationManager");
 
     // Get Recon's ReplicationManager (actually a ReconReplicationManager instance)
@@ -112,8 +118,25 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
     // 1. Runs health checks on all containers using inherited SCM logic
     // 2. Captures ALL unhealthy containers (no sampling)
     // 3. Stores all health states in database
-    reconRM.processAll();
+    boolean succeeded = false;
+    try {
+      reconRM.processAll();
+      metrics.incrSuccess();
+      succeeded = true;
+    } catch (Exception e) {
+      metrics.incrFailure();
+      throw e;
+    } finally {
+      long durationMs = Time.monotonicNow() - start;
+      metrics.addRunTime(durationMs);
+      LOG.info("ContainerHealthTaskV2 completed with status={} in {} ms",
+          succeeded ? "success" : "failure", durationMs);
+    }
+  }
 
-    LOG.info("ContainerHealthTaskV2 completed successfully");
+  @Override
+  public synchronized void stop() {
+    super.stop();
+    metrics.unRegister();
   }
 }

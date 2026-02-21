@@ -33,6 +33,9 @@ import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinitionV2;
 import org.apache.ozone.test.LambdaTestUtils;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -43,6 +46,55 @@ import org.junit.jupiter.api.Test;
  * with the @BeforeEach/@AfterEach setup in that class.
  */
 public class TestReconTasksV2MultiNode {
+
+  private static MiniOzoneCluster cluster;
+  private static ReconService reconService;
+  private static ReconStorageContainerManagerFacade reconScm;
+  private static ReconContainerManager reconContainerManager;
+  private static PipelineManager reconPipelineManager;
+
+  @BeforeAll
+  public static void setupCluster() throws Exception {
+    OzoneConfiguration testConf = new OzoneConfiguration();
+    testConf.set(HDDS_CONTAINER_REPORT_INTERVAL, "5s");
+    testConf.set(HDDS_PIPELINE_REPORT_INTERVAL, "5s");
+
+    ReconTaskConfig taskConfig = testConf.getObject(ReconTaskConfig.class);
+    taskConfig.setMissingContainerTaskInterval(Duration.ofSeconds(10));
+    testConf.setFromObject(taskConfig);
+
+    testConf.set("ozone.scm.stale.node.interval", "6s");
+    testConf.set("ozone.scm.dead.node.interval", "8s");
+
+    reconService = new ReconService(testConf);
+    cluster = MiniOzoneCluster.newBuilder(testConf)
+        .setNumDatanodes(3)
+        .addService(reconService)
+        .build();
+
+    cluster.waitForClusterToBeReady();
+
+    reconScm = (ReconStorageContainerManagerFacade)
+        reconService.getReconServer().getReconStorageContainerManager();
+    reconPipelineManager = reconScm.getPipelineManager();
+    reconContainerManager = (ReconContainerManager) reconScm.getContainerManager();
+  }
+
+  @BeforeEach
+  public void cleanupBeforeEach() throws Exception {
+    // Ensure each test starts from a clean unhealthy-container table.
+    reconContainerManager.getContainerSchemaManagerV2().clearAllUnhealthyContainerRecords();
+    // Ensure Recon has initialized pipeline state before assertions.
+    LambdaTestUtils.await(60000, 5000,
+        () -> (!reconPipelineManager.getPipelines().isEmpty()));
+  }
+
+  @AfterAll
+  public static void shutdownCluster() {
+    if (cluster != null) {
+      cluster.shutdown();
+    }
+  }
 
   /**
    * Test that ContainerHealthTaskV2 can query UNDER_REPLICATED containers.
@@ -75,57 +127,17 @@ public class TestReconTasksV2MultiNode {
    */
   @Test
   public void testContainerHealthTaskV2UnderReplicated() throws Exception {
-    // Create a cluster with 3 datanodes
-    OzoneConfiguration testConf = new OzoneConfiguration();
-    testConf.set(HDDS_CONTAINER_REPORT_INTERVAL, "5s");
-    testConf.set(HDDS_PIPELINE_REPORT_INTERVAL, "5s");
+    cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE, 60000);
 
-    ReconTaskConfig taskConfig = testConf.getObject(ReconTaskConfig.class);
-    taskConfig.setMissingContainerTaskInterval(Duration.ofSeconds(10));
-    testConf.setFromObject(taskConfig);
+    // Verify the query mechanism for UNDER_REPLICATED state works
+    List<UnhealthyContainerRecordV2> underReplicatedContainers =
+        reconContainerManager.getContainerSchemaManagerV2()
+            .getUnhealthyContainers(
+                ContainerSchemaDefinitionV2.UnHealthyContainerStates.UNDER_REPLICATED,
+                0L, 0L, 1000);
 
-    testConf.set("ozone.scm.stale.node.interval", "6s");
-    testConf.set("ozone.scm.dead.node.interval", "8s");
-
-    ReconService testRecon = new ReconService(testConf);
-    MiniOzoneCluster testCluster = MiniOzoneCluster.newBuilder(testConf)
-        .setNumDatanodes(3)
-        .addService(testRecon)
-        .build();
-
-    try {
-      testCluster.waitForClusterToBeReady();
-      testCluster.waitForPipelineTobeReady(
-          HddsProtos.ReplicationFactor.THREE, 60000);
-
-      ReconStorageContainerManagerFacade reconScm =
-          (ReconStorageContainerManagerFacade)
-              testRecon.getReconServer().getReconStorageContainerManager();
-
-      PipelineManager reconPipelineManager = reconScm.getPipelineManager();
-
-      // Make sure Recon's pipeline state is initialized
-      LambdaTestUtils.await(60000, 5000,
-          () -> (!reconPipelineManager.getPipelines().isEmpty()));
-
-      ReconContainerManager reconContainerManager =
-          (ReconContainerManager) reconScm.getContainerManager();
-
-      // Verify the query mechanism for UNDER_REPLICATED state works
-      List<UnhealthyContainerRecordV2> underReplicatedContainers =
-          reconContainerManager.getContainerSchemaManagerV2()
-              .getUnhealthyContainers(
-                  ContainerSchemaDefinitionV2.UnHealthyContainerStates.UNDER_REPLICATED,
-                  0L, 0L, 1000);
-
-      // Should be empty in normal operation (all replicas healthy)
-      assertEquals(0, underReplicatedContainers.size());
-
-    } finally {
-      if (testCluster != null) {
-        testCluster.shutdown();
-      }
-    }
+    // Should be empty in normal operation (all replicas healthy)
+    assertEquals(0, underReplicatedContainers.size());
   }
 
   /**
@@ -143,80 +155,26 @@ public class TestReconTasksV2MultiNode {
    */
   @Test
   public void testContainerHealthTaskV2OverReplicated() throws Exception {
-    // Create a cluster with 3 datanodes
-    OzoneConfiguration testConf = new OzoneConfiguration();
-    testConf.set(HDDS_CONTAINER_REPORT_INTERVAL, "5s");
-    testConf.set(HDDS_PIPELINE_REPORT_INTERVAL, "5s");
+    cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 60000);
 
-    ReconTaskConfig taskConfig = testConf.getObject(ReconTaskConfig.class);
-    taskConfig.setMissingContainerTaskInterval(Duration.ofSeconds(10));
-    testConf.setFromObject(taskConfig);
+    // Note: Creating over-replication in integration tests is challenging
+    // as it requires artificially adding extra replicas. In production,
+    // over-replication can occur when:
+    // 1. A dead datanode comes back online with old replicas
+    // 2. Replication commands create extra replicas before cleanup
+    // 3. Manual intervention or bugs cause duplicate replicas
+    //
+    // For now, this test verifies the detection mechanism exists.
+    // If over-replication is detected in the future, the V2 table
+    // should contain the record with proper replica counts.
 
-    testConf.set("ozone.scm.stale.node.interval", "6s");
-    testConf.set("ozone.scm.dead.node.interval", "8s");
-
-    ReconService testRecon = new ReconService(testConf);
-    MiniOzoneCluster testCluster = MiniOzoneCluster.newBuilder(testConf)
-        .setNumDatanodes(3)
-        .addService(testRecon)
-        .build();
-
-    try {
-      testCluster.waitForClusterToBeReady();
-      testCluster.waitForPipelineTobeReady(
-          HddsProtos.ReplicationFactor.ONE, 60000);
-
-      ReconStorageContainerManagerFacade reconScm =
-          (ReconStorageContainerManagerFacade)
-              testRecon.getReconServer().getReconStorageContainerManager();
-
-      PipelineManager reconPipelineManager = reconScm.getPipelineManager();
-
-      // Make sure Recon's pipeline state is initialized
-      LambdaTestUtils.await(60000, 5000,
-          () -> (!reconPipelineManager.getPipelines().isEmpty()));
-
-      ReconContainerManager reconContainerManager =
-          (ReconContainerManager) reconScm.getContainerManager();
-
-      // Note: Creating over-replication in integration tests is challenging
-      // as it requires artificially adding extra replicas. In production,
-      // over-replication can occur when:
-      // 1. A dead datanode comes back online with old replicas
-      // 2. Replication commands create extra replicas before cleanup
-      // 3. Manual intervention or bugs cause duplicate replicas
-      //
-      // For now, this test verifies the detection mechanism exists.
-      // If over-replication is detected in the future, the V2 table
-      // should contain the record with proper replica counts.
-
-      // The actual over-replication detection would look like this:
-      // LambdaTestUtils.await(120000, 6000, () -> {
-      //   List<UnhealthyContainerRecordV2> overReplicatedContainers =
-      //       reconContainerManager.getContainerSchemaManagerV2()
-      //           .getUnhealthyContainers(
-      //               ContainerSchemaDefinitionV2.UnHealthyContainerStates.OVER_REPLICATED,
-      //               0L, 0L, 1000);
-      //   if (!overReplicatedContainers.isEmpty()) {
-      //     UnhealthyContainerRecordV2 record = overReplicatedContainers.get(0);
-      //     return record.getActualReplicaCount() > record.getExpectedReplicaCount();
-      //   }
-      //   return false;
-      // });
-
-      // For now, just verify that the query mechanism works
-      List<UnhealthyContainerRecordV2> overReplicatedContainers =
-          reconContainerManager.getContainerSchemaManagerV2()
-              .getUnhealthyContainers(
-                  ContainerSchemaDefinitionV2.UnHealthyContainerStates.OVER_REPLICATED,
-                  0L, 0L, 1000);
-      // Should be empty in normal operation
-      assertEquals(0, overReplicatedContainers.size());
-
-    } finally {
-      if (testCluster != null) {
-        testCluster.shutdown();
-      }
-    }
+    // For now, just verify that the query mechanism works
+    List<UnhealthyContainerRecordV2> overReplicatedContainers =
+        reconContainerManager.getContainerSchemaManagerV2()
+            .getUnhealthyContainers(
+                ContainerSchemaDefinitionV2.UnHealthyContainerStates.OVER_REPLICATED,
+                0L, 0L, 1000);
+    // Should be empty in normal operation
+    assertEquals(0, overReplicatedContainers.size());
   }
 }
