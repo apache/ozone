@@ -220,6 +220,15 @@ public class TestStorageDistributionEndpoint {
       List<DatanodeStorageReport> reports = storageResponse.getDataNodeUsage();
       List<HddsProtos.DatanodeUsageInfoProto> scmReports =
           scm.getClientProtocolServer().getDatanodeUsageInfo(true, 3, 1);
+
+      long totalReserved = 0;
+      long totalMinFreeSpace = 0;
+      long totalPreAllocated = 0;
+      long totalFileSystemCapacity = 0;
+      long totalOzoneCapacity = 0;
+      long totalOzoneUsedSpace = 0;
+      long totalRemaining = 0;
+
       for (DatanodeStorageReport report : reports) {
         for (HddsProtos.DatanodeUsageInfoProto scmReport : scmReports) {
           if (scmReport.getNode().getUuid().equals(report.getDatanodeUuid())) {
@@ -231,9 +240,23 @@ public class TestStorageDistributionEndpoint {
             assertEquals(scmReport.getCommitted(), report.getCommitted());
             assertEquals(scmReport.getFsAvailable(), report.getFilesystemAvailable());
             assertEquals(scmReport.getFsCapacity(), report.getFilesystemCapacity());
+            totalReserved += scmReport.getReserved();
+            totalMinFreeSpace += scmReport.getFreeSpaceToSpare();
+            totalPreAllocated += scmReport.getCommitted();
+            totalFileSystemCapacity += scmReport.getFsCapacity();
+            totalOzoneCapacity += scmReport.getCapacity();
+            totalOzoneUsedSpace += scmReport.getUsed();
+            totalRemaining += scmReport.getRemaining();
           }
         }
       }
+      assertEquals(totalReserved, storageResponse.getGlobalStorage().getTotalReservedSpace());
+      assertEquals(totalMinFreeSpace, storageResponse.getGlobalStorage().getTotalMinimumFreeSpace());
+      assertEquals(totalPreAllocated, storageResponse.getGlobalStorage().getTotalOzonePreAllocatedContainerSpace());
+      assertEquals(totalOzoneCapacity, storageResponse.getGlobalStorage().getTotalOzoneCapacity());
+      assertEquals(totalOzoneUsedSpace, storageResponse.getGlobalStorage().getTotalOzoneUsedSpace());
+      assertEquals(totalFileSystemCapacity, storageResponse.getGlobalStorage().getTotalFileSystemCapacity());
+      assertEquals(totalRemaining, storageResponse.getGlobalStorage().getTotalOzoneFreeSpace());
       return true;
     } catch (Exception e) {
       LOG.debug("Waiting for storage distribution assertions to pass", e);
