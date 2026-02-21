@@ -184,6 +184,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
       }
     } catch (IOException e) {
       LOG.error("unable to write to archive stream", e);
+      response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
     } finally {
       try {
         if (tmpdir != null) {
@@ -269,8 +270,6 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
       if (shouldContinue) {
         // we finished transferring files from snapshot DB's by now and
         // this is the last step where we transfer the active om.db contents
-        Map<String, String> hardLinkFileMap = new HashMap<>();
-        omdbArchiver.setHardLinkFileMap(hardLinkFileMap);
         SnapshotCache snapshotCache = om.getOmSnapshotManager().getSnapshotCache();
         OmSnapshotLocalDataManager localDataManager = om.getOmSnapshotManager().getSnapshotLocalDataManager();
         /*
@@ -376,9 +375,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
     }
     for (Path snapshotLocalPropertyYaml : snapshotLocalPropertyFiles) {
       File yamlFile = snapshotLocalPropertyYaml.toFile();
-      if (omdbArchiver.getHardLinkFileMap() != null) {
-        omdbArchiver.getHardLinkFileMap().put(yamlFile.getAbsolutePath(), yamlFile.getName());
-      }
+      omdbArchiver.recordHardLinkMapping(yamlFile.getAbsolutePath(), yamlFile.getName());
       omdbArchiver.recordFileEntry(yamlFile, yamlFile.getName());
     }
   }
@@ -410,17 +407,26 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
   static void writeHardlinkFile(OzoneConfiguration conf, Map<String, String> hardlinkFileMap,
       ArchiveOutputStream<TarArchiveEntry> archiveOutputStream) throws IOException {
     Path data = Files.createTempFile(DATA_PREFIX, DATA_SUFFIX);
-    Path metaDirPath = OMStorage.getOmDbDir(conf).toPath();
-    StringBuilder sb = new StringBuilder();
+    try {
+      Path metaDirPath = OMStorage.getOmDbDir(conf).toPath()
+          .toAbsolutePath().normalize();
+      StringBuilder sb = new StringBuilder();
 
-    for (Map.Entry<String, String> entry : hardlinkFileMap.entrySet()) {
-      Path p = Paths.get(entry.getKey());
-      String fileId = entry.getValue();
-      Path relativePath = metaDirPath.relativize(p);
-      sb.append(relativePath).append('\t').append(fileId).append('\n');
+      for (Map.Entry<String, String> entry : hardlinkFileMap.entrySet()) {
+        Path p = new File(entry.getKey()).toPath();
+        if (!p.isAbsolute()) {
+          p = metaDirPath.resolve(p);
+        }
+        p = p.toAbsolutePath().normalize();
+        String fileId = entry.getValue();
+        Path relativePath = metaDirPath.relativize(p);
+        sb.append(relativePath).append('\t').append(fileId).append('\n');
+      }
+      Files.write(data, sb.toString().getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING);
+      includeFile(data.toFile(), OmSnapshotManager.OM_HARDLINK_FILE, archiveOutputStream);
+    } finally {
+      Files.deleteIfExists(data);
     }
-    Files.write(data, sb.toString().getBytes(StandardCharsets.UTF_8), StandardOpenOption.TRUNCATE_EXISTING);
-    includeFile(data.toFile(), OmSnapshotManager.OM_HARDLINK_FILE, archiveOutputStream);
   }
 
   /**
@@ -500,14 +506,12 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
           continue;
         }
         String fileId = OmSnapshotUtils.getFileInodeAndLastModifiedTimeString(dbFile);
-        if (omdbArchiver.getHardLinkFileMap() != null) {
-          String path = dbFile.toFile().getAbsolutePath();
-          // if the file is in the om checkpoint dir, then we need to change the path to point to the OM DB.
-          if (path.contains(OM_CHECKPOINT_DIR)) {
-            path = getDbStore().getDbLocation().toPath().resolve(dbFile.getFileName()).toAbsolutePath().toString();
-          }
-          omdbArchiver.getHardLinkFileMap().put(path, fileId);
+        String path = dbFile.toFile().getAbsolutePath();
+        // if the file is in the om checkpoint dir, then we need to change the path to point to the OM DB.
+        if (path.contains(OM_CHECKPOINT_DIR)) {
+          path = getDbStore().getDbLocation().toPath().resolve(dbFile.getFileName()).toAbsolutePath().toString();
         }
+        omdbArchiver.recordHardLinkMapping(path, fileId);
         if (!sstFilesToExclude.contains(fileId)) {
           long fileSize = Files.size(dbFile);
           if (maxTotalSstSize.get() - fileSize <= 0) {
