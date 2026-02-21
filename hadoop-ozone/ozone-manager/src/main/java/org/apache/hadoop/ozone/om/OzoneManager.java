@@ -39,10 +39,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BL
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
 import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.LAYOUT_VERSION_KEY;
-import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_TEMP_FILE;
@@ -123,7 +121,6 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.security.PrivilegedExceptionAction;
 import java.time.Duration;
@@ -149,7 +146,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import javax.management.ObjectName;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -159,7 +155,6 @@ import org.apache.hadoop.crypto.key.KeyProvider;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.SafeModeAction;
 import org.apache.hadoop.hdds.ExitManager;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -1228,7 +1223,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     return new OzoneBlockTokenSecretManager(expiryTime, secretKeyClient);
   }
 
-  private void stopSecretManager() {
+  void stopSecretManager() {
     if (secretKeyClient != null) {
       LOG.info("Stopping secret key client.");
       secretKeyClient.stop();
@@ -1374,7 +1369,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * Creates a new instance of rpc server. If an earlier instance is already
    * running then returns the same.
    */
-  private RPC.Server getRpcServer(OzoneConfiguration conf) throws IOException {
+  RPC.Server getRpcServer(OzoneConfiguration conf) throws IOException {
     if (isOmRpcServerRunning) {
       return omRpcServer;
     }
@@ -2272,7 +2267,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * Starts a Trash Emptier thread that does an fs.trashRoots and performs
    * checkpointing & deletion.
    */
-  private void startTrashEmptier(Configuration conf) throws IOException {
+  void startTrashEmptier(Configuration conf) throws IOException {
     if (emptier == null) {
       float hadoopTrashInterval =
           conf.getFloat(FS_TRASH_INTERVAL_KEY, FS_TRASH_INTERVAL_DEFAULT);
@@ -2473,7 +2468,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
   }
 
-  private void startSecretManagerIfNecessary() {
+  void startSecretManagerIfNecessary() {
     boolean shouldRun = isOzoneSecurityEnabled();
     if (shouldRun) {
       boolean running = delegationTokenMgr.isRunning();
@@ -4057,164 +4052,27 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    */
   TermIndex installCheckpoint(String leaderId, Path checkpointLocation)
       throws Exception {
-    Path omDbPath = Paths.get(checkpointLocation.toString(), OM_DB_NAME);
-    TransactionInfo checkpointTrxnInfo = OzoneManagerRatisUtils
-        .getTrxnInfoFromCheckpoint(configuration, omDbPath);
-    LOG.info("Installing checkpoint with OMTransactionInfo {}",
-        checkpointTrxnInfo);
-    return installCheckpoint(leaderId, checkpointLocation, checkpointTrxnInfo);
+    OmRatisCheckpointInstaller installer = new OmRatisCheckpointInstaller();
+    return installer.installCheckpoint(this, leaderId, checkpointLocation);
   }
 
+  /**
+   * Install checkpoint obtained from leader using the dbCheckpoint endpoint.
+   * This method is used by tests that already have the TransactionInfo.
+   *
+   * @param leaderId leader OM node ID
+   * @param checkpointLocation checkpoint data directory
+   * @param checkpointTrxnInfo transaction info from checkpoint
+   * @return TermIndex if installation succeeds, null otherwise
+   * @throws Exception if installation fails
+   */
   TermIndex installCheckpoint(String leaderId, Path checkpointLocation,
       TransactionInfo checkpointTrxnInfo) throws Exception {
-    long startTime = Time.monotonicNow();
-    File oldDBLocation = metadataManager.getStore().getDbLocation();
-    Path omDbPath = Paths.get(checkpointLocation.toString(), OM_DB_NAME);
-    try {
-      // Stop Background services
-      keyManager.stop();
-      stopSecretManager();
-      stopTrashEmptier();
-      omSnapshotManager.invalidateCache();
-      // Pause the State Machine so that no new transactions can be applied.
-      // This action also clears the OM Double Buffer so that if there are any
-      // pending transactions in the buffer, they are discarded.
-      omRatisServer.getOmStateMachine().pause();
-    } catch (Exception e) {
-      LOG.error("Failed to stop/ pause the services. Cannot proceed with " +
-          "installing the new checkpoint.");
-      // Stop the checkpoint install process and restart the services.
-      keyManager.start(configuration);
-      startSecretManagerIfNecessary();
-      startTrashEmptier(configuration);
-      throw e;
-    }
-
-    File dbBackup = null;
-    TermIndex termIndex = omRatisServer.getLastAppliedTermIndex();
-    long term = termIndex.getTerm();
-    long lastAppliedIndex = termIndex.getIndex();
-
-    // Check if current applied log index is smaller than the downloaded
-    // checkpoint transaction index. If yes, proceed by stopping the ratis
-    // server so that the OM state can be re-initialized. If no then do not
-    // proceed with installSnapshot.
-    boolean canProceed = OzoneManagerRatisUtils.verifyTransactionInfo(
-        checkpointTrxnInfo, lastAppliedIndex, leaderId, omDbPath);
-
-    boolean oldOmMetadataManagerStopped = false;
-    boolean newMetadataManagerStarted = false;
-    boolean omRpcServerStopped = false;
-    long time = Time.monotonicNow();
-    if (canProceed) {
-      // Stop RPC server before stop metadataManager
-      omRpcServer.stop();
-      isOmRpcServerRunning = false;
-      omRpcServerStopped = true;
-      LOG.info("RPC server is stopped. Spend {} ms.", Time.monotonicNow() - time);
-      try {
-        // Stop old metadataManager before replacing DB Dir
-        time = Time.monotonicNow();
-        metadataManager.stop();
-        oldOmMetadataManagerStopped = true;
-        LOG.info("metadataManager is stopped. Spend {} ms.", Time.monotonicNow() - time);
-      } catch (Exception e) {
-        String errorMsg = "Failed to stop metadataManager. Cannot proceed " +
-            "with installing the new checkpoint.";
-        LOG.error(errorMsg);
-        exitManager.exitSystem(1, errorMsg, e, LOG);
-      }
-      try {
-        time = Time.monotonicNow();
-        dbBackup = replaceOMDBWithCheckpoint(lastAppliedIndex, oldDBLocation, checkpointLocation);
-        term = checkpointTrxnInfo.getTerm();
-        lastAppliedIndex = checkpointTrxnInfo.getTransactionIndex();
-        LOG.info("Replaced DB with checkpoint from OM: {}, term: {}, " +
-            "index: {}, time: {} ms", leaderId, term, lastAppliedIndex,
-            Time.monotonicNow() - time);
-      } catch (Exception e) {
-        LOG.error("Failed to install Snapshot from {} as OM failed to replace" +
-            " DB with downloaded checkpoint. Reloading old OM state.",
-            leaderId, e);
-      }
-    } else {
-      LOG.warn("Cannot proceed with InstallSnapshot as OM is at TermIndex {} " +
-          "and checkpoint has lower TermIndex {}. Reloading old state of OM.",
-          termIndex, checkpointTrxnInfo.getTermIndex());
-    }
-
-    if (oldOmMetadataManagerStopped) {
-      // Close snapDiff's rocksDB instance only if metadataManager gets closed.
-      omSnapshotManager.close();
-    }
-
-    // Reload the OM DB store with the new checkpoint.
-    // Restart (unpause) the state machine and update its last applied index
-    // to the installed checkpoint's snapshot index.
-    try {
-      if (oldOmMetadataManagerStopped) {
-        time = Time.monotonicNow();
-        reloadOMState();
-        setTransactionInfo(TransactionInfo.valueOf(termIndex));
-        omRatisServer.getOmStateMachine().unpause(lastAppliedIndex, term);
-        newMetadataManagerStarted = true;
-        LOG.info("Reloaded OM state with Term: {} and Index: {}. Spend {} ms",
-            term, lastAppliedIndex, Time.monotonicNow() - time);
-      } else {
-        // OM DB is not stopped. Start the services.
-        keyManager.start(configuration);
-        startSecretManagerIfNecessary();
-        startTrashEmptier(configuration);
-        omRatisServer.getOmStateMachine().unpause(lastAppliedIndex, term);
-        LOG.info("OM DB is not stopped. Started services with Term: {} and " +
-            "Index: {}", term, lastAppliedIndex);
-      }
-    } catch (Exception ex) {
-      String errorMsg = "Failed to reload OM state and instantiate services.";
-      exitManager.exitSystem(1, errorMsg, ex, LOG);
-    }
-
-    if (omRpcServerStopped && newMetadataManagerStarted) {
-      // Start the RPC server. RPC server start requires metadataManager
-      try {
-        time = Time.monotonicNow();
-        omRpcServer = getRpcServer(configuration);
-        omRpcServer.start();
-        isOmRpcServerRunning = true;
-        LOG.info("RPC server is re-started. Spend {} ms.", Time.monotonicNow() - time);
-      } catch (Exception e) {
-        String errorMsg = "Failed to start RPC Server.";
-        exitManager.exitSystem(1, errorMsg, e, LOG);
-      }
-    }
-    buildDBCheckpointInstallAuditLog(leaderId, term, lastAppliedIndex);
-
-    // Delete the backup DB
-    try {
-      if (dbBackup != null) {
-        FileUtils.deleteFully(dbBackup);
-      }
-    } catch (Exception e) {
-      LOG.error("Failed to delete the backup of the original DB {}",
-          dbBackup, e);
-    }
-
-    if (lastAppliedIndex != checkpointTrxnInfo.getTransactionIndex()) {
-      // Install Snapshot failed and old state was reloaded. Return null to
-      // Ratis to indicate that installation failed.
-      return null;
-    }
-
-    // TODO: We should only return the snpashotIndex to the leader.
-    //  Should be fixed after RATIS-586
-    TermIndex newTermIndex = TermIndex.valueOf(term, lastAppliedIndex);
-    LOG.info("Install Checkpoint is finished with Term: {} and Index: {}. " +
-        "Spend {} ms.", newTermIndex.getTerm(), newTermIndex.getIndex(),
-        (Time.monotonicNow() - startTime));
-    return newTermIndex;
+    OmRatisCheckpointInstaller installer = new OmRatisCheckpointInstaller();
+    return installer.installCheckpoint(this, leaderId, checkpointLocation, checkpointTrxnInfo);
   }
 
-  private void buildDBCheckpointInstallAuditLog(String leaderId, long term, long lastAppliedIndex) {
+  void buildDBCheckpointInstallAuditLog(String leaderId, long term, long lastAppliedIndex) {
     Map<String, String> auditMap = new LinkedHashMap<>();
     auditMap.put(AUDIT_PARAM_LEADER_ID, leaderId);
     auditMap.put(AUDIT_PARAM_TERM, String.valueOf(term));
@@ -4222,158 +4080,10 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     SYSTEMAUDIT.logWriteSuccess(buildAuditMessageForSuccess(OMSystemAction.DB_CHECKPOINT_INSTALL, auditMap));
   }
 
-  private void stopTrashEmptier() {
+  void stopTrashEmptier() {
     if (this.emptier != null) {
       emptier.interrupt();
       emptier = null;
-    }
-  }
-
-  /**
-   * Replaces the OM DB with checkpoint data from leader.
-   * Only backs up and replaces directories/files that are present in checkpointLocation.
-   *
-   * @param lastAppliedIndex last applied transaction index
-   * @param oldDB current DB directory
-   * @param checkpointLocation checkpoint data directory from leader
-   * @return backup directory containing original state (only changed items)
-   * @throws IOException if operations fail
-   */
-  File replaceOMDBWithCheckpoint(long lastAppliedIndex, File oldDB, Path checkpointLocation)
-      throws IOException {
-
-    // Create single parent backup directory
-    String dbBackupName = OzoneConsts.OM_DB_BACKUP_PREFIX + lastAppliedIndex
-        + "_" + System.currentTimeMillis();
-    File dbDir = oldDB.getParentFile();
-    File dbBackupDir = new File(dbDir, dbBackupName);
-
-    if (!dbBackupDir.mkdirs()) {
-      throw new IOException("Failed to create backup directory: " + dbBackupDir);
-    }
-
-    // Only backup items that are present in checkpointLocation
-    // Track what we backed up for selective restore
-    Set<String> backedUpItems = new HashSet<>();
-
-    if (Files.exists(checkpointLocation) && Files.isDirectory(checkpointLocation)) {
-      try (Stream<Path> checkpointContents = Files.list(checkpointLocation)) {
-        for (Path checkpointItem : checkpointContents.collect(Collectors.toList())) {
-          Path fileName = checkpointItem.getFileName();
-          if (fileName == null) {
-            LOG.warn("Skipping path with no file name: {}", checkpointItem);
-            continue;
-          }
-          String itemName = fileName.toString();
-          // Skip backup directories, raft logs, and marker files
-          if (itemName.startsWith(OzoneConsts.OM_DB_BACKUP_PREFIX)
-              || itemName.equals(DB_TRANSIENT_MARKER) ||
-              itemName.equals(OZONE_RATIS_SNAPSHOT_DIR) ||
-              itemName.equals(new File(getRatisLogDirectory()).getName())) {
-            continue;
-          }
-
-          // Only backup if this item exists in dbDir
-          Path existingItem = dbDir.toPath().resolve(itemName);
-          if (Files.exists(existingItem)) {
-            Path backupTarget = dbBackupDir.toPath().resolve(itemName);
-            Files.move(existingItem, backupTarget);
-            backedUpItems.add(itemName);
-          }
-        }
-      }
-    }
-
-    // Move checkpoint files (only items present in checkpointLocation)
-    moveCheckpointFiles(oldDB, checkpointLocation, dbDir, dbBackupDir, backedUpItems);
-
-    return dbBackupDir;
-  }
-
-  /**
-   * Moves contents from checkpointLocation to dbDir, replacing existing files/dirs.
-   * Only moves items that are present in checkpointLocation.
-   * Uses a single parent backup for rollback on failure.
-   *
-   * @param oldDB the old DB directory (will be replaced)
-   * @param checkpointLocation source directory containing checkpoint data
-   * @param dbDir target directory (parent of oldDB)
-   * @param dbBackupDir backup directory containing the original state
-   * @param backedUpItems set of item names that were backed up (for selective restore)
-   * @throws IOException if file operations fail
-   */
-  private void moveCheckpointFiles(File oldDB, Path checkpointLocation, File dbDir,
-      File dbBackupDir, Set<String> backedUpItems) throws IOException {
-    Path markerFile = new File(dbDir, DB_TRANSIENT_MARKER).toPath();
-    try {
-      // Create transient marker file
-      Files.createFile(markerFile);
-      // Move everything from checkpointLocation to dbDir, replacing existing
-      if (!Files.exists(checkpointLocation) || !Files.isDirectory(checkpointLocation)) {
-        throw new IOException("Checkpoint data directory does not exist: " + checkpointLocation);
-      }
-      try (Stream<Path> checkpointContents = Files.list(checkpointLocation)) {
-        for (Path sourcePath : checkpointContents.collect(Collectors.toList())) {
-          Path fileName = sourcePath.getFileName();
-          if (fileName == null) {
-            LOG.warn("Skipping path with no file name: {}", sourcePath);
-            continue;
-          }
-          String itemName = fileName.toString();
-          // Skip backup directories, raft logs, and marker files
-          if (itemName.startsWith(OzoneConsts.OM_DB_BACKUP_PREFIX) ||
-              itemName.equals(DB_TRANSIENT_MARKER) ||
-              itemName.equals(OZONE_RATIS_SNAPSHOT_DIR) ||
-              itemName.equals(new File(getRatisLogDirectory()).getName())) {
-            continue;
-          }
-          Path targetPath = dbDir.toPath().resolve(itemName);
-          if (Files.exists(targetPath)) {
-            throw new IOException("Cannnot move checkpoint data into target." +
-                "Checkpoint data already exists: " + targetPath);
-          }
-          // Move source to target
-          Files.move(sourcePath, targetPath);
-        }
-      }
-      // Success - delete marker file
-      Files.deleteIfExists(markerFile);
-    } catch (IOException e) {
-      LOG.error("Failed to move checkpoint data from {} to {}. " +
-              "Restoring from backup.",
-          checkpointLocation, dbDir, e);
-      // Rollback: restore only the items that were backed up
-      try {
-        // Delete only the items that were replaced
-        for (String itemName : backedUpItems) {
-          Path targetPath = dbDir.toPath().resolve(itemName);
-          if (Files.exists(targetPath)) {
-            if (Files.isDirectory(targetPath)) {
-              FileUtil.fullyDelete(targetPath.toFile());
-            } else {
-              Files.delete(targetPath);
-            }
-          }
-        }
-        // Restore from backup - only restore items that were backed up
-        if (dbBackupDir.exists() && dbBackupDir.isDirectory()) {
-          File[] backupContents = dbBackupDir.listFiles();
-          if (backupContents != null) {
-            for (File backupItem : backupContents) {
-              String itemName = backupItem.getName();
-              if (backedUpItems.contains(itemName)) {
-                Path targetPath = dbDir.toPath().resolve(itemName);
-                Files.move(backupItem.toPath(), targetPath);
-              }
-            }
-          }
-        }
-        Files.deleteIfExists(markerFile);
-      } catch (IOException ex) {
-        String errorMsg = "Failed to restore from backup. OM is in an inconsistent state.";
-        exitManager.exitSystem(1, errorMsg, ex, LOG);
-      }
-      throw e;
     }
   }
 
@@ -4382,7 +4092,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * All the classes which use/ store MetadataManager should also be updated
    * with the new MetadataManager instance.
    */
-  private void reloadOMState() throws IOException {
+  void reloadOMState() throws IOException {
     instantiateServices(true);
 
     // Restart required services
@@ -4417,6 +4127,27 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public OzoneConfiguration getConfiguration() {
     return configuration;
+  }
+
+  RPC.Server getOmRpcServer() {
+    return omRpcServer;
+  }
+
+  void setOmRpcServer(RPC.Server server) {
+    this.omRpcServer = server;
+  }
+
+  @VisibleForTesting
+  public boolean isOmRpcServerRunning() {
+    return isOmRpcServerRunning;
+  }
+
+  void setOmRpcServerRunning(boolean running) {
+    this.isOmRpcServerRunning = running;
+  }
+
+  ExitManager getExitManager() {
+    return exitManager;
   }
 
   public OmConfig getConfig() {
@@ -4983,11 +4714,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   @VisibleForTesting
   public void setMinMultipartUploadPartSize(int partSizeForTest) {
     this.minMultipartUploadPartSize = partSizeForTest;
-  }
-
-  @VisibleForTesting
-  public boolean isOmRpcServerRunning() {
-    return isOmRpcServerRunning;
   }
 
   @Override
