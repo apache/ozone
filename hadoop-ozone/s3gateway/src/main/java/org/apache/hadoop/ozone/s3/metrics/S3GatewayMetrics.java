@@ -304,12 +304,17 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
    * @return S3GatewayMetrics
    */
   public static synchronized S3GatewayMetrics create(OzoneConfiguration conf) {
+    if (!conf.getBoolean(S3GatewayConfigKeys.OZONE_S3G_METRICS_ENABLED,
+        S3GatewayConfigKeys.OZONE_S3G_METRICS_ENABLED_DEFAULT)) {
+      return null;
+    }
     if (instance != null) {
       return instance;
     }
     MetricsSystem ms = DefaultMetricsSystem.instance();
     instance = ms.register(SOURCE_NAME, "S3 Gateway Metrics",
         new S3GatewayMetrics(conf));
+    Runtime.getRuntime().addShutdownHook(new Thread(S3GatewayMetrics::unRegister));
     return instance;
   }
 
