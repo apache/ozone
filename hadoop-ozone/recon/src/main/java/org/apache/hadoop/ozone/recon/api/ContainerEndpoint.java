@@ -403,7 +403,7 @@ public class ContainerEndpoint {
       int limit,
       long maxContainerId,
       long minContainerId) {
-    List<UnhealthyContainerMetadata> unhealthyMeta = new ArrayList<>();
+    List<UnhealthyContainerMetadata> unhealthyMeta;
     List<UnhealthyContainersSummary> summary = new ArrayList<>();
 
     try {

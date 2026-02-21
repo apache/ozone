@@ -26,8 +26,8 @@ import java.util.Objects;
 import java.util.Set;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
@@ -384,19 +384,22 @@ public class ReconReplicationManager extends ReplicationManager {
       handleMissingContainer(containerId, currentTime, recordsToInsert, stats);
       break;
     case UNDER_REPLICATED:
+      stats.incrementUnderRepCount();
       handleReplicaStateContainer(containerId, currentTime,
           UnHealthyContainerStates.UNDER_REPLICATED, "Insufficient replicas",
-          recordsToInsert, negativeSizeRecorded, stats::incrementUnderRepCount, stats);
+          recordsToInsert, negativeSizeRecorded, stats);
       break;
     case OVER_REPLICATED:
+      stats.incrementOverRepCount();
       handleReplicaStateContainer(containerId, currentTime,
           UnHealthyContainerStates.OVER_REPLICATED, "Excess replicas",
-          recordsToInsert, negativeSizeRecorded, stats::incrementOverRepCount, stats);
+          recordsToInsert, negativeSizeRecorded, stats);
       break;
     case MIS_REPLICATED:
+      stats.incrementMisRepCount();
       handleReplicaStateContainer(containerId, currentTime,
           UnHealthyContainerStates.MIS_REPLICATED, "Placement policy violated",
-          recordsToInsert, negativeSizeRecorded, stats::incrementMisRepCount, stats);
+          recordsToInsert, negativeSizeRecorded, stats);
       break;
     default:
       break;
@@ -431,9 +434,7 @@ public class ReconReplicationManager extends ReplicationManager {
       String reason,
       List<UnhealthyContainerRecordV2> recordsToInsert,
       Set<Long> negativeSizeRecorded,
-      Runnable counterIncrementer,
       ProcessingStats stats) throws ContainerNotFoundException {
-    counterIncrementer.run();
     ContainerInfo container = containerManager.getContainer(containerId);
     Set<ContainerReplica> replicas = containerManager.getContainerReplicas(containerId);
     int expected = container.getReplicationConfig().getRequiredNodes();

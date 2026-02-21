@@ -48,8 +48,6 @@ import org.junit.jupiter.api.Test;
 public class TestReconTasksV2MultiNode {
 
   private static MiniOzoneCluster cluster;
-  private static ReconService reconService;
-  private static ReconStorageContainerManagerFacade reconScm;
   private static ReconContainerManager reconContainerManager;
   private static PipelineManager reconPipelineManager;
 
@@ -66,7 +64,7 @@ public class TestReconTasksV2MultiNode {
     testConf.set("ozone.scm.stale.node.interval", "6s");
     testConf.set("ozone.scm.dead.node.interval", "8s");
 
-    reconService = new ReconService(testConf);
+    ReconService reconService = new ReconService(testConf);
     cluster = MiniOzoneCluster.newBuilder(testConf)
         .setNumDatanodes(3)
         .addService(reconService)
@@ -74,7 +72,7 @@ public class TestReconTasksV2MultiNode {
 
     cluster.waitForClusterToBeReady();
 
-    reconScm = (ReconStorageContainerManagerFacade)
+    ReconStorageContainerManagerFacade reconScm = (ReconStorageContainerManagerFacade)
         reconService.getReconServer().getReconStorageContainerManager();
     reconPipelineManager = reconScm.getPipelineManager();
     reconContainerManager = (ReconContainerManager) reconScm.getContainerManager();
