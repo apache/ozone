@@ -75,6 +75,11 @@
             <goals>
               <goal>test-jar</goal>
             </goals>
+            <configuration>
+              <excludes>
+                <exclude>junit-platform.properties</exclude>
+              </excludes>
+            </configuration>
           </execution>
         </executions>
       </plugin>
