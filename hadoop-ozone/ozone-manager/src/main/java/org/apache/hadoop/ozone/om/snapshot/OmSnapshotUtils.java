@@ -25,6 +25,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.FileTime;
@@ -32,6 +33,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Ozone Manager Snapshot Utilities.
@@ -41,6 +44,8 @@ public final class OmSnapshotUtils {
   public static final String DATA_PREFIX = "data";
   public static final String DATA_SUFFIX = "txt";
   public static final String PATH_SEPARATOR = "/";
+  private static final Logger LOG =
+      LoggerFactory.getLogger(OmSnapshotUtils.class);
 
   private OmSnapshotUtils() { }
 
@@ -70,9 +75,15 @@ public final class OmSnapshotUtils {
    * @throws IOException if an I/O error occurs
    */
   public static String getFileInodeAndLastModifiedTimeString(Path file) throws IOException {
-    Object inode = getINode(file);
-    FileTime mTime = Files.getLastModifiedTime(file);
-    return String.format("%s-%s", inode, mTime.toMillis());
+    Object inode;
+    try {
+      inode = getINode(file);
+      FileTime mTime = Files.getLastModifiedTime(file);
+      return String.format("%s-%s", inode, mTime.toMillis());
+    } catch (NoSuchFileException e) {
+      LOG.warn("File {} not found.", file);
+      return "";
+    }
   }
 
   /**
