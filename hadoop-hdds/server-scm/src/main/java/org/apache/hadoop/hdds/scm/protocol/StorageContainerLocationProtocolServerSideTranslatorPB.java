@@ -1141,6 +1141,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     Optional<Boolean> networkTopologyEnable = Optional.empty();
     Optional<String> includeNodes = Optional.empty();
     Optional<String> excludeNodes = Optional.empty();
+    Optional<String> excludeContainers = Optional.empty();
 
     if (request.hasThreshold()) {
       threshold = Optional.of(request.getThreshold());
@@ -1201,12 +1202,16 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       excludeNodes = Optional.of(request.getExcludeNodes());
     }
 
+    if (request.hasExcludeContainers()) {
+      excludeContainers = Optional.of(request.getExcludeContainers());
+    }
+
     return impl.startContainerBalancer(threshold, iterations,
         maxDatanodesPercentageToInvolvePerIteration,
         maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
         maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
         moveReplicationTimeout, networkTopologyEnable, includeNodes,
-        excludeNodes);
+        excludeNodes, excludeContainers);
   }
 
   public StopContainerBalancerResponseProto stopContainerBalancer(

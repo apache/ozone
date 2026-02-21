@@ -510,13 +510,14 @@ public class ContainerOperationClient implements ScmClient {
       Optional<Integer> moveReplicationTimeout,
       Optional<Boolean> networkTopologyEnable,
       Optional<String> includeNodes,
-      Optional<String> excludeNodes) throws IOException {
+      Optional<String> excludeNodes,
+      Optional<String> excludeContainers) throws IOException {
     return storageContainerLocationClient.startContainerBalancer(threshold,
         iterations, maxDatanodesPercentageToInvolvePerIteration,
         maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
         maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
         moveReplicationTimeout, networkTopologyEnable, includeNodes,
-        excludeNodes);
+        excludeNodes, excludeContainers);
   }
 
   @Override

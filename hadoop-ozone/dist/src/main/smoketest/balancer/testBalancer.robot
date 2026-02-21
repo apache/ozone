@@ -66,6 +66,11 @@ Run Container Balancer
     ${result} =             Execute                         ozone admin containerbalancer start -t 0.1 -d 100 -i 3
                             Should Contain                  ${result}             Container Balancer started successfully.
 
+Run Container Balancer With Exclude Containers
+    [arguments]             ${exclude_containers}
+    ${result} =             Execute                         ozone admin containerbalancer start --exclude-containers "${exclude_containers}" -t 0.1 -d 100 -i 3
+                            Should Contain                  ${result}             Container Balancer started successfully.
+
 Wait Finish Of Balancing
     ${result} =             Execute                         ozone admin containerbalancer status
                             Wait Until Keyword Succeeds      4min    10sec    ContainerBalancer is Not Running
@@ -172,7 +177,7 @@ Verify Container Balancer for RATIS/EC containers
 
     Datanode Recommission
 
-    Run Container Balancer
+    Run Container Balancer With Exclude Containers          2
 
     Run Balancer Status
 
@@ -185,6 +190,6 @@ Verify Container Balancer for RATIS/EC containers
     ${datanodeOzoneUsedBytesInfoAfterContainerBalancing} =    Get Datanode Ozone Used Bytes Info          ${uuid}
     Should Not Be Equal As Integers     ${datanodeOzoneUsedBytesInfo}    ${datanodeOzoneUsedBytesInfoAfterContainerBalancing}
     #We need to ensure that after balancing, the amount of data recorded on each datanode falls within the following ranges:
-    #{SIZE}*3 < used < {SIZE}*3.5 for RATIS containers, and {SIZE}*0.7 < used < {SIZE}*1.5 for EC containers.
+    #{SIZE}*1.5 < used < {SIZE}*2.5 for RATIS containers, and {SIZE}*0.7 < used < {SIZE}*1.5 for EC containers.
     Should Be True    ${datanodeOzoneUsedBytesInfoAfterContainerBalancing} < ${SIZE} * ${UPPER_LIMIT}
     Should Be True    ${datanodeOzoneUsedBytesInfoAfterContainerBalancing} > ${SIZE} * ${LOWER_LIMIT}
