@@ -311,7 +311,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
    */
   private OMResponse submitRequest(OMRequest omRequest)
       throws IOException {
-    OMRequest.Builder builder = OMRequest.newBuilder(omRequest);
+    OMRequest.Builder  builder = OMRequest.newBuilder(omRequest);
     // Insert S3 Authentication information for each request.
     if (getThreadLocalS3Auth() != null) {
       builder.setS3Authentication(
@@ -337,8 +337,10 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         CallerContext.setCurrent(callerContext);
       }
     }
-    return transport.submitRequest(
-        builder.setTraceID(TracingUtil.exportCurrentSpan()).build());
+    OMResponse response =
+        transport.submitRequest(
+            builder.setTraceID(TracingUtil.exportCurrentSpan()).build());
+    return response;
   }
 
   /**
