@@ -116,7 +116,7 @@ message MultipartPartInfo {
 
 ### 2.1 Data Layout Changes
 
-#### 2.1.1 Chosen Approach (Implemented): Reuse `multipartInfoTable` + add `multipartPartsTable`
+#### 2.1.1 Chosen Approach: Reuse `multipartInfoTable` + add `multipartPartsTable`
 
 Keep `multipartInfoTable` for MPU metadata, and store part rows in `multipartPartsTable`.
 
@@ -225,7 +225,7 @@ encodedKey = [61 62 63 31 32 33 2d 75 75 69 64 2d 34 35 36 00 00 00 00 02]
              [--------------uploadId UTF-8------------][00][--int32 BE--]
 ```
 
-#### 2.1.2 Alternative Approach (Proposed): Add `multipartMetadataTable` + `multipartPartsTable`
+#### 2.1.2 Alternative Approach: Add `multipartMetadataTable` + `multipartPartsTable`
 
 Split metadata and introduce two new tables:
 * **`multipartMetadataTable`**: lightweight per-MPU metadata (no part list).
