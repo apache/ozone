@@ -2271,7 +2271,12 @@
           <properties>
             <configurationParameters>junit.platform.output.capture.stdout = true
               junit.platform.output.capture.stderr = true
-              junit.jupiter.execution.timeout.default = 5m</configurationParameters>
+              junit.jupiter.execution.timeout.default = 5m
+              junit.jupiter.execution.parallel.enabled = true
+              junit.jupiter.execution.parallel.mode.default = same_thread
+              junit.jupiter.execution.parallel.mode.classes.default = same_thread
+              junit.jupiter.execution.parallel.config.strategy = dynamic
+              junit.jupiter.execution.parallel.config.dynamic.factor = 1</configurationParameters>
           </properties>
           <includes>
             <include>**/Test*.java</include>
