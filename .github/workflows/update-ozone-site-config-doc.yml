@@ -16,7 +16,7 @@
 name: update-ozone-site-config-doc
 on:
   workflow_run:
-    workflows: ["ci"]
+    workflows: ["build-branch"]
     types: [completed]
     branches: [master]
 
