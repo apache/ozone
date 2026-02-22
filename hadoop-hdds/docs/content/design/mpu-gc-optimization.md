@@ -3,7 +3,7 @@ title: Multipart Upload GC Pressure Optimizations
 summary: Change Multipart Upload Logic to improve OM GC Pressure
 date: 2026-02-19
 jira: HDDS-10611
-status: implemented
+status: proposed
 author: Abhishek Pal, Rakesh Radhakrishnan
 ---
 <!--
@@ -137,8 +137,6 @@ Keep `multipartInfoTable` for MPU metadata, and store part rows in `multipartPar
 * Prefix scan for all parts in one upload uses:
   * `uploadId(UTF-8 bytes)` + `0x00`
 
-This replaces the previous string-padding style examples (like `part00001`) with typed key encoding.
-
 ```protobuf
 message MultipartKeyInfo {
     required string uploadID = 1;
@@ -216,13 +214,13 @@ Key:   OmMultipartPartKey{uploadId="abc123-uuid-456", partNumber=10}
 Value: OmMultipartPartInfo{partNumber=10, partName=".../part10", ...}
 ```
 
-`multipartPartsTable` (encoded key bytes, illustrative):
+`multipartPartsTable` (encoded key bytes):
 ```text
 uploadId = "abc123-uuid-456"
 partNumber = 2
 
 encodedKey = [61 62 63 31 32 33 2d 75 75 69 64 2d 34 35 36 00 00 00 00 02]
-             [--------------uploadId UTF-8------------][00][--int32 BE--]
+             [--------------uploadId UTF-8---------------][00][--int32 BE--]
 ```
 
 #### 2.1.2 Alternative Approach: Add `multipartMetadataTable` + `multipartPartsTable`
@@ -230,8 +228,6 @@ encodedKey = [61 62 63 31 32 33 2d 75 75 69 64 2d 34 35 36 00 00 00 00 02]
 Split metadata and introduce two new tables:
 * **`multipartMetadataTable`**: lightweight per-MPU metadata (no part list).
 * **`multipartPartsTable`**: one row per part (no aggregation).
-
-> Note: This approach is proposed and not implemented in current code.
 
 ```protobuf
 message MultipartMetadataInfo {
@@ -315,7 +311,7 @@ openKeyTable[/vol1/b1/fileA/upload-001] ->
   * `schemaVersion=0` otherwise.
 * No part row is created at initiate time; part rows are created during commit-part.
 * FSO response path (`S3InitiateMultipartUploadResponseWithFSO`) still writes parent directory entries, then open-file + multipart-info rows.
-* Backward compatibility check overview: write path selection is schema-based and layout-gated (see [3.1 Backward compatibility and layout gating](#31-backward-compatibility-and-layout-gating)).
+* Backward compatibility: write path selection is schema-based and layout-gated (see [3.1 Backward compatibility and layout gating](#31-backward-compatibility-and-layout-gating)).
 
 Example:
 ```text
@@ -328,7 +324,7 @@ multipartInfoTable[/vol1/b1/fileA/upload-001] ->
 **Old Flow**
 * Read `multipartInfoTable[multipartKey]`.
 * Read current uploaded part blocks from `openKeyTable[getOpenKey(..., clientID)]`.
-* Upsert in inline map:
+* Insert in inline map:
   * `oldPart = multipartKeyInfo.getPartKeyInfo(partNumber)`
   * `multipartKeyInfo.addPartKeyInfo(currentPart)`
 * Delete committed one-shot open key for this part.
@@ -348,11 +344,11 @@ After:  partKeyInfoList=[{part=1,size=64MB},{part=2,size=40MB}]
   * `schemaVersion=0`: same old inline behavior.
   * `schemaVersion=1`:
     * create `multipartPartKey = OmMultipartPartKey(uploadId, partNumber)`,
-    * write `multipartPartTable[multipartPartKey] = OmMultipartPartInfo{openKey, partName, partNumber, size, metadata, locations}`,
+    * write `multipartPartTable[multipartPartKey] = OmMultipartPartInfo{openKey, partName, partNumber, size, metadata, locations}`
     * keep current part open key in `openKeyTable` (needed later by list/complete/abort),
     * if overwriting an existing part row, delete old part open key and adjust quota.
 * `multipartInfoTable[multipartKey]` is still updated for metadata/updateID.
-* Backward compatibility check overview: schema decides row format, and split behavior is blocked before finalization (see [3.1 Backward compatibility and layout gating](#31-backward-compatibility-and-layout-gating)).
+* Backward compatibility: schema decides row format, and split behavior is blocked before finalization (see [3.1 Backward compatibility and layout gating](#31-backward-compatibility-and-layout-gating)).
 
 Example (`schemaVersion=1`):
 ```text
@@ -391,7 +387,7 @@ Complete [1,2,3] -> keyTable[/vol1/b1/fileA] written, MPU rows removed
 * Cleanup:
   * always delete `multipartInfoTable[multipartKey]` and `openKeyTable[multipartOpenKey]`,
   * for split schema also delete all matching `multipartPartTable` rows and their tracked part open keys.
-* Backward compatibility check overview: completion transparently supports both persisted schemas and enforces layout gating for split rows (see [3.1 Backward compatibility and layout gating](#31-backward-compatibility-and-layout-gating)).
+* Backward compatibility: completion transparently supports both persisted schemas and enforces layout gating for split rows (see [3.1 Backward compatibility and layout gating](#31-backward-compatibility-and-layout-gating)).
 
 Example (`schemaVersion=1` cleanup):
 ```text
@@ -424,7 +420,7 @@ Abort upload-001 -> delete MPU metadata/open rows and tombstone parts
     * compute released quota from part rows,
     * for each part: move corresponding open key to deleted table, delete part open key, delete part row.
 * Delete `multipartInfoTable[multipartKey]` and `multipartOpenKey` entry.
-* Backward compatibility check overview: abort handles both old inline and new split rows in the same codepath (see [3.1 Backward compatibility and layout gating](#31-backward-compatibility-and-layout-gating)).
+* Backward compatibility: abort handles both old inline and new split rows in the same codepath (see [3.1 Backward compatibility and layout gating](#31-backward-compatibility-and-layout-gating)).
 
 Example (`schemaVersion=1`):
 ```text
@@ -467,12 +463,7 @@ openKeyTable[/vol1/b1/fileA#c2] -> KeyInfo{size=40MB, eTag=...}
 listParts response partNumber=2, size=40MB, eTag=...
 ```
 
-##### Related APIs
-* `ListMultipartUploads` remains upload-session listing (not part listing), returning upload IDs and metadata from MPU entries.
-* Wire path for list-parts remains unchanged:
-  * `MultipartKeyHandler` (S3G) -> `OzoneBucket.listParts` -> OM RPC (`OzoneManagerRequestHandler`) -> `OzoneManager.listParts` -> `KeyManagerImpl.listParts`.
-
-#### 2.2.2 Alternative Approach Flow (Proposed)
+#### 2.2.2 Alternative Approach Flow
 
 ##### Multipart Upload Initiate
 
@@ -557,10 +548,10 @@ multipartPartsTable[OmMultipartPartKey{uploadId="upload-001", partNumber=2}] ->
 
 #### Pros and Cons
 
-|                      | Pros                                                                                                                                                                                                    | Cons                                                                                                                                                                                           |
-|----------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Chosen Approach      | * Minimal migration risk<br/> * Reuses existing `OmMultipartKeyInfo` plumbing<br/>* Easiest incremental rollout with `schemaVersion` gating.<br/> * Lower implementation impact request/response paths. | * Carries complexity for mixed code (same table serving legacy + split metadata modes).<br/> * Still coupled to `OmMultipartKeyInfo`.<br/> * More conditional logic over time.                 |
-| Alternative Approach | * Clean separation of concerns (`multipartMetadataTable` vs `multipartPartsTable`)<br/> * Clearer long-term model and easier mental mapping.<br/> * Avoids overloading legacy value type.               | * Requires wider code changes (new codecs/table wiring/request/response updates).<br/> * Higher migration and compatibility test surface.<br/> * More rollout complexity than chosen approach. |
+|                      | Pros                                                                                                                                                                                                   | Cons                                                                                                                                                                                         |
+|----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Chosen Approach      | * Minimal migration risk<br/> * Reuses existing `OmMultipartKeyInfo` message<br/>* Easiest incremental rollout with `schemaVersion` gating.<br/> * Lower implementation impact request/response paths. | * Carries complexity for mixed code (same table serving legacy + split metadata modes).<br/> * Still coupled to `OmMultipartKeyInfo`.<br/> * More conditional logic over time.               |
+| Alternative Approach | * Clean separation of concerns (`multipartMetadataTable` vs `multipartPartsTable`)<br/> * Clearer long-term model and easier mental mapping.<br/> * Avoids overloading legacy value type.              | * Requires wider code changes (new codecs/table wiring/request/response updates).<br/> * Higher migration and compatibility test scope.<br/> * More rollout complexity than chosen approach. |
 
 ## 3. Upgrades
 Add a new feature in `OMLayoutFeature`:
