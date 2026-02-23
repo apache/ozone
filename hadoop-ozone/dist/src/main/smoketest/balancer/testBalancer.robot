@@ -153,6 +153,11 @@ All container is closed
     ${output} =         Execute           ozone admin container list --state OPEN
                         Should Be Equal   ${output}   [ ]
 
+Get All Container IDs
+    [Documentation]    Fetches all container IDs from standard text output using awk
+    ${result} =        Execute    ozone admin container list | grep '"containerID"' | awk '{print $3}' | tr -d ',' | xargs | tr ' ' ','
+    [return]           ${result}
+
 Get Datanode Ozone Used Bytes Info
     [arguments]             ${uuid}
     ${output} =    Execute    export DATANODES=$(ozone admin datanode list --json) && for datanode in $(echo "$\{DATANODES\}" | jq -r '.[].id'); do ozone admin datanode usageinfo --uuid=$\{datanode\} --json | jq '{(.[0].datanodeDetails.uuid) : .[0].ozoneUsed}'; done | jq -s add
@@ -177,7 +182,9 @@ Verify exclude command CLI for Container Balancer
 
     Datanode Recommission
 
-    Run Container Balancer With Exclude Containers          1,2,3
+    ${all_containers} =         Get All Container IDs
+
+    Run Container Balancer With Exclude Containers          ${all_containers}
 
     Wait Finish Of Balancing
 
