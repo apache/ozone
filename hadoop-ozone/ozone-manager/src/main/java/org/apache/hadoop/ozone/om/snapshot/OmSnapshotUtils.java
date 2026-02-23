@@ -25,7 +25,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.FileTime;
@@ -44,8 +43,6 @@ public final class OmSnapshotUtils {
   public static final String DATA_PREFIX = "data";
   public static final String DATA_SUFFIX = "txt";
   public static final String PATH_SEPARATOR = "/";
-  private static final Logger LOG =
-      LoggerFactory.getLogger(OmSnapshotUtils.class);
 
   private OmSnapshotUtils() { }
 
