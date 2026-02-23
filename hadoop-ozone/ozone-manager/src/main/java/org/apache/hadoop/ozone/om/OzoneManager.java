@@ -53,6 +53,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_CERT_STORAGE_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_STORAGE_POLICY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_STORAGE_POLICY_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_KEY_DELETING_LIMIT_PER_TASK;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
@@ -172,6 +174,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationException;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
+import org.apache.hadoop.hdds.protocol.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.protocol.SecretKeyProtocol;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ReconfigureProtocolProtos.ReconfigureProtocolService;
@@ -4778,6 +4781,13 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public BucketLayout getOMDefaultBucketLayout() {
     return this.defaultBucketLayout;
+  }
+
+  public OzoneStoragePolicy getDefaultStoragePolicy() {
+    String policyString = configuration.getTrimmed(
+        OZONE_DEFAULT_STORAGE_POLICY,
+        OZONE_DEFAULT_STORAGE_POLICY_DEFAULT);
+    return OzoneStoragePolicy.fromString(policyString);
   }
 
   /**

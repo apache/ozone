@@ -782,6 +782,13 @@ enum BucketLayoutProto {
     OBJECT_STORE = 3;
 }
 
+enum StoragePolicyProto {
+    STORAGE_POLICY_UNSET = 0;
+    HOT = 1;
+    WARM = 2;
+    COLD = 3;
+}
+
 /**
  * Cipher suite.
  */
