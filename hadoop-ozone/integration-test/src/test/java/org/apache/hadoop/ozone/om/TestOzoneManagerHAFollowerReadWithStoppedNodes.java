@@ -111,8 +111,12 @@ public class TestOzoneManagerHAFollowerReadWithStoppedNodes extends TestOzoneMan
     getCluster().stopOzoneManager(2);
     Thread.sleep(NODE_FAILURE_TIMEOUT * 4);
 
+    // Write requests will fail with OMNotLeaderException
     createVolumeTest(false);
     createKeyTest(false);
+
+    // Read requests will fail with either OMReadIndexException or OMReadException
+    listVolumes(false);
   }
 
   @Test

@@ -42,6 +42,8 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
+import org.apache.hadoop.ozone.om.exceptions.OMReadException;
+import org.apache.hadoop.ozone.om.exceptions.OMReadIndexException;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.SecretManager;
@@ -429,6 +431,44 @@ public abstract class OMFailoverProxyProviderBase<T> implements
           ((RemoteException) cause).unwrapRemoteException();
       if (ioException instanceof OMNotLeaderException) {
         return (OMNotLeaderException) ioException;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Unwrap the exception and return the wrapped ReadIndexException if any.
+   *
+   * @param exception exception to unwrap.
+   * @return the unwrapped OMReadIndexException or null if the wrapped
+   *         exception is not OMReadIndexException.
+   */
+  public static OMReadIndexException getReadIndexException(Exception exception) {
+    Throwable cause = exception.getCause();
+    if (cause instanceof RemoteException) {
+      IOException ioException =
+          ((RemoteException) cause).unwrapRemoteException();
+      if (ioException instanceof OMReadIndexException) {
+        return (OMReadIndexException) ioException;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Unwrap the exception and return the wrapped ReadException if any.
+   *
+   * @param exception exception to unwrap.
+   * @return the unwrapped OMReadException or null if the wrapped
+   *         exception is not OMReadException.
+   */
+  public static OMReadException getReadException(Exception exception) {
+    Throwable cause = exception.getCause();
+    if (cause instanceof RemoteException) {
+      IOException ioException =
+          ((RemoteException) cause).unwrapRemoteException();
+      if (ioException instanceof OMReadException) {
+        return (OMReadException) ioException;
       }
     }
     return null;

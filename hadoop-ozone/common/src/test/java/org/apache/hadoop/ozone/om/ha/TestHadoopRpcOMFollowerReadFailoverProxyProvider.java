@@ -58,6 +58,8 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
+import org.apache.hadoop.ozone.om.exceptions.OMReadException;
+import org.apache.hadoop.ozone.om.exceptions.OMReadIndexException;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoRequest;
@@ -337,6 +339,22 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
     assertInstanceOf(RpcNoSuchProtocolException.class, exception.getCause());
   }
 
+  @Test
+  void testReadIndexException() throws Exception {
+    setupProxyProvider(3);
+    omNodeAnswers[0].isThrowReadIndexException = true;
+    doRead();
+    assertHandledBy(1);
+  }
+
+  @Test
+  void testReadException() throws Exception {
+    setupProxyProvider(3);
+    omNodeAnswers[0].isThrowReadException = true;
+    doRead();
+    assertHandledBy(1);
+  }
+
   private void setupProxyProvider(int omNodeCount) throws Exception {
     setupProxyProvider(omNodeCount, new OzoneConfiguration());
   }
@@ -489,6 +507,8 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
     private volatile boolean isLeader = false;
     private volatile boolean isLeaderReady = true;
     private volatile boolean isFollowerReadSupported = true;
+    private volatile boolean isThrowReadIndexException = false;
+    private volatile boolean isThrowReadException = false;
 
     private OMProtocolAnswer clientAnswer = new OMProtocolAnswer();
 
@@ -524,13 +544,31 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
           }
           break;
         case GetKeyInfo:
-          if (!isLeader && !isFollowerReadSupported) {
-            throw new ServiceException(
-                new RemoteException(
-                    OMNotLeaderException.class.getCanonicalName(),
-                    "OM follower read is not supported"
-                )
-            );
+          if (!isLeader) {
+            if (!isFollowerReadSupported) {
+              throw new ServiceException(
+                  new RemoteException(
+                      OMNotLeaderException.class.getCanonicalName(),
+                      "OM follower read is not supported"
+                  )
+              );
+            }
+            if (isThrowReadIndexException) {
+              throw new ServiceException(
+                  new RemoteException(
+                      OMReadIndexException.class.getCanonicalName(),
+                      "ReadIndex exception"
+                  )
+              );
+            }
+            if (isThrowReadException) {
+              throw new ServiceException(
+                  new RemoteException(
+                      OMReadException.class.getCanonicalName(),
+                      "ReadException"
+                  )
+              );
+            }
           }
           if (isLeader && !isLeaderReady) {
             throw new ServiceException(
