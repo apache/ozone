@@ -28,6 +28,7 @@ import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.protocol.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -146,5 +147,42 @@ public class TestOmBucketInfo {
     ReplicationConfig config =
         recovered.getDefaultReplicationConfig().getReplicationConfig();
     assertEquals(new ECReplicationConfig(3, 2), config);
+  }
+
+  @Test
+  public void protobufConversionWithStoragePolicy() {
+    OmBucketInfo bucket = OmBucketInfo.newBuilder()
+        .setBucketName("bucket")
+        .setVolumeName("vol1")
+        .setCreationTime(1L)
+        .setIsVersionEnabled(false)
+        .setStorageType(StorageType.ARCHIVE)
+        .setStoragePolicy(OzoneStoragePolicy.COLD)
+        .build();
+
+    assertEquals(OzoneStoragePolicy.COLD, bucket.getStoragePolicy());
+
+    OmBucketInfo recovered =
+        OmBucketInfo.getFromProtobuf(bucket.getProtobuf());
+    assertEquals(bucket, recovered);
+    assertEquals(OzoneStoragePolicy.COLD, recovered.getStoragePolicy());
+  }
+
+  @Test
+  public void protobufConversionWithoutStoragePolicy() {
+    OmBucketInfo bucket = OmBucketInfo.newBuilder()
+        .setBucketName("bucket")
+        .setVolumeName("vol1")
+        .setCreationTime(1L)
+        .setIsVersionEnabled(false)
+        .setStorageType(StorageType.ARCHIVE)
+        .build();
+
+    assertNull(bucket.getStoragePolicy());
+
+    OmBucketInfo recovered =
+        OmBucketInfo.getFromProtobuf(bucket.getProtobuf());
+    assertEquals(bucket, recovered);
+    assertNull(recovered.getStoragePolicy());
   }
 }

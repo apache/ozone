@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Objects;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.protocol.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -170,6 +171,12 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
         bucketInfoBuilder.setStorageType(storageType);
         LOG.debug("Updating bucket storage type for bucket: {} in volume: {}",
             bucketName, volumeName);
+      }
+
+      //Check StoragePolicy to update
+      OzoneStoragePolicy storagePolicy = omBucketArgs.getStoragePolicy();
+      if (storagePolicy != null) {
+        bucketInfoBuilder.setStoragePolicy(storagePolicy);
       }
 
       //Check Versioning to update

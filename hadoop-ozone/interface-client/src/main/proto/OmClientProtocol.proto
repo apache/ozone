@@ -774,6 +774,7 @@ message BucketInfo {
     optional hadoop.hdds.DefaultReplicationConfig defaultReplicationConfig = 20;
     optional uint64 snapshotUsedBytes = 21;
     optional uint64 snapshotUsedNamespace = 22;
+    optional StoragePolicyProto storagePolicy = 23;
 }
 
 enum BucketLayoutProto {
@@ -854,6 +855,7 @@ message BucketArgs {
     optional string ownerName = 10;
     optional hadoop.hdds.DefaultReplicationConfig defaultReplicationConfig = 11;
     optional BucketEncryptionInfoProto bekInfo = 12;
+    optional StoragePolicyProto storagePolicy = 13;
 }
 
 message PrefixInfo {

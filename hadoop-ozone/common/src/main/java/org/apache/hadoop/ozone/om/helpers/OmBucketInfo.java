@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.protocol.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CopyObject;
@@ -33,6 +34,7 @@ import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.Auditable;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.StoragePolicyProto;
 import org.apache.hadoop.ozone.protocolPB.OMPBHelper;
 
 /**
@@ -107,6 +109,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
 
   private final String owner;
 
+  private final OzoneStoragePolicy storagePolicy;
+
   private OmBucketInfo(Builder b) {
     super(b);
     this.volumeName = b.volumeName;
@@ -128,6 +132,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     this.bucketLayout = b.bucketLayout;
     this.owner = b.owner;
     this.defaultReplicationConfig = b.defaultReplicationConfig;
+    this.storagePolicy = b.storagePolicy;
   }
 
   public static Codec<OmBucketInfo> getCodec() {
@@ -303,6 +308,10 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     return owner;
   }
 
+  public OzoneStoragePolicy getStoragePolicy() {
+    return storagePolicy;
+  }
+
   /**
    * Returns new builder class that builds a OmBucketInfo.
    *
@@ -341,6 +350,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     auditMap.put(OzoneConsts.SNAPSHOT_USED_BYTES, String.valueOf(this.snapshotUsedBytes));
     auditMap.put(OzoneConsts.SNAPSHOT_USED_NAMESPACE, String.valueOf(this.snapshotUsedNamespace));
     auditMap.put(OzoneConsts.OWNER, this.owner);
+    auditMap.put(OzoneConsts.STORAGE_POLICY,
+        (this.storagePolicy != null) ? this.storagePolicy.name() : null);
     auditMap.put(OzoneConsts.REPLICATION_TYPE,
         (this.defaultReplicationConfig != null) ?
             String.valueOf(this.defaultReplicationConfig.getType()) : null);
@@ -378,7 +389,8 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         .setSnapshotUsedNamespace(snapshotUsedNamespace)
         .setBucketLayout(bucketLayout)
         .setOwner(owner)
-        .setDefaultReplicationConfig(defaultReplicationConfig);
+        .setDefaultReplicationConfig(defaultReplicationConfig)
+        .setStoragePolicy(storagePolicy);
   }
 
   /**
@@ -401,6 +413,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     private long quotaInNamespace = OzoneConsts.QUOTA_RESET;
     private BucketLayout bucketLayout = BucketLayout.DEFAULT;
     private String owner;
+    private OzoneStoragePolicy storagePolicy;
     private DefaultReplicationConfig defaultReplicationConfig;
     private long snapshotUsedBytes;
     private long snapshotUsedNamespace;
@@ -544,6 +557,11 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
       return this;
     }
 
+    public Builder setStoragePolicy(OzoneStoragePolicy policy) {
+      this.storagePolicy = policy;
+      return this;
+    }
+
     public Builder setDefaultReplicationConfig(
         DefaultReplicationConfig defaultReplConfig) {
       this.defaultReplicationConfig = defaultReplConfig;
@@ -603,6 +621,9 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     }
     if (owner != null) {
       bib.setOwner(owner);
+    }
+    if (storagePolicy != null) {
+      bib.setStoragePolicy(storagePolicy.toProto());
     }
     return bib.build();
   }
@@ -672,6 +693,11 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
     }
     if (bucketInfo.hasOwner()) {
       obib.setOwner(bucketInfo.getOwner());
+    }
+    if (bucketInfo.hasStoragePolicy()
+        && bucketInfo.getStoragePolicy() != StoragePolicyProto.STORAGE_POLICY_UNSET) {
+      obib.setStoragePolicy(
+          OzoneStoragePolicy.fromProto(bucketInfo.getStoragePolicy()));
     }
     return obib;
   }
@@ -745,6 +771,7 @@ public final class OmBucketInfo extends WithObjectID implements Auditable, CopyO
         Objects.equals(getMetadata(), that.getMetadata()) &&
         Objects.equals(bekInfo, that.bekInfo) &&
         Objects.equals(owner, that.owner) &&
+        Objects.equals(storagePolicy, that.storagePolicy) &&
         Objects.equals(defaultReplicationConfig, that.defaultReplicationConfig);
   }
 

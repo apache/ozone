@@ -21,6 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.protocol.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.audit.Auditable;
@@ -63,6 +64,8 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
    */
   private final String ownerName;
 
+  private final OzoneStoragePolicy storagePolicy;
+
   private OmBucketArgs(Builder b) {
     super(b);
     this.volumeName = b.volumeName;
@@ -76,6 +79,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     this.quotaInNamespaceSet = b.quotaInNamespaceSet;
     this.quotaInNamespace = quotaInNamespaceSet ? b.quotaInNamespace : OzoneConsts.QUOTA_RESET;
     this.bekInfo = b.bekInfo;
+    this.storagePolicy = b.storagePolicy;
   }
 
   /**
@@ -160,6 +164,10 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     return ownerName;
   }
 
+  public OzoneStoragePolicy getStoragePolicy() {
+    return storagePolicy;
+  }
+
   /**
    * Returns new builder class that builds a OmBucketArgs.
    * @return Builder
@@ -182,6 +190,9 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     }
     if (this.ownerName != null) {
       auditMap.put(OzoneConsts.OWNER, this.ownerName);
+    }
+    if (this.storagePolicy != null) {
+      auditMap.put(OzoneConsts.STORAGE_POLICY, this.storagePolicy.name());
     }
     if (this.quotaInBytesSet && quotaInBytes > 0 ||
         (this.quotaInBytes != OzoneConsts.QUOTA_RESET)) {
@@ -222,6 +233,7 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     private BucketEncryptionKeyInfo bekInfo;
     private DefaultReplicationConfig defaultReplicationConfig;
     private String ownerName;
+    private OzoneStoragePolicy storagePolicy;
 
     /**
      * Constructs a builder.
@@ -288,6 +300,11 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
       return this;
     }
 
+    public Builder setStoragePolicy(OzoneStoragePolicy policy) {
+      this.storagePolicy = policy;
+      return this;
+    }
+
     /**
      * Constructs the OmBucketArgs.
      * @return instance of OmBucketArgs.
@@ -326,6 +343,9 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     if (ownerName != null) {
       builder.setOwnerName(ownerName);
     }
+    if (storagePolicy != null) {
+      builder.setStoragePolicy(storagePolicy.toProto());
+    }
 
     if (bekInfo != null) {
       builder.setBekInfo(OMPBHelper.convert(bekInfo));
@@ -352,6 +372,10 @@ public final class OmBucketArgs extends WithMetadata implements Auditable {
     }
     if (bucketArgs.hasOwnerName()) {
       builder.setOwnerName(bucketArgs.getOwnerName());
+    }
+    if (bucketArgs.hasStoragePolicy()) {
+      builder.setStoragePolicy(
+          OzoneStoragePolicy.fromProto(bucketArgs.getStoragePolicy()));
     }
 
     if (bucketArgs.hasDefaultReplicationConfig()) {
