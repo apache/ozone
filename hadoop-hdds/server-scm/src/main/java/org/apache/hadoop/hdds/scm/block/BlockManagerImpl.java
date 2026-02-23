@@ -31,6 +31,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -145,11 +146,14 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   @Override
   public AllocatedBlock allocateBlock(final long size,
       ReplicationConfig replicationConfig,
-      String owner, ExcludeList excludeList)
+      String owner, ExcludeList excludeList,
+      StorageType storageType)
       throws IOException {
     if (LOG.isTraceEnabled()) {
       LOG.trace("Size : {} , replicationConfig: {}", size, replicationConfig);
     }
+    LOG.debug("Allocating block: size={}, replication={}, storageType={}",
+        size, replicationConfig, storageType);
     if (scm.getScmContext().isInSafeMode()) {
       throw new SCMException("SafeModePrecheck failed for allocateBlock",
           SCMException.ResultCodes.SAFE_MODE_EXCEPTION);

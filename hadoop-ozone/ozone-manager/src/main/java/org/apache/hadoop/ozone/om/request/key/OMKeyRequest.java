@@ -213,7 +213,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
     try {
       allocatedBlocks = scmClient.getBlockClient()
           .allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID,
-              excludeList, clientMachine);
+              excludeList, clientMachine, storageType);
     } catch (SCMException ex) {
       omMetrics.incNumBlockAllocateCallFails();
       if (ex.getResult()

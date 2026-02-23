@@ -47,6 +47,7 @@ import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
@@ -189,7 +190,8 @@ public class SCMBlockProtocolServer implements
       long size, int num,
       ReplicationConfig replicationConfig,
       String owner, ExcludeList excludeList,
-      String clientMachine
+      String clientMachine,
+      StorageType storageType
   ) throws IOException {
     long startNanos = Time.monotonicNowNanos();
     Map<String, String> auditMap = Maps.newHashMap();
@@ -198,6 +200,7 @@ public class SCMBlockProtocolServer implements
     auditMap.put("replication", replicationConfig.toString());
     auditMap.put("owner", owner);
     auditMap.put("client", clientMachine);
+    auditMap.put("storageType", String.valueOf(storageType));
     List<AllocatedBlock> blocks = new ArrayList<>(num);
 
     if (LOG.isDebugEnabled()) {
@@ -207,7 +210,8 @@ public class SCMBlockProtocolServer implements
     try {
       for (int i = 0; i < num; i++) {
         AllocatedBlock block = scm.getScmBlockManager()
-            .allocateBlock(size, replicationConfig, owner, excludeList);
+            .allocateBlock(size, replicationConfig, owner, excludeList,
+                storageType);
         if (block != null) {
           // Sort the datanodes if client machine is specified
           final Node client = getClientNode(clientMachine);
