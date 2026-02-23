@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
@@ -107,6 +108,10 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
     UserInfo userInfo = getUserIfNotExists(ozoneManager);
     ReplicationConfig repConfig = ReplicationConfig.fromProto(keyArgs.getType(),
         keyArgs.getFactor(), keyArgs.getEcReplicationConfig());
+    final OmBucketInfo bucketInfo = ozoneManager
+        .getBucketInfo(keyArgs.getVolumeName(), keyArgs.getBucketName());
+    final StorageType storageType = resolveEffectiveStoragePolicy(
+        bucketInfo, ozoneManager).getPrimaryStorageType();
     // To allocate atleast one block passing requested size and scmBlockSize
     // as same value. When allocating block requested size is same as
     // scmBlockSize.
@@ -117,7 +122,8 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
             ozoneManager.getPreallocateBlocksMax(),
             ozoneManager.isGrpcBlockTokenEnabled(),
             ozoneManager.getOMServiceId(), ozoneManager.getMetrics(),
-            keyArgs.getSortDatanodes(), userInfo);
+            keyArgs.getSortDatanodes(), userInfo,
+            storageType);
 
     // Set modification time and normalize key if required.
     KeyArgs.Builder newKeyArgs =
