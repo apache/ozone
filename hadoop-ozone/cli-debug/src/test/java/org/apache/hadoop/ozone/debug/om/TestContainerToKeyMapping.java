@@ -155,7 +155,7 @@ public class TestContainerToKeyMapping {
     // Check open FSO file in openKeys
     assertThat(output).contains("\"" + CONTAINER_ID_1 + "\"");
     assertThat(output).contains("\"openKeys\"");
-    assertThat(output).contains("/vol1/fso-bucket/dir1/openFile");
+    assertThat(output).contains("/100/200/300/openFile/1");
 
     // Check open OBS key in openKeys
     assertThat(output).contains("\"" + CONTAINER_ID_2 + "\"");
@@ -173,7 +173,7 @@ public class TestContainerToKeyMapping {
     // Check MPU parts in openKeys
     assertThat(output).contains("\"" + CONTAINER_ID_4 + "\"");
     assertThat(output).contains("\"openKeys\"");
-    assertThat(output).contains("/vol1/obs-bucket/mpuKey");
+    assertThat(output).contains("/vol1/obs-bucket/mpuKey/test-upload-id");
   }
 
   @Test
@@ -183,12 +183,10 @@ public class TestContainerToKeyMapping {
 
     String output = outWriter.toString();
 
-    // Check MPU parts in openKeys
+    // Open keys and MPU always show table key (not affected by --onlyFileNames)
     assertThat(output).contains("\"" + CONTAINER_ID_4 + "\"");
     assertThat(output).contains("\"openKeys\"");
-    assertThat(output).contains("mpuKey");
-    // Should not contain full path
-    assertThat(output).doesNotContain("/vol1/obs-bucket/mpuKey");
+    assertThat(output).contains("/vol1/obs-bucket/mpuKey/test-upload-id");
   }
 
   @Test
@@ -399,4 +397,3 @@ public class TestContainerToKeyMapping {
     return cmd.execute(argList.toArray(new String[0]));
   }
 }
-

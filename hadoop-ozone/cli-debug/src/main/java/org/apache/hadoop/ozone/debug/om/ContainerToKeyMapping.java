@@ -207,9 +207,9 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
       for (Long containerId : containerIds) {
         containerToOpenKeysMap.put(containerId, new ArrayList<>());
       }
-      processOpenFiles(containerIds, containerToOpenKeysMap, unreferencedCountMap, bucketVolMap);
+      processOpenFiles(containerIds, containerToOpenKeysMap);
       processOpenKeys(containerIds, containerToOpenKeysMap);
-      processMultipartUpload(containerIds, containerToOpenKeysMap, unreferencedCountMap, bucketVolMap);
+      processMultipartUpload(containerIds, containerToOpenKeysMap);
     }
     // Process FSO keys (fileTable)
     processFSOKeys(containerIds, containerToKeysMap, unreferencedCountMap, bucketVolMap);
@@ -272,14 +272,12 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
     }
   }
 
-  private void processOpenFiles(Set<Long> containerIds, Map<Long, List<String>> containerToOpenKeysMap,
-      Map<Long, Long> unreferencedCountMap, Map<Long, Pair<Long, String>> bucketVolMap) {
+  private void processOpenFiles(Set<Long> containerIds, Map<Long, List<String>> containerToOpenKeysMap) {
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> fileIterator =
              openFileTable.iterator()) {
       while (fileIterator.hasNext()) {
-        OmKeyInfo keyInfo = fileIterator.next().getValue();
-        addOpenKeyToContainerMap(keyInfo, containerIds, containerToOpenKeysMap, true,
-            bucketVolMap, unreferencedCountMap);
+        Table.KeyValue<String, OmKeyInfo> entry = fileIterator.next();
+        addOpenKeyToContainerMap(entry.getKey(), entry.getValue(), containerIds, containerToOpenKeysMap);
       }
     } catch (Exception e) {
       err().println("Exception occurred reading openFileTable (FSO keys), " + e);
@@ -290,87 +288,51 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
     try (TableIterator<String, ? extends Table.KeyValue<String, OmKeyInfo>> keyIterator =
              openKeyTable.iterator()) {
       while (keyIterator.hasNext()) {
-        OmKeyInfo keyInfo = keyIterator.next().getValue();
-        addOpenKeyToContainerMap(keyInfo, containerIds, containerToOpenKeysMap, false, null, null);
+        Table.KeyValue<String, OmKeyInfo> entry = keyIterator.next();
+        addOpenKeyToContainerMap(entry.getKey(), entry.getValue(), containerIds, containerToOpenKeysMap);
       }
     } catch (Exception e) {
       err().println("Exception occurred reading openKeyTable (OBS keys), " + e);
     }
   }
 
-  private void addOpenKeyToContainerMap(OmKeyInfo keyInfo, Set<Long> containerIds,
-      Map<Long, List<String>> containerToOpenKeysMap, boolean isFSO,
-      Map<Long, Pair<Long, String>> bucketVolMap, Map<Long, Long> unreferencedCountMap) throws Exception {
+  private void addOpenKeyToContainerMap(String dbKey, OmKeyInfo keyInfo, Set<Long> containerIds,
+      Map<Long, List<String>> containerToOpenKeysMap) {
     // Find which containers this key uses
     Set<Long> keyContainers = getKeyContainers(keyInfo, containerIds);
 
     if (!keyContainers.isEmpty()) {
-      String keyPath;
-      if (onlyFileNames) {
-        keyPath = keyInfo.getKeyName();
-      } else {
-        if (isFSO) {
-          keyPath = reconstructFullPath(keyInfo, bucketVolMap, unreferencedCountMap, keyContainers);
-        } else {
-          keyPath = buildFullOBSPath(keyInfo);
-        }
-      }
-
-      if (keyPath != null) {
-        for (Long containerId : keyContainers) {
-          containerToOpenKeysMap.get(containerId).add(keyPath);
-        }
+      for (Long containerId : keyContainers) {
+        containerToOpenKeysMap.get(containerId).add(dbKey);
       }
     }
   }
 
-  private void processMultipartUpload(Set<Long> containerIds, Map<Long, List<String>> containerToOpenKeysMap,
-      Map<Long, Long> unreferencedCountMap, Map<Long, Pair<Long, String>> bucketVolMap) {
+  private void processMultipartUpload(Set<Long> containerIds, Map<Long, List<String>> containerToOpenKeysMap) {
     try (TableIterator<String, ? extends Table.KeyValue<String, OmMultipartKeyInfo>> mpuIterator =
              multipartInfoTable.iterator()) {
 
       while (mpuIterator.hasNext()) {
         Table.KeyValue<String, OmMultipartKeyInfo> entry = mpuIterator.next();
+        String dbKey = entry.getKey();
         OmMultipartKeyInfo mpuInfo = entry.getValue();
 
-        // Iterate through all uploaded parts
+        // Collect all target containers that have parts of this MPU
+        Set<Long> matchedContainers = new HashSet<>();
         for (PartKeyInfo partKeyInfo : mpuInfo.getPartKeyInfoMap()) {
           OmKeyInfo partKey = OmKeyInfo.getFromProtobuf(partKeyInfo.getPartKeyInfo());
-          Set<Long> keyContainers = getKeyContainers(partKey, containerIds);
+          matchedContainers.addAll(getKeyContainers(partKey, containerIds));
+        }
 
-          if (!keyContainers.isEmpty()) {
-            // Check if this is FSO or OBS based on parentObjectID
-            // FSO keys have parentObjectID > 0 pointing to parent directory
-            // OBS keys have parentObjectID = 0
-            boolean isOBS = partKey.getParentObjectID() == 0;
-
-            String keyPath;
-            if (onlyFileNames) {
-              keyPath = partKey.getKeyName();
-            } else {
-              if (isOBS) {
-                keyPath = buildFullOBSPath(partKey);
-              } else {
-                keyPath = reconstructFullPath(partKey, bucketVolMap, unreferencedCountMap, keyContainers);
-              }
-            }
-
-            if (keyPath != null) {
-              for (Long containerId : keyContainers) {
-                containerToOpenKeysMap.get(containerId).add(keyPath);
-              }
-            }
+        if (!matchedContainers.isEmpty()) {
+          for (Long containerId : matchedContainers) {
+            containerToOpenKeysMap.get(containerId).add(dbKey);
           }
         }
       }
     } catch (Exception e) {
       err().println("Exception occurred reading multipartInfoTable, " + e);
     }
-  }
-
-  private String buildFullOBSPath(OmKeyInfo keyInfo) {
-    return OM_KEY_PREFIX + keyInfo.getVolumeName() + OM_KEY_PREFIX +
-        keyInfo.getBucketName() + OM_KEY_PREFIX + keyInfo.getKeyName();
   }
 
   private Set<Long> getKeyContainers(OmKeyInfo keyInfo, Set<Long> targetContainerIds) {
@@ -439,11 +401,11 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
       // Check dir tree
       Pair<Long, String> nameParentPair = getFromDirTree(prvParent);
       if (nameParentPair == null) {
-        // If parent is not found, mark the key as unreferenced and increment its count
+        // If parent is not found (maybe in deletion process), increment unreferenced count
         for (Long containerId : keyContainers) {
           unreferencedCountMap.put(containerId, unreferencedCountMap.get(containerId) + 1);
         }
-        return "[unreferenced] " + keyInfo.getKeyName();
+        return null;
       }
       sb.insert(0, nameParentPair.getValue() + OM_KEY_PREFIX);
       prvParent = nameParentPair.getKey();
@@ -512,7 +474,7 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
         containerNode.set("keys", keysArray);
         
         // Add open keys array only if --in-progress flag is set
-        int totalKeys = entry.getValue().size();
+        long totalKeys = entry.getValue().size();
         if (containerToOpenKeysMap != null) {
           ArrayNode openKeysArray = mapper.createArrayNode();
           List<String> openKeys = containerToOpenKeysMap.get(containerId);
@@ -524,13 +486,16 @@ public class ContainerToKeyMapping extends AbstractSubcommand implements Callabl
           }
           containerNode.set("openKeys", openKeysArray);
         }
-        containerNode.put("totalKeys", totalKeys);
         
         // Add unreferenced count if > 0
         long unreferencedCount = unreferencedCountMap.get(containerId);
         if (unreferencedCount > 0) {
           containerNode.put("unreferencedKeys", unreferencedCount);
+          totalKeys += unreferencedCount;
         }
+
+        // Total keys = committed keys + open keys + unreferenced keys
+        containerNode.put("totalKeys", totalKeys);
         
         containersNode.set(containerId.toString(), containerNode);
       }
