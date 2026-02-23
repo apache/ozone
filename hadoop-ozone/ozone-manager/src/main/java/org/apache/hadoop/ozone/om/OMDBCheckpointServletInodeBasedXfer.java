@@ -513,8 +513,11 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         if (onlySstFile && !dbFile.toString().endsWith(ROCKSDB_SST_SUFFIX)) {
           continue;
         }
-        String fileId = OmSnapshotUtils.getFileInodeAndLastModifiedTimeString(dbFile);
-        if (fileId.isEmpty()) {
+        String fileId;
+        try {
+          fileId = OmSnapshotUtils.getFileInodeAndLastModifiedTimeString(dbFile);
+        } catch (NoSuchFileException nsfe) {
+          LOG.warn("File {} not found.", dbFile);
           logFileNoLongerExists(dbFile);
           continue;
         }

@@ -138,12 +138,7 @@ public final class Archiver {
     File link = tmpDir.resolve(entryName).toFile();
     long bytes = 0;
     try {
-      try {
-        Files.createLink(link.toPath(), file.toPath());
-      } catch (NoSuchFileException noSuchFileException) {
-        LOG.warn("Failed to include file {} in the tarball as the file doesn't exist", file.toPath());
-        return  0;
-      }
+      Files.createLink(link.toPath(), file.toPath());
       TarArchiveEntry entry = archiveOutput.createArchiveEntry(link, entryName);
       archiveOutput.putArchiveEntry(entry);
       try (InputStream input = Files.newInputStream(link.toPath())) {
