@@ -160,7 +160,7 @@ Get Datanode Ozone Used Bytes Info
     [return]          ${result}
 
 ** Test Cases ***
-Verify Container Balancer for RATIS/EC containers
+Verify exclude command CLI for Container Balancer
     Prepare For Tests
 
     Datanode In Maintenance Mode
@@ -177,7 +177,22 @@ Verify Container Balancer for RATIS/EC containers
 
     Datanode Recommission
 
-    Run Container Balancer With Exclude Containers          2
+    Run Container Balancer With Exclude Containers          1,2,3
+
+    Wait Finish Of Balancing
+
+    ${datanodeOzoneUsedBytesInfoAfterContainerBalancing} =    Get Datanode Ozone Used Bytes Info          ${uuid}
+    Should Be Equal As Integers     ${datanodeOzoneUsedBytesInfo}    ${datanodeOzoneUsedBytesInfoAfterContainerBalancing}
+
+Verify Container Balancer for RATIS/EC containers
+
+    ${uuid} =                   Get Uuid
+    Datanode Usageinfo          ${uuid}
+
+    ${datanodeOzoneUsedBytesInfo} =    Get Datanode Ozone Used Bytes Info          ${uuid}
+    Should Be True    ${datanodeOzoneUsedBytesInfo} < ${SIZE}
+
+    Run Container Balancer
 
     Run Balancer Status
 
@@ -190,6 +205,6 @@ Verify Container Balancer for RATIS/EC containers
     ${datanodeOzoneUsedBytesInfoAfterContainerBalancing} =    Get Datanode Ozone Used Bytes Info          ${uuid}
     Should Not Be Equal As Integers     ${datanodeOzoneUsedBytesInfo}    ${datanodeOzoneUsedBytesInfoAfterContainerBalancing}
     #We need to ensure that after balancing, the amount of data recorded on each datanode falls within the following ranges:
-    #{SIZE}*1.5 < used < {SIZE}*2.5 for RATIS containers, and {SIZE}*0.7 < used < {SIZE}*1.5 for EC containers.
+    #{SIZE}*3 < used < {SIZE}*3.5 for RATIS containers, and {SIZE}*0.7 < used < {SIZE}*1.5 for EC containers.
     Should Be True    ${datanodeOzoneUsedBytesInfoAfterContainerBalancing} < ${SIZE} * ${UPPER_LIMIT}
     Should Be True    ${datanodeOzoneUsedBytesInfoAfterContainerBalancing} > ${SIZE} * ${LOWER_LIMIT}
