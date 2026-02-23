@@ -25,6 +25,7 @@ import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
+import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
@@ -75,5 +76,9 @@ public class OMSnapshotCreateResponse extends OMClientResponse {
     // Create the snapshot checkpoint. Also cleans up some tables.
     OmSnapshotManager.createOmSnapshotCheckpoint(omMetadataManager,
         snapshotInfo, batchOperation);
+
+    // Add entries to snapshotIdToTableKey in case of Raft replay
+    ((OmMetadataManagerImpl) omMetadataManager).getSnapshotChainManager()
+        .addSnapshotToTableKey(snapshotInfo.getSnapshotId(), snapshotInfo.getTableKey());
   }
 }

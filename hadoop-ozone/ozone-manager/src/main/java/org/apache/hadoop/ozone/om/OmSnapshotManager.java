@@ -284,12 +284,23 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   public static boolean isSnapshotPurged(SnapshotChainManager chainManager, OMMetadataManager omMetadataManager,
       UUID snapshotId, TransactionInfo transactionInfo) throws IOException {
+    boolean purgeFlushed = transactionInfo != null &&
+        isTransactionFlushedToDisk(omMetadataManager, transactionInfo);
     String tableKey = chainManager.getTableKey(snapshotId);
     if (tableKey == null) {
-      return true;
+      // Snapshot chain is rebuilt from DB on every OM restart (loadFromSnapshotInfoTable),
+      // but entries committed to the Raft log (but not yet flushed) after the restart
+      // are applied in addToDBBatch (skipping validateAndUpdateCache), so they never call
+      // addSnapshot(). This can affect any OM (leader or follower) after a restart.
+      //
+      // Need to fall back to transactionInfo. null means no purge has been recorded. Treat as active.
+      LOG.debug("snapshotId {} has null tableKey in SnapshotChainManager. "
+              + "transactionInfo={} purgeFlushed={}. Returning {}",
+          snapshotId, transactionInfo, purgeFlushed, purgeFlushed);
+      return purgeFlushed;
     }
-    return !omMetadataManager.getSnapshotInfoTable().isExist(tableKey) && transactionInfo != null &&
-        isTransactionFlushedToDisk(omMetadataManager, transactionInfo);
+    boolean inDB = omMetadataManager.getSnapshotInfoTable().isExist(tableKey);
+    return !inDB && purgeFlushed;
   }
 
   /**

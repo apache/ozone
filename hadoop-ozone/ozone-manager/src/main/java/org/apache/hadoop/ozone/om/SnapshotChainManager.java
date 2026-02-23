@@ -296,6 +296,10 @@ public class SnapshotChainManager {
       globalSnapshotChain.clear();
       snapshotChainByPath.clear();
       latestSnapshotIdByPath.clear();
+      if (!snapshotIdToTableKey.isEmpty()) {
+        LOG.debug("Clearing snapshotIdToTableKey (had {} entries) on thread {}",
+            snapshotIdToTableKey.size(), Thread.currentThread().getName());
+      }
       snapshotIdToTableKey.clear();
 
       while (keyIter.hasNext()) {
@@ -353,6 +357,17 @@ public class SnapshotChainManager {
     // store snapshot ID to snapshot DB table key in the map
     snapshotIdToTableKey.put(snapshotInfo.getSnapshotId(),
         snapshotInfo.getTableKey());
+    LOG.debug("Added to snapshotIdToTableKey: snapshotId={} tableKey={}",
+        snapshotInfo.getSnapshotId(), snapshotInfo.getTableKey());
+  }
+
+  /**
+   * Used by OMSnapshotCreateResponse#addToDBBatch to add to snapshotIdToTableKey map during Raft replay.
+   */
+  public synchronized void addSnapshotToTableKey(UUID snapshotId, String tableKey) throws IOException {
+    validateSnapshotChain();
+    LOG.debug("Adding to snapshotIdToTableKey: snapshotId={} tableKey={}", snapshotId, tableKey);
+    snapshotIdToTableKey.putIfAbsent(snapshotId, tableKey);
   }
 
   /**
@@ -378,7 +393,9 @@ public class SnapshotChainManager {
    */
   public synchronized void removeFromSnapshotIdToTable(UUID snapshotId) throws IOException {
     validateSnapshotChain();
-    snapshotIdToTableKey.remove(snapshotId);
+    String tableKey = snapshotIdToTableKey.remove(snapshotId);
+    LOG.debug("Removed from snapshotIdToTableKey: snapshotId={} tableKey={}. caller: {}",
+        snapshotId, tableKey, Thread.currentThread().getStackTrace()[2]);
   }
 
   /**
@@ -570,7 +587,12 @@ public class SnapshotChainManager {
   }
 
   public String getTableKey(UUID snapshotId) {
-    return snapshotIdToTableKey.get(snapshotId);
+    String tableKey = snapshotIdToTableKey.get(snapshotId);
+    if (tableKey == null) {
+      LOG.debug("getTableKey returned null for snapshotId={}. snapshotIdToTableKey has {} entries",
+          snapshotId, snapshotIdToTableKey.size());
+    }
+    return tableKey;
   }
 
   public LinkedHashMap<UUID, SnapshotChainInfo> getSnapshotChainPath(
