@@ -114,8 +114,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numFollowerReadLocalLeaseFailLog;
   private @Metric MutableCounterLong numFollowerReadLocalLeaseFailTime;
 
-  private @Metric MutableCounterLong numStaleRead;
-
   // Failure Metrics
   private @Metric MutableCounterLong numVolumeCreateFails;
   private @Metric MutableCounterLong numVolumeUpdateFails;
@@ -990,14 +988,6 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public long getNumFollowerReadLocalLeaseSuccess() {
     return numFollowerReadLocalLeaseSuccess.value();
-  }
-
-  public void incNumStaleRead() {
-    numStaleRead.incr();
-  }
-
-  public long getNumStaleRead() {
-    return numStaleRead.value();
   }
 
   public void incNumFollowerReadLocalLeaseFailLog() {

@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.fs.ozone;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_TYPE_DEFAULT;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_TYPE_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_KEY;
 
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
@@ -39,7 +39,7 @@ import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyHint;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyType;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyProto;
 import org.apache.hadoop.security.UserGroupInformation;
 
 /**
@@ -53,7 +53,7 @@ public class Hadoop27RpcTransport implements OmTransport {
 
   private final HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> omFailoverProxyProvider;
   private final boolean followerReadEnabled;
-  private final ReadConsistencyType defaultLeaderReadConsistencyType;
+  private final ReadConsistencyProto defaultLeaderReadConsistency;
   private HadoopRpcOMFollowerReadFailoverProxyProvider followerReadFailoverProxyProvider;
 
   public Hadoop27RpcTransport(ConfigurationSource conf,
@@ -75,22 +75,22 @@ public class Hadoop27RpcTransport implements OmTransport {
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY,
         OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_DEFAULT);
 
-    String defaultLeaderReadConsistencyTypeStr = conf.get(OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_TYPE_KEY,
-        OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_TYPE_DEFAULT);
-    defaultLeaderReadConsistencyType =
-        ReadConsistency.valueOf(defaultLeaderReadConsistencyTypeStr, false).toProto();
+    String defaultLeaderReadConsistencyStr = conf.get(OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_KEY,
+        OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_DEFAULT);
+    defaultLeaderReadConsistency =
+        ReadConsistency.valueOf(defaultLeaderReadConsistencyStr).toProto();
 
     if (followerReadEnabled) {
-      String defaultFollowerReadConsistencyTypeStr = conf.get(
-          OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_TYPE_KEY,
-          OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_TYPE_DEFAULT
+      String defaultFollowerReadConsistencyStr = conf.get(
+          OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_KEY,
+          OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_DEFAULT
       );
-      ReadConsistencyType defaultFollowerReadConsistencyType =
-          ReadConsistency.valueOf(defaultFollowerReadConsistencyTypeStr, true).toProto();
+      ReadConsistencyProto defaultFollowerReadConsistency =
+          ReadConsistency.valueOf(defaultFollowerReadConsistencyStr).toProto();
       this.followerReadFailoverProxyProvider =
           new HadoopRpcOMFollowerReadFailoverProxyProvider(omFailoverProxyProvider,
-              defaultFollowerReadConsistencyType,
-              defaultLeaderReadConsistencyType);
+              defaultFollowerReadConsistency,
+              defaultLeaderReadConsistency);
       this.rpcProxy = OzoneManagerProtocolPB.newProxy(followerReadFailoverProxyProvider, maxFailovers);
     } else {
       // TODO: It should be possible to simply instantiate HadoopRpcOMFollowerReadFailoverProxyProvider
@@ -126,7 +126,7 @@ public class Hadoop27RpcTransport implements OmTransport {
       // If there is already user-defined read consistency hint, we should respect it
       return basePayload;
     }
-    if (defaultLeaderReadConsistencyType == ReadConsistencyType.CONSISTENCY_TYPE_UNKNOWN) {
+    if (defaultLeaderReadConsistency == ReadConsistencyProto.UNKNOWN_READ_CONSISTENCY) {
       return basePayload;
     }
 
@@ -134,7 +134,7 @@ public class Hadoop27RpcTransport implements OmTransport {
         .setReadConsistencyHint(
             ReadConsistencyHint
                 .newBuilder()
-                .setConsistencyType(defaultLeaderReadConsistencyType)
+                .setReadConsistency(defaultLeaderReadConsistency)
         ).build();
   }
 

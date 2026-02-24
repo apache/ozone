@@ -3150,24 +3150,24 @@
     </description>
   </property>
   <property>
-    <name>ozone.client.follower.read.default.consistency.type</name>
-    <value>LINEARIZABLE</value>
+    <name>ozone.client.follower.read.default.consistency</name>
+    <value>LINEARIZABLE_ALLOW_FOLLOWER</value>
     <description>
-      The default consistency type when client enables follower read.
+      The default consistency when client enables follower read.
       Currently, the supported follower read consistency are
-      LINEARIZABLE, LOCAL_LEASE, and STALE.
-      The default value is LINEARIZABLE to preserve the same strong
-      consistency behavior when switching from leader-only read to follower read .
+      LINEARIZABLE_ALLOW_FOLLOWER and LOCAL_LEASE
+      The default value is LINEARIZABLE_ALLOW_FOLLOWER to preserve the same strong
+      consistency behavior when switching from leader-only read to follower read.
     </description>
   </property>
   <property>
-    <name>ozone.client.leader.read.default.consistency.type</name>
-    <value>NON_LINEARIZABLE</value>
+    <name>ozone.client.leader.read.default.consistency</name>
+    <value>DEFAULT</value>
     <description>
-      The default consistency type when client disables follower read.
+      The default consistency when client disables follower read.
       Currently, the supported leader read consistency are
-      LINEARIZABLE and NON_LINEARIZABLE.
-      The default value is NON_LINEARIZABLE for backward compatibility reason
+      DEFAULT and LINEARIZABLE_LEADER_ONLY.
+      The default value is DEFAULT for backward compatibility reason
       which is mostly strongly consistent.
     </description>
   </property>

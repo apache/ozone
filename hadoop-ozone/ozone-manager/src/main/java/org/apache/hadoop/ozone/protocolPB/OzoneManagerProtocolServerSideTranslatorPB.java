@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.protocolPB;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_READY;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.NOT_LEADER;
 import static org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils.createErrorResponse;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyType.CONSISTENCY_TYPE_UNKNOWN;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyProto.UNKNOWN_READ_CONSISTENCY;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.PrepareStatus;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
@@ -50,7 +50,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMReque
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyHint;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyHint.LocalLeaseContext;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyType;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyProto;
 import org.apache.hadoop.ozone.security.S3SecurityUtil;
 import org.apache.ratis.proto.RaftProtos.CommitInfoProto;
 import org.apache.ratis.proto.RaftProtos.FollowerInfoProto;
@@ -229,8 +229,8 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       return handler.handleReadRequest(request);
     }
 
-    if (!request.hasReadConsistencyHint() || !request.getReadConsistencyHint().hasConsistencyType() ||
-        request.getReadConsistencyHint().getConsistencyType() == CONSISTENCY_TYPE_UNKNOWN) {
+    if (!request.hasReadConsistencyHint() || !request.getReadConsistencyHint().hasReadConsistency() ||
+        request.getReadConsistencyHint().getReadConsistency() == UNKNOWN_READ_CONSISTENCY) {
       // Read from leader or followers using linearizable read
       if (ozoneManager.getConfig().isFollowerReadLocalLeaseEnabled() &&
           allowFollowerReadLocalLease(omRatisServer.getServerDivision(),
@@ -269,14 +269,10 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       // there is no guarantee since it depends on the OM node configuration (e.g.
       // whether OM Raft server enables linearizable read).
       ReadConsistencyHint readConsistencyHint = request.getReadConsistencyHint();
-      ReadConsistencyType consistencyType = readConsistencyHint.getConsistencyType();
+      ReadConsistencyProto readConsistency = readConsistencyHint.getReadConsistency();
       RaftServerStatus raftServerStatus;
-      switch (consistencyType) {
-      case STALE:
-        // Serve the stale read request immediately for both leader and follower
-        ozoneManager.getMetrics().incNumStaleRead();
-        return handler.handleReadRequest(request);
-      case LOCAL_LEASE_FOLLOWER_READ:
+      switch (readConsistency) {
+      case LOCAL_LEASE:
         raftServerStatus = omRatisServer.getLeaderStatus();
         switch (raftServerStatus) {
         case NOT_LEADER:
@@ -305,7 +301,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
         default:
           throw createUnknownRaftServerStatusException(raftServerStatus);
         }
-      case LINEARIZABLE_LEADER_READ:
+      case LINEARIZABLE_LEADER_ONLY:
         raftServerStatus = omRatisServer.getLeaderStatus();
         switch (raftServerStatus) {
         case NOT_LEADER:
@@ -322,7 +318,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
         default:
           throw createUnknownRaftServerStatusException(raftServerStatus);
         }
-      case LINEARIZABLE_FOLLOWER_READ:
+      case LINEARIZABLE_ALLOW_FOLLOWER:
         raftServerStatus = omRatisServer.getLeaderStatus();
         switch (raftServerStatus) {
         case LEADER_AND_NOT_READY:

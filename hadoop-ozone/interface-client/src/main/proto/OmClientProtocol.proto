@@ -2357,10 +2357,10 @@ message DeleteObjectTaggingRequest {
 message DeleteObjectTaggingResponse {
 }
 
-enum ReadConsistencyType {
-  // Unknown consistency type, the read consistency behavior is decided
+enum ReadConsistencyProto {
+  // Unknown consistency, the read consistency behavior is decided
   // by the OM
-  CONSISTENCY_TYPE_UNKNOWN = 0;
+  UNKNOWN_READ_CONSISTENCY = 0;
   // Client sends all read requests to OM node that the client believes is the current leader.
   // If the OM node is not a leader, the OM node throws an exception so the client failover to the OM leader.
   // OM leader handles the request immediately without doing leadership check to verify
@@ -2382,12 +2382,12 @@ enum ReadConsistencyType {
   // by the OM leader, but OM leader will carry out leadership check by sending heartbeats or checking
   // the leader lease (if leader lease is enabled). This ensures that there are no stale reads.
   // There might be performance tradeoff due to this leadership check.
-  LINEARIZABLE_LEADER_READ = 2;
+  LINEARIZABLE_LEADER_ONLY = 2;
   // Client can send read requests to OM followers, but it requires the follower
   // to carry out ReadIndex protocol to ensure linearizability. Similar to
   // LinearizableLeaderRead, this consistency guarantee ensures that there are no stale reads.
   // There might be performance tradeoff due to the ReadIndex protocol.
-  LINEARIZABLE_FOLLOWER_READ = 3;
+  LINEARIZABLE_ALLOW_FOLLOWER = 3;
   // Client can send read request to OM followers, and the follower only serves
   // the read requests when these conditions are met
   // 1. The last RPC elapsed time with the leader is within the time limit
@@ -2398,13 +2398,7 @@ enum ReadConsistencyType {
   // requires session information of the last seen index. If the client failover
   // from a leader / fast follower to a slow follower that is still within the bound,
   // the slow follower can serve data that is more stale than the last seen index.
-  LOCAL_LEASE_FOLLOWER_READ = 4;
-  // Client can send read request to OM followers and the
-  // OM node serves the read request immediately. This has the best read performance, but
-  // OM node can return arbitrarily stale values when sent to followers (i.e. eventually consistent).
-  // When this requests is served by the leader, the consistency guarantee is similar
-  // to DEFAULT consistency.
-  STALE = 5;
+  LOCAL_LEASE = 4;
   // TODO: Support timestamp-based bounded stale reads
 }
 
@@ -2418,7 +2412,7 @@ message ReadConsistencyHint {
     optional uint64 leaseTimeMs = 2;
   }
 
-  optional ReadConsistencyType consistencyType = 1;
+  optional ReadConsistencyProto readConsistency = 1;
 
   // Oneof
   optional LocalLeaseContext localLeaseContext = 2;

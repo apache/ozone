@@ -18,9 +18,9 @@
 package org.apache.hadoop.ozone.om;
 
 import static java.util.UUID.randomUUID;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_TYPE_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_TYPE_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
@@ -60,7 +60,6 @@ import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFollowerReadFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.OMProxyInfo;
-import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
@@ -515,7 +514,7 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends TestOzoneManag
   void testClientWithLinearizableLeaderRead() throws Exception {
     OzoneConfiguration clientConf = new OzoneConfiguration(getConf());
     clientConf.setBoolean(OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, false);
-    clientConf.set(OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_TYPE_KEY, "LINEARIZABLE");
+    clientConf.set(OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_KEY, "LINEARIZABLE");
 
     OzoneClient ozoneClient = null;
     try {
@@ -542,40 +541,10 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends TestOzoneManag
   }
 
   @Test
-  void testClientWithStaleEnabled() throws Exception {
-    OzoneConfiguration clientConf = new OzoneConfiguration(getConf());
-    clientConf.setBoolean(OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, true);
-    clientConf.set(OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_TYPE_KEY, "STALE");
-
-    OzoneClient ozoneClient = null;
-    try {
-      ozoneClient = OzoneClientFactory.getRpcClient(clientConf);
-      ObjectStore objectStore = ozoneClient.getObjectStore();
-      HadoopRpcOMFollowerReadFailoverProxyProvider followerReadFailoverProxyProvider =
-          OmTestUtil.getFollowerReadFailoverProxyProvider(objectStore);
-      assertNotNull(followerReadFailoverProxyProvider);
-      assertTrue(followerReadFailoverProxyProvider.isUseFollowerRead());
-
-      String currentOMNodeId = followerReadFailoverProxyProvider.getCurrentProxy().getNodeId();
-      OzoneManager ozoneManager = getCluster().getOzoneManager(currentOMNodeId);
-      assertNotNull(ozoneManager);
-      assertEquals(currentOMNodeId, ozoneManager.getOMNodeId());
-
-      long previousStaleReadNum = ozoneManager.getMetrics().getNumStaleRead();
-
-      objectStore.listVolumes("");
-      long currentStaleReadNum = ozoneManager.getMetrics().getNumStaleRead();
-      assertThat(currentStaleReadNum).isGreaterThan(previousStaleReadNum);
-    } finally {
-      IOUtils.closeQuietly(ozoneClient);
-    }
-  }
-
-  @Test
   void testClientWithLocalLeaseEnabled() throws Exception {
     OzoneConfiguration clientConf = new OzoneConfiguration(getConf());
     clientConf.setBoolean(OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, true);
-    clientConf.set(OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_TYPE_KEY, "LOCAL_LEASE");
+    clientConf.set(OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_KEY, "LOCAL_LEASE");
     OzoneClient ozoneClient = null;
     try {
       ozoneClient = OzoneClientFactory.getRpcClient(clientConf);
@@ -598,19 +567,5 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends TestOzoneManag
     } finally {
       IOUtils.closeQuietly(ozoneClient);
     }
-  }
-
-  @Test
-  void testInvalidFollowerReadConsistency() {
-    assertThrows(IllegalArgumentException.class,
-        () -> ReadConsistency.valueOf("LOCAL_LEASE", false));
-    assertThrows(IllegalArgumentException.class,
-        () -> ReadConsistency.valueOf("STALE", false));
-    assertThrows(IllegalArgumentException.class,
-        () -> ReadConsistency.valueOf("NON_LINEARIZABLE", true));
-    assertThrows(IllegalArgumentException.class,
-        () -> ReadConsistency.valueOf("UNKNOWN", true));
-    assertThrows(IllegalArgumentException.class,
-        () -> ReadConsistency.valueOf("UNKNOWN", false));
   }
 }

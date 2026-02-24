@@ -69,7 +69,7 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyType;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.ratis.conf.Parameters;
 import org.apache.ratis.conf.RaftProperties;
@@ -521,28 +521,21 @@ public final class OzoneManagerRatisServer {
   }
 
   private RaftClientRequest.Type getRaftReadRequestType(OMRequest omRequest) {
-    if (!omRequest.hasReadConsistencyHint() || !omRequest.getReadConsistencyHint().hasConsistencyType() ||
-        omRequest.getReadConsistencyHint().getConsistencyType() == ReadConsistencyType.CONSISTENCY_TYPE_UNKNOWN) {
+    if (!omRequest.hasReadConsistencyHint() || !omRequest.getReadConsistencyHint().hasReadConsistency() ||
+        omRequest.getReadConsistencyHint().getReadConsistency() == ReadConsistencyProto.UNKNOWN_READ_CONSISTENCY) {
       // If there is no consistency hint, we simply follow the Raft server read option
       return RaftClientRequest.readRequestType();
     }
     // Allow client to decide which read consistency semantic can be used
     ReadConsistency readConsistency =
-        ReadConsistency.fromProto(omRequest.getReadConsistencyHint().getConsistencyType());
-    switch (readConsistency.getConsistencyType()) {
-    case STALE:
-      return RaftClientRequest.staleReadRequestType(0);
-    case LINEARIZABLE:
+        ReadConsistency.fromProto(omRequest.getReadConsistencyHint().getReadConsistency());
+    if (readConsistency.isLinearizable()) {
       // Note that the linearizable request type might not be respected
       // if the Raft server does not set the read option to LINEARIZABLE
       return RaftClientRequest.readRequestType(false);
-    case NON_LINEARIZABLE:
+    } else {
       // This will do a leader-only read even if the Raft server read option is LINEARIZABLE
       return RaftClientRequest.readRequestType(true);
-    default:
-      // This should not be reached, but if it does, the read consistency
-      // depends on the Raft server read option (LINEARIZABLE or DEFAULT)
-      return RaftClientRequest.readRequestType();
     }
   }
 
