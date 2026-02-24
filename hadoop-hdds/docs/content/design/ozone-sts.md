@@ -150,6 +150,10 @@ will be created to run every 3 hours to delete revoked tokens that have been in 
 input parameter for the command-line utility will be the sessionToken - this value is returned in plain text as a result 
 of the AssumeRole call (mentioned above).  In this way, specific STS tokens can be revoked as opposed to all tokens.  Furthermore, 
 AWS doesn't have a standard API to revoke tokens therefore we are creating our own system.
+
+Additionally, if the Kerberos identity of the user that created the STS token is revoked via the `ozone s3 revokesecret`
+command, then all the existing and unexpired STS tokens that user created will be revoked.
+
 Note: STS token revocation checks are strictly enforced and will fail-closed if there are internal errors such as not
 being able to communicate with the revocation database table, etc.
 Note: The creator of the STS token or an S3/tenant admin are the only ones allowed to revoke a token.

@@ -17,13 +17,13 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
-import com.google.protobuf.ByteString;
-import com.google.protobuf.InvalidProtocolBufferException;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.ListArgument;
 import org.apache.hadoop.hdds.scm.ha.ReflectionUtil;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 
 /**
  * {@link Codec} for {@link List} objects.
@@ -59,6 +59,12 @@ public class ListCodec implements Codec {
       final ListArgument listArgs = (ListArgument) ReflectionUtil
           .getMethod(ListArgument.class, "parseFrom", byte[].class)
           .invoke(null, (Object) value.toByteArray());
+
+      // proto2 required-equivalent check
+      if (!listArgs.hasType()) {
+        throw new InvalidProtocolBufferException("Missing ListArgument.type");
+      }
+
       final Class<?> dataType = ReflectionUtil.getClass(listArgs.getType());
       for (ByteString element : listArgs.getValueList()) {
         result.add(CodecFactory.getCodec(dataType)

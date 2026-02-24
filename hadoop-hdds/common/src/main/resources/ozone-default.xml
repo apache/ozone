@@ -1750,6 +1750,16 @@
   </property>
 
   <property>
+    <name>hdds.scm.safemode.log.interval</name>
+    <value>1m</value>
+    <tag>HDDS,SCM,OPERATION</tag>
+    <description>
+      Interval at which SCM logs safemode status while SCM is in safemode.
+      Default is 1 minute.
+    </description>
+  </property>
+
+  <property>
     <name>hdds.container.action.max.limit</name>
     <value>20</value>
     <tag>DATANODE</tag>
@@ -2310,7 +2320,7 @@
   </property>
   <property>
     <name>ozone.om.ratis.snapshot.max.total.sst.size</name>
-    <value>100000000</value>
+    <value>10737418240</value>
     <tag>OZONE, OM, RATIS</tag>
     <description>
       Max size of SST files in OM Ratis Snapshot tarball.
@@ -3116,9 +3126,9 @@
       Expert only. Ozone RpcClient attempts talking to each OzoneManager
       ipc.client.connect.max.retries (default = 10) number of times before
       failing over to another OzoneManager, if available. This parameter
-      represents the number of times the client will failover before giving
-      up. This value is kept high so that client does not give up trying to
-      connect to OMs easily.
+      represents the number of times per request the client will failover
+      before giving up. This value is kept high so that client does not
+      give up trying to connect to OMs easily.
     </description>
   </property>
   <property>
@@ -3129,6 +3139,13 @@
       to contact OM. Wait time increases linearly if same OM is retried
       again. If retrying on multiple OMs proxies in round robin fashion, the
       wait time is introduced after all the OM proxies have been attempted once.
+    </description>
+  </property>
+  <property>
+    <name>ozone.client.follower.read.enabled</name>
+    <value>false</value>
+    <description>
+      Enable client to read from OM followers.
     </description>
   </property>
   <property>
@@ -4361,7 +4378,7 @@
       recon rocks DB containerKeyTable
     </description>
   </property>
-
+    
   <property>
     <name>ozone.recon.filesizecount.flush.db.max.threshold</name>
     <value>200000</value>
@@ -4850,8 +4867,8 @@
   </property>
   <property>
     <name>hdds.datanode.kerberos.principal</name>
-    <value/>
-    <tag>OZONE, DATANODE</tag>
+    <value>dn/_HOST@REALM</value>
+    <tag>OZONE, SECURITY, KERBEROS, DATANODE</tag>
     <description>
       The Datanode service principal. This is typically set to
       dn/_HOST@REALM.TLD. Each Datanode will substitute _HOST with its

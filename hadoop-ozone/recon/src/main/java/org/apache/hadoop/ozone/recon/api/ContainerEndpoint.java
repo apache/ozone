@@ -659,11 +659,11 @@ public class ContainerEndpoint {
           }
         }
 
-        List<Pipeline> pipelines = new ArrayList<>();
         nonOMContainers.forEach(containerInfo -> {
           ContainerDiscrepancyInfo containerDiscrepancyInfo = new ContainerDiscrepancyInfo();
           containerDiscrepancyInfo.setContainerID(containerInfo.getContainerID());
           containerDiscrepancyInfo.setNumberOfKeys(0);
+          List<Pipeline> pipelines = new ArrayList<>();
           PipelineID pipelineID = null;
           try {
             pipelineID = containerInfo.getPipelineID();

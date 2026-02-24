@@ -31,13 +31,10 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapInQuotes;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
-import javax.annotation.PostConstruct;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
 import javax.ws.rs.HEAD;
@@ -50,7 +47,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.audit.AuditEventStatus;
 import org.apache.hadoop.ozone.audit.AuditMessage;
 import org.apache.hadoop.ozone.audit.S3GAction;
@@ -65,14 +61,12 @@ import org.apache.hadoop.ozone.s3.commontypes.KeyMetadata;
 import org.apache.hadoop.ozone.s3.endpoint.MultiDeleteRequest.DeleteObject;
 import org.apache.hadoop.ozone.s3.endpoint.MultiDeleteResponse.DeletedObject;
 import org.apache.hadoop.ozone.s3.endpoint.MultiDeleteResponse.Error;
-import org.apache.hadoop.ozone.s3.endpoint.S3BucketAcl.Grant;
 import org.apache.hadoop.ozone.s3.exception.OS3Exception;
 import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.ContinueToken;
 import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.apache.hadoop.ozone.s3.util.S3StorageType;
 import org.apache.hadoop.util.Time;
-import org.apache.http.HttpStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -107,6 +101,14 @@ public class BucketEndpoint extends EndpointBase {
     S3GAction s3GAction = S3GAction.GET_BUCKET;
     PerformanceStringBuilder perf = new PerformanceStringBuilder();
 
+    // Chain of responsibility: let each handler try to handle the request
+    for (BucketOperationHandler handler : handlers) {
+      Response response = handler.handleGetRequest(bucketName);
+      if (response != null) {
+        return response;  // Handler handled the request
+      }
+    }
+
     final String continueToken = queryParams().get(QueryParams.CONTINUATION_TOKEN);
     final String delimiter = queryParams().get(QueryParams.DELIMITER);
     final String encodingType = queryParams().get(QueryParams.ENCODING_TYPE);
@@ -122,15 +124,6 @@ public class BucketEndpoint extends EndpointBase {
     OzoneBucket bucket = null;
 
     try {
-      final String aclMarker = queryParams().get(QueryParams.ACL);
-      if (aclMarker != null) {
-        s3GAction = S3GAction.GET_ACL;
-        S3BucketAcl result = getAcl(bucketName);
-        getMetrics().updateGetAclSuccessStats(startNanos);
-        auditReadSuccess(s3GAction);
-        return Response.ok(result, MediaType.APPLICATION_XML_TYPE).build();
-      }
-
       final String uploads = queryParams().get(QueryParams.UPLOADS);
       if (uploads != null) {
         s3GAction = S3GAction.LIST_MULTIPART_UPLOAD;
@@ -314,35 +307,7 @@ public class BucketEndpoint extends EndpointBase {
       }
     }
 
-    // No handler handled the request, execute default operation: create bucket
-    return handleCreateBucket(bucketName);
-  }
-
-  /**
-   * Default PUT bucket operation (create bucket).
-   */
-  private Response handleCreateBucket(String bucketName)
-      throws IOException, OS3Exception {
-    long startNanos = Time.monotonicNowNanos();
-    S3GAction s3GAction = S3GAction.CREATE_BUCKET;
-
-    try {
-      String location = createS3Bucket(bucketName);
-      auditWriteSuccess(s3GAction);
-      getMetrics().updateCreateBucketSuccessStats(startNanos);
-      return Response.status(HttpStatus.SC_OK).header("Location", location)
-          .build();
-    } catch (OMException exception) {
-      auditWriteFailure(s3GAction, exception);
-      getMetrics().updateCreateBucketFailureStats(startNanos);
-      if (exception.getResult() == ResultCodes.INVALID_BUCKET_NAME) {
-        throw newError(S3ErrorTable.INVALID_BUCKET_NAME, bucketName, exception);
-      }
-      throw exception;
-    } catch (Exception ex) {
-      auditWriteFailure(s3GAction, ex);
-      throw ex;
-    }
+    throw newError(S3ErrorTable.NOT_IMPLEMENTED, "PUT bucket");
   }
 
   public Response listMultipartUploads(
@@ -435,38 +400,14 @@ public class BucketEndpoint extends EndpointBase {
   @DELETE
   public Response delete(@PathParam(BUCKET) String bucketName)
       throws IOException, OS3Exception {
-    long startNanos = Time.monotonicNowNanos();
-    S3GAction s3GAction = S3GAction.DELETE_BUCKET;
-
-    try {
-      if (S3Owner.hasBucketOwnershipVerificationConditions(getHeaders())) {
-        OzoneBucket bucket = getBucket(bucketName);
-        S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
+    for (BucketOperationHandler handler : handlers) {
+      Response response = handler.handleDeleteRequest(bucketName);
+      if (response != null) {
+        return response;
       }
-      deleteS3Bucket(bucketName);
-    } catch (OMException ex) {
-      auditWriteFailure(s3GAction, ex);
-      getMetrics().updateDeleteBucketFailureStats(startNanos);
-      if (ex.getResult() == ResultCodes.BUCKET_NOT_EMPTY) {
-        throw newError(S3ErrorTable.BUCKET_NOT_EMPTY, bucketName, ex);
-      } else if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
-        throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
-      } else if (isAccessDenied(ex)) {
-        throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
-      } else {
-        throw ex;
-      }
-    } catch (Exception ex) {
-      auditWriteFailure(s3GAction, ex);
-      throw ex;
     }
 
-    auditWriteSuccess(s3GAction);
-    getMetrics().updateDeleteBucketSuccessStats(startNanos);
-    return Response
-        .status(HttpStatus.SC_NO_CONTENT)
-        .build();
-
+    throw newError(S3ErrorTable.NOT_IMPLEMENTED, "DELETE bucket");
   }
 
   /**
@@ -534,51 +475,6 @@ public class BucketEndpoint extends EndpointBase {
     return result;
   }
 
-  /**
-   * Implement acl get.
-   * <p>
-   * see: https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketAcl.html
-   */
-  public S3BucketAcl getAcl(String bucketName)
-      throws OS3Exception, IOException {
-    long startNanos = Time.monotonicNowNanos();
-    S3BucketAcl result = new S3BucketAcl();
-    try {
-      OzoneBucket bucket = getBucket(bucketName);
-      S3Owner.verifyBucketOwnerCondition(getHeaders(), bucketName, bucket.getOwner());
-      S3Owner owner = S3Owner.of(bucket.getOwner());
-      result.setOwner(owner);
-
-      // TODO: remove this duplication avoid logic when ACCESS and DEFAULT scope
-      // TODO: are merged.
-      // Use set to remove ACLs with different scopes(ACCESS and DEFAULT)
-      Set<Grant> grantSet = new HashSet<>();
-      // Return ACL list
-      for (OzoneAcl acl : bucket.getAcls()) {
-        List<Grant> grants = S3Acl.ozoneNativeAclToS3Acl(acl);
-        grantSet.addAll(grants);
-      }
-      ArrayList<Grant> grantList = new ArrayList<>();
-      grantList.addAll(grantSet);
-      result.setAclList(
-          new S3BucketAcl.AccessControlList(grantList));
-      return result;
-    } catch (OMException ex) {
-      getMetrics().updateGetAclFailureStats(startNanos);
-      auditReadFailure(S3GAction.GET_ACL, ex);
-      if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
-        throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
-      } else if (isAccessDenied(ex)) {
-        throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
-      } else {
-        throw newError(S3ErrorTable.INTERNAL_ERROR, bucketName, ex);
-      }
-    } catch (OS3Exception ex) {
-      getMetrics().updateGetAclFailureStats(startNanos);
-      throw ex;
-    }
-  }
-
   private void addKey(ListObjectResponse response, OzoneKey next) {
     KeyMetadata keyMetadata = new KeyMetadata();
     keyMetadata.setKey(EncodingTypeObject.createNullable(next.getName(),
@@ -597,8 +493,7 @@ public class BucketEndpoint extends EndpointBase {
   }
 
   @Override
-  @PostConstruct
-  public void init() {
+  protected void init() {
     listKeysShallowEnabled = getOzoneConfiguration().getBoolean(
         OZONE_S3G_LIST_KEYS_SHALLOW_ENABLED,
         OZONE_S3G_LIST_KEYS_SHALLOW_ENABLED_DEFAULT);
@@ -606,12 +501,14 @@ public class BucketEndpoint extends EndpointBase {
         OZONE_S3G_LIST_MAX_KEYS_LIMIT,
         OZONE_S3G_LIST_MAX_KEYS_LIMIT_DEFAULT);
 
-    // Initialize PUT handlers
-    BucketAclHandler aclHandler = new BucketAclHandler();
-    copyDependenciesTo(aclHandler);
-    aclHandler.initialization();
-
+    // initialize handlers
     handlers = new ArrayList<>();
-    handlers.add(aclHandler);
+    addHandler(new BucketAclHandler());
+    addHandler(new BucketCrudHandler());
+  }
+
+  private <T extends EndpointBase & BucketOperationHandler> void addHandler(T handler) {
+    copyDependenciesTo(handler);
+    handlers.add(handler);
   }
 }

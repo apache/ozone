@@ -18,15 +18,20 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import static org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType.PIPELINE;
+import static org.apache.ratis.util.Preconditions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.google.protobuf.InvalidProtocolBufferException;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
+import org.apache.hadoop.hdds.scm.ha.io.ListCodec;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.ratis.protocol.Message;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
+import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -88,5 +93,135 @@ public class TestSCMRatisRequest {
         new Class[]{value.getClass()}, value);
     assertEquals(operation, SCMRatisRequest.decode(request.encode()).getOperation());
     assertEquals(value, SCMRatisRequest.decode(request.encode()).getArguments()[0]);
+  }
+
+  @Test
+  public void testDecodeMissingRequestTypeShouldFail() throws Exception {
+    SCMRatisProtocol.SCMRatisRequestProto proto =
+        SCMRatisProtocol.SCMRatisRequestProto.newBuilder()
+            // no type
+            .setMethod(SCMRatisProtocol.Method.newBuilder()
+                .setName("test")
+                .build())
+            .build();
+
+    Message msg = Message.valueOf(
+        UnsafeByteOperations.unsafeWrap(proto.toByteString().asReadOnlyByteBuffer()));
+
+    InvalidProtocolBufferException ex = assertThrows(
+        InvalidProtocolBufferException.class,
+        () -> SCMRatisRequest.decode(msg));
+
+    assertTrue(ex.getMessage().contains("Missing request type"));
+  }
+
+  @Test
+  public void testDecodeMissingMethodShouldFail() throws Exception {
+    SCMRatisProtocol.SCMRatisRequestProto proto =
+        SCMRatisProtocol.SCMRatisRequestProto.newBuilder()
+            .setType(SCMRatisProtocol.RequestType.PIPELINE)
+            // no method
+            .build();
+
+    Message msg = Message.valueOf(
+        UnsafeByteOperations.unsafeWrap(proto.toByteString().asReadOnlyByteBuffer()));
+
+    InvalidProtocolBufferException ex = assertThrows(
+        InvalidProtocolBufferException.class,
+        () -> SCMRatisRequest.decode(msg));
+
+    assertTrue(ex.getMessage().contains("Missing method"));
+  }
+
+  @Test
+  public void testDecodeMissingMethodNameShouldFail() throws Exception {
+    SCMRatisProtocol.SCMRatisRequestProto proto =
+        SCMRatisProtocol.SCMRatisRequestProto.newBuilder()
+            .setType(SCMRatisProtocol.RequestType.PIPELINE)
+            .setMethod(SCMRatisProtocol.Method.newBuilder()
+                // no name
+                .build())
+            .build();
+
+    Message msg = Message.valueOf(
+        UnsafeByteOperations.unsafeWrap(proto.toByteString().asReadOnlyByteBuffer()));
+
+    InvalidProtocolBufferException ex = assertThrows(
+        InvalidProtocolBufferException.class,
+        () -> SCMRatisRequest.decode(msg));
+
+    assertTrue(ex.getMessage().contains("Missing method name"));
+  }
+
+  @Test
+  public void testDecodeMissingArgumentTypeShouldFail() throws Exception {
+    SCMRatisProtocol.MethodArgument arg =
+        SCMRatisProtocol.MethodArgument.newBuilder()
+            // no type
+            .setValue(ByteString.copyFromUtf8("v"))
+            .build();
+
+    SCMRatisProtocol.SCMRatisRequestProto proto =
+        SCMRatisProtocol.SCMRatisRequestProto.newBuilder()
+            .setType(SCMRatisProtocol.RequestType.PIPELINE)
+            .setMethod(SCMRatisProtocol.Method.newBuilder()
+                .setName("test")
+                .addArgs(arg)
+                .build())
+            .build();
+
+    Message msg = Message.valueOf(
+        UnsafeByteOperations.unsafeWrap(proto.toByteString().asReadOnlyByteBuffer()));
+
+    InvalidProtocolBufferException ex = assertThrows(
+        InvalidProtocolBufferException.class,
+        () -> SCMRatisRequest.decode(msg));
+
+    assertTrue(ex.getMessage().contains("Missing argument type"));
+  }
+
+  @Test
+  public void testDecodeMissingArgumentValueShouldFail() throws Exception {
+    SCMRatisProtocol.MethodArgument arg =
+        SCMRatisProtocol.MethodArgument.newBuilder()
+            .setType("java.lang.String")
+            // no value
+            .build();
+
+    SCMRatisProtocol.SCMRatisRequestProto proto =
+        SCMRatisProtocol.SCMRatisRequestProto.newBuilder()
+            .setType(SCMRatisProtocol.RequestType.PIPELINE)
+            .setMethod(SCMRatisProtocol.Method.newBuilder()
+                .setName("test")
+                .addArgs(arg)
+                .build())
+            .build();
+
+    Message msg = Message.valueOf(
+        UnsafeByteOperations.unsafeWrap(proto.toByteString().asReadOnlyByteBuffer()));
+
+    InvalidProtocolBufferException ex = assertThrows(
+        InvalidProtocolBufferException.class,
+        () -> SCMRatisRequest.decode(msg));
+
+    assertTrue(ex.getMessage().contains("Missing argument value"));
+  }
+
+  @Test
+  public void testListDecodeMissingTypeShouldFail() throws Exception {
+    // ListArgument without type
+    SCMRatisProtocol.ListArgument listArg =
+        SCMRatisProtocol.ListArgument.newBuilder()
+            // no type
+            .addValue(ByteString.copyFromUtf8("x"))
+            .build();
+
+    ListCodec codec = new ListCodec();
+
+    InvalidProtocolBufferException ex = assertThrows(
+        InvalidProtocolBufferException.class,
+        () -> codec.deserialize(List.class, listArg.toByteString()));
+
+    assertTrue(ex.getMessage().contains("Missing ListArgument.type"));
   }
 }

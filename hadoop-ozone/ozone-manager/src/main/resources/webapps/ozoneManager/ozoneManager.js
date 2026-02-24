@@ -119,6 +119,7 @@
 
             ctrl.formatBytes = function(bytes, decimals) {
                if(bytes == 0) return '0 Bytes';
+               if (!bytes) return 'N/A';
                var k = 1024, // or 1024 for binary
                    dm = decimals + 1 || 3,
                    sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'],
