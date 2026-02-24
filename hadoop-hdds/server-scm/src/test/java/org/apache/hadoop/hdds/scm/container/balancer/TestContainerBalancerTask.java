@@ -19,8 +19,10 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyString;
@@ -414,28 +416,22 @@ public class TestContainerBalancerTask {
   @Test
   public void testStartBalancerWithInvalidNodes() {
     ContainerBalancer balancer = new ContainerBalancer(scm);
-    ContainerBalancerConfiguration cbConf =
-        conf.getObject(ContainerBalancerConfiguration.class);
+    ContainerBalancerConfiguration cbConf = conf.getObject(ContainerBalancerConfiguration.class);
 
     // Testing if invalid hostname throws an exception
     cbConf.setIncludeNodes("invalid-host-name");
-    org.junit.jupiter.api.Assertions.assertThrows(
-        InvalidContainerBalancerConfigurationException.class,
-        () -> balancer.startBalancer(cbConf),
+    assertThrows(InvalidContainerBalancerConfigurationException.class, () -> balancer.startBalancer(cbConf),
         "Should throw exception for non-existent hostname");
 
     // Testing if invalid IP throws an exception
     cbConf.setIncludeNodes("883.883.883.883");
-    org.junit.jupiter.api.Assertions.assertThrows(
-        InvalidContainerBalancerConfigurationException.class,
-        () -> balancer.startBalancer(cbConf),
+    assertThrows(InvalidContainerBalancerConfigurationException.class, () -> balancer.startBalancer(cbConf),
         "Should throw exception for non-existent IP");
 
     // Testing that a valid entry does not throw an exception
     DatanodeDetails realNode = nodesInCluster.get(0).getDatanodeDetails();
     cbConf.setIncludeNodes(realNode.getIpAddress());
-    org.junit.jupiter.api.Assertions.assertDoesNotThrow(
-        () -> balancer.startBalancer(cbConf));
+    assertDoesNotThrow(() -> balancer.startBalancer(cbConf));
   }
 
   /**
