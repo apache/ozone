@@ -36,9 +36,9 @@ public class TestComponentVersionInvariants {
   public static Stream<Arguments> values() {
     return Stream.of(
         arguments(
-            DatanodeVersion.values(),
-            DatanodeVersion.DEFAULT_VERSION,
-            DatanodeVersion.FUTURE_VERSION),
+            HDDSVersion.values(),
+            HDDSVersion.DEFAULT_VERSION,
+            HDDSVersion.FUTURE_VERSION),
         arguments(
             ClientVersion.values(),
             ClientVersion.DEFAULT_VERSION,

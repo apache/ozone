@@ -28,7 +28,7 @@ import com.google.common.collect.ImmutableSet;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.apache.hadoop.hdds.DatanodeVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -77,13 +77,13 @@ public class TestDatanodeDetails {
         dn.toProtoBuilder(DEFAULT_VERSION.toProtoValue(), requiredPorts);
     protoBuilder.clearCurrentVersion();
     DatanodeDetails dn2 = DatanodeDetails.newBuilder(protoBuilder.build()).build();
-    assertEquals(DatanodeVersion.SEPARATE_RATIS_PORTS_AVAILABLE.toProtoValue(), dn2.getCurrentVersion());
+    assertEquals(HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE.toProtoValue(), dn2.getCurrentVersion());
 
     // test that if the current version is set, it is used
     protoBuilder =
         dn.toProtoBuilder(DEFAULT_VERSION.toProtoValue(), requiredPorts);
     DatanodeDetails dn3 = DatanodeDetails.newBuilder(protoBuilder.build()).build();
-    assertEquals(DatanodeVersion.CURRENT.toProtoValue(), dn3.getCurrentVersion());
+    assertEquals(HDDSVersion.CURRENT.toProtoValue(), dn3.getCurrentVersion());
   }
 
   public static void assertPorts(HddsProtos.DatanodeDetailsProto dn,

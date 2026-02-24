@@ -49,7 +49,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hdds.DatanodeVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -460,8 +460,8 @@ public class DatanodeSimulator implements Callable<Void>, FreonSubcommand {
     DatanodeDetails details = DatanodeDetails.newBuilder()
         .setUuid(UUID.randomUUID())
         .build();
-    details.setInitialVersion(DatanodeVersion.CURRENT_VERSION);
-    details.setCurrentVersion(DatanodeVersion.CURRENT_VERSION);
+    details.setInitialVersion(HDDSVersion.CURRENT_VERSION);
+    details.setCurrentVersion(HDDSVersion.CURRENT_VERSION);
     details.setHostName(HddsUtils.getHostName(config));
     details.setIpAddress(randomIp());
     details.setStandalonePort(0);
@@ -470,7 +470,7 @@ public class DatanodeSimulator implements Callable<Void>, FreonSubcommand {
     details.setVersion(HDDS_VERSION_INFO.getVersion());
     details.setSetupTime(Time.now());
     details.setRevision(HDDS_VERSION_INFO.getRevision());
-    details.setCurrentVersion(DatanodeVersion.CURRENT_VERSION);
+    details.setCurrentVersion(HDDSVersion.CURRENT_VERSION);
     return details;
   }
 

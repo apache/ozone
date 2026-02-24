@@ -34,7 +34,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Stream;
-import org.apache.hadoop.hdds.DatanodeVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.DatanodeRatisServerConfig;
@@ -83,7 +83,7 @@ public class TestBlockDataStreamOutput {
   private static final String VOLUME_NAME = "testblockoutputstream";
   private static final String BUCKET_NAME = VOLUME_NAME;
   private static String keyString = UUID.randomUUID().toString();
-  private static final DatanodeVersion DN_OLD_VERSION = DatanodeVersion.SEPARATE_RATIS_PORTS_AVAILABLE;
+  private static final HDDSVersion DN_OLD_VERSION = HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE;
 
   static MiniOzoneCluster createCluster() throws IOException,
       InterruptedException, TimeoutException {
