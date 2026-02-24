@@ -15,12 +15,9 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.utils;
+package com.google.common.util.concurrent;
 
 import com.google.common.base.Supplier;
-import com.google.common.util.concurrent.Striped;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -33,14 +30,14 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * the client code to do that ({@link Striped#custom(int, Supplier)} is package
  * private). Ref: https://github.com/google/guava/issues/2514
  *
- * So, we have to use reflection to forcibly support fair order policy with
- * {@link Striped}. When the above issue is resolved, we can remove this util.
+ * So, we place this class in the same package as {@link Striped} to directly
+ * call the package-private method without reflection.
+ * When the above issue is resolved, we can remove this util.
  */
 public final class SimpleStriped {
 
   private SimpleStriped() {
   }
-
 
   /**
    * Creates a {@code Striped<L>} with eagerly initialized, strongly referenced
@@ -50,17 +47,8 @@ public final class SimpleStriped {
    * @param supplier a {@code Supplier<L>} object to obtain locks from.
    * @return a new {@code Striped<L>}.
    */
-  @SuppressWarnings("unchecked")
   public static <L> Striped<L> custom(int stripes, Supplier<L> supplier) {
-    try {
-      Method custom =
-          Striped.class.getDeclaredMethod("custom", int.class, Supplier.class);
-      custom.setAccessible(true);
-      return (Striped<L>) custom.invoke(null, stripes, supplier);
-    } catch (NoSuchMethodException | IllegalAccessException |
-             InvocationTargetException e) {
-      throw new IllegalStateException("Error creating custom Striped.", e);
-    }
+    return Striped.custom(stripes, supplier);
   }
 
   /**
@@ -68,6 +56,7 @@ public final class SimpleStriped {
    * strongly referenced read-write locks. Every lock is reentrant.
    *
    * @param stripes the minimum number of stripes (locks) required
+   * @param fair whether to use a fair ordering policy
    * @return a new {@code Striped<ReadWriteLock>}
    */
   public static Striped<ReadWriteLock> readWriteLock(int stripes,
