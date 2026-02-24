@@ -89,7 +89,13 @@ public class StorageDistributionEndpoint {
     try {
       List<DatanodeStorageReport> nodeStorageReports = collectDatanodeReports();
       GlobalStorageReport globalStorageReport = calculateGlobalStorageReport();
-      OpenKeyBytesInfo totalOpenKeySize = calculateOpenKeySizes();
+      OpenKeyBytesInfo totalOpenKeySize;
+      try {
+        totalOpenKeySize = calculateOpenKeySizes();
+      } catch (Exception e) {
+        LOG.error("Error calculating open key sizes", e);
+        totalOpenKeySize = new OpenKeyBytesInfo(0L, 0L);
+      }
 
       Map<String, Long> namespaceMetrics = new HashMap<>();
       try {

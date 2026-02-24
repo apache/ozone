@@ -259,7 +259,7 @@ const Capacity: React.FC<object> = () => {
     </span>
   );
 
-const openKeyUsageBreakdown = (
+  const openKeyUsageBreakdown = (
     <span>
       OPEN KEYS
       <Popover
@@ -268,16 +268,16 @@ const openKeyUsageBreakdown = (
         content={
           <div className='openkeys-space-breakdown'>
             Open Key/File Bytes
-            <Tag color='red'>{filesize(storageDistribution.data.usedSpaceBreakdown.openKeyBytes?.openKeyAndFileBytes ?? 0, {round: 1})}</Tag>
+            <Tag color='blue'>{filesize(storageDistribution.data.usedSpaceBreakdown.openKeyBytes?.openKeyAndFileBytes ?? 0, {round: 1})}</Tag>
             Multipart Key Bytes
-            <Tag color='green'>{filesize(storageDistribution.data.usedSpaceBreakdown.openKeyBytes?.multipartOpenKeyBytes ?? 0, {round: 1})}</Tag>
+            <Tag color='orange'>{filesize(storageDistribution.data.usedSpaceBreakdown.openKeyBytes?.multipartOpenKeyBytes ?? 0, {round: 1})}</Tag>
           </div>
         }
       >
-        <InfoCircleOutlined style={{ color: '#2f84d8', fontSize: 12, marginLeft: 2 }} />
+        <InfoCircleOutlined style={{ color: '#2f84d8', fontSize: 12, marginLeft: 4 }} />
       </Popover>
     </span>
-   );
+  );
 
   return (
     <>

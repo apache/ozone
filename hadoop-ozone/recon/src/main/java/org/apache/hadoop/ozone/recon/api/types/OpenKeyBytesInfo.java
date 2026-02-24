@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.recon.api.types;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 /**
  * Represents information about the open keys in a storage system.
  * This class provides details regarding different types of open key bytes
@@ -24,8 +26,10 @@ package org.apache.hadoop.ozone.recon.api.types;
  */
 public class OpenKeyBytesInfo {
 
-  private long totalOpenKeyBytes;
+  @JsonProperty("openKeyAndFileBytes")
   private long openKeyAndFileBytes;
+
+  @JsonProperty("multipartOpenKeyBytes")
   private long multipartOpenKeyBytes;
 
   public OpenKeyBytesInfo() { }
@@ -33,11 +37,11 @@ public class OpenKeyBytesInfo {
   public OpenKeyBytesInfo(long openKeyAndFileBytes, long multipartOpenKeyBytes) {
     this.openKeyAndFileBytes = openKeyAndFileBytes;
     this.multipartOpenKeyBytes = multipartOpenKeyBytes;
-    this.totalOpenKeyBytes = openKeyAndFileBytes + multipartOpenKeyBytes;
   }
 
+  @JsonProperty("totalOpenKeyBytes")
   public long getTotalOpenKeyBytes() {
-    return totalOpenKeyBytes;
+    return openKeyAndFileBytes + multipartOpenKeyBytes;
   }
 
   public long getOpenKeyAndFileBytes() {
