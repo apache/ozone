@@ -29,6 +29,16 @@ public class ManagedBloomFilter extends BloomFilter {
   private final UncheckedAutoCloseable leakTracker = track(this);
 
   @Override
+  public boolean equals(Object obj) {
+    return super.equals(obj);
+  }
+
+  @Override
+  public int hashCode() {
+    return super.hashCode();
+  }
+
+  @Override
   public void close() {
     try {
       super.close();
