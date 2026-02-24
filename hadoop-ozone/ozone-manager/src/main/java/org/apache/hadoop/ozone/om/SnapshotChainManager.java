@@ -385,8 +385,7 @@ public class SnapshotChainManager {
   public synchronized void removeFromSnapshotIdToTable(UUID snapshotId) throws IOException {
     validateSnapshotChain();
     String tableKey = snapshotIdToTableKey.remove(snapshotId);
-    LOG.debug("Removed from snapshotIdToTableKey: snapshotId={} tableKey={}. caller: {}",
-        snapshotId, tableKey, Thread.currentThread().getStackTrace()[2]);
+    LOG.debug("Removed from snapshotIdToTableKey: snapshotId={} tableKey={}", snapshotId, tableKey);
   }
 
   /**
