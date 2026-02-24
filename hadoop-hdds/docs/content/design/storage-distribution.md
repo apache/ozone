@@ -122,16 +122,19 @@ All metrics are aggregated, and exposed through a **RESTful API (/storagedistrib
 ##### dataNodeUsage Array (Per-DataNode Metrics)
 Each object represents the storage metrics for a single DataNode.
 
-| Field            | Type   | Description                                    |
-|------------------|--------|------------------------------------------------|
-| datanodeUuid     | String | Unique identifier for the DataNode             |
-| hostName         | String | Hostname of the DataNode                       |
-| capacity         | Long   | Total capacity of the DataNode in bytes.       |
-| used             | Long   | Used space on the DataNode in bytes.           |
-| remaining        | Long   | Remaining free space on the DataNode in bytes. |
-| committed        | Long   | Bytes pre allocated for the containers.      |
-| minimumFreeSpace | Long   | Configured minimum free space in bytes.        |
-| reserved         | Long   | Configured reserved space in bytes.            | 
+| Field               | Type   | Description                                              |
+|---------------------|--------|----------------------------------------------------------|
+| datanodeUuid        | String | Unique identifier for the DataNode                       |
+| hostName            | String | Hostname of the DataNode                                 |
+| capacity            | Long   | Ozone capacity of the DataNode in bytes.                 |
+| used                | Long   | Ozone Used space on the DataNode in bytes.               |
+| remaining           | Long   | Remaining free space on the DataNode in bytes for Ozone. |
+| committed           | Long   | Bytes pre allocated for the containers.                  |
+| minimumFreeSpace    | Long   | Configured minimum free space in bytes.                  |
+| reserved            | Long   | Configured reserved space in bytes, for non Ozone usage. | 
+| filesystemCapacity  | Long   | Total filesystem capacity of the DataNode in bytes       |
+| filesystemUsed      | Long   | Total used filesystem space of DataNode in bytes         |
+| filesystemAvailable | Long   | Total available filesystem space of DataNode in bytes    |
 
 **Example Response:**
 
@@ -167,7 +170,10 @@ Each object represents the storage metrics for a single DataNode.
       "remaining": 1000839806976,
       "committed": 0,
       "minimumFreeSpace": 1080992000,
-      "reserved": 108110008
+      "reserved": 108110008,
+      "filesystemCapacity" : 1081100128256,
+      "filesystemUsed" : 80260321280,
+      "filesystemAvailable" : 1000839806976
     },
     {
       "datanodeUuid": "d211a430-6363-4882-a4b5-5d3275652e5a",
@@ -177,7 +183,10 @@ Each object represents the storage metrics for a single DataNode.
       "remaining": 1000839806976,
       "committed": 0,
       "minimumFreeSpace": 1080992000,
-      "reserved": 108110008
+      "reserved": 108110008,
+      "filesystemCapacity" : 1081100128256,
+      "filesystemUsed" : 80260321280,
+      "filesystemAvailable" : 1000839806976
     },
     {
       "datanodeUuid": "70fd6c8c-b3f3-43ad-83ac-4e0dc6e9d74d",
@@ -187,7 +196,10 @@ Each object represents the storage metrics for a single DataNode.
       "remaining": 1000839806976,
       "committed": 0,
       "minimumFreeSpace": 1080992000,
-      "reserved": 108110008
+      "reserved": 108110008,
+      "filesystemCapacity" : 1081100128256,
+      "filesystemUsed" : 80260321280,
+      "filesystemAvailable" : 1000839806976
     }
   ]
 }
