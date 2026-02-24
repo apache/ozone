@@ -21,6 +21,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
@@ -514,7 +515,7 @@ public class ContainerBalancer extends StatefulService {
     return status + config.toString();
   }
 
-  private void validateNodeList(java.util.Set<String> nodes, String type)
+  private void validateNodeList(Set<String> nodes, String type)
       throws InvalidContainerBalancerConfigurationException {
     if (nodes == null || nodes.isEmpty()) {
       return;
