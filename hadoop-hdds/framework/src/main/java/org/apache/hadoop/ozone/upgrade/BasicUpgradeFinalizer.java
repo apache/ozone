@@ -40,7 +40,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.hadoop.ozone.common.Storage;
-import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeAction;
 import org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;

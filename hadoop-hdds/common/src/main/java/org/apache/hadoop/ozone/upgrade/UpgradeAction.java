@@ -15,13 +15,18 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.om.upgrade;
-
-import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.upgrade.UpgradeAction;
+package org.apache.hadoop.ozone.upgrade;
 
 /**
- * Upgrade Action for OzoneManager which takes in an 'OM' instance.
+ * Generic UpgradeAction interface. An upgrade action is an operation that
+ * is run at least once as a pre-requisite to finalizing a layout feature.
+ * @param <T> action argument type
  */
-public interface OmUpgradeAction extends UpgradeAction<OzoneManager> {
+public interface UpgradeAction<T> {
+
+  default String name() {
+    return getClass().getSimpleName();
+  }
+
+  void execute(T arg) throws Exception;
 }

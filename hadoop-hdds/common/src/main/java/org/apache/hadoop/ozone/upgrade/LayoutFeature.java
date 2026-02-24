@@ -34,20 +34,6 @@ public interface LayoutFeature extends Versioned {
     return Optional.empty();
   }
 
-  /**
-   * Generic UpgradeAction interface. An upgrade action is an operation that
-   * is run at least once as a pre-requisite to finalizing a layout feature.
-   * @param <T>
-   */
-  interface UpgradeAction<T> {
-
-    default String name() {
-      return getClass().getSimpleName();
-    }
-
-    void execute(T arg) throws Exception;
-  }
-
   @Override
   default int version() {
     return this.layoutVersion();
