@@ -39,13 +39,11 @@ import org.apache.hadoop.ipc_.RemoteException;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
-import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.SecretManager;
-import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
