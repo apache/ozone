@@ -17,9 +17,21 @@
 
 package org.apache.hadoop.ozone;
 
+import org.apache.hadoop.ozone.upgrade.UpgradeAction;
+import java.util.Optional;
+
 /**
  * Base class defining the version in the entire system.
  */
 public interface Versioned {
   int version();
+
+  /**
+   * @return the description of the version enum value.
+   */
+  String description();
+
+  default Optional<? extends UpgradeAction> action() {
+    return Optional.empty();
+  }
 }

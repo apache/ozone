@@ -23,13 +23,6 @@ import org.apache.hadoop.ozone.Versioned;
  * Base type for component version enums.
  */
 public interface ComponentVersion extends Versioned {
-
-  /**
-   * Returns the description of the version enum value.
-   * @return the description of the version enum value.
-   */
-  String description();
-
   /**
    * Returns the value that represents the enum in a protocol message
    * transferred over the wire.

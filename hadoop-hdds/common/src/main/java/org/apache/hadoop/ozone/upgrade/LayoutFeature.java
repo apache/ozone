@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.upgrade;
 
-import java.util.Optional;
 import org.apache.hadoop.ozone.Versioned;
 
 /**
@@ -27,12 +26,6 @@ public interface LayoutFeature extends Versioned {
   String name();
 
   int layoutVersion();
-
-  String description();
-
-  default Optional<? extends UpgradeAction> action() {
-    return Optional.empty();
-  }
 
   @Override
   default int version() {
