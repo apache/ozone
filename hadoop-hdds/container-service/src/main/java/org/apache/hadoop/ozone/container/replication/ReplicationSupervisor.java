@@ -49,8 +49,10 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicationCommandPriority;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.ozone.container.checksum.ReconcileContainerTask;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.ec.reconstruction.ECReconstructionCoordinatorTask;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
 import org.apache.hadoop.util.Time;
@@ -224,6 +226,7 @@ public final class ReplicationSupervisor {
       }
     }
     registry = new MetricsRegistry(ReplicationSupervisor.class.getSimpleName());
+    initAllTaskCounters();
   }
 
   /**
@@ -247,19 +250,36 @@ public final class ReplicationSupervisor {
     return true;
   }
 
+  private void initAllTaskCounters() {
+    initCounters(ReplicationTask.METRIC_NAME,
+        ReplicationTask.METRIC_DESCRIPTION_SEGMENT,
+        ReplicationTask.class.getSimpleName());
+    initCounters(ECReconstructionCoordinatorTask.METRIC_NAME,
+        ECReconstructionCoordinatorTask.METRIC_DESCRIPTION_SEGMENT,
+        ECReconstructionCoordinatorTask.class.getSimpleName());
+    initCounters(ReconcileContainerTask.METRIC_NAME,
+        ReconcileContainerTask.METRIC_DESCRIPTION_SEGMENT,
+        ReconcileContainerTask.class.getSimpleName());
+  }
+
   public void initCounters(AbstractReplicationTask task) {
-    if (requestCounter.get(task.getMetricName()) == null) {
+    initCounters(task.getMetricName(), task.getMetricDescriptionSegment(),
+        task.getClass().getSimpleName());
+  }
+
+  public void initCounters(String metricName, String metricDescriptionSegment,
+      String taskSimpleName) {
+    if (requestCounter.get(metricName) == null) {
       synchronized (this) {
-        if (requestCounter.get(task.getMetricName()) == null) {
-          requestCounter.put(task.getMetricName(), new AtomicLong(0));
-          successCounter.put(task.getMetricName(), new AtomicLong(0));
-          failureCounter.put(task.getMetricName(), new AtomicLong(0));
-          timeoutCounter.put(task.getMetricName(), new AtomicLong(0));
-          skippedCounter.put(task.getMetricName(), new AtomicLong(0));
-          queuedCounter.put(task.getMetricName(), new AtomicLong(0));
-          opsLatencyMs.put(task.getMetricName(), registry.newRate(
-              task.getClass().getSimpleName() + "Ms"));
-          METRICS_MAP.put(task.getMetricName(), task.getMetricDescriptionSegment());
+        if (requestCounter.get(metricName) == null) {
+          requestCounter.put(metricName, new AtomicLong(0));
+          successCounter.put(metricName, new AtomicLong(0));
+          failureCounter.put(metricName, new AtomicLong(0));
+          timeoutCounter.put(metricName, new AtomicLong(0));
+          skippedCounter.put(metricName, new AtomicLong(0));
+          queuedCounter.put(metricName, new AtomicLong(0));
+          opsLatencyMs.put(metricName, registry.newRate(taskSimpleName + "Ms"));
+          METRICS_MAP.put(metricName, metricDescriptionSegment);
         }
       }
     }
