@@ -31,8 +31,8 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -165,7 +165,7 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
     }
 
     ContainerInfo containerInfo = writableContainerFactory.getContainer(
-        size, replicationConfig, owner, excludeList);
+        size, replicationConfig, owner, excludeList, storageType);
 
     if (containerInfo != null) {
       return newBlock(containerInfo);

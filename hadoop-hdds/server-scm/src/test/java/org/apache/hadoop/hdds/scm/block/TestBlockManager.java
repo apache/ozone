@@ -44,8 +44,8 @@ import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -573,6 +573,36 @@ public class TestBlockManager {
     assertNotNull(blockManager
         .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig, OzoneConsts.OZONE,
             new ExcludeList(), StorageType.DEFAULT));
+  }
+
+  /**
+   * Integration test: verifies the full BlockManagerImpl → WritableContainerFactory
+   * → WritableRatisContainerProvider → PipelineStorageTypeFilter chain.
+   * MockNodeManager reports only DISK volumes. Requesting SSD should fail
+   * because the filter removes all existing pipelines, and newly created
+   * pipelines also contain DISK-only nodes so they too get filtered on
+   * the second attempt.
+   */
+  @Test
+  public void testAllocateBlockWithNonMatchingStorageTypeFails()
+      throws Exception {
+    pipelineManager.createPipeline(replicationConfig);
+    HddsTestUtils.openAllRatisPipelines(pipelineManager);
+
+    // Verify DISK allocation works (baseline — all nodes report DISK)
+    AllocatedBlock diskBlock = blockManager.allocateBlock(
+        DEFAULT_BLOCK_SIZE, replicationConfig, OzoneConsts.OZONE,
+        new ExcludeList(), StorageType.DISK);
+    assertNotNull(diskBlock);
+
+    // SSD allocation should fail: MockNodeManager nodes only have DISK
+    // volumes, so the PipelineStorageTypeFilter removes all pipelines,
+    // pipeline creation adds another DISK-only pipeline which also gets
+    // filtered, resulting in IOException.
+    assertThrows(IOException.class,
+        () -> blockManager.allocateBlock(DEFAULT_BLOCK_SIZE,
+            replicationConfig, OzoneConsts.OZONE,
+            new ExcludeList(), StorageType.SSD));
   }
 
   private class DatanodeCommandHandler implements
