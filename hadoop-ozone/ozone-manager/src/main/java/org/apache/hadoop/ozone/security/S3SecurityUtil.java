@@ -86,6 +86,14 @@ public final class S3SecurityUtil {
             throw new OMException("STS token no longer valid: OriginalAccessKeyId principal revoked", REVOKED_TOKEN);
           }
 
+          // Ensure the access key ID in the request matches the one encoded in the token.
+          // This prevents using a valid token and secretKey to authenticate arbitrary accessKeyIds.
+          final String requestAccessId = omRequest.getS3Authentication().getAccessId();
+          if (!requestAccessId.equals(stsTokenIdentifier.getTempAccessKeyId())) {
+            throw new OMException(
+                "STS token validation failed - accessKeyId is invalid for session token", INVALID_TOKEN);
+          }
+
           // HMAC signature and expiration were validated above.  Now validate AWS signature.
           validateSTSTokenAwsSignature(stsTokenIdentifier, omRequest);
           OzoneManager.setStsTokenIdentifier(stsTokenIdentifier);
