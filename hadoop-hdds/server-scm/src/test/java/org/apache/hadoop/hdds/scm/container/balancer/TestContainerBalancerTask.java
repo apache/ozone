@@ -411,6 +411,33 @@ public class TestContainerBalancerTask {
     assertFalse(zeroOrNegSizeContainerMoved);
   }
 
+  @Test
+  public void testStartBalancerWithInvalidNodes() {
+    ContainerBalancer balancer = new ContainerBalancer(scm);
+    ContainerBalancerConfiguration cbConf =
+        conf.getObject(ContainerBalancerConfiguration.class);
+
+    // Testing if invalid hostname throws an exception
+    cbConf.setIncludeNodes("invalid-host-name");
+    org.junit.jupiter.api.Assertions.assertThrows(
+        InvalidContainerBalancerConfigurationException.class,
+        () -> balancer.startBalancer(cbConf),
+        "Should throw exception for non-existent hostname");
+
+    // Testing if invalid IP throws an exception
+    cbConf.setIncludeNodes("883.883.883.883");
+    org.junit.jupiter.api.Assertions.assertThrows(
+        InvalidContainerBalancerConfigurationException.class,
+        () -> balancer.startBalancer(cbConf),
+        "Should throw exception for non-existent IP");
+
+    // Testing that a valid entry does not throw an exception
+    DatanodeDetails realNode = nodesInCluster.get(0).getDatanodeDetails();
+    cbConf.setIncludeNodes(realNode.getIpAddress());
+    org.junit.jupiter.api.Assertions.assertDoesNotThrow(
+        () -> balancer.startBalancer(cbConf));
+  }
+
   /**
    * Generates a range of equally spaced utilization(that is, used / capacity)
    * values from 0 to 1.
