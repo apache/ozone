@@ -17,27 +17,23 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
+import java.math.BigInteger;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 
 /**
- * {@link Codec} implementation for non-shaded
- * {@link com.google.protobuf.ByteString} objects.
+ * Codec for type BigInteger.
  */
-public class ByteStringCodec implements Codec {
+public class ScmBigIntegerCodec implements ScmCodec<BigInteger> {
 
   @Override
-  public ByteString serialize(Object object)
-      throws InvalidProtocolBufferException {
-    return UnsafeByteOperations.unsafeWrap(
-        ((com.google.protobuf.ByteString) object).asReadOnlyByteBuffer());
+  public ByteString serialize(BigInteger object) {
+    // BigInteger returns a new byte[].
+    return UnsafeByteOperations.unsafeWrap(object.toByteArray());
   }
 
   @Override
-  public Object deserialize(Class<?> type, ByteString value)
-      throws InvalidProtocolBufferException {
-    return com.google.protobuf.UnsafeByteOperations.
-        unsafeWrap(value.asReadOnlyByteBuffer());
+  public BigInteger deserialize(Class< ? > type, ByteString value) {
+    return new BigInteger(value.toByteArray());
   }
 }

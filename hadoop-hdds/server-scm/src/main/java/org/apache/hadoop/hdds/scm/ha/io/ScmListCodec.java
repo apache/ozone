@@ -26,9 +26,9 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 
 /**
- * {@link Codec} for {@link List} objects.
+ * {@link ScmCodec} for {@link List} objects.
  */
-public class ListCodec implements Codec {
+public class ScmListCodec implements ScmCodec<Object> {
 
   @Override
   public ByteString serialize(Object object)
@@ -39,7 +39,7 @@ public class ListCodec implements Codec {
       Class<?> type = values.get(0).getClass();
       listArgs.setType(type.getName());
       for (Object value : values) {
-        listArgs.addValue(CodecFactory.getCodec(type).serialize(value));
+        listArgs.addValue(ScmCodecFactory.getCodec(type).serialize(value));
       }
     } else {
       listArgs.setType(Object.class.getName());
@@ -67,7 +67,7 @@ public class ListCodec implements Codec {
 
       final Class<?> dataType = ReflectionUtil.getClass(listArgs.getType());
       for (ByteString element : listArgs.getValueList()) {
-        result.add(CodecFactory.getCodec(dataType)
+        result.add(ScmCodecFactory.getCodec(dataType)
             .deserialize(dataType, element));
       }
       return result;

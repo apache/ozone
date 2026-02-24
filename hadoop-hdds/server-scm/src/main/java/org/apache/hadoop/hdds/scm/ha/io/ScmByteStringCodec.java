@@ -18,22 +18,19 @@
 package org.apache.hadoop.hdds.scm.ha.io;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 
 /**
  * A dummy codec that serializes a ByteString object to ByteString.
  */
-public class ScmByteStringCodec implements Codec {
+public class ScmByteStringCodec implements ScmCodec<ByteString> {
 
   @Override
-  public ByteString serialize(Object object)
-      throws InvalidProtocolBufferException {
-    return (ByteString) object;
+  public ByteString serialize(ByteString object) {
+    return object;
   }
 
   @Override
-  public Object deserialize(Class<?> type, ByteString value)
-      throws InvalidProtocolBufferException {
+  public ByteString deserialize(Class<?> type, ByteString value) {
     return value;
   }
 }

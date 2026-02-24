@@ -17,26 +17,22 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
-import java.math.BigInteger;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.junit.jupiter.api.Test;
+import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 
 /**
- * Class to test BigIntegerCodec serialize and deserialize.
+ * {@link ScmCodec} implementation for non-shaded
+ * {@link com.google.protobuf.ByteString} objects.
  */
-public class TestBigIntegerCodec {
+public class ScmNonShadedByteStringCodec implements ScmCodec<com.google.protobuf.ByteString> {
 
-  @Test
-  public void testCodec() {
-    BigIntegerCodec bigIntegerCodec = new BigIntegerCodec();
+  @Override
+  public ByteString serialize(com.google.protobuf.ByteString object) {
+    return UnsafeByteOperations.unsafeWrap(object.asReadOnlyByteBuffer());
+  }
 
-    BigInteger bigInteger = BigInteger.valueOf(100);
-    ByteString byteString = bigIntegerCodec.serialize(bigInteger);
-
-    BigInteger actual =
-        (BigInteger) bigIntegerCodec.deserialize(BigInteger.class, byteString);
-    assertEquals(bigInteger, actual);
+  @Override
+  public com.google.protobuf.ByteString deserialize(Class<?> type, ByteString value) {
+    return com.google.protobuf.UnsafeByteOperations.unsafeWrap(value.asReadOnlyByteBuffer());
   }
 }

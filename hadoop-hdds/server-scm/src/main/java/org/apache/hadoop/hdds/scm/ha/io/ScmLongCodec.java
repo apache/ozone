@@ -17,37 +17,24 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
-import com.google.common.primitives.Ints;
-import com.google.protobuf.ProtocolMessageEnum;
-import java.lang.reflect.InvocationTargetException;
-import org.apache.hadoop.hdds.scm.ha.ReflectionUtil;
+import com.google.common.primitives.Longs;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 
 /**
- * {@link Codec} for {@link ProtocolMessageEnum} objects.
+ * {@link ScmCodec} for {@code Long} objects.
  */
-public class EnumCodec implements Codec {
+public class ScmLongCodec implements ScmCodec<Long> {
 
   @Override
-  public ByteString serialize(Object object)
-      throws InvalidProtocolBufferException {
+  public ByteString serialize(Long object) {
     // toByteArray returns a new array
-    return UnsafeByteOperations.unsafeWrap(Ints.toByteArray(((ProtocolMessageEnum) object).getNumber()));
+    return UnsafeByteOperations.unsafeWrap(Longs.toByteArray(object));
   }
 
   @Override
-  public Object deserialize(Class<?> type, ByteString value)
-      throws InvalidProtocolBufferException {
-    try {
-      return ReflectionUtil.getMethod(type, "valueOf", int.class)
-          .invoke(null, Ints.fromByteArray(
-              value.toByteArray()));
-    } catch (NoSuchMethodException | IllegalAccessException
-        | InvocationTargetException ex) {
-      throw new InvalidProtocolBufferException(
-          "Message cannot be decoded!" + ex.getMessage());
-    }
+  public Long deserialize(Class<?> type, ByteString value) {
+    return Longs.fromByteArray(value.toByteArray());
   }
+
 }

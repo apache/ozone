@@ -17,27 +17,18 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
-import com.google.common.primitives.Longs;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
-import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 
 /**
- * {@link Codec} for {@code Long} objects.
+ * To serialize/deserialize Java objects to/from protobuf ByteString for SCM HA.
+ *
+ * @param <T>
  */
-public class LongCodec implements Codec {
+public interface ScmCodec<T> {
 
-  @Override
-  public ByteString serialize(Object object)
-      throws InvalidProtocolBufferException {
-    // toByteArray returns a new array
-    return UnsafeByteOperations.unsafeWrap(Longs.toByteArray((Long) object));
-  }
+  ByteString serialize(T object) throws InvalidProtocolBufferException;
 
-  @Override
-  public Object deserialize(Class<?> type, ByteString value)
-      throws InvalidProtocolBufferException {
-    return Longs.fromByteArray(value.toByteArray());
-  }
+  T deserialize(Class<?> type, ByteString value) throws InvalidProtocolBufferException;
 
 }

@@ -31,31 +31,31 @@ import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferExce
 import org.apache.ratis.thirdparty.com.google.protobuf.Message;
 
 /**
- * Maps types to the corresponding {@link Codec} implementation.
+ * Maps types to the corresponding {@link ScmCodec} implementation.
  */
-public final class CodecFactory {
+public final class ScmCodecFactory {
 
-  private static Map<Class<?>, Codec> codecs = new HashMap<>();
+  private static Map<Class<?>, ScmCodec> codecs = new HashMap<>();
 
   static {
-    codecs.put(com.google.protobuf.Message.class, new GeneratedMessageCodec());
+    codecs.put(com.google.protobuf.Message.class, new ScmNonShadedGeneratedMessageCodec());
     codecs.put(Message.class, new ScmGeneratedMessageCodec());
-    codecs.put(ProtocolMessageEnum.class, new EnumCodec());
-    codecs.put(List.class, new ListCodec());
-    codecs.put(Integer.class, new IntegerCodec());
-    codecs.put(Long.class, new LongCodec());
-    codecs.put(String.class, new StringCodec());
-    codecs.put(Boolean.class, new BooleanCodec());
-    codecs.put(BigInteger.class, new BigIntegerCodec());
-    codecs.put(X509Certificate.class, new X509CertificateCodec());
-    codecs.put(com.google.protobuf.ByteString.class, new ByteStringCodec());
+    codecs.put(ProtocolMessageEnum.class, new ScmEnumCodec());
+    codecs.put(List.class, new ScmListCodec());
+    codecs.put(Integer.class, new ScmIntegerCodec());
+    codecs.put(Long.class, new ScmLongCodec());
+    codecs.put(String.class, new ScmStringCodec());
+    codecs.put(Boolean.class, new ScmBooleanCodec());
+    codecs.put(BigInteger.class, new ScmBigIntegerCodec());
+    codecs.put(X509Certificate.class, new ScmX509CertificateCodec());
+    codecs.put(com.google.protobuf.ByteString.class, new ScmNonShadedByteStringCodec());
     codecs.put(ByteString.class, new ScmByteStringCodec());
-    codecs.put(ManagedSecretKey.class, new ManagedSecretKeyCodec());
+    codecs.put(ManagedSecretKey.class, new ScmManagedSecretKeyCodec());
   }
 
-  private CodecFactory() { }
+  private ScmCodecFactory() { }
 
-  public static Codec getCodec(Class<?> type)
+  public static ScmCodec getCodec(Class<?> type)
       throws InvalidProtocolBufferException {
     final List<Class<?>> classes = new ArrayList<>();
     classes.add(type);

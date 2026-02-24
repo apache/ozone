@@ -1,0 +1,188 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: update-ozone-site-config-doc
+on:
+  workflow_run:
+    workflows: ["build-branch"]
+    types: [completed]
+    branches: [master]
+
+jobs:
+  update-ozone-site-config-doc:
+    if: |
+      github.event.workflow_run.conclusion == 'success' &&
+      github.repository == 'apache/ozone' &&
+      !startsWith(github.event.workflow_run.head_commit.message, '[Auto]')
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download generated documentation
+        uses: actions/download-artifact@v4
+        with:
+          name: config-documentation
+          path: .
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Check if ozone-site repository exists
+        id: check-site-repo
+        run: |
+          REPO_OWNER="${{ github.repository_owner }}"
+          if gh repo view "$REPO_OWNER/ozone-site" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "ozone-site repository not found for $REPO_OWNER, skipping"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Checkout ozone-site repository
+        if: steps.check-site-repo.outputs.exists == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/ozone-site
+          ref: 'master'
+          path: ozone-site
+          token: ${{ secrets.OZONE_WEBSITE_BUILD }}
+      
+      - name: Check if documentation changed
+        if: steps.check-site-repo.outputs.exists == 'true'
+        id: check-changes
+        run: |
+          cd ozone-site
+          
+          # Find target directory
+          TARGET_DIR=$(ls -d docs/*-administrator-guide/*-configuration 2>/dev/null | head -1)
+          
+          if [ -z "$TARGET_DIR" ]; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "Target directory not found, skipping"
+            exit 0
+          fi
+          
+          TARGET_FILE="$TARGET_DIR/05-appendix.md"
+          echo "Checking against $TARGET_FILE"
+          
+          # Copy new file to target location
+          cp ../Configurations.md "$TARGET_FILE"
+          
+          # Check if file changed using git status
+          if git status --porcelain "$TARGET_FILE" | grep -q .; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "target_file=$TARGET_FILE" >> $GITHUB_OUTPUT
+            echo "Configurations.md has changed in ozone-site"
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "No changes in ozone-site documentation"
+          fi
+      
+      - name: Checkout ozone repository for script access
+        if: steps.check-changes.outputs.changed == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      
+      - name: Extract JIRA ID from commit message
+        if: steps.check-changes.outputs.changed == 'true'
+        id: extract-jira
+        run: |
+          COMMIT_MSG=$(git log -1 --format='%s' ${{ github.event.workflow_run.head_sha }})
+          echo "Commit message: $COMMIT_MSG"
+          
+          JIRA_ID=$(echo "$COMMIT_MSG" | grep -oE '(HDDS|OZONE)-[0-9]+' | head -1 || echo "")
+          
+          if [ -n "$JIRA_ID" ]; then
+            echo "jira_id=$JIRA_ID" >> $GITHUB_OUTPUT
+            echo "Using JIRA ID: $JIRA_ID"
+          else
+            echo "jira_id=" >> $GITHUB_OUTPUT
+            echo "No JIRA ID found"
+          fi
+      
+      - name: Commit and push changes
+        if: steps.check-changes.outputs.changed == 'true'
+        run: |
+          cd ozone-site
+          
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          
+          # Use single branch name
+          BRANCH_NAME="automated-config-doc-update"
+          
+          echo "Current branch: $(git branch --show-current)"
+          echo "Current commit: $(git rev-parse HEAD)"
+          
+          # Create/reset branch at current commit
+          git checkout -B "$BRANCH_NAME"
+          echo "Created/reset branch $BRANCH_NAME at current commit"
+          
+          TARGET_FILE="${{ steps.check-changes.outputs.target_file }}"
+          git add "$TARGET_FILE"
+          
+          # Build commit message with JIRA ID if available
+          JIRA_ID="${{ steps.extract-jira.outputs.jira_id }}"
+          COMMIT_MSG="[Auto] Update configuration documentation from ozone ${{ github.event.workflow_run.head_sha }}"
+          if [ -n "$JIRA_ID" ]; then
+            COMMIT_MSG="$JIRA_ID. $COMMIT_MSG"
+          fi
+          
+          git commit -m "$COMMIT_MSG"
+          
+          echo "Pushing $BRANCH_NAME to origin"
+          git push -f origin "$BRANCH_NAME"
+      
+      - name: Create or update Pull Request in ozone-site
+        if: steps.check-changes.outputs.changed == 'true' && github.repository == 'apache/ozone'
+        env:
+          GH_TOKEN: ${{ secrets.OZONE_WEBSITE_BUILD }}
+        run: |
+          cd ozone-site
+          
+          BRANCH_NAME="automated-config-doc-update"
+          REPO="${{ github.repository }}"
+          JIRA_ID="${{ steps.extract-jira.outputs.jira_id }}"
+          
+          # Generate PR body
+          cd ..
+          dev-support/ci/pr_body_config_doc.sh \
+            "$REPO" \
+            "${{ github.workflow }}" \
+            "${{ github.run_id }}" \
+            "${{ github.event.workflow_run.head_branch }}" \
+            "${{ github.event.workflow_run.head_sha }}" \
+            "$JIRA_ID" > ozone-site/pr_body.txt
+          
+          cd ozone-site
+          
+          # Check if PR already exists
+          EXISTING_PR=$(gh pr list --repo "${{ github.repository_owner }}/ozone-site" \
+            --head "$BRANCH_NAME" --base master --json number --jq '.[0].number' || echo "")
+          
+          if [ -n "$EXISTING_PR" ]; then
+            echo "Updating existing PR #$EXISTING_PR"
+            gh pr edit "$EXISTING_PR" --repo "${{ github.repository_owner }}/ozone-site" --body-file pr_body.txt
+          else
+            echo "Creating new PR"
+            TITLE="[Auto] Update configuration documentation"
+            if [ -n "$JIRA_ID" ]; then
+              TITLE="$JIRA_ID. $TITLE"
+            fi
+            gh pr create --repo "${{ github.repository_owner }}/ozone-site" \
+              --base master --head "$BRANCH_NAME" \
+              --title "$TITLE" \
+              --body-file pr_body.txt
+          fi

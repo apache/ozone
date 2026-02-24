@@ -17,42 +17,36 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-
-import java.security.cert.X509Certificate;
-import org.apache.hadoop.hdds.security.x509.certificate.utils.CertificateCodec;
+import com.google.protobuf.Message;
+import java.lang.reflect.InvocationTargetException;
+import org.apache.hadoop.hdds.scm.ha.ReflectionUtil;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 
 /**
- * Codec for type X509Certificate.
+ * {@link ScmCodec} implementation for non-shaded
+ * {@link com.google.protobuf.Message} objects.
  */
-public class X509CertificateCodec implements Codec {
+public class ScmNonShadedGeneratedMessageCodec implements ScmCodec<Object> {
+
   @Override
   public ByteString serialize(Object object)
       throws InvalidProtocolBufferException {
-    try {
-      String certString =
-          CertificateCodec.getPEMEncodedString((X509Certificate) object);
-      // getBytes returns a new array
-      return UnsafeByteOperations.unsafeWrap(certString.getBytes(UTF_8));
-    } catch (Exception ex) {
-      throw new InvalidProtocolBufferException(
-          "X509Certificate cannot be decoded: " + ex.getMessage());
-    }
+    return UnsafeByteOperations.unsafeWrap(
+        ((Message) object).toByteString().asReadOnlyByteBuffer());
   }
 
   @Override
-  public Object deserialize(Class< ? > type, ByteString value)
+  public Object deserialize(Class<?> type, ByteString value)
       throws InvalidProtocolBufferException {
     try {
-      String pemEncodedCert = new String(value.toByteArray(), UTF_8);
-      return CertificateCodec.getX509Certificate(pemEncodedCert);
-    } catch (Exception ex) {
-      throw new InvalidProtocolBufferException(
-          "X509Certificate cannot be decoded: " + ex.getMessage());
+      return ReflectionUtil.getMethod(type, "parseFrom", byte[].class)
+          .invoke(null, (Object) value.toByteArray());
+    } catch (NoSuchMethodException | IllegalAccessException
+             | InvocationTargetException ex) {
+      ex.printStackTrace();
+      throw new InvalidProtocolBufferException("Message cannot be decoded: " + ex.getMessage());
     }
   }
 }
-

@@ -17,34 +17,34 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
-import java.lang.reflect.InvocationTargetException;
-import org.apache.hadoop.hdds.scm.ha.ReflectionUtil;
+import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos;
+import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
-import org.apache.ratis.thirdparty.com.google.protobuf.Message;
+import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 
 /**
- * {@link ScmCodec} for {@link Message} objects.
+ * A codec for {@link ManagedSecretKey} objects.
  */
-public class ScmGeneratedMessageCodec implements ScmCodec<Object> {
-
+public class ScmManagedSecretKeyCodec implements ScmCodec<ManagedSecretKey> {
   @Override
-  public ByteString serialize(Object object) throws InvalidProtocolBufferException {
-    return ((Message)object).toByteString();
+  public ByteString serialize(ManagedSecretKey object)
+      throws InvalidProtocolBufferException {
+    ManagedSecretKey secretKey = object;
+    return UnsafeByteOperations.unsafeWrap(
+        secretKey.toProtobuf().toByteString().asReadOnlyByteBuffer());
   }
 
   @Override
-  public Message deserialize(Class<?> type, ByteString value)
+  public ManagedSecretKey deserialize(Class<?> type, ByteString value)
       throws InvalidProtocolBufferException {
     try {
-      return (Message) ReflectionUtil.getMethod(type,
-              "parseFrom", byte[].class)
-          .invoke(null, (Object) value.toByteArray());
-    } catch (NoSuchMethodException | IllegalAccessException
-             | InvocationTargetException ex) {
-      ex.printStackTrace();
-      throw new InvalidProtocolBufferException(
-          "Message cannot be decoded: " + ex.getMessage());
+      SCMSecretKeyProtocolProtos.ManagedSecretKey message =
+          SCMSecretKeyProtocolProtos.ManagedSecretKey.parseFrom(
+              value.asReadOnlyByteBuffer());
+      return ManagedSecretKey.fromProtobuf(message);
+    } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+      throw new InvalidProtocolBufferException("Failed to deserialize value for " + type, e);
     }
   }
 }

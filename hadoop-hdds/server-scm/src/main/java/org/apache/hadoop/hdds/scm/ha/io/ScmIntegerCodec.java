@@ -17,17 +17,22 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
+import com.google.common.primitives.Ints;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
+import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 
 /**
- * Codec interface to marshall/unmarshall data to/from {@link ByteString}.
+ * Encodes/decodes an integer to a byte string.
  */
-public interface Codec {
+public class ScmIntegerCodec implements ScmCodec<Integer> {
+  @Override
+  public ByteString serialize(Integer object) {
+    // toByteArray returns a new array
+    return UnsafeByteOperations.unsafeWrap(Ints.toByteArray(object));
+  }
 
-  ByteString serialize(Object object) throws InvalidProtocolBufferException;
-
-  Object deserialize(Class<?> type, ByteString value)
-      throws InvalidProtocolBufferException;
-
+  @Override
+  public Integer deserialize(Class<?> type, ByteString value) {
+    return Ints.fromByteArray(value.toByteArray());
+  }
 }

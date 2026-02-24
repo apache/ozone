@@ -17,25 +17,25 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
-import com.google.common.primitives.Ints;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import java.math.BigInteger;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
-import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
+import org.junit.jupiter.api.Test;
 
 /**
- * Encodes/decodes an integer to a byte string.
+ * Class to test BigIntegerCodec serialize and deserialize.
  */
-public class IntegerCodec implements Codec {
-  @Override
-  public ByteString serialize(Object object)
-      throws InvalidProtocolBufferException {
-    // toByteArray returns a new array
-    return UnsafeByteOperations.unsafeWrap(Ints.toByteArray((Integer) object));
-  }
+public class TestScmBigIntegerCodec {
 
-  @Override
-  public Object deserialize(Class<?> type, ByteString value)
-      throws InvalidProtocolBufferException {
-    return Ints.fromByteArray(value.toByteArray());
+  @Test
+  public void testCodec() {
+    ScmBigIntegerCodec scmBigIntegerCodec = new ScmBigIntegerCodec();
+
+    BigInteger bigInteger = BigInteger.valueOf(100);
+    ByteString byteString = scmBigIntegerCodec.serialize(bigInteger);
+
+    BigInteger actual = scmBigIntegerCodec.deserialize(BigInteger.class, byteString);
+    assertEquals(bigInteger, actual);
   }
 }

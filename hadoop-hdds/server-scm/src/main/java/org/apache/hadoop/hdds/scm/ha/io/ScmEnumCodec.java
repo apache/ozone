@@ -17,34 +17,37 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
-import org.apache.hadoop.hdds.protocol.proto.SCMSecretKeyProtocolProtos;
-import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
+import com.google.common.primitives.Ints;
+import com.google.protobuf.ProtocolMessageEnum;
+import java.lang.reflect.InvocationTargetException;
+import org.apache.hadoop.hdds.scm.ha.ReflectionUtil;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 
 /**
- * A codec for {@link ManagedSecretKey} objects.
+ * {@link ScmCodec} for {@link ProtocolMessageEnum} objects.
  */
-public class ManagedSecretKeyCodec implements Codec {
+public class ScmEnumCodec implements ScmCodec<Object>  {
+
   @Override
   public ByteString serialize(Object object)
       throws InvalidProtocolBufferException {
-    ManagedSecretKey secretKey = (ManagedSecretKey) object;
-    return UnsafeByteOperations.unsafeWrap(
-        secretKey.toProtobuf().toByteString().asReadOnlyByteBuffer());
+    // toByteArray returns a new array
+    return UnsafeByteOperations.unsafeWrap(Ints.toByteArray(((ProtocolMessageEnum) object).getNumber()));
   }
 
   @Override
   public Object deserialize(Class<?> type, ByteString value)
       throws InvalidProtocolBufferException {
     try {
-      SCMSecretKeyProtocolProtos.ManagedSecretKey message =
-          SCMSecretKeyProtocolProtos.ManagedSecretKey.parseFrom(
-              value.asReadOnlyByteBuffer());
-      return ManagedSecretKey.fromProtobuf(message);
-    } catch (com.google.protobuf.InvalidProtocolBufferException e) {
-      throw new InvalidProtocolBufferException("Failed to deserialize value for " + type, e);
+      return ReflectionUtil.getMethod(type, "valueOf", int.class)
+          .invoke(null, Ints.fromByteArray(
+              value.toByteArray()));
+    } catch (NoSuchMethodException | IllegalAccessException
+        | InvocationTargetException ex) {
+      throw new InvalidProtocolBufferException(
+          "Message cannot be decoded!" + ex.getMessage());
     }
   }
 }

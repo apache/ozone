@@ -18,7 +18,7 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.SCMRatisResponseProto;
-import org.apache.hadoop.hdds.scm.ha.io.CodecFactory;
+import org.apache.hadoop.hdds.scm.ha.io.ScmCodecFactory;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -75,7 +75,7 @@ public final class SCMRatisResponse {
     final Class<?> type = result.getClass();
     final SCMRatisResponseProto response = SCMRatisResponseProto.newBuilder()
         .setType(type.getName())
-        .setValue(CodecFactory.getCodec(type).serialize(result))
+        .setValue(ScmCodecFactory.getCodec(type).serialize(result))
         .build();
     return Message.valueOf(UnsafeByteOperations.unsafeWrap(response.toByteString().asReadOnlyByteBuffer()));
   }
@@ -104,7 +104,7 @@ public final class SCMRatisResponse {
 
     try {
       final Class<?> type = ReflectionUtil.getClass(responseProto.getType());
-      return new SCMRatisResponse(CodecFactory.getCodec(type)
+      return new SCMRatisResponse(ScmCodecFactory.getCodec(type)
           .deserialize(type, responseProto.getValue()));
     } catch (ClassNotFoundException e) {
       throw new InvalidProtocolBufferException(responseProto.getType() +

@@ -15,25 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.ha.io;
-
-import java.math.BigInteger;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
-
 /**
- * Codec for type BigInteger.
+ * The network topology supported by Ozone.
  */
-public class BigIntegerCodec implements Codec {
-
-  @Override
-  public ByteString serialize(Object object) {
-    // BigInteger returns a new byte[].
-    return UnsafeByteOperations.unsafeWrap(((BigInteger) object).toByteArray());
-  }
-
-  @Override
-  public Object deserialize(Class< ? > type, ByteString value) {
-    return new BigInteger(value.toByteArray());
-  }
-}
+package org.apache.hadoop.hdds.scm.net;

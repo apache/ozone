@@ -35,7 +35,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Class to test X509CertificateCodec serialize and deserialize.
  */
-public class TestX509CertificateCodec {
+public class TestScmX509CertificateCodec {
 
   @BeforeAll
   public static void initSecurityProvider() {
@@ -49,11 +49,10 @@ public class TestX509CertificateCodec {
         KeyStoreTestUtil.generateCertificate("CN=Test", keyPair, 30,
         "SHA256withRSA");
 
-    X509CertificateCodec x509CertificateCodec = new X509CertificateCodec();
-    ByteString byteString = x509CertificateCodec.serialize(x509Certificate);
+    ScmX509CertificateCodec scmX509CertificateCodec = new ScmX509CertificateCodec();
+    ByteString byteString = scmX509CertificateCodec.serialize(x509Certificate);
 
-    X509Certificate actual = (X509Certificate)
-        x509CertificateCodec.deserialize(X509Certificate.class, byteString);
+    X509Certificate actual = scmX509CertificateCodec.deserialize(X509Certificate.class, byteString);
 
     assertEquals(x509Certificate, actual);
 
@@ -62,10 +61,10 @@ public class TestX509CertificateCodec {
   @Test
   public void testCodecError() {
 
-    X509CertificateCodec x509CertificateCodec = new X509CertificateCodec();
+    ScmX509CertificateCodec scmX509CertificateCodec = new ScmX509CertificateCodec();
     final ByteString byteString = UnsafeByteOperations.unsafeWrap("dummy".getBytes(UTF_8));
 
     assertThrows(InvalidProtocolBufferException.class, () ->
-        x509CertificateCodec.deserialize(X509Certificate.class, byteString));
+        scmX509CertificateCodec.deserialize(X509Certificate.class, byteString));
   }
 }
