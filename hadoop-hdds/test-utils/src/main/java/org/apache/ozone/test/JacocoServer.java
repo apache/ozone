@@ -42,7 +42,6 @@ public final class JacocoServer {
   private JacocoServer() {
   }
 
-  @SuppressWarnings("checkstyle:EmptyStatement")
   public static void main(String[] args) throws IOException {
     ExecutionDataWriter destination =
         new ExecutionDataWriter(Files.newOutputStream(Paths.get(destinationFile)));
@@ -56,7 +55,15 @@ public final class JacocoServer {
       }
     }));
 
-    while (true) {
+    try {
+      acceptConnections(serverSocket, destination);
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
+
+  private static void acceptConnections(ServerSocket serverSocket, ExecutionDataWriter destination) throws IOException {
+    while (!serverSocket.isClosed()) {
       final Socket socket = serverSocket.accept();
       new Thread(() -> {
         try {
@@ -68,8 +75,10 @@ public final class JacocoServer {
               synchronizedCall(destination::visitSessionInfo));
           reader.setExecutionDataVisitor(
               synchronizedCall(destination::visitClassExecution));
-          while (reader.read()) {
-            ;//read until the end of the stream.
+          while (true) {
+            if (!reader.read()) {
+              break;
+            }
           }
           synchronized (lockMonitor) {
             destination.flush();
