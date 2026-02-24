@@ -229,7 +229,7 @@ public class ContainerBalancerSelectionCriteria {
     ContainerHealthResult.HealthState state =
         replicationManager.getContainerReplicationHealth(container, replicas).getHealthState();
     if (state != ContainerHealthResult.HealthState.HEALTHY) {
-      LOG.debug("Excluding container {} with replicas [{}] as its health is {}.", container, replicas, state);
+      LOG.debug("Excluding container {} with replicas {} as its health is {}.", container, replicas, state);
       return false;
     }
 
