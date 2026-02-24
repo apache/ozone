@@ -280,9 +280,9 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
             throw createLeaderErrorException(raftServerStatus);
           }
           LocalLeaseContext localLeaseContext = readConsistencyHint.getLocalLeaseContext();
-          long localLeaseLagLimit = localLeaseContext.getLagLimit() > 0 ?
+          long localLeaseLagLimit = localLeaseContext.hasLagLimit() ?
               localLeaseContext.getLagLimit() : ozoneManager.getConfig().getFollowerReadLocalLeaseLagLimit();
-          long localLeaseLeaseTimeMs = localLeaseContext.getLeaseTimeMs() > 0 ?
+          long localLeaseLeaseTimeMs = localLeaseContext.hasLeaseTimeMs() ?
               localLeaseContext.getLeaseTimeMs() : ozoneManager.getConfig().getFollowerReadLocalLeaseTimeMs();
           if (allowFollowerReadLocalLease(omRatisServer.getServerDivision(),
               localLeaseLagLimit, localLeaseLeaseTimeMs)) {
@@ -365,6 +365,9 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
   boolean allowFollowerReadLocalLease(Division ratisDivision, long leaseLagLimit, long leaseTimeMsLimit) {
     final DivisionInfo divisionInfo = ratisDivision.getInfo();
     final FollowerInfoProto followerInfo = divisionInfo.getRoleInfoProto().getFollowerInfo();
+    if (leaseTimeMsLimit == -1) {
+      leaseTimeMsLimit = Long.MAX_VALUE;
+    }
     if (followerInfo == null) {
       LOG.debug("FollowerRead Local Lease not allowed: Not a follower. ");
       return false; // not follower
@@ -379,6 +382,12 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       LOG.debug("FollowerRead Local Lease not allowed: Local lease Time expired. ");
       ozoneManager.getMetrics().incNumFollowerReadLocalLeaseFailTime();
       return false; // lease time expired
+    }
+
+    if (leaseLagLimit == -1) {
+      // Allow infinite lag time, which allows unbounded stale reads
+      // There is no need to check the leader lag
+      return true;
     }
 
     final RaftPeerId leaderId = divisionInfo.getLeaderId();
