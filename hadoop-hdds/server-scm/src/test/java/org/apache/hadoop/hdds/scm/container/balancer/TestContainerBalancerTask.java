@@ -418,20 +418,32 @@ public class TestContainerBalancerTask {
     ContainerBalancer balancer = new ContainerBalancer(scm);
     ContainerBalancerConfiguration cbConf = conf.getObject(ContainerBalancerConfiguration.class);
 
-    // Testing if invalid hostname throws an exception
+    // Testing invalid hostname and ip for includeNodes
     cbConf.setIncludeNodes("invalid-host-name");
     assertThrows(InvalidContainerBalancerConfigurationException.class, () -> balancer.startBalancer(cbConf),
-        "Should throw exception for non-existent hostname");
-
-    // Testing if invalid IP throws an exception
+        "Should throw exception for non-existent hostname in includeNodes");
     cbConf.setIncludeNodes("883.883.883.883");
     assertThrows(InvalidContainerBalancerConfigurationException.class, () -> balancer.startBalancer(cbConf),
-        "Should throw exception for non-existent IP");
+        "Should throw exception for non-existent IP in includeNodes");
+    cbConf.setIncludeNodes("");
 
-    // Testing that a valid entry does not throw an exception
-    DatanodeDetails realNode = nodesInCluster.get(0).getDatanodeDetails();
-    cbConf.setIncludeNodes(realNode.getIpAddress());
-    assertDoesNotThrow(() -> balancer.startBalancer(cbConf));
+    // Testing invalid hostname and ip for excludeNodes
+    cbConf.setExcludeNodes("invalid-host-name");
+    assertThrows(InvalidContainerBalancerConfigurationException.class, () -> balancer.startBalancer(cbConf),
+        "Should throw exception for non-existent hostname in excludeNodes");
+    cbConf.setExcludeNodes("883.883.883.883");
+    assertThrows(InvalidContainerBalancerConfigurationException.class, () -> balancer.startBalancer(cbConf),
+        "Should throw exception for non-existent IP in excludeNodes");
+    cbConf.setExcludeNodes("");
+
+    // Testing a valid case
+    DatanodeDetails includeNode = nodesInCluster.get(0).getDatanodeDetails();
+    DatanodeDetails excludeNode = nodesInCluster.get(1).getDatanodeDetails();
+    cbConf.setIncludeNodes(includeNode.getIpAddress());
+    cbConf.setExcludeNodes(excludeNode.getIpAddress());
+    assertDoesNotThrow(() -> balancer.startBalancer(cbConf),
+        "Should succeed when both include and exclude nodes are valid");
+    stopBalancer();
   }
 
   /**
