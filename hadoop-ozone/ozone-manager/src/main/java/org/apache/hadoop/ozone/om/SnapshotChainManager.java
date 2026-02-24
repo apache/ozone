@@ -362,15 +362,6 @@ public class SnapshotChainManager {
   }
 
   /**
-   * Used by OMSnapshotCreateResponse#addToDBBatch to add to snapshotIdToTableKey map during Raft replay.
-   */
-  public synchronized void addSnapshotToTableKey(UUID snapshotId, String tableKey) throws IOException {
-    validateSnapshotChain();
-    LOG.debug("Adding to snapshotIdToTableKey: snapshotId={} tableKey={}", snapshotId, tableKey);
-    snapshotIdToTableKey.putIfAbsent(snapshotId, tableKey);
-  }
-
-  /**
    * Update snapshot chain when snapshot changes (e.g. renamed).
    */
   public synchronized void updateSnapshot(SnapshotInfo snapshotInfo) {
