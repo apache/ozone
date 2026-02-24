@@ -157,16 +157,6 @@ public abstract class OMFailoverProxyProviderBase<T> implements
       }
     } else if (HddsUtils.shouldNotFailoverOnRpcException(unwrappedException)) {
       return false;
-    } else if (ex instanceof StateMachineException) {
-      StateMachineException smEx = (StateMachineException) ex;
-      Throwable cause = smEx.getCause();
-      if (cause instanceof OMException) {
-        OMException omEx = (OMException) cause;
-        // Do not failover if the operation was blocked because the OM was
-        // prepared.
-        return omEx.getResult() !=
-           OMException.ResultCodes.NOT_SUPPORTED_OPERATION_WHEN_PREPARED;
-      }
     }
     return true;
   }
