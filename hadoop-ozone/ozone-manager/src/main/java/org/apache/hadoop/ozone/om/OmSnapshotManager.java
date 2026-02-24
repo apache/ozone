@@ -382,8 +382,12 @@ public final class OmSnapshotManager implements AutoCloseable {
           }
           try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataMetaProvider snapshotLocalDataProvider =
                    snapshotLocalDataManager.getOmSnapshotLocalDataMeta(snapshotInfo)) {
+            final OmSnapshotLocalDataManager.SnapshotVersionsMeta snapshotMeta = snapshotLocalDataProvider.getMeta();
+            if (snapshotMeta == null) {
+              throw new OMException("Snapshot local metadata is missing for snapshotId: " + snapshotId, FILE_NOT_FOUND);
+            }
             snapshotMetadataManager = getSnapshotOmMetadataManager(snapshotInfo,
-                snapshotLocalDataProvider.getMeta().getVersion(), maxOpenSstFilesInSnapshotDb, conf);
+                snapshotMeta.getVersion(), maxOpenSstFilesInSnapshotDb, conf);
           }
         } catch (IOException e) {
           LOG.error("Failed to retrieve snapshot: {}", snapshotTableKey, e);
