@@ -1428,6 +1428,68 @@ public class RpcClient implements ClientProtocol {
     return createOutputStream(openKey);
   }
 
+  @Override
+  public OzoneOutputStream createKeyIfNotExists(String volumeName,
+      String bucketName, String keyName, long size,
+      ReplicationConfig replicationConfig, Map<String, String> metadata,
+      Map<String, String> tags) throws IOException {
+    if (omVersion.compareTo(OzoneManagerVersion.ATOMIC_REWRITE_KEY) < 0) {
+      throw new IOException(
+          "OzoneManager does not support atomic key creation.");
+    }
+
+    createKeyPreChecks(volumeName, bucketName, keyName, replicationConfig);
+
+    OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setDataSize(size)
+        .setReplicationConfig(replicationConfig)
+        .addAllMetadataGdpr(metadata)
+        .addAllTags(tags)
+        .setLatestVersionLocation(getLatestVersionLocation)
+        .setExpectedDataGeneration(
+            OzoneConsts.EXPECTED_GEN_CREATE_IF_NOT_EXISTS);
+
+    OpenKeySession openKey = ozoneManagerClient.openKey(builder.build());
+    if (isS3GRequest.get() && size == 0) {
+      openKey.getKeyInfo().setDataSize(0);
+    }
+    return createOutputStream(openKey);
+  }
+
+  @Override
+  @SuppressWarnings("checkstyle:parameternumber")
+  public OzoneOutputStream rewriteKeyIfMatch(String volumeName,
+      String bucketName, String keyName, long size, String expectedETag,
+      ReplicationConfig replicationConfig, Map<String, String> metadata,
+      Map<String, String> tags) throws IOException {
+    if (omVersion.compareTo(OzoneManagerVersion.ATOMIC_REWRITE_KEY) < 0) {
+      throw new IOException(
+          "OzoneManager does not support conditional key rewrite.");
+    }
+
+    createKeyPreChecks(volumeName, bucketName, keyName, replicationConfig);
+
+    OmKeyArgs.Builder builder = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setDataSize(size)
+        .setReplicationConfig(replicationConfig)
+        .addAllMetadataGdpr(metadata)
+        .addAllTags(tags)
+        .setLatestVersionLocation(getLatestVersionLocation)
+        .setExpectedETag(expectedETag);
+
+    OpenKeySession openKey = ozoneManagerClient.openKey(builder.build());
+    if (isS3GRequest.get() && size == 0) {
+      openKey.getKeyInfo().setDataSize(0);
+    }
+    return createOutputStream(openKey);
+  }
+
   private void createKeyPreChecks(String volumeName, String bucketName, String keyName,
       ReplicationConfig replicationConfig) throws IOException {
     verifyVolumeName(volumeName);

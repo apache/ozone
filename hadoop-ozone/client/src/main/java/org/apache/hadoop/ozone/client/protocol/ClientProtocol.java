@@ -380,6 +380,44 @@ public interface ClientProtocol {
        Map<String, String> metadata) throws IOException;
 
   /**
+   * Creates a key only if it does not exist (S3 If-None-Match: * semantics).
+   *
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param keyName Name of the Key
+   * @param size Size of the data
+   * @param replicationConfig The replication configuration
+   * @param metadata custom key value metadata
+   * @param tags Tags used for S3 object tags
+   * @return {@link OzoneOutputStream}
+   * @throws OMException with KEY_ALREADY_EXISTS if key exists
+   */
+  OzoneOutputStream createKeyIfNotExists(String volumeName, String bucketName,
+      String keyName, long size, ReplicationConfig replicationConfig,
+      Map<String, String> metadata, Map<String, String> tags)
+      throws IOException;
+
+  /**
+   * Rewrites a key only if its ETag matches (S3 If-Match semantics).
+   *
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param keyName Name of the Key
+   * @param size Size of the data
+   * @param expectedETag The ETag value the existing key must have
+   * @param replicationConfig The replication configuration
+   * @param metadata custom key value metadata
+   * @param tags Tags used for S3 object tags
+   * @return {@link OzoneOutputStream}
+   * @throws OMException with ETAG_MISMATCH, ETAG_NOT_AVAILABLE, or KEY_NOT_FOUND
+   */
+  @SuppressWarnings("checkstyle:parameternumber")
+  OzoneOutputStream rewriteKeyIfMatch(String volumeName, String bucketName,
+      String keyName, long size, String expectedETag,
+      ReplicationConfig replicationConfig, Map<String, String> metadata,
+      Map<String, String> tags) throws IOException;
+
+  /**
    * Writes a key in an existing bucket.
    * @param volumeName Name of the Volume
    * @param bucketName Name of the Bucket

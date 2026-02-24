@@ -188,8 +188,18 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
       } else if (ex.getResult() == ResultCodes.FILE_ALREADY_EXISTS) {
         throw newError(S3ErrorTable.NO_OVERWRITE, keyPath, ex);
+      } else if (ex.getResult() == ResultCodes.KEY_ALREADY_EXISTS) {
+        throw newError(PRECOND_FAILED, keyPath, ex);
+      } else if (ex.getResult() == ResultCodes.ETAG_MISMATCH) {
+        throw newError(PRECOND_FAILED, keyPath, ex);
+      } else if (ex.getResult() == ResultCodes.ETAG_NOT_AVAILABLE) {
+        throw newError(PRECOND_FAILED, keyPath, ex);
       } else if (ex.getResult() == ResultCodes.INVALID_REQUEST) {
         throw newError(S3ErrorTable.INVALID_REQUEST, keyPath);
+      } else if (ex.getResult() == ResultCodes.KEY_NOT_FOUND
+          && getHeaders().getHeaderString(S3Consts.IF_MATCH_HEADER) != null) {
+        // If-Match failed because the key doesn't exist
+        throw newError(PRECOND_FAILED, keyPath, ex);
       } else if (ex.getResult() == ResultCodes.KEY_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_KEY, keyPath);
       } else if (ex.getResult() == ResultCodes.NOT_SUPPORTED_OPERATION) {
@@ -231,7 +241,6 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
       copyHeader = getHeaders().getHeaderString(COPY_SOURCE_HEADER);
 
-      // Normal put object
       ReplicationConfig replicationConfig = getReplicationConfig(bucket);
 
       boolean enableEC = false;
@@ -272,6 +281,15 @@ public class ObjectEndpoint extends ObjectOperationHandler {
         return Response.ok().status(HttpStatus.SC_OK).build();
       }
 
+      String ifNoneMatch = getHeaders().getHeaderString(
+          S3Consts.IF_NONE_MATCH_HEADER);
+      String ifMatch = getHeaders().getHeaderString(
+          S3Consts.IF_MATCH_HEADER);
+
+      if (ifNoneMatch != null && ifMatch != null) {
+        throw newError(INVALID_REQUEST, keyPath);
+      }
+
       // Normal put object
       S3ChunkInputStreamInfo chunkInputStreamInfo = getS3ChunkInputStreamInfo(body,
           length, amzDecodedLength, keyPath);
@@ -282,21 +300,24 @@ public class ObjectEndpoint extends ObjectOperationHandler {
           getCustomMetadataFromHeaders(getHeaders().getRequestHeaders());
       Map<String, String> tags = getTaggingFromHeaders(getHeaders());
 
+      boolean hasConditionalHeaders = ifNoneMatch != null || ifMatch != null;
       long putLength;
       final String md5Hash;
-      if (isDatastreamEnabled() && !enableEC && length > getDatastreamMinLength()) {
+      if (isDatastreamEnabled() && !enableEC
+          && length > getDatastreamMinLength() && !hasConditionalHeaders) {
         perf.appendStreamMode();
         Pair<String, Long> keyWriteResult = ObjectEndpointStreaming
             .put(bucket, keyPath, length, replicationConfig, getChunkSize(),
-                customMetadata, tags, multiDigestInputStream, getHeaders(), signatureInfo.isSignPayload(), perf);
+                customMetadata, tags, multiDigestInputStream, getHeaders(),
+                signatureInfo.isSignPayload(), perf);
         md5Hash = keyWriteResult.getKey();
         putLength = keyWriteResult.getValue();
       } else {
         final String amzContentSha256Header =
             validateSignatureHeader(getHeaders(), keyPath, signatureInfo.isSignPayload());
-        try (OzoneOutputStream output = getClientProtocol().createKey(
-            volume.getName(), bucketName, keyPath, length, replicationConfig,
-            customMetadata, tags)) {
+        try (OzoneOutputStream output = openKeyForPut(
+            volume.getName(), bucketName, bucket, keyPath, length,
+            replicationConfig, customMetadata, tags, ifNoneMatch, ifMatch)) {
           long metadataLatencyNs =
               getMetrics().updatePutKeyMetadataStats(startNanos);
           perf.appendMetaLatencyNanos(metadataLatencyNs);
@@ -1300,6 +1321,47 @@ public class ObjectEndpoint extends ObjectOperationHandler {
 
     getMetrics().updateDeleteObjectTaggingSuccessStats(startNanos);
     return Response.noContent().build();
+  }
+
+  /**
+   * Opens a key for put, applying conditional write logic based on
+   * If-None-Match and If-Match headers.
+   */
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  private OzoneOutputStream openKeyForPut(String volumeName, String bucketName,
+      OzoneBucket bucket, String keyPath, long length,
+      ReplicationConfig replicationConfig, Map<String, String> customMetadata,
+      Map<String, String> tags, String ifNoneMatch, String ifMatch)
+      throws IOException {
+    if (ifNoneMatch != null && "*".equals(ifNoneMatch.trim())) {
+      return getClientProtocol().createKeyIfNotExists(
+          volumeName, bucketName, keyPath, length, replicationConfig,
+          customMetadata, tags);
+    } else if (ifMatch != null) {
+      String expectedETag = parseETag(ifMatch);
+      return getClientProtocol().rewriteKeyIfMatch(
+          volumeName, bucketName, keyPath, length, expectedETag,
+          replicationConfig, customMetadata, tags);
+    } else {
+      return getClientProtocol().createKey(
+          volumeName, bucketName, keyPath, length, replicationConfig,
+          customMetadata, tags);
+    }
+  }
+
+  /**
+   * Parses an ETag from a conditional header value, removing surrounding
+   * quotes if present.
+   */
+  static String parseETag(String headerValue) {
+    if (headerValue == null) {
+      return null;
+    }
+    String etag = headerValue.trim();
+    if (etag.startsWith("\"") && etag.endsWith("\"")) {
+      return etag.substring(1, etag.length() - 1);
+    }
+    return etag;
   }
 
   /** Request context shared among {@code ObjectOperationHandler}s. */

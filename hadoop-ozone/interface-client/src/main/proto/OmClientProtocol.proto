@@ -566,6 +566,10 @@ enum Status {
     KEY_UNDER_LEASE_SOFT_LIMIT_PERIOD = 97;
 
     TOO_MANY_SNAPSHOTS = 98;
+
+    ETAG_MISMATCH = 99;
+
+    ETAG_NOT_AVAILABLE = 100;
 }
 
 /**
@@ -1082,6 +1086,11 @@ message KeyArgs {
     // This allows a key to be created an committed atomically if the original has not
     // been modified.
     optional uint64 expectedDataGeneration = 23;
+
+    // expectedETag, when set, indicates that the existing key must have
+    // the given ETag for the operation to succeed. This is used for
+    // S3 conditional writes with the If-Match header.
+    optional string expectedETag = 24;
 }
 
 message KeyLocation {
@@ -1173,6 +1182,11 @@ message KeyInfo {
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
     optional uint64 expectedDataGeneration = 22;
+
+    // expectedETag, when set, indicates that the existing key must have
+    // the given ETag for the operation to succeed. This is used for
+    // S3 conditional writes with the If-Match header.
+    optional string expectedETag = 23;
 }
 
 // KeyInfoProtoLight is a lightweight subset of KeyInfo message containing

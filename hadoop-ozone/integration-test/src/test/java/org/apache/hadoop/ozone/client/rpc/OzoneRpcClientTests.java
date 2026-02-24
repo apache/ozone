@@ -1443,6 +1443,100 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     assertThat(e).hasMessageContaining("not found");
   }
 
+  @ParameterizedTest
+  @EnumSource
+  void testCreateKeyIfNotExistsSuccess(BucketLayout layout) throws IOException {
+    checkFeatureEnable(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
+    OzoneBucket bucket = createBucket(layout);
+    String keyName = "create-if-not-exists-" + layout.name();
+    byte[] content = "test-content".getBytes(UTF_8);
+
+    try (OzoneOutputStream out = bucket.createKeyIfNotExists(
+        keyName, content.length,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+        Collections.emptyMap(), Collections.emptyMap())) {
+      out.write(content);
+    }
+
+    assertKeyContent(bucket, keyName, content);
+  }
+
+  @ParameterizedTest
+  @EnumSource
+  void testCreateKeyIfNotExistsFailsWhenKeyExists(BucketLayout layout) throws IOException {
+    checkFeatureEnable(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
+    OzoneBucket bucket = createBucket(layout);
+    OzoneKeyDetails keyDetails = createTestKey(bucket);
+    byte[] newContent = "new-content".getBytes(UTF_8);
+
+    OMException e = assertThrows(OMException.class, () -> {
+      try (OzoneOutputStream out = bucket.createKeyIfNotExists(
+          keyDetails.getName(), newContent.length,
+          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+          Collections.emptyMap(), Collections.emptyMap())) {
+        out.write(newContent);
+      }
+    });
+    assertEquals(KEY_ALREADY_EXISTS, e.getResult());
+  }
+
+  @ParameterizedTest
+  @EnumSource
+  void testRewriteKeyIfMatchSuccess(BucketLayout layout) throws IOException {
+    checkFeatureEnable(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
+    OzoneBucket bucket = createBucket(layout);
+    OzoneKeyDetails keyDetails = createTestKey(bucket);
+    String etag = keyDetails.getMetadata().get(OzoneConsts.ETAG);
+    assertNotNull(etag, "Key should have an ETag");
+
+    byte[] newContent = "rewritten-content".getBytes(UTF_8);
+    try (OzoneOutputStream out = bucket.rewriteKeyIfMatch(
+        keyDetails.getName(), newContent.length, etag,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+        keyDetails.getMetadata(), Collections.emptyMap())) {
+      out.write(newContent);
+    }
+
+    assertKeyContent(bucket, keyDetails.getName(), newContent);
+  }
+
+  @ParameterizedTest
+  @EnumSource
+  void testRewriteKeyIfMatchFailsWithWrongETag(BucketLayout layout) throws IOException {
+    checkFeatureEnable(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
+    OzoneBucket bucket = createBucket(layout);
+    OzoneKeyDetails keyDetails = createTestKey(bucket);
+    byte[] newContent = "rewritten-content".getBytes(UTF_8);
+
+    OMException e = assertThrows(OMException.class, () -> {
+      try (OzoneOutputStream out = bucket.rewriteKeyIfMatch(
+          keyDetails.getName(), newContent.length, "wrong-etag",
+          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+          keyDetails.getMetadata(), Collections.emptyMap())) {
+        out.write(newContent);
+      }
+    });
+    assertEquals(OMException.ResultCodes.ETAG_MISMATCH, e.getResult());
+  }
+
+  @ParameterizedTest
+  @EnumSource
+  void testRewriteKeyIfMatchFailsWhenKeyNotFound(BucketLayout layout) throws IOException {
+    checkFeatureEnable(OzoneManagerVersion.ATOMIC_REWRITE_KEY);
+    OzoneBucket bucket = createBucket(layout);
+    byte[] content = "content".getBytes(UTF_8);
+
+    OMException e = assertThrows(OMException.class, () -> {
+      try (OzoneOutputStream out = bucket.rewriteKeyIfMatch(
+          "nonexistent-key", content.length, "some-etag",
+          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+          Collections.emptyMap(), Collections.emptyMap())) {
+        out.write(content);
+      }
+    });
+    assertEquals(KEY_NOT_FOUND, e.getResult());
+  }
+
   private static void rewriteKey(
       OzoneBucket bucket, OzoneKeyDetails keyDetails, byte[] newContent
   ) throws IOException {

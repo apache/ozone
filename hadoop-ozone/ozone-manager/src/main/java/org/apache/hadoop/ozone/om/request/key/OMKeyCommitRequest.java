@@ -303,6 +303,7 @@ public class OMKeyCommitRequest extends OMKeyRequest {
       // Set the UpdateID to current transactionLogIndex
       omKeyInfo = omKeyInfo.toBuilder()
           .setExpectedDataGeneration(null)
+          .setExpectedETag(null)
           .addAllMetadata(KeyValueUtil.getFromProtobuf(
                 commitKeyArgs.getMetadataList()))
           .setUpdateID(trxnLogIndex)
@@ -633,6 +634,25 @@ public class OMKeyCommitRequest extends OMKeyRequest {
               ") does not match the expected generation to rewrite (" + toCommit.getExpectedDataGeneration() + ")",
               KEY_NOT_FOUND);
         }
+      }
+    }
+
+    if (toCommit.getExpectedETag() != null) {
+      String expectedETag = toCommit.getExpectedETag();
+      auditMap.put("expectedETag", expectedETag);
+
+      if (existing == null) {
+        throw new OMException("Key not found for If-Match at commit",
+            OMException.ResultCodes.KEY_NOT_FOUND);
+      }
+      String currentETag = existing.getMetadata().get(OzoneConsts.ETAG);
+      if (currentETag == null) {
+        throw new OMException("Key does not have an ETag at commit",
+            OMException.ResultCodes.ETAG_NOT_AVAILABLE);
+      }
+      if (!currentETag.equals(expectedETag)) {
+        throw new OMException("ETag changed during write (concurrent modification)",
+            OMException.ResultCodes.ETAG_MISMATCH);
       }
     }
   }

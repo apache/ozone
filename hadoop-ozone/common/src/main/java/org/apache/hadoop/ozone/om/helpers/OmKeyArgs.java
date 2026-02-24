@@ -62,6 +62,7 @@ public final class OmKeyArgs implements Auditable {
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
   private Long expectedDataGeneration = null;
+  private final String expectedETag;
 
   private OmKeyArgs(Builder b) {
     this.volumeName = b.volumeName;
@@ -83,6 +84,7 @@ public final class OmKeyArgs implements Auditable {
     this.ownerName = b.ownerName;
     this.tags = b.tags;
     this.expectedDataGeneration = b.expectedDataGeneration;
+    this.expectedETag = b.expectedETag;
   }
 
   public boolean getIsMultipartKey() {
@@ -169,6 +171,10 @@ public final class OmKeyArgs implements Auditable {
     return expectedDataGeneration;
   }
 
+  public String getExpectedETag() {
+    return expectedETag;
+  }
+
   @Override
   public Map<String, String> toAuditMap() {
     Map<String, String> auditMap = new LinkedHashMap<>();
@@ -214,6 +220,9 @@ public final class OmKeyArgs implements Auditable {
     if (expectedDataGeneration != null) {
       builder.setExpectedDataGeneration(expectedDataGeneration);
     }
+    if (expectedETag != null) {
+      builder.setExpectedETag(expectedETag);
+    }
     return builder.build();
   }
 
@@ -240,6 +249,7 @@ public final class OmKeyArgs implements Auditable {
     private boolean forceUpdateContainerCacheFromSCM;
     private final Map<String, String> tags = new HashMap<>();
     private Long expectedDataGeneration = null;
+    private String expectedETag;
 
     public Builder() {
       this(AclListBuilder.empty());
@@ -267,6 +277,7 @@ public final class OmKeyArgs implements Auditable {
       this.forceUpdateContainerCacheFromSCM =
           obj.forceUpdateContainerCacheFromSCM;
       this.expectedDataGeneration = obj.expectedDataGeneration;
+      this.expectedETag = obj.expectedETag;
       this.metadata.putAll(obj.metadata);
       this.tags.putAll(obj.tags);
       this.acls = AclListBuilder.of(obj.acls);
@@ -382,6 +393,11 @@ public final class OmKeyArgs implements Auditable {
 
     public Builder setExpectedDataGeneration(long generation) {
       this.expectedDataGeneration = generation;
+      return this;
+    }
+
+    public Builder setExpectedETag(String eTag) {
+      this.expectedETag = eTag;
       return this;
     }
 

@@ -250,6 +250,25 @@ public class ClientProtocolStub implements ClientProtocol {
   }
 
   @Override
+  public OzoneOutputStream createKeyIfNotExists(String volumeName,
+      String bucketName, String keyName, long size,
+      ReplicationConfig replicationConfig, Map<String, String> metadata,
+      Map<String, String> tags) throws IOException {
+    return getBucket(volumeName, bucketName)
+        .createKeyIfNotExists(keyName, size, replicationConfig, metadata, tags);
+  }
+
+  @Override
+  public OzoneOutputStream rewriteKeyIfMatch(String volumeName,
+      String bucketName, String keyName, long size, String expectedETag,
+      ReplicationConfig replicationConfig, Map<String, String> metadata,
+      Map<String, String> tags) throws IOException {
+    return getBucket(volumeName, bucketName)
+        .rewriteKeyIfMatch(keyName, size, expectedETag, replicationConfig,
+            metadata, tags);
+  }
+
+  @Override
   public OzoneInputStream getKey(String volumeName, String bucketName,
                                  String keyName) throws IOException {
     return getBucket(volumeName, bucketName).readKey(keyName);
