@@ -17,15 +17,8 @@
 
 package org.apache.hadoop.ozone.container.upgrade;
 
-import static org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes.PREFINALIZE_VALIDATION_FAILED;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.FINALIZATION_IN_PROGRESS;
-import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.FINALIZATION_REQUIRED;
-
-import java.io.IOException;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
-import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
@@ -39,40 +32,6 @@ public class DataNodeUpgradeFinalizer extends
 
   public DataNodeUpgradeFinalizer(HDDSLayoutVersionManager versionManager) {
     super(versionManager);
-  }
-
-  @Override
-  public void preFinalizeUpgrade(DatanodeStateMachine dsm)
-      throws IOException {
-    if (!canFinalizeDataNode(dsm)) {
-      // DataNode is not yet ready to finalize.
-      // Reset the Finalization state.
-      getVersionManager().setUpgradeState(FINALIZATION_REQUIRED);
-      String msg = "Pre Finalization checks failed on the DataNode.";
-      logAndEmit(msg);
-      throw new UpgradeException(msg, PREFINALIZE_VALIDATION_FAILED);
-    }
-    getVersionManager().setUpgradeState(FINALIZATION_IN_PROGRESS);
-  }
-
-  private boolean canFinalizeDataNode(DatanodeStateMachine dsm) {
-    // Lets be sure that we do not have any open container before we return
-    // from here. This function should be called in its own finalizer thread
-    // context.
-    for (Container<?> ctr :
-        dsm.getContainer().getController().getContainers()) {
-      ContainerProtos.ContainerDataProto.State state = ctr.getContainerState();
-      long id = ctr.getContainerData().getContainerID();
-      switch (state) {
-      case OPEN:
-      case CLOSING:
-        LOG.warn("FinalizeUpgrade : Waiting for container {} to close, current "
-            + "state is: {}", id, state);
-        return false;
-      default:
-      }
-    }
-    return true;
   }
 
   @Override

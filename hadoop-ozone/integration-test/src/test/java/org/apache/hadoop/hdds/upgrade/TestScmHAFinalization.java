@@ -88,6 +88,7 @@ public class TestScmHAFinalization {
 
     conf.setInt(SCMStorageConfig.TESTING_INIT_LAYOUT_VERSION_KEY, HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
     conf.set(ScmConfigKeys.OZONE_SCM_HA_RATIS_SERVER_RPC_FIRST_ELECTION_TIMEOUT, "5s");
+    conf.set(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL_DEFAULT, "1s");
 
     MiniOzoneHAClusterImpl.Builder clusterBuilder = MiniOzoneCluster.newHABuilder(conf);
     clusterBuilder.setNumOfStorageContainerManagers(NUM_SCMS)
@@ -330,45 +331,21 @@ public class TestScmHAFinalization {
       // At least one node (leader) should be in the FINALIZATION_REQUIRED stage.
       assertTrue(scms.stream().anyMatch(scm ->
           scm.getScmContext().getFinalizationCheckpoint() == FinalizationCheckpoint.FINALIZATION_REQUIRED));
-      // Pipeline creation should not be frozen at this point, even on leader.
-      assertTrue(scms.stream().noneMatch(scm ->
-          scm.getPipelineManager().isPipelineCreationFrozen()));
       break;
     case AFTER_PRE_FINALIZE_UPGRADE:
       // At least one node (leader) should be in the FINALIZATION_STARTED stage.
       assertTrue(scms.stream().anyMatch(scm ->
           scm.getScmContext().getFinalizationCheckpoint() == FinalizationCheckpoint.FINALIZATION_STARTED));
-      // Pipeline creation should be frozen on nodes where the finalization checkpoint is FINALIZATION_STARTED,
-      // this should include the leader SCM.
-      assertTrue(scms.stream()
-          .filter(scm ->
-              scm.getScmContext().getFinalizationCheckpoint() == FinalizationCheckpoint.FINALIZATION_STARTED)
-          .allMatch(scm ->
-              scm.getPipelineManager().isPipelineCreationFrozen()));
       break;
     case AFTER_COMPLETE_FINALIZATION:
       // At least one node (leader) should be in the MLV_EQUALS_SLV stage.
       assertTrue(scms.stream().anyMatch(scm ->
           scm.getScmContext().getFinalizationCheckpoint() == FinalizationCheckpoint.MLV_EQUALS_SLV));
-      // Pipeline creation should not be frozen on nodes where the finalization checkpoint is MLV_EQUALS_SLV,
-      // this should include the leader SCM.
-      assertTrue(scms.stream()
-          .filter(scm ->
-              scm.getScmContext().getFinalizationCheckpoint() == FinalizationCheckpoint.MLV_EQUALS_SLV)
-          .noneMatch(scm ->
-              scm.getPipelineManager().isPipelineCreationFrozen()));
       break;
     case AFTER_POST_FINALIZE_UPGRADE:
       // At least one node (leader) should be in the FINALIZATION_COMPLETE stage.
       assertTrue(scms.stream().anyMatch(scm ->
           scm.getScmContext().getFinalizationCheckpoint() == FinalizationCheckpoint.FINALIZATION_COMPLETE));
-      // Pipeline creation should not be frozen on nodes where the finalization checkpoint is FINALIZATION_COMPLETE,
-      // this should include the leader SCM.
-      assertTrue(scms.stream()
-          .filter(scm ->
-              scm.getScmContext().getFinalizationCheckpoint() == FinalizationCheckpoint.FINALIZATION_COMPLETE)
-          .noneMatch(scm ->
-              scm.getPipelineManager().isPipelineCreationFrozen()));
       break;
     default:
       fail("Unknown halting point in test: " + haltingPoint);
