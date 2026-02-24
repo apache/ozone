@@ -22,7 +22,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.protobuf.ByteString;
-import com.google.protobuf.ProtoUtils;
+import com.google.protobuf.UnsafeByteOperations;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -630,7 +630,9 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
     for (int i = 0; i < src.size(); i++) {
       dst[i] = src.get(i).byteValue();
     }
-    return ProtoUtils.unsafeByteString(dst);
+
+    return dst.length > 0 ? UnsafeByteOperations.unsafeWrap(dst)
+        : ByteString.EMPTY;
   }
 
   /**

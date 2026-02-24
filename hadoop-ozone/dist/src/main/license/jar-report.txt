@@ -13,7 +13,6 @@ share/ozone/lib/asm-util.jar
 share/ozone/lib/aspectjrt.jar
 share/ozone/lib/aws-java-sdk-core.jar
 share/ozone/lib/aws-java-sdk-kms.jar
-share/ozone/lib/aws-java-sdk-logs.jar
 share/ozone/lib/aws-java-sdk-s3.jar
 share/ozone/lib/bcpkix-jdk18on.jar
 share/ozone/lib/bcprov-jdk18on.jar
@@ -27,6 +26,7 @@ share/ozone/lib/commons-collections.jar
 share/ozone/lib/commons-collections4.jar
 share/ozone/lib/commons-compress.jar
 share/ozone/lib/commons-configuration2.jar
+share/ozone/lib/commons-csv.jar
 share/ozone/lib/commons-daemon.jar
 share/ozone/lib/commons-digester.jar
 share/ozone/lib/commons-io.jar
@@ -66,6 +66,7 @@ share/ozone/lib/hadoop-hdfs-client.jar
 share/ozone/lib/hadoop-hdfs.jar
 share/ozone/lib/hadoop-shaded-guava.jar
 share/ozone/lib/hadoop-shaded-protobuf_3_25.jar
+share/ozone/lib/hdds-cli-common.jar
 share/ozone/lib/hdds-client.jar
 share/ozone/lib/hdds-common.jar
 share/ozone/lib/hdds-config.jar
@@ -83,11 +84,8 @@ share/ozone/lib/hk2-api.jar
 share/ozone/lib/hk2-locator.jar
 share/ozone/lib/hk2-utils.jar
 share/ozone/lib/hppc.jar
-share/ozone/lib/httpasyncclient.jar
 share/ozone/lib/httpclient.jar
 share/ozone/lib/httpcore.jar
-share/ozone/lib/httpcore-nio.jar
-share/ozone/lib/httpmime.jar
 share/ozone/lib/istack-commons-runtime.jar
 share/ozone/lib/j2objc-annotations.jar
 share/ozone/lib/jackson-annotations.jar
@@ -128,7 +126,6 @@ share/ozone/lib/jersey-media-jaxb.jar
 share/ozone/lib/jersey-media-json-jackson.jar
 share/ozone/lib/jersey-server.jar
 share/ozone/lib/jettison.jar
-share/ozone/lib/jetty-client.jar
 share/ozone/lib/jetty-http.jar
 share/ozone/lib/jetty-io.jar
 share/ozone/lib/jetty-security.jar
@@ -211,11 +208,11 @@ share/ozone/lib/opentelemetry-sdk-logs.jar
 share/ozone/lib/opentelemetry-sdk-metrics.jar
 share/ozone/lib/opentelemetry-sdk-trace.jar
 share/ozone/lib/opentelemetry-sdk.jar
-share/ozone/lib/orc-core.jar
-share/ozone/lib/orc-shims.jar
 share/ozone/lib/osgi-resource-locator.jar
 share/ozone/lib/ozone-client.jar
 share/ozone/lib/ozone-cli-admin.jar
+share/ozone/lib/ozone-cli-debug.jar
+share/ozone/lib/ozone-cli-repair.jar
 share/ozone/lib/ozone-cli-shell.jar
 share/ozone/lib/ozone-common.jar
 share/ozone/lib/ozone-csi.jar
@@ -242,9 +239,9 @@ share/ozone/lib/picocli-shell-jline3.jar
 share/ozone/lib/protobuf-java.jar
 share/ozone/lib/protobuf-java.jar
 share/ozone/lib/proto-google-common-protos.jar
+share/ozone/lib/ranger-audit-core.jar
 share/ozone/lib/ranger-intg.jar
 share/ozone/lib/ranger-plugin-classloader.jar
-share/ozone/lib/ranger-plugins-audit.jar
 share/ozone/lib/ranger-plugins-common.jar
 share/ozone/lib/ranger-plugins-cred.jar
 share/ozone/lib/ratis-client.jar

@@ -89,7 +89,7 @@ public class TestBucketAclHandler {
     when(headers.getHeaderString(S3Acl.GRANT_READ))
         .thenReturn("id=\"testuser\"");
 
-    assertNotNull(aclHandler.handlePutRequest(BUCKET_NAME, null),
+    assertNotNull(aclHandler.handlePutRequest(mockContext(), BUCKET_NAME, null),
         "Handler should handle request with ?acl param");
   }
 
@@ -100,7 +100,7 @@ public class TestBucketAclHandler {
     when(headers.getHeaderString(S3Acl.GRANT_READ))
         .thenReturn("id=\"testuser\"");
 
-    Response response = aclHandler.handlePutRequest(BUCKET_NAME, null);
+    Response response = aclHandler.handlePutRequest(mockContext(), BUCKET_NAME, null);
 
     assertNull(response, "Handler should return null without ?acl param");
   }
@@ -121,7 +121,7 @@ public class TestBucketAclHandler {
     when(headers.getHeaderString(headerName))
         .thenReturn("id=\"testuser\"");
 
-    assertSucceeds(() -> aclHandler.handlePutRequest(BUCKET_NAME, null));
+    assertSucceeds(() -> aclHandler.handlePutRequest(mockContext(), BUCKET_NAME, null));
   }
 
   @Test
@@ -131,7 +131,7 @@ public class TestBucketAclHandler {
     when(headers.getHeaderString(S3Acl.GRANT_WRITE))
         .thenReturn("id=\"testuser2\"");
 
-    assertSucceeds(() -> aclHandler.handlePutRequest(BUCKET_NAME, null));
+    assertSucceeds(() -> aclHandler.handlePutRequest(mockContext(), BUCKET_NAME, null));
   }
 
   @Test
@@ -140,7 +140,7 @@ public class TestBucketAclHandler {
         .thenReturn("uri=\"http://example.com\"");
 
     assertErrorResponse(NOT_IMPLEMENTED,
-        () -> aclHandler.handlePutRequest(BUCKET_NAME, null));
+        () -> aclHandler.handlePutRequest(mockContext(), BUCKET_NAME, null));
   }
 
   @Test
@@ -149,7 +149,7 @@ public class TestBucketAclHandler {
         .thenReturn("emailAddress=\"test@example.com\"");
 
     assertErrorResponse(NOT_IMPLEMENTED,
-        () -> aclHandler.handlePutRequest(BUCKET_NAME, null));
+        () -> aclHandler.handlePutRequest(mockContext(), BUCKET_NAME, null));
   }
 
   @Test
@@ -158,7 +158,7 @@ public class TestBucketAclHandler {
         .thenReturn("id=\"testuser\"");
 
     assertThrows(OS3Exception.class,
-        () -> aclHandler.handlePutRequest("nonexistent-bucket", null),
+        () -> aclHandler.handlePutRequest(mockContext(), "nonexistent-bucket", null),
         "Should throw OS3Exception for non-existent bucket");
   }
 
@@ -184,7 +184,7 @@ public class TestBucketAclHandler {
     InputStream body = new ByteArrayInputStream(
         aclXml.getBytes(StandardCharsets.UTF_8));
 
-    assertSucceeds(() -> aclHandler.handlePutRequest(BUCKET_NAME, body));
+    assertSucceeds(() -> aclHandler.handlePutRequest(mockContext(), BUCKET_NAME, body));
   }
 
   @Test
@@ -193,7 +193,7 @@ public class TestBucketAclHandler {
         .thenReturn("invalid-format");
 
     assertThrows(OS3Exception.class,
-        () -> aclHandler.handlePutRequest(BUCKET_NAME, null),
+        () -> aclHandler.handlePutRequest(mockContext(), BUCKET_NAME, null),
         "Should throw OS3Exception for invalid header format");
   }
 
@@ -202,7 +202,7 @@ public class TestBucketAclHandler {
     when(headers.getHeaderString(S3Acl.GRANT_READ))
         .thenReturn("id=\"user1\",id=\"user2\"");
 
-    assertSucceeds(() -> aclHandler.handlePutRequest(BUCKET_NAME, null));
+    assertSucceeds(() -> aclHandler.handlePutRequest(mockContext(), BUCKET_NAME, null));
   }
 
   @Test
@@ -213,7 +213,7 @@ public class TestBucketAclHandler {
     when(headers.getHeaderString(S3Acl.GRANT_WRITE))
         .thenReturn(null);
 
-    aclHandler.handlePutRequest(BUCKET_NAME, null);
+    aclHandler.handlePutRequest(mockContext(), BUCKET_NAME, null);
 
     // Replace with new ACL
     when(headers.getHeaderString(S3Acl.GRANT_READ))
@@ -221,7 +221,7 @@ public class TestBucketAclHandler {
     when(headers.getHeaderString(S3Acl.GRANT_WRITE))
         .thenReturn("id=\"user2\"");
 
-    assertSucceeds(() -> aclHandler.handlePutRequest(BUCKET_NAME, null));
+    assertSucceeds(() -> aclHandler.handlePutRequest(mockContext(), BUCKET_NAME, null));
   }
 
   @Test
@@ -233,7 +233,7 @@ public class TestBucketAclHandler {
 
     // This should throw exception for non-existent bucket
     assertThrows(OS3Exception.class,
-        () -> spyHandler.handlePutRequest("nonexistent-bucket", null));
+        () -> spyHandler.handlePutRequest(mockContext(), "nonexistent-bucket", null));
 
     // Verify that auditWriteFailure was called with PUT_ACL action
     verify(spyHandler, times(1)).auditWriteFailure(
@@ -250,7 +250,7 @@ public class TestBucketAclHandler {
         .thenReturn("invalid-format");
 
     assertThrows(OS3Exception.class,
-        () -> spyHandler.handlePutRequest(BUCKET_NAME, null));
+        () -> spyHandler.handlePutRequest(mockContext(), BUCKET_NAME, null));
 
     // Verify that auditWriteFailure was called with PUT_ACL action
     verify(spyHandler, times(1)).auditWriteFailure(
@@ -265,19 +265,19 @@ public class TestBucketAclHandler {
     // Remove "acl" query parameter - handler should not handle request
     aclHandler.queryParamsForTest().unset("acl");
 
-    assertNull(aclHandler.handleGetRequest(BUCKET_NAME),
+    assertNull(aclHandler.handleGetRequest(mockContext(), BUCKET_NAME),
         "Handler should return null without ?acl param");
   }
 
   @Test
   public void testHandleGetRequestSucceeds() throws Exception {
-    assertSucceeds(() -> aclHandler.handleGetRequest(BUCKET_NAME));
+    assertSucceeds(() -> aclHandler.handleGetRequest(mockContext(), BUCKET_NAME));
   }
 
   @Test
   public void testHandleGetRequestBucketNotFound() {
     assertThrows(OS3Exception.class,
-        () -> aclHandler.handleGetRequest("nonexistent-bucket"),
+        () -> aclHandler.handleGetRequest(mockContext(), "nonexistent-bucket"),
         "Should throw OS3Exception for non-existent bucket");
   }
 
@@ -286,10 +286,10 @@ public class TestBucketAclHandler {
     // First set some ACL
     when(headers.getHeaderString(S3Acl.GRANT_READ))
         .thenReturn("id=\"testuser\"");
-    aclHandler.handlePutRequest(BUCKET_NAME, null);
+    aclHandler.handlePutRequest(mockContext(), BUCKET_NAME, null);
 
     // Now get ACL
-    Response response = aclHandler.handleGetRequest(BUCKET_NAME);
+    Response response = aclHandler.handleGetRequest(mockContext(), BUCKET_NAME);
 
     assertNotNull(response);
     S3BucketAcl result = assertInstanceOf(S3BucketAcl.class, response.getEntity());
@@ -302,7 +302,7 @@ public class TestBucketAclHandler {
   public void testAuditLoggingOnGetSuccess() throws Exception {
     BucketAclHandler spyHandler = spy(aclHandler);
 
-    Response response = spyHandler.handleGetRequest(BUCKET_NAME);
+    Response response = spyHandler.handleGetRequest(mockContext(), BUCKET_NAME);
 
     assertNotNull(response);
     // Verify that auditReadSuccess was called with GET_ACL action
@@ -315,11 +315,15 @@ public class TestBucketAclHandler {
 
     // This should throw exception for non-existent bucket
     assertThrows(OS3Exception.class,
-        () -> spyHandler.handleGetRequest("nonexistent-bucket"));
+        () -> spyHandler.handleGetRequest(mockContext(), "nonexistent-bucket"));
 
     // Verify that auditReadFailure was called with GET_ACL action
     verify(spyHandler, times(1)).auditReadFailure(
         eq(S3GAction.GET_ACL),
         any(OS3Exception.class));
+  }
+
+  private static S3RequestContext mockContext() {
+    return new S3RequestContext(mock(BucketEndpoint.class), null);
   }
 }

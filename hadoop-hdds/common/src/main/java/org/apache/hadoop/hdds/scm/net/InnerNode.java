@@ -99,9 +99,4 @@ public interface InnerNode extends Node {
 
   @Override
   int hashCode();
-
-  static InnerNode fromProtobuf(
-      HddsProtos.InnerNode innerNode) {
-    return InnerNodeImpl.fromProtobuf(innerNode);
-  }
 }
