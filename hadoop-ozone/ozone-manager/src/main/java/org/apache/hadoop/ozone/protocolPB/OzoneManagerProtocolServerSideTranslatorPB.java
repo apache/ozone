@@ -276,6 +276,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
         raftServerStatus = omRatisServer.getLeaderStatus();
         switch (raftServerStatus) {
         case NOT_LEADER:
+        case LEADER_AND_NOT_READY:
           if (!ozoneManager.getConfig().isFollowerReadLocalLeaseEnabled()) {
             throw createLeaderErrorException(raftServerStatus);
           }
@@ -290,8 +291,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
             return handler.handleReadRequest(request);
           }
           // The LocalLease lag is too high, trigger failover
-          throw createLeaderErrorException(raftServerStatus);
-        case LEADER_AND_NOT_READY:
           throw createLeaderErrorException(raftServerStatus);
         case LEADER_AND_READY:
           // Although local lease does not apply for leader (since leader is always up-to-date)
