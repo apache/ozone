@@ -46,6 +46,8 @@
     <dependency>
       <groupId>org.rocksdb</groupId>
       <artifactId>rocksdbjni</artifactId>
+      <version>${rocksdb.version}</version>
+      <classifier>${rocksdbjni.classifier}</classifier>
       <!-- <scope>test</scope> but transitive via hdds-managed-rocksdb -->
     </dependency>
     <dependency>
@@ -173,6 +175,8 @@
                     <artifactItem>
                       <groupId>org.rocksdb</groupId>
                       <artifactId>rocksdbjni</artifactId>
+                      <version>${rocksdb.version}</version>
+                      <classifier>${rocksdbjni.classifier}</classifier>
                       <type>jar</type>
                       <overWrite>false</overWrite>
                       <outputDirectory>${project.build.directory}/rocksdbjni</outputDirectory>

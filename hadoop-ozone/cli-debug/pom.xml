@@ -191,6 +191,8 @@
     <dependency>
       <groupId>org.rocksdb</groupId>
       <artifactId>rocksdbjni</artifactId>
+      <version>${rocksdb.version}</version>
+      <classifier>${rocksdbjni.classifier}</classifier>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>

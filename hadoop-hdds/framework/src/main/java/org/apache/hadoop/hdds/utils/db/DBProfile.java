@@ -87,6 +87,7 @@ public enum DBProfile {
       ManagedBlockBasedTableConfig config = new ManagedBlockBasedTableConfig();
       config.setBlockCache(new ManagedLRUCache(blockCacheSize))
           .setBlockSize(blockSize)
+          .setFormatVersion(BLOCK_BASED_TABLE_FORMAT_VERSION)
           .setPinL0FilterAndIndexBlocksInCache(true)
           .setFilterPolicy(new ManagedBloomFilter());
       return config;
@@ -144,6 +145,9 @@ public enum DBProfile {
       return SSD.getBlockBasedTableConfig();
     }
   };
+
+  // Keep SST/block-based table format stable across RocksDB upgrades.
+  private static final int BLOCK_BASED_TABLE_FORMAT_VERSION = 5;
 
   public static long toLong(double value) {
     BigDecimal temp = BigDecimal.valueOf(value);
