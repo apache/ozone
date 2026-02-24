@@ -20,7 +20,10 @@
 COMPOSE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 export COMPOSE_DIR
 
-: "${RANGER_VERSION:=2.6.0}"
+if [[ -z "${RANGER_VERSION:-}" ]]; then
+  source "${COMPOSE_DIR}/.env"
+fi
+
 : "${DOWNLOAD_DIR:=${TEMP_DIR:-/tmp}}"
 
 # shellcheck source=/dev/null
@@ -53,6 +56,8 @@ perl -wpl -i \
   -e 's@^POLICY_MGR_URL=.*@POLICY_MGR_URL=http://ranger:6080@;' \
   -e 's@^REPOSITORY_NAME=.*@REPOSITORY_NAME=dev_ozone@;' \
   -e 's@^CUSTOM_USER=ozone@CUSTOM_USER=hadoop@;' \
+  -e 's@^XAAUDIT.LOG4J.ENABLE=true@XAAUDIT.LOG4J.ENABLE=false@;' \
+  -e 's@^XAAUDIT.LOG4J.DESTINATION.LOG4J=true@XAAUDIT.LOG4J.DESTINATION.LOG4J=false@;' \
   "${RANGER_OZONE_PLUGIN_DIR}/install.properties"
 
 echo 'machine ranger login admin password rangerR0cks!' > ../../.netrc

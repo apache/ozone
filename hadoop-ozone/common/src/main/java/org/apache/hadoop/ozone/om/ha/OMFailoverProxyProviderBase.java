@@ -22,12 +22,8 @@ import com.google.protobuf.ServiceException;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hdds.HddsUtils;
@@ -69,14 +65,11 @@ public abstract class OMFailoverProxyProviderBase<T> implements
   private final ConfigurationSource conf;
   private final Class<T> protocolClass;
 
-  // Map of OMNodeID to its proxy
-  private Map<String, ProxyInfo<T>> omProxies;
-  private List<String> omNodeIDList;
-  private Map<String, InetSocketAddress> omNodeAddressMap;
+  private final OMProxyInfo.OrderedMap<T> omProxies;
 
-  private String currentProxyOMNodeId;
+  // These are used to identify the current and next OM node
+  // Note that these fields need to be modified atomically (e.g. using synchronized)
   private int currentProxyIndex;
-  private String nextProxyOMNodeId;
   private int nextProxyIndex;
 
   // OMFailoverProxyProvider, on encountering certain exception, tries each OM
@@ -84,11 +77,11 @@ public abstract class OMFailoverProxyProviderBase<T> implements
   // before attempting to contact all the OMs again. For other exceptions
   // such as LeaderNotReadyException, the same OM is contacted again with a
   // linearly increasing wait time.
-  private Set<String> attemptedOMs = new HashSet<>();
+  private final Set<String> attemptedOMs = new HashSet<>();
   private String lastAttemptedOM;
   private int numAttemptsOnSameOM = 0;
   private final long waitBetweenRetries;
-  private Set<String> accessControlExceptionOMs = new HashSet<>();
+  private final Set<String> accessControlExceptionOMs = new HashSet<>();
   private boolean performFailoverDone;
 
   private final UserGroupInformation ugi;
@@ -106,19 +99,19 @@ public abstract class OMFailoverProxyProviderBase<T> implements
         OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY,
         OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT);
 
-    loadOMClientConfigs(conf, omServiceId);
-    Objects.requireNonNull(omProxies, "omProxies == null");
-    Objects.requireNonNull(omNodeIDList, "omNodeIDList == null");
-    Objects.requireNonNull(omNodeAddressMap, "omNodeAddressMap == null");
-
+    this.omProxies = new OMProxyInfo.OrderedMap<>(initOmProxiesFromConfigs(conf, omServiceId));
     nextProxyIndex = 0;
-    nextProxyOMNodeId = omNodeIDList.get(nextProxyIndex);
     currentProxyIndex = 0;
-    currentProxyOMNodeId = nextProxyOMNodeId;
   }
 
-  protected abstract void loadOMClientConfigs(ConfigurationSource config,
-                                              String omSvcId)
+  /**
+   * Initialize the OM proxies from the configuration and the OM service ID.
+   *
+   * @param config configuration containing OM node information
+   * @param omSvcId OM service ID
+   * @throws IOException if any exception occurs while trying to initialize the proxy.
+   */
+  protected abstract List<OMProxyInfo<T>> initOmProxiesFromConfigs(ConfigurationSource config, String omSvcId)
       throws IOException;
 
   /**
@@ -131,13 +124,12 @@ public abstract class OMFailoverProxyProviderBase<T> implements
     Configuration hadoopConf =
         LegacyHadoopConfigurationSource.asHadoopConfiguration(getConf());
 
-    // TODO: Post upgrade to Protobuf 3.x we need to use ProtobufRpcEngine2
     RPC.setProtocolEngine(hadoopConf, getInterface(), ProtobufRpcEngine.class);
 
     // Ensure we do not attempt retry on the same OM in case of exceptions
     RetryPolicy connectionRetryPolicy = RetryPolicies.failoverOnNetworkException(0);
 
-    return (T) RPC.getProtocolProxy(
+    return RPC.getProtocolProxy(
         getInterface(),
         RPC.getProtocolVersion(protocolClass),
         omAddress,
@@ -155,14 +147,13 @@ public abstract class OMFailoverProxyProviderBase<T> implements
         unwrappedException instanceof SecretManager.InvalidToken) {
       // Retry all available OMs once before failing with
       // AccessControlException.
+      final String nextProxyOMNodeId = omProxies.getNodeId(nextProxyIndex);
       if (accessControlExceptionOMs.contains(nextProxyOMNodeId)) {
         accessControlExceptionOMs.clear();
         return false;
       } else {
         accessControlExceptionOMs.add(nextProxyOMNodeId);
-        if (accessControlExceptionOMs.containsAll(omNodeIDList)) {
-          return false;
-        }
+        return !accessControlExceptionOMs.containsAll(omProxies.getNodeIds());
       }
     } else if (HddsUtils.shouldNotFailoverOnRpcException(unwrappedException)) {
       return false;
@@ -182,7 +173,12 @@ public abstract class OMFailoverProxyProviderBase<T> implements
 
   @VisibleForTesting
   public synchronized String getCurrentProxyOMNodeId() {
-    return currentProxyOMNodeId;
+    return omProxies.getNodeId(currentProxyIndex);
+  }
+
+  @VisibleForTesting
+  public synchronized String getNextProxyOMNodeId() {
+    return omProxies.getNodeId(nextProxyIndex);
   }
 
   @VisibleForTesting
@@ -220,9 +216,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
                 notLeaderException.getSuggestedLeaderNodeId();
             if (suggestedLeaderAddress != null &&
                 suggestedNodeId != null &&
-                omNodeAddressMap.containsKey(suggestedNodeId) &&
-                omNodeAddressMap.get(suggestedNodeId).toString()
-                    .equals(suggestedLeaderAddress)) {
+                omProxies.contains(suggestedNodeId, suggestedLeaderAddress)) {
               setNextOmProxy(suggestedNodeId);
               return getRetryAction(RetryDecision.FAILOVER_AND_RETRY,
                   failovers);
@@ -259,7 +253,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
           return new RetryAction(fallbackAction, getWaitTime());
         } else {
           LOG.error("Failed to connect to OMs: {}. Attempted {} failovers.",
-              omNodeIDList, maxFailovers);
+              omProxies.getNodeIds(), maxFailovers);
           return RetryAction.FAIL;
         }
       }
@@ -285,10 +279,11 @@ public abstract class OMFailoverProxyProviderBase<T> implements
    */
   @Override
   public synchronized void performFailover(T currentProxy) {
-    LOG.debug("Failing over OM from {}:{} to {}:{}",
-        currentProxyOMNodeId, currentProxyIndex,
-        nextProxyOMNodeId, nextProxyIndex);
-    currentProxyOMNodeId = nextProxyOMNodeId;
+    if (LOG.isDebugEnabled()) {
+      final String c = omProxies.getNodeId(currentProxyIndex);
+      final String n = omProxies.getNodeId(nextProxyIndex);
+      LOG.debug("Failing over OM from {}:{} to {}:{}", c, currentProxyIndex, n, nextProxyIndex);
+    }
     currentProxyIndex = nextProxyIndex;
     performFailoverDone = true;
   }
@@ -318,7 +313,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
       int newProxyIndex = incrementNextProxyIndex();
       if (LOG.isDebugEnabled()) {
         LOG.debug("Incrementing OM proxy index to {}, nodeId: {}",
-            newProxyIndex, omNodeIDList.get(newProxyIndex));
+            newProxyIndex, omProxies.getNodeId(newProxyIndex));
       }
     }
   }
@@ -330,11 +325,10 @@ public abstract class OMFailoverProxyProviderBase<T> implements
   private synchronized int incrementNextProxyIndex() {
     // Before failing over to next proxy, add the proxy OM (which has
     // returned an exception) to the list of attemptedOMs.
-    lastAttemptedOM = nextProxyOMNodeId;
-    attemptedOMs.add(nextProxyOMNodeId);
+    lastAttemptedOM = omProxies.getNodeId(nextProxyIndex);
+    attemptedOMs.add(lastAttemptedOM);
 
     nextProxyIndex = (nextProxyIndex + 1) % omProxies.size();
-    nextProxyOMNodeId = omNodeIDList.get(nextProxyIndex);
     return nextProxyIndex;
   }
 
@@ -344,11 +338,12 @@ public abstract class OMFailoverProxyProviderBase<T> implements
    * @return true if failover is successful, false otherwise.
    */
   private synchronized boolean updateLeaderOMNodeId(String newLeaderOMNodeId) {
+    final String nextProxyOMNodeId = omProxies.getNodeId(nextProxyIndex);
     if (!nextProxyOMNodeId.equals(newLeaderOMNodeId)) {
-      if (omProxies.containsKey(newLeaderOMNodeId)) {
+      final Integer i = omProxies.indexOf(newLeaderOMNodeId);
+      if (i != null) {
         lastAttemptedOM = nextProxyOMNodeId;
-        nextProxyOMNodeId = newLeaderOMNodeId;
-        nextProxyIndex = omNodeIDList.indexOf(nextProxyOMNodeId);
+        nextProxyIndex = i;
         return true;
       }
     } else {
@@ -366,7 +361,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
    * @return delay in milliseconds
    */
   public synchronized long getWaitTime() {
-    if (nextProxyOMNodeId.equals(lastAttemptedOM)) {
+    if (omProxies.getNodeId(nextProxyIndex).equals(lastAttemptedOM)) {
       // Clear attemptedOMs list as the same OM has been selected again.
       attemptedOMs.clear();
 
@@ -379,7 +374,7 @@ public abstract class OMFailoverProxyProviderBase<T> implements
 
     // OMs are being contacted in Round Robin way. Check if all the OMs have
     // been contacted in this attempt.
-    for (String omNodeID : omProxies.keySet()) {
+    for (String omNodeID : omProxies.getNodeIds()) {
       if (!attemptedOMs.contains(omNodeID)) {
         return 0;
       }
@@ -391,19 +386,20 @@ public abstract class OMFailoverProxyProviderBase<T> implements
     return waitBetweenRetries;
   }
 
-  public List<ProxyInfo> getOMProxies() {
-    return new ArrayList<ProxyInfo>(omProxies.values());
+  public List<OMProxyInfo<T>> getOMProxies() {
+    return omProxies.getProxies();
   }
 
-  public Map<String, ProxyInfo<T>> getOMProxyMap() {
+  public OMProxyInfo.OrderedMap<T> getOMProxyMap() {
     return omProxies;
   }
 
   /**
-   * Check if exception is OMLeaderNotReadyException.
+   * Unwrap the exception and return the wrapped OMLeaderNotReadyException if any.
    *
-   * @param exception
-   * @return OMLeaderNotReadyException
+   * @param exception exception to unwrap.
+   * @return the unwrapped OMLeaderNotReadyException or null if the wrapped
+   *         exception is not OMLeaderNotReadyException.
    */
   public static OMLeaderNotReadyException getLeaderNotReadyException(
       Exception exception) {
@@ -419,9 +415,11 @@ public abstract class OMFailoverProxyProviderBase<T> implements
   }
 
   /**
-   * Check if exception is a OMNotLeaderException.
+   * Unwrap the exception and return the wrapped OMNotLeaderException if any.
    *
-   * @return OMNotLeaderException.
+   * @param exception exception to unwrap.
+   * @return the unwrapped OMNotLeaderException or null if the wrapped
+   *         exception is not OMNotLeaderException.
    */
   public static OMNotLeaderException getNotLeaderException(
       Exception exception) {
@@ -439,24 +437,4 @@ public abstract class OMFailoverProxyProviderBase<T> implements
   protected ConfigurationSource getConf() {
     return conf;
   }
-
-  protected synchronized void setOmProxies(Map<String,
-      ProxyInfo<T>> omProxies) {
-    this.omProxies = omProxies;
-  }
-
-  protected synchronized void setOmNodeIDList(List<String> omNodeIDList) {
-    Collections.shuffle(omNodeIDList);
-    this.omNodeIDList = Collections.unmodifiableList(omNodeIDList);
-  }
-
-  protected synchronized List<String> getOmNodeIDList() {
-    return omNodeIDList;
-  }
-
-  protected synchronized void setOmNodeAddressMap(
-      Map<String, InetSocketAddress> map) {
-    this.omNodeAddressMap = map;
-  }
-
 }

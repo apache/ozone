@@ -24,6 +24,7 @@ import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_DN
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -271,6 +272,11 @@ public class DataNodeMetricsService {
   private void updateFinalState(CollectionContext context) {
     // Update shared state atomically
     synchronized (this) {
+      // Sort by pendingBlockSize in descending order so highest values appear first
+      context.results.sort(
+          Comparator.comparingLong(DatanodePendingDeletionMetrics::getPendingBlockSize)
+              .reversed()
+      );
       pendingDeletionList = context.results;
       totalPendingDeletion = context.totalPending;
       totalNodesQueried = context.totalQueried;
@@ -294,16 +300,23 @@ public class DataNodeMetricsService {
     totalNodesFailed = 0;
   }
 
-  public DataNodeMetricsServiceResponse getCollectedMetrics() {
+  public DataNodeMetricsServiceResponse getCollectedMetrics(Integer limit) {
     startTask();
     if (currentStatus == MetricCollectionStatus.FINISHED) {
-      return DataNodeMetricsServiceResponse.newBuilder()
+      DataNodeMetricsServiceResponse.Builder dnMetricsBuilder = DataNodeMetricsServiceResponse.newBuilder();
+      dnMetricsBuilder
           .setStatus(currentStatus)
-          .setPendingDeletion(pendingDeletionList)
           .setTotalPendingDeletionSize(totalPendingDeletion)
           .setTotalNodesQueried(totalNodesQueried)
-          .setTotalNodeQueryFailures(totalNodesFailed)
-          .build();
+          .setTotalNodeQueryFailures(totalNodesFailed);
+
+      if (null == limit) {
+        return dnMetricsBuilder.setPendingDeletion(pendingDeletionList).build();
+      } else {
+        return dnMetricsBuilder.setPendingDeletion(
+            pendingDeletionList.subList(0, Math.min(limit, pendingDeletionList.size())
+        )).build();
+      }
     }
     return DataNodeMetricsServiceResponse.newBuilder()
         .setStatus(currentStatus)

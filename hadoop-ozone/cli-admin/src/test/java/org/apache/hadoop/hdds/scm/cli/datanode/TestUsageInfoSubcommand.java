@@ -84,13 +84,17 @@ public class TestUsageInfoSubcommand {
     assertEquals(ARRAY, json.getNodeType());
     assertNotNull(json.get(0).get("datanodeDetails"));
     assertEquals(10, json.get(0).get("ozoneUsed").longValue());
-    assertEquals(100, json.get(0).get("capacity").longValue());
-    assertEquals(80, json.get(0).get("remaining").longValue());
-    assertEquals(20, json.get(0).get("totalUsed").longValue());
+    assertEquals(100, json.get(0).get("ozoneCapacity").longValue());
+    assertEquals(80, json.get(0).get("ozoneAvailable").longValue());
 
-    assertEquals(20.00, json.get(0).get("totalUsedPercent").doubleValue(), 0.001);
     assertEquals(10.00, json.get(0).get("ozoneUsedPercent").doubleValue(), 0.001);
-    assertEquals(80.00, json.get(0).get("remainingPercent").doubleValue(), 0.001);
+    assertEquals(80.00, json.get(0).get("ozoneAvailablePercent").doubleValue(), 0.001);
+
+    assertEquals(1000, json.get(0).get("filesystemCapacity").longValue());
+    assertEquals(700, json.get(0).get("filesystemAvailable").longValue());
+    assertEquals(300, json.get(0).get("filesystemUsed").longValue());
+    assertEquals(30.00, json.get(0).get("filesystemUsedPercent").doubleValue(), 0.001);
+    assertEquals(70.00, json.get(0).get("filesystemAvailablePercent").doubleValue(), 0.001);
 
     assertEquals(5, json.get(0).get("containerCount").longValue());
     assertEquals(10, json.get(0).get("pipelineCount").longValue());
@@ -111,21 +115,24 @@ public class TestUsageInfoSubcommand {
 
     // then
     String output = outContent.toString(CharEncoding.UTF_8);
-    assertThat(output).contains("UUID         :");
-    assertThat(output).contains("IP Address   :");
-    assertThat(output).contains("Hostname     :");
-    assertThat(output).contains("Capacity     :");
-    assertThat(output).contains("Total Used   :");
-    assertThat(output).contains("Total Used % :");
-    assertThat(output).contains("Ozone Used   :");
-    assertThat(output).contains("Ozone Used % :");
-    assertThat(output).contains("Remaining    :");
-    assertThat(output).contains("Remaining %  :");
-    assertThat(output).contains("Container(s) :");
-    assertThat(output).contains("Pipeline(s)  :");
+    assertThat(output).contains("UUID                    :");
+    assertThat(output).contains("IP Address              :");
+    assertThat(output).contains("Hostname                :");
+    assertThat(output).contains("Ozone Capacity          :");
+    assertThat(output).contains("Ozone Used              :");
+    assertThat(output).contains("Ozone Used %            :");
+    assertThat(output).contains("Ozone Available         :");
+    assertThat(output).contains("Ozone Available %       :");
+    assertThat(output).contains("Container(s)            :");
+    assertThat(output).contains("Pipeline(s)             :");
     assertThat(output).contains("Container Pre-allocated :");
     assertThat(output).contains("Remaining Allocatable   :");
     assertThat(output).contains("Free Space To Spare     :");
+    assertThat(output).contains("Filesystem Capacity     :");
+    assertThat(output).contains("Filesystem Used         :");
+    assertThat(output).contains("Filesystem Available    :");
+    assertThat(output).contains("Filesystem Used %       :");
+    assertThat(output).contains("Filesystem Available %  :");
   }
 
   private List<HddsProtos.DatanodeUsageInfoProto> getUsageProto() {
@@ -137,6 +144,8 @@ public class TestUsageInfoSubcommand {
         .setUsed(10)
         .setContainerCount(5)
         .setPipelineCount(10)
+        .setFsCapacity(1000)
+        .setFsAvailable(700)
         .build());
     return result;
   }

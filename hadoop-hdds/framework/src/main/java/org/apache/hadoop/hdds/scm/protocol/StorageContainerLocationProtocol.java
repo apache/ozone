@@ -441,7 +441,8 @@ public interface StorageContainerLocationProtocol extends Closeable {
       Optional<Integer> moveReplicationTimeout,
       Optional<Boolean> networkTopologyEnable,
       Optional<String> includeNodes,
-      Optional<String> excludeNodes) throws IOException;
+      Optional<String> excludeNodes,
+      Optional<String> excludeContainers) throws IOException;
 
   /**
    * Stop ContainerBalancer.

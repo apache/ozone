@@ -31,7 +31,6 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProt
 import static org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol.ADMIN_COMMAND_TYPE;
 import static org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol.FOLLOWER_READABLE_COMMAND_TYPES;
 
-import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
@@ -186,7 +185,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   private static final String ROLE_TYPE = "SCM";
 
   private OzoneProtocolMessageDispatcher<ScmContainerLocationRequest,
-      ScmContainerLocationResponse, ProtocolMessageEnum>
+      ScmContainerLocationResponse, StorageContainerLocationProtocolProtos.Type>
       dispatcher;
 
   /**
@@ -199,7 +198,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   public StorageContainerLocationProtocolServerSideTranslatorPB(
       StorageContainerLocationProtocol impl,
       StorageContainerManager scm,
-      ProtocolMessageMetrics<ProtocolMessageEnum> protocolMetrics)
+      ProtocolMessageMetrics<StorageContainerLocationProtocolProtos.Type> protocolMetrics)
       throws IOException {
     this.impl = impl;
     this.scm = scm;
@@ -1146,6 +1145,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     Optional<Boolean> networkTopologyEnable = Optional.empty();
     Optional<String> includeNodes = Optional.empty();
     Optional<String> excludeNodes = Optional.empty();
+    Optional<String> excludeContainers = Optional.empty();
 
     if (request.hasThreshold()) {
       threshold = Optional.of(request.getThreshold());
@@ -1206,12 +1206,16 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       excludeNodes = Optional.of(request.getExcludeNodes());
     }
 
+    if (request.hasExcludeContainers()) {
+      excludeContainers = Optional.of(request.getExcludeContainers());
+    }
+
     return impl.startContainerBalancer(threshold, iterations,
         maxDatanodesPercentageToInvolvePerIteration,
         maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
         maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
         moveReplicationTimeout, networkTopologyEnable, includeNodes,
-        excludeNodes);
+        excludeNodes, excludeContainers);
   }
 
   public StopContainerBalancerResponseProto stopContainerBalancer(
@@ -1380,7 +1384,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   public DecommissionScmResponseProto decommissionScm(
       DecommissionScmRequestProto request) throws IOException {
     return impl.decommissionScm(
-        request.getScmId());
+            request.getScmId());
   }
 
   public GetMetricsResponseProto getMetrics(GetMetricsRequestProto request) throws IOException {
@@ -1391,4 +1395,5 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     impl.reconcileContainer(request.getContainerID());
     return ReconcileContainerResponseProto.getDefaultInstance();
   }
+
 }

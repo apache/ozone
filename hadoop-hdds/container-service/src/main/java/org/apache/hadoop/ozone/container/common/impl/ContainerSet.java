@@ -236,6 +236,40 @@ public class ContainerSet implements Iterable<Container<?>> {
   }
 
   /**
+   * Update Container to container map.
+   * @param container container to be added
+   * @return If container is added to containerMap returns true, otherwise
+   * false
+   */
+  public Container updateContainer(Container<?> container) throws
+      StorageContainerException {
+    Objects.requireNonNull(container, "container cannot be null");
+
+    long containerId = container.getContainerData().getContainerID();
+    if (!containerMap.containsKey(containerId)) {
+      LOG.error("Container doesn't exists with container Id {}", containerId);
+      throw new StorageContainerException("Container doesn't exist with " +
+          "container Id " + containerId,
+          ContainerProtos.Result.CONTAINER_NOT_FOUND);
+    } else {
+      LOG.debug("Container with container Id {} is updated to containerMap",
+          containerId);
+      Container<?> oldContainer = containerMap.put(containerId, container);
+      HddsVolume volume = container.getContainerData().getVolume();
+      if (volume != null) {
+        volume.addContainer(container.getContainerData().getContainerID());
+      }
+      if (oldContainer != null) {
+        volume = oldContainer.getContainerData().getVolume();
+        if (volume != null) {
+          volume.removeContainer(oldContainer.getContainerData().getContainerID());
+        }
+      }
+      return oldContainer;
+    }
+  }
+
+  /**
    * Returns the Container with specified containerId.
    * @param containerId ID of the container to get
    * @return Container
@@ -423,7 +457,7 @@ public class ContainerSet implements Iterable<Container<?>> {
     while (containerIdIterator.hasNext()) {
       Long containerId = containerIdIterator.next();
       Container<?> container = containerMap.get(containerId);
-      if (container != null) {
+      if (container != null && container.getContainerData().getVolume() == volume) {
         containers.add(container);
       }
     }

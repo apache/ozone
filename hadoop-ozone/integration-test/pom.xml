@@ -286,6 +286,11 @@
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
+      <artifactId>hdds-cli-common</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-client</artifactId>
       <scope>test</scope>
     </dependency>
@@ -366,12 +371,21 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-test-utils</artifactId>
-      <type>test-jar</type>
       <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-cli-admin</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-cli-debug</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-cli-repair</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>
