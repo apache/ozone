@@ -59,11 +59,9 @@ public class TestContainerBalancerSelectionCriteria {
   private ContainerBalancerSelectionCriteria criteria;
   private ContainerManager containerManager;
   private ReplicationManager replicationManager;
-  private FindSourceStrategy findSourceStrategy;
   private DatanodeDetails source;
   private ContainerInfo containerInfo;
   private ContainerID containerID;
-  private Set<ContainerReplica> replicas;
 
   @BeforeEach
   public void setup() throws Exception {
@@ -74,14 +72,14 @@ public class TestContainerBalancerSelectionCriteria {
     NodeManager nodeManager = mock(NodeManager.class);
     containerManager = mock(ContainerManager.class);
     replicationManager = mock(ReplicationManager.class);
-    findSourceStrategy = mock(FindSourceStrategy.class);
+    FindSourceStrategy findSourceStrategy = mock(FindSourceStrategy.class);
 
     source = MockDatanodeDetails.randomDatanodeDetails();
     containerInfo = ReplicationTestUtil.createContainerInfo(RatisReplicationConfig.getInstance(THREE), 1L,
         HddsProtos.LifeCycleState.CLOSED, 1L, OzoneConsts.GB);
     containerID = containerInfo.containerID();
 
-    replicas = new HashSet<>();
+    Set<ContainerReplica> replicas = new HashSet<>();
     replicas.add(ReplicationTestUtil.createContainerReplica(containerID, 0, IN_SERVICE, CLOSED,
         1L, OzoneConsts.GB, source, source.getID()));
 
