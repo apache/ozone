@@ -97,15 +97,12 @@ Split MPU metadata into:
 message MultipartPartInfo {
   required string partName = 1;
   required uint32 partNumber = 2;
-  required string volumeName = 3;
-  required string bucketName = 4;
-  required string keyName = 5;
-  required uint64 dataSize = 6;
-  required uint64 modificationTime = 7;
-  repeated KeyLocationList keyLocationList = 8;
-  repeated hadoop.hdds.KeyValue metadata = 9;
-  optional FileEncryptionInfoProto fileEncryptionInfo = 10;
-  optional FileChecksumProto fileChecksum = 11;
+  required uint64 dataSize = 3;
+  required uint64 modificationTime = 4;
+  repeated KeyLocationList keyLocationList = 5;
+  repeated hadoop.hdds.KeyValue metadata = 6;
+  optional FileEncryptionInfoProto fileEncryptionInfo = 7;
+  optional FileChecksumProto fileChecksum = 8;
 }
 ```
 
@@ -154,12 +151,16 @@ message MultipartKeyInfo {
     required uint64 creationTime = 2;
     required hadoop.hdds.ReplicationType type = 3;
     optional hadoop.hdds.ReplicationFactor factor = 4;
-    repeated PartKeyInfo partKeyInfoList = 5;
+    repeated PartKeyInfo partKeyInfoList = 5; [deprecated = true]
     optional uint64 objectID = 6;
     optional uint64 updateID = 7;
     optional uint64 parentID = 8;
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 9;
     optional uint32 schemaVersion = 10; // default 0
+    // Following is pulled in from part info as these will not change for a given part number
+    required string volumeName = 11;
+    required string bucketName = 12;
+    required string keyName = 13;
 }
 ```
 
