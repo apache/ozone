@@ -890,6 +890,40 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     verify(archiverSpy, times(2)).recordFileEntry(any(), anyString());
   }
 
+  @Test
+  public void testCollectSnapshotDataSkipsDeletedFile() throws Exception {
+    OMDBCheckpointServletInodeBasedXfer servlet = new OMDBCheckpointServletInodeBasedXfer();
+    Path dbDir = Files.createTempDirectory(folder, "dbdir-");
+    Path yaml1 = dbDir.resolve("snap1.yaml");
+    Path yaml2 = dbDir.resolve("snap2.yaml");
+    Files.write(yaml1, "content1".getBytes(StandardCharsets.UTF_8));
+    Files.write(yaml2, "content1".getBytes(StandardCharsets.UTF_8));
+    // Delete file2 before transfer , same as pruner
+    Files.delete(yaml2);
+    OMDBArchiver archiver = new OMDBArchiver();
+    archiver.setHardLinkFileMap(new HashMap<>());
+    Path tmpDir = folder.resolve("tmp-deleted-file-test");
+    Files.createDirectories(tmpDir);
+    archiver.setTmpDir(tmpDir);
+    OMDBArchiver archiverSpy = spy(archiver);
+    Set<String> sstFilesToExclude = new HashSet<>();
+    Set<Path> yamlFiles = new HashSet<>();
+    yamlFiles.add(yaml1);
+    yamlFiles.add(yaml2);
+    AtomicLong maxTotalSstSize = new AtomicLong(Long.MAX_VALUE);
+    doAnswer(invocation -> archiver.recordFileEntry(invocation.getArgument(0), invocation.getArgument(1))).when(
+        archiverSpy).recordFileEntry(any(), anyString());
+    try {
+      servlet.collectSnapshotData(sstFilesToExclude, new HashSet<>(), yamlFiles, maxTotalSstSize, archiverSpy);
+    } catch (Exception e) {
+      fail("collectSnapshot should not throw an exception", e);
+    }
+    verify(archiverSpy, times(2)).recordFileEntry(any(), anyString());
+    // only 1 entry
+    assertEquals(1, archiver.getFilesToWriteIntoTarball().size());
+    assertEquals(1, archiver.getHardLinkFileMap().size());
+  }
+
   private void writeDummyKeyToDeleteTableOfSnapshotDB(OzoneSnapshot snapshotToModify, String bucketName,
       String volumeName, String keyName)
       throws IOException {
