@@ -29,10 +29,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.NavigableMap;
+import java.util.Objects;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.management.ObjectName;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status;
@@ -142,7 +142,7 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
   }
 
   public void setUpgradeState(Status status) {
-    Preconditions.checkNotNull(status, "status");
+    Objects.requireNonNull(status, "status");
     while (true) {
       State cur = requireState();
       State next = cur.withStatus(status);
@@ -153,7 +153,7 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
   }
 
   public void finalized(T layoutFeature) {
-    Preconditions.checkNotNull(layoutFeature, "layoutFeature");
+    Objects.requireNonNull(layoutFeature, "layoutFeature");
 
     while (true) {
       State cur = requireState();
@@ -223,7 +223,7 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
 
   @Override
   public boolean isAllowed(LayoutFeature layoutFeature) {
-    Preconditions.checkNotNull(layoutFeature, "layoutFeature");
+    Objects.requireNonNull(layoutFeature, "layoutFeature");
     return layoutFeature.layoutVersion() <= requireState().metadataLayoutVersion;
   }
 
