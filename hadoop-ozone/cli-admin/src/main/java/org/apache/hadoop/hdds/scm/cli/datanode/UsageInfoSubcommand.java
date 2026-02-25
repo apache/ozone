@@ -154,9 +154,11 @@ public class UsageInfoSubcommand extends ScmSubcommand {
             info.getContainerCount());
     System.out.printf("%-24s: %s (%s) %n", "Container Pre-allocated",
         info.getCommitted() + " B", StringUtils.byteDesc(info.getCommitted()));
+    long remainingAllocatable = info.getOzoneAvailable() - info.getCommitted()
+        - info.getFreeSpaceToSpare();
     System.out.printf("%-24s: %s (%s) %n", "Remaining Allocatable",
-        (info.getOzoneAvailable() - info.getCommitted()) + " B",
-        StringUtils.byteDesc((info.getOzoneAvailable() - info.getCommitted())));
+        remainingAllocatable + " B",
+        StringUtils.byteDesc(remainingAllocatable));
     System.out.printf("%-24s: %s (%s) %n", "Free Space To Spare",
         info.getFreeSpaceToSpare() + " B",
         StringUtils.byteDesc(info.getFreeSpaceToSpare()));
