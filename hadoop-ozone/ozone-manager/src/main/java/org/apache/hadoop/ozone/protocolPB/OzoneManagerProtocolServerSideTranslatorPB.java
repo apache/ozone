@@ -361,12 +361,9 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
     }
   }
 
-  boolean allowFollowerReadLocalLease(Division ratisDivision, long leaseLagLimit, long leaseTimeMsLimit) {
+  boolean allowFollowerReadLocalLease(Division ratisDivision, long leaseLogLimit, long leaseTimeMsLimit) {
     final DivisionInfo divisionInfo = ratisDivision.getInfo();
     final FollowerInfoProto followerInfo = divisionInfo.getRoleInfoProto().getFollowerInfo();
-    if (leaseTimeMsLimit == -1) {
-      leaseTimeMsLimit = Long.MAX_VALUE;
-    }
     if (followerInfo == null) {
       LOG.debug("FollowerRead Local Lease not allowed: Not a follower. ");
       return false; // not follower
@@ -377,14 +374,14 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       return false; // no leader
     }
 
-    if (leaderInfo.getLastRpcElapsedTimeMs() > leaseTimeMsLimit) {
+    if (leaseTimeMsLimit >= 0 && leaderInfo.getLastRpcElapsedTimeMs() > leaseTimeMsLimit) {
       LOG.debug("FollowerRead Local Lease not allowed: Local lease Time expired. ");
       ozoneManager.getMetrics().incNumFollowerReadLocalLeaseFailTime();
       return false; // lease time expired
     }
 
-    if (leaseLagLimit == -1) {
-      // Allow infinite lag time, which allows unbounded stale reads
+    if (leaseLogLimit == -1) {
+      // Allow infinite log lag, which allows unbounded stale reads
       // There is no need to check the leader lag
       return true;
     }
@@ -404,7 +401,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       return false;
     }
 
-    boolean ret = divisionInfo.getLastAppliedIndex() + leaseLagLimit >= leaderCommit;
+    boolean ret = divisionInfo.getLastAppliedIndex() + leaseLogLimit >= leaderCommit;
     if (!ret) {
       ozoneManager.getMetrics().incNumFollowerReadLocalLeaseFailLog();
       LOG.debug("FollowerRead Local Lease not allowed: Index Lag exceeds limit. ");
