@@ -44,7 +44,9 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
+import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
+import org.apache.hadoop.ozone.om.response.HasCompletedRequestInfo;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
@@ -409,6 +411,46 @@ public final class OzoneManagerDoubleBuffer {
       try {
         addToBatchWithTrace(omResponse,
             () -> response.checkAndUpdateDB(omMetadataManager, batchOperation));
+
+        // This is a strawman approach and requires some discussion
+        // with the community on approach.
+        //
+        // At the moment any response type which we want to capture a
+        // OmCompletedRequestInfo for is required to implement the
+        // interface HasCompletedRequestInfo and the method
+        // getCompletedRequestInfo() and we then have this extra step
+        // here in the double buffer to capture the rows.
+        //
+        // It would seem ideal that the double buffer shouldn't have to
+        // know/care that there is the concept of capturing this
+        // OmCompletedRequestInfo row for certain response times but the
+        // approach described above seemed like the least invasive
+        // approach overall.  I am open to other views.
+        //
+        // Other approaches I considered:
+        // - adding a similar getCompletedRequestInfo method to each
+        // *request* type which want to capture a row for.  The downside
+        // of this was that since requests are not part of the
+        // addToBatch flow the OmCompletedRequestInfo instance then had
+        // to be passed through from the request to the relevant
+        // response constructors and this created quite a bit of code
+        // churn which I perceived as messy
+        //
+        // * in terms of the actual data capture, rather than this
+        // "instanceof" approach in this class I toyed with
+        // having each response type which we want to capture a row for
+        // capturing it itself in its on implementation of addDBBatch
+        // (i.e. no need for any new code in this class).  This
+        // seemed to be a bit messier to me in terms of code duplication
+        //
+        if (response instanceof HasCompletedRequestInfo) {
+          OmCompletedRequestInfo completedRequestInfo = ((HasCompletedRequestInfo) response).getCompletedRequestInfo(
+              entry.getTermIndex().getIndex());
+
+          omMetadataManager.getCompletedRequestInfoTable().putWithBatch(
+              batchOperation, completedRequestInfo.getTrxLogIndex(), completedRequestInfo);
+        }
+
       } catch (IOException ex) {
         // During Adding to RocksDB batch entry got an exception.
         // We should terminate the OM.

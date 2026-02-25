@@ -25,16 +25,19 @@ import java.io.IOException;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
+import org.apache.hadoop.ozone.om.response.HasCompletedRequestInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 
 /**
  * Response for RenameKey request.
  */
 @CleanupTableInfo(cleanupTables = {KEY_TABLE, SNAPSHOT_RENAMED_TABLE})
-public class OMKeyRenameResponse extends OmKeyResponse {
+public class OMKeyRenameResponse extends OmKeyResponse implements HasCompletedRequestInfo {
 
   private String fromKeyName;
   private String toKeyName;
@@ -106,5 +109,18 @@ public class OMKeyRenameResponse extends OmKeyResponse {
 
   public String getToKeyName() {
     return toKeyName;
+  }
+
+  @Override
+  public OmCompletedRequestInfo getCompletedRequestInfo(long trxnLogIndex) {
+    return OmCompletedRequestInfo.newBuilder()
+        .setTrxLogIndex(trxnLogIndex)
+        .setCmdType(Type.RenameKey)
+        .setCreationTime(System.currentTimeMillis())
+        .setVolumeName(renameKeyInfo.getVolumeName())
+        .setBucketName(renameKeyInfo.getBucketName())
+        .setKeyName(renameKeyInfo.getKeyName())
+        .setOpArgs(new OmCompletedRequestInfo.OperationArgs.RenameKeyArgs(toKeyName))
+        .build();
   }
 }
