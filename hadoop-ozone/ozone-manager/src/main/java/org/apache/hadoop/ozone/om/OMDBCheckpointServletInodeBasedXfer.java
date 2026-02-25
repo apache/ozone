@@ -381,9 +381,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         omdbArchiver.recordFileEntry(yamlFile, yamlFile.getName());
       } catch (NoSuchFileException e) {
         logFileNoLongerExists(yamlFile.toPath());
-        if (omdbArchiver.getHardLinkFileMap() != null) {
-          omdbArchiver.getHardLinkFileMap().remove(yamlFile.getAbsolutePath());
-        }
+        omdbArchiver.removeHardLinkMapping(yamlFile.getAbsolutePath());
       }
     }
   }
@@ -539,9 +537,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
             sstFilesToExclude.add(fileId);
           } catch (NoSuchFileException e) {
             logFileNoLongerExists(dbFile);
-            if (path != null && omdbArchiver.getHardLinkFileMap() != null) {
-              omdbArchiver.getHardLinkFileMap().remove(path);
-            }
+            omdbArchiver.removeHardLinkMapping(path);
           }
         }
       }

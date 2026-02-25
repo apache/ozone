@@ -901,7 +901,6 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     // Delete file2 before transfer , same as pruner
     Files.delete(yaml2);
     OMDBArchiver archiver = new OMDBArchiver();
-    archiver.setHardLinkFileMap(new HashMap<>());
     Path tmpDir = folder.resolve("tmp-deleted-file-test");
     Files.createDirectories(tmpDir);
     archiver.setTmpDir(tmpDir);
@@ -921,7 +920,6 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     verify(archiverSpy, times(2)).recordFileEntry(any(), anyString());
     // only 1 entry
     assertEquals(1, archiver.getFilesToWriteIntoTarball().size());
-    assertEquals(1, archiver.getHardLinkFileMap().size());
   }
 
   private void writeDummyKeyToDeleteTableOfSnapshotDB(OzoneSnapshot snapshotToModify, String bucketName,
