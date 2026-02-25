@@ -64,7 +64,6 @@ public class TestOMBootstrap {
 
   private MiniOzoneHAClusterImpl cluster;
   private ObjectStore objectStore;
-  private OzoneConfiguration conf;
   private OzoneBucket ozoneBucket;
   private String volumeName;
   private String bucketName;
@@ -79,7 +78,7 @@ public class TestOMBootstrap {
 
   @BeforeEach
   public void init() throws Exception {
-    conf = new OzoneConfiguration();
+    OzoneConfiguration conf = new OzoneConfiguration();
     conf.setBoolean(OMConfigKeys.OZONE_OM_DB_CHECKPOINT_USE_V2_KEY, useV2CheckpointFormat());
     conf.setInt(OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP, 5);
     conf.setStorageSize(OMConfigKeys.OZONE_OM_RATIS_SEGMENT_SIZE_KEY, 16, StorageUnit.KB);
