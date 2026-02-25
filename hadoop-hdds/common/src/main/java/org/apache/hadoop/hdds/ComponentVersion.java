@@ -31,7 +31,7 @@ public interface ComponentVersion extends Versioned {
   int toProtoValue();
 
   @Override
-  default int version() {
+  default int serialize() {
     return toProtoValue();
   }
 }

@@ -72,7 +72,7 @@ public enum ClientVersion implements ComponentVersion {
 
   @Override
   public String toString() {
-    return name() + " (" + version() + ")";
+    return name() + " (" + serialize() + ")";
   }
 
   public static ClientVersion fromProtoValue(int value) {

@@ -66,7 +66,7 @@ public enum HDDSVersion implements ComponentVersion {
 
   @Override
   public String toString() {
-    return name() + " (" + version() + ")";
+    return name() + " (" + serialize() + ")";
   }
 
   public static HDDSVersion fromProtoValue(int value) {

@@ -88,7 +88,7 @@ public class TestUpgradeFinalizerActions {
 
     @Override
     public String toString() {
-      return name() + " (" + version() + ")";
+      return name() + " (" + serialize() + ")";
     }
 
     public void addAction(UpgradeAction upgradeAction) {

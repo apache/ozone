@@ -17,14 +17,14 @@
 
 package org.apache.hadoop.ozone;
 
-import org.apache.hadoop.ozone.upgrade.UpgradeAction;
 import java.util.Optional;
+import org.apache.hadoop.ozone.upgrade.UpgradeAction;
 
 /**
  * Base class defining the version in the entire system.
  */
 public interface Versioned {
-  int version();
+  int serialize();
 
   /**
    * @return the description of the version enum value.

@@ -69,7 +69,7 @@ public enum OMLayoutFeature implements LayoutFeature {
 
   @Override
   public String toString() {
-    return name() + " (" + version() + ")";
+    return name() + " (" + serialize() + ")";
   }
 
   /**

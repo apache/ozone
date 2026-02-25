@@ -26,7 +26,7 @@ public interface LayoutFeature extends Versioned {
   int layoutVersion();
 
   @Override
-  default int version() {
+  default int serialize() {
     return this.layoutVersion();
   }
 }

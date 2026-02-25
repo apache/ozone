@@ -84,7 +84,7 @@ public enum OzoneManagerVersion implements ComponentVersion {
 
   @Override
   public String toString() {
-    return name() + " (" + version() + ")";
+    return name() + " (" + serialize() + ")";
   }
 
   public static OzoneManagerVersion fromProtoValue(int value) {

@@ -92,7 +92,7 @@ public enum HDDSLayoutFeature implements LayoutFeature {
 
   @Override
   public String toString() {
-    return name() + " (" + version() + ")";
+    return name() + " (" + serialize() + ")";
   }
 
   public Optional<HDDSUpgradeAction> scmAction() {
