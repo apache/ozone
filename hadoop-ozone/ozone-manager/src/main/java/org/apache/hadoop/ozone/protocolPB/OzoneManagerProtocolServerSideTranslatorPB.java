@@ -231,39 +231,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
 
     if (!request.hasReadConsistencyHint() || !request.getReadConsistencyHint().hasReadConsistency() ||
         request.getReadConsistencyHint().getReadConsistency() == UNSPECIFIED) {
-      // Read from leader or followers using linearizable read
-      if (ozoneManager.getConfig().isFollowerReadLocalLeaseEnabled() &&
-          allowFollowerReadLocalLease(omRatisServer.getServerDivision(),
-              ozoneManager.getConfig().getFollowerReadLocalLeaseLagLimit(),
-              ozoneManager.getConfig().getFollowerReadLocalLeaseTimeMs())) {
-        ozoneManager.getMetrics().incNumFollowerReadLocalLeaseSuccess();
-        return handler.handleReadRequest(request);
-      }
-      // Get current OM's role
-      RaftServerStatus raftServerStatus = omRatisServer.getLeaderStatus();
-      // === 1. Follower linearizable read ===
-      if (raftServerStatus == NOT_LEADER && omRatisServer.isLinearizableRead()) {
-        ozoneManager.getMetrics().incNumLinearizableRead();
-        return ozoneManager.getOmExecutionFlow().submit(request, false);
-      }
-      // === 2. Leader local read (skip ReadIndex if allowed) ===
-      if (raftServerStatus == LEADER_AND_READY) {
-        if (ozoneManager.getConfig().isAllowLeaderSkipLinearizableRead()) {
-          ozoneManager.getMetrics().incNumLeaderSkipLinearizableRead();
-          // leader directly serves local committed data
-          return handler.handleReadRequest(request);
-        }
-        // otherwise use linearizable path when enabled
-        if (omRatisServer.isLinearizableRead()) {
-          ozoneManager.getMetrics().incNumLinearizableRead();
-          return ozoneManager.getOmExecutionFlow().submit(request, false);
-        }
-
-        // fallback to local read
-        return handler.handleReadRequest(request);
-      } else {
-        throw createLeaderErrorException(raftServerStatus);
-      }
+      return submitReadRequestToOmWithoutHint(request);
     } else {
       // If read consistency hint is specified, we should try to respect it although
       // there is no guarantee since it depends on the OM node configuration (e.g.
@@ -273,90 +241,142 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       RaftServerStatus raftServerStatus;
       switch (readConsistency) {
       case LOCAL_LEASE:
-        raftServerStatus = omRatisServer.getLeaderStatus();
-        switch (raftServerStatus) {
-        case NOT_LEADER:
-        case LEADER_AND_NOT_READY:
-          if (!ozoneManager.getConfig().isFollowerReadLocalLeaseEnabled()) {
-            throw createLeaderErrorException(raftServerStatus);
-          }
-          LocalLeaseContext localLeaseContext = readConsistencyHint.getLocalLeaseContext();
-          long localLeaseLagLimit = localLeaseContext.hasLagLimit() ?
-              localLeaseContext.getLagLimit() : ozoneManager.getConfig().getFollowerReadLocalLeaseLagLimit();
-          long localLeaseLeaseTimeMs = localLeaseContext.hasLeaseTimeMs() ?
-              localLeaseContext.getLeaseTimeMs() : ozoneManager.getConfig().getFollowerReadLocalLeaseTimeMs();
-          if (allowFollowerReadLocalLease(omRatisServer.getServerDivision(),
-              localLeaseLagLimit, localLeaseLeaseTimeMs)) {
-            ozoneManager.getMetrics().incNumFollowerReadLocalLeaseSuccess();
-            return handler.handleReadRequest(request);
-          }
-          // The LocalLease lag is too high, trigger failover
-          throw createLeaderErrorException(raftServerStatus);
-        case LEADER_AND_READY:
-          // Although local lease does not apply for leader (since leader is always up-to-date)
-          // We still add the local lease metrics for compatibility reasons
-          ozoneManager.getMetrics().incNumFollowerReadLocalLeaseSuccess();
-          return handler.handleReadRequest(request);
-        default:
-          throw createUnknownRaftServerStatusException(raftServerStatus);
-        }
+        return submitReadRequestToOmLocalLease(request, readConsistencyHint.getLocalLeaseContext());
       case LINEARIZABLE_LEADER_ONLY:
-        raftServerStatus = omRatisServer.getLeaderStatus();
-        switch (raftServerStatus) {
-        case NOT_LEADER:
-        case LEADER_AND_NOT_READY:
-          throw createLeaderErrorException(raftServerStatus);
-        case LEADER_AND_READY:
-          if (omRatisServer.isLinearizableRead()) {
-            ozoneManager.getMetrics().incNumLinearizableRead();
-            return ozoneManager.getOmExecutionFlow().submit(request, false);
-          } else {
-            // If linearizable read is not enabled, fallback to leader read
-            return handler.handleReadRequest(request);
-          }
-        default:
-          throw createUnknownRaftServerStatusException(raftServerStatus);
-        }
+        return submitReadRequestToOmLinearizableLeaderOnly(request);
       case LINEARIZABLE_ALLOW_FOLLOWER:
-        raftServerStatus = omRatisServer.getLeaderStatus();
-        switch (raftServerStatus) {
-        case LEADER_AND_NOT_READY:
-        case NOT_LEADER:
-          if (omRatisServer.isLinearizableRead()) {
-            ozoneManager.getMetrics().incNumLinearizableRead();
-            return ozoneManager.getOmExecutionFlow().submit(request, false);
-          } else {
-            throw createLeaderErrorException(raftServerStatus);
-          }
-        case LEADER_AND_READY:
-          if (ozoneManager.getConfig().isAllowLeaderSkipLinearizableRead()) {
-            ozoneManager.getMetrics().incNumLeaderSkipLinearizableRead();
-            // leader directly serves local committed data
-            return handler.handleReadRequest(request);
-          }
-
-          // If the Raft server read option is not LINEARIZABLE, this will
-          // use leader read
-          if (omRatisServer.isLinearizableRead()) {
-            ozoneManager.getMetrics().incNumLinearizableRead();
-          }
-          return ozoneManager.getOmExecutionFlow().submit(request, false);
-        default:
-          throw createUnknownRaftServerStatusException(raftServerStatus);
-        }
+        return submitReadRequestToOmLinearizableAllowFollower(request);
       case DEFAULT:
       default:
-        raftServerStatus = omRatisServer.getLeaderStatus();
-        switch (raftServerStatus) {
-        case LEADER_AND_READY:
-          return handler.handleReadRequest(request);
-        case LEADER_AND_NOT_READY:
-        case NOT_LEADER:
-          throw createLeaderErrorException(raftServerStatus);
-        default:
-          throw createUnknownRaftServerStatusException(raftServerStatus);
-        }
+        return submitReadRequestToOmDefault(request);
       }
+    }
+  }
+
+  private OMResponse submitReadRequestToOmWithoutHint(OMRequest request) throws ServiceException {
+    // Read from leader or followers using linearizable read
+    if (ozoneManager.getConfig().isFollowerReadLocalLeaseEnabled() &&
+        allowFollowerReadLocalLease(omRatisServer.getServerDivision(),
+            ozoneManager.getConfig().getFollowerReadLocalLeaseLagLimit(),
+            ozoneManager.getConfig().getFollowerReadLocalLeaseTimeMs())) {
+      ozoneManager.getMetrics().incNumFollowerReadLocalLeaseSuccess();
+      return handler.handleReadRequest(request);
+    }
+    // Get current OM's role
+    RaftServerStatus raftServerStatus = omRatisServer.getLeaderStatus();
+    // === 1. Follower linearizable read ===
+    if (raftServerStatus == NOT_LEADER && omRatisServer.isLinearizableRead()) {
+      ozoneManager.getMetrics().incNumLinearizableRead();
+      return ozoneManager.getOmExecutionFlow().submit(request, false);
+    }
+    // === 2. Leader local read (skip ReadIndex if allowed) ===
+    if (raftServerStatus == LEADER_AND_READY) {
+      if (ozoneManager.getConfig().isAllowLeaderSkipLinearizableRead()) {
+        ozoneManager.getMetrics().incNumLeaderSkipLinearizableRead();
+        // leader directly serves local committed data
+        return handler.handleReadRequest(request);
+      }
+      // otherwise use linearizable path when enabled
+      if (omRatisServer.isLinearizableRead()) {
+        ozoneManager.getMetrics().incNumLinearizableRead();
+        return ozoneManager.getOmExecutionFlow().submit(request, false);
+      }
+
+      // fallback to local read
+      return handler.handleReadRequest(request);
+    } else {
+      throw createLeaderErrorException(raftServerStatus);
+    }
+  }
+
+  private OMResponse submitReadRequestToOmLocalLease(OMRequest request, LocalLeaseContext localLeaseContext)
+      throws ServiceException {
+    RaftServerStatus raftServerStatus = omRatisServer.getLeaderStatus();
+    switch (raftServerStatus) {
+    case NOT_LEADER:
+    case LEADER_AND_NOT_READY:
+      if (!ozoneManager.getConfig().isFollowerReadLocalLeaseEnabled()) {
+        throw createLeaderErrorException(raftServerStatus);
+      }
+      long localLeaseLagLimit = localLeaseContext.hasLagLimit() ?
+          localLeaseContext.getLagLimit() : ozoneManager.getConfig().getFollowerReadLocalLeaseLagLimit();
+      long localLeaseLeaseTimeMs = localLeaseContext.hasLeaseTimeMs() ?
+          localLeaseContext.getLeaseTimeMs() : ozoneManager.getConfig().getFollowerReadLocalLeaseTimeMs();
+      if (allowFollowerReadLocalLease(omRatisServer.getServerDivision(),
+          localLeaseLagLimit, localLeaseLeaseTimeMs)) {
+        ozoneManager.getMetrics().incNumFollowerReadLocalLeaseSuccess();
+        return handler.handleReadRequest(request);
+      }
+      // The LocalLease lag is too high, trigger failover
+      throw createLeaderErrorException(raftServerStatus);
+    case LEADER_AND_READY:
+      // Although local lease does not apply for leader (since leader is always up-to-date)
+      // We still add the local lease metrics for compatibility reasons
+      ozoneManager.getMetrics().incNumFollowerReadLocalLeaseSuccess();
+      return handler.handleReadRequest(request);
+    default:
+      throw createUnknownRaftServerStatusException(raftServerStatus);
+    }
+  }
+
+  private OMResponse submitReadRequestToOmLinearizableLeaderOnly(OMRequest request) throws ServiceException {
+    RaftServerStatus raftServerStatus = omRatisServer.getLeaderStatus();
+    switch (raftServerStatus) {
+    case NOT_LEADER:
+    case LEADER_AND_NOT_READY:
+      throw createLeaderErrorException(raftServerStatus);
+    case LEADER_AND_READY:
+      if (omRatisServer.isLinearizableRead()) {
+        ozoneManager.getMetrics().incNumLinearizableRead();
+        return ozoneManager.getOmExecutionFlow().submit(request, false);
+      } else {
+        // If linearizable read is not enabled, fallback to leader read
+        return handler.handleReadRequest(request);
+      }
+    default:
+      throw createUnknownRaftServerStatusException(raftServerStatus);
+    }
+  }
+
+  private OMResponse submitReadRequestToOmLinearizableAllowFollower(OMRequest request) throws ServiceException {
+    RaftServerStatus raftServerStatus = omRatisServer.getLeaderStatus();
+    switch (raftServerStatus) {
+    case LEADER_AND_NOT_READY:
+    case NOT_LEADER:
+      if (omRatisServer.isLinearizableRead()) {
+        ozoneManager.getMetrics().incNumLinearizableRead();
+        return ozoneManager.getOmExecutionFlow().submit(request, false);
+      } else {
+        throw createLeaderErrorException(raftServerStatus);
+      }
+    case LEADER_AND_READY:
+      if (ozoneManager.getConfig().isAllowLeaderSkipLinearizableRead()) {
+        ozoneManager.getMetrics().incNumLeaderSkipLinearizableRead();
+        // leader directly serves local committed data
+        return handler.handleReadRequest(request);
+      }
+
+      // If the Raft server read option is not LINEARIZABLE, this will
+      // use leader read
+      if (omRatisServer.isLinearizableRead()) {
+        ozoneManager.getMetrics().incNumLinearizableRead();
+      }
+      return ozoneManager.getOmExecutionFlow().submit(request, false);
+    default:
+      throw createUnknownRaftServerStatusException(raftServerStatus);
+    }
+  }
+
+  private OMResponse submitReadRequestToOmDefault(OMRequest request) throws ServiceException {
+    RaftServerStatus raftServerStatus = omRatisServer.getLeaderStatus();
+    switch (raftServerStatus) {
+    case LEADER_AND_READY:
+      return handler.handleReadRequest(request);
+    case LEADER_AND_NOT_READY:
+    case NOT_LEADER:
+      throw createLeaderErrorException(raftServerStatus);
+    default:
+      throw createUnknownRaftServerStatusException(raftServerStatus);
     }
   }
 
