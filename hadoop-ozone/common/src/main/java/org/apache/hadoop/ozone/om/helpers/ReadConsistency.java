@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyHint;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyProto;
 
 /**
@@ -27,6 +28,19 @@ public enum ReadConsistency {
   LOCAL_LEASE(false, true),
   LINEARIZABLE_LEADER_ONLY(true, false),
   LINEARIZABLE_ALLOW_FOLLOWER(true, true);
+
+  private static final ReadConsistencyHint DEFAULT_HINT = ReadConsistencyHint.newBuilder()
+      .setReadConsistency(ReadConsistencyProto.DEFAULT)
+      .build();
+  private static final ReadConsistencyHint LOCAL_LEASE_HINT = ReadConsistencyHint.newBuilder()
+      .setReadConsistency(ReadConsistencyProto.LOCAL_LEASE)
+      .build();
+  private static final ReadConsistencyHint LINEARIZABLE_LEADER_ONLY_HINT = ReadConsistencyHint.newBuilder()
+      .setReadConsistency(ReadConsistencyProto.LINEARIZABLE_LEADER_ONLY)
+      .build();
+  private static final ReadConsistencyHint LINEARIZABLE_ALLOW_FOLLOWER_HINT = ReadConsistencyHint.newBuilder()
+      .setReadConsistency(ReadConsistencyProto.LINEARIZABLE_ALLOW_FOLLOWER)
+      .build();
 
   private final boolean linearizable;
   private final boolean followerRead;
@@ -73,6 +87,21 @@ public enum ReadConsistency {
     case DEFAULT:
     default:
       return ReadConsistency.DEFAULT;
+    }
+  }
+
+  public ReadConsistencyHint getHint() {
+    switch (this) {
+    case DEFAULT:
+      return DEFAULT_HINT;
+    case LOCAL_LEASE:
+      return LOCAL_LEASE_HINT;
+    case LINEARIZABLE_LEADER_ONLY:
+      return LINEARIZABLE_LEADER_ONLY_HINT;
+    case LINEARIZABLE_ALLOW_FOLLOWER:
+      return LINEARIZABLE_ALLOW_FOLLOWER_HINT;
+    default:
+      return null;
     }
   }
 }

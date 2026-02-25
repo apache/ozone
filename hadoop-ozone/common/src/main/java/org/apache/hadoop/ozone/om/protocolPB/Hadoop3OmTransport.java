@@ -38,7 +38,6 @@ import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyHint;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyProto;
 import org.apache.hadoop.security.UserGroupInformation;
 
 /**
@@ -55,7 +54,7 @@ public class Hadoop3OmTransport implements OmTransport {
 
   private final HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> omFailoverProxyProvider;
   private final boolean followerReadEnabled;
-  private final ReadConsistencyProto defaultLeaderReadConsistency;
+  private final ReadConsistencyHint defaultLeaderReadConsistencyHint;
   private HadoopRpcOMFollowerReadFailoverProxyProvider followerReadFailoverProxyProvider;
 
   public Hadoop3OmTransport(ConfigurationSource conf,
@@ -79,8 +78,8 @@ public class Hadoop3OmTransport implements OmTransport {
 
     String defaultLeaderReadConsistencyStr = conf.get(OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_KEY,
         OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_DEFAULT);
-    defaultLeaderReadConsistency = 
-        ReadConsistency.valueOf(defaultLeaderReadConsistencyStr).toProto();
+    ReadConsistency defaultLeaderReadConsistency = ReadConsistency.valueOf(defaultLeaderReadConsistencyStr);
+    defaultLeaderReadConsistencyHint = defaultLeaderReadConsistency.getHint();
 
     // TODO: In the future, we might support more FollowerReadProxyProvider strategies depending on factors
     //  like latency, applied index, etc.
@@ -91,8 +90,8 @@ public class Hadoop3OmTransport implements OmTransport {
           OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_KEY,
           OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_DEFAULT
       );
-      ReadConsistencyProto defaultFollowerReadConsistency =
-          ReadConsistency.valueOf(defaultFollowerReadConsistencyStr).toProto();
+      ReadConsistency defaultFollowerReadConsistency =
+          ReadConsistency.valueOf(defaultFollowerReadConsistencyStr);
       this.followerReadFailoverProxyProvider =
           new HadoopRpcOMFollowerReadFailoverProxyProvider(omFailoverProxyProvider,
               defaultFollowerReadConsistency,
@@ -132,16 +131,10 @@ public class Hadoop3OmTransport implements OmTransport {
       // If there is already user-defined read consistency hint, we should respect it
       return basePayload;
     }
-    if (defaultLeaderReadConsistency == ReadConsistencyProto.UNSPECIFIED) {
-      return basePayload;
-    }
 
     return basePayload.toBuilder()
-        .setReadConsistencyHint(
-            ReadConsistencyHint
-                .newBuilder()
-                .setReadConsistency(defaultLeaderReadConsistency)
-        ).build();
+        .setReadConsistencyHint(defaultLeaderReadConsistencyHint)
+        .build();
   }
 
   @Override

@@ -38,10 +38,12 @@ import org.apache.hadoop.ipc_.RpcNoSuchProtocolException;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
+import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyHint;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyProto;
+import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,19 +88,23 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
   /** The last proxy that has been used. Only used for testing. */
   private volatile OMProxyInfo<OzoneManagerProtocolPB> lastProxy = null;
 
-  private final ReadConsistencyProto followerReadConsistencyType;
-  private final ReadConsistencyProto leaderReadConsistencyType;
+  private final ReadConsistencyHint followerReadConsistency;
+  private final ReadConsistencyHint leaderReadConsistency;
 
   public HadoopRpcOMFollowerReadFailoverProxyProvider(
       HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> failoverProxy
   ) {
-    this(failoverProxy, ReadConsistencyProto.LINEARIZABLE_ALLOW_FOLLOWER, ReadConsistencyProto.DEFAULT);
+    this(failoverProxy, ReadConsistency.LINEARIZABLE_ALLOW_FOLLOWER, ReadConsistency.DEFAULT);
   }
 
   public HadoopRpcOMFollowerReadFailoverProxyProvider(
       HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> failoverProxy,
-      ReadConsistencyProto followerReadConsistencyType,
-      ReadConsistencyProto leaderReadConsistencyType) {
+      ReadConsistency followerReadConsistencyType,
+      ReadConsistency leaderReadConsistencyType) {
+    Preconditions.assertTrue(followerReadConsistencyType.allowFollowerRead(),
+        "Invalid follower read consistency " + followerReadConsistencyType);
+    Preconditions.assertTrue(!leaderReadConsistencyType.allowFollowerRead(),
+        "Invalid leader read consistency" + leaderReadConsistencyType);
     this.failoverProxy = failoverProxy;
     // Create a wrapped proxy containing all the proxies. Since this combined
     // proxy is just redirecting to other proxies, all invocations can share it.
@@ -110,8 +116,8 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
         new Class<?>[] {OzoneManagerProtocolPB.class}, new FollowerReadInvocationHandler());
     combinedProxy = new ProxyInfo<>(wrappedProxy, combinedInfo);
     this.useFollowerRead = true;
-    this.followerReadConsistencyType = followerReadConsistencyType;
-    this.leaderReadConsistencyType = leaderReadConsistencyType;
+    this.followerReadConsistency = followerReadConsistencyType.getHint();
+    this.leaderReadConsistency = leaderReadConsistencyType.getHint();
   }
 
   @Override
@@ -235,13 +241,11 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
       // for read requests.
       boolean isFollowerReadEligible = useFollowerRead && OmUtils.shouldSendToFollower(omRequest);
       if (!omRequest.hasReadConsistencyHint()) {
-        ReadConsistencyProto defaultReadConsistency = isFollowerReadEligible
-            ? followerReadConsistencyType : leaderReadConsistencyType;
-        if (defaultReadConsistency != null &&
-            defaultReadConsistency != ReadConsistencyProto.UNSPECIFIED) {
+        final ReadConsistencyHint defaultReadConsistency = isFollowerReadEligible
+            ? followerReadConsistency : leaderReadConsistency;
+        if (defaultReadConsistency != null) {
           omRequest = omRequest.toBuilder()
-              .setReadConsistencyHint(ReadConsistencyHint.newBuilder()
-                  .setReadConsistency(defaultReadConsistency).build())
+              .setReadConsistencyHint(defaultReadConsistency)
               .build();
           args[1] = omRequest;
         }
