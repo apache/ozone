@@ -262,9 +262,9 @@ const Capacity: React.FC<object> = () => {
             <>
               <div className='unused-space-breakdown'>
                 File System Capacity
-                <Tag color='red'>{filesize(storageDistribution.data.globalStorage.totalFileSystemCapacity, { round: 1 })}</Tag>
+                <Tag color='blue'>{filesize(storageDistribution.data.globalStorage.totalFileSystemCapacity, { round: 1 })}</Tag>
                 Reserved Space
-                <Tag color='green'>{filesize(storageDistribution.data.globalStorage.totalReservedSpace, { round: 1 })}</Tag>
+                <Tag color='orange'>{filesize(storageDistribution.data.globalStorage.totalReservedSpace, { round: 1 })}</Tag>
               </div>
               <div className="capacity-info">
                 Ozone Capacity shows how much usable space is available after subtracting the reserved space from the file system capacity.
