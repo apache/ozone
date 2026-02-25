@@ -19,10 +19,10 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationManager.ReplicationManagerConfiguration;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyString;
@@ -419,21 +419,23 @@ public class TestContainerBalancerTask {
     ContainerBalancerConfiguration cbConf = conf.getObject(ContainerBalancerConfiguration.class);
 
     // Testing invalid hostname and ip for includeNodes
-    cbConf.setIncludeNodes("invalid-host-name");
-    assertThrows(InvalidContainerBalancerConfigurationException.class, () -> balancer.startBalancer(cbConf),
-        "Should throw exception for non-existent hostname in includeNodes");
-    cbConf.setIncludeNodes("883.883.883.883");
-    assertThrows(InvalidContainerBalancerConfigurationException.class, () -> balancer.startBalancer(cbConf),
-        "Should throw exception for non-existent IP in includeNodes");
+    String invalidHost = "invalid-host-name";
+    cbConf.setIncludeNodes(invalidHost);
+    assertThatThrownBy(() -> balancer.startBalancer(cbConf)).
+        isInstanceOf(InvalidContainerBalancerConfigurationException.class).hasMessageContaining(invalidHost);
+    String invalidIp = "883.883.883.883";
+    cbConf.setIncludeNodes(invalidIp);
+    assertThatThrownBy(() -> balancer.startBalancer(cbConf))
+        .isInstanceOf(InvalidContainerBalancerConfigurationException.class).hasMessageContaining(invalidIp);
     cbConf.setIncludeNodes("");
 
     // Testing invalid hostname and ip for excludeNodes
-    cbConf.setExcludeNodes("invalid-host-name");
-    assertThrows(InvalidContainerBalancerConfigurationException.class, () -> balancer.startBalancer(cbConf),
-        "Should throw exception for non-existent hostname in excludeNodes");
-    cbConf.setExcludeNodes("883.883.883.883");
-    assertThrows(InvalidContainerBalancerConfigurationException.class, () -> balancer.startBalancer(cbConf),
-        "Should throw exception for non-existent IP in excludeNodes");
+    cbConf.setExcludeNodes(invalidHost);
+    assertThatThrownBy(() -> balancer.startBalancer(cbConf))
+        .isInstanceOf(InvalidContainerBalancerConfigurationException.class).hasMessageContaining(invalidHost);
+    cbConf.setExcludeNodes(invalidIp);
+    assertThatThrownBy(() -> balancer.startBalancer(cbConf))
+        .isInstanceOf(InvalidContainerBalancerConfigurationException.class).hasMessageContaining(invalidIp);
     cbConf.setExcludeNodes("");
 
     // Testing a valid case

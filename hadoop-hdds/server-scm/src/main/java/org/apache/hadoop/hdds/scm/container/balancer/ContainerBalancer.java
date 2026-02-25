@@ -515,6 +515,13 @@ public class ContainerBalancer extends StatefulService {
     return status + config.toString();
   }
 
+  /**
+   * Validates if the provided datanodes are known by SCM.
+   *
+   * @param nodes set of datanode hostnames or IP addresses
+   * @param type context label for the error message
+   * @throws InvalidContainerBalancerConfigurationException if a node is unknown
+   */
   private void validateNodeList(Set<String> nodes, String type)
       throws InvalidContainerBalancerConfigurationException {
     if (nodes == null || nodes.isEmpty()) {
