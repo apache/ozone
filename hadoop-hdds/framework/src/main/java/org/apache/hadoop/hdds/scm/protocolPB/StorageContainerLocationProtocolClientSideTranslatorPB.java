@@ -115,6 +115,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationRequest;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationRequest.Builder;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationResponse;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SetAckMissingContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SingleNodeQueryRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SingleNodeQueryResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerRequestProto;
@@ -1245,5 +1246,15 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         .build();
     // TODO check error handling.
     submitRequest(Type.ReconcileContainer, builder -> builder.setReconcileContainerRequest(request));
+  }
+
+  @Override
+  public void setAckMissingContainer(long containerID, boolean acknowledge) 
+      throws IOException {
+    SetAckMissingContainerRequestProto request = SetAckMissingContainerRequestProto.newBuilder()
+        .setContainerID(containerID)
+        .setAcknowledge(acknowledge)
+        .build();
+    submitRequest(Type.SetAckMissingContainer, builder -> builder.setSetAckMissingContainerRequest(request));
   }
 }

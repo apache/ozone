@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
@@ -222,4 +223,14 @@ public interface ContainerManager {
    * @return containerStateManger
    */
   ContainerStateManager getContainerStateManager();
+
+  /**
+   * Update container info in the container manager.
+   * This is used for updating container metadata like ackMissing flag.
+   *
+   * @param containerInfo Updated container info proto
+   * @throws IOException
+   */
+  void updateContainerInfo(ContainerID containerID, ContainerInfoProto containerInfo)
+      throws IOException;
 }

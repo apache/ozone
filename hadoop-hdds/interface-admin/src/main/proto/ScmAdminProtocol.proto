@@ -87,6 +87,7 @@ message ScmContainerLocationRequest {
   optional ContainerBalancerStatusInfoRequestProto containerBalancerStatusInfoRequest = 48;
   optional ReconcileContainerRequestProto reconcileContainerRequest = 49;
   optional GetDeletedBlocksTxnSummaryRequestProto getDeletedBlocksTxnSummaryRequest = 50;
+  optional SetAckMissingContainerRequestProto setAckMissingContainerRequest = 51;
 }
 
 message ScmContainerLocationResponse {
@@ -145,6 +146,7 @@ message ScmContainerLocationResponse {
   optional ContainerBalancerStatusInfoResponseProto containerBalancerStatusInfoResponse = 48;
   optional ReconcileContainerResponseProto reconcileContainerResponse = 49;
   optional GetDeletedBlocksTxnSummaryResponseProto getDeletedBlocksTxnSummaryResponse = 50;
+  optional SetAckMissingContainerResponseProto setAckMissingContainerResponse = 51;
 
   enum Status {
     OK = 1;
@@ -202,6 +204,7 @@ enum Type {
   GetContainerBalancerStatusInfo = 44;
   ReconcileContainer = 45;
   GetDeletedBlocksTransactionSummary = 46;
+  SetAckMissingContainer = 47;
 }
 
 /**
@@ -694,6 +697,14 @@ message ReconcileContainerRequestProto {
 }
 
 message ReconcileContainerResponseProto {
+}
+
+message SetAckMissingContainerRequestProto {
+  optional int64 containerID = 1;
+  optional bool acknowledge = 2;
+}
+
+message SetAckMissingContainerResponseProto {
 }
 
 /**

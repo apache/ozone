@@ -122,6 +122,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationRequest;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationResponse;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ScmContainerLocationResponse.Status;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SetAckMissingContainerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SetAckMissingContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SingleNodeQueryRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SingleNodeQueryResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerRequestProto;
@@ -747,6 +749,13 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setCmdType(request.getCmdType())
             .setStatus(Status.OK)
             .setReconcileContainerResponse(reconcileContainer(request.getReconcileContainerRequest()))
+            .build();
+      case SetAckMissingContainer:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setSetAckMissingContainerResponse(
+                setAckMissingContainer(request.getSetAckMissingContainerRequest()))
             .build();
       default:
         throw new IllegalArgumentException(
@@ -1392,4 +1401,9 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     return ReconcileContainerResponseProto.getDefaultInstance();
   }
 
+  public SetAckMissingContainerResponseProto setAckMissingContainer(
+      SetAckMissingContainerRequestProto request) throws IOException {
+    impl.setAckMissingContainer(request.getContainerID(), request.getAcknowledge());
+    return SetAckMissingContainerResponseProto.getDefaultInstance();
+  }
 }

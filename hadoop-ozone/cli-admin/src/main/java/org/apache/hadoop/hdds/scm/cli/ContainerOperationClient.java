@@ -599,4 +599,9 @@ public class ContainerOperationClient implements ScmClient {
   public void reconcileContainer(long id) throws IOException {
     storageContainerLocationClient.reconcileContainer(id);
   }
+
+  @Override
+  public void setAckMissingContainer(long containerId, boolean acknowledge) throws IOException {
+    storageContainerLocationClient.setAckMissingContainer(containerId, acknowledge);
+  }
 }

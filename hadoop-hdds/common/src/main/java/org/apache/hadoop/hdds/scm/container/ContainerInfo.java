@@ -123,6 +123,10 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
         .setReplicationConfig(config)
         .setSequenceId(info.getSequenceId());
 
+    if (info.hasAckMissing() && info.getAckMissing()) {
+      builder.setHealthState(ContainerHealthState.ACK_MISSING);
+    }
+
     if (info.hasPipelineID()) {
       builder.setPipelineID(PipelineID.getFromProtobuf(info.getPipelineID()));
     }
@@ -286,6 +290,11 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
 
     if (getPipelineID() != null) {
       builder.setPipelineID(getPipelineID().getProtobuf());
+    }
+
+    // Only persist ACK_MISSING health state, others are dynamic
+    if (healthState == ContainerHealthState.ACK_MISSING) {
+      builder.setAckMissing(true);
     }
 
     return builder.build();

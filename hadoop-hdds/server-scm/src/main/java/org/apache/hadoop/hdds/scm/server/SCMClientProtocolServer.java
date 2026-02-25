@@ -71,6 +71,7 @@ import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.scm.DatanodeAdminError;
 import org.apache.hadoop.hdds.scm.FetchMetrics;
 import org.apache.hadoop.hdds.scm.ScmInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerListResult;
@@ -1685,6 +1686,43 @@ public class SCMClientProtocolServer implements
       AUDIT.logWriteSuccess(buildAuditMessageForSuccess(SCMAction.RECONCILE_CONTAINER, auditMap));
     } catch (SCMException ex) {
       AUDIT.logWriteFailure(buildAuditMessageForFailure(SCMAction.RECONCILE_CONTAINER, auditMap, ex));
+      throw ex;
+    }
+  }
+
+  @Override
+  public void setAckMissingContainer(long longContainerID, boolean acknowledge) throws IOException {
+    ContainerID containerID = ContainerID.valueOf(longContainerID);
+    final Map<String, String> auditMap = new HashMap<>();
+    auditMap.put("containerID", containerID.toString());
+    auditMap.put("acknowledge", String.valueOf(acknowledge));
+
+    try {
+      getScm().checkAdminAccess(getRemoteUser(), false);
+      ContainerInfo containerInfo = scm.getContainerManager().getContainer(containerID);
+      
+      if (acknowledge) {
+        // Validation for setting ACK_MISSING
+        Set<ContainerReplica> replicas = scm.getContainerManager().getContainerReplicas(containerID);
+        if (replicas != null && !replicas.isEmpty()) {
+          throw new IOException("Container " + longContainerID + " has " + replicas.size() +
+              " replicas and cannot be acknowledged as missing");
+        }
+        if (containerInfo.getNumberOfKeys() == 0) {
+          throw new IOException("Container " + longContainerID + " is empty (0 keys) and cannot be acknowledged.");
+        }
+        // Set to ACK_MISSING
+        containerInfo.setHealthState(ContainerHealthState.ACK_MISSING);
+        AUDIT.logWriteSuccess(buildAuditMessageForSuccess(SCMAction.ACKNOWLEDGE_MISSING_CONTAINER, auditMap));
+      } else {
+        containerInfo.setHealthState(null);
+        AUDIT.logWriteSuccess(buildAuditMessageForSuccess(SCMAction.UNACKNOWLEDGE_MISSING_CONTAINER, auditMap));
+      }
+      scm.getContainerManager().updateContainerInfo(containerID, containerInfo.getProtobuf());
+    } catch (IOException ex) {
+      SCMAction action = acknowledge ?
+          SCMAction.ACKNOWLEDGE_MISSING_CONTAINER : SCMAction.UNACKNOWLEDGE_MISSING_CONTAINER;
+      AUDIT.logWriteFailure(buildAuditMessageForFailure(action, auditMap, ex));
       throw ex;
     }
   }

@@ -464,4 +464,12 @@ public interface ScmClient extends Closeable {
    */
   void reconcileContainer(long containerID) throws IOException;
 
+  /**
+   * Set or unset the ACK_MISSING state for a container.
+   *
+   * @param containerId The ID of the container.
+   * @param acknowledge true to set ACK_MISSING, false to unset to MISSING.
+   * @throws IOException
+   */
+  void setAckMissingContainer(long containerId, boolean acknowledge) throws IOException;
 }

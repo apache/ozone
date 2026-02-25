@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
+import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.ACK_MISSING;
 import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.EMPTY;
 import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.HEALTHY;
 import static org.apache.hadoop.hdds.scm.container.ContainerHealthState.MISSING;
@@ -37,6 +38,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -59,6 +63,7 @@ public class TestContainerHealthState {
     assertEquals(7, OPEN_UNHEALTHY.getValue());
     assertEquals(8, QUASI_CLOSED_STUCK.getValue());
     assertEquals(9, OPEN_WITHOUT_PIPELINE.getValue());
+    assertEquals(10, ACK_MISSING.getValue());
   }
 
   @Test
@@ -69,7 +74,7 @@ public class TestContainerHealthState {
     assertEquals(102, MISSING_UNDER_REPLICATED.getValue());
     assertEquals(103, QUASI_CLOSED_STUCK_UNDER_REPLICATED.getValue());
     assertEquals(104, QUASI_CLOSED_STUCK_OVER_REPLICATED.getValue());
-    assertEquals(105, ContainerHealthState.QUASI_CLOSED_STUCK_MISSING.getValue());
+    assertEquals(105, QUASI_CLOSED_STUCK_MISSING.getValue());
   }
 
   @Test
@@ -101,6 +106,7 @@ public class TestContainerHealthState {
     assertEquals(OPEN_UNHEALTHY, ContainerHealthState.fromValue((short) 7));
     assertEquals(QUASI_CLOSED_STUCK, ContainerHealthState.fromValue((short) 8));
     assertEquals(OPEN_WITHOUT_PIPELINE, ContainerHealthState.fromValue((short) 9));
+    assertEquals(ACK_MISSING, ContainerHealthState.fromValue((short) 10));
   }
 
   @Test
@@ -126,7 +132,7 @@ public class TestContainerHealthState {
   @Test
   public void testAllEnumValuesAreUnique() {
     // Verify all enum constants have unique values
-    java.util.Set<Short> values = new java.util.HashSet<>();
+    Set<Short> values = new HashSet<>();
     for (ContainerHealthState state : ContainerHealthState.values()) {
       assertFalse(values.contains(state.getValue()),
           "Duplicate value found: " + state.getValue());
@@ -137,16 +143,16 @@ public class TestContainerHealthState {
   @Test
   public void testIndividualStateCount() {
     // Should have 10 individual states (0-9)
-    long individualCount = java.util.Arrays.stream(ContainerHealthState.values())
+    long individualCount = Arrays.stream(ContainerHealthState.values())
         .filter(s -> s.getValue() >= 0 && s.getValue() <= 99)
         .count();
-    assertEquals(10, individualCount, "Expected 10 individual states");
+    assertEquals(11, individualCount, "Expected 10 individual states");
   }
 
   @Test
   public void testCombinationStateCount() {
     // Should have 6 combination states (100-105)
-    long combinationCount = java.util.Arrays.stream(ContainerHealthState.values())
+    long combinationCount = Arrays.stream(ContainerHealthState.values())
         .filter(s -> s.getValue() >= 100)
         .count();
     assertEquals(6, combinationCount, "Expected 6 combination states");
