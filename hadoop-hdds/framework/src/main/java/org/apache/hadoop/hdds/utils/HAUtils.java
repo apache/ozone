@@ -250,6 +250,7 @@ public final class HAUtils {
     try (DBStore dbStore = DBStoreBuilder
         .newBuilder(tempConfig, definition, dbName, dbDir)
         .setOpenReadOnly(true)
+        .setCreateCheckpointDirs(false)
         .build()) {
       // Get the table name with TransactionInfo as the value. The transaction
       // info table name are different in SCM and SCM.
