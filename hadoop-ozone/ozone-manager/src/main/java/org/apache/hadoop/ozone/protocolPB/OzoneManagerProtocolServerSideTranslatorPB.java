@@ -321,7 +321,6 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
         raftServerStatus = omRatisServer.getLeaderStatus();
         switch (raftServerStatus) {
         case LEADER_AND_NOT_READY:
-          throw createLeaderErrorException(raftServerStatus);
         case NOT_LEADER:
           if (omRatisServer.isLinearizableRead()) {
             ozoneManager.getMetrics().incNumLinearizableRead();
