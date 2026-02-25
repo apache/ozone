@@ -318,6 +318,13 @@ public class TestOMRatisSnapshots {
   }
 
   private void checkSnapshot(OzoneManager leaderOM, OzoneManager followerOM,
+      String snapshotName,
+      List<String> keys, SnapshotInfo snapshotInfo) throws RocksDBException, IOException {
+    checkSnapshot(volumeName, bucketName, leaderOM, followerOM, snapshotName, keys, snapshotInfo);
+  }
+
+  static void checkSnapshot(String volumeName, String bucketName,
+      OzoneManager leaderOM, OzoneManager followerOM,
                              String snapshotName,
                              List<String> keys, SnapshotInfo snapshotInfo)
       throws IOException, RocksDBException {
@@ -1097,6 +1104,12 @@ public class TestOMRatisSnapshots {
 
   private SnapshotInfo createOzoneSnapshot(OzoneManager leaderOM, String name)
       throws IOException {
+    return createOzoneSnapshot(objectStore, volumeName, bucketName, leaderOM, name);
+  }
+
+  static SnapshotInfo createOzoneSnapshot(ObjectStore objectStore, String volumeName, String bucketName,
+      OzoneManager leaderOM, String name)
+      throws IOException {
     objectStore.createSnapshot(volumeName, bucketName, name);
 
     String tableKey = SnapshotInfo.getTableKey(volumeName,
@@ -1130,6 +1143,10 @@ public class TestOMRatisSnapshots {
   }
 
   private List<String> writeKeys(long keyCount) throws IOException {
+    return writeKeys(ozoneBucket, keyCount);
+  }
+
+  static List<String> writeKeys(OzoneBucket ozoneBucket, long keyCount) throws IOException {
     List<String> keys = new ArrayList<>();
     long index = 0;
     while (index < keyCount) {

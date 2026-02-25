@@ -22,6 +22,8 @@ import static java.net.HttpURLConnection.HTTP_OK;
 import static org.apache.hadoop.ozone.OzoneConsts.MULTIPART_FORM_DATA_BOUNDARY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_CHECKPOINT_USE_V2_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_CHECKPOINT_USE_V2_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_PROVIDER_CONNECTION_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_PROVIDER_CONNECTION_TIMEOUT_KEY;
@@ -83,6 +85,7 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
   private final HttpConfig.Policy httpPolicy;
   private final boolean spnegoEnabled;
   private final URLConnectionFactory connectionFactory;
+  private final boolean useV2CheckpointApi;
 
   public OmRatisSnapshotProvider(File snapshotDir,
       Map<String, OMNodeDetails> peerNodesMap, HttpConfig.Policy httpPolicy,
@@ -92,6 +95,7 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
     this.httpPolicy = httpPolicy;
     this.spnegoEnabled = spnegoEnabled;
     this.connectionFactory = connectionFactory;
+    this.useV2CheckpointApi = OZONE_OM_DB_CHECKPOINT_USE_V2_DEFAULT;
   }
 
   public OmRatisSnapshotProvider(MutableConfigurationSource conf,
@@ -100,6 +104,8 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
     LOG.info("Initializing OM Snapshot Provider");
     this.peerNodesMap = new ConcurrentHashMap<>();
     peerNodesMap.putAll(peerNodeDetails);
+    this.useV2CheckpointApi = conf.getBoolean(OZONE_OM_DB_CHECKPOINT_USE_V2_KEY,
+        OZONE_OM_DB_CHECKPOINT_USE_V2_DEFAULT);
 
     this.httpPolicy = HttpConfig.getHttpPolicy(conf);
     this.spnegoEnabled = conf.get(OZONE_OM_HTTP_AUTH_TYPE, "simple")
@@ -143,7 +149,7 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
       throws IOException {
     OMNodeDetails leader = peerNodesMap.get(leaderNodeID);
     URL omCheckpointUrl = leader.getOMDBCheckpointEndpointUrl(
-        httpPolicy.isHttpEnabled(), true);
+        useV2CheckpointApi, httpPolicy.isHttpEnabled(), true);
     LOG.info("Downloading latest checkpoint from Leader OM {}. Checkpoint: {} URL: {}",
         leaderNodeID, targetFile.getName(), omCheckpointUrl);
     SecurityUtil.doAsCurrentUser(() -> {
@@ -212,7 +218,7 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
 
   @Override
   public DBCheckpoint getCheckpointFromUntarredDb(Path untarredDbDir) throws IOException {
-    return new InodeMetadataRocksDBCheckpoint(untarredDbDir);
+    return new InodeMetadataRocksDBCheckpoint(untarredDbDir, useV2CheckpointApi);
   }
 
   /**

@@ -226,6 +226,10 @@ public final class OMConfigKeys {
   public static final long
       OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT = 10737418240L;
 
+  public static final String OZONE_OM_DB_CHECKPOINT_USE_V2_KEY
+      = "ozone.om.db.checkpoint.use.v2";
+  public static final boolean OZONE_OM_DB_CHECKPOINT_USE_V2_DEFAULT = true;
+
   // OM Ratis server configurations
   public static final String OZONE_OM_RATIS_SERVER_REQUEST_TIMEOUT_KEY
       = "ozone.om.ratis.server.request.timeout";
