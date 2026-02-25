@@ -49,6 +49,21 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
   private static final Logger LOG =
       LoggerFactory.getLogger(AbstractLayoutVersionManager.class);
 
+  private final AtomicReference<State> state = new AtomicReference<>();
+
+  private final AtomicBoolean initialized = new AtomicBoolean(false);
+
+  @VisibleForTesting
+  protected volatile NavigableMap<Integer, LayoutFeature> features =
+      Collections.unmodifiableNavigableMap(new TreeMap<>());
+  @VisibleForTesting
+  protected volatile Map<String, LayoutFeature> featureMap =
+      Collections.unmodifiableMap(new HashMap<>());
+  // Allows querying upgrade state while an upgrade is in progress.
+  // Note that MLV may have been incremented during the upgrade
+  // by the time the value is read/used.
+  private ObjectName mBean;
+
   private static final class State {
     final int metadataLayoutVersion; // MLV
     final int softwareLayoutVersion; // SLV
@@ -72,22 +87,7 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
       return new State(newMlv, softwareLayoutVersion, computeStatus(newMlv, softwareLayoutVersion));
     }
   }
-
-  private final AtomicReference<State> state = new AtomicReference<>();
-
-  private final AtomicBoolean initialized = new AtomicBoolean(false);
-
-  @VisibleForTesting
-  protected volatile NavigableMap<Integer, LayoutFeature> features =
-      Collections.unmodifiableNavigableMap(new TreeMap<>());
-  @VisibleForTesting
-  protected volatile Map<String, LayoutFeature> featureMap =
-      Collections.unmodifiableMap(new HashMap<>());
-  // Allows querying upgrade state while an upgrade is in progress.
-  // Note that MLV may have been incremented during the upgrade
-  // by the time the value is read/used.
-  private ObjectName mBean;
-
+  
   private State requireState() {
     State s = state.get();
     Preconditions.checkState(s != null, "LayoutVersionManager is not initialized.");
