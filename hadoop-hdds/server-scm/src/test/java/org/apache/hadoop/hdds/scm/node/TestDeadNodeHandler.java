@@ -83,7 +83,7 @@ public class TestDeadNodeHandler {
   private ContainerManager containerManager;
   private PipelineManagerImpl pipelineManager;
   private DeadNodeHandler deadNodeHandler;
-  private HealthyReadOnlyNodeHandler healthyReadOnlyNodeHandler;
+  private UnhealthyToHealthyNodeHandler unhealthyToHealthyNodeHandler;
   private EventPublisher publisher;
   @TempDir
   private File storageDir;
@@ -118,9 +118,7 @@ public class TestDeadNodeHandler {
     deletedBlockLog = mock(DeletedBlockLog.class);
     deadNodeHandler = new DeadNodeHandler(nodeManager,
         mock(PipelineManager.class), containerManager, deletedBlockLog);
-    healthyReadOnlyNodeHandler =
-        new HealthyReadOnlyNodeHandler(nodeManager,
-            pipelineManager);
+    unhealthyToHealthyNodeHandler = new UnhealthyToHealthyNodeHandler(nodeManager, scm.getSCMServiceManager());
     eventQueue.addHandler(SCMEvents.DEAD_NODE, deadNodeHandler);
     publisher = mock(EventPublisher.class);
   }
@@ -284,7 +282,7 @@ public class TestDeadNodeHandler {
     assertEquals(datanode3, container3Replicas.iterator().next().getDatanodeDetails());
 
     //datanode will be added back to ClusterNetworkTopology if it resurrects
-    healthyReadOnlyNodeHandler.onMessage(datanode1, publisher);
+    unhealthyToHealthyNodeHandler.onMessage(datanode1, publisher);
     assertTrue(
         nodeManager.getClusterNetworkTopologyMap().contains(datanode1));
 

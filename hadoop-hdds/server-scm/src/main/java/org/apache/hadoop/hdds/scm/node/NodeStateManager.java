@@ -19,12 +19,10 @@ package org.apache.hadoop.hdds.scm.node;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_STALENODE_INTERVAL;
-import static org.apache.hadoop.hdds.scm.events.SCMEvents.HEALTHY_READONLY_NODE;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -221,32 +219,20 @@ public class NodeStateManager implements Runnable, Closeable {
   private void initialiseState2EventMap() {
     state2EventMap.put(STALE, SCMEvents.STALE_NODE);
     state2EventMap.put(DEAD, SCMEvents.DEAD_NODE);
-    state2EventMap
-        .put(HEALTHY, SCMEvents.HEALTHY_READONLY_TO_HEALTHY_NODE);
-    state2EventMap
-        .put(NodeState.HEALTHY_READONLY, HEALTHY_READONLY_NODE);
+    state2EventMap.put(HEALTHY, SCMEvents.UNHEALTHY_TO_HEALTHY_NODE);
   }
 
   /*
    *
    * Node and State Transition Mapping:
    *
-   * State: HEALTHY             -------------------> STALE
+   * State: HEALTHY         -------------------> STALE
    * Event:                          TIMEOUT
    *
-   * State: HEALTHY             -------------------> HEALTHY_READONLY
-   * Event:                       LAYOUT_MISMATCH
-   *
-   * State: HEALTHY_READONLY    -------------------> HEALTHY
-   * Event:                       LAYOUT_MATCH
-   *
-   * State: HEALTHY_READONLY    -------------------> STALE
-   * Event:                          TIMEOUT
-   *
-   * State: STALE           -------------------> HEALTHY_READONLY
+   * State: STALE           -------------------> HEALTHY
    * Event:                       RESTORE
    *
-   * State: DEAD            -------------------> HEALTHY_READONLY
+   * State: DEAD            -------------------> HEALTHY
    * Event:                       RESURRECT
    *
    * State: STALE           -------------------> DEAD
@@ -254,39 +240,16 @@ public class NodeStateManager implements Runnable, Closeable {
    *
    *  Node State Flow
    *
-   *                                        +-----<---------<---+
-   *                                        |    (RESURRECT)    |
-   *    +-->-----(LAYOUT_MISMATCH)-->--+    V                   |
-   *    |                              |    |                   ^
-   *    |                              |    |                   |
-   *    |                              V    V                   |
-   *    |  +-----(LAYOUT_MATCH)--[HEALTHY_READONLY]             |
-   *    |  |                            ^  |                    |
-   *    |  |                            |  |                    ^
-   *    |  |                            |  |(TIMEOUT)           |
-   *    ^  |                  (RESTORE) |  |                    |
-   *    |  V                            |  V                    |
-   * [HEALTHY]---->----------------->[STALE]------->--------->[DEAD]
-   *               (TIMEOUT)                  (TIMEOUT)
-   *
    */
 
   /**
    * Initializes the lifecycle of node state machine.
    */
   private void initializeStateMachines() {
-    nodeHealthSM.addTransition(HEALTHY_READONLY, HEALTHY,
-        NodeLifeCycleEvent.LAYOUT_MATCH);
-    nodeHealthSM.addTransition(HEALTHY_READONLY, STALE,
-        NodeLifeCycleEvent.TIMEOUT);
     nodeHealthSM.addTransition(HEALTHY, STALE, NodeLifeCycleEvent.TIMEOUT);
-    nodeHealthSM.addTransition(HEALTHY, HEALTHY_READONLY,
-        NodeLifeCycleEvent.LAYOUT_MISMATCH);
     nodeHealthSM.addTransition(STALE, DEAD, NodeLifeCycleEvent.TIMEOUT);
-    nodeHealthSM.addTransition(STALE, HEALTHY_READONLY,
-        NodeLifeCycleEvent.RESTORE);
-    nodeHealthSM.addTransition(DEAD, HEALTHY_READONLY,
-        NodeLifeCycleEvent.RESURRECT);
+    nodeHealthSM.addTransition(STALE, HEALTHY, NodeLifeCycleEvent.RESTORE);
+    nodeHealthSM.addTransition(DEAD, HEALTHY, NodeLifeCycleEvent.RESURRECT);
   }
 
   /**
@@ -309,7 +272,7 @@ public class NodeStateManager implements Runnable, Closeable {
   }
 
   private DatanodeInfo newDatanodeInfo(DatanodeDetails datanode, LayoutVersionProto layout) {
-    final NodeStatus status = newNodeStatus(datanode, layout);
+    final NodeStatus status = newNodeStatus(datanode);
     return new DatanodeInfo(datanode, status, layout);
   }
 
@@ -320,22 +283,15 @@ public class NodeStateManager implements Runnable, Closeable {
    * updated to reflect the datanode state.
    * @param dn DatanodeDetails reported by the datanode
    */
-  private NodeStatus newNodeStatus(DatanodeDetails dn,
-      LayoutVersionProto layoutInfo) {
+  private NodeStatus newNodeStatus(DatanodeDetails dn) {
     HddsProtos.NodeOperationalState dnOpState = dn.getPersistedOpState();
-    NodeState state = HEALTHY;
-
-    if (layoutMisMatchCondition.test(layoutInfo)) {
-      state = HEALTHY_READONLY;
-    }
-
     if (dnOpState != NodeOperationalState.IN_SERVICE) {
       LOG.info("Updating nodeOperationalState on registration as the " +
               "datanode has a persisted state of {} and expiry of {}",
           dnOpState, dn.getPersistedOpStateExpiryEpochSec());
-      return NodeStatus.valueOf(dnOpState, state, dn.getPersistedOpStateExpiryEpochSec());
+      return NodeStatus.valueOf(dnOpState, HEALTHY, dn.getPersistedOpStateExpiryEpochSec());
     } else {
-      return NodeStatus.valueOf(NodeOperationalState.IN_SERVICE, state);
+      return NodeStatus.valueOf(NodeOperationalState.IN_SERVICE, HEALTHY);
     }
   }
 
@@ -756,37 +712,6 @@ public class NodeStateManager implements Runnable, Closeable {
   }
 
   /**
-   * Upgrade finalization needs to move all nodes to a healthy readonly state
-   * when finalization finishes to make sure no nodes with metadata layout
-   * version older than SCM's are used in pipelines. Pipeline creation is
-   * still frozen at this point in the finalization flow.
-   *
-   * This method is synchronized to coordinate node state updates between
-   * the upgrade finalization thread which calls this method, and the
-   * node health processing thread that calls {@link #checkNodesHealth}.
-   */
-  public synchronized void forceNodesToHealthyReadOnly() {
-    try {
-      List<DatanodeInfo> nodes = nodeStateMap.getDatanodeInfos(null, HEALTHY);
-      for (DatanodeInfo node : nodes) {
-        nodeStateMap.updateNodeHealthState(node.getID(),
-            HEALTHY_READONLY);
-        if (state2EventMap.containsKey(HEALTHY_READONLY)) {
-          // At this point pipeline creation is already frozen and the node's
-          // state has been updated in nodeStateMap. This event should be a
-          // no-op aside from logging a message, so it is ok to complete
-          // asynchronously.
-          eventPublisher.fireEvent(state2EventMap.get(HEALTHY_READONLY),
-              node);
-        }
-      }
-
-    } catch (NodeNotFoundException ex) {
-      LOG.error("Inconsistent NodeStateMap! {}", nodeStateMap);
-    }
-  }
-
-  /**
    * This method is synchronized to coordinate node state updates between
    * the upgrade finalization thread which calls
    * {@link #forceNodesToHealthyReadOnly}, and the node health processing
@@ -842,14 +767,6 @@ public class NodeStateManager implements Runnable, Closeable {
         case HEALTHY:
           updateNodeLayoutVersionState(node, layoutMisMatchCondition, status,
               NodeLifeCycleEvent.LAYOUT_MISMATCH);
-          // Move the node to STALE if the last heartbeat time is less than
-          // configured stale-node interval.
-          updateNodeState(node, staleNodeCondition, status,
-              NodeLifeCycleEvent.TIMEOUT);
-          break;
-        case HEALTHY_READONLY:
-          updateNodeLayoutVersionState(node, layoutMatchCondition, status,
-              NodeLifeCycleEvent.LAYOUT_MATCH);
           // Move the node to STALE if the last heartbeat time is less than
           // configured stale-node interval.
           updateNodeState(node, staleNodeCondition, status,

@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.hdds.upgrade;
 
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.ALREADY_FINALIZED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.FINALIZATION_DONE;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -106,11 +104,6 @@ public final class TestHddsUpgradeUtils {
     assertEquals(scmVersionManager.getSoftwareLayoutVersion(),
         scmVersionManager.getMetadataLayoutVersion());
     assertThat(scmVersionManager.getMetadataLayoutVersion()).isGreaterThanOrEqualTo(1);
-
-    // SCM will not return from finalization until all HEALTHY datanodes
-    // have completed their finalization (MLV == SLV). This ensures datanodes
-    // are ready to serve requests even though containers may remain OPEN.
-    testDataNodesStateOnSCM(scm, numDatanodes, HEALTHY, HEALTHY_READONLY);
 
     int countContainers = 0;
     for (ContainerInfo ignored : scm.getContainerManager().getContainers()) {
