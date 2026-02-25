@@ -88,6 +88,7 @@ public class S3STSEndpoint extends S3STSEndpointBase {
   private static final String ACCESS_DENIED = "AccessDenied";
   private static final String INVALID_CLIENT_TOKEN_ID = "InvalidClientTokenId";
   private static final String UNSUPPORTED_OPERATION = "UnsupportedOperation";
+  private static final String MALFORMED_POLICY_DOCUMENT = "MalformedPolicyDocument";
 
   @Inject
   private RequestIdentifier requestIdentifier;
@@ -284,12 +285,13 @@ public class S3STSEndpoint extends S3STSEndpointBase {
         }
         if (omException.getResult() == OMException.ResultCodes.NOT_SUPPORTED_OPERATION ||
             omException.getResult() == OMException.ResultCodes.FEATURE_NOT_ENABLED) {
-          throw new OSTSException(
-              UNSUPPORTED_OPERATION, omException.getMessage(), NOT_IMPLEMENTED.getStatusCode());
+          throw new OSTSException(UNSUPPORTED_OPERATION, omException.getMessage(), NOT_IMPLEMENTED.getStatusCode());
         }
         if (omException.getResult() == OMException.ResultCodes.INVALID_REQUEST) {
-          throw new OSTSException(
-              VALIDATION_ERROR, omException.getMessage(), BAD_REQUEST.getStatusCode());
+          throw new OSTSException(VALIDATION_ERROR, omException.getMessage(), BAD_REQUEST.getStatusCode());
+        }
+        if (omException.getResult() == OMException.ResultCodes.MALFORMED_POLICY_DOCUMENT) {
+          throw new OSTSException(MALFORMED_POLICY_DOCUMENT, omException.getMessage(), BAD_REQUEST.getStatusCode());
         }
       }
       throw new OSTSException(

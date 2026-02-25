@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.security.acl.iam;
 
 import static java.util.Collections.emptySet;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.MALFORMED_POLICY_DOCUMENT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 import static org.apache.hadoop.ozone.security.acl.AssumeRoleRequest.OzoneGrant;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
@@ -119,7 +119,7 @@ public class TestIamSessionPolicyResolver {
         "}";
 
     expectResolveThrowsForBothAuthorizers(
-        json, "IAM session policy: Invalid policy JSON - missing Statement", INVALID_REQUEST);
+        json, "IAM session policy: Invalid policy JSON - missing Statement", MALFORMED_POLICY_DOCUMENT);
   }
 
   @Test
@@ -134,7 +134,7 @@ public class TestIamSessionPolicyResolver {
 
     expectResolveThrowsForBothAuthorizers(
         json, "IAM session policy: Invalid Effect in JSON policy (must be a String) - [\"Allow\"]",
-        INVALID_REQUEST);
+        MALFORMED_POLICY_DOCUMENT);
   }
 
   @Test
@@ -147,7 +147,7 @@ public class TestIamSessionPolicyResolver {
         "}";
 
     expectResolveThrowsForBothAuthorizers(
-        json, "IAM session policy: Effect is missing from JSON policy", INVALID_REQUEST);
+        json, "IAM session policy: Effect is missing from JSON policy", MALFORMED_POLICY_DOCUMENT);
   }
 
   @Test
@@ -193,7 +193,7 @@ public class TestIamSessionPolicyResolver {
 
     expectResolveThrowsForBothAuthorizers(
         json, "IAM session policy: Invalid Condition (must have operator StringEquals or StringLike and key name " +
-        "s3:prefix) - [\"RandomCondition\"]", INVALID_REQUEST);
+        "s3:prefix) - [\"RandomCondition\"]", MALFORMED_POLICY_DOCUMENT);
   }
 
   @Test
@@ -209,7 +209,7 @@ public class TestIamSessionPolicyResolver {
 
     expectResolveThrowsForBothAuthorizers(
         json, "IAM session policy: Missing Condition operator value for StringEquals",
-        INVALID_REQUEST);
+        MALFORMED_POLICY_DOCUMENT);
   }
 
   @Test
@@ -225,7 +225,7 @@ public class TestIamSessionPolicyResolver {
 
     expectResolveThrowsForBothAuthorizers(
         json, "IAM session policy: Invalid Condition operator value structure - [{\"s3:prefix\":\"folder/\"}]",
-        INVALID_REQUEST);
+        MALFORMED_POLICY_DOCUMENT);
   }
 
   @Test
@@ -234,7 +234,7 @@ public class TestIamSessionPolicyResolver {
 
     expectResolveThrowsForBothAuthorizers(
         invalidJson, "IAM session policy: Invalid policy JSON (most likely JSON structure is incorrect)",
-        INVALID_REQUEST);
+        MALFORMED_POLICY_DOCUMENT);
   }
 
   @Test
@@ -242,7 +242,8 @@ public class TestIamSessionPolicyResolver {
     final String json = createJsonStringLargerThan2048Characters();
 
     expectResolveThrowsForBothAuthorizers(
-        json, "IAM session policy: Invalid policy JSON - exceeds maximum length of 2048 characters", INVALID_REQUEST);
+        json, "IAM session policy: Invalid policy JSON - exceeds maximum length of 2048 characters",
+        MALFORMED_POLICY_DOCUMENT);
   }
 
   @Test
@@ -681,20 +682,20 @@ public class TestIamSessionPolicyResolver {
   public void testValidateAndCategorizeResourcesWithArnWithNoBucketThrows() {
     expectOMExceptionWithCode(
         () -> validateAndCategorizeResources(NATIVE, Collections.singleton("arn:aws:s3:::")),
-        "IAM session policy: Invalid Resource Arn - arn:aws:s3:::", INVALID_REQUEST);
+        "IAM session policy: Invalid Resource Arn - arn:aws:s3:::", MALFORMED_POLICY_DOCUMENT);
     expectOMExceptionWithCode(
         () -> validateAndCategorizeResources(RANGER, Collections.singleton("arn:aws:s3:::")),
-        "IAM session policy: Invalid Resource Arn - arn:aws:s3:::", INVALID_REQUEST);
+        "IAM session policy: Invalid Resource Arn - arn:aws:s3:::", MALFORMED_POLICY_DOCUMENT);
   }
 
   @Test
   public void testValidateAndCategorizeResourcesWithNoResourcesThrows() {
     expectOMExceptionWithCode(
         () -> validateAndCategorizeResources(NATIVE, emptySet()), "IAM session policy: No Resource(s) found in policy",
-        INVALID_REQUEST);
+        MALFORMED_POLICY_DOCUMENT);
     expectOMExceptionWithCode(
         () -> validateAndCategorizeResources(RANGER, emptySet()), "IAM session policy: No Resource(s) found in policy",
-        INVALID_REQUEST);
+        MALFORMED_POLICY_DOCUMENT);
   }
 
   @Test
@@ -1925,7 +1926,7 @@ public class TestIamSessionPolicyResolver {
         "}";
 
     expectResolveThrowsForBothAuthorizers(
-        json, "IAM session policy: Invalid Resource Arn - arn:aws:s3:::", INVALID_REQUEST);
+        json, "IAM session policy: Invalid Resource Arn - arn:aws:s3:::", MALFORMED_POLICY_DOCUMENT);
   }
 
   private static void expectIllegalArgumentException(Runnable runnable, String expectedMessage) {

@@ -19,7 +19,7 @@ package org.apache.hadoop.ozone.security.acl.iam;
 
 import static java.util.Collections.singleton;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_REQUEST;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.MALFORMED_POLICY_DOCUMENT;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_SUPPORTED_OPERATION;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.CREATE;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.DELETE;
@@ -181,7 +181,7 @@ public final class IamSessionPolicyResolver {
     if (policyJson.length() > MAX_JSON_LENGTH) {
       throw new OMException(
           ERROR_PREFIX + "Invalid policy JSON - exceeds maximum length of " + MAX_JSON_LENGTH + " characters",
-          INVALID_REQUEST);
+          MALFORMED_POLICY_DOCUMENT);
     }
   }
 
@@ -194,12 +194,12 @@ public final class IamSessionPolicyResolver {
       root = MAPPER.readTree(policyJson);
     } catch (Exception e) {
       throw new OMException(
-          ERROR_PREFIX + "Invalid policy JSON (most likely JSON structure is incorrect)", e, INVALID_REQUEST);
+          ERROR_PREFIX + "Invalid policy JSON (most likely JSON structure is incorrect)", e, MALFORMED_POLICY_DOCUMENT);
     }
 
     final JsonNode statementsNode = root.path("Statement");
     if (statementsNode.isMissingNode()) {
-      throw new OMException(ERROR_PREFIX + "Invalid policy JSON - missing Statement", INVALID_REQUEST);
+      throw new OMException(ERROR_PREFIX + "Invalid policy JSON - missing Statement", MALFORMED_POLICY_DOCUMENT);
     }
 
     final Set<JsonNode> statements = new HashSet<>();
@@ -227,10 +227,10 @@ public final class IamSessionPolicyResolver {
       }
 
       throw new OMException(
-          ERROR_PREFIX + "Invalid Effect in JSON policy (must be a String) - " + effectNode, INVALID_REQUEST);
+          ERROR_PREFIX + "Invalid Effect in JSON policy (must be a String) - " + effectNode, MALFORMED_POLICY_DOCUMENT);
     }
 
-    throw new OMException(ERROR_PREFIX + "Effect is missing from JSON policy", INVALID_REQUEST);
+    throw new OMException(ERROR_PREFIX + "Effect is missing from JSON policy", MALFORMED_POLICY_DOCUMENT);
   }
 
   /**
@@ -276,7 +276,7 @@ public final class IamSessionPolicyResolver {
       if (!cond.isObject()) {
         throw new OMException(
             ERROR_PREFIX + "Invalid Condition (must have operator StringEquals or StringLike " +
-            "and key name s3:prefix) - " + cond, INVALID_REQUEST);
+            "and key name s3:prefix) - " + cond, MALFORMED_POLICY_DOCUMENT);
       }
 
       final String operator = cond.fieldNames().next();
@@ -287,12 +287,12 @@ public final class IamSessionPolicyResolver {
       final JsonNode operatorValue = cond.get(operator);
       if ("null".equals(operatorValue.asText())) {
         throw new OMException(
-            ERROR_PREFIX + "Missing Condition operator value for " + operator, INVALID_REQUEST);
+            ERROR_PREFIX + "Missing Condition operator value for " + operator, MALFORMED_POLICY_DOCUMENT);
       }
 
       if (!operatorValue.isObject()) {
         throw new OMException(
-            ERROR_PREFIX + "Invalid Condition operator value structure - " + operatorValue, INVALID_REQUEST);
+            ERROR_PREFIX + "Invalid Condition operator value structure - " + operatorValue, MALFORMED_POLICY_DOCUMENT);
       }
 
       final String keyName = operatorValue.fieldNames().hasNext() ? operatorValue.fieldNames().next() : null;
@@ -382,7 +382,7 @@ public final class IamSessionPolicyResolver {
       Set<String> resources) throws OMException {
     final Set<ResourceSpec> resourceSpecs = new HashSet<>();
     if (resources.isEmpty()) {
-      throw new OMException(ERROR_PREFIX + "No Resource(s) found in policy", INVALID_REQUEST);
+      throw new OMException(ERROR_PREFIX + "No Resource(s) found in policy", MALFORMED_POLICY_DOCUMENT);
     }
     for (String resource : resources) {
       if ("*".equals(resource)) {
@@ -397,7 +397,7 @@ public final class IamSessionPolicyResolver {
 
       final String suffix = resource.substring(AWS_S3_ARN_PREFIX.length());
       if (suffix.isEmpty()) {
-        throw new OMException(ERROR_PREFIX + "Invalid Resource Arn - " + resource, INVALID_REQUEST);
+        throw new OMException(ERROR_PREFIX + "Invalid Resource Arn - " + resource, MALFORMED_POLICY_DOCUMENT);
       }
 
       ResourceSpec spec = parseResourceSpec(suffix);
