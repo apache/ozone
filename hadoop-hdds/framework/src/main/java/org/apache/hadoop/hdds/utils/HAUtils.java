@@ -247,7 +247,10 @@ public final class HAUtils {
       DBDefinition definition)
       throws IOException {
 
-    try (DBStore dbStore = DBStoreBuilder.newBuilder(tempConfig, definition, dbName, dbDir).build()) {
+    try (DBStore dbStore = DBStoreBuilder
+        .newBuilder(tempConfig, definition, dbName, dbDir)
+        .setOpenReadOnly(true)
+        .build()) {
       // Get the table name with TransactionInfo as the value. The transaction
       // info table name are different in SCM and SCM.
 
