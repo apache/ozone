@@ -101,8 +101,9 @@ public class TestOMValidatorProcessor {
 
   @ParameterizedTest
   @MethodSource("annotatedClasses")
-  public <V extends Enum<V> & ComponentVersion> void testACorrectAnnotationSetupForPreProcessCompiles(Class<?> annotationClass,
-                                                                                             V version) {
+  public <V extends Enum<V> & ComponentVersion> void
+      testACorrectAnnotationSetupForPreProcessCompiles(
+          Class<?> annotationClass, V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
         annotationOf(preProcess(), aReqType(), annotationClass, version),
         modifiers("public", "static"),
@@ -129,8 +130,9 @@ public class TestOMValidatorProcessor {
 
   @ParameterizedTest
   @MethodSource("annotatedClasses")
-  public <V extends Enum<V> & ComponentVersion> void testValidatorDoesNotNecessarilyThrowsExceptions(Class<?> annotationClass,
-                                                                                            V version) {
+  public <V extends Enum<V> & ComponentVersion> void
+      testValidatorDoesNotNecessarilyThrowsExceptions(
+          Class<?> annotationClass, V version) {
     List<String> source = generateSourceOfValidatorMethodWith(
         annotationOf(preProcess(), aReqType(), annotationClass, version),
         modifiers("public", "static"),
