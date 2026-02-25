@@ -132,7 +132,7 @@ public class Hadoop3OmTransport implements OmTransport {
       // If there is already user-defined read consistency hint, we should respect it
       return basePayload;
     }
-    if (defaultLeaderReadConsistency == ReadConsistencyProto.UNKNOWN_READ_CONSISTENCY) {
+    if (defaultLeaderReadConsistency == ReadConsistencyProto.UNSPECIFIED) {
       return basePayload;
     }
 

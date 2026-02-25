@@ -238,7 +238,7 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
         ReadConsistencyProto defaultReadConsistency = isFollowerReadEligible
             ? followerReadConsistencyType : leaderReadConsistencyType;
         if (defaultReadConsistency != null &&
-            defaultReadConsistency != ReadConsistencyProto.UNKNOWN_READ_CONSISTENCY) {
+            defaultReadConsistency != ReadConsistencyProto.UNSPECIFIED) {
           omRequest = omRequest.toBuilder()
               .setReadConsistencyHint(ReadConsistencyHint.newBuilder()
                   .setReadConsistency(defaultReadConsistency).build())
