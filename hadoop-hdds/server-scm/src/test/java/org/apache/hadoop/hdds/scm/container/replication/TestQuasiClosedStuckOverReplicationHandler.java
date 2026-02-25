@@ -17,7 +17,9 @@
 
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.QUASI_CLOSED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -97,11 +99,11 @@ public class TestQuasiClosedStuckOverReplicationHandler {
   @Test
   public void testReturnsZeroIfNotOverReplicated() throws IOException {
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(container.containerID(),
-        StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.QUASI_CLOSED,
-        Pair.of(origin1, HddsProtos.NodeOperationalState.IN_SERVICE),
-        Pair.of(origin1, HddsProtos.NodeOperationalState.IN_SERVICE),
-        Pair.of(origin2, HddsProtos.NodeOperationalState.IN_SERVICE),
-        Pair.of(origin2, HddsProtos.NodeOperationalState.IN_SERVICE));
+        QUASI_CLOSED,
+        Pair.of(origin1, IN_SERVICE),
+        Pair.of(origin1, IN_SERVICE),
+        Pair.of(origin2, IN_SERVICE),
+        Pair.of(origin2, IN_SERVICE));
 
     int count = handler.processAndSendCommands(replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 1);
     assertEquals(0, count);
@@ -110,13 +112,13 @@ public class TestQuasiClosedStuckOverReplicationHandler {
   @Test
   public void testNoCommandsScheduledIfPendingOps() throws IOException {
     Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(container.containerID(),
-        StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.QUASI_CLOSED,
-        Pair.of(origin1, HddsProtos.NodeOperationalState.IN_SERVICE),
-        Pair.of(origin1, HddsProtos.NodeOperationalState.IN_SERVICE),
-        Pair.of(origin1, HddsProtos.NodeOperationalState.IN_SERVICE),
-        Pair.of(origin2, HddsProtos.NodeOperationalState.IN_SERVICE),
-        Pair.of(origin2, HddsProtos.NodeOperationalState.IN_SERVICE),
-        Pair.of(origin2, HddsProtos.NodeOperationalState.IN_SERVICE));
+        QUASI_CLOSED,
+        Pair.of(origin1, IN_SERVICE),
+        Pair.of(origin1, IN_SERVICE),
+        Pair.of(origin1, IN_SERVICE),
+        Pair.of(origin2, IN_SERVICE),
+        Pair.of(origin2, IN_SERVICE),
+        Pair.of(origin2, IN_SERVICE));
     List<ContainerReplicaOp> pendingOps = new ArrayList<>();
     pendingOps.add(new ContainerReplicaOp(
         ContainerReplicaOp.PendingOpType.DELETE,
@@ -132,13 +134,21 @@ public class TestQuasiClosedStuckOverReplicationHandler {
 
   @Test
   public void testCommandScheduledForOverReplicatedContainer() throws IOException {
-    Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(container.containerID(),
-        StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.QUASI_CLOSED,
-        Pair.of(origin1, HddsProtos.NodeOperationalState.IN_SERVICE),
-        Pair.of(origin1, HddsProtos.NodeOperationalState.IN_SERVICE),
-        Pair.of(origin1, HddsProtos.NodeOperationalState.IN_SERVICE),
-        Pair.of(origin2, HddsProtos.NodeOperationalState.IN_SERVICE),
-        Pair.of(origin2, HddsProtos.NodeOperationalState.IN_SERVICE));
+    // origin1 is the best origin (BCSID=10, target=3): has 4 copies, over-replicated by 1.
+    // origin2 is an other origin (BCSID=5, target=2): has 2 copies, at target.
+    Set<ContainerReplica> replicas = new HashSet<>();
+    replicas.add(ReplicationTestUtil.createReplicaWithOriginAndSeqId(container.containerID(),
+        origin1, IN_SERVICE, QUASI_CLOSED, 10));
+    replicas.add(ReplicationTestUtil.createReplicaWithOriginAndSeqId(container.containerID(),
+        origin1, IN_SERVICE, QUASI_CLOSED, 10));
+    replicas.add(ReplicationTestUtil.createReplicaWithOriginAndSeqId(container.containerID(),
+        origin1, IN_SERVICE, QUASI_CLOSED, 10));
+    replicas.add(ReplicationTestUtil.createReplicaWithOriginAndSeqId(container.containerID(),
+        origin1, IN_SERVICE, QUASI_CLOSED, 10));
+    replicas.add(ReplicationTestUtil.createReplicaWithOriginAndSeqId(container.containerID(),
+        origin2, IN_SERVICE, QUASI_CLOSED, 5));
+    replicas.add(ReplicationTestUtil.createReplicaWithOriginAndSeqId(container.containerID(),
+        origin2, IN_SERVICE, QUASI_CLOSED, 5));
 
     int count = handler.processAndSendCommands(replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 1);
     assertEquals(1, count);
@@ -148,20 +158,52 @@ public class TestQuasiClosedStuckOverReplicationHandler {
 
   @Test
   public void testOverloadedExceptionContinuesAndThrows() throws NotLeaderException, CommandTargetOverloadedException {
-    Set<ContainerReplica> replicas = ReplicationTestUtil.createReplicasWithOriginAndOpState(container.containerID(),
-        StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.QUASI_CLOSED,
-        Pair.of(origin1, HddsProtos.NodeOperationalState.IN_SERVICE),
-        Pair.of(origin1, HddsProtos.NodeOperationalState.IN_SERVICE),
-        Pair.of(origin1, HddsProtos.NodeOperationalState.IN_SERVICE),
-        Pair.of(origin2, HddsProtos.NodeOperationalState.IN_SERVICE),
-        Pair.of(origin2, HddsProtos.NodeOperationalState.IN_SERVICE),
-        Pair.of(origin2, HddsProtos.NodeOperationalState.IN_SERVICE));
+    // origin1 is the best origin (BCSID=10, target=3): has 4 copies, over-replicated by 1.
+    // origin2 is an other origin (BCSID=5, target=2): has 3 copies, over-replicated by 1.
+    // With the first delete overloaded: the first delete command throws, the second succeeds.
+    // Expect 1 command sent total and CommandTargetOverloadedException thrown.
+    Set<ContainerReplica> replicas = new HashSet<>();
+    replicas.add(ReplicationTestUtil.createReplicaWithOriginAndSeqId(container.containerID(),
+        origin1, IN_SERVICE, QUASI_CLOSED, 10));
+    replicas.add(ReplicationTestUtil.createReplicaWithOriginAndSeqId(container.containerID(),
+        origin1, IN_SERVICE, QUASI_CLOSED, 10));
+    replicas.add(ReplicationTestUtil.createReplicaWithOriginAndSeqId(container.containerID(),
+        origin1, IN_SERVICE, QUASI_CLOSED, 10));
+    replicas.add(ReplicationTestUtil.createReplicaWithOriginAndSeqId(container.containerID(),
+        origin1, IN_SERVICE, QUASI_CLOSED, 10));
+    replicas.add(ReplicationTestUtil.createReplicaWithOriginAndSeqId(container.containerID(),
+        origin2, IN_SERVICE, QUASI_CLOSED, 5));
+    replicas.add(ReplicationTestUtil.createReplicaWithOriginAndSeqId(container.containerID(),
+        origin2, IN_SERVICE, QUASI_CLOSED, 5));
+    replicas.add(ReplicationTestUtil.createReplicaWithOriginAndSeqId(container.containerID(),
+        origin2, IN_SERVICE, QUASI_CLOSED, 5));
 
     ReplicationTestUtil.mockRMSendThrottledDeleteCommand(replicationManager, commandsSent, new AtomicBoolean(true));
 
     assertThrows(CommandTargetOverloadedException.class, () ->
         handler.processAndSendCommands(replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 1));
     assertEquals(1, commandsSent.size());
+  }
+
+  @Test
+  public void testBestOriginNotOverReplicated() throws IOException {
+    // origin1 is the best origin (BCSID=10, target=3): has exactly 3 copies, at target.
+    // origin2 is an other origin (BCSID=5, target=2): has exactly 2 copies, at target.
+    // Neither origin is over-replicated, so no delete commands should be scheduled.
+    Set<ContainerReplica> replicas = new HashSet<>();
+    replicas.add(ReplicationTestUtil.createReplicaWithOriginAndSeqId(container.containerID(),
+        origin1, IN_SERVICE, QUASI_CLOSED, 10));
+    replicas.add(ReplicationTestUtil.createReplicaWithOriginAndSeqId(container.containerID(),
+        origin1, IN_SERVICE, QUASI_CLOSED, 10));
+    replicas.add(ReplicationTestUtil.createReplicaWithOriginAndSeqId(container.containerID(),
+        origin1, IN_SERVICE, QUASI_CLOSED, 10));
+    replicas.add(ReplicationTestUtil.createReplicaWithOriginAndSeqId(container.containerID(),
+        origin2, IN_SERVICE, QUASI_CLOSED, 5));
+    replicas.add(ReplicationTestUtil.createReplicaWithOriginAndSeqId(container.containerID(),
+        origin2, IN_SERVICE, QUASI_CLOSED, 5));
+
+    int count = handler.processAndSendCommands(replicas, Collections.emptyList(), getOverReplicatedHealthResult(), 1);
+    assertEquals(0, count);
   }
 
   private ContainerHealthResult.OverReplicatedHealthResult getOverReplicatedHealthResult() {

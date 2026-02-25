@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.container.replication;
 
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.UNHEALTHY;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -26,11 +28,16 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
-import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 
 /**
  * Class to count the replicas in a quasi-closed stuck container.
+ *
+ * <p>Origins are ranked by their highest healthy BCSID (sequenceId). The origins with the
+ * highest BCSID receive {@code bestOriginCopies} replicas, while all other origins receive
+ * {@code otherOriginCopies}. If multiple origins share the same highest BCSID they are all treated
+ * as "best". For a single-origin container, {@code bestOriginCopies} is always used.
+ *
  */
 public class QuasiClosedStuckReplicaCount {
 
@@ -40,13 +47,20 @@ public class QuasiClosedStuckReplicaCount {
   private final int minHealthyForMaintenance;
   private final boolean hasHealthyReplicas;
   private final boolean hasOutOfServiceReplicas;
+  private final int bestOriginCopies;
+  private final int otherOriginCopies;
+  private final Set<DatanodeID> bestOrigins;
 
-  public QuasiClosedStuckReplicaCount(Set<ContainerReplica> replicas, int minHealthyForMaintenance) {
+  public QuasiClosedStuckReplicaCount(Set<ContainerReplica> replicas, int minHealthyForMaintenance,
+      int bestOriginCopies, int otherOriginCopies) {
     this.minHealthyForMaintenance = minHealthyForMaintenance;
+    this.bestOriginCopies = bestOriginCopies;
+    this.otherOriginCopies = otherOriginCopies;
+
     boolean hasHealthy = false;
     boolean hasOutOfService = false;
     for (ContainerReplica r : replicas) {
-      if (r.getState() != StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.UNHEALTHY) {
+      if (r.getState() != UNHEALTHY) {
         hasHealthy = true;
       }
       replicasByOrigin.computeIfAbsent(r.getOriginDatanodeId(), k -> new HashSet<>()).add(r);
@@ -64,6 +78,39 @@ public class QuasiClosedStuckReplicaCount {
 
     this.hasHealthyReplicas = hasHealthy;
     this.hasOutOfServiceReplicas = hasOutOfService;
+    this.bestOrigins = computeBestOrigins();
+  }
+
+  /**
+   * Identifies the best origins whose maximum BCSID among healthy replicas equals the cluster-wide maximum healthy
+   * BCSID. Origins with only UNHEALTHY replicas are excluded. If all replicas are UNHEALTHY the returned set is empty.
+   */
+  private Set<DatanodeID> computeBestOrigins() {
+    long maxBcsid = Long.MIN_VALUE;
+
+    for (Map.Entry<DatanodeID, Set<ContainerReplica>> entry : replicasByOrigin.entrySet()) {
+      for (ContainerReplica r : entry.getValue()) {
+        if (r.getState() != UNHEALTHY && r.getSequenceId() != null && r.getSequenceId() > maxBcsid) {
+          maxBcsid = r.getSequenceId();
+        }
+      }
+    }
+
+    if (maxBcsid == Long.MIN_VALUE) {
+      return Collections.emptySet();
+    }
+
+    final long highestBcsid = maxBcsid;
+    Set<DatanodeID> best = new HashSet<>();
+    for (Map.Entry<DatanodeID, Set<ContainerReplica>> entry : replicasByOrigin.entrySet()) {
+      boolean hasBestBcsid = entry.getValue().stream()
+          .anyMatch(r -> r.getState() != UNHEALTHY && r.getSequenceId() != null
+              && r.getSequenceId() == highestBcsid);
+      if (hasBestBcsid) {
+        best.add(entry.getKey());
+      }
+    }
+    return best;
   }
 
   public int availableOrigins() {
@@ -92,6 +139,10 @@ public class QuasiClosedStuckReplicaCount {
     return maintenance == null ? 0 : maintenance.size();
   }
 
+  private int targetCopiesForOrigin(DatanodeID origin) {
+    return bestOrigins.contains(origin) ? bestOriginCopies : otherOriginCopies;
+  }
+
   public List<MisReplicatedOrigin> getUnderReplicatedReplicas() {
     List<MisReplicatedOrigin> misReplicatedOrigins = new ArrayList<>();
 
@@ -106,28 +157,29 @@ public class QuasiClosedStuckReplicaCount {
           misReplicatedOrigins.add(new MisReplicatedOrigin(entry.getValue(), additionalReplicas));
         }
       } else {
-        if (inService.size() < 3) {
-          int additionalReplicas = 3 - inService.size();
+        if (inService.size() < bestOriginCopies) {
+          int additionalReplicas = bestOriginCopies - inService.size();
           misReplicatedOrigins.add(new MisReplicatedOrigin(entry.getValue(), additionalReplicas));
         }
       }
       return misReplicatedOrigins;
     }
 
-    // If there are multiple origins, we expect 2 copies of each origin
-    // For maintenance, we expect 1 copy of each origin and ignore the minHealthyForMaintenance parameter
+    // Multiple origins: the best origins target bestOriginCopies; all others target otherOriginCopies.
+    // For maintenance, we expect 1 copy of each origin online regardless of best/other designation.
     for (Map.Entry<DatanodeID, Set<ContainerReplica>> entry : replicasByOrigin.entrySet()) {
       final Set<ContainerReplica> inService = getInService(entry.getKey());
       final int maintenanceCount = getMaintenanceCount(entry.getKey());
+      final int target = targetCopiesForOrigin(entry.getKey());
 
-      if (inService.size() < 2) {
+      if (inService.size() < target) {
         if (maintenanceCount > 0) {
           if (inService.isEmpty()) {
             // We need 1 copy online for maintenance
             misReplicatedOrigins.add(new MisReplicatedOrigin(entry.getValue(), 1));
           }
         } else {
-          misReplicatedOrigins.add(new MisReplicatedOrigin(entry.getValue(), 2 - inService.size()));
+          misReplicatedOrigins.add(new MisReplicatedOrigin(entry.getValue(), target - inService.size()));
         }
       }
     }
@@ -136,7 +188,7 @@ public class QuasiClosedStuckReplicaCount {
 
   /**
    * Returns True is the container is over-replicated. This means that if we have a single origin, there are more than
-   * 3 copies. If we have multiple origins, there are more than 2 copies of each origin.
+   * bestOrigin copies. If we have multiple origins, there are more than target copies of each origin.
    * The over replication check ignore maintenance replicas. The container may become over replicated when maintenance
    * ends.
    *
@@ -147,25 +199,24 @@ public class QuasiClosedStuckReplicaCount {
   }
 
   public List<MisReplicatedOrigin> getOverReplicatedOrigins() {
-    // If there is only a single origin, we expect 3 copies, otherwise we expect 2 copies of each origin
+    // If there is only a single origin, we expect bestOriginCopies copies.
     if (replicasByOrigin.size() == 1) {
       final DatanodeID origin = replicasByOrigin.keySet().iterator().next();
       final Set<ContainerReplica> inService = getInService(origin);
-      if (inService.size() > 3) {
-        return Collections.singletonList(new MisReplicatedOrigin(inService, inService.size() - 3));
+      if (inService.size() > bestOriginCopies) {
+        return Collections.singletonList(new MisReplicatedOrigin(inService, inService.size() - bestOriginCopies));
       }
       return Collections.emptyList();
     }
 
-    // If there are multiple origins, we expect 2 copies of each origin
     List<MisReplicatedOrigin> overReplicatedOrigins = new ArrayList<>();
     for (DatanodeID origin : replicasByOrigin.keySet()) {
       final Set<ContainerReplica> replicas = getInService(origin);
-      if (replicas.size() > 2) {
-        overReplicatedOrigins.add(new MisReplicatedOrigin(replicas, replicas.size() - 2));
+      final int target = targetCopiesForOrigin(origin);
+      if (replicas.size() > target) {
+        overReplicatedOrigins.add(new MisReplicatedOrigin(replicas, replicas.size() - target));
       }
     }
-    // If we have 2 copies or less of each origin, we are not over-replicated
     return overReplicatedOrigins;
   }
 
