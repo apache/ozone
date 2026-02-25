@@ -258,13 +258,13 @@ public abstract class BasicUpgradeFinalizer
       Optional<? extends UpgradeAction> action) throws UpgradeException {
 
     if (!action.isPresent()) {
-      emitNOOPMsg(feature.name());
+      emitNOOPMsg(feature.toString());
     } else {
       LOG.info("Running finalization actions for layout feature: {}", feature);
       try {
         action.get().execute(component);
       } catch (Exception e) {
-        logFinalizationFailureAndThrow(e, feature.name());
+        logFinalizationFailureAndThrow(e, feature.toString());
       }
     }
   }

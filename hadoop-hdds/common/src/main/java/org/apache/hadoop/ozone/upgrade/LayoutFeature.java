@@ -23,8 +23,6 @@ import org.apache.hadoop.ozone.Versioned;
  * Generic Layout feature interface for Ozone.
  */
 public interface LayoutFeature extends Versioned {
-  String name();
-
   int layoutVersion();
 
   @Override

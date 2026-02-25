@@ -50,9 +50,9 @@ public class OMLayoutFeatureAspect {
 
   @Before("@annotation(DisallowedUntilLayoutVersion) && execution(* *(..))")
   public void checkLayoutFeature(JoinPoint joinPoint) throws IOException {
-    String featureName = ((MethodSignature) joinPoint.getSignature())
+    LayoutFeature layoutFeature = ((MethodSignature) joinPoint.getSignature())
         .getMethod().getAnnotation(DisallowedUntilLayoutVersion.class)
-        .value().name();
+        .value();
     LayoutVersionManager lvm;
     final Object[] args = joinPoint.getArgs();
     if (joinPoint.getTarget() instanceof OzoneManagerRequestHandler) {
@@ -73,19 +73,18 @@ public class OMLayoutFeatureAspect {
         lvm = new OMLayoutVersionManager();
       }
     }
-    checkIsAllowed(joinPoint.getSignature().toShortString(), lvm, featureName);
+    checkIsAllowed(joinPoint.getSignature().toShortString(), lvm, layoutFeature);
   }
 
   private void checkIsAllowed(String operationName,
                               LayoutVersionManager lvm,
-                              String featureName) throws OMException {
-    if (!lvm.isAllowed(featureName)) {
-      LayoutFeature layoutFeature = lvm.getFeature(featureName);
+                              LayoutFeature layoutFeature) throws OMException {
+    if (!lvm.isAllowed(layoutFeature)) {
       throw new OMException(String.format("Operation %s cannot be invoked " +
               "before finalization. It belongs to the layout feature %s, " +
               "whose layout version is %d. Current Layout version is %d",
           operationName,
-          layoutFeature.name(),
+          layoutFeature.toString(),
           layoutFeature.layoutVersion(),
           lvm.getMetadataLayoutVersion()),
           NOT_SUPPORTED_OPERATION_PRIOR_FINALIZATION);
@@ -113,7 +112,7 @@ public class OMLayoutFeatureAspect {
 
     LayoutFeature lf = annotation.value();
     checkIsAllowed(joinPoint.getTarget().getClass().getSimpleName(),
-        om.getVersionManager(), lf.name());
+        om.getVersionManager(), lf);
   }
 
   /**

@@ -69,6 +69,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateDirectoryRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
+import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -113,7 +114,7 @@ public class TestOMDirectoryCreateRequestWithFSO {
                     BucketLayout.DEFAULT));
     OMLayoutVersionManager lvm = mock(OMLayoutVersionManager.class);
     when(lvm.getMetadataLayoutVersion()).thenReturn(0);
-    when(lvm.isAllowed(anyString())).thenReturn(true);
+    when(lvm.isAllowed(any(LayoutFeature.class))).thenReturn(true);
     when(ozoneManager.getVersionManager()).thenReturn(lvm);
   }
 

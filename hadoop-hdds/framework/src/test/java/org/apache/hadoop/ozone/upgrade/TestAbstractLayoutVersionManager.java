@@ -58,7 +58,6 @@ public class TestAbstractLayoutVersionManager {
     versionManager.init(1, getTestLayoutFeatures(3));
 
     assertEquals(3, versionManager.features.size());
-    assertEquals(3, versionManager.featureMap.size());
 
     assertEquals(1, versionManager.getMetadataLayoutVersion());
     assertEquals(3, versionManager.getSoftwareLayoutVersion());
@@ -76,7 +75,6 @@ public class TestAbstractLayoutVersionManager {
     versionManager.init(2, getTestLayoutFeatures(2));
 
     assertEquals(2, versionManager.features.size());
-    assertEquals(2, versionManager.featureMap.size());
 
     assertEquals(2, versionManager.getMetadataLayoutVersion());
     assertEquals(2, versionManager.getSoftwareLayoutVersion());
@@ -101,7 +99,6 @@ public class TestAbstractLayoutVersionManager {
     versionManager.finalized(lfs[1]);
 
     assertEquals(3, versionManager.features.size());
-    assertEquals(3, versionManager.featureMap.size());
 
     assertEquals(2, versionManager.getMetadataLayoutVersion());
     assertEquals(3, versionManager.getSoftwareLayoutVersion());
@@ -145,22 +142,16 @@ public class TestAbstractLayoutVersionManager {
     LayoutFeature[] lfs = getTestLayoutFeatures(3);
     versionManager.init(1, lfs);
 
-    assertTrue(versionManager.isAllowed(lfs[0].name()));
     assertTrue(versionManager.isAllowed(lfs[0]));
 
-    assertFalse(versionManager.isAllowed(lfs[1].name()));
     assertFalse(versionManager.isAllowed(lfs[1]));
-    assertFalse(versionManager.isAllowed(lfs[2].name()));
     assertFalse(versionManager.isAllowed(lfs[2]));
 
     versionManager.finalized(lfs[1]);
 
-    assertTrue(versionManager.isAllowed(lfs[0].name()));
     assertTrue(versionManager.isAllowed(lfs[0]));
-    assertTrue(versionManager.isAllowed(lfs[1].name()));
     assertTrue(versionManager.isAllowed(lfs[1]));
 
-    assertFalse(versionManager.isAllowed(lfs[2].name()));
     assertFalse(versionManager.isAllowed(lfs[2]));
   }
 
@@ -188,11 +179,6 @@ public class TestAbstractLayoutVersionManager {
     for (int i = 1; i <= num; i++) {
       int finalI = i;
       lfs[k++] = new LayoutFeature() {
-        @Override
-        public String name() {
-          return "LF-" + finalI;
-        }
-
         @Override
         public int layoutVersion() {
           return finalI;
