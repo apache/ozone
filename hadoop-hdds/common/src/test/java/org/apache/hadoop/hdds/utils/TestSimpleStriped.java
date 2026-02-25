@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.utils;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
-import com.google.common.util.concurrent.SimpleStriped;
 import com.google.common.util.concurrent.Striped;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;

@@ -15,9 +15,10 @@
  * limitations under the License.
  */
 
-package com.google.common.util.concurrent;
+package org.apache.hadoop.hdds.utils;
 
 import com.google.common.base.Supplier;
+import com.google.common.util.concurrent.Striped;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -25,14 +26,12 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * A custom factory to force creation of {@link Striped}
  * locks with fair order policy.
  *
- * The reason of this util is that today guava's {@link Striped} does not
- * support creating locks with fair policy, either supports a mechanism for
- * the client code to do that ({@link Striped#custom(int, Supplier)} is package
- * private). Ref: https://github.com/google/guava/issues/2514
+ * Guava's {@link Striped} does not natively support creating locks with
+ * fair ordering policy. Ref: https://github.com/google/guava/issues/2514
  *
- * So, we place this class in the same package as {@link Striped} to directly
- * call the package-private method without reflection.
- * When the above issue is resolved, we can remove this util.
+ * {@link Striped#custom(int, Supplier)} is now public, so we can call it
+ * directly. When fair policy is natively supported by {@link Striped}, this
+ * util can be removed.
  */
 public final class SimpleStriped {
 
