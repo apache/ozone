@@ -398,10 +398,17 @@ public abstract class ContainerData {
   }
 
   /**
-   * Calculate how much committedBytes should be decremented for write.
-   * This is used both for decrementing on write and restoring on failure.
+   * Increase the number of bytes write into the container.
+   * Also decrement committed bytes against the bytes written.
+   * @param bytes the number of bytes write into the container.
    */
-  private long getCommittedBytesDecrement(long bytes) {
+  private void incrWriteBytes(long bytes) {
+    /*
+       Increase the cached Used Space in VolumeInfo as it
+       maybe not updated, DU or DedicatedDiskSpaceUsage runs
+       periodically to update the Used Space in VolumeInfo.
+     */
+    this.getVolume().incrementUsedSpace(bytes);
     // Calculate bytes used before this write operation.
     // Note that getBytesUsed() already includes the 'bytes' from the current write.
     long bytesUsedBeforeWrite = getBytesUsed() - bytes;
@@ -410,31 +417,8 @@ public abstract class ContainerData {
     if (committedSpace && availableSpaceBeforeWrite > 0) {
       // Decrement committed space only by the portion of the write that fits within the originally committed space,
       // up to maxSize
-      return Math.min(bytes, availableSpaceBeforeWrite);
-    }
-    return 0;
-  }
-
-  /**
-   * Increase the number of bytes write into the container.
-   * Also decrement committed bytes against the bytes written.
-   * @param bytes the number of bytes write into the container.
-   */
-  private void incrWriteBytes(long bytes) {
-    long committedBytesDecrement = getCommittedBytesDecrement(bytes);
-    if (committedBytesDecrement > 0) {
-      this.getVolume().incCommittedBytes(-committedBytesDecrement);
-    }
-  }
-
-  /**
-   * Restore committedBytes when a write operation fails after writeChunk succeeded.
-   * This undoes the committedBytes decrement done in incrWriteBytes().
-   */
-  public void restoreCommittedBytesOnWriteFailure(long bytes) {
-    long committedBytesDecrement = getCommittedBytesDecrement(bytes);
-    if (committedBytesDecrement > 0) {
-      this.getVolume().incCommittedBytes(committedBytesDecrement);
+      long decrement = Math.min(bytes, availableSpaceBeforeWrite);
+      this.getVolume().incCommittedBytes(-decrement);
     }
   }
 
@@ -587,7 +571,9 @@ public abstract class ContainerData {
 
   public void updateWriteStats(long bytesWritten, boolean overwrite) {
     getStatistics().updateWrite(bytesWritten, overwrite);
-    incrWriteBytes(bytesWritten);
+    if (!overwrite) {
+      incrWriteBytes(bytesWritten);
+    }
   }
 
   @Override

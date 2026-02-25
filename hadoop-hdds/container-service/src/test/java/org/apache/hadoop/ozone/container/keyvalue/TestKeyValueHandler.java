@@ -56,7 +56,6 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -82,7 +81,6 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerC
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.WriteChunkRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -90,7 +88,6 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
 import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
-import org.apache.hadoop.ozone.common.Checksum;
 import org.apache.hadoop.ozone.common.ChunkBuffer;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
@@ -116,14 +113,12 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
-import org.apache.hadoop.ozone.container.keyvalue.interfaces.ChunkManager;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScannerConfiguration;
 import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -917,159 +912,6 @@ public class TestKeyValueHandler {
     }
   }
 
-  /**
-   * Test that space tracking (usedSpace and committedBytes) is correctly
-   * managed during successful write operations.
-   */
-  @Test
-  public void testWriteChunkSpaceTrackingSuccess() throws Exception {
-    final long containerID = 1L;
-    final String testDir = tempDir.toString();
-    final String clusterId = UUID.randomUUID().toString();
-    final String datanodeId = UUID.randomUUID().toString();
-    OzoneConfiguration testConf = new OzoneConfiguration();
-    final ContainerSet containerSet = newContainerSet();
-    final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
-
-    HddsVolume hddsVolume = new HddsVolume.Builder(testDir).conf(testConf)
-        .clusterID(clusterId).datanodeUuid(datanodeId)
-        .volumeSet(volumeSet)
-        .build();
-    hddsVolume.format(clusterId);
-    hddsVolume.createWorkingDir(clusterId, null);
-    hddsVolume.createTmpDirs(clusterId);
-
-    when(volumeSet.getVolumesList())
-        .thenReturn(Collections.singletonList(hddsVolume));
-
-    final ContainerMetrics metrics = ContainerMetrics.create(testConf);
-    final KeyValueHandler kvHandler = new KeyValueHandler(testConf,
-        datanodeId, containerSet, volumeSet, metrics,
-        c -> { }, new ContainerChecksumTreeManager(testConf));
-    kvHandler.setClusterID(clusterId);
-
-    final ContainerCommandRequestProto createContainer =
-        createContainerRequest(datanodeId, containerID);
-    kvHandler.handleCreateContainer(createContainer, null);
-
-    KeyValueContainer container = (KeyValueContainer) containerSet.getContainer(containerID);
-    assertNotNull(container);
-
-    long initialUsedSpace = hddsVolume.getCurrentUsage().getUsedSpace();
-    long initialCommittedBytes = hddsVolume.getCommittedBytes();
-    long initialReservedSpace = hddsVolume.getSpaceReservedForWrites();
-
-    long chunkSize = 1024 * 1024; // 1MB
-    ContainerCommandRequestProto writeRequest =
-        createWriteChunkRequest(datanodeId, chunkSize);
-    ContainerProtos.ContainerCommandResponseProto response =
-        kvHandler.handleWriteChunk(writeRequest, container, null);
-    assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
-
-    long finalUsedSpace = hddsVolume.getCurrentUsage().getUsedSpace();
-    long finalCommittedBytes = hddsVolume.getCommittedBytes();
-    long finalReservedSpace = hddsVolume.getSpaceReservedForWrites();
-
-    assertEquals(initialUsedSpace + chunkSize, finalUsedSpace,
-        "usedSpace should be incremented by chunk size after successful write");
-    assertTrue(finalCommittedBytes < initialCommittedBytes,
-        "committedBytes should be decremented after successful write");
-    assertEquals(initialReservedSpace, finalReservedSpace,
-        "spaceReservedForWrites should be back to initial value after successful write");
-  }
-
-  /**
-   * Test that space tracking is correctly rolled back when write operation fails.
-   * This test uses reflection to mock the ChunkManager and inject a failure during
-   * writeChunk(), which happens AFTER space is reserved. This verifies that:
-   * 1. usedSpace remains unchanged (never incremented on failure)
-   * 2. spaceReservedForWrites is released (incremented then decremented back)
-   * 3. committedBytes is restored (decremented by writeChunk, then incremented back on rollback)
-   */
-  @Test
-  public void testWriteChunkSpaceTrackingFailure() throws Exception {
-    final long containerID = 1L;
-    final String testDir = tempDir.toString();
-    final String clusterId = UUID.randomUUID().toString();
-    final String datanodeId = UUID.randomUUID().toString();
-    OzoneConfiguration testConf = new OzoneConfiguration();
-    final ContainerSet containerSet = newContainerSet();
-    final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
-
-    HddsVolume hddsVolume = new HddsVolume.Builder(testDir).conf(testConf)
-        .clusterID(clusterId).datanodeUuid(datanodeId)
-        .volumeSet(volumeSet)
-        .build();
-    hddsVolume.format(clusterId);
-    hddsVolume.createWorkingDir(clusterId, null);
-    hddsVolume.createTmpDirs(clusterId);
-
-    when(volumeSet.getVolumesList())
-        .thenReturn(Collections.singletonList(hddsVolume));
-
-    final ContainerMetrics metrics = ContainerMetrics.create(testConf);
-    final KeyValueHandler kvHandler = new KeyValueHandler(testConf,
-        datanodeId, containerSet, volumeSet, metrics,
-        c -> { }, new ContainerChecksumTreeManager(testConf));
-    kvHandler.setClusterID(clusterId);
-
-    final ContainerCommandRequestProto createContainer =
-        createContainerRequest(datanodeId, containerID);
-    kvHandler.handleCreateContainer(createContainer, null);
-
-    KeyValueContainer container = (KeyValueContainer) containerSet.getContainer(containerID);
-    assertNotNull(container);
-
-    long initialUsedSpace = hddsVolume.getCurrentUsage().getUsedSpace();
-    long initialCommittedBytes = hddsVolume.getCommittedBytes();
-    long initialReservedSpace = hddsVolume.getSpaceReservedForWrites();
-
-    // Use reflection to replace the chunkManager in the handler with a spy,
-    // so we can inject a failure during writeChunk()
-    Field chunkManagerField = KeyValueHandler.class.getDeclaredField("chunkManager");
-    chunkManagerField.setAccessible(true);
-    ChunkManager originalChunkManager = (ChunkManager) chunkManagerField.get(kvHandler);
-    ChunkManager spyChunkManager = spy(originalChunkManager);
-
-    // Configure the spy to throw an IOException on writeChunk call
-    doAnswer(invocation -> {
-      throw new IOException("Simulated disk write failure");
-    }).when(spyChunkManager).writeChunk(
-        any(Container.class),
-        any(BlockID.class),
-        any(ChunkInfo.class),
-        any(ChunkBuffer.class),
-        any(DispatcherContext.class));
-
-    chunkManagerField.set(kvHandler, spyChunkManager);
-
-    try {
-      // Attempt to write a chunk - should fail during chunkManager.writeChunk()
-      // but AFTER space has been reserved
-      long chunkSize = 1024 * 1024; // 1MB
-      ContainerCommandRequestProto writeRequest =
-          createWriteChunkRequest(datanodeId, chunkSize);
-      ContainerProtos.ContainerCommandResponseProto response =
-          kvHandler.handleWriteChunk(writeRequest, container, null);
-
-      assertNotEquals(ContainerProtos.Result.SUCCESS, response.getResult(),
-          "Write should fail due to injected IOException");
-
-      long finalUsedSpace = hddsVolume.getCurrentUsage().getUsedSpace();
-      long finalCommittedBytes = hddsVolume.getCommittedBytes();
-      long finalReservedSpace = hddsVolume.getSpaceReservedForWrites();
-
-      assertEquals(initialUsedSpace, finalUsedSpace,
-          "usedSpace should remain unchanged after failed write");
-      assertEquals(initialCommittedBytes, finalCommittedBytes,
-          "committedBytes should remain unchanged after failed write (decremented then restored)");
-      assertEquals(initialReservedSpace, finalReservedSpace,
-          "spaceReservedForWrites should be back to initial value after failed write");
-    } finally {
-      chunkManagerField.set(kvHandler, originalChunkManager);
-    }
-  }
-
   private static ContainerCommandRequestProto createContainerRequest(
       String datanodeId, long containerID) {
     return ContainerCommandRequestProto.newBuilder()
@@ -1243,34 +1085,5 @@ public class TestKeyValueHandler {
       FileUtils.deleteDirectory(testDir.toFile());
       ContainerMetrics.remove();
     }
-  }
-
-  /**
-   * Helper method to create a WriteChunk request for testing.
-   */
-  private ContainerCommandRequestProto createWriteChunkRequest(
-      String datanodeId, long chunkSize) {
-    final long containerID = 1L;
-    final long localID = 1L;
-    ByteString data = ByteString.copyFrom(new byte[(int) chunkSize]);
-    
-    ContainerProtos.ChunkInfo chunk = ContainerProtos.ChunkInfo.newBuilder()
-        .setChunkName(localID + "_chunk_1")
-        .setOffset(0)
-        .setLen(data.size())
-        .setChecksumData(Checksum.getNoChecksumDataProto())
-        .build();
-
-    WriteChunkRequestProto.Builder writeChunkRequest = WriteChunkRequestProto.newBuilder()
-        .setBlockID(new BlockID(containerID, localID).getDatanodeBlockIDProtobuf())
-        .setChunkData(chunk)
-        .setData(data);
-
-    return ContainerCommandRequestProto.newBuilder()
-        .setContainerID(containerID)
-        .setCmdType(ContainerProtos.Type.WriteChunk)
-        .setDatanodeUuid(datanodeId)
-        .setWriteChunk(writeChunkRequest)
-        .build();
   }
 }

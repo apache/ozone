@@ -1037,11 +1037,6 @@ public class KeyValueHandler extends Handler {
     }
 
     ContainerProtos.BlockData blockDataProto = null;
-    HddsVolume volume = kvContainer.getContainerData().getVolume();
-    long bytesToWrite = 0;
-    boolean spaceReserved = false;
-    boolean writeChunkSucceeded = false;
-    
     try {
       checkContainerOpen(kvContainer);
 
@@ -1062,17 +1057,9 @@ public class KeyValueHandler extends Handler {
             ChunkBuffer.wrap(writeChunk.getData().asReadOnlyByteBufferList());
         // TODO: Can improve checksum validation here. Make this one-shot after protocol change.
         validateChunkChecksumData(data, chunkInfo);
-        bytesToWrite = chunkInfo.getLen();
-        
-        // Reserve space before writing
-        if (volume != null && bytesToWrite > 0) {
-          volume.reserveSpaceForWrite(bytesToWrite);
-          spaceReserved = true;
-        }
       }
       chunkManager
           .writeChunk(kvContainer, blockID, chunkInfo, data, dispatcherContext);
-      writeChunkSucceeded = true;
 
       final boolean isCommit = dispatcherContext.getStage().isCommit();
       if (isCommit && writeChunk.hasBlock()) {
@@ -1099,48 +1086,20 @@ public class KeyValueHandler extends Handler {
         metrics.incContainerOpsLatencies(Type.PutBlock, Time.monotonicNowNanos() - startTime);
       }
 
-      if (spaceReserved) {
-        commitSpaceReservedForWrite(volume, bytesToWrite);
-      }
       // We should increment stats after writeChunk
       if (isWrite) {
         metrics.incContainerBytesStats(Type.WriteChunk, writeChunk
             .getChunkData().getLen());
       }
     } catch (StorageContainerException ex) {
-      releaseSpaceReservedForWrite(volume, spaceReserved, writeChunkSucceeded, bytesToWrite, kvContainer);
       return ContainerUtils.logAndReturnError(LOG, ex, request);
     } catch (IOException ex) {
-      releaseSpaceReservedForWrite(volume, spaceReserved, writeChunkSucceeded, bytesToWrite, kvContainer);
       return ContainerUtils.logAndReturnError(LOG,
           new StorageContainerException("Write Chunk failed", ex, IO_EXCEPTION),
           request);
     }
 
     return getWriteChunkResponseSuccess(request, blockDataProto);
-  }
-
-  /**
-   * Commit space reserved for write to usedSpace when write operation succeeds.
-   */
-  private void commitSpaceReservedForWrite(HddsVolume volume, long bytes) {
-    volume.incrementUsedSpace(bytes);
-    volume.releaseReservedSpaceForWrite(bytes);
-  }
-
-  /**
-   * Release space reserved for write when write operation fails.
-   * Also restores committedBytes if it was decremented during write.
-   */
-  private void releaseSpaceReservedForWrite(HddsVolume volume, boolean spaceReserved,
-      boolean writeChunkSucceeded, long bytes, KeyValueContainer kvContainer) {
-    if (spaceReserved) {
-      volume.releaseReservedSpaceForWrite(bytes);
-      // Only restore committedBytes if write chunk succeeded
-      if (writeChunkSucceeded) {
-        kvContainer.getContainerData().restoreCommittedBytesOnWriteFailure(bytes);
-      }
-    }
   }
 
   /**

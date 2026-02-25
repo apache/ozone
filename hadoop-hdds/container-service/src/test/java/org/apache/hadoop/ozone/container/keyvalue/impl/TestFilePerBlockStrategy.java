@@ -229,6 +229,57 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     Assertions.assertEquals(containerData.getBytesUsed(), writeChunkData.remaining() + newWriteChunkData.remaining());
   }
 
+  /**
+   * Test that overwrite operations that extend the file correctly update usedSpace by the delta.
+   */
+  @Test
+  public void testOverwriteFileExtensionUpdatesByDelta() throws Exception {
+    KeyValueContainer kvContainer = getKeyValueContainer();
+    KeyValueContainerData containerData = kvContainer.getContainerData();
+    ChunkManager chunkManager = createTestSubject();
+
+    // Initial write: 4 bytes at offset 0
+    byte[] initialData = "test".getBytes(UTF_8);
+    ChunkInfo initialChunk = new ChunkInfo(String.format("%d.data.%d", getBlockID().getLocalID(), 0),
+        0,  // offset
+        initialData.length);
+    ChunkBuffer initialBuffer = ChunkBuffer.allocate(initialData.length).put(initialData);
+    initialBuffer.rewind();
+    setDataChecksum(initialChunk, initialBuffer);
+
+    long initialUsedSpace = containerData.getVolume().getCurrentUsage().getUsedSpace();
+    long initialBlockBytes = containerData.getBytesUsed();
+    chunkManager.writeChunk(kvContainer, getBlockID(), initialChunk, initialBuffer, WRITE_STAGE);
+    long afterFirstWriteUsedSpace = containerData.getVolume().getCurrentUsage().getUsedSpace();
+    long afterFirstWriteBlockBytes = containerData.getBytesUsed();
+
+    assertEquals(initialUsedSpace + initialData.length, afterFirstWriteUsedSpace);
+    assertEquals(initialBlockBytes + initialData.length, afterFirstWriteBlockBytes);
+
+    // Overwrite that extends file: write 6 bytes at offset 2 (extends file from 4 to 8 bytes)
+    // File before: [t][e][s][t]
+    // File after:  [t][e][e][x][t][e][n][d]
+    // File length delta: 8 - 4 = 4 bytes
+    byte[] overwriteData = "extend".getBytes(UTF_8);
+    ChunkInfo overwriteChunk = new ChunkInfo(String.format("%d.data.%d", getBlockID().getLocalID(), 0),
+        2,  // offset - starts at position 2
+        overwriteData.length);
+    ChunkBuffer overwriteBuffer = ChunkBuffer.allocate(overwriteData.length).put(overwriteData);
+    overwriteBuffer.rewind();
+    setDataChecksum(overwriteChunk, overwriteBuffer);
+
+    chunkManager.writeChunk(kvContainer, getBlockID(), overwriteChunk, overwriteBuffer, WRITE_STAGE);
+    long afterOverwriteUsedSpace = containerData.getVolume().getCurrentUsage().getUsedSpace();
+    long afterOverwriteBlockBytes = containerData.getBytesUsed();
+
+    long expectedDelta = (2 + overwriteData.length) - initialData.length; // 8 - 4 = 4
+    long expectedWriteBytes = initialData.length + overwriteData.length + expectedDelta;
+
+    assertEquals(afterFirstWriteUsedSpace + expectedDelta, afterOverwriteUsedSpace);
+    assertEquals(afterFirstWriteBlockBytes + expectedDelta, afterOverwriteBlockBytes);
+    assertEquals(expectedWriteBytes, containerData.getStatistics().getWriteBytes());
+  }
+
   @Test
   public void testPutBlockForClosedContainer() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
