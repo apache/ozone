@@ -48,8 +48,8 @@ public enum OMLayoutFeature implements LayoutFeature {
 
   ///////////////////////////////  /////////////////////////////
 
-  private int layoutVersion;
-  private String description;
+  private final int layoutVersion;
+  private final String description;
   private OmUpgradeAction action;
 
   OMLayoutFeature(final int layoutVersion, String description) {
@@ -65,6 +65,11 @@ public enum OMLayoutFeature implements LayoutFeature {
   @Override
   public String description() {
     return description;
+  }
+
+  @Override
+  public String toString() {
+    return name() + " (" + version() + ")";
   }
 
   /**

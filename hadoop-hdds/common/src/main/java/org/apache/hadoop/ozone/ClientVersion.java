@@ -70,6 +70,11 @@ public enum ClientVersion implements ComponentVersion {
     return version;
   }
 
+  @Override
+  public String toString() {
+    return name() + " (" + version() + ")";
+  }
+
   public static ClientVersion fromProtoValue(int value) {
     return BY_PROTO_VALUE.getOrDefault(value, FUTURE_VERSION);
   }

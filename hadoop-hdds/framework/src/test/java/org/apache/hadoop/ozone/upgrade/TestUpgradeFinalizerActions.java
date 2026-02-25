@@ -86,6 +86,11 @@ public class TestUpgradeFinalizerActions {
       return null;
     }
 
+    @Override
+    public String toString() {
+      return name() + " (" + version() + ")";
+    }
+
     public void addAction(UpgradeAction upgradeAction) {
       this.action = upgradeAction;
     }

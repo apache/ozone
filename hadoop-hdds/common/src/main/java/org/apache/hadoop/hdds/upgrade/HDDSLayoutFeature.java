@@ -46,8 +46,8 @@ public enum HDDSLayoutFeature implements LayoutFeature {
 
   //////////////////////////////  //////////////////////////////
 
-  private int layoutVersion;
-  private String description;
+  private final int layoutVersion;
+  private final String description;
   private HDDSUpgradeAction scmAction;
   private HDDSUpgradeAction datanodeAction;
 
@@ -88,6 +88,11 @@ public enum HDDSLayoutFeature implements LayoutFeature {
   @Override
   public String description() {
     return description;
+  }
+
+  @Override
+  public String toString() {
+    return name() + " (" + version() + ")";
   }
 
   public Optional<HDDSUpgradeAction> scmAction() {
