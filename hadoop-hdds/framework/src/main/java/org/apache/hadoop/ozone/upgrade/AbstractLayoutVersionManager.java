@@ -199,12 +199,7 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
               "next feature to be finalized. " + versionMsg);
     }
   }
-
-  private boolean softwareIsBehindMetaData() {
-    State s = requireState();
-    return s.metadataLayoutVersion > s.softwareLayoutVersion;
-  }
-
+  
   @Override
   public int getMetadataLayoutVersion() {
     return requireState().metadataLayoutVersion;
