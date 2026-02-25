@@ -169,7 +169,7 @@ public class OmConfig extends ReconfigurableConfig {
       description = "If the log lag between leader OM and follower OM is larger " +
           "than this number, the follower OM is not up-to-date."
   )
-  private long followerReadLocalLeaseLagLimit;
+  private long followerReadLocalLeaseLogLimit;
 
   @Config(key = "ozone.om.follower.read.local.lease.time.ms",
       defaultValue = "5000",
@@ -230,12 +230,12 @@ public class OmConfig extends ReconfigurableConfig {
     this.followerReadLocalLeaseEnabled = newValue;
   }
 
-  public long getFollowerReadLocalLeaseLagLimit() {
-    return followerReadLocalLeaseLagLimit;
+  public long getFollowerReadLocalLeaseLogLimit() {
+    return followerReadLocalLeaseLogLimit;
   }
 
-  public void setFollowerReadLocalLeaseLagLimit(long newValue) {
-    this.followerReadLocalLeaseLagLimit = newValue;
+  public void setFollowerReadLocalLeaseLogLimit(long newValue) {
+    this.followerReadLocalLeaseLogLimit = newValue;
   }
 
   public long getFollowerReadLocalLeaseTimeMs() {

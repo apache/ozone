@@ -2408,7 +2408,7 @@ enum ReadConsistencyProto {
 // or whether it is superseded by the OM server-side configuration.
 message ReadConsistencyHint {
   message LocalLeaseContext {
-    optional uint64 lagLimit = 1;
+    optional uint64 logLimit = 1;
     optional uint64 leaseTimeMs = 2;
   }
 

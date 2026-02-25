@@ -238,10 +238,10 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       // whether OM Raft server enables linearizable read).
       ReadConsistencyHint readConsistencyHint = request.getReadConsistencyHint();
       ReadConsistencyProto readConsistency = readConsistencyHint.getReadConsistency();
-      RaftServerStatus raftServerStatus;
       switch (readConsistency) {
       case LOCAL_LEASE:
-        return submitReadRequestToOmLocalLease(request, readConsistencyHint.getLocalLeaseContext());
+        return submitReadRequestToOmLocalLease(request,
+            readConsistencyHint.hasLocalLeaseContext() ? readConsistencyHint.getLocalLeaseContext() : null);
       case LINEARIZABLE_LEADER_ONLY:
         return submitReadRequestToOmLinearizableLeaderOnly(request);
       case LINEARIZABLE_ALLOW_FOLLOWER:
@@ -257,7 +257,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
     // Read from leader or followers using linearizable read
     if (ozoneManager.getConfig().isFollowerReadLocalLeaseEnabled() &&
         allowFollowerReadLocalLease(omRatisServer.getServerDivision(),
-            ozoneManager.getConfig().getFollowerReadLocalLeaseLagLimit(),
+            ozoneManager.getConfig().getFollowerReadLocalLeaseLogLimit(),
             ozoneManager.getConfig().getFollowerReadLocalLeaseTimeMs())) {
       ozoneManager.getMetrics().incNumFollowerReadLocalLeaseSuccess();
       return handler.handleReadRequest(request);
@@ -298,12 +298,12 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       if (!ozoneManager.getConfig().isFollowerReadLocalLeaseEnabled()) {
         throw createLeaderErrorException(raftServerStatus);
       }
-      long localLeaseLagLimit = localLeaseContext.hasLagLimit() ?
-          localLeaseContext.getLagLimit() : ozoneManager.getConfig().getFollowerReadLocalLeaseLagLimit();
-      long localLeaseLeaseTimeMs = localLeaseContext.hasLeaseTimeMs() ?
+      long localLeaseLogLimit = localLeaseContext != null && localLeaseContext.hasLogLimit() ?
+          localLeaseContext.getLogLimit() : ozoneManager.getConfig().getFollowerReadLocalLeaseLogLimit();
+      long localLeaseLeaseTimeMs = localLeaseContext != null && localLeaseContext.hasLeaseTimeMs() ?
           localLeaseContext.getLeaseTimeMs() : ozoneManager.getConfig().getFollowerReadLocalLeaseTimeMs();
       if (allowFollowerReadLocalLease(omRatisServer.getServerDivision(),
-          localLeaseLagLimit, localLeaseLeaseTimeMs)) {
+          localLeaseLogLimit, localLeaseLeaseTimeMs)) {
         ozoneManager.getMetrics().incNumFollowerReadLocalLeaseSuccess();
         return handler.handleReadRequest(request);
       }
@@ -393,7 +393,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       return false; // no leader
     }
 
-    if (leaseTimeMsLimit >= 0 && leaderInfo.getLastRpcElapsedTimeMs() > leaseTimeMsLimit) {
+    if (leaseTimeMsLimit != -1 && leaderInfo.getLastRpcElapsedTimeMs() > leaseTimeMsLimit) {
       LOG.debug("FollowerRead Local Lease not allowed: Local lease Time expired. ");
       ozoneManager.getMetrics().incNumFollowerReadLocalLeaseFailTime();
       return false; // lease time expired

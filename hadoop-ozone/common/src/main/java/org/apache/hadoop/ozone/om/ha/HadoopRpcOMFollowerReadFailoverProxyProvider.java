@@ -87,7 +87,9 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
   /** The last proxy that has been used. Only used for testing. */
   private volatile OMProxyInfo<OzoneManagerProtocolPB> lastProxy = null;
 
+  /** The read consistency hint used when follower read is enabled. */
   private final ReadConsistencyHint followerReadConsistency;
+  /** The read consistency hint used when follower read is disabled or when follower read fails. */
   private final ReadConsistencyHint leaderReadConsistency;
 
   public HadoopRpcOMFollowerReadFailoverProxyProvider(
@@ -103,7 +105,7 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
     Preconditions.assertTrue(followerReadConsistencyType.allowFollowerRead(),
         "Invalid follower read consistency " + followerReadConsistencyType);
     Preconditions.assertTrue(!leaderReadConsistencyType.allowFollowerRead(),
-        "Invalid leader read consistency" + leaderReadConsistencyType);
+        "Invalid leader read consistency " + leaderReadConsistencyType);
     this.failoverProxy = failoverProxy;
     // Create a wrapped proxy containing all the proxies. Since this combined
     // proxy is just redirecting to other proxies, all invocations can share it.

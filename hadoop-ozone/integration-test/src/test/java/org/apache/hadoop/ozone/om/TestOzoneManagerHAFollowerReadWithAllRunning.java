@@ -514,7 +514,7 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends TestOzoneManag
   void testClientWithLinearizableLeaderRead() throws Exception {
     OzoneConfiguration clientConf = new OzoneConfiguration(getConf());
     clientConf.setBoolean(OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, false);
-    clientConf.set(OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_KEY, "LINEARIZABLE");
+    clientConf.set(OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_KEY, "LINEARIZABLE_LEADER_ONLY");
 
     OzoneClient ozoneClient = null;
     try {
