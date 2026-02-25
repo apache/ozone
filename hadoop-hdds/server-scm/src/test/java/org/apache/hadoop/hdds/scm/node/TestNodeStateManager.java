@@ -61,9 +61,6 @@ public class TestNodeStateManager {
   private NodeStateManager nsm;
   private ConfigurationSource conf;
   private MockEventPublisher eventPublisher;
-  private SCMContext scmContext;
-  private int scmSlv;
-  private int scmMlv;
 
   @BeforeEach
   public void setUp() {
@@ -85,12 +82,12 @@ public class TestNodeStateManager {
     };
     // Make NodeStateManager behave as if SCM has completed finalization,
     // unless a test changes the value of this variable.
-    scmContext = SCMContext.emptyContext();
+    SCMContext scmContext = SCMContext.emptyContext();
     scmContext.setFinalizationCheckpoint(
         FinalizationCheckpoint.FINALIZATION_COMPLETE);
     eventPublisher = new MockEventPublisher();
-    scmSlv = maxLayoutVersion();
-    scmMlv = maxLayoutVersion();
+    int scmSlv = maxLayoutVersion();
+    int scmMlv = maxLayoutVersion();
     LayoutVersionManager mockVersionManager = mock(HDDSLayoutVersionManager.class);
     when(mockVersionManager.getMetadataLayoutVersion()).thenReturn(scmMlv);
     when(mockVersionManager.getSoftwareLayoutVersion()).thenReturn(scmSlv);
