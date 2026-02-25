@@ -81,23 +81,6 @@ public class TestUsageInfoSubcommand {
     ObjectMapper mapper = new ObjectMapper();
     JsonNode json = mapper.readTree(outContent.toString("UTF-8"));
 
-    JsonNode node = json.get(0);
-    originalOut.println("JSON output (compared values):");
-    originalOut.println("  ozoneUsed: " + node.get("ozoneUsed"));
-    originalOut.println("  ozoneCapacity: " + node.get("ozoneCapacity"));
-    originalOut.println("  ozoneAvailable: " + node.get("ozoneAvailable"));
-    originalOut.println("  ozoneUsedPercent: " + node.get("ozoneUsedPercent"));
-    originalOut.println("  ozoneAvailablePercent: " + node.get("ozoneAvailablePercent"));
-    originalOut.println("  filesystemCapacity: " + node.get("filesystemCapacity"));
-    originalOut.println("  filesystemAvailable: " + node.get("filesystemAvailable"));
-    originalOut.println("  filesystemUsed: " + node.get("filesystemUsed"));
-    originalOut.println("  filesystemUsedPercent: " + node.get("filesystemUsedPercent"));
-    originalOut.println("  filesystemAvailablePercent: " + node.get("filesystemAvailablePercent"));
-    originalOut.println("  containerCount: " + node.get("containerCount"));
-    originalOut.println("  pipelineCount: " + node.get("pipelineCount"));
-    originalOut.println("  remainingAllocatable: " + node.get("remainingAllocatable"));
-    originalOut.println("  minFreeSpaceToSpare: " + node.get("freeSpaceToSpare"));
-
     assertEquals(ARRAY, json.getNodeType());
     assertNotNull(json.get(0).get("datanodeDetails"));
     assertEquals(10, json.get(0).get("ozoneUsed").longValue());
