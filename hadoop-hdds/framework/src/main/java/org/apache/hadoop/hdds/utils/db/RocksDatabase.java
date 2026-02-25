@@ -879,6 +879,12 @@ public final class RocksDatabase implements Closeable {
         boolean isKeyWithPrefixPresent = RocksDiffUtils.isKeyWithPrefixPresent(
             prefixForColumnFamily, firstDbKey, lastDbKey);
         if (!isKeyWithPrefixPresent) {
+          ColumnFamilyHandle handle = getColumnFamilyHandle(sstFileColumnFamily);
+          if (handle == null) {
+            LOG.warn("Skipping sst file deletion for {}: no handle found for column family {}",
+                liveFileMetaData.fileName(), sstFileColumnFamily);
+            continue;
+          }
           LOG.info("Deleting sst file: {} with start key: {} and end key: {} "
                   + "corresponding to column family {} from db: {}. "
                   + "Prefix for the column family: {}.",
@@ -887,7 +893,7 @@ public final class RocksDatabase implements Closeable {
               StringUtils.bytes2String(liveFileMetaData.columnFamilyName()),
               db.get().getName(),
               prefixForColumnFamily);
-          db.deleteFile(liveFileMetaData);
+          db.deleteFile(handle, liveFileMetaData);
         }
       }
     }

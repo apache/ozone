@@ -272,7 +272,7 @@ new file mode 100644
 index 000000000..5ba8a82ee
 --- /dev/null
 +++ b/tools/raw_sst_file_reader.cc
-@@ -0,0 +1,272 @@
+@@ -0,0 +1,271 @@
 +//  Copyright (c) 2011-present, Facebook, Inc.  All rights reserved.
 +//  This source code is licensed under both the GPLv2 (found in the
 +//  COPYING file in the root directory) and Apache 2.0 License
@@ -380,9 +380,9 @@ index 000000000..5ba8a82ee
 +
 +  rep_->file_.reset(new RandomAccessFileReader(std::move(file), file_path));
 +
-+  FilePrefetchBuffer prefetch_buffer(
-+      0 /* readahead_size */, 0 /* max_readahead_size */, true /* enable */,
-+      false /* track_min_offset */);
++  FilePrefetchBuffer prefetch_buffer(ReadaheadParams(),
++                                     !fopts.use_mmap_reads /* enable */,
++                                     false /* track_min_offset */);
 +  if (s.ok()) {
 +    const uint64_t kSstDumpTailPrefetchSize = 512 * 1024;
 +    uint64_t prefetch_size = (file_size > kSstDumpTailPrefetchSize)
@@ -391,11 +391,10 @@ index 000000000..5ba8a82ee
 +    uint64_t prefetch_off = file_size - prefetch_size;
 +    IOOptions opts;
 +    s = prefetch_buffer.Prefetch(opts, rep_->file_.get(), prefetch_off,
-+                                 static_cast<size_t>(prefetch_size),
-+                                 Env::IO_TOTAL /* rate_limiter_priority */);
++                                 static_cast<size_t>(prefetch_size));
 +
-+    s = ReadFooterFromFile(opts, rep_->file_.get(), &prefetch_buffer, file_size,
-+                           &footer);
++    s = ReadFooterFromFile(opts, rep_->file_.get(), *fs, &prefetch_buffer,
++                           file_size, &footer);
 +  }
 +  if (s.ok()) {
 +    magic_number = footer.table_magic_number();
@@ -411,10 +410,9 @@ index 000000000..5ba8a82ee
 +    }
 +
 +    s = ROCKSDB_NAMESPACE::ReadTableProperties(
-+        rep_->file_.get(), file_size, magic_number, rep_->ioptions_, &(rep_->table_properties_),
-+        /* memory_allocator= */ nullptr, (magic_number == kBlockBasedTableMagicNumber)
-+                                             ? &prefetch_buffer
-+                                             : nullptr);
++        rep_->file_.get(), file_size, magic_number, rep_->ioptions_, rep_->read_options_,
++        &(rep_->table_properties_), /* memory_allocator= */ nullptr,
++        (magic_number == kBlockBasedTableMagicNumber) ? &prefetch_buffer : nullptr);
 +    // For old sst format, ReadTableProperties might fail but file can be read
 +    if (s.ok()) {
 +      s = SetTableOptionsByMagicNumber(magic_number);
@@ -448,9 +446,10 @@ index 000000000..5ba8a82ee
 +
 +Status RawSstFileReader::NewTableReader(uint64_t file_size) {
 +  auto t_opt =
-+      TableReaderOptions(rep_->ioptions_, rep_->moptions_.prefix_extractor, rep_->soptions_,
-+                         rep_->internal_comparator_, false /* skip_filters */,
-+                         false /* imortal */, true /* force_direct_prefetch */);
++      TableReaderOptions(rep_->ioptions_, rep_->moptions_.prefix_extractor,
++                         rep_->moptions_.compression_manager.get(), rep_->soptions_,
++                         rep_->internal_comparator_, 0 /* block_protection_bytes_per_key */,
++                         false /* skip_filters */, false /* immortal */, true /* force_direct_prefetch */);
 +  // Allow open file with global sequence number for backward compatibility.
 +  t_opt.largest_seqno = kMaxSequenceNumber;
 +

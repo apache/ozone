@@ -205,7 +205,8 @@
     <reflections.version>0.10.2</reflections.version>
     <reload4j.version>1.2.26</reload4j.version>
     <restrict-imports.enforcer.version>2.6.1</restrict-imports.enforcer.version>
-    <rocksdb.version>7.7.3</rocksdb.version>
+    <rocksdb.version>10.4.2</rocksdb.version>
+    <rocksdbjni.classifier>linux64</rocksdbjni.classifier>
     <servlet-api.version>3.1.0</servlet-api.version>
     <shell-executable>bash</shell-executable>
     <slf4j.version>2.0.17</slf4j.version>
@@ -2567,6 +2568,28 @@
       <properties>
         <skip.installnodepnpm>true</skip.installnodepnpm>
         <skip.pnpm>true</skip.pnpm>
+      </properties>
+    </profile>
+    <profile>
+      <id>rocksdbjni-osx</id>
+      <activation>
+        <os>
+          <family>mac</family>
+        </os>
+      </activation>
+      <properties>
+        <rocksdbjni.classifier>osx</rocksdbjni.classifier>
+      </properties>
+    </profile>
+    <profile>
+      <id>rocksdbjni-win64</id>
+      <activation>
+        <os>
+          <family>windows</family>
+        </os>
+      </activation>
+      <properties>
+        <rocksdbjni.classifier>win64</rocksdbjni.classifier>
       </properties>
     </profile>
     <!-- The following profiles define test splits for CI -->
