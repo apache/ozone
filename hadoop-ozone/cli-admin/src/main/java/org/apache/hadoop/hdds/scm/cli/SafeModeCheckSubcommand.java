@@ -18,7 +18,6 @@
 package org.apache.hadoop.hdds.scm.cli;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -32,7 +31,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeInfo;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB.ScmNodeTarget;
-import org.apache.hadoop.net.NetUtils;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
@@ -61,14 +59,15 @@ public class SafeModeCheckSubcommand extends AbstractSubcommand implements Calla
     OzoneConfiguration conf = getOzoneConf();
     serviceId = HddsUtils.getScmServiceId(conf);
     String scmAddress = scmOption.getScm();
-    nodes = SCMNodeInfo.buildNodeInfo(conf);
-    
-    if (serviceId != null) {
-      System.out.println("Service ID: " + serviceId);
-    }
 
     ScmNodeTarget targetScmNode = new ScmNodeTarget();
     try (ScmClient scmClient = scmOption.createScmClient(conf, targetScmNode)) {
+      nodes = SCMNodeInfo.buildNodeInfo(conf);
+
+      if (serviceId != null) {
+        System.out.println("Service ID: " + serviceId);
+      }
+      
       if (allNodes) {
         executeForAllNodes(scmClient, targetScmNode);
       } else if (StringUtils.isNotEmpty(scmAddress)) {
@@ -172,8 +171,8 @@ public class SafeModeCheckSubcommand extends AbstractSubcommand implements Calla
         }
       }
     } catch (Exception e) {
-      System.out.printf("%s [%s]: ERROR: Failed to get safe mode status for SCM node%n",
-          node.getScmClientAddress(), nodeId);
+      System.out.printf("%s [%s]: ERROR: Failed to get safe mode status for SCM node: %s%n",
+          node.getScmClientAddress(), nodeId, e.getMessage());
     }
   }
 
@@ -186,18 +185,25 @@ public class SafeModeCheckSubcommand extends AbstractSubcommand implements Calla
       return true;
     }
 
-    // Normalizing both addresses and comparing
     try {
-      InetSocketAddress addr1 = NetUtils.createSocketAddr(address1);
-      InetSocketAddress addr2 = NetUtils.createSocketAddr(address2);
+      // Parse both addresses into host:port components
+      String[] parts1 = address1.split(":", 2);
+      String[] parts2 = address2.split(":", 2);
 
-      if (addr1.getAddress() == null || addr2.getAddress() == null) {
+      String host1 = parts1[0];
+      String host2 = parts2[0];
+      
+      // Hostnames must match
+      if (!host1.equalsIgnoreCase(host2)) {
         return false;
       }
-      return addr1.getAddress().equals(addr2.getAddress()) &&
-          (addr1.getPort() == 0 || addr2.getPort() == 0 ||
-              addr1.getPort() == addr2.getPort());
 
+      // If both have ports specified, they must match
+      if (parts1.length > 1 && parts2.length > 1) {
+        return parts1[1].equals(parts2[1]);
+      }
+
+      return true;
     } catch (Exception e) {
       // If address resolution fails, no match
       return false;
