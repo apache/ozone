@@ -75,10 +75,8 @@ public final class JacocoServer {
               synchronizedCall(destination::visitSessionInfo));
           reader.setExecutionDataVisitor(
               synchronizedCall(destination::visitClassExecution));
-          while (true) {
-            if (!reader.read()) {
-              break;
-            }
+          while (reader.read()) {
+            Thread.yield();
           }
           synchronized (lockMonitor) {
             destination.flush();
