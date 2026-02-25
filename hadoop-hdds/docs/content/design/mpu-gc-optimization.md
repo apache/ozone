@@ -145,6 +145,8 @@ Keep `multipartInfoTable` for MPU metadata, and store part rows in `multipartPar
 Note: The null byte separator ensures that the "uploadId" is properly delimited from the "partNumber" in the byte encoding, allowing for correct lexicographical ordering.
 ```
 
+The parts are stored in lexicographical order by uploadID and part number, which complies with the S3 specifications for ordering of ListPart and ListMultipartUpload operations.
+
 #### MultipartKeyInfo Structure
 ```protobuf
 message MultipartKeyInfo {
