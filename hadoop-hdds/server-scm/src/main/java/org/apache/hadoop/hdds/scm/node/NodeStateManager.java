@@ -713,8 +713,7 @@ public class NodeStateManager implements Runnable, Closeable {
 
   /**
    * This method is synchronized to coordinate node state updates between
-   * the upgrade finalization thread which calls
-   * {@link #forceNodesToHealthyReadOnly}, and the node health processing
+   * the upgrade finalization thread and the node health processing
    * thread that calls this method.
    */
   @VisibleForTesting
