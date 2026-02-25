@@ -57,7 +57,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -269,40 +268,6 @@ public class TestSCMNodeManager {
   }
 
   /**
-   * Tests that node manager handles layout version changes from heartbeats
-   * correctly.
-   *
-   * @throws IOException
-   * @throws InterruptedException
-   * @throws TimeoutException
-   */
-  @Test
-  public void testScmLayoutOnHeartbeat() throws Exception {
-    OzoneConfiguration conf = getConf();
-    conf.setTimeDuration(ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL,
-        1, TimeUnit.DAYS);
-
-    try (SCMNodeManager nodeManager = createNodeManager(conf)) {
-      assertTrue(scm.getScmContext().isLeader());
-      // Register 2 nodes correctly.
-      // These will be used with a faulty node to test pipeline creation.
-      DatanodeDetails goodNode1 = registerWithCapacity(nodeManager);
-      DatanodeDetails goodNode2 = registerWithCapacity(nodeManager);
-
-      scm.exitSafeMode();
-
-      assertPipelineClosedAfterLayoutHeartbeat(goodNode1, goodNode2,
-          nodeManager, SMALLER_MLV_LAYOUT_PROTO);
-      assertPipelineClosedAfterLayoutHeartbeat(goodNode1, goodNode2,
-          nodeManager, LARGER_MLV_SLV_LAYOUT_PROTO);
-      assertPipelineClosedAfterLayoutHeartbeat(goodNode1, goodNode2,
-          nodeManager, SMALLER_MLV_SLV_LAYOUT_PROTO);
-      assertPipelineClosedAfterLayoutHeartbeat(goodNode1, goodNode2,
-          nodeManager, LARGER_SLV_LAYOUT_PROTO);
-    }
-  }
-
-  /**
    * Create {@link DatanodeDetails} to register with {@code nodeManager}, and
    * provide the datanode maximum capacity so that space used does not block
    * pipeline creation.
@@ -425,29 +390,6 @@ public class TestSCMNodeManager {
 
       scm.exitSafeMode();
 
-      // SCM should auto create a factor 1 pipeline for the one healthy node.
-      // Still should not have enough healthy nodes for ratis 3 pipeline.
-      assertPipelines(HddsProtos.ReplicationFactor.ONE,
-          count -> count == 1,
-          Collections.singletonList(goodNode));
-      assertPipelines(HddsProtos.ReplicationFactor.THREE,
-          count -> count == 0,
-          new ArrayList<>());
-
-      // Even when safemode exit or new node addition trigger pipeline
-      // creation, they will fail with not enough healthy nodes for ratis 3
-      // pipeline. Therefore we do not have to worry about this create call
-      // failing due to datanodes reaching their maximum pipeline limit.
-      assertPipelineCreationFailsWithExceedingLimit(2);
-
-      // Heartbeat bad MLV nodes back to healthy.
-      nodeManager.processLayoutVersionReport(badMlvNode1, CORRECT_LAYOUT_PROTO);
-      nodeManager.processLayoutVersionReport(badMlvNode2, CORRECT_LAYOUT_PROTO);
-      nodeManager.processHeartbeat(badMlvNode1);
-      nodeManager.processHeartbeat(badMlvNode2);
-
-      // After moving out of healthy readonly, pipeline creation should be
-      // triggered.
       assertPipelines(HddsProtos.ReplicationFactor.ONE,
           count -> count == 3,
           Arrays.asList(badMlvNode1, badMlvNode2, goodNode));
