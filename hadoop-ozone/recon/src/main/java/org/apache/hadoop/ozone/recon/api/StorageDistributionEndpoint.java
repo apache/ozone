@@ -178,9 +178,6 @@ public class StorageDistributionEndpoint {
     Long totalOpenKeySize = namespaceMetrics.get("totalOpenKeySize");
     Long totalCommittedSize = namespaceMetrics.get("totalCommittedSize");
     Long totalKeys = namespaceMetrics.get("totalKeys");
-    Long totalContainerPreAllocated = nodeStorageReports.stream()
-        .map(DatanodeStorageReport::getCommitted)
-        .reduce(0L, Long::sum);
 
     return StorageCapacityDistributionResponse.newBuilder()
             .setDataNodeUsage(nodeStorageReports)
@@ -190,7 +187,7 @@ public class StorageDistributionEndpoint {
                     totalKeys != null ? totalKeys : 0L))
             .setUsedSpaceBreakDown(new UsedSpaceBreakDown(
                     totalOpenKeySize != null ? totalOpenKeySize : 0L,
-                    totalCommittedSize != null ? totalCommittedSize : 0L, totalContainerPreAllocated))
+                    totalCommittedSize != null ? totalCommittedSize : 0L))
             .build();
   }
 

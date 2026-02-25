@@ -18,11 +18,11 @@
 
 export const StorageDistribution = {
   globalStorage: {
-    totalFileSystemCapacity : 11264,
+    totalFileSystemCapacity: 11264,
     totalOzoneUsedSpace: 4096,
     totalOzoneFreeSpace: 4096,
     totalOzoneCapacity: 10240,
-    totalReservedSpace:1024,
+    totalReservedSpace: 1024,
     totalOzonePreAllocatedContainerSpace: 1024
   },
   globalNamespace: {
