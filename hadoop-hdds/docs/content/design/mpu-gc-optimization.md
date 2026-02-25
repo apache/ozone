@@ -45,6 +45,10 @@ Presently Ozone has several overheads when uploading large files via Multipart u
 
 **Implications:**
 1. Each MPU part commit reads the full `OmMultipartKeyInfo`, deserializes it, adds one part, serializes it, and writes it back (HDDS-10611).
+<br>
+```
+Side note: This is a common pattern in regular open key writes as well, but the MPU case is more severe due to the growing part list and more frequent updates.
+```
 2. RocksDB WAL logs each full write → WAL growth (HDDS-8238).
 3. GC pressure grows with the size of the object (HDDS-10611).
 
@@ -137,6 +141,11 @@ Keep `multipartInfoTable` for MPU metadata, and store part rows in `multipartPar
 * Prefix scan for all parts in one upload uses:
   * `uploadId(UTF-8 bytes)` + `0x00`
 
+```text
+Note: The null byte separator ensures that the "uploadId" is properly delimited from the "partNumber" in the byte encoding, allowing for correct lexicographical ordering.
+```
+
+#### MultipartKeyInfo Structure
 ```protobuf
 message MultipartKeyInfo {
     required string uploadID = 1;
@@ -214,7 +223,7 @@ Key:   OmMultipartPartKey{uploadId="abc123-uuid-456", partNumber=10}
 Value: OmMultipartPartInfo{partNumber=10, partName=".../part10", ...}
 ```
 
-`multipartPartsTable` (encoded key bytes):
+`multipartPartsTable` (encoded key sample):
 ```text
 uploadId = "abc123-uuid-456"
 partNumber = 2
@@ -548,10 +557,10 @@ multipartPartsTable[OmMultipartPartKey{uploadId="upload-001", partNumber=2}] ->
 
 #### Pros and Cons
 
-|                      | Pros                                                                                                                                                                                                   | Cons                                                                                                                                                                                         |
-|----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Chosen Approach      | * Minimal migration risk<br/> * Reuses existing `OmMultipartKeyInfo` message<br/>* Easiest incremental rollout with `schemaVersion` gating.<br/> * Lower implementation impact request/response paths. | * Carries complexity for mixed code (same table serving legacy + split metadata modes).<br/> * Still coupled to `OmMultipartKeyInfo`.<br/> * More conditional logic over time.               |
-| Alternative Approach | * Clean separation of concerns (`multipartMetadataTable` vs `multipartPartsTable`)<br/> * Clearer long-term model and easier mental mapping.<br/> * Avoids overloading legacy value type.              | * Requires wider code changes (new codecs/table wiring/request/response updates).<br/> * Higher migration and compatibility test scope.<br/> * More rollout complexity than chosen approach. |
+|                      | Pros                                                                                                                                                                                                                                                                  | Cons                                                                                                                                                                                         |
+|----------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Chosen Approach      | * Minimal migration risk<br/> * Reuses existing `OmMultipartKeyInfo` message<br/>* Easiest incremental rollout with `schemaVersion` gating, so finalization of upgrades do not affect existing key writes.<br/> * Lower implementation impact request/response paths. | * Carries complexity for mixed code (same table serving legacy + split metadata modes).<br/> * Still coupled to `OmMultipartKeyInfo`.<br/> * More conditional logic over time.               |
+| Alternative Approach | * Clean separation of concerns (`multipartMetadataTable` vs `multipartPartsTable`)<br/> * Clearer long-term model and easier mental mapping.<br/> * Avoids overloading legacy value type.                                                                             | * Requires wider code changes (new codecs/table wiring/request/response updates).<br/> * Higher migration and compatibility test scope.<br/> * More rollout complexity than chosen approach. |
 
 ## 3. Upgrades
 Add a new feature in `OMLayoutFeature`:
