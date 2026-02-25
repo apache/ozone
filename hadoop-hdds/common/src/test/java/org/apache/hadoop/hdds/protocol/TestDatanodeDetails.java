@@ -44,11 +44,11 @@ public class TestDatanodeDetails {
     DatanodeDetails subject = MockDatanodeDetails.randomDatanodeDetails();
 
     HddsProtos.DatanodeDetailsProto proto =
-        subject.toProto(DEFAULT_VERSION.toProtoValue());
+        subject.toProto(DEFAULT_VERSION.serialize());
     assertPorts(proto, V0_PORTS);
 
     HddsProtos.DatanodeDetailsProto protoV1 =
-        subject.toProto(VERSION_HANDLES_UNKNOWN_DN_PORTS.toProtoValue());
+        subject.toProto(VERSION_HANDLES_UNKNOWN_DN_PORTS.serialize());
     assertPorts(protoV1, ALL_PORTS);
   }
 
@@ -74,16 +74,16 @@ public class TestDatanodeDetails {
     Set<Port.Name> requiredPorts = Stream.of(Port.Name.STANDALONE, Port.Name.RATIS)
         .collect(Collectors.toSet());
     HddsProtos.DatanodeDetailsProto.Builder protoBuilder =
-        dn.toProtoBuilder(DEFAULT_VERSION.toProtoValue(), requiredPorts);
+        dn.toProtoBuilder(DEFAULT_VERSION.serialize(), requiredPorts);
     protoBuilder.clearCurrentVersion();
     DatanodeDetails dn2 = DatanodeDetails.newBuilder(protoBuilder.build()).build();
-    assertEquals(HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE.toProtoValue(), dn2.getCurrentVersion());
+    assertEquals(HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE.serialize(), dn2.getCurrentVersion());
 
     // test that if the current version is set, it is used
     protoBuilder =
-        dn.toProtoBuilder(DEFAULT_VERSION.toProtoValue(), requiredPorts);
+        dn.toProtoBuilder(DEFAULT_VERSION.serialize(), requiredPorts);
     DatanodeDetails dn3 = DatanodeDetails.newBuilder(protoBuilder.build()).build();
-    assertEquals(HDDSVersion.CURRENT.toProtoValue(), dn3.getCurrentVersion());
+    assertEquals(HDDSVersion.CURRENT.serialize(), dn3.getCurrentVersion());
   }
 
   public static void assertPorts(HddsProtos.DatanodeDetailsProto dn,

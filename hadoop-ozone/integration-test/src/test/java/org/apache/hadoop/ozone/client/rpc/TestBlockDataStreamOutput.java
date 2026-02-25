@@ -341,7 +341,7 @@ public class TestBlockDataStreamOutput {
       List<HddsDatanodeService> dns = cluster.getHddsDatanodes();
       for (HddsDatanodeService dn : dns) {
         DatanodeDetails details = dn.getDatanodeDetails();
-        assertEquals(DN_OLD_VERSION.toProtoValue(), details.getCurrentVersion());
+        assertEquals(DN_OLD_VERSION.serialize(), details.getCurrentVersion());
       }
 
       String keyName = getKeyName();
@@ -352,7 +352,7 @@ public class TestBlockDataStreamOutput {
       // Now check 3 DNs in a random pipeline returns the correct DN versions
       List<DatanodeDetails> streamDnDetails = stream.getPipeline().getNodes();
       for (DatanodeDetails details : streamDnDetails) {
-        assertEquals(DN_OLD_VERSION.toProtoValue(), details.getCurrentVersion());
+        assertEquals(DN_OLD_VERSION.serialize(), details.getCurrentVersion());
       }
     }
   }

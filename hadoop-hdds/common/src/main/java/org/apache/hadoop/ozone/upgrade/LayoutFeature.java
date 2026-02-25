@@ -17,12 +17,12 @@
 
 package org.apache.hadoop.ozone.upgrade;
 
-import org.apache.hadoop.ozone.Versioned;
+import org.apache.hadoop.hdds.ComponentVersion;
 
 /**
  * Generic Layout feature interface for Ozone.
  */
-public interface LayoutFeature extends Versioned {
+public interface LayoutFeature extends ComponentVersion {
   int layoutVersion();
 
   @Override

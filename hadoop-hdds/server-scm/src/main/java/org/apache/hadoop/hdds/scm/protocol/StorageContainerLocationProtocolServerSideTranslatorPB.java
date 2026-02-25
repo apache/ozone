@@ -221,7 +221,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     // annotated interceptors.
     boolean checkResponseForECRepConfig = false;
     if (request.getVersion() <
-        ClientVersion.ERASURE_CODING_SUPPORT.toProtoValue()) {
+        ClientVersion.ERASURE_CODING_SUPPORT.serialize()) {
       if (request.getCmdType() == GetContainer
           || request.getCmdType() == ListContainer
           || request.getCmdType() == GetContainerWithPipeline

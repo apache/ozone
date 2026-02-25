@@ -24,8 +24,8 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableMap;
 import java.lang.annotation.Annotation;
 import java.util.Map;
+import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.ozone.ClientVersion;
-import org.apache.hadoop.ozone.Versioned;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature;
 import org.apache.hadoop.ozone.om.upgrade.OMLayoutVersionManager;
@@ -44,7 +44,8 @@ class TestVersionExtractor {
     ValidationContext context = mock(ValidationContext.class);
     LayoutVersionManager layoutVersionManager = new OMLayoutVersionManager(layoutVersionValue.serialize());
     when(context.versionManager()).thenReturn(layoutVersionManager);
-    Versioned version = VersionExtractor.LAYOUT_VERSION_EXTRACTOR.extractVersion(null, context);
+    ComponentVersion version =
+        VersionExtractor.LAYOUT_VERSION_EXTRACTOR.extractVersion(null, context);
     assertEquals(layoutVersionValue, version);
   }
 
@@ -53,7 +54,8 @@ class TestVersionExtractor {
   void testClientVersionExtractor(ClientVersion expectedClientVersion) {
     OMRequest request = mock(OMRequest.class);
     when(request.getVersion()).thenReturn(expectedClientVersion.serialize());
-    Versioned version = VersionExtractor.CLIENT_VERSION_EXTRACTOR.extractVersion(request, null);
+    ComponentVersion version =
+        VersionExtractor.CLIENT_VERSION_EXTRACTOR.extractVersion(request, null);
     assertEquals(expectedClientVersion, version);
   }
 
@@ -62,7 +64,8 @@ class TestVersionExtractor {
   void testClientVersionExtractorForFutureValues(int futureVersion) {
     OMRequest request = mock(OMRequest.class);
     when(request.getVersion()).thenReturn(ClientVersion.CURRENT_VERSION + futureVersion);
-    Versioned version = VersionExtractor.CLIENT_VERSION_EXTRACTOR.extractVersion(request, null);
+    ComponentVersion version =
+        VersionExtractor.CLIENT_VERSION_EXTRACTOR.extractVersion(request, null);
     assertEquals(ClientVersion.FUTURE_VERSION, version);
   }
 

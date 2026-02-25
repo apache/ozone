@@ -111,10 +111,10 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
     }
 
     if (initialVersion != null) {
-      dnConf.setInt(TESTING_DATANODE_VERSION_INITIAL, initialVersion.toProtoValue());
+      dnConf.setInt(TESTING_DATANODE_VERSION_INITIAL, initialVersion.serialize());
     }
     if (currentVersion != null) {
-      dnConf.setInt(TESTING_DATANODE_VERSION_CURRENT, currentVersion.toProtoValue());
+      dnConf.setInt(TESTING_DATANODE_VERSION_CURRENT, currentVersion.serialize());
     }
     dnConf.set(HDDS_RATIS_LEADER_FIRST_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY, "1s");
     dnConf.set(HDDS_INITIAL_HEARTBEAT_INTERVAL, "500ms");
