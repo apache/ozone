@@ -86,7 +86,7 @@ public class TestSafeModeCheckSubcommandHA {
     String output = out.get();
     
     assertThat(output).contains(cluster.getScmLeader().getSCMNodeId());
-    assertThat(output).containsPattern("SCM is (in|out of) safe mode\\.");
+    assertThat(output).containsPattern("(in|out of) safe mode");
   }
 
   @Test
@@ -96,7 +96,7 @@ public class TestSafeModeCheckSubcommandHA {
     String output = out.get();
     
     assertThat(output).contains(cluster.getScmLeader().getSCMNodeId());
-    assertThat(output).containsPattern("SCM is (in|out of) safe mode\\.");
+    assertThat(output).containsPattern("(in|out of) safe mode");
     assertAllSafeModeRules(output);
   }
 
@@ -115,7 +115,7 @@ public class TestSafeModeCheckSubcommandHA {
 
       assertThat(output).contains("Service ID: " + serviceId);
       assertThat(output).contains(nodeId);
-      assertThat(output).containsPattern("\\[" + nodeId + "\\]: (IN|OUT OF) SAFE MODE");
+      assertThat(output).containsPattern("\\[" + nodeId + "\\]: (in|out of) safe mode");
     }
   }
 
@@ -177,7 +177,7 @@ public class TestSafeModeCheckSubcommandHA {
     for (StorageContainerManager scm : scms) {
       String nodeId = scm.getSCMNodeId();
       assertThat(output).contains(nodeId);
-      assertThat(output).containsPattern("\\[" + nodeId + "\\]: (IN|OUT OF) SAFE MODE");
+      assertThat(output).containsPattern("\\[" + nodeId + "\\]: (in|out of) safe mode");
     }
   }
 }

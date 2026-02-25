@@ -61,8 +61,10 @@ public class SafeModeCheckSubcommand extends AbstractSubcommand implements Calla
     OzoneConfiguration conf = getOzoneConf();
     serviceId = HddsUtils.getScmServiceId(conf);
     String scmAddress = scmOption.getScm();
+    nodes = SCMNodeInfo.buildNodeInfo(conf);
+    
     if (serviceId != null) {
-      nodes = SCMNodeInfo.buildNodeInfo(conf);
+      System.out.println("Service ID: " + serviceId);
     }
 
     ScmNodeTarget targetScmNode = new ScmNodeTarget();
@@ -79,105 +81,67 @@ public class SafeModeCheckSubcommand extends AbstractSubcommand implements Calla
   }
 
   private void executeForSingleNode(ScmClient scmClient, ScmNodeTarget targetScmNode) throws IOException {
-    boolean inSafeMode;
-    Map<String, Pair<Boolean, String>> rules = null;
-
-    // If SCM HA mode, query the leader node.
+    SCMNodeInfo targetNode;
     if (serviceId != null) {
-      String leaderNodeId = findLeaderNodeId(scmClient);
-      if (leaderNodeId == null) {
-        throw new IOException("Unable to determine SCM leader for the service " + serviceId);
-      }
-      System.out.printf("SCM node %s%n", leaderNodeId);
-      targetScmNode.setNodeId(leaderNodeId);
-      inSafeMode = scmClient.inSafeMode();
-      if (isVerbose()) {
-        rules = scmClient.getSafeModeRuleStatuses();
+      // HA mode: find leader
+      targetNode = findLeaderNode(scmClient);
+      if (targetNode == null) {
+        throw new IOException("Could not determine leader node");
       }
     } else {
-      // Non-HA mode
-      inSafeMode = scmClient.inSafeMode();
-      if (isVerbose()) {
-        rules = scmClient.getSafeModeRuleStatuses();
-      }
+      // Non-HA mode: use single node
+      targetNode = nodes.get(0);
     }
     
-    if (inSafeMode) {
-      System.out.println("SCM is in safe mode.");
-    } else {
-      System.out.println("SCM is out of safe mode.");
-    }
-    if (isVerbose() && rules != null) {
-      printSafeModeRules(rules);
-    }
+    queryNode(scmClient, targetScmNode, targetNode);
   }
 
   /**
-   * Find the leader node ID from SCM roles.
+   * Find the leader node from SCM roles.
    * @param scmClient the SCM client
-   * @return the leader node ID, or null if not found
+   * @return the leader SCMNodeInfo
    */
-  private String findLeaderNodeId(ScmClient scmClient) throws IOException {
+  private SCMNodeInfo findLeaderNode(ScmClient scmClient) throws IOException {
     try {
       List<String> roles = scmClient.getScmRoles();
-
       for (String role : roles) {
         String[] parts = role.split(":");
         if (parts.length < 3 || !"LEADER".equalsIgnoreCase(parts[2])) {
           continue;
         }
-        
         String leaderHost = parts[0];
         String leaderIp = parts.length >= 5 ? parts[4] : null;
-
         for (SCMNodeInfo node : nodes) {
           String nodeHost = node.getScmClientAddress().split(":")[0];
 
           if (matchesAddress(leaderHost, nodeHost) || (leaderIp != null && !leaderIp.isEmpty() &&
                   matchesAddress(leaderIp, nodeHost))) {
-            return node.getNodeId();
+            return node;
           }
         }
       }
 
       return null;
     } catch (IOException e) {
-      throw new IOException("Could not determine leader node for service: " + serviceId, e);
+      throw new IOException("Could not determine leader node", e);
     }
   }
 
   private void executeForSpecificNode(ScmClient scmClient, ScmNodeTarget targetScmNode, 
       String scmAddress) throws IOException {
-    if (serviceId == null) {
-      executeForSingleNode(scmClient, targetScmNode);
-      return;
-    }
-
-    System.out.println("Service ID: " + serviceId);
-    // Find the node matching the --scm address
-    List<SCMNodeInfo> matchedNodes = nodes.stream()
+    SCMNodeInfo matchedNode = nodes.stream()
         .filter(node -> matchesAddress(node.getScmClientAddress(), scmAddress))
-        .collect(Collectors.toList());
-
-    if (matchedNodes.isEmpty()) {
-      throw new IOException("Specified --scm address " + scmAddress +
-          " does not match any node in service " + serviceId +
-          ". Nodes: " + nodes.stream()
-              .map(n -> n.getScmClientAddress() + " [" + n.getNodeId() + "]")
-              .collect(Collectors.joining(", ")));
-    }
+        .findFirst()
+        .orElseThrow(() -> new IOException("Specified --scm address " + scmAddress +
+            " does not match any node in service " + serviceId +
+            ". Nodes: " + nodes.stream()
+            .map(n -> n.getScmClientAddress() + " [" + n.getNodeId() + "]")
+            .collect(Collectors.joining(", "))));
     
-    queryNode(scmClient, targetScmNode, matchedNodes.get(0));
+    queryNode(scmClient, targetScmNode, matchedNode);
   }
 
   private void executeForAllNodes(ScmClient scmClient, ScmNodeTarget targetScmNode) throws IOException {
-    if (serviceId == null) {
-      executeForSingleNode(scmClient, targetScmNode);
-      return;
-    }
-
-    System.out.println("Service ID: " + serviceId);
-
     for (SCMNodeInfo node : nodes) {
       queryNode(scmClient, targetScmNode, node);
     }
@@ -192,10 +156,14 @@ public class SafeModeCheckSubcommand extends AbstractSubcommand implements Calla
       
       boolean inSafeMode = scmClient.inSafeMode();
 
-      System.out.printf("%s [%s]: %s%n",
-          node.getScmClientAddress(),
-          nodeId,
-          inSafeMode ? "IN SAFE MODE" : "OUT OF SAFE MODE");
+      if (serviceId != null) {
+        System.out.printf("%s [%s]: %s%n",
+            node.getScmClientAddress(),
+            nodeId,
+            inSafeMode ? "in safe mode" : "out of safe mode");
+      } else {
+        System.out.printf("SCM is %s safe mode.%n", inSafeMode ? "in" : "out of");
+      }
 
       if (isVerbose()) {
         Map<String, Pair<Boolean, String>> rules = scmClient.getSafeModeRuleStatuses();
@@ -204,7 +172,7 @@ public class SafeModeCheckSubcommand extends AbstractSubcommand implements Calla
         }
       }
     } catch (Exception e) {
-      System.out.printf("%s [%s]: ERROR: Failed to get safe mode status from SCM node%n",
+      System.out.printf("%s [%s]: ERROR: Failed to get safe mode status for SCM node%n",
           node.getScmClientAddress(), nodeId);
     }
   }
