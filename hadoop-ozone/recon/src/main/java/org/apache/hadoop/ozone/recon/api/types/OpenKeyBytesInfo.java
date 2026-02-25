@@ -32,6 +32,9 @@ public class OpenKeyBytesInfo {
   @JsonProperty("multipartOpenKeyBytes")
   private long multipartOpenKeyBytes;
 
+  @JsonProperty("totalOpenKeyBytes")
+  private long totalOpenKeyBytes;
+
   public OpenKeyBytesInfo() { }
 
   public OpenKeyBytesInfo(long openKeyAndFileBytes, long multipartOpenKeyBytes) {
@@ -39,7 +42,6 @@ public class OpenKeyBytesInfo {
     this.multipartOpenKeyBytes = multipartOpenKeyBytes;
   }
 
-  @JsonProperty("totalOpenKeyBytes")
   public long getTotalOpenKeyBytes() {
     return openKeyAndFileBytes + multipartOpenKeyBytes;
   }
