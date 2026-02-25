@@ -306,50 +306,6 @@ public class TestSCMNodeManager {
     return cmd.getDatanode();
   }
 
-  private void assertPipelineClosedAfterLayoutHeartbeat(
-      DatanodeDetails originalNode1, DatanodeDetails originalNode2,
-      SCMNodeManager nodeManager, LayoutVersionProto layout) throws Exception {
-
-    List<DatanodeDetails>  originalNodes =
-        Arrays.asList(originalNode1, originalNode2);
-
-    // Initial condition: 2 healthy nodes registered.
-    assertPipelines(HddsProtos.ReplicationFactor.ONE, count -> count == 2,
-        originalNodes);
-    assertPipelines(HddsProtos.ReplicationFactor.THREE,
-        count -> count == 0, new ArrayList<>());
-
-    // Even when safemode exit or new node addition trigger pipeline
-    // creation, they will fail with not enough healthy nodes for ratis 3
-    // pipeline. Therefore we do not have to worry about this create call
-    // failing due to datanodes reaching their maximum pipeline limit.
-    assertPipelineCreationFailsWithNotEnoughNodes(2);
-
-    // Register a new node correctly.
-    DatanodeDetails node = registerWithCapacity(nodeManager);
-
-    List<DatanodeDetails> allNodes = new ArrayList<>(originalNodes);
-    allNodes.add(node);
-
-    // Safemode exit and adding the new node should trigger pipeline creation.
-    assertPipelines(HddsProtos.ReplicationFactor.ONE, count -> count == 3,
-        allNodes);
-    assertPipelines(HddsProtos.ReplicationFactor.THREE, count -> count >= 1,
-        allNodes);
-
-    // node sends incorrect layout.
-    nodeManager.processLayoutVersionReport(node, layout);
-
-    // Its pipelines should be closed then removed, meaning there is not
-    // enough nodes for factor 3 pipelines.
-    assertPipelines(HddsProtos.ReplicationFactor.ONE, count -> count == 2,
-        originalNodes);
-    assertPipelines(HddsProtos.ReplicationFactor.THREE,
-        count -> count == 0, new ArrayList<>());
-
-    assertPipelineCreationFailsWithNotEnoughNodes(2);
-  }
-
   /**
    * Tests that node manager handles layout versions for newly registered nodes
    * correctly.
@@ -397,32 +353,6 @@ public class TestSCMNodeManager {
           count -> count >= 1,
           Arrays.asList(badMlvNode1, badMlvNode2, goodNode));
     }
-  }
-
-  private void assertPipelineCreationFailsWithNotEnoughNodes(
-      int actualNodeCount) throws Exception {
-    SCMException ex = assertThrows(SCMException.class, () -> {
-      ReplicationConfig ratisThree =
-          ReplicationConfig.fromProtoTypeAndFactor(
-              HddsProtos.ReplicationType.RATIS,
-              HddsProtos.ReplicationFactor.THREE);
-      scm.getPipelineManager().createPipeline(ratisThree);
-    }, "3 nodes should not have been found for a pipeline.");
-    assertThat(ex.getMessage()).contains("Required 3. Found " +
-        actualNodeCount);
-  }
-
-  private void assertPipelineCreationFailsWithExceedingLimit(int limit) {
-    // Build once, outside the assertion
-    ReplicationConfig config = ReplicationConfig.fromProtoTypeAndFactor(
-        HddsProtos.ReplicationType.RATIS,
-        HddsProtos.ReplicationFactor.THREE);
-    SCMException ex = assertThrows(
-        SCMException.class,
-        () -> scm.getPipelineManager().createPipeline(config),
-        "3 nodes should not have been found for a pipeline.");
-    assertThat(ex.getMessage())
-        .contains("Cannot create pipeline as it would exceed the limit per datanode: " + limit);
   }
 
   private void assertPipelines(HddsProtos.ReplicationFactor factor,
