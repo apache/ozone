@@ -26,7 +26,7 @@ import java.util.Map;
 /**
  * Versioning for datanode.
  */
-public enum DatanodeVersion implements ComponentVersion {
+public enum HDDSVersion implements ComponentVersion {
 
   DEFAULT_VERSION(0, "Initial version"),
 
@@ -39,17 +39,17 @@ public enum DatanodeVersion implements ComponentVersion {
   FUTURE_VERSION(-1, "Used internally in the client when the server side is "
       + " newer and an unknown server version has arrived to the client.");
 
-  public static final DatanodeVersion CURRENT = latest();
+  public static final HDDSVersion CURRENT = latest();
   public static final int CURRENT_VERSION = CURRENT.version;
 
-  private static final Map<Integer, DatanodeVersion> BY_PROTO_VALUE =
+  private static final Map<Integer, HDDSVersion> BY_PROTO_VALUE =
       Arrays.stream(values())
-          .collect(toMap(DatanodeVersion::toProtoValue, identity()));
+          .collect(toMap(HDDSVersion::toProtoValue, identity()));
 
   private final int version;
   private final String description;
 
-  DatanodeVersion(int version, String description) {
+  HDDSVersion(int version, String description) {
     this.version = version;
     this.description = description;
   }
@@ -64,12 +64,12 @@ public enum DatanodeVersion implements ComponentVersion {
     return version;
   }
 
-  public static DatanodeVersion fromProtoValue(int value) {
+  public static HDDSVersion fromProtoValue(int value) {
     return BY_PROTO_VALUE.getOrDefault(value, FUTURE_VERSION);
   }
 
-  private static DatanodeVersion latest() {
-    DatanodeVersion[] versions = DatanodeVersion.values();
+  private static HDDSVersion latest() {
+    HDDSVersion[] versions = HDDSVersion.values();
     return versions[versions.length - 2];
   }
 }

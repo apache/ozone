@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.client.io;
 
-import static org.apache.hadoop.hdds.DatanodeVersion.STREAM_BLOCK_SUPPORT;
+import static org.apache.hadoop.hdds.HDDSVersion.STREAM_BLOCK_SUPPORT;
 
 import java.io.IOException;
 import java.util.concurrent.ExecutorService;

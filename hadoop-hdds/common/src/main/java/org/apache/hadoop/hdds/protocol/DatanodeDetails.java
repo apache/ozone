@@ -36,7 +36,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.hadoop.hdds.DatanodeVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.annotation.InterfaceStability;
@@ -469,7 +469,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
       builder.setCurrentVersion(datanodeDetailsProto.getCurrentVersion());
     } else {
       // fallback to version 1 if not present
-      builder.setCurrentVersion(DatanodeVersion.SEPARATE_RATIS_PORTS_AVAILABLE.toProtoValue());
+      builder.setCurrentVersion(HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE.toProtoValue());
     }
     return builder;
   }
@@ -727,7 +727,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
     private HddsProtos.NodeOperationalState persistedOpState;
     private long persistedOpStateExpiryEpochSec = 0;
     private int initialVersion;
-    private int currentVersion = DatanodeVersion.CURRENT_VERSION;
+    private int currentVersion = HDDSVersion.CURRENT_VERSION;
 
     /**
      * Default private constructor. To create Builder instance use

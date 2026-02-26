@@ -22,7 +22,7 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.ComponentVersion;
-import org.apache.hadoop.hdds.DatanodeVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.cli.DebugSubcommand;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.ClientVersion;
@@ -52,7 +52,7 @@ public class VersionDebug implements Callable<Void>, DebugSubcommand {
         ),
         "components", ImmutableSortedMap.of(
             "client", asMap(ClientVersion.CURRENT),
-            "datanode", asMap(DatanodeVersion.CURRENT),
+            "datanode", asMap(HDDSVersion.CURRENT),
             "om", asMap(OzoneManagerVersion.CURRENT)
         )
     )));
