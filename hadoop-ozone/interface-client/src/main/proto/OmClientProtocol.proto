@@ -2360,7 +2360,7 @@ message DeleteObjectTaggingResponse {
 enum ReadConsistencyProto {
   // Unspecified consistency, the read consistency behavior is decided
   // by the OM
-  UNSPECIFIED = 0;
+  READ_CONSISTENCY_UNSPECIFIED = 0;
   // Client sends all read requests to OM node that the client believes is the current leader.
   // If the OM node is not a leader, the OM node throws an exception so the client failover to the OM leader.
   // OM leader handles the request immediately without doing leadership check to verify

@@ -522,7 +522,7 @@ public final class OzoneManagerRatisServer {
 
   private static RaftClientRequest.Type getRaftReadRequestType(OMRequest omRequest) {
     if (!omRequest.hasReadConsistencyHint() || !omRequest.getReadConsistencyHint().hasReadConsistency() ||
-        omRequest.getReadConsistencyHint().getReadConsistency() == ReadConsistencyProto.UNSPECIFIED) {
+        omRequest.getReadConsistencyHint().getReadConsistency() == ReadConsistencyProto.READ_CONSISTENCY_UNSPECIFIED) {
       // If there is no consistency hint, we simply follow the Raft server read option
       return RaftClientRequest.readRequestType();
     }

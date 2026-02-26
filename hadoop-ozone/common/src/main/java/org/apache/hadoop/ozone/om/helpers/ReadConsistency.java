@@ -69,7 +69,7 @@ public enum ReadConsistency {
     case LOCAL_LEASE:
       return ReadConsistencyProto.LOCAL_LEASE;
     default:
-      return ReadConsistencyProto.UNSPECIFIED;
+      return ReadConsistencyProto.READ_CONSISTENCY_UNSPECIFIED;
     }
   }
 
