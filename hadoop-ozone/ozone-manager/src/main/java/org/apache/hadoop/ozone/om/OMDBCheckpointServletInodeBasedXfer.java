@@ -305,6 +305,8 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
             }
             collectFilesFromDir(sstFilesToExclude, getCompactionLogDir(), maxTotalSstSize, false, omdbArchiver);
             try (Stream<Path> backupFiles = sstBackupFiles.stream()) {
+              // since pruner can delete the files after it has been loaded into sstBackupFiles,
+              // NoSuchFileException needs to be caught
               collectFilesFromDir(sstFilesToExclude, backupFiles, maxTotalSstSize, false, omdbArchiver, true);
             }
             Collection<Path> snapshotLocalPropertyFiles = getSnapshotLocalDataPaths(localDataManager,
