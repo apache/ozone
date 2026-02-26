@@ -391,7 +391,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       return false; // no leader
     }
 
-    if (leaseTimeMsLimit != -1 && leaderInfo.getLastRpcElapsedTimeMs() > leaseTimeMsLimit) {
+    if (leaseTimeMsLimit >= -1 && leaderInfo.getLastRpcElapsedTimeMs() > leaseTimeMsLimit) {
       LOG.debug("FollowerRead Local Lease not allowed: Local lease Time expired. ");
       ozoneManager.getMetrics().incNumFollowerReadLocalLeaseFailTime();
       return false; // lease time expired
