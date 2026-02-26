@@ -251,6 +251,7 @@ public final class HAUtils {
         .newBuilder(tempConfig, definition, dbName, dbDir)
         .setOpenReadOnly(true)
         .setCreateCheckpointDirs(false)
+        .setEnableRocksDbMetrics(false)
         .build()) {
       // Get the table name with TransactionInfo as the value. The transaction
       // info table name are different in SCM and SCM.
