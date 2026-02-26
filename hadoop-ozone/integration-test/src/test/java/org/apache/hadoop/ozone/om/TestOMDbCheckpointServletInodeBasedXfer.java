@@ -33,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.anyCollection;
@@ -57,6 +58,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -867,7 +869,10 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     Files.write(sstFile1, "content1".getBytes(StandardCharsets.UTF_8));
     Files.write(sstFile2, "content2".getBytes(StandardCharsets.UTF_8));
     Files.write(sstFile3, "content3".getBytes(StandardCharsets.UTF_8));
-
+    List<Path> filesUnderDir = new ArrayList<>();
+    filesUnderDir.add(sstFile1);
+    filesUnderDir.add(sstFile2);
+    filesUnderDir.add(sstFile3);
     // Delete file2 before transfer , same as pruner
     Files.delete(sstFile2);
     OMDBArchiver archiver = new OMDBArchiver();
@@ -882,44 +887,15 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     doAnswer(invocation -> archiver.recordFileEntry(
         invocation.getArgument(0), invocation.getArgument(1)))
         .when(archiverSpy).recordFileEntry(any(), anyString());
-
-    boolean result = servlet.collectFilesFromDir(sstFilesToExclude, dbDir,
-        maxTotalSstSize, true, archiverSpy);
-
+    boolean result = servlet.collectFilesFromDir(sstFilesToExclude, filesUnderDir.stream(),
+        maxTotalSstSize, true, archiverSpy, true);
     assertTrue(result);
     verify(archiverSpy, times(2)).recordFileEntry(any(), anyString());
-  }
-
-  @Test
-  public void testCollectSnapshotDataSkipsDeletedFile() throws Exception {
-    OMDBCheckpointServletInodeBasedXfer servlet = new OMDBCheckpointServletInodeBasedXfer();
-    Path dbDir = Files.createTempDirectory(folder, "dbdir-");
-    Path yaml1 = dbDir.resolve("snap1.yaml");
-    Path yaml2 = dbDir.resolve("snap2.yaml");
-    Files.write(yaml1, "content1".getBytes(StandardCharsets.UTF_8));
-    Files.write(yaml2, "content1".getBytes(StandardCharsets.UTF_8));
-    // Delete file2 before transfer , same as pruner
-    Files.delete(yaml2);
-    OMDBArchiver archiver = new OMDBArchiver();
-    Path tmpDir = folder.resolve("tmp-deleted-file-test");
-    Files.createDirectories(tmpDir);
-    archiver.setTmpDir(tmpDir);
-    OMDBArchiver archiverSpy = spy(archiver);
-    Set<String> sstFilesToExclude = new HashSet<>();
-    Set<Path> yamlFiles = new HashSet<>();
-    yamlFiles.add(yaml1);
-    yamlFiles.add(yaml2);
-    AtomicLong maxTotalSstSize = new AtomicLong(Long.MAX_VALUE);
-    doAnswer(invocation -> archiver.recordFileEntry(invocation.getArgument(0), invocation.getArgument(1))).when(
-        archiverSpy).recordFileEntry(any(), anyString());
-    try {
-      servlet.collectSnapshotData(sstFilesToExclude, new HashSet<>(), yamlFiles, maxTotalSstSize, archiverSpy);
-    } catch (Exception e) {
-      fail("collectSnapshot should not throw an exception", e);
-    }
-    verify(archiverSpy, times(2)).recordFileEntry(any(), anyString());
-    // only 1 entry
-    assertEquals(1, archiver.getFilesToWriteIntoTarball().size());
+    // should throw exception when flag is set to false.
+    assertThrows(NoSuchFileException.class, () -> {
+      servlet.collectFilesFromDir(sstFilesToExclude, filesUnderDir.stream(),
+          maxTotalSstSize, true, archiverSpy, false);
+    });
   }
 
   private void writeDummyKeyToDeleteTableOfSnapshotDB(OzoneSnapshot snapshotToModify, String bucketName,

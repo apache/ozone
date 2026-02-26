@@ -305,7 +305,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
             }
             collectFilesFromDir(sstFilesToExclude, getCompactionLogDir(), maxTotalSstSize, false, omdbArchiver);
             try (Stream<Path> backupFiles = sstBackupFiles.stream()) {
-              collectFilesFromDir(sstFilesToExclude, backupFiles, maxTotalSstSize, false, omdbArchiver);
+              collectFilesFromDir(sstFilesToExclude, backupFiles, maxTotalSstSize, false, omdbArchiver, true);
             }
             Collection<Path> snapshotLocalPropertyFiles = getSnapshotLocalDataPaths(localDataManager,
                 snapshotInCheckpoint.keySet());
@@ -377,12 +377,7 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
     for (Path snapshotLocalPropertyYaml : snapshotLocalPropertyFiles) {
       File yamlFile = snapshotLocalPropertyYaml.toFile();
       omdbArchiver.recordHardLinkMapping(yamlFile.getAbsolutePath(), yamlFile.getName());
-      try {
-        omdbArchiver.recordFileEntry(yamlFile, yamlFile.getName());
-      } catch (NoSuchFileException e) {
-        logFileNoLongerExists(yamlFile.toPath());
-        omdbArchiver.removeHardLinkMapping(yamlFile.getAbsolutePath());
-      }
+      omdbArchiver.recordFileEntry(yamlFile, yamlFile.getName());
     }
   }
 
@@ -484,6 +479,12 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
     }
   }
 
+  private boolean collectFilesFromDir(Set<String> sstFilesToExclude, Stream<Path> files,
+      AtomicLong maxTotalSstSize, boolean onlySstFile, OMDBArchiver omdbArchiver) throws IOException {
+    return collectFilesFromDir(sstFilesToExclude, files, maxTotalSstSize,
+        onlySstFile, omdbArchiver, false);
+  }
+
   /**
    * Collects database files to the archive, handling deduplication based on inode IDs.
    * Here the dbDir could either be a snapshot db directory, the active om.db,
@@ -501,8 +502,9 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
    * @return true if processing should continue, false if size limit reached
    * @throws IOException if an I/O error occurs
    */
-  private boolean collectFilesFromDir(Set<String> sstFilesToExclude, Stream<Path> files, AtomicLong maxTotalSstSize,
-      boolean onlySstFile, OMDBArchiver omdbArchiver) throws IOException {
+  boolean collectFilesFromDir(Set<String> sstFilesToExclude, Stream<Path> files,
+      AtomicLong maxTotalSstSize, boolean onlySstFile, OMDBArchiver omdbArchiver,
+      boolean ignoreNoSuchFileException) throws IOException {
     long bytesRecorded = 0L;
     int filesWritten = 0;
     Iterable<Path> iterable = files::iterator;
@@ -515,9 +517,12 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
         try {
           fileId = OmSnapshotUtils.getFileInodeAndLastModifiedTimeString(dbFile);
         } catch (NoSuchFileException nsfe) {
-          LOG.warn("File {} not found.", dbFile);
-          logFileNoLongerExists(dbFile);
-          continue;
+          if (ignoreNoSuchFileException) {
+            LOG.warn("File {} not found.", dbFile);
+            logFileNoLongerExists(dbFile);
+            continue;
+          }
+          throw nsfe;
         }
         String path = dbFile.toFile().getAbsolutePath();
         // if the file is in the om checkpoint dir, then we need to change the path to point to the OM DB.
@@ -536,8 +541,12 @@ public class OMDBCheckpointServletInodeBasedXfer extends DBCheckpointServlet {
             maxTotalSstSize.addAndGet(-fileSize);
             sstFilesToExclude.add(fileId);
           } catch (NoSuchFileException e) {
-            logFileNoLongerExists(dbFile);
-            omdbArchiver.removeHardLinkMapping(path);
+            if (ignoreNoSuchFileException) {
+              logFileNoLongerExists(dbFile);
+              omdbArchiver.removeHardLinkMapping(path);
+            } else {
+              throw e;
+            }
           }
         }
       }
