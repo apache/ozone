@@ -53,6 +53,7 @@ public class ContainerBalancerSelectionCriteria {
   private ContainerManager containerManager;
   private Map<ContainerID, DatanodeDetails> containerToSourceMap;
   private Set<ContainerID> excludeContainers;
+  private Set<ContainerID> includeContainers;
   private Set<ContainerID> excludeContainersDueToFailure;
   private FindSourceStrategy findSourceStrategy;
   private Map<DatanodeDetails, NavigableSet<ContainerID>> setMap;
@@ -71,6 +72,7 @@ public class ContainerBalancerSelectionCriteria {
     this.containerToSourceMap = containerToSourceMap;
     excludeContainersDueToFailure = new HashSet<>();
     excludeContainers = balancerConfiguration.getExcludeContainers();
+    includeContainers = balancerConfiguration.getIncludeContainers();
     this.findSourceStrategy = findSourceStrategy;
     this.setMap = new HashMap<>();
   }
@@ -156,6 +158,10 @@ public class ContainerBalancerSelectionCriteria {
   public boolean shouldBeExcluded(ContainerID containerID,
       DatanodeDetails node, long sizeMovedAlready) {
     ContainerInfo container;
+    //if any container is excluded only those should be used
+    if (!includeContainers.isEmpty() && !includeContainers.contains(containerID)) {
+      return true; // Exclude if not in include list
+    }
     try {
       container = containerManager.getContainer(containerID);
     } catch (ContainerNotFoundException e) {
@@ -227,6 +233,11 @@ public class ContainerBalancerSelectionCriteria {
     this.excludeContainers = excludeContainers;
   }
 
+  public void setIncludeContainers(
+      Set<ContainerID> includeContainers) {
+    this.includeContainers = includeContainers;
+  }
+
   public void addToExcludeDueToFailContainers(ContainerID container) {
     this.excludeContainersDueToFailure.add(container);
   }
@@ -236,6 +247,9 @@ public class ContainerBalancerSelectionCriteria {
         new TreeSet<>(orderContainersByUsedBytes().reversed());
     try {
       Set<ContainerID> idSet = nodeManager.getContainers(node);
+      if (includeContainers != null && !includeContainers.isEmpty()) {
+        idSet.retainAll(includeContainers);
+      }
       if (excludeContainers != null) {
         idSet.removeAll(excludeContainers);
       }

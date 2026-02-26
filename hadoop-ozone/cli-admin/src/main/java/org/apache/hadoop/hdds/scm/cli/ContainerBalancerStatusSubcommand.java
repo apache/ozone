@@ -122,6 +122,7 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
                     "%-50s %s%n" +
                     "%-50s %s%n" +
                     "%-50s %s%n" +
+                    "%-50s %s%n" +
                     "%-50s %s%n", "Key", "Value", "Threshold",
             configuration.getUtilizationThreshold(), "Max Datanodes to Involve per Iteration(percent)",
             configuration.getDatanodesInvolvedMaxPercentagePerIteration(),
@@ -143,12 +144,15 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
             configuration.getMoveNetworkTopologyEnable(),
             "Whether to Trigger Refresh Datanode Usage Info",
             configuration.getTriggerDuBeforeMoveEnable(),
+            "Container IDs to Include to Balancing",
+            configuration.getIncludeContainers().isEmpty() ? "None" : configuration.getIncludeContainers(),
             "Container IDs to Exclude from Balancing",
             configuration.getExcludeContainers().isEmpty() ? "None" : configuration.getExcludeContainers(),
             "Datanodes Specified to be Balanced",
             configuration.getIncludeDatanodes().isEmpty() ? "None" : configuration.getIncludeDatanodes(),
             "Datanodes Excluded from Balancing",
             configuration.getExcludeDatanodes().isEmpty() ? "None" : configuration.getExcludeDatanodes());
+
   }
 
   private String getPrettyIterationStatusInfo(ContainerBalancerTaskIterationStatusInfoProto iterationStatusInfo) {

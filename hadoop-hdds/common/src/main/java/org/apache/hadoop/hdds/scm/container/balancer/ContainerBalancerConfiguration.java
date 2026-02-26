@@ -91,6 +91,11 @@ public final class ContainerBalancerConfiguration {
       "to exclude from balancing. For example \"1, 4, 5\" or \"1,4,5\".")
   private String excludeContainers = "";
 
+  @Config(key = "hdds.container.balancer.include.containers", type = ConfigType.STRING, defaultValue =
+      "", tags = {ConfigTag.BALANCER}, description = "List of container IDs " +
+      "to include to balancing. For example \"1, 4, 5\" or \"1,4,5\".")
+  private String includeContainers = "";
+
   @Config(key = "hdds.container.balancer.move.timeout", type = ConfigType.TIME, defaultValue = "65m",
       tags = {ConfigTag.BALANCER}, description =
       "The amount of time to allow a single container to move " +
@@ -311,6 +316,17 @@ public final class ContainerBalancerConfiguration {
         }).collect(Collectors.toSet());
   }
 
+  public Set<ContainerID> getIncludeContainers() {
+    if (includeContainers.isEmpty()) {
+      return new HashSet<>();
+    }
+    return Arrays.stream(includeContainers.split(","))
+        .map(s -> {
+          s = s.trim();
+          return ContainerID.valueOf(Long.parseLong(s));
+        }).collect(Collectors.toSet());
+  }
+
   /**
    * Sets containers to exclude from balancing.
    * @param excludeContainers String of {@link ContainerID} to exclude. For
@@ -318,6 +334,16 @@ public final class ContainerBalancerConfiguration {
    */
   public void setExcludeContainers(String excludeContainers) {
     this.excludeContainers = excludeContainers;
+  }
+
+  /**
+   * Sets containers to include in balancing. When non-empty, only these
+   * containers will be considered for balancing.
+   * @param includeContainers String of {@link ContainerID} to include. For
+   *                          example, "1, 4, 5" or "1,4,5".
+   */
+  public void setIncludeContainers(String includeContainers) {
+    this.includeContainers = includeContainers;
   }
 
   public Duration getMoveTimeout() {
@@ -422,6 +448,7 @@ public final class ContainerBalancerConfiguration {
             "%-50s %s%n" +
             "%-50s %s%n" +
             "%-50s %s%n" +
+            "%-50s %s%n" +
             "%-50s %s%n", "Key", "Value", "Threshold",
         threshold, "Max Datanodes to Involve per Iteration(percent)",
         maxDatanodesPercentageToInvolvePerIteration,
@@ -443,6 +470,8 @@ public final class ContainerBalancerConfiguration {
         networkTopologyEnable,
         "Whether to Trigger Refresh Datanode Usage Info",
         triggerDuEnable,
+        "Container IDs to Include to Balancing",
+        includeContainers.equals("") ? "None" : includeContainers,
         "Container IDs to Exclude from Balancing",
         excludeContainers.equals("") ? "None" : excludeContainers,
         "Datanodes Specified to be Balanced",
@@ -463,6 +492,7 @@ public final class ContainerBalancerConfiguration {
         .setSizeLeavingSourceMax(maxSizeLeavingSource)
         .setIterations(iterations)
         .setExcludeContainers(excludeContainers)
+        .setIncludeContainers(includeContainers)
         .setMoveTimeout(moveTimeout)
         .setBalancingIterationInterval(balancingInterval)
         .setIncludeDatanodes(includeNodes)
@@ -496,6 +526,9 @@ public final class ContainerBalancerConfiguration {
     }
     if (proto.hasIterations()) {
       config.setIterations(proto.getIterations());
+    }
+    if (proto.hasIncludeContainers()) {
+      config.setIncludeContainers(proto.getIncludeContainers());
     }
     if (proto.hasExcludeContainers()) {
       config.setExcludeContainers(proto.getExcludeContainers());

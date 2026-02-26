@@ -126,6 +126,13 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
           "(specify \"1,2,3\" for container IDs).")
   private Optional<String> excludeContainers;
 
+  @Option(names = {"--include-containers"},
+      description = "A list of container IDs separated by commas. " +
+          "The containers specified in this list are included in balancing. " +
+          "This configuration is empty by default " +
+          "(specify \"1,2,3\" for container IDs).")
+  private Optional<String> includeContainers;
+
   @Override
   public void execute(ScmClient scmClient) throws IOException {
     StartContainerBalancerResponseProto response = scmClient.
@@ -134,7 +141,7 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
         maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
         maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
         moveReplicationTimeout, networkTopologyEnable, includeNodes,
-        excludeNodes, excludeContainers);
+        excludeNodes, excludeContainers, includeContainers);
     if (response.getStart()) {
       System.out.println("Container Balancer started successfully.");
     } else {
