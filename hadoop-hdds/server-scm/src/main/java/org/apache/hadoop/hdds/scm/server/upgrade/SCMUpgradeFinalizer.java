@@ -17,14 +17,13 @@
 
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
-import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.CLOSED;
-
 import java.io.IOException;
-import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.LayoutVersionProto;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
-import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
@@ -67,16 +66,11 @@ public class SCMUpgradeFinalizer extends
       context.getFinalizationStateManager().addFinalizingMark();
     }
     logCheckpointCrossed(FinalizationCheckpoint.FINALIZATION_STARTED);
-
-    if (!stateManager.crossedCheckpoint(
-        FinalizationCheckpoint.MLV_EQUALS_SLV)) {
-      closePipelinesBeforeFinalization(context.getPipelineManager());
-    }
   }
 
   @Override
   public void finalizeLayoutFeature(LayoutFeature lf,
-       SCMUpgradeFinalizationContext context) throws UpgradeException {
+      SCMUpgradeFinalizationContext context) throws UpgradeException {
     // Run upgrade actions, update VERSION file, and update layout version in
     // DB.
     try {
@@ -115,89 +109,89 @@ public class SCMUpgradeFinalizer extends
         context.getFinalizationStateManager();
     if (!stateManager.crossedCheckpoint(
         FinalizationCheckpoint.FINALIZATION_COMPLETE)) {
-      createPipelinesAfterFinalization(context);
+      waitForDatanodesToFinalize(context);
       stateManager.removeFinalizingMark();
     }
   }
 
-  private void closePipelinesBeforeFinalization(PipelineManager pipelineManager)
-      throws IOException {
-    /*
-     * Before we can call finalize the feature, we need to make sure that
-     * all existing pipelines are closed and pipeline Manger would freeze
-     * all new pipeline creation.
-     */
-    String msg = "  Existing pipelines and containers will be closed " +
-        "during Upgrade.";
-    msg += "\n  New pipelines creation will remain frozen until Upgrade " +
-        "is finalized.";
+  /**
+   * Wait for all HEALTHY datanodes to complete finalization before finishing
+   * SCM finalization. This ensures that when the client receives a
+   * FINALIZATION_DONE status, all healthy datanodes have also finalized.
+   *
+   * A datanode is considered finalized when its metadata layout version (MLV)
+   * equals its software layout version (SLV), indicating it has completed
+   * processing all layout features.
+   *
+   * @param context The finalization context containing node manager reference
+   * @throws SCMException if waiting is interrupted or SCM loses leadership
+   * @throws NotLeaderException if SCM is no longer the leader
+   */
+  private void waitForDatanodesToFinalize(SCMUpgradeFinalizationContext context)
+      throws SCMException, NotLeaderException {
+    NodeManager nodeManager = context.getNodeManager();
 
-    // Pipeline creation should already be frozen when the finalization state
-    // manager set the checkpoint.
-    if (!pipelineManager.isPipelineCreationFrozen()) {
-      throw new SCMException("Error during finalization. Pipeline creation" +
-          "should have been frozen before closing existing pipelines.",
-          SCMException.ResultCodes.INTERNAL_ERROR);
-    }
+    LOG.info("Waiting for all HEALTHY datanodes to complete finalization before finishing SCM finalization.");
 
-    for (Pipeline pipeline : pipelineManager.getPipelines()) {
-      if (pipeline.getPipelineState() != CLOSED) {
-        pipelineManager.closePipeline(pipeline.getId());
-      }
-    }
-
-    // We can not yet move all the existing data nodes to HEALTHY-READONLY
-    // state since the next heartbeat will move them back to HEALTHY state.
-    // This has to wait till postFinalizeUpgrade, when SCM MLV version is
-    // already upgraded as part of finalize processing.
-    // While in this state, it should be safe to do finalize processing for
-    // all new features. This will also update ondisk mlv version. Any
-    // disrupting upgrade can add a hook here to make sure that SCM is in a
-    // consistent state while finalizing the upgrade.
-
-    logAndEmit(msg);
-  }
-
-  private void createPipelinesAfterFinalization(
-      SCMUpgradeFinalizationContext context) throws SCMException,
-      NotLeaderException {
-    // Pipeline creation should already be resumed when the finalization state
-    // manager set the checkpoint.
-    PipelineManager pipelineManager = context.getPipelineManager();
-    if (pipelineManager.isPipelineCreationFrozen()) {
-      throw new SCMException("Error during finalization. Pipeline creation " +
-          "should have been resumed before waiting for new pipelines.",
-          SCMException.ResultCodes.INTERNAL_ERROR);
-    }
-
-    // Wait for at least one pipeline to be created before finishing
-    // finalization, so clients can write.
-    boolean hasPipeline = false;
-    while (!hasPipeline) {
+    boolean allDatanodesFinalized = false;
+    while (!allDatanodesFinalized) {
       // Break out of the wait and step down from driving finalization if this
       // SCM is no longer the leader by throwing NotLeaderException.
       context.getSCMContext().getTermOfLeader();
 
-      ReplicationConfig ratisThree =
-          ReplicationConfig.fromProtoTypeAndFactor(
-              HddsProtos.ReplicationType.RATIS,
-              HddsProtos.ReplicationFactor.THREE);
-      int pipelineCount =
-          pipelineManager.getPipelines(ratisThree, Pipeline.PipelineState.OPEN)
-              .size();
+      allDatanodesFinalized = true;
+      int totalHealthyNodes = 0;
+      int finalizedNodes = 0;
+      int unfinalizedNodes = 0;
 
-      hasPipeline = (pipelineCount >= 1);
-      if (!hasPipeline) {
-        LOG.info("Waiting for at least one open Ratis 3 pipeline after SCM " +
-            "finalization.");
+      for (DatanodeDetails dn : nodeManager.getAllNodes()) {
+        try {
+          // Only check HEALTHY nodes. STALE/DEAD nodes will be told to
+          // finalize when they recover.
+          if (nodeManager.getNodeStatus(dn).isHealthy()) {
+            totalHealthyNodes++;
+            DatanodeInfo datanodeInfo = nodeManager.getDatanodeInfo(dn);
+            if (datanodeInfo == null) {
+              LOG.warn("Could not get DatanodeInfo for {}, skipping in " +
+                  "finalization wait.", dn.getHostName());
+              continue;
+            }
+
+            LayoutVersionProto dnLayout = datanodeInfo.getLastKnownLayoutVersion();
+            int dnMlv = dnLayout.getMetadataLayoutVersion();
+            int dnSlv = dnLayout.getSoftwareLayoutVersion();
+
+            if (dnMlv < dnSlv) {
+              // Datanode has not yet finalized
+              allDatanodesFinalized = false;
+              unfinalizedNodes++;
+              LOG.debug("Datanode {} has not yet finalized: MLV={}, SLV={}",
+                  dn.getHostName(), dnMlv, dnSlv);
+            } else {
+              finalizedNodes++;
+            }
+          }
+        } catch (NodeNotFoundException e) {
+          // Node was removed while we were iterating. This is OK, skip it.
+          LOG.debug("Node {} not found while waiting for finalization, " +
+              "skipping.", dn);
+        }
+      }
+
+      if (!allDatanodesFinalized) {
+        LOG.info("Waiting for datanodes to finalize. Status: {}/{} healthy " +
+                "datanodes have finalized ({} remaining).",
+            finalizedNodes, totalHealthyNodes, unfinalizedNodes);
         try {
           Thread.sleep(5000);
         } catch (InterruptedException e) {
-          // Try again on next loop iteration.
           Thread.currentThread().interrupt();
+          throw new SCMException("Interrupted while waiting for datanodes to " +
+              "finalize.", SCMException.ResultCodes.INTERNAL_ERROR);
         }
       } else {
-        LOG.info("Open pipeline found after SCM finalization");
+        LOG.info("All {} HEALTHY datanodes have completed finalization.",
+            totalHealthyNodes);
       }
     }
   }

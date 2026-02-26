@@ -408,9 +408,7 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   default HDDSLayoutVersionManager getLayoutVersionManager() {
     return null;
   }
-
-  default void forceNodesToHealthyReadOnly() { }
-
+  
   /**
    * This API allows removal of only DECOMMISSIONED, IN_MAINTENANCE and DEAD nodes
    * from NodeManager data structures and cleanup memory.

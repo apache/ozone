@@ -133,11 +133,6 @@ public class FinalizationManagerImpl implements FinalizationManager {
   }
 
   @Override
-  public boolean crossedCheckpoint(FinalizationCheckpoint checkpoint) {
-    return finalizationStateManager.crossedCheckpoint(checkpoint);
-  }
-
-  @Override
   public FinalizationCheckpoint getCheckpoint() {
     return finalizationStateManager.getFinalizationCheckpoint();
   }

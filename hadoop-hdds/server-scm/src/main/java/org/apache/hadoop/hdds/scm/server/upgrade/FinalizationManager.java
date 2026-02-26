@@ -43,8 +43,6 @@ public interface FinalizationManager {
   BasicUpgradeFinalizer<SCMUpgradeFinalizationContext, HDDSLayoutVersionManager>
       getUpgradeFinalizer();
 
-  boolean crossedCheckpoint(FinalizationCheckpoint checkpoint);
-
   FinalizationCheckpoint getCheckpoint();
 
   void buildUpgradeContext(NodeManager nodeManager,
@@ -54,11 +52,6 @@ public interface FinalizationManager {
   void reinitialize(Table<String, String> finalizationStore) throws IOException;
 
   void onLeaderReady();
-
-  static boolean shouldCreateNewPipelines(FinalizationCheckpoint checkpoint) {
-    return !checkpoint.hasCrossed(FinalizationCheckpoint.FINALIZATION_STARTED)
-        || checkpoint.hasCrossed(FinalizationCheckpoint.MLV_EQUALS_SLV);
-  }
 
   static boolean shouldTellDatanodesToFinalize(
       FinalizationCheckpoint checkpoint) {
