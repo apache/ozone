@@ -68,13 +68,20 @@ public enum ClientVersion implements ComponentVersion {
     return version;
   }
 
+  public static ClientVersion deserialize(int value) {
+    return BY_VALUE.getOrDefault(value, FUTURE_VERSION);
+  }
+
+  @Override
+  public boolean isSupportedBy(int serializedVersion) {
+    // In order for the other serialized version to support this version's features,
+    // the other version must be equal or larger to this version.
+    return deserialize(serializedVersion).compareTo(this) >= 0;
+  }
+
   @Override
   public String toString() {
     return name() + " (" + serialize() + ")";
-  }
-
-  public static ClientVersion deserialize(int value) {
-    return BY_VALUE.getOrDefault(value, FUTURE_VERSION);
   }
 
   private static ClientVersion latest() {
