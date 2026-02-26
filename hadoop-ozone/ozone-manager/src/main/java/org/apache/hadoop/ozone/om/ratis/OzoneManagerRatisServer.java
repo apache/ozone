@@ -56,6 +56,7 @@ import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine.Server;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -69,7 +70,6 @@ import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyProto;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status;
 import org.apache.ratis.conf.Parameters;
 import org.apache.ratis.conf.RaftProperties;
@@ -521,8 +521,7 @@ public final class OzoneManagerRatisServer {
   }
 
   private static RaftClientRequest.Type getRaftReadRequestType(OMRequest omRequest) {
-    if (!omRequest.hasReadConsistencyHint() || !omRequest.getReadConsistencyHint().hasReadConsistency() ||
-        omRequest.getReadConsistencyHint().getReadConsistency() == ReadConsistencyProto.READ_CONSISTENCY_UNSPECIFIED) {
+    if (!OmUtils.specifiedReadConsistency(omRequest)) {
       // If there is no consistency hint, we simply follow the Raft server read option
       return RaftClientRequest.readRequestType();
     }

@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.protocolPB;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_READY;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.NOT_LEADER;
 import static org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils.createErrorResponse;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyProto.READ_CONSISTENCY_UNSPECIFIED;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type.PrepareStatus;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
@@ -229,8 +228,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       return handler.handleReadRequest(request);
     }
 
-    if (!request.hasReadConsistencyHint() || !request.getReadConsistencyHint().hasReadConsistency() ||
-        request.getReadConsistencyHint().getReadConsistency() == READ_CONSISTENCY_UNSPECIFIED) {
+    if (!OmUtils.specifiedReadConsistency(request)) {
       return submitReadRequestToOmWithoutHint(request);
     } else {
       // If read consistency hint is specified, we should try to respect it although
