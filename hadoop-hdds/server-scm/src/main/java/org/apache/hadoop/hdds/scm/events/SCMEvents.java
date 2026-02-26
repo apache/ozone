@@ -191,7 +191,7 @@ public final class SCMEvents {
    * state to healthy state.
    */
   public static final TypedEvent<DatanodeDetails>
-      UNHEALTHY_TO_HEALTHY_NODE = new TypedEvent<>(DatanodeDetails.class, "HEALTHY_READONLY_TO_HEALTHY_NODE");
+      UNHEALTHY_TO_HEALTHY_NODE = new TypedEvent<>(DatanodeDetails.class, "UNHEALTHY_TO_HEALTHY_NODE");
 
   /**
    * This event will be triggered by CommandStatusReportHandler whenever a

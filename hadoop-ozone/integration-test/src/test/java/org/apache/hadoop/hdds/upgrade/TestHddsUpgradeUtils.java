@@ -183,10 +183,8 @@ public final class TestHddsUpgradeUtils {
   }
 
   public static void testDataNodesStateOnSCM(List<StorageContainerManager> scms,
-      int expectedDatanodeCount, HddsProtos.NodeState state,
-      HddsProtos.NodeState alternateState) {
-    scms.forEach(scm -> testDataNodesStateOnSCM(scm, expectedDatanodeCount,
-        state, alternateState));
+      int expectedDatanodeCount, HddsProtos.NodeState state) {
+    scms.forEach(scm -> testDataNodesStateOnSCM(scm, expectedDatanodeCount, state));
   }
 
   /*
@@ -197,15 +195,13 @@ public final class TestHddsUpgradeUtils {
    * setting "alternateState = null".
    */
   public static void testDataNodesStateOnSCM(StorageContainerManager scm,
-      int expectedDatanodeCount, HddsProtos.NodeState state,
-      HddsProtos.NodeState alternateState) {
+      int expectedDatanodeCount, HddsProtos.NodeState state) {
     int countNodes = 0;
     for (DatanodeDetails dn : scm.getScmNodeManager().getAllNodes()) {
       try {
         HddsProtos.NodeState dnState =
             scm.getScmNodeManager().getNodeStatus(dn).getHealth();
-        assertTrue((dnState == state) ||
-            (alternateState != null && dnState == alternateState));
+        assertTrue(dnState == state);
       } catch (NodeNotFoundException e) {
         e.printStackTrace();
         fail("Node not found");

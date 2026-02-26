@@ -24,7 +24,6 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.STALE;
 
 import java.util.Collections;
@@ -63,8 +62,6 @@ public final class NodeStatus {
       EnumSet.of(DECOMMISSIONING, DECOMMISSIONED, ENTERING_MAINTENANCE, IN_MAINTENANCE));
 
   private static final NodeStatus IN_SERVICE_HEALTHY = valueOf(IN_SERVICE, HEALTHY);
-
-  private static final NodeStatus IN_SERVICE_HEALTHY_READONLY = valueOf(IN_SERVICE, HEALTHY_READONLY);
 
   private static final Set<NodeOperationalState> MAINTENANCE_STATES = Collections.unmodifiableSet(
       EnumSet.of(ENTERING_MAINTENANCE, IN_MAINTENANCE));
@@ -122,11 +119,6 @@ public final class NodeStatus {
   /** @return the status of {@link NodeOperationalState#IN_SERVICE} and {@link NodeState#HEALTHY}. */
   public static NodeStatus inServiceHealthy() {
     return IN_SERVICE_HEALTHY;
-  }
-
-  /** @return the status of {@link NodeOperationalState#IN_SERVICE} and {@link NodeState#HEALTHY_READONLY}. */
-  public static NodeStatus inServiceHealthyReadOnly() {
-    return IN_SERVICE_HEALTHY_READONLY;
   }
 
   /** @return the status of {@link NodeOperationalState#IN_SERVICE} and {@link NodeState#STALE}. */
@@ -219,10 +211,9 @@ public final class NodeStatus {
     return operationalState == IN_MAINTENANCE;
   }
 
-  /** @return true iff this node is {@link NodeState#HEALTHY} or {@link NodeState#HEALTHY_READONLY}. */
+  /** @return true iff this node is {@link NodeState#HEALTHY} */
   public boolean isHealthy() {
-    return health == HEALTHY
-        || health == HEALTHY_READONLY;
+    return health == HEALTHY;
   }
 
   /** @return true iff this node is {@link NodeState#HEALTHY} or {@link NodeState#STALE}. */

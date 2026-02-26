@@ -201,8 +201,6 @@ public class TestClusterStateEndpoint extends AbstractReconSqlDBTest {
         1000L, 400L, 600L, 300L, 50L, 20L);
     when(mockNodeManager.getStats()).thenReturn(scmNodeStat);
     when(mockNodeManager.getNodeCount(NodeStatus.inServiceHealthy())).thenReturn(1);
-    when(mockNodeManager.getNodeCount(NodeStatus.inServiceHealthyReadOnly()))
-        .thenReturn(0);
     when(mockNodeManager.getAllNodeCount()).thenReturn(1);
     when(mockNodeManager.getAllNodes()).thenReturn(Collections.singletonList(mockDatanode));
     when(mockNodeManager.getTotalFilesystemUsage(mockDatanode))
