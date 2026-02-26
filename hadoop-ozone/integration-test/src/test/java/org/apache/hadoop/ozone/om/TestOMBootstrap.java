@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT_V2;
 import static org.apache.hadoop.ozone.om.TestOMRatisSnapshots.checkSnapshot;
 import static org.apache.hadoop.ozone.om.TestOMRatisSnapshots.createOzoneSnapshot;
 import static org.apache.hadoop.ozone.om.TestOMRatisSnapshots.writeKeys;
@@ -25,10 +27,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
@@ -43,18 +45,24 @@ import org.apache.hadoop.ozone.conf.OMClientConfig;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
+import org.apache.hadoop.ozone.om.ratis_snapshot.OmRatisSnapshotProvider;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.Parameter;
+import org.junit.jupiter.params.ParameterizedClass;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
- * Tests that bootstrapping a follower works for v1 checkpoint format.
+ * Tests that bootstrapping a follower works for both v1/v2 checkpoint format.
  * A stopped follower is restarted after the leader has advanced beyond
  * the purge gap, forcing InstallSnapshot/bootstrap.
  */
+@ParameterizedClass
+@ValueSource(booleans = {false, true})
 public class TestOMBootstrap {
 
   private static final String OM_SERVICE_ID = "om-service-test1";
@@ -69,17 +77,13 @@ public class TestOMBootstrap {
   private String bucketName;
   private OzoneClient client;
 
-  /**
-   * Override in subclasses to use v2 checkpoint format.
-   */
-  protected boolean useV2CheckpointFormat() {
-    return false;
-  }
+  @Parameter
+  private boolean useV2Checkpoint;
 
   @BeforeEach
   public void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(OMConfigKeys.OZONE_OM_DB_CHECKPOINT_USE_V2_KEY, useV2CheckpointFormat());
+    conf.setBoolean(OMConfigKeys.OZONE_OM_DB_CHECKPOINT_USE_V2_KEY, useV2Checkpoint);
     conf.setInt(OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP, 5);
     conf.setStorageSize(OMConfigKeys.OZONE_OM_RATIS_SEGMENT_SIZE_KEY, 16, StorageUnit.KB);
     conf.setStorageSize(OMConfigKeys.OZONE_OM_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY, 16, StorageUnit.KB);
@@ -143,7 +147,9 @@ public class TestOMBootstrap {
     SnapshotInfo snapshotInfo2 = createOzoneSnapshot(objectStore, volumeName,
         bucketName, leaderOM, "snap2");
 
-    LogCapturer logCapture = LogCapturer.captureLogs(OzoneManager.class);
+    LogCapturer ozoneManagerLog = LogCapturer.captureLogs(OzoneManager.class);
+    LogCapturer omRatisSnapshotProviderLog = LogCapturer.captureLogs(
+        OmRatisSnapshotProvider.class);
     cluster.restartOzoneManager(followerOM, true);
 
     TransactionInfo transactionInfo = TransactionInfo.readTransactionInfo(
@@ -157,8 +163,14 @@ public class TestOMBootstrap {
       return index >= leaderOMSnapshotIndex - 1;
     }, 100, 30_000);
 
-    assertLogCapture(logCapture, "Reloaded OM state");
-    assertLogCapture(logCapture, "Install Checkpoint is finished");
+    assertLogCapture(ozoneManagerLog, "Reloaded OM state");
+    assertLogCapture(ozoneManagerLog, "Install Checkpoint is finished");
+    assertLogCapture(ozoneManagerLog, "Install Checkpoint is finished");
+    if (useV2Checkpoint) {
+      assertLogCapture(omRatisSnapshotProviderLog, OZONE_DB_CHECKPOINT_HTTP_ENDPOINT_V2);
+    } else {
+      assertLogCapture(omRatisSnapshotProviderLog, OZONE_DB_CHECKPOINT_HTTP_ENDPOINT);
+    }
 
     OMMetadataManager followerOMMetaMngr = followerOM.getMetadataManager();
     assertNotNull(followerOMMetaMngr.getVolumeTable().get(
