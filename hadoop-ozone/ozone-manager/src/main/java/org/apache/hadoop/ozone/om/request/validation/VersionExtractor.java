@@ -49,8 +49,7 @@ public enum VersionExtractor {
   CLIENT_VERSION_EXTRACTOR {
     @Override
     public ComponentVersion extractVersion(OMRequest req, ValidationContext ctx) {
-      return req.getVersion() > ClientVersion.CURRENT.serialize() ?
-          ClientVersion.FUTURE_VERSION : ClientVersion.deserialize(req.getVersion());
+      return ClientVersion.deserialize(req.getVersion());
     }
 
     @Override

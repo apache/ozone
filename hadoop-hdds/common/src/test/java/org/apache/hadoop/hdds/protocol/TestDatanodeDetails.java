@@ -77,13 +77,15 @@ public class TestDatanodeDetails {
         dn.toProtoBuilder(DEFAULT_VERSION.serialize(), requiredPorts);
     protoBuilder.clearCurrentVersion();
     DatanodeDetails dn2 = DatanodeDetails.newBuilder(protoBuilder.build()).build();
-    assertEquals(HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE.serialize(), dn2.getCurrentVersion());
+    assertEquals(HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE,
+        HDDSVersion.deserialize(dn2.getCurrentVersion()));
 
     // test that if the current version is set, it is used
     protoBuilder =
         dn.toProtoBuilder(DEFAULT_VERSION.serialize(), requiredPorts);
     DatanodeDetails dn3 = DatanodeDetails.newBuilder(protoBuilder.build()).build();
-    assertEquals(HDDSVersion.SOFTWARE_VERSION.serialize(), dn3.getCurrentVersion());
+    assertEquals(HDDSVersion.SOFTWARE_VERSION,
+        HDDSVersion.deserialize(dn3.getCurrentVersion()));
   }
 
   public static void assertPorts(HddsProtos.DatanodeDetailsProto dn,
