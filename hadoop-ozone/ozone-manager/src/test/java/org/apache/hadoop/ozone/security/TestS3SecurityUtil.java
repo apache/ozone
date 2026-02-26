@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.security;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INTERNAL_ERROR;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_TOKEN;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.REVOKED_TOKEN;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -57,6 +58,7 @@ import org.mockito.MockedStatic;
 public class TestS3SecurityUtil {
   private static final byte[] ENCRYPTION_KEY = new byte[5];
   private static final TestClock CLOCK = TestClock.newInstance();
+  private static final String TEMP_ACCESS_KEY_ID = "temp-access-key-id";
 
   {
     ThreadLocalRandom.current().nextBytes(ENCRYPTION_KEY);
@@ -132,6 +134,33 @@ public class TestS3SecurityUtil {
             .setExpectedMessage("Could not determine if original principal is revoked"));
   }
 
+  @Test
+  public void testValidateS3CredentialFailsWhenRequestAccessIdDoesNotMatchTokenOwner() throws Exception {
+    validateS3CredentialHelper(
+        new TestConfig()
+            .setRequestAccessId("some-other-access-id")
+            .setExpectedResult(INVALID_TOKEN)
+            .setExpectedMessage("STS token validation failed - accessKeyId is invalid for session token"));
+  }
+
+  @Test
+  public void testValidateS3CredentialFailsWhenRequestAccessIdMissing() throws Exception {
+    validateS3CredentialHelper(
+        new TestConfig()
+            .setIncludeAccessId(false)
+            .setExpectedResult(INVALID_TOKEN)
+            .setExpectedMessage("STS token validation failed - accessKeyId is invalid for session token"));
+  }
+
+  @Test
+  public void testValidateS3CredentialFailsWhenRequestAccessIdEmpty() throws Exception {
+    validateS3CredentialHelper(
+        new TestConfig()
+            .setRequestAccessId("")
+            .setExpectedResult(INVALID_TOKEN)
+            .setExpectedMessage("STS token validation failed - accessKeyId is invalid for session token"));
+  }
+
   private void validateS3CredentialHelper(TestConfig config) throws Exception {
     try (OzoneManager ozoneManager = mock(OzoneManager.class)) {
       when(ozoneManager.isSecurityEnabled()).thenReturn(true);
@@ -178,7 +207,8 @@ public class TestS3SecurityUtil {
         awsV4AuthValidatorMock.when(() -> AWSV4AuthValidator.validateRequest(anyString(), anyString(), anyString()))
             .thenReturn(true);
 
-        final OMRequest omRequest = createRequestWithSessionToken(sessionToken);
+        final OMRequest omRequest = createRequestWithSessionToken(
+            config.requestAccessId, config.includeAccessId);
 
         if (config.expectedResult != null) {
           final OMException omException = assertThrows(
@@ -199,19 +229,20 @@ public class TestS3SecurityUtil {
 
   private STSTokenIdentifier createSTSTokenIdentifier() {
     return new STSTokenIdentifier(
-        "temp-access-key-id", "original-access-key-id", "arn:aws:iam::123456789012:role/test-role",
+        TEMP_ACCESS_KEY_ID, "original-access-key-id", "arn:aws:iam::123456789012:role/test-role",
         CLOCK.instant().plusSeconds(3600), "secret-access-key", "session-policy",
         ENCRYPTION_KEY);
   }
 
-  @SuppressWarnings("SameParameterValue")
-  private static OMRequest createRequestWithSessionToken(String sessionToken) {
-    final S3Authentication s3Authentication = S3Authentication.newBuilder()
-        .setAccessId("accessKeyId")
+  private static OMRequest createRequestWithSessionToken(String accessId, boolean includeAccessId) {
+    final S3Authentication.Builder s3AuthenticationBuilder = S3Authentication.newBuilder()
         .setStringToSign("string-to-sign")
         .setSignature("signature")
-        .setSessionToken(sessionToken)
-        .build();
+        .setSessionToken("session-token");
+    if (includeAccessId) {
+      s3AuthenticationBuilder.setAccessId(accessId);
+    }
+    final S3Authentication s3Authentication = s3AuthenticationBuilder.build();
 
     return OMRequest.newBuilder()
         .setClientId(UUID.randomUUID().toString())
@@ -223,12 +254,14 @@ public class TestS3SecurityUtil {
   /**
    * Helper class to create various scenarios for testing.
    */
-  private static class TestConfig {
+  private static final class TestConfig {
     private OMMetadataManager metadataManager = mock(OMMetadataManager.class);
     private Table<String, Long> revokedSTSTokenTable = new InMemoryTestTable<>();
     private boolean isTokenRevoked = false;
     private boolean isOriginalAccessKeyIdRevoked = false;
     private boolean shouldOriginalAccessKeyIdCheckThrowError = false;
+    private String requestAccessId = TEMP_ACCESS_KEY_ID;
+    private boolean includeAccessId = true;
     private OMException.ResultCodes expectedResult = null;
     private String expectedMessage = null;
 
@@ -258,6 +291,17 @@ public class TestS3SecurityUtil {
     @SuppressWarnings("SameParameterValue")
     TestConfig setShouldOriginalAccessKeyIdCheckThrowError(boolean isError) {
       this.shouldOriginalAccessKeyIdCheckThrowError = isError;
+      return this;
+    }
+
+    TestConfig setRequestAccessId(String requestAccessId) {
+      this.requestAccessId = requestAccessId;
+      return this;
+    }
+
+    @SuppressWarnings("SameParameterValue")
+    TestConfig setIncludeAccessId(boolean includeAccessId) {
+      this.includeAccessId = includeAccessId;
       return this;
     }
 
