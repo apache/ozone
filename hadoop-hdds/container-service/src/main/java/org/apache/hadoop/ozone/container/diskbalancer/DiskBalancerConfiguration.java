@@ -116,6 +116,15 @@ public final class DiskBalancerConfiguration {
       description = "If true, the DiskBalancer will automatically stop once disks are balanced.")
   private boolean stopAfterDiskEven = true;
 
+  @Config(key = "hdds.datanode.disk.balancer.replica.deletion.delay",
+      defaultValue = "5m",
+      type = ConfigType.TIME,
+      tags = { DATANODE, ConfigTag.DISKBALANCER },
+      description = "The deletion delay after a container is successfully moved from source volume to " +
+          "destination volume before the source container replica is deleted. " +
+          "Unit could be defined with postfix (ns,ms,s,m,h,d).")
+  private long replicaDeletionDelay = Duration.ofMinutes(5).toMillis();
+
   public DiskBalancerConfiguration(Double threshold,
       Long bandwidthInMB,
       Integer parallelThread,
@@ -179,6 +188,15 @@ public final class DiskBalancerConfiguration {
   
   public void setStopAfterDiskEven(boolean stopAfterDiskEven) {
     this.stopAfterDiskEven = stopAfterDiskEven;
+  }
+
+  /**
+   * Gets the replica deletion delay in milliseconds.
+   *
+   * @return delay in milliseconds before source replica is deleted after move
+   */
+  public long getReplicaDeletionDelay() {
+    return replicaDeletionDelay;
   }
 
   /**
