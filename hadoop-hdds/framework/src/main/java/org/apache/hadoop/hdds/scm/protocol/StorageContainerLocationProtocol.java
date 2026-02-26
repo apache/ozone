@@ -74,6 +74,14 @@ public interface StorageContainerLocationProtocol extends Closeable {
       Type.ForceExitSafeMode));
 
   /**
+   * Read-only commands that can execute on followers without leader check.
+   * These commands respect the --scm parameter and query the specified SCM.
+   */
+  Set<Type> FOLLOWER_READABLE_COMMAND_TYPES = Collections.unmodifiableSet(EnumSet.of(
+      Type.InSafeMode,
+      Type.GetSafeModeRuleStatuses));
+  
+  /**
    * Asks SCM where a container should be allocated. SCM responds with the
    * set of datanodes that should be used creating this container.
    *

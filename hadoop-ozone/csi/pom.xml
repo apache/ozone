@@ -198,6 +198,11 @@
       <classifier>linux-x86_64</classifier>
       <scope>runtime</scope>
     </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-reload4j</artifactId>
+      <scope>runtime</scope>
+    </dependency>
   </dependencies>
 
   <build>
