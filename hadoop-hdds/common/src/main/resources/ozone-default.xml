@@ -1604,6 +1604,15 @@
   </property>
 
   <property>
+    <name>ozone.om.db.checkpoint.use.v2</name>
+    <value>true</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Denotes if the OM bootstrap V2 implementation is set as default.
+    </description>
+  </property>
+
+  <property>
     <name>hdds.datanode.plugins</name>
     <value/>
     <description>
