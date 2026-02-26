@@ -223,7 +223,7 @@ public class TestSnapshotDeletingService {
       SnapshotMoveKeyInfos moveKeyInfo = SnapshotMoveKeyInfos.newBuilder()
           .setKey(largeKeyName)
           .addAllKeyInfos(keyInfos.stream()
-              .map(k -> k.getProtobuf(ClientVersion.CURRENT_VERSION))
+              .map(k -> k.getProtobuf(ClientVersion.CURRENT.serialize()))
               .collect(Collectors.toList()))
           .build();
       deletedKeys.add(moveKeyInfo);
@@ -258,7 +258,7 @@ public class TestSnapshotDeletingService {
       
       SnapshotMoveKeyInfos moveDirInfo = SnapshotMoveKeyInfos.newBuilder()
           .setKey(largeDirName)
-          .addKeyInfos(dirInfo.getProtobuf(ClientVersion.CURRENT_VERSION))
+          .addKeyInfos(dirInfo.getProtobuf(ClientVersion.CURRENT.serialize()))
           .build();
       deletedDirs.add(moveDirInfo);
     }

@@ -110,14 +110,14 @@ public class TestPipelineStateManagerImpl {
   public void testAddAndGetPipeline() throws IOException, TimeoutException {
     Exception e = assertThrows(SCMException.class,
         () -> stateManager.addPipeline(createDummyPipeline(0)
-            .getProtobufMessage(ClientVersion.CURRENT_VERSION)));
+            .getProtobufMessage(ClientVersion.CURRENT.serialize())));
     // replication factor and number of nodes in the pipeline do not match
     assertThat(e.getMessage()).contains("do not match");
 
     // add a pipeline
     Pipeline pipeline = createDummyPipeline(1);
     HddsProtos.Pipeline pipelineProto = pipeline
-        .getProtobufMessage(ClientVersion.CURRENT_VERSION);
+        .getProtobufMessage(ClientVersion.CURRENT.serialize());
 
     try {
       stateManager.addPipeline(pipelineProto);
@@ -144,11 +144,11 @@ public class TestPipelineStateManagerImpl {
 
     Set<HddsProtos.Pipeline> pipelines = new HashSet<>();
     HddsProtos.Pipeline pipeline = createDummyPipeline(1).getProtobufMessage(
-        ClientVersion.CURRENT_VERSION);
+        ClientVersion.CURRENT.serialize());
     stateManager.addPipeline(pipeline);
     pipelines.add(pipeline);
     pipeline = createDummyPipeline(1).getProtobufMessage(
-        ClientVersion.CURRENT_VERSION);
+        ClientVersion.CURRENT.serialize());
     stateManager.addPipeline(pipeline);
     pipelines.add(pipeline);
 
@@ -179,19 +179,19 @@ public class TestPipelineStateManagerImpl {
           // 5 pipelines in allocated state for each type and factor
           HddsProtos.Pipeline pipeline =
               createDummyPipeline(type, factor, factor.getNumber())
-                  .getProtobufMessage(ClientVersion.CURRENT_VERSION);
+                  .getProtobufMessage(ClientVersion.CURRENT.serialize());
           stateManager.addPipeline(pipeline);
           pipelines.add(pipeline);
 
           // 5 pipelines in open state for each type and factor
           pipeline = createDummyPipeline(type, factor, factor.getNumber())
-              .getProtobufMessage(ClientVersion.CURRENT_VERSION);
+              .getProtobufMessage(ClientVersion.CURRENT.serialize());
           stateManager.addPipeline(pipeline);
           pipelines.add(pipeline);
 
           // 5 pipelines in closed state for each type and factor
           pipeline = createDummyPipeline(type, factor, factor.getNumber())
-              .getProtobufMessage(ClientVersion.CURRENT_VERSION);
+              .getProtobufMessage(ClientVersion.CURRENT.serialize());
           stateManager.addPipeline(pipeline);
           pipelines.add(pipeline);
         }
@@ -232,20 +232,20 @@ public class TestPipelineStateManagerImpl {
           // 5 pipelines in allocated state for each type and factor
           HddsProtos.Pipeline pipeline =
               createDummyPipeline(type, factor, factor.getNumber())
-                  .getProtobufMessage(ClientVersion.CURRENT_VERSION);
+                  .getProtobufMessage(ClientVersion.CURRENT.serialize());
           stateManager.addPipeline(pipeline);
           pipelines.add(pipeline);
 
           // 5 pipelines in open state for each type and factor
           pipeline = createDummyPipeline(type, factor, factor.getNumber())
-              .getProtobufMessage(ClientVersion.CURRENT_VERSION);
+              .getProtobufMessage(ClientVersion.CURRENT.serialize());
           stateManager.addPipeline(pipeline);
           openPipeline(pipeline);
           pipelines.add(pipeline);
 
           // 5 pipelines in dormant state for each type and factor
           pipeline = createDummyPipeline(type, factor, factor.getNumber())
-              .getProtobufMessage(ClientVersion.CURRENT_VERSION);
+              .getProtobufMessage(ClientVersion.CURRENT.serialize());
           stateManager.addPipeline(pipeline);
           openPipeline(pipeline);
           deactivatePipeline(pipeline);
@@ -253,7 +253,7 @@ public class TestPipelineStateManagerImpl {
 
           // 5 pipelines in closed state for each type and factor
           pipeline = createDummyPipeline(type, factor, factor.getNumber())
-              .getProtobufMessage(ClientVersion.CURRENT_VERSION);
+              .getProtobufMessage(ClientVersion.CURRENT.serialize());
           stateManager.addPipeline(pipeline);
           finalizePipeline(pipeline);
           pipelines.add(pipeline);
@@ -292,7 +292,7 @@ public class TestPipelineStateManagerImpl {
     long containerID = 0;
     Pipeline pipeline = createDummyPipeline(1);
     HddsProtos.Pipeline pipelineProto = pipeline
-        .getProtobufMessage(ClientVersion.CURRENT_VERSION);
+        .getProtobufMessage(ClientVersion.CURRENT.serialize());
     stateManager.addPipeline(pipelineProto);
     pipeline = stateManager.getPipeline(pipeline.getId());
     stateManager.addContainerToPipeline(pipeline.getId(),
@@ -325,7 +325,7 @@ public class TestPipelineStateManagerImpl {
   public void testRemovePipeline() throws IOException, TimeoutException {
     Pipeline pipeline = createDummyPipeline(1);
     HddsProtos.Pipeline pipelineProto = pipeline
-        .getProtobufMessage(ClientVersion.CURRENT_VERSION);
+        .getProtobufMessage(ClientVersion.CURRENT.serialize());
     stateManager.addPipeline(pipelineProto);
     // close the pipeline
     openPipeline(pipelineProto);
@@ -347,7 +347,7 @@ public class TestPipelineStateManagerImpl {
     long containerID = 1;
     Pipeline pipeline = createDummyPipeline(1);
     HddsProtos.Pipeline pipelineProto = pipeline
-        .getProtobufMessage(ClientVersion.CURRENT_VERSION);
+        .getProtobufMessage(ClientVersion.CURRENT.serialize());
     // create an open pipeline in stateMap
     stateManager.addPipeline(pipelineProto);
     openPipeline(pipelineProto);
@@ -387,7 +387,7 @@ public class TestPipelineStateManagerImpl {
   public void testFinalizePipeline() throws IOException, TimeoutException {
     Pipeline pipeline = createDummyPipeline(1);
     HddsProtos.Pipeline pipelineProto = pipeline
-        .getProtobufMessage(ClientVersion.CURRENT_VERSION);
+        .getProtobufMessage(ClientVersion.CURRENT.serialize());
     stateManager.addPipeline(pipelineProto);
     // finalize on ALLOCATED pipeline
     finalizePipeline(pipelineProto);
@@ -398,7 +398,7 @@ public class TestPipelineStateManagerImpl {
 
     pipeline = createDummyPipeline(1);
     pipelineProto = pipeline
-        .getProtobufMessage(ClientVersion.CURRENT_VERSION);
+        .getProtobufMessage(ClientVersion.CURRENT.serialize());
     stateManager.addPipeline(pipelineProto);
     openPipeline(pipelineProto);
     // finalize on OPEN pipeline
@@ -410,7 +410,7 @@ public class TestPipelineStateManagerImpl {
 
     pipeline = createDummyPipeline(1);
     pipelineProto = pipeline
-        .getProtobufMessage(ClientVersion.CURRENT_VERSION);
+        .getProtobufMessage(ClientVersion.CURRENT.serialize());
     stateManager.addPipeline(pipelineProto);
     openPipeline(pipelineProto);
     finalizePipeline(pipelineProto);
@@ -426,7 +426,7 @@ public class TestPipelineStateManagerImpl {
   public void testOpenPipeline() throws IOException, TimeoutException {
     Pipeline pipeline = createDummyPipeline(1);
     HddsProtos.Pipeline pipelineProto = pipeline
-        .getProtobufMessage(ClientVersion.CURRENT_VERSION);
+        .getProtobufMessage(ClientVersion.CURRENT.serialize());
     stateManager.addPipeline(pipelineProto);
     // open on ALLOCATED pipeline
     openPipeline(pipelineProto);
@@ -448,7 +448,7 @@ public class TestPipelineStateManagerImpl {
         HddsProtos.ReplicationFactor.THREE, 3);
     // pipeline in allocated state should not be reported
     HddsProtos.Pipeline pipelineProto = pipeline
-        .getProtobufMessage(ClientVersion.CURRENT_VERSION);
+        .getProtobufMessage(ClientVersion.CURRENT.serialize());
     stateManager.addPipeline(pipelineProto);
     assertEquals(0, stateManager
         .getPipelines(RatisReplicationConfig
@@ -470,7 +470,7 @@ public class TestPipelineStateManagerImpl {
         .setState(Pipeline.PipelineState.OPEN)
         .build();
     HddsProtos.Pipeline pipelineProto2 = pipeline2
-        .getProtobufMessage(ClientVersion.CURRENT_VERSION);
+        .getProtobufMessage(ClientVersion.CURRENT.serialize());
     // pipeline in open state should be reported
     stateManager.addPipeline(pipelineProto2);
     assertEquals(2, stateManager

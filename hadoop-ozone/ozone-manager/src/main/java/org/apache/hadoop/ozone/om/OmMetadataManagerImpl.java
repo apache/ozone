@@ -1468,7 +1468,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
                 .map(OmKeyLocationInfoGroup::getLocationList)
                 .map(Collection::stream)
                 .orElseGet(Stream::empty)
-                .map(loc -> loc.getProtobuf(ClientVersion.CURRENT_VERSION))
+                .map(loc -> loc.getProtobuf(ClientVersion.CURRENT.serialize()))
                 .forEach(keyArgs::addKeyLocations);
 
             OzoneManagerProtocolClientSideTranslatorPB.setReplicationConfig(

@@ -83,7 +83,7 @@ public class TestDatanodeDetails {
     protoBuilder =
         dn.toProtoBuilder(DEFAULT_VERSION.serialize(), requiredPorts);
     DatanodeDetails dn3 = DatanodeDetails.newBuilder(protoBuilder.build()).build();
-    assertEquals(HDDSVersion.CURRENT.serialize(), dn3.getCurrentVersion());
+    assertEquals(HDDSVersion.SOFTWARE_VERSION.serialize(), dn3.getCurrentVersion());
   }
 
   public static void assertPorts(HddsProtos.DatanodeDetailsProto dn,

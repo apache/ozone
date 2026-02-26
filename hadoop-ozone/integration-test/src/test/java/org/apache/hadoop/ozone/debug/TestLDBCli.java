@@ -500,7 +500,7 @@ public class TestLDBCli {
       OmKeyInfo value = OMRequestTestUtils.createOmKeyInfo("vol1", "buck1",
           key, ReplicationConfig.fromProtoTypeAndFactor(STAND_ALONE,
               HddsProtos.ReplicationFactor.ONE)).build();
-      keyTable.put(key.getBytes(UTF_8), value.getProtobuf(ClientVersion.CURRENT_VERSION).toByteArray());
+      keyTable.put(key.getBytes(UTF_8), value.getProtobuf(ClientVersion.CURRENT.serialize()).toByteArray());
       // Populate map
       dbMap.put(key, toMap(value));
     }

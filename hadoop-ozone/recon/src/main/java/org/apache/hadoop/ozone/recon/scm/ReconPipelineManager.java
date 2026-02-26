@@ -166,7 +166,7 @@ public final class ReconPipelineManager extends PipelineManagerImpl {
       if (containsPipeline(pipeline.getId())) {
         return false;
       }
-      getStateManager().addPipeline(pipeline.getProtobufMessage(ClientVersion.CURRENT_VERSION));
+      getStateManager().addPipeline(pipeline.getProtobufMessage(ClientVersion.CURRENT.serialize()));
       return true;
     } finally {
       releaseWriteLock();

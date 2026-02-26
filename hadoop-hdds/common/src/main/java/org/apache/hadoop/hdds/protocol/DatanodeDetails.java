@@ -517,7 +517,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
    */
   @JsonIgnore
   public HddsProtos.DatanodeDetailsProto getProtoBufMessage() {
-    return toProto(ClientVersion.CURRENT_VERSION);
+    return toProto(ClientVersion.CURRENT.serialize());
   }
 
   public HddsProtos.DatanodeDetailsProto toProto(int clientVersion) {
@@ -572,7 +572,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
     builder.setPersistedOpStateExpiry(persistedOpStateExpiryEpochSec);
 
     final boolean handlesUnknownPorts =
-        ClientVersion.fromProtoValue(clientVersion)
+        ClientVersion.deserialize(clientVersion)
         .compareTo(VERSION_HANDLES_UNKNOWN_DN_PORTS) >= 0;
     final int requestedPortCount = filterPorts.size();
     final boolean maySkip = requestedPortCount > 0;

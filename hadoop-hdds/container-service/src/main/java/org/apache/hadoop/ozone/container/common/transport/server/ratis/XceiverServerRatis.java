@@ -216,7 +216,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT,
         OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT_DEFAULT);
 
-    if (HDDSVersion.fromProtoValue(datanodeDetails.getInitialVersion())
+    if (HDDSVersion.deserialize(datanodeDetails.getInitialVersion())
         .compareTo(SEPARATE_RATIS_PORTS_AVAILABLE) >= 0) {
       adminPort = determinePort(
           OzoneConfigKeys.HDDS_CONTAINER_RATIS_ADMIN_PORT,
