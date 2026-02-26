@@ -238,6 +238,8 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         .writeDbDataToStream(any(), any(), any(), any(), any());
     doCallRealMethod().when(omDbCheckpointServletMock)
         .collectFilesFromDir(any(), any(), any(), anyBoolean(), any());
+    doCallRealMethod().when(omDbCheckpointServletMock)
+        .collectFilesFromDir(any(), any(), any(), anyBoolean(), any(), anyBoolean());
     doCallRealMethod().when(omDbCheckpointServletMock).collectDbDataToTransfer(any(), any(), any());
 
     when(omDbCheckpointServletMock.getBootstrapStateLock())
