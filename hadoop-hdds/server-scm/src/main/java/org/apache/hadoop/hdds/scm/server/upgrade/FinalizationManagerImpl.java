@@ -49,7 +49,6 @@ public class FinalizationManagerImpl implements FinalizationManager {
   private SCMUpgradeFinalizer upgradeFinalizer;
   private SCMUpgradeFinalizationContext context;
   private SCMStorageConfig storage;
-  private HDDSLayoutVersionManager versionManager;
   private final FinalizationStateManager finalizationStateManager;
   private ThreadFactory threadFactory;
 
@@ -76,9 +75,7 @@ public class FinalizationManagerImpl implements FinalizationManager {
 
   private void initCommonFields(Builder builder) {
     this.storage = builder.storage;
-    this.versionManager = builder.versionManager;
-    this.upgradeFinalizer = new SCMUpgradeFinalizer(this.versionManager,
-        builder.executor);
+    this.upgradeFinalizer = new SCMUpgradeFinalizer(builder.versionManager, builder.executor);
   }
 
   @Override
