@@ -156,16 +156,13 @@ jobs:
           JIRA_ID="${{ steps.extract-jira.outputs.jira_id }}"
           
           # Generate PR body
-          cd ..
-          dev-support/ci/pr_body_config_doc.sh \
+          ../ozone-repo/dev-support/ci/pr_body_config_doc.sh \
             "$REPO" \
             "${{ github.workflow }}" \
             "${{ github.run_id }}" \
             "${{ github.event.workflow_run.head_branch }}" \
             "${{ github.event.workflow_run.head_sha }}" \
-            "$JIRA_ID" > ozone-site/pr_body.txt
-          
-          cd ozone-site
+            "$JIRA_ID" > pr_body.txt
           
           # Check if PR already exists
           EXISTING_PR=$(gh pr list --repo "${{ github.repository_owner }}/ozone-site" \
