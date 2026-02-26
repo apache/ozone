@@ -94,8 +94,6 @@ public class TestScmFinalization {
     HDDSLayoutVersionManager versionManager =
         new HDDSLayoutVersionManager(
             HDDSLayoutFeature.INITIAL_VERSION.layoutVersion());
-    PipelineManager pipelineManager =
-        getMockPipelineManager(FinalizationCheckpoint.FINALIZATION_REQUIRED);
     // State manager keeps upgrade information in memory as well as writing
     // it to disk, so we can mock the classes that handle disk ops for this
     // test.
@@ -113,12 +111,9 @@ public class TestScmFinalization {
         stateManager.getFinalizationCheckpoint());
     SCMUpgradeFinalizationContext context =
         new SCMUpgradeFinalizationContext.Builder()
-        .setConfiguration(new OzoneConfiguration())
         .setFinalizationStateManager(stateManager)
         .setStorage(mock(SCMStorageConfig.class))
-        .setLayoutVersionManager(versionManager)
         .setSCMContext(scmContext)
-        .setPipelineManager(pipelineManager)
         .setNodeManager(mock(NodeManager.class))
         .build();
     stateManager.setUpgradeContext(context);
@@ -221,7 +216,7 @@ public class TestScmFinalization {
         .setFinalizationStore(finalizationStore)
         .build();
 
-    manager.buildUpgradeContext(nodeManager, pipelineManager, scmContext);
+    manager.buildUpgradeContext(nodeManager, scmContext);
 
     // Execute upgrade finalization, then check that events happened in the
     // correct order.

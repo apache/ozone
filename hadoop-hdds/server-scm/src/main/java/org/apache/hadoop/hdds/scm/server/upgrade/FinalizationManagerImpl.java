@@ -28,7 +28,6 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -50,7 +49,6 @@ public class FinalizationManagerImpl implements FinalizationManager {
   private SCMUpgradeFinalizer upgradeFinalizer;
   private SCMUpgradeFinalizationContext context;
   private SCMStorageConfig storage;
-  private OzoneConfiguration conf;
   private HDDSLayoutVersionManager versionManager;
   private final FinalizationStateManager finalizationStateManager;
   private ThreadFactory threadFactory;
@@ -79,22 +77,17 @@ public class FinalizationManagerImpl implements FinalizationManager {
   private void initCommonFields(Builder builder) {
     this.storage = builder.storage;
     this.versionManager = builder.versionManager;
-    this.conf = builder.conf;
     this.upgradeFinalizer = new SCMUpgradeFinalizer(this.versionManager,
         builder.executor);
   }
 
   @Override
   public void buildUpgradeContext(NodeManager nodeManager,
-                                  PipelineManager pipelineManager,
-                                  SCMContext scmContext) {
+      SCMContext scmContext) {
     this.context = new SCMUpgradeFinalizationContext.Builder()
             .setStorage(this.storage)
             .setFinalizationStateManager(finalizationStateManager)
-            .setConfiguration(conf)
             .setNodeManager(nodeManager)
-            .setPipelineManager(pipelineManager)
-            .setLayoutVersionManager(versionManager)
             .setSCMContext(scmContext)
             .build();
 

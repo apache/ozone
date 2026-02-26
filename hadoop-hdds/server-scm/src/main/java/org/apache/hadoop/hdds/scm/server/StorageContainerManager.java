@@ -788,8 +788,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
               );
     }
 
-    finalizationManager.buildUpgradeContext(scmNodeManager, pipelineManager,
-        scmContext);
+    finalizationManager.buildUpgradeContext(scmNodeManager,   scmContext);
 
     ReplicationManager.ReplicationManagerConfiguration rmConf =
         conf.getObject(ReplicationManager.ReplicationManagerConfiguration.class);
