@@ -311,7 +311,6 @@ public class TestHDDSUpgrade {
         cluster.getStorageContainerManagersList(),
             NUM_CONTAINERS_CREATED, NUM_DATA_NODES);
 
-    // All datanodes on the SCM should have moved to HEALTHY-READONLY state.
     TestHddsUpgradeUtils.testDataNodesStateOnSCM(cluster.getStorageContainerManagersList(), NUM_DATA_NODES, HEALTHY);
 
     // Verify the SCM has driven all the DataNodes through Layout Upgrade.

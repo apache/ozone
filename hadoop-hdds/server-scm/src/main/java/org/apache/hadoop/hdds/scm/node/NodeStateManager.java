@@ -192,19 +192,12 @@ public class NodeStateManager implements Runnable, Closeable {
     skippedHealthChecks = 0;
     checkPaused = false; // accessed only from test functions
 
-    // This will move a datanode out of healthy readonly state if passed.
     layoutMatchCondition = (layout) ->
         (layout.getMetadataLayoutVersion() ==
              layoutVersionManager.getMetadataLayoutVersion()) &&
             (layout.getSoftwareLayoutVersion() ==
             layoutVersionManager.getSoftwareLayoutVersion());
 
-    // This will move a datanode in to healthy readonly state if passed.
-    // When SCM finishes finalizing, it will automatically move all datanodes
-    // to healthy readonly as well.
-    // If nodes heartbeat while SCM is finalizing, they should not be moved
-    // to healthy readonly until SCM finishes updating its MLV, hence the
-    // checkpoint check here.
     layoutMisMatchCondition = (layout) ->
         FinalizationManager.shouldTellDatanodesToFinalize(
             scmContext.getFinalizationCheckpoint()) &&

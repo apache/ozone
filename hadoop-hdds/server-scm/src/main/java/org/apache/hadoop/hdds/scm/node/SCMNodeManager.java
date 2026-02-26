@@ -1109,6 +1109,11 @@ public class SCMNodeManager implements NodeManager {
     for (NodeOperationalState opState : NodeOperationalState.values()) {
       Map<String, Integer> states = new HashMap<>();
       for (NodeState health : NodeState.values()) {
+        if (health == NodeState.HEALTHY_READONLY) {
+          // HEALTHY_READONLY is deprecated and can no longer occur in SCM, but it cannot be removed
+          // from the protobuf for compatibility reasons. Skip it here to avoid confusion.
+          continue;
+        }
         states.put(health.name(), 0);
       }
       nodes.put(opState.name(), states);

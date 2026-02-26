@@ -261,7 +261,7 @@ public class TestNodeStateManager {
     nsm.addNode(dn, UpgradeUtils.defaultLayoutVersionProto());
 
     // First set the node to decommissioned, then run through all op states in
-    // order and ensure the healthy_to_healthy_readonly event gets fired
+    // order and ensure the unhealthy_to_healthy event gets fired
     nsm.setNodeOperationalState(dn,
         HddsProtos.NodeOperationalState.DECOMMISSIONED);
     for (HddsProtos.NodeOperationalState s :
