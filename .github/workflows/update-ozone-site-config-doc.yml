@@ -51,13 +51,13 @@ jobs:
       
       - name: Checkout ozone-site repository
         if: steps.check-site-repo.outputs.exists == 'true'
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ github.repository_owner }}/ozone-site
-          ref: 'master'
-          path: ozone-site
-          token: ${{ secrets.OZONE_WEBSITE_BUILD }}
-      
+        run: |
+          git config --global url."https://asf-ci-deploy:${{ secrets.OZONE_WEBSITE_BUILD }}@github.com/".insteadOf "https://github.com/"
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          
+          git clone --depth=1 --branch=master https://github.com/${{ github.repository_owner }}/ozone-site.git ozone-site
+
       - name: Check if documentation changed
         if: steps.check-site-repo.outputs.exists == 'true'
         id: check-changes
@@ -94,11 +94,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
+          path: ozone-repo
       
       - name: Extract JIRA ID from commit message
         if: steps.check-changes.outputs.changed == 'true'
         id: extract-jira
         run: |
+          cd ozone-repo
           COMMIT_MSG=$(git log -1 --format='%s' ${{ github.event.workflow_run.head_sha }})
           echo "Commit message: $COMMIT_MSG"
           
@@ -116,9 +118,6 @@ jobs:
         if: steps.check-changes.outputs.changed == 'true'
         run: |
           cd ozone-site
-          
-          git config user.name 'github-actions[bot]'
-          git config user.email 'github-actions[bot]@users.noreply.github.com'
           
           # Use single branch name
           BRANCH_NAME="automated-config-doc-update"
