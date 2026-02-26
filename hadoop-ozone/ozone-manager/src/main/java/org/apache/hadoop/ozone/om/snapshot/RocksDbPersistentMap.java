@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.om.snapshot;
 
 import jakarta.annotation.Nonnull;
-import java.io.IOException;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -29,7 +28,6 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedSlice;
 import org.apache.hadoop.ozone.util.ClosableIterator;
 import org.rocksdb.ColumnFamilyHandle;
-import org.rocksdb.RocksDBException;
 
 /**
  * Persistent map backed by RocksDB.
@@ -55,37 +53,31 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
 
   @Override
   public V get(K key) {
-    try {
-      byte[] rawKey = codecRegistry.asRawData(key);
-      byte[] rawValue = db.get().get(columnFamilyHandle, rawKey);
-      return codecRegistry.asObject(rawValue, valueType);
-    } catch (IOException | RocksDBException exception) {
-      // TODO: [SNAPSHOT] Fail gracefully.
-      throw new RuntimeException(exception);
-    }
+    return SnapshotStorageException.wrap(
+        "Failed to read map entry", () -> {
+          byte[] rawKey = codecRegistry.asRawData(key);
+          byte[] rawValue = db.get().get(columnFamilyHandle, rawKey);
+          return codecRegistry.asObject(rawValue, valueType);
+        });
   }
 
   @Override
   public void put(K key, V value) {
-    try {
-      byte[] rawKey = codecRegistry.asRawData(key);
-      byte[] rawValue = codecRegistry.asRawData(value);
-      db.get().put(columnFamilyHandle, rawKey, rawValue);
-    } catch (IOException | RocksDBException exception) {
-      // TODO: [SNAPSHOT] Fail gracefully.
-      throw new RuntimeException(exception);
-    }
+    SnapshotStorageException.wrap(
+        "Failed to write map entry", () -> {
+          byte[] rawKey = codecRegistry.asRawData(key);
+          byte[] rawValue = codecRegistry.asRawData(value);
+          db.get().put(columnFamilyHandle, rawKey, rawValue);
+        });
   }
 
   @Override
   public void remove(K key) {
-    try {
-      byte[] rawKey = codecRegistry.asRawData(key);
-      db.get().delete(columnFamilyHandle, rawKey);
-    } catch (IOException | RocksDBException exception) {
-      // TODO: [SNAPSHOT] Fail gracefully.
-      throw new RuntimeException(exception);
-    }
+    SnapshotStorageException.wrap(
+        "Failed to delete map entry", () -> {
+          byte[] rawKey = codecRegistry.asRawData(key);
+          db.get().delete(columnFamilyHandle, rawKey);
+        });
   }
 
   @Override
@@ -95,26 +87,28 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
     ManagedRocksIterator iterator;
     final ManagedSlice lowerBoundSlice;
     final ManagedSlice upperBoundSlice;
-    try {
-      if (lowerBound.isPresent()) {
-        lowerBoundSlice = new ManagedSlice(
-            codecRegistry.asRawData(lowerBound.get()));
-        readOptions.setIterateLowerBound(lowerBoundSlice);
-      } else {
-        lowerBoundSlice = null;
-      }
 
-      if (upperBound.isPresent()) {
-        upperBoundSlice = new ManagedSlice(
-            codecRegistry.asRawData(upperBound.get()));
-        readOptions.setIterateUpperBound(upperBoundSlice);
-      } else {
-        upperBoundSlice = null;
-      }
-    } catch (IOException exception) {
-      // TODO: [SNAPSHOT] Fail gracefully.
-      throw new RuntimeException(exception);
-    }
+    lowerBoundSlice = SnapshotStorageException.wrap(
+        "Failed to serialize map iterator lower bound", () -> {
+          if (lowerBound.isPresent()) {
+            ManagedSlice slice = new ManagedSlice(
+                codecRegistry.asRawData(lowerBound.get()));
+            readOptions.setIterateLowerBound(slice);
+            return slice;
+          }
+          return null;
+        });
+
+    upperBoundSlice = SnapshotStorageException.wrap(
+        "Failed to serialize map iterator upper bound", () -> {
+          if (upperBound.isPresent()) {
+            ManagedSlice slice = new ManagedSlice(
+                codecRegistry.asRawData(upperBound.get()));
+            readOptions.setIterateUpperBound(slice);
+            return slice;
+          }
+          return null;
+        });
 
     iterator = ManagedRocksIterator.managed(
         db.get().newIterator(columnFamilyHandle, readOptions));
@@ -132,16 +126,14 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
         if (!hasNext()) {
           throw new NoSuchElementException("No more elements in the map.");
         }
-        K key;
-        V value;
-
-        try {
-          key = codecRegistry.asObject(iterator.get().key(), keyType);
-          value = codecRegistry.asObject(iterator.get().value(), valueType);
-        } catch (IOException exception) {
-          // TODO: [SNAPSHOT] Fail gracefully.
-          throw new RuntimeException(exception);
-        }
+        K key = SnapshotStorageException.wrap(
+            "Failed to deserialize map entry", () -> {
+              K k = codecRegistry.asObject(iterator.get().key(), keyType);
+              return k;
+            });
+        V value = SnapshotStorageException.wrap(
+            "Failed to deserialize map entry",
+            () -> codecRegistry.asObject(iterator.get().value(), valueType));
 
         // Move iterator to the next.
         iterator.get().next();
