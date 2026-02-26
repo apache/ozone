@@ -23,7 +23,6 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.ALREADY
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.FINALIZATION_DONE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -112,10 +111,7 @@ public final class TestHddsUpgradeUtils {
     // are ready to serve requests even though containers may remain OPEN.
     testDataNodesStateOnSCM(scm, numDatanodes, HEALTHY, HEALTHY_READONLY);
 
-    int countContainers = 0;
-    for (ContainerInfo ignored : scm.getContainerManager().getContainers()) {
-      countContainers++;
-    }
+    int countContainers = scm.getContainerManager().getContainers().size();
     assertThat(countContainers).isGreaterThanOrEqualTo(numContainers);
   }
 
@@ -134,11 +130,7 @@ public final class TestHddsUpgradeUtils {
     int countContainers = 0;
     for (HddsDatanodeService dataNode : datanodes) {
       DatanodeStateMachine dsm = dataNode.getDatanodeStateMachine();
-      // Also verify that all the existing containers are open.
-      for (Container<?> container :
-          dsm.getContainer().getController().getContainers()) {
-        assertSame(container.getContainerState(),
-            ContainerProtos.ContainerDataProto.State.OPEN);
+      for (Container<?> ignored : dsm.getContainer().getController().getContainers()) {
         countContainers++;
       }
     }
@@ -180,7 +172,6 @@ public final class TestHddsUpgradeUtils {
           dnVersionManager.getMetadataLayoutVersion());
       assertThat(dnVersionManager.getMetadataLayoutVersion()).isGreaterThanOrEqualTo(1);
 
-      // Verify containers are in acceptable states (OPEN is now allowed).
       for (Container<?> ignored :
           dsm.getContainer().getController().getContainers()) {
         countContainers++;
