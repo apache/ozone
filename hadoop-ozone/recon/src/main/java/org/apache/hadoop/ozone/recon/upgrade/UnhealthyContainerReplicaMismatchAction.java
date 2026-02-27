@@ -39,7 +39,6 @@ import org.slf4j.LoggerFactory;
  */
 @UpgradeActionRecon(feature = UNHEALTHY_CONTAINER_REPLICA_MISMATCH)
 public class UnhealthyContainerReplicaMismatchAction implements ReconUpgradeAction {
-
   private static final Logger LOG = LoggerFactory.getLogger(UnhealthyContainerReplicaMismatchAction.class);
   private DSLContext dslContext;
 

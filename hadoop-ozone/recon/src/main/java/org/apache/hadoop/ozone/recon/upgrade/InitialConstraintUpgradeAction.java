@@ -82,8 +82,8 @@ public class InitialConstraintUpgradeAction implements ReconUpgradeAction {
 
     dslContext.alterTable(ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME)
         .add(DSL.constraint(ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME + "ck1")
-            .check(field(name("container_state"))
-                .in(enumStates)))
+        .check(field(name("container_state"))
+        .in(enumStates)))
         .execute();
 
     LOG.info("Added the updated constraint to the UNHEALTHY_CONTAINERS table for enum state values: {}",

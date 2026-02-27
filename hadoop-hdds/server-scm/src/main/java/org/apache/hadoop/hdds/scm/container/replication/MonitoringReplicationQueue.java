@@ -22,7 +22,7 @@ package org.apache.hadoop.hdds.scm.container.replication;
  * checking containers in a read-only mode, where we don't want to queue them
  * for replication.
  */
-public class NoOpsReplicationQueue extends ReplicationQueue {
+public class MonitoringReplicationQueue extends ReplicationQueue {
 
   @Override
   public void enqueue(ContainerHealthResult.UnderReplicatedHealthResult

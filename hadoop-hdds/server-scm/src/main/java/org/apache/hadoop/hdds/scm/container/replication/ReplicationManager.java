@@ -190,7 +190,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   private final OverReplicatedProcessor overReplicatedProcessor;
   private final HealthCheck containerCheckChain;
   private final ReplicationQueue noOpsReplicationQueue =
-      new NoOpsReplicationQueue();
+      new MonitoringReplicationQueue();
 
   /**
    * Constructs ReplicationManager instance with the given configuration.

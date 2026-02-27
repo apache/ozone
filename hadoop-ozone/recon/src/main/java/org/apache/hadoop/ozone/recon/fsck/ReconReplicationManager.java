@@ -32,7 +32,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
-import org.apache.hadoop.hdds.scm.container.replication.NoOpsReplicationQueue;
+import org.apache.hadoop.hdds.scm.container.replication.MonitoringReplicationQueue;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationQueue;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -274,7 +274,7 @@ public class ReconReplicationManager extends ReplicationManager {
    * <p><b>Differences from SCM's processAll():</b></p>
    * <ul>
    *   <li>Uses ReconReplicationManagerReport (captures all containers)</li>
-   *   <li>Uses NoOpsReplicationQueue (doesn't enqueue commands)</li>
+   *   <li>Uses MonitoringReplicationQueue (doesn't enqueue commands)</li>
    *   <li>Adds REPLICA_MISMATCH detection (not done by SCM)</li>
    *   <li>Stores results in database instead of just keeping in-memory report</li>
    * </ul>
@@ -287,7 +287,7 @@ public class ReconReplicationManager extends ReplicationManager {
 
     // Use extended report that captures ALL containers, not just 100 samples
     final ReconReplicationManagerReport report = new ReconReplicationManagerReport();
-    final ReplicationQueue nullQueue = new NoOpsReplicationQueue();
+    final ReplicationQueue nullQueue = new MonitoringReplicationQueue();
 
     // Get all containers (same as parent)
     final List<ContainerInfo> containers = containerManager.getContainers();
