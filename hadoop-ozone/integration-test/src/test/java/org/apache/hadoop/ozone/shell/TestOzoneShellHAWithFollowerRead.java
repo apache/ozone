@@ -114,6 +114,15 @@ public class TestOzoneShellHAWithFollowerRead extends TestOzoneShellHA {
       // Local lease time is set to negative, for this OM should fail all local lease read requests
       assertEquals(0, omFollower2.getMetrics().getNumFollowerReadLocalLeaseSuccess());
       assertThat(omFollower2.getMetrics().getNumFollowerReadLocalLeaseFailTime() > 0).isTrue();
+
+      // Setting the local lease time and log limit to -1 allow infinite lag
+      newConf2.setLong("ozone.om.follower.read.local.lease.time.ms", -1);
+      newConf2.setLong("ozone.om.follower.read.local.lease.log.limit", -1);
+      omFollower2.setConfiguration(newConf2);
+      for (int i = 0; i < 100; i++) {
+        execute(ozoneShell, args);
+      }
+      assertThat(omFollower2.getMetrics().getNumFollowerReadLocalLeaseSuccess() > 0).isTrue();
     } finally {
       if (omFollower1 != null) {
         omFollower1.setConfiguration(oldConf);
