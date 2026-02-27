@@ -71,6 +71,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
@@ -917,6 +918,34 @@ public class TestPipelineManagerImpl {
     assertThat(coll)
         .withFailMessage("waitOnePipelineReady() was called on allocated pipeline")
         .contains(allocatedPipeline.getId());
+    pipelineManager.close();
+  }
+
+  @Test
+  public void testCreatePipelineWithStorageType() throws Exception {
+    PipelineManagerImpl pipelineManager = createPipelineManager(true);
+
+    // MockNodeManager creates storage reports with DISK type by default.
+    // DISK-typed pipeline should succeed.
+    Pipeline diskPipeline = pipelineManager.createPipeline(
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
+        StorageType.DISK);
+    assertNotNull(diskPipeline);
+    assertEquals(3, diskPipeline.getNodes().size());
+
+    // SSD-typed pipeline should fail since no nodes have SSD storage.
+    assertThrows(IOException.class,
+        () -> pipelineManager.createPipeline(
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
+            StorageType.SSD));
+
+    // null StorageType should fall through to untyped creation.
+    Pipeline untypedPipeline = pipelineManager.createPipeline(
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE),
+        (StorageType) null);
+    assertNotNull(untypedPipeline);
+    assertEquals(3, untypedPipeline.getNodes().size());
+
     pipelineManager.close();
   }
 
