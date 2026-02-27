@@ -52,6 +52,7 @@ public final class ScmCodecFactory {
     codecs.put(HddsProtos.PipelineState.class, new ScmHddsPipelineStateCodec());
     codecs.put(ManagedSecretKey.class, new ScmManagedSecretKeyCodec());
     codecs.put(HddsProtos.LifeCycleEvent.class, new ScmHddsLifeCycleEventCodec());
+    codecs.put(HddsProtos.NodeType.class, new ScmHddsNodeTypeCodec());
   }
 
   private ScmCodecFactory() { }
