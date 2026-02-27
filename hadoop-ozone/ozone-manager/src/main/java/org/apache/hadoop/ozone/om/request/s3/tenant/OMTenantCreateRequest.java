@@ -117,7 +117,6 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
     final CreateTenantRequest request = omRequest.getCreateTenantRequest();
     Objects.requireNonNull(request, "request == null");
     final String tenantId = request.getTenantId();
-
     // Check tenantId validity
     if (tenantId.contains(OzoneConsts.TENANT_ID_USERNAME_DELIMITER)) {
       throw new OMException("Invalid tenant name " + tenantId +

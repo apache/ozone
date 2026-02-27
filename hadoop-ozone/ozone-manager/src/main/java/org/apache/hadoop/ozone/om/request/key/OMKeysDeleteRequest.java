@@ -56,6 +56,7 @@ import org.apache.hadoop.ozone.om.helpers.ErrorInfo;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
+import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
@@ -391,13 +392,14 @@ public class OMKeysDeleteRequest extends OMKeyRequest {
   public static OMRequest blockDeleteKeysWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {
     if (req.getDeleteKeysRequest().hasDeleteKeys()) {
-      DeleteKeyArgs keyArgs = req.getDeleteKeysRequest().getDeleteKeys();
+      final DeleteKeyArgs keyArgs = req.getDeleteKeysRequest().getDeleteKeys();
 
-      if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {
-        BucketLayout bucketLayout = ctx.getBucketLayout(
-            keyArgs.getVolumeName(), keyArgs.getBucketName());
-        bucketLayout.validateSupportedOperation();
-      }
+      OMClientRequestUtils.validateVolumeName(keyArgs.getVolumeName());
+      OMClientRequestUtils.validateBucketName(keyArgs.getBucketName());
+
+      final BucketLayout bucketLayout = ctx.getBucketLayout(
+          keyArgs.getVolumeName(), keyArgs.getBucketName());
+      bucketLayout.validateSupportedOperation();
     }
     return req;
   }

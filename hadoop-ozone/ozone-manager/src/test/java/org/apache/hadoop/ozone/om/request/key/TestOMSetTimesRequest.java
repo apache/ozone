@@ -19,9 +19,15 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.UUID;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -59,6 +65,25 @@ public class TestOMSetTimesRequest extends TestOMKeyRequest {
         omMetadataManager.getKeyTable(getBucketLayout()).get(ozoneKey)
             .getModificationTime();
     assertEquals(mtime, keyMtime);
+  }
+
+  @Test
+  public void preExecutePermissionDeniedWhenAclEnabled() throws Exception {
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, getBucketLayout());
+    addKeyToTable();
+
+    when(ozoneManager.getAclsEnabled()).thenReturn(true);
+
+    OMRequest req = createSetTimesKeyRequest(2000, 1000);
+
+    OMKeySetTimesRequest setTimes = spy(new OMKeySetTimesRequest(req, getBucketLayout()));
+    doThrow(new OMException("denied", OMException.ResultCodes.PERMISSION_DENIED))
+        .when(setTimes).checkAcls(any(), any(), any(), any(), any(), any(), any());
+
+    OMException e = assertThrows(OMException.class,
+        () -> setTimes.preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, e.getResult());
   }
 
   protected void executeAndReturn(long mtime)

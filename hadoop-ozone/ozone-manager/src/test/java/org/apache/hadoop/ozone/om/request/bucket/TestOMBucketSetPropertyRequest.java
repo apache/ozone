@@ -24,13 +24,20 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.util.UUID;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketArgs;
@@ -41,6 +48,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.SetBucketPropertyRequest;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.Test;
 
@@ -75,6 +83,28 @@ public class TestOMBucketSetPropertyRequest extends TestBucketRequest {
 
     // As user info gets added.
     assertNotEquals(omRequest, omBucketSetPropertyRequest.preExecute(ozoneManager));
+  }
+
+  @Test
+  public void preExecutePermissionDeniedWhenAclEnabled() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    when(ozoneManager.getAclsEnabled()).thenReturn(true);
+
+    IAccessAuthorizer authorizer = mock(IAccessAuthorizer.class);
+    when(authorizer.isNative()).thenReturn(false);
+    when(ozoneManager.getAccessAuthorizer()).thenReturn(authorizer);
+
+    OMRequest originalRequest = createSetBucketPropertyRequest(
+        volumeName, bucketName, true, Long.MAX_VALUE);
+
+    OMBucketSetPropertyRequest req = spy(new OMBucketSetPropertyRequest(originalRequest));
+    doThrow(new OMException("denied", OMException.ResultCodes.PERMISSION_DENIED))
+        .when(req).checkAcls(any(), any(), any(), any(), any(), any(), any());
+
+    OMException e = assertThrows(OMException.class, () -> req.preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, e.getResult());
   }
 
   @Test

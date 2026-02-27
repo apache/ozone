@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.request.key;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.request.OMClientRequestUtils.validateKeyName;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
@@ -38,6 +39,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
@@ -72,6 +74,15 @@ public class OMKeyRenameRequest extends OMKeyRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    final OMRequest omRequest = commonKeyRenamePreExecute(ozoneManager);
+    final KeyArgs keyArgs = omRequest.getRenameKeyRequest().getKeyArgs();
+    final String toKeyName = omRequest.getRenameKeyRequest().getToKeyName();
+    validateKeyName(toKeyName);
+    validateKeyName(keyArgs.getKeyName());
+    return omRequest;
+  }
+
+  public OMRequest commonKeyRenamePreExecute(OzoneManager ozoneManager) throws IOException {
     RenameKeyRequest renameKeyRequest = super.preExecute(ozoneManager)
         .getRenameKeyRequest();
     Objects.requireNonNull(renameKeyRequest, "renameKeyRequest == null");
@@ -96,7 +107,6 @@ public class OMKeyRenameRequest extends OMKeyRequest {
         .setRenameKeyRequest(renameKeyRequest.toBuilder().setToKeyName(dstKey)
             .setKeyArgs(resolvedArgs))
         .setUserInfo(getUserIfNotExists(ozoneManager)).build();
-
   }
 
   protected KeyArgs resolveBucketAndCheckAcls(KeyArgs keyArgs,
@@ -145,10 +155,6 @@ public class OMKeyRenameRequest extends OMKeyRequest {
     String toKey = null, fromKey = null;
     Result result = null;
     try {
-      if (toKeyName.isEmpty() || fromKeyName.isEmpty()) {
-        throw new OMException("Key name is empty",
-            OMException.ResultCodes.INVALID_KEY_NAME);
-      }
       mergeOmLockDetails(omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
       acquiredLock = getOmLockDetails().isLockAcquired();
@@ -266,15 +272,14 @@ public class OMKeyRenameRequest extends OMKeyRequest {
   )
   public static OMRequest blockRenameKeyWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {
-    if (req.getRenameKeyRequest().hasKeyArgs()) {
-      KeyArgs keyArgs = req.getRenameKeyRequest().getKeyArgs();
+    final KeyArgs keyArgs = req.getRenameKeyRequest().getKeyArgs();
 
-      if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {
-        BucketLayout bucketLayout = ctx.getBucketLayout(
-            keyArgs.getVolumeName(), keyArgs.getBucketName());
-        bucketLayout.validateSupportedOperation();
-      }
-    }
+    OMClientRequestUtils.validateVolumeName(keyArgs.getVolumeName());
+    OMClientRequestUtils.validateBucketName(keyArgs.getBucketName());
+
+    final BucketLayout bucketLayout = ctx.getBucketLayout(
+        keyArgs.getVolumeName(), keyArgs.getBucketName());
+    bucketLayout.validateSupportedOperation();
     return req;
   }
 

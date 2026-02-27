@@ -18,10 +18,16 @@
 package org.apache.hadoop.ozone.om.request.bucket;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.newDeleteBucketRequest;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
 import java.util.UUID;
@@ -29,6 +35,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.cache.CacheKey;
 import org.apache.hadoop.hdds.utils.db.cache.CacheValue;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
@@ -57,6 +64,24 @@ public class TestOMBucketDeleteRequest extends TestBucketRequest {
 
     // As user info gets added.
     assertNotEquals(omRequest, omBucketDeleteRequest.preExecute(ozoneManager));
+  }
+
+  @Test
+  public void preExecutePermissionDeniedWhenAclEnabled() throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+
+    when(ozoneManager.getAclsEnabled()).thenReturn(true);
+
+    OMRequest originalRequest = newDeleteBucketRequest(volumeName, bucketName);
+
+    OMBucketDeleteRequest req = spy(new OMBucketDeleteRequest(originalRequest));
+    doThrow(new OMException("denied", OMException.ResultCodes.PERMISSION_DENIED))
+        .when(req).checkAcls(any(), any(), any(), any(), any(), any(), any());
+
+    OMException e = assertThrows(OMException.class,
+        () -> req.preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.PERMISSION_DENIED, e.getResult());
   }
 
   @Test

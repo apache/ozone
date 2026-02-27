@@ -22,12 +22,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -47,10 +49,10 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
     OMRequest originalRequest =
         OMRequestTestUtils.createSetVolumePropertyRequest(volumeName, newOwner);
 
-    OMVolumeSetQuotaRequest omVolumeSetQuotaRequest =
-        new OMVolumeSetQuotaRequest(originalRequest);
+    OMVolumeSetOwnerRequest omVolumeSetOwnerRequest =
+        new OMVolumeSetOwnerRequest(originalRequest);
 
-    OMRequest modifiedRequest = omVolumeSetQuotaRequest.preExecute(
+    OMRequest modifiedRequest = omVolumeSetOwnerRequest.preExecute(
         ozoneManager);
     assertNotEquals(modifiedRequest, originalRequest);
   }
@@ -150,25 +152,15 @@ public class TestOMVolumeSetOwnerRequest extends TestOMVolumeRequest {
   @Test
   public void testInvalidRequest() throws Exception {
     String volumeName = UUID.randomUUID().toString();
-
-    // create request with quota set.
     OMRequest originalRequest =
-        OMRequestTestUtils.createSetVolumePropertyRequest(volumeName,
-            100L, 100L);
+        OMRequestTestUtils.createSetVolumePropertyRequest(volumeName);
 
     OMVolumeSetOwnerRequest omVolumeSetOwnerRequest =
         new OMVolumeSetOwnerRequest(originalRequest);
 
-    omVolumeSetOwnerRequest.preExecute(ozoneManager);
-
-    OMClientResponse omClientResponse =
-        omVolumeSetOwnerRequest.validateAndUpdateCache(ozoneManager, 1);
-
-    OzoneManagerProtocolProtos.OMResponse omResponse =
-        omClientResponse.getOMResponse();
-    assertNotNull(omResponse.getCreateVolumeResponse());
-    assertEquals(OzoneManagerProtocolProtos.Status.INVALID_REQUEST,
-        omResponse.getStatus());
+    OMException e = assertThrows(OMException.class,
+        () -> omVolumeSetOwnerRequest.preExecute(ozoneManager));
+    assertEquals(OMException.ResultCodes.INVALID_REQUEST, e.getResult());
   }
 
   @Test

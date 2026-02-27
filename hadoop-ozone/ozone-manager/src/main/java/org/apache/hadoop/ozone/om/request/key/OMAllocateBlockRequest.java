@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
+import org.apache.hadoop.ozone.om.request.OMClientRequestUtils;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
 import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
 import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
@@ -313,15 +314,15 @@ public class OMAllocateBlockRequest extends OMKeyRequest {
   )
   public static OMRequest blockAllocateBlockWithBucketLayoutFromOldClient(
       OMRequest req, ValidationContext ctx) throws IOException {
-    if (req.getAllocateBlockRequest().hasKeyArgs()) {
-      KeyArgs keyArgs = req.getAllocateBlockRequest().getKeyArgs();
+    final KeyArgs keyArgs = req.getAllocateBlockRequest().getKeyArgs();
 
-      if (keyArgs.hasVolumeName() && keyArgs.hasBucketName()) {
-        BucketLayout bucketLayout = ctx.getBucketLayout(
-            keyArgs.getVolumeName(), keyArgs.getBucketName());
-        bucketLayout.validateSupportedOperation();
-      }
-    }
+    OMClientRequestUtils.validateVolumeName(keyArgs.getVolumeName());
+    OMClientRequestUtils.validateBucketName(keyArgs.getBucketName());
+
+    final BucketLayout bucketLayout = ctx.getBucketLayout(
+        keyArgs.getVolumeName(), keyArgs.getBucketName());
+    bucketLayout.validateSupportedOperation();
+
     return req;
   }
 }

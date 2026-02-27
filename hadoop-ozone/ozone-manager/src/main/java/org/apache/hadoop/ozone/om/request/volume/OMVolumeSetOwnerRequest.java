@@ -31,6 +31,7 @@ import org.apache.hadoop.ozone.audit.OMAction;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OMMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
@@ -61,16 +62,37 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
 
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    String volume =
+        getOmRequest().getSetVolumePropertyRequest().getVolumeName();
+
+    // In production this will never happen, this request will be called only
+    // when we have ownerName in setVolumePropertyRequest.
+    if (!getOmRequest().getSetVolumePropertyRequest().hasOwnerName()) {
+      /* Added this for the safer side if someone uses these API's directly
+       * in future.
+       * https://github.com/apache/hadoop/pull/884#discussion_r292679484
+       * */
+      throw new OMException("SetVolumePropertyRequest must contains OwnerName",
+          OMException.ResultCodes.INVALID_REQUEST);
+    }
 
     long modificationTime = Time.now();
     SetVolumePropertyRequest.Builder setPropertyRequestBuilder = getOmRequest()
         .getSetVolumePropertyRequest().toBuilder()
         .setModificationTime(modificationTime);
 
-    return getOmRequest().toBuilder()
+    OMRequest omRequest = getOmRequest().toBuilder()
         .setSetVolumePropertyRequest(setPropertyRequestBuilder)
         .setUserInfo(getUserInfo())
         .build();
+    setOmRequest(omRequest);
+    // check Acl
+    if (ozoneManager.getAclsEnabled()) {
+      checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
+          OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
+          volume, null, null);
+    }
+    return getOmRequest();
   }
 
   @Override
@@ -82,13 +104,6 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
 
     OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(
         getOmRequest());
-    // In production this will never happen, this request will be called only
-    // when we have ownerName in setVolumePropertyRequest.
-    if (!setVolumePropertyRequest.hasOwnerName()) {
-      omResponse.setStatus(OzoneManagerProtocolProtos.Status.INVALID_REQUEST)
-          .setSuccess(false);
-      return new OMVolumeSetOwnerResponse(omResponse.build());
-    }
 
     OMMetrics omMetrics = ozoneManager.getMetrics();
     omMetrics.incNumVolumeUpdates();
@@ -108,13 +123,6 @@ public class OMVolumeSetOwnerRequest extends OMVolumeRequest {
     String oldOwner = null;
     OMClientResponse omClientResponse = null;
     try {
-      // check Acl
-      if (ozoneManager.getAclsEnabled()) {
-        checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
-            OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
-            volume, null, null);
-      }
-
       long maxUserVolumeCount = ozoneManager.getMaxUserVolumeCount();
       OzoneManagerStorageProtos.PersistedUserVolumeInfo oldOwnerVolumeList;
       OzoneManagerStorageProtos.PersistedUserVolumeInfo newOwnerVolumeList;

@@ -62,10 +62,12 @@ public class OMVolumeSetAclRequest extends OMVolumeAclRequest {
         getOmRequest().getSetAclRequest().toBuilder()
             .setModificationTime(modificationTime);
 
-    return getOmRequest().toBuilder()
+    OMRequest omRequest = getOmRequest().toBuilder()
         .setSetAclRequest(setAclRequestBuilder)
         .setUserInfo(getUserInfo())
         .build();
+    setOmRequest(omRequest);
+    return super.preExecute(ozoneManager);
   }
 
   public OMVolumeSetAclRequest(OMRequest omRequest) {

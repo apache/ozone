@@ -785,6 +785,20 @@ public final class OMRequestTestUtils {
         .setClientId(UUID.randomUUID().toString());
   }
 
+  public static OMRequest newDeleteBucketRequest(String volumeName, String bucketName) {
+    OzoneManagerProtocolProtos.DeleteBucketRequest.Builder req =
+        OzoneManagerProtocolProtos.DeleteBucketRequest.newBuilder()
+            .setVolumeName(volumeName)
+            .setBucketName(bucketName);
+
+    return OMRequest.newBuilder()
+        .setDeleteBucketRequest(req)
+        .setVersion(ClientVersion.CURRENT_VERSION)
+        .setCmdType(OzoneManagerProtocolProtos.Type.DeleteBucket)
+        .setClientId(UUID.randomUUID().toString())
+        .build();
+  }
+
   public static List< KeyValue> getMetadataList() {
     List<KeyValue> metadataList = new ArrayList<>();
     metadataList.add(KeyValue.newBuilder().setKey("key1").setValue(
@@ -842,6 +856,16 @@ public final class OMRequestTestUtils {
     SetVolumePropertyRequest setVolumePropertyRequest =
         SetVolumePropertyRequest.newBuilder().setVolumeName(volumeName)
             .setOwnerName(newOwner).setModificationTime(Time.now()).build();
+
+    return OMRequest.newBuilder().setClientId(UUID.randomUUID().toString())
+        .setCmdType(OzoneManagerProtocolProtos.Type.SetVolumeProperty)
+        .setSetVolumePropertyRequest(setVolumePropertyRequest).build();
+  }
+
+  public static OMRequest createSetVolumePropertyRequest(String volumeName) {
+    SetVolumePropertyRequest setVolumePropertyRequest =
+        SetVolumePropertyRequest.newBuilder().setVolumeName(volumeName)
+            .setModificationTime(Time.now()).build();
 
     return OMRequest.newBuilder().setClientId(UUID.randomUUID().toString())
         .setCmdType(OzoneManagerProtocolProtos.Type.SetVolumeProperty)

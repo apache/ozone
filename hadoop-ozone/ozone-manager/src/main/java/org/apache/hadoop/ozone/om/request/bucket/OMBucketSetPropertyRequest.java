@@ -97,10 +97,21 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
       setBucketPropertyRequestBuilder.setBucketArgs(bucketArgsBuilder.build());
     }
 
-    return getOmRequest().toBuilder()
+    final OMRequest omRequest = getOmRequest()
+        .toBuilder()
         .setSetBucketPropertyRequest(setBucketPropertyRequestBuilder)
         .setUserInfo(getUserInfo())
         .build();
+    setOmRequest(omRequest);
+
+    final String volumeName = bucketArgs.getVolumeName();
+    final String bucketName = bucketArgs.getBucketName();
+    // check Acl
+    if (ozoneManager.getAclsEnabled()) {
+      checkAclPermission(ozoneManager, volumeName, bucketName);
+    }
+
+    return getOmRequest();
   }
 
   @Override
@@ -132,11 +143,6 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
     boolean acquiredBucketLock = false, success = true;
     OMClientResponse omClientResponse = null;
     try {
-      // check Acl
-      if (ozoneManager.getAclsEnabled()) {
-        checkAclPermission(ozoneManager, volumeName, bucketName);
-      }
-
       // acquire lock.
       mergeOmLockDetails(omMetadataManager.getLock().acquireWriteLock(
           BUCKET_LOCK, volumeName, bucketName));
@@ -301,12 +307,12 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
             OMException.ResultCodes.QUOTA_ERROR);
       }
     }
-    
+
     // avoid iteration of other bucket if quota set is less than previous set
     if (quotaInBytes < dbBucketInfo.getQuotaInBytes()) {
       return true;
     }
-    
+
     List<OmBucketInfo> bucketList = metadataManager.listBuckets(
         omVolumeArgs.getVolume(), null, null, Integer.MAX_VALUE, false);
     for (OmBucketInfo bucketInfo : bucketList) {
@@ -342,7 +348,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
     if (quotaInNamespace < OzoneConsts.QUOTA_RESET || quotaInNamespace == 0) {
       return false;
     }
-    
+
     if (quotaInNamespace != OzoneConsts.QUOTA_RESET
         && quotaInNamespace < dbBucketInfo.getTotalBucketNamespace()) {
       throw new OMException("Cannot update bucket quota. NamespaceQuota " +
