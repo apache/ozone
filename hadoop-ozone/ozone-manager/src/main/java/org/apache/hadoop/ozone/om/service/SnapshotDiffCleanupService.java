@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
@@ -195,14 +196,9 @@ public class SnapshotDiffCleanupService extends BackgroundService {
 
         if (totalNumberOfEntries > 0) {
           byte[] beginKey = codecRegistry.asRawData(prefix + DELIMITER + 0);
-          byte[] endKey = codecRegistry.asRawData(prefix + DELIMITER +
-              (totalNumberOfEntries - 1));
+          byte[] endKey = codecRegistry.asRawData(StringUtils.getLexicographicallyHigherString(prefix + DELIMITER));
           // Delete Range excludes the endKey.
-          // Hence, we do two delete,
-          //  1. deleteRange form beginKey(included) to endKey(excluded).
-          //  2. delete endKey.
           writeBatch.deleteRange(snapDiffReportCfh, beginKey, endKey);
-          writeBatch.delete(snapDiffReportCfh, endKey);
         }
         // Finally, remove the entry from the purged job table.
         writeBatch.delete(snapDiffPurgedJobCfh, key);
