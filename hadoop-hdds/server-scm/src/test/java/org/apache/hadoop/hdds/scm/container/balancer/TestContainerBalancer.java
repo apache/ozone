@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_NODE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -128,6 +129,8 @@ public class TestContainerBalancer {
 
   @Test
   public void testStartBalancerStop() throws Exception {
+    //stop should not throw an exception as it is idempotent
+    assertDoesNotThrow(() -> containerBalancer.stopBalancer());
     startBalancer(balancerConfiguration);
     assertThrows(IllegalContainerBalancerStateException.class,
         () -> containerBalancer.startBalancer(balancerConfiguration),
@@ -142,9 +145,9 @@ public class TestContainerBalancer {
     stopBalancer();
     assertSame(ContainerBalancerTask.Status.STOPPED, containerBalancer.getBalancerStatus());
 
-    assertThrows(Exception.class,
-        () -> containerBalancer.stopBalancer(),
-        "Exception should be thrown when stop again");
+    // If the balancer is already stopped, the stop command should do nothing
+    // and return successfully as stopBalancer is idempotent
+    assertDoesNotThrow(() -> containerBalancer.stopBalancer());
   }
 
   @Test

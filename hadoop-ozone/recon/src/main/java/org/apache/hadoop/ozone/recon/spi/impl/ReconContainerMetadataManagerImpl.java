@@ -171,24 +171,6 @@ public class ReconContainerMetadataManagerImpl
 
   /**
    * Concatenate the containerID and Key Prefix using a delimiter and store the
-   * count into the container DB store.
-   *
-   * @param containerKeyPrefix the containerID, key-prefix tuple.
-   * @param count Count of the keys matching that prefix.
-   * @throws IOException on failure.
-   */
-  @Override
-  public void storeContainerKeyMapping(ContainerKeyPrefix containerKeyPrefix,
-                                       Integer count)
-      throws IOException {
-    containerKeyTable.put(containerKeyPrefix, count);
-    if (containerKeyPrefix.toKeyPrefixContainer() != null) {
-      keyContainerTable.put(containerKeyPrefix.toKeyPrefixContainer(), count);
-    }
-  }
-
-  /**
-   * Concatenate the containerID and Key Prefix using a delimiter and store the
    * count into a batch.
    *
    * @param batch the batch we store into
@@ -206,19 +188,6 @@ public class ReconContainerMetadataManagerImpl
       keyContainerTable.putWithBatch(batch,
           containerKeyPrefix.toKeyPrefixContainer(), count);
     }
-  }
-
-  /**
-   * Store the containerID -&gt; no. of keys count into the container DB store.
-   *
-   * @param containerID the containerID.
-   * @param count count of the keys within the given containerID.
-   * @throws IOException on failure.
-   */
-  @Override
-  public void storeContainerKeyCount(Long containerID, Long count)
-      throws IOException {
-    containerKeyCountTable.put(containerID, count);
   }
 
   /**

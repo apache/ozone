@@ -23,6 +23,11 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getRandom
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.getTestReconOmMetadataManager;
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.initializeNewOmMetadataManager;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -30,28 +35,35 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.concurrent.TimeoutException;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
+import org.apache.hadoop.hdds.scm.container.placement.metrics.SCMNodeStat;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.ClusterStateResponse;
+import org.apache.hadoop.ozone.recon.api.types.ClusterStorageReport;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
+import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
+import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
-import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -108,11 +120,12 @@ public class TestClusterStateEndpoint extends AbstractReconSqlDBTest {
                                                     ozoneStorageContainerManager.getPipelineManager();
     ContainerHealthSchemaManager containerHealthSchemaManager =
         reconTestInjector.getInstance(ContainerHealthSchemaManager.class);
-    GlobalStatsDao globalStatsDao = getDao(GlobalStatsDao.class);
+    ReconGlobalStatsManager reconGlobalStatsManager = 
+        reconTestInjector.getInstance(ReconGlobalStatsManager.class);
     conf = mock(OzoneConfiguration.class);
     clusterStateEndpoint =
-        new ClusterStateEndpoint(ozoneStorageContainerManager, globalStatsDao,
-            containerHealthSchemaManager, conf);
+        new ClusterStateEndpoint(ozoneStorageContainerManager,
+            reconGlobalStatsManager, containerHealthSchemaManager, conf);
     pipeline = getRandomPipeline();
     pipelineID = pipeline.getId();
     reconPipelineManager.addPipeline(pipeline);
@@ -156,6 +169,64 @@ public class TestClusterStateEndpoint extends AbstractReconSqlDBTest {
     ClusterStateResponse clusterStateResponse = (ClusterStateResponse) clusterState.getEntity();
     assertEquals("scmServiceId", clusterStateResponse.getScmServiceId());
     assertEquals("omServiceId", clusterStateResponse.getOmServiceId());
+  }
+
+  @Test
+  public void testStorageReportIsClusterStorageReport() {
+    OzoneStorageContainerManager mockScm = mock(OzoneStorageContainerManager.class);
+    ReconNodeManager mockNodeManager = mock(ReconNodeManager.class);
+    ReconPipelineManager mockPipelineManager = mock(ReconPipelineManager.class);
+    ReconContainerManager mockContainerManager = mock(ReconContainerManager.class);
+    ContainerHealthSchemaManager mockContainerHealthSchemaManager =
+        mock(ContainerHealthSchemaManager.class);
+    ReconGlobalStatsManager mockGlobalStatsManager =
+        mock(ReconGlobalStatsManager.class);
+    OzoneConfiguration mockConf = mock(OzoneConfiguration.class);
+    DatanodeInfo mockDatanode = mock(DatanodeInfo.class);
+
+    when(mockScm.getScmNodeManager()).thenReturn(mockNodeManager);
+    when(mockScm.getPipelineManager()).thenReturn(mockPipelineManager);
+    when(mockScm.getContainerManager()).thenReturn(mockContainerManager);
+
+    when(mockPipelineManager.getPipelines()).thenReturn(Collections.emptyList());
+    when(mockContainerManager.getContainers()).thenReturn(Collections.emptyList());
+    when(mockContainerManager.getContainerStateCount(HddsProtos.LifeCycleState.OPEN))
+        .thenReturn(0);
+    when(mockContainerManager.getContainerStateCount(HddsProtos.LifeCycleState.DELETED))
+        .thenReturn(0);
+    when(mockContainerHealthSchemaManager.getUnhealthyContainers(
+        any(), anyLong(), any(), anyInt())).thenReturn(Collections.emptyList());
+
+    SCMNodeStat scmNodeStat = new SCMNodeStat(
+        1000L, 400L, 600L, 300L, 50L, 20L);
+    when(mockNodeManager.getStats()).thenReturn(scmNodeStat);
+    when(mockNodeManager.getNodeCount(NodeStatus.inServiceHealthy())).thenReturn(1);
+    when(mockNodeManager.getNodeCount(NodeStatus.inServiceHealthyReadOnly()))
+        .thenReturn(0);
+    when(mockNodeManager.getAllNodeCount()).thenReturn(1);
+    when(mockNodeManager.getAllNodes()).thenReturn(Collections.singletonList(mockDatanode));
+    when(mockNodeManager.getTotalFilesystemUsage(mockDatanode))
+        .thenReturn(new SpaceUsageSource.Fixed(2000L, 1500L, 500L));
+
+    ClusterStateEndpoint endpoint = new ClusterStateEndpoint(
+        mockScm, mockGlobalStatsManager, mockContainerHealthSchemaManager, mockConf);
+
+    ClusterStateResponse response =
+        (ClusterStateResponse) endpoint.getClusterState().getEntity();
+
+    assertNotNull(response.getStorageReport());
+    assertInstanceOf(ClusterStorageReport.class, response.getStorageReport());
+
+    ClusterStorageReport report = response.getStorageReport();
+    assertEquals(1000L, report.getCapacity());
+    assertEquals(400L, report.getUsed());
+    assertEquals(600L, report.getRemaining());
+    assertEquals(300L, report.getCommitted());
+    assertEquals(50L, report.getMinimumFreeSpace());
+    assertEquals(20L, report.getReserved());
+    assertEquals(2000L, report.getFilesystemCapacity());
+    assertEquals(500L, report.getFilesystemUsed());
+    assertEquals(1500L, report.getFilesystemAvailable());
   }
 
   ContainerInfo newContainerInfo(long containerId,

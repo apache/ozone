@@ -17,9 +17,14 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_DIR_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
+import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_RENAMED_TABLE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -87,7 +92,7 @@ public class TestKeyManagerImpl {
         for (int k = 0; k < numberOfKeysPerBucket; k++) {
           String key = String.format("/%s%010d/%s%010d/%s%010d", volumeNamePrefix, i, bucketNamePrefix, j,
               keyPrefix, k);
-          V value = valueClass == String.class ? (V) key : Mockito.mock(valueClass);
+          V value = valueClass == String.class ? (V) key : mock(valueClass);
           values.put(key, value);
 
           if ((volumeNumberFilter == null || i == volumeNumberFilter) &&
@@ -122,11 +127,12 @@ public class TestKeyManagerImpl {
     String keyPrefix = "key";
     OzoneConfiguration configuration = new OzoneConfiguration();
     OMMetadataManager metadataManager = Mockito.mock(OMMetadataManager.class);
-    when(metadataManager.getBucketKeyPrefix(anyString(), anyString())).thenAnswer(i ->
-        "/" + i.getArguments()[0] + "/" + i.getArguments()[1] + "/");
     KeyManagerImpl km = new KeyManagerImpl(null, null, metadataManager, configuration, null, null, null);
     Table<String, RepeatedOmKeyInfo> mockedDeletedTable = Mockito.mock(Table.class);
+    when(mockedDeletedTable.getName()).thenReturn(DELETED_TABLE);
     when(metadataManager.getDeletedTable()).thenReturn(mockedDeletedTable);
+    when(metadataManager.getTableBucketPrefix(eq(DELETED_TABLE), anyString(), anyString()))
+        .thenAnswer(i -> "/" + i.getArguments()[1] + "/" + i.getArguments()[2] + "/");
     CheckedFunction<Table.KeyValue<String, RepeatedOmKeyInfo>, Boolean, IOException> filter =
         (kv) -> Long.parseLong(kv.getKey().split(keyPrefix)[1]) % 2 == 0;
     List<Table.KeyValue<String, List<OmKeyInfo>>> expectedEntries = mockTableIterator(
@@ -149,7 +155,8 @@ public class TestKeyManagerImpl {
       assertThrows(expectedException, () -> km.getDeletedKeyEntries(volumeName, bucketName, startKey, filter,
           numberOfEntries));
     } else {
-      assertEquals(expectedEntries, km.getDeletedKeyEntries(volumeName, bucketName, startKey, filter, numberOfEntries));
+      assertEquals(expectedEntries,
+          km.getDeletedKeyEntries(volumeName, bucketName, startKey, filter, numberOfEntries));
     }
   }
 
@@ -166,11 +173,12 @@ public class TestKeyManagerImpl {
     String keyPrefix = "";
     OzoneConfiguration configuration = new OzoneConfiguration();
     OMMetadataManager metadataManager = Mockito.mock(OMMetadataManager.class);
-    when(metadataManager.getBucketKeyPrefix(anyString(), anyString())).thenAnswer(i ->
-        "/" + i.getArguments()[0] + "/" + i.getArguments()[1] + "/");
     KeyManagerImpl km = new KeyManagerImpl(null, null, metadataManager, configuration, null, null, null);
     Table<String, String> mockedRenameTable = Mockito.mock(Table.class);
+    when(mockedRenameTable.getName()).thenReturn(SNAPSHOT_RENAMED_TABLE);
     when(metadataManager.getSnapshotRenamedTable()).thenReturn(mockedRenameTable);
+    when(metadataManager.getTableBucketPrefix(eq(SNAPSHOT_RENAMED_TABLE), anyString(), anyString()))
+        .thenAnswer(i -> "/" + i.getArguments()[1] + "/" + i.getArguments()[2] + "/");
     CheckedFunction<Table.KeyValue<String, String>, Boolean, IOException> filter =
         (kv) -> Long.parseLong(kv.getKey().split("/")[3]) % 2 == 0;
     List<Table.KeyValue<String, String>> expectedEntries = mockTableIterator(
@@ -186,7 +194,8 @@ public class TestKeyManagerImpl {
       assertThrows(expectedException, () -> km.getRenamesKeyEntries(volumeName, bucketName, startKey,
           filter, numberOfEntries));
     } else {
-      assertEquals(expectedEntries, km.getRenamesKeyEntries(volumeName, bucketName, startKey, filter, numberOfEntries));
+      assertEquals(expectedEntries,
+          km.getRenamesKeyEntries(volumeName, bucketName, startKey, filter, numberOfEntries));
     }
   }
 
@@ -204,11 +213,12 @@ public class TestKeyManagerImpl {
     startVolumeNumber = null;
     OzoneConfiguration configuration = new OzoneConfiguration();
     OMMetadataManager metadataManager = Mockito.mock(OMMetadataManager.class);
-    when(metadataManager.getBucketKeyPrefixFSO(anyString(), anyString())).thenAnswer(i ->
-        "/" + i.getArguments()[0] + "/" + i.getArguments()[1] + "/");
     KeyManagerImpl km = new KeyManagerImpl(null, null, metadataManager, configuration, null, null, null);
     Table<String, OmKeyInfo> mockedDeletedDirTable = Mockito.mock(Table.class);
+    when(mockedDeletedDirTable.getName()).thenReturn(DELETED_DIR_TABLE);
     when(metadataManager.getDeletedDirTable()).thenReturn(mockedDeletedDirTable);
+    when(metadataManager.getTableBucketPrefix(eq(DELETED_DIR_TABLE), anyString(), anyString()))
+        .thenAnswer(i -> "/" + i.getArguments()[1] + "/" + i.getArguments()[2] + "/");
     List<Table.KeyValue<String, OmKeyInfo>> expectedEntries = mockTableIterator(
         OmKeyInfo.class, mockedDeletedDirTable, numberOfVolumes, numberOfBucketsPerVolume, numberOfKeysPerBucket,
         volumeNamePrefix, bucketNamePrefix, keyPrefix, volumeNumber, bucketNumber, startVolumeNumber, startBucketNumber,

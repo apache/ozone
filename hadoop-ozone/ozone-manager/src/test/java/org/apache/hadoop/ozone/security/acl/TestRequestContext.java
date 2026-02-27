@@ -17,11 +17,11 @@
 
 package org.apache.hadoop.ozone.security.acl;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.IOException;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -30,70 +30,25 @@ import org.junit.jupiter.api.Test;
 public class TestRequestContext {
 
   @Test
-  public void testRecursiveAccessFlag() throws IOException {
-    RequestContext context = getUserRequestContext("om",
-            IAccessAuthorizer.ACLType.CREATE, false, "volume1",
-            true);
-    assertTrue(context.isRecursiveAccessCheck(),
-        "Wrongly sets recursiveAccessCheck flag value");
+  void testRecursiveAccessFlag() {
+    RequestContext.Builder builder = RequestContext.newBuilder();
 
-    context = getUserRequestContext("om",
-            IAccessAuthorizer.ACLType.CREATE, false, "volume1",
-            false);
-    assertFalse(context.isRecursiveAccessCheck(),
-        "Wrongly sets recursiveAccessCheck flag value");
-
-    context = getUserRequestContext(
-            "user1", IAccessAuthorizer.ACLType.CREATE,
-            true, "volume1");
-    assertFalse(context.isRecursiveAccessCheck(),
-        "Wrongly sets recursiveAccessCheck flag value");
-
-    RequestContext.Builder builder = new RequestContext.Builder();
-
-    assertFalse(builder.build().isRecursiveAccessCheck(),
-        "Wrongly sets recursive flag value");
+    assertFalse(builder.build().isRecursiveAccessCheck(), "default value");
 
     builder.setRecursiveAccessCheck(true);
-    assertTrue(builder.build().isRecursiveAccessCheck(),
-        "Wrongly sets recursive flag value");
+    assertTrue(builder.build().isRecursiveAccessCheck());
 
-    context = new RequestContext("host", null,
-            null, "serviceId",
-            IAccessAuthorizer.ACLIdentityType.GROUP,
-            IAccessAuthorizer.ACLType.CREATE, "owner");
-    assertFalse(context.isRecursiveAccessCheck(),
-        "Wrongly sets recursive flag value");
-
-    context = new RequestContext("host", null,
-            null, "serviceId",
-            IAccessAuthorizer.ACLIdentityType.GROUP,
-            IAccessAuthorizer.ACLType.CREATE, "owner", false);
-    assertFalse(context.isRecursiveAccessCheck(),
-        "Wrongly sets recursive flag value");
-
-    context = new RequestContext("host", null,
-            null, "serviceId",
-            IAccessAuthorizer.ACLIdentityType.GROUP,
-            IAccessAuthorizer.ACLType.CREATE, "owner", true);
-    assertTrue(context.isRecursiveAccessCheck(),
-        "Wrongly sets recursive flag value");
+    builder.setRecursiveAccessCheck(false);
+    assertFalse(builder.build().isRecursiveAccessCheck());
   }
 
-  private RequestContext getUserRequestContext(String username,
-      IAccessAuthorizer.ACLType type, boolean isOwner, String ownerName,
-      boolean recursiveAccessCheck) throws IOException {
+  @Test
+  void testSessionPolicy() {
+    RequestContext.Builder builder = RequestContext.newBuilder();
+    assertNull(builder.build().getSessionPolicy(), "default value");
 
-    return RequestContext.getBuilder(
-            UserGroupInformation.createRemoteUser(username), null, null,
-            type, ownerName, recursiveAccessCheck).build();
-  }
-
-  private RequestContext getUserRequestContext(String username,
-      IAccessAuthorizer.ACLType type, boolean isOwner, String ownerName) {
-    return RequestContext.getBuilder(
-            UserGroupInformation.createRemoteUser(username), null, null,
-            type, ownerName).build();
+    final String policy = "{\"Statement\":[]}";
+    builder.setSessionPolicy(policy);
+    assertEquals(policy, builder.build().getSessionPolicy());
   }
 }
-

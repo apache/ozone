@@ -200,14 +200,14 @@ public class TestContainerReconciliationWithMockDatanodes {
 
   @ParameterizedTest
   @MethodSource("corruptionValues")
-  public void testContainerReconciliation(int numBlocksToDelete, int numChunksToCorrupt) throws Exception {
+  public void testContainerReconciliation(int numBlocksToRemove, int numChunksToCorrupt) throws Exception {
     LOG.info("Healthy data checksum for container {} in this test is {}", CONTAINER_ID,
         checksumToString(healthyDataChecksum));
     // Introduce corruption in each container on different replicas.
     List<MockDatanode> dnsToCorrupt = datanodes.stream().limit(2).collect(Collectors.toList());
 
-    dnsToCorrupt.get(0).introduceCorruption(CONTAINER_ID, numBlocksToDelete, numChunksToCorrupt, false);
-    dnsToCorrupt.get(1).introduceCorruption(CONTAINER_ID, numBlocksToDelete, numChunksToCorrupt, true);
+    dnsToCorrupt.get(0).introduceCorruption(CONTAINER_ID, numBlocksToRemove, numChunksToCorrupt, false);
+    dnsToCorrupt.get(1).introduceCorruption(CONTAINER_ID, numBlocksToRemove, numChunksToCorrupt, true);
     // Use synchronous on-demand scans to re-build the merkle trees after corruption.
     datanodes.forEach(d -> d.scanContainer(CONTAINER_ID));
     // Without reconciliation, checksums should be different because of the corruption.
@@ -239,15 +239,15 @@ public class TestContainerReconciliationWithMockDatanodes {
    */
   public enum FailureLocation {
     GET_CONTAINER_CHECKSUM_INFO("getContainerChecksumInfo"),
-    GET_BLOCK("getBlock"), 
+    GET_BLOCK("getBlock"),
     READ_CHUNK("readChunk");
-    
+
     private final String methodName;
-    
+
     FailureLocation(String methodName) {
       this.methodName = methodName;
     }
-    
+
     public String getMethodName() {
       return methodName;
     }
@@ -267,45 +267,45 @@ public class TestContainerReconciliationWithMockDatanodes {
   @ParameterizedTest
   @MethodSource("failureLocations")
   public void testContainerReconciliationWithPeerFailure(FailureLocation failureLocation) throws Exception {
-    LOG.info("Testing container reconciliation with peer failure in {} for container {}", 
+    LOG.info("Testing container reconciliation with peer failure in {} for container {}",
         failureLocation.getMethodName(), CONTAINER_ID);
-    
+
     // Introduce corruption in the first datanode
     MockDatanode corruptedNode = datanodes.get(0);
     MockDatanode healthyNode1 = datanodes.get(1);
     MockDatanode healthyNode2 = datanodes.get(2);
     corruptedNode.introduceCorruption(CONTAINER_ID, 1, 1, false);
-    
+
     // Use synchronous on-demand scans to re-build the merkle trees after corruption.
     datanodes.forEach(d -> d.scanContainer(CONTAINER_ID));
-    
+
     // Without reconciliation, checksums should be different.
     assertUniqueChecksumCount(CONTAINER_ID, datanodes, 2);
     waitForExpectedScanCount(1);
-    
+
     // Create a failing peer - we'll make the second datanode fail during the specified operation
     DatanodeDetails failingPeerDetails = healthyNode1.getDnDetails();
     // Mock the failure for the specific method based on the failure mode
     mockContainerProtocolCalls(failureLocation, failingPeerDetails);
-    
+
     // Now reconcile the corrupted node with its peers (including the failing one)
     List<DatanodeDetails> peers = Arrays.asList(failingPeerDetails, healthyNode2.getDnDetails());
     corruptedNode.reconcileContainer(dnClient, peers, CONTAINER_ID);
-    
+
     // Wait for scan to complete - but this time we only expect the corrupted node to have a scan
     // triggered by reconciliation, so we wait specifically for that one
     try {
       GenericTestUtils.waitFor(() -> corruptedNode.getOnDemandScanCount() == 2, 100, 5_000);
     } catch (TimeoutException ex) {
-      LOG.warn("Timed out waiting for on-demand scan after reconciliation. Current count: {}", 
+      LOG.warn("Timed out waiting for on-demand scan after reconciliation. Current count: {}",
           corruptedNode.getOnDemandScanCount());
     }
-    
+
     // The corrupted node should still be repaired because it was able to reconcile with the healthy peer
     // even though one peer failed
     long repairedDataChecksum = assertUniqueChecksumCount(CONTAINER_ID, datanodes, 1);
     assertEquals(healthyDataChecksum, repairedDataChecksum);
-    
+
     // Restore the original mock behavior for other tests
     mockContainerProtocolCalls();
   }
@@ -686,7 +686,7 @@ public class TestContainerReconciliationWithMockDatanodes {
      * 2. Corrupt chunks at an offset.
      * If revers is true, the blocks and chunks are deleted in reverse order.
      */
-    public void introduceCorruption(long containerID, int numBlocksToDelete, int numChunksToCorrupt, boolean reverse)
+    public void introduceCorruption(long containerID, int numBlocksToRemove, int numChunksToCorrupt, boolean reverse)
         throws IOException {
       KeyValueContainer container = getContainer(containerID);
       KeyValueContainerData containerData = container.getContainerData();
@@ -695,7 +695,7 @@ public class TestContainerReconciliationWithMockDatanodes {
            BatchOperation batch = handle.getStore().getBatchHandler().initBatchOperation()) {
         List<BlockData> blockDataList = getSortedBlocks(container);
         int size = blockDataList.size();
-        for (int i = 0; i < numBlocksToDelete; i++) {
+        for (int i = 0; i < numBlocksToRemove; i++) {
           BlockData blockData = reverse ? blockDataList.get(size - 1 - i) : blockDataList.get(i);
           File blockFile = TestContainerCorruptions.getBlock(container, blockData.getBlockID().getLocalID());
           Assertions.assertTrue(blockFile.delete());
@@ -706,7 +706,7 @@ public class TestContainerReconciliationWithMockDatanodes {
         handle.getStore().getBatchHandler().commitBatchOperation(batch);
         // Check that the correct number of blocks were deleted.
         blockDataList = getSortedBlocks(container);
-        assertEquals(numBlocksToDelete, size - blockDataList.size());
+        assertEquals(numBlocksToRemove, size - blockDataList.size());
       }
 
       // Corrupt chunks at an offset.

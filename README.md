@@ -50,18 +50,35 @@ Latest release artifacts (source release and binary packages) are [available](ht
 
 ## Quick start
 
-### Run Ozone from published Docker image
+### Run Ozone with Docker Compose
 
-The easiest way to start a cluster with docker is:
+The easiest way to start a cluster with docker is by using Docker Compose:
 
+- Obtain Ozone’s sample Docker Compose configuration:
+```bash
+curl -O https://raw.githubusercontent.com/apache/ozone-docker/refs/heads/latest/docker-compose.yaml
 ```
-docker run -p 9878:9878 apache/ozone
+
+- Start the cluster
+```bash
+docker compose up -d --scale datanode=3
 ```
+
+- Note: By default, the cluster will be started with replication factor set to 1. It can be changed by setting the environment variable `OZONE_REPLICATION_FACTOR` to the desired value.
 
 And you can use AWS S3 cli:
 
+- First, let’s configure AWS access key and secret key. Because the cluster is not secured, you can use any arbitrary access key and secret key. For example:
+```bash
+export AWS_ACCESS_KEY_ID=testuser/scm@EXAMPLE.COM
+export AWS_SECRET_ACCESS_KEY=c261b6ecabf7d37d5f9ded654b1c724adac9bd9f13e247a235e567e8296d2999
 ```
+
+- Then we can create a bucket and upload a file to it:
+```bash
 aws s3api --endpoint http://localhost:9878/ create-bucket --bucket=wordcount
+# create a temporary file to upload to Ozone via S3 support 
+ls -1 > /tmp/testfile
 aws s3 --endpoint http://localhost:9878 cp --storage-class REDUCED_REDUNDANCY  /tmp/testfile  s3://wordcount/testfile
 ```
 
@@ -71,9 +88,9 @@ If you need a more realistic cluster, you can [download](https://ozone.apache.or
 
 After you untar the binary:
 
-```
+```bash
 cd compose/ozone
-docker-compose up -d --scale datanode=3
+docker compose up -d --scale datanode=3
 ```
 
 The `compose` folder contains different sets of configured clusters (secure, HA, mapreduce example), you can check the various subfolders for more examples.
@@ -86,15 +103,15 @@ Ozone is a first class citizen of the Cloud-Native environments. The binary pack
 
 Ozone can be built with [Apache Maven](https://maven.apache.org):
 
-```
+```bash
 mvn clean install -DskipTests
 ```
 
 And can be started with the help of Docker:
 
-```
+```bash
 cd hadoop-ozone/dist/target/ozone-*/compose/ozone
-docker-compose up -d --scale datanode=3
+docker compose up -d --scale datanode=3
 ```
 For more information, you can check the [Contribution guideline](./CONTRIBUTING.md)
 

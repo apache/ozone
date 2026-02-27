@@ -24,7 +24,12 @@ import static org.apache.hadoop.hdds.scm.net.NetConstants.RACK_SCHEMA;
 import static org.apache.hadoop.hdds.scm.net.NetConstants.ROOT_SCHEMA;
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -154,11 +159,14 @@ public class TestContainerPlacement {
 
   ContainerManager createContainerManager()
       throws IOException {
+    pipelineManager = spy(pipelineManager);
+    doReturn(true).when(pipelineManager).hasEnoughSpace(any(), anyLong());
+
     return new ContainerManagerImpl(conf,
         scmhaManager, sequenceIdGen, pipelineManager,
         SCMDBDefinition.CONTAINERS.getTable(dbStore),
         new ContainerReplicaPendingOps(
-            Clock.system(ZoneId.systemDefault())));
+            Clock.system(ZoneId.systemDefault()), null));
   }
 
   /**
@@ -224,6 +232,8 @@ public class TestContainerPlacement {
                   SCMTestUtils.getReplicationType(conf),
                   SCMTestUtils.getReplicationFactor(conf)),
               OzoneConsts.OZONE);
+      assertNotNull(container, "allocateContainer returned null (unexpected in this placement test)");
+
       int replicaCount = 0;
       for (DatanodeDetails datanodeDetails : datanodes) {
         if (replicaCount ==

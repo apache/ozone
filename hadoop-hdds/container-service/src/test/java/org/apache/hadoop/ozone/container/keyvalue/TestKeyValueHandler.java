@@ -30,6 +30,8 @@ import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTest
 import static org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeTestUtils.verifyAllDataChecksumsMatch;
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createBlockMetaData;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
+import static org.apache.ozone.test.MetricsAsserts.assertCounter;
+import static org.apache.ozone.test.MetricsAsserts.getMetrics;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -37,6 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -53,6 +56,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
@@ -68,11 +72,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.FileUtil;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
@@ -80,10 +86,16 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.security.token.TokenVerifier;
+import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
+import org.apache.hadoop.metrics2.MetricsRecordBuilder;
+import org.apache.hadoop.ozone.common.ChunkBuffer;
+import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.checksum.ContainerChecksumTreeManager;
 import org.apache.hadoop.ozone.container.checksum.ContainerMerkleTreeWriter;
 import org.apache.hadoop.ozone.container.checksum.DNContainerOperationClient;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
+import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerMetrics;
 import org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
@@ -94,9 +106,11 @@ import org.apache.hadoop.ozone.container.common.interfaces.Handler;
 import org.apache.hadoop.ozone.container.common.report.IncrementalReportSender;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.RoundRobinVolumeChoosingPolicy;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
@@ -105,6 +119,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OnDemandContainerScanner;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
+import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -825,6 +840,78 @@ public class TestKeyValueHandler {
     assertNull(containerSet.getContainer(containerID));
   }
 
+  /**
+   * Test to verify that immediate ICRs are sent when container state changes,
+   * and deferred ICRs are sent when closing a container without a state change.
+   */
+  @ContainerLayoutTestInfo.ContainerTest
+  public void testICRsOnContainerClose(ContainerLayoutVersion containerLayoutVersion) throws Exception {
+    final long containerID = 1L;
+    final ContainerSet containerSet = newContainerSet();
+    final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
+
+    KeyValueContainerData containerData = new KeyValueContainerData(
+        containerID, containerLayoutVersion, (long) StorageUnit.GB.toBytes(1),
+        UUID.randomUUID().toString(), DATANODE_UUID);
+
+    HddsVolume hddsVolume = new HddsVolume.Builder(tempDir.toString()).conf(conf)
+        .clusterID(CLUSTER_ID).datanodeUuid(DATANODE_UUID)
+        .volumeSet(volumeSet)
+        .build();
+    hddsVolume.format(CLUSTER_ID);
+    hddsVolume.createWorkingDir(CLUSTER_ID, null);
+    hddsVolume.createTmpDirs(CLUSTER_ID);
+
+    when(volumeSet.getVolumesList()).thenReturn(Collections.singletonList(hddsVolume));
+    when(volumeSet.getFailedVolumesList()).thenReturn(Collections.emptyList());
+
+    IncrementalReportSender<Container> mockIcrSender = mock(IncrementalReportSender.class);
+
+    KeyValueHandler kvHandler = new KeyValueHandler(conf,
+        DATANODE_UUID, containerSet, volumeSet, ContainerMetrics.create(conf),
+        mockIcrSender, new ContainerChecksumTreeManager(conf));
+    kvHandler.setClusterID(CLUSTER_ID);
+
+    try {
+      // markContainerForClose - OPEN -> CLOSING (should send immediate ICR)
+      containerData.setState(ContainerProtos.ContainerDataProto.State.OPEN);
+      KeyValueContainer container = new KeyValueContainer(containerData, conf);
+      container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(), CLUSTER_ID);
+      containerSet.addContainer(container);
+
+      kvHandler.markContainerForClose(container);
+      verify(mockIcrSender, times(1)).send(any(Container.class)); // Immediate ICR
+      verify(mockIcrSender, times(0)).sendDeferred(any(Container.class)); // No deferred ICR
+      assertEquals(ContainerProtos.ContainerDataProto.State.CLOSING, container.getContainerState());
+
+      // markContainerForClose - CLOSING -> CLOSING (should send deferred ICR)
+      reset(mockIcrSender);
+      kvHandler.markContainerForClose(container);
+
+      verify(mockIcrSender, times(0)).send(any(Container.class)); // No immediate ICR
+      verify(mockIcrSender, times(1)).sendDeferred(any(Container.class)); // Deferred ICR
+      assertEquals(ContainerProtos.ContainerDataProto.State.CLOSING, container.getContainerState());
+
+      // closeContainer - CLOSING -> CLOSED (should send immediate ICR)
+      reset(mockIcrSender);
+      kvHandler.closeContainer(container);
+
+      verify(mockIcrSender, times(1)).send(any(Container.class));         // Immediate ICR
+      verify(mockIcrSender, times(0)).sendDeferred(any(Container.class)); // No deferred ICR
+      assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED, container.getContainerState());
+
+      // closeContainer - CLOSED -> CLOSED (should return, no ICR)
+      reset(mockIcrSender);
+      kvHandler.closeContainer(container);
+
+      verify(mockIcrSender, times(0)).send(any(Container.class));         // No immediate ICR
+      verify(mockIcrSender, times(0)).sendDeferred(any(Container.class)); // No deferred ICR
+      assertEquals(ContainerProtos.ContainerDataProto.State.CLOSED, container.getContainerState());
+    } finally {
+      FileUtils.deleteDirectory(tempDir.toFile());
+    }
+  }
+
   private static ContainerCommandRequestProto createContainerRequest(
       String datanodeId, long containerID) {
     return ContainerCommandRequestProto.newBuilder()
@@ -864,5 +951,139 @@ public class TestKeyValueHandler {
     containerSet.registerOnDemandScanner(onDemandScanner);
 
     return kvHandler;
+  }
+
+  private static class HandlerWithVolumeSet {
+    private final KeyValueHandler handler;
+    private final MutableVolumeSet volumeSet;
+    private final ContainerSet containerSet;
+
+    HandlerWithVolumeSet(KeyValueHandler handler, MutableVolumeSet volumeSet, ContainerSet containerSet) {
+      this.handler = handler;
+      this.volumeSet = volumeSet;
+      this.containerSet = containerSet;
+    }
+
+    KeyValueHandler getHandler() {
+      return handler;
+    }
+
+    MutableVolumeSet getVolumeSet() {
+      return volumeSet;
+    }
+
+    ContainerSet getContainerSet() {
+      return containerSet;
+    }
+  }
+
+  private HandlerWithVolumeSet createKeyValueHandlerWithVolumeSet(Path path) throws IOException {
+    ContainerMetrics.remove();
+    final ContainerSet containerSet = newContainerSet();
+    final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
+
+    HddsVolume hddsVolume = new HddsVolume.Builder(path.toString()).conf(conf)
+        .clusterID(CLUSTER_ID).datanodeUuid(DATANODE_UUID)
+        .volumeSet(volumeSet)
+        .build();
+    hddsVolume.format(CLUSTER_ID);
+    hddsVolume.createWorkingDir(CLUSTER_ID, null);
+    hddsVolume.createTmpDirs(CLUSTER_ID);
+    when(volumeSet.getVolumesList()).thenReturn(Collections.singletonList(hddsVolume));
+
+    final KeyValueHandler kvHandler = ContainerTestUtils.getKeyValueHandler(conf,
+        DATANODE_UUID, containerSet, volumeSet);
+    kvHandler.setClusterID(CLUSTER_ID);
+    hddsVolume.getVolumeInfoStats().unregister();
+    hddsVolume.getVolumeIOStats().unregister();
+
+    ContainerController controller = new ContainerController(containerSet,
+        Collections.singletonMap(ContainerType.KeyValueContainer, kvHandler));
+    OnDemandContainerScanner onDemandScanner = new OnDemandContainerScanner(
+        conf.getObject(ContainerScannerConfiguration.class), controller);
+    containerSet.registerOnDemandScanner(onDemandScanner);
+
+    return new HandlerWithVolumeSet(kvHandler, volumeSet, containerSet);
+  }
+
+  @Test
+  public void testReadBlockMetrics() throws Exception {
+    Path testDir = Files.createTempDirectory("testReadBlockMetrics");
+    RandomAccessFileChannel blockFile = null;
+    try {
+      conf.set(OZONE_SCM_CONTAINER_LAYOUT_KEY, ContainerLayoutVersion.FILE_PER_BLOCK.name());
+      HandlerWithVolumeSet handlerWithVolume = createKeyValueHandlerWithVolumeSet(testDir);
+      KeyValueHandler kvHandler = handlerWithVolume.getHandler();
+      MutableVolumeSet volumeSet = handlerWithVolume.getVolumeSet();
+      ContainerSet containerSet = handlerWithVolume.getContainerSet();
+
+      long containerID = ContainerTestHelper.getTestContainerID();
+      KeyValueContainerData containerData = new KeyValueContainerData(
+          containerID, ContainerLayoutVersion.FILE_PER_BLOCK,
+          (long) StorageUnit.GB.toBytes(1), UUID.randomUUID().toString(),
+          DATANODE_UUID);
+      KeyValueContainer container = new KeyValueContainer(containerData, conf);
+      container.create(volumeSet, new RoundRobinVolumeChoosingPolicy(), CLUSTER_ID);
+      containerSet.addContainer(container);
+
+      BlockID blockID = ContainerTestHelper.getTestBlockID(containerID);
+      BlockData blockData = new BlockData(blockID);
+      ChunkInfo chunkInfo = new ChunkInfo("chunk1", 0, 1024);
+      blockData.addChunk(chunkInfo.getProtoBufMessage());
+      kvHandler.getBlockManager().putBlock(container, blockData);
+
+      ChunkBuffer data = ChunkBuffer.wrap(ByteBuffer.allocate(1024));
+      kvHandler.getChunkManager().writeChunk(container, blockID, chunkInfo, data,
+          DispatcherContext.getHandleWriteChunk());
+
+      ContainerCommandRequestProto readBlockRequest =
+          ContainerCommandRequestProto.newBuilder()
+              .setCmdType(ContainerProtos.Type.ReadBlock)
+              .setContainerID(containerID)
+              .setDatanodeUuid(DATANODE_UUID)
+              .setReadBlock(ContainerProtos.ReadBlockRequestProto.newBuilder()
+                  .setBlockID(blockID.getDatanodeBlockIDProtobuf())
+                  .setOffset(0)
+                  .setLength(1024)
+                  .build())
+              .build();
+
+      final AtomicInteger responseCount = new AtomicInteger(0);
+
+      StreamObserver<ContainerCommandResponseProto> streamObserver =
+          new StreamObserver<ContainerCommandResponseProto>() {
+            @Override
+            public void onNext(ContainerCommandResponseProto response) {
+              assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+              responseCount.incrementAndGet();
+            }
+
+            @Override
+            public void onError(Throwable t) {
+              fail("ReadBlock failed", t);
+            }
+
+            @Override
+            public void onCompleted() {
+            }
+          };
+
+      blockFile = new RandomAccessFileChannel();
+      ContainerCommandResponseProto response = kvHandler.readBlock(
+          readBlockRequest, container, blockFile, streamObserver);
+
+      assertNull(response, "ReadBlock should return null on success");
+      assertTrue(responseCount.get() > 0, "Should receive at least one response");
+
+      MetricsRecordBuilder containerMetrics = getMetrics(
+          ContainerMetrics.STORAGE_CONTAINER_METRICS);
+      assertCounter("bytesReadBlock", 1024L, containerMetrics);
+    } finally {
+      if (blockFile != null) {
+        blockFile.close();
+      }
+      FileUtils.deleteDirectory(testDir.toFile());
+      ContainerMetrics.remove();
+    }
   }
 }

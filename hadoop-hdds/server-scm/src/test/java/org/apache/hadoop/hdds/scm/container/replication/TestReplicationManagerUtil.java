@@ -25,6 +25,7 @@ import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUt
 import static org.apache.hadoop.hdds.scm.container.replication.ReplicationTestUtil.createContainerReplica;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
@@ -97,6 +98,12 @@ public class TestReplicationManagerUtil {
             IN_MAINTENANCE, ContainerReplicaProto.State.CLOSED, 1);
     replicas.add(maintenance);
 
+    // dead maintenance node should neither be on the used list nor on the excluded list
+    ContainerReplica deadMaintenanceReplica = createContainerReplica(cid, 0,
+        IN_MAINTENANCE, ContainerReplicaProto.State.CLOSED, 1);
+    DatanodeDetails deadMaintenanceNode = deadMaintenanceReplica.getDatanodeDetails();
+    replicas.add(deadMaintenanceReplica);
+
     // Take one of the replicas and set it to be removed. It should be on the
     // excluded list rather than the used list.
     Set<ContainerReplica> toBeRemoved = new HashSet<>();
@@ -107,14 +114,17 @@ public class TestReplicationManagerUtil {
     DatanodeDetails pendingAdd = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails pendingDelete = MockDatanodeDetails.randomDatanodeDetails();
     List<ContainerReplicaOp> pending = new ArrayList<>();
-    pending.add(ContainerReplicaOp.create(
-        ContainerReplicaOp.PendingOpType.ADD, pendingAdd, 0));
-    pending.add(ContainerReplicaOp.create(
-        ContainerReplicaOp.PendingOpType.DELETE, pendingDelete, 0));
+    pending.add(new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.ADD, pendingAdd, 0, null, Long.MAX_VALUE, 0));
+    pending.add(new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.DELETE, pendingDelete, 0, null, Long.MAX_VALUE, 0));
 
     when(replicationManager.getNodeStatus(any())).thenAnswer(
         invocation -> {
           final DatanodeDetails dn = invocation.getArgument(0);
+          if (dn.equals(deadMaintenanceNode)) {
+            return NodeStatus.valueOf(dn.getPersistedOpState(), HddsProtos.NodeState.DEAD);
+          }
           for (ContainerReplica r : replicas) {
             if (r.getDatanodeDetails().equals(dn)) {
               return NodeStatus.valueOf(
@@ -137,6 +147,7 @@ public class TestReplicationManagerUtil {
         .contains(maintenance.getDatanodeDetails());
     assertThat(excludedAndUsedNodes.getUsedNodes())
         .contains(pendingAdd);
+    assertFalse(excludedAndUsedNodes.getUsedNodes().contains(deadMaintenanceNode));
 
     assertEquals(4, excludedAndUsedNodes.getExcludedNodes().size());
     assertThat(excludedAndUsedNodes.getExcludedNodes())
@@ -147,6 +158,7 @@ public class TestReplicationManagerUtil {
         .contains(remove.getDatanodeDetails());
     assertThat(excludedAndUsedNodes.getExcludedNodes())
         .contains(pendingDelete);
+    assertFalse(excludedAndUsedNodes.getExcludedNodes().contains(deadMaintenanceNode));
   }
 
   @Test
@@ -191,10 +203,10 @@ public class TestReplicationManagerUtil {
     DatanodeDetails pendingAdd = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails pendingDelete = MockDatanodeDetails.randomDatanodeDetails();
     List<ContainerReplicaOp> pending = new ArrayList<>();
-    pending.add(ContainerReplicaOp.create(
-        ContainerReplicaOp.PendingOpType.ADD, pendingAdd, 0));
-    pending.add(ContainerReplicaOp.create(
-        ContainerReplicaOp.PendingOpType.DELETE, pendingDelete, 0));
+    pending.add(new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.ADD, pendingAdd, 0, null, Long.MAX_VALUE, 0));
+    pending.add(new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.DELETE, pendingDelete, 0, null, Long.MAX_VALUE, 0));
 
     when(replicationManager.getNodeStatus(any())).thenAnswer(
         invocation -> {
@@ -274,10 +286,10 @@ public class TestReplicationManagerUtil {
     DatanodeDetails pendingAdd = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails pendingDelete = MockDatanodeDetails.randomDatanodeDetails();
     List<ContainerReplicaOp> pending = new ArrayList<>();
-    pending.add(ContainerReplicaOp.create(
-        ContainerReplicaOp.PendingOpType.ADD, pendingAdd, 0));
-    pending.add(ContainerReplicaOp.create(
-        ContainerReplicaOp.PendingOpType.DELETE, pendingDelete, 0));
+    pending.add(new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.ADD, pendingAdd, 0, null, Long.MAX_VALUE, 0));
+    pending.add(new ContainerReplicaOp(
+        ContainerReplicaOp.PendingOpType.DELETE, pendingDelete, 0, null, Long.MAX_VALUE, 0));
 
     // set up mocks such ContainerReplicaPendingOps returns the containerSizeScheduled map
     ReplicationManagerConfiguration rmConf = new ReplicationManagerConfiguration();
@@ -305,13 +317,13 @@ public class TestReplicationManagerUtil {
     when(replicationManager.getNodeManager()).thenReturn(nodeManagerMock);
     doReturn(fullDn).when(nodeManagerMock).getNode(fullDn.getID());
     doReturn(new SCMNodeMetric(50 * oneGb, 20 * oneGb, 30 * oneGb, 5 * oneGb,
-        20 * oneGb)).when(nodeManagerMock).getNodeStat(fullDn);
+        20 * oneGb, 0)).when(nodeManagerMock).getNodeStat(fullDn);
     doReturn(spaceAvailableDn).when(nodeManagerMock).getNode(spaceAvailableDn.getID());
     doReturn(new SCMNodeMetric(50 * oneGb, 10 * oneGb, 40 * oneGb, 5 * oneGb,
-        20 * oneGb)).when(nodeManagerMock).getNodeStat(spaceAvailableDn);
+        20 * oneGb, 0)).when(nodeManagerMock).getNodeStat(spaceAvailableDn);
     doReturn(expiredOpDn).when(nodeManagerMock).getNode(expiredOpDn.getID());
     doReturn(new SCMNodeMetric(50 * oneGb, 20 * oneGb, 30 * oneGb, 5 * oneGb,
-        20 * oneGb)).when(nodeManagerMock).getNodeStat(expiredOpDn);
+        20 * oneGb, 0)).when(nodeManagerMock).getNodeStat(expiredOpDn);
 
     when(replicationManager.getNodeStatus(any())).thenAnswer(
         invocation -> {

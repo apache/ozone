@@ -31,17 +31,19 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.Collection;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.sql.DataSource;
-import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.recon.ReconConfig;
+import org.apache.hadoop.hdds.recon.ReconConfigKeys;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
+import org.apache.hadoop.hdds.server.OzoneAdmins;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.recon.api.types.FeatureProvider;
@@ -86,6 +88,7 @@ public class ReconServer extends GenericCli implements Callable<Void> {
   private ReconStorageConfig reconStorage;
   private CertificateClient certClient;
   private ReconTaskStatusMetrics reconTaskStatusMetrics;
+  private OzoneAdmins reconAdmins;
 
   private volatile boolean isStarted = false;
 
@@ -105,18 +108,27 @@ public class ReconServer extends GenericCli implements Callable<Void> {
             ReconServer.class, originalArgs, LOG, configuration);
     ConfigurationProvider.setConfiguration(configuration);
 
-
-    injector = Guice.createInjector(new ReconControllerModule(),
-        new ReconRestServletModule(configuration),
-        new ReconSchemaGenerationModule());
-
-    //Pass on injector to listener that does the Guice - Jersey HK2 bridging.
-    ReconGuiceServletContextListener.setInjector(injector);
-
-    reconStorage = injector.getInstance(ReconStorageConfig.class);
+    try {
+      reconAdmins = createReconAdmins(configuration);
+    } catch (IOException e) {
+      LOG.error("Failed to identify current user for Recon admin initialization. " +
+          "Please check Kerberos configuration or system user settings.", e);
+      throw e;
+    }
+    LOG.info("Recon start with adminUsers: {}", reconAdmins.getAdminUsernames());
 
     LOG.info("Initializing Recon server...");
     try {
+      injector = Guice.createInjector(new ReconControllerModule(this),
+          new ReconRestServletModule(configuration),
+          new ReconSchemaGenerationModule());
+
+      //Pass on injector to listener that does the Guice - Jersey HK2 bridging.
+      ReconGuiceServletContextListener.setInjector(injector);
+
+      reconStorage = injector.getInstance(ReconStorageConfig.class);
+
+
       loginReconUserIfSecurityEnabled(configuration);
       try {
         if (reconStorage.getState() != INITIALIZED) {
@@ -177,6 +189,13 @@ public class ReconServer extends GenericCli implements Callable<Void> {
       layoutVersionManager.finalizeLayoutFeatures();
 
       LOG.info("Recon schema versioning completed.");
+
+      // Register ReconTaskStatusMetrics after schema upgrade completes
+      // This ensures the RECON_TASK_STATUS table has all required columns
+      if (reconTaskStatusMetrics != null) {
+        reconTaskStatusMetrics.register();
+        LOG.debug("ReconTaskStatusMetrics registered after schema upgrade");
+      }
 
       LOG.info("Recon server initialized successfully!");
     } catch (Exception e) {
@@ -274,9 +293,6 @@ public class ReconServer extends GenericCli implements Callable<Void> {
       isStarted = true;
       // Initialize metrics for Recon
       HddsServerUtil.initializeMetrics(configuration, "Recon");
-      if (reconTaskStatusMetrics != null) {
-        reconTaskStatusMetrics.register();
-      }
       if (httpServer != null) {
         httpServer.start();
       }
@@ -377,7 +393,7 @@ public class ReconServer extends GenericCli implements Callable<Void> {
           reconConfig.getKerberosPrincipal(),
           reconConfig.getKerberosKeytab());
       UserGroupInformation.setConfiguration(conf);
-      InetSocketAddress socAddr = HddsUtils.getReconAddresses(conf);
+      InetSocketAddress socAddr = HddsServerUtil.getReconAddressForDatanodes(conf);
       SecurityUtil.login(conf,
           OZONE_RECON_KERBEROS_KEYTAB_FILE_KEY,
           OZONE_RECON_KERBEROS_PRINCIPAL_KEY,
@@ -423,5 +439,37 @@ public class ReconServer extends GenericCli implements Callable<Void> {
   @VisibleForTesting
   ReconHttpServer getHttpServer() {
     return httpServer;
+  }
+
+  /**
+   * Creates OzoneAdmins for Recon with the starter user and configured admins.
+   *
+   * @param conf OzoneConfiguration
+   * @return OzoneAdmins instance
+   * @throws IOException if unable to get current user
+   */
+  private OzoneAdmins createReconAdmins(OzoneConfiguration conf) throws IOException {
+    String starterUser = UserGroupInformation.getCurrentUser().getShortUserName();
+    Collection<String> adminUsers =
+        OzoneAdmins.getOzoneAdminsFromConfig(conf, starterUser);
+    adminUsers.addAll(
+        conf.getStringCollection(ReconConfigKeys.OZONE_RECON_ADMINISTRATORS));
+
+    Collection<String> adminGroups =
+        OzoneAdmins.getOzoneAdminsGroupsFromConfig(conf);
+    adminGroups.addAll(
+        conf.getStringCollection(ReconConfigKeys.OZONE_RECON_ADMINISTRATORS_GROUPS));
+
+    return new OzoneAdmins(adminUsers, adminGroups);
+  }
+
+  /**
+   * Check if a user is a Recon administrator.
+   *
+   * @param user UserGroupInformation
+   * @return true if the user is an admin, false otherwise
+   */
+  public boolean isAdmin(UserGroupInformation user) {
+    return reconAdmins.isAdmin(user);
   }
 }

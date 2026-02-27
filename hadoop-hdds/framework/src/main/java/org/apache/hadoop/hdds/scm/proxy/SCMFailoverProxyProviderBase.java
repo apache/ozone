@@ -39,8 +39,8 @@ import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
-import org.apache.hadoop.ipc.ProtobufRpcEngine;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine;
+import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
@@ -191,6 +191,17 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
     }
     return scmProxies.values().stream()
         .map(proxyInfo -> proxyInfo.proxy).collect(Collectors.toList());
+  }
+
+  public synchronized T getProxyForNode(String nodeId) throws IOException {
+    ProxyInfo<T> proxyInfo = scmProxies.get(nodeId);
+    if (proxyInfo == null) {
+      if (!scmProxyInfoMap.containsKey(nodeId)) {
+        throw new IOException("Unknown SCM node ID: " + nodeId);
+      }
+      proxyInfo = createSCMProxy(nodeId);
+    }
+    return proxyInfo.proxy;
   }
 
   @Override

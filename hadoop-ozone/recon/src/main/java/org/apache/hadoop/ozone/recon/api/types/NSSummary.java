@@ -37,24 +37,27 @@ public class NSSummary {
   // for performance optimization, not just direct files in this directory
   private int numOfFiles;
   private long sizeOfFiles;
+  private long replicatedSizeOfFiles;
   private int[] fileSizeBucket;
   private Set<Long> childDir;
   private String dirName;
   private long parentId = 0;
 
   public NSSummary() {
-    this(0, 0L, new int[ReconConstants.NUM_OF_FILE_SIZE_BINS],
+    this(0, 0L, 0L, new int[ReconConstants.NUM_OF_FILE_SIZE_BINS],
         new HashSet<>(), "", 0);
   }
 
   public NSSummary(int numOfFiles,
                    long sizeOfFiles,
+                   long replicatedSizeOfFiles,
                    int[] bucket,
                    Set<Long> childDir,
                    String dirName,
                    long parentId) {
     this.numOfFiles = numOfFiles;
     this.sizeOfFiles = sizeOfFiles;
+    this.replicatedSizeOfFiles = replicatedSizeOfFiles;
     setFileSizeBucket(bucket);
     this.childDir = childDir;
     this.dirName = dirName;
@@ -73,6 +76,10 @@ public class NSSummary {
    */
   public long getSizeOfFiles() {
     return sizeOfFiles;
+  }
+
+  public long getReplicatedSizeOfFiles() {
+    return replicatedSizeOfFiles;
   }
 
   public int[] getFileSizeBucket() {
@@ -99,6 +106,10 @@ public class NSSummary {
    */
   public void setSizeOfFiles(long sizeOfFiles) {
     this.sizeOfFiles = sizeOfFiles;
+  }
+
+  public void setReplicatedSizeOfFiles(long replicatedSizeOfFiles) {
+    this.replicatedSizeOfFiles = replicatedSizeOfFiles;
   }
 
   public void setFileSizeBucket(int[] fileSizeBucket) {
@@ -142,6 +153,7 @@ public class NSSummary {
         ", childDir=" + childDir +
         ", numOfFiles=" + numOfFiles +
         ", sizeOfFiles=" + sizeOfFiles +
+        ", replicatedSizeOfFiles=" + replicatedSizeOfFiles +
         ", fileSizeBucket=" + Arrays.toString(fileSizeBucket) +
         '}';
   }

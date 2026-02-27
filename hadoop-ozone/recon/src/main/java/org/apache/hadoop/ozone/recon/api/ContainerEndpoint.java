@@ -285,7 +285,7 @@ public class ContainerEndpoint {
             keyMetadata.setVolume(omKeyInfo.getVolumeName());
             keyMetadata.setKey(omKeyInfo.getKeyName());
             keyMetadata.setCompletePath(ReconUtils.constructFullPath(omKeyInfo,
-                reconNamespaceSummaryManager, omMetadataManager));
+                reconNamespaceSummaryManager));
             keyMetadata.setCreationTime(
                 Instant.ofEpochMilli(omKeyInfo.getCreationTime()));
             keyMetadata.setModificationTime(
@@ -659,11 +659,11 @@ public class ContainerEndpoint {
           }
         }
 
-        List<Pipeline> pipelines = new ArrayList<>();
         nonOMContainers.forEach(containerInfo -> {
           ContainerDiscrepancyInfo containerDiscrepancyInfo = new ContainerDiscrepancyInfo();
           containerDiscrepancyInfo.setContainerID(containerInfo.getContainerID());
           containerDiscrepancyInfo.setNumberOfKeys(0);
+          List<Pipeline> pipelines = new ArrayList<>();
           PipelineID pipelineID = null;
           try {
             pipelineID = containerInfo.getPipelineID();

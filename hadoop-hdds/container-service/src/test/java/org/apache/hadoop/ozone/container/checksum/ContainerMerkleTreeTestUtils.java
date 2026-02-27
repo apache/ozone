@@ -29,6 +29,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
@@ -36,6 +37,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -43,6 +45,7 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.HddsDatanodeService;
+import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
@@ -75,6 +78,7 @@ public final class ContainerMerkleTreeTestUtils {
 
       assertEquals(expectedBlockTree.getBlockID(), actualBlockTree.getBlockID());
       assertEquals(expectedBlockTree.getDataChecksum(), actualBlockTree.getDataChecksum());
+      assertEquals(expectedBlockTree.getDeleted(), actualBlockTree.getDeleted());
 
       long prevChunkOffset = -1;
       for (int chunkIndex = 0; chunkIndex < expectedBlockTree.getChunkMerkleTreeCount(); chunkIndex++) {
@@ -148,14 +152,34 @@ public final class ContainerMerkleTreeTestUtils {
 
   public static ContainerMerkleTreeWriter buildTestTree(ConfigurationSource conf, int numBlocks) {
     ContainerMerkleTreeWriter tree = new ContainerMerkleTreeWriter();
+
     byte byteValue = 1;
-    for (int blockIndex = 1; blockIndex <= numBlocks; blockIndex++) {
+    for (int i = 0; i < numBlocks; i++) {
+      long blockID = i + 1;
       for (int chunkIndex = 0; chunkIndex < 4; chunkIndex++) {
-        tree.addChunks(blockIndex, true,
+        tree.addChunks(blockID, true,
             buildChunk(conf, chunkIndex, ByteBuffer.wrap(new byte[]{byteValue++, byteValue++, byteValue++})));
       }
     }
     return tree;
+  }
+
+  /**
+   * Builds a tree with continuous block IDs from 1 to numLiveBlocks, then writes marks the specified IDs within that
+   * set of blocks as deleted.
+   */
+  public static ContainerProtos.ContainerMerkleTree buildTestTree(ConfigurationSource conf, int numLiveBlocks,
+                                                        long... deletedBlockIDs) {
+
+    ContainerMerkleTreeWriter treeWriter = buildTestTree(conf, numLiveBlocks);
+    return treeWriter.addDeletedBlocks(getDeletedBlockData(conf, deletedBlockIDs), true);
+  }
+
+  public static List<BlockData> getDeletedBlockData(ConfigurationSource conf, long... blockIDs) {
+    List<BlockData> deletedBlockData = new ArrayList<>();
+    // Container ID within the block is not used in these tests.
+    Arrays.stream(blockIDs).forEach(id -> deletedBlockData.add(buildBlockData(conf, 1, id)));
+    return deletedBlockData;
   }
 
   /**
@@ -173,6 +197,25 @@ public final class ContainerMerkleTreeTestUtils {
     introduceCorruptChunks(treeBuilder, numCorruptChunks, diff);
     ContainerProtos.ContainerMerkleTree build = treeBuilder.build();
     return Pair.of(build, diff);
+  }
+
+  /**
+   * Writes a ContainerMerkleTree proto directly into a container without using a ContainerMerkleTreeWriter.
+   */
+  public static void updateTreeProto(ContainerData data, ContainerProtos.ContainerMerkleTree tree)
+      throws IOException {
+    ContainerProtos.ContainerChecksumInfo checksumInfo = ContainerProtos.ContainerChecksumInfo.newBuilder()
+        .setContainerID(data.getContainerID())
+        .setContainerMerkleTree(tree).build();
+    File checksumFile = getContainerChecksumFile(data);
+
+    try (OutputStream outputStream = Files.newOutputStream(checksumFile.toPath())) {
+      checksumInfo.writeTo(outputStream);
+    } catch (IOException ex) {
+      throw new IOException("Error occurred when writing container merkle tree for containerID "
+          + data.getContainerID(), ex);
+    }
+    data.setDataChecksum(checksumInfo.getContainerMerkleTree().getDataChecksum());
   }
 
   /**
@@ -336,22 +379,6 @@ public final class ContainerMerkleTreeTestUtils {
     return getContainerChecksumFile(container.getContainerData()).exists();
   }
 
-  public static void writeContainerDataTreeProto(ContainerData data, ContainerProtos.ContainerMerkleTree tree)
-      throws IOException {
-    ContainerProtos.ContainerChecksumInfo checksumInfo = ContainerProtos.ContainerChecksumInfo.newBuilder()
-        .setContainerID(data.getContainerID())
-        .setContainerMerkleTree(tree).build();
-    File checksumFile = getContainerChecksumFile(data);
-
-    try (OutputStream outputStream = Files.newOutputStream(checksumFile.toPath())) {
-      checksumInfo.writeTo(outputStream);
-    } catch (IOException ex) {
-      throw new IOException("Error occurred when writing container merkle tree for containerID "
-          + data.getContainerID(), ex);
-    }
-    data.setDataChecksum(checksumInfo.getContainerMerkleTree().getDataChecksum());
-  }
-
   /**
    * This function verifies that the in-memory data checksum matches the one stored in the container data and
    * the RocksDB.
@@ -384,5 +411,14 @@ public final class ContainerMerkleTreeTestUtils {
           "the one in the checksum file.");
       assertEquals(dbDataChecksum, dataChecksum);
     }
+  }
+
+  public static BlockData buildBlockData(ConfigurationSource config, long containerID, long blockID) {
+    BlockData blockData = new BlockData(new BlockID(containerID, blockID));
+    byte byteValue = 0;
+    blockData.addChunk(buildChunk(config, 0, ByteBuffer.wrap(new byte[]{byteValue++, byteValue++, byteValue++})));
+    blockData.addChunk(buildChunk(config, 1, ByteBuffer.wrap(new byte[]{byteValue++, byteValue++, byteValue++})));
+    blockData.addChunk(buildChunk(config, 2, ByteBuffer.wrap(new byte[]{byteValue++, byteValue++, byteValue++})));
+    return blockData;
   }
 }

@@ -16,15 +16,11 @@
  * limitations under the License.
  */
 
-import React, { useState } from 'react';
-import axios, {
-  CanceledError,
-  AxiosError
-} from 'axios';
+import React, { useState, useEffect } from 'react';
 import { Row, Col, Card, Result } from 'antd';
 
 import { showDataFetchError } from '@/utils/common';
-import { PromiseAllSettledGetHelper } from '@/utils/axiosRequestHelper';
+import { useApiData } from '@/v2/hooks/useAPIData.hook';
 
 import { Option } from '@/v2/components/select/multiSelect';
 import FileSizeDistribution from '@/v2/components/plots/insightsFilePlot';
@@ -38,7 +34,6 @@ import {
 
 const Insights: React.FC<{}> = () => {
 
-  const [loading, setLoading] = useState<boolean>(false);
   const [state, setState] = useState<InsightsState>({
     volumeBucketMap: new Map<string, Set<string>>(),
     volumeOptions: [],
@@ -58,95 +53,88 @@ const Insights: React.FC<{}> = () => {
     }]
   });
 
-  const cancelInsightSignal = React.useRef<AbortController>();
+  // Individual API calls
+  const fileCountAPI = useApiData<FileCountResponse[]>(
+    '/api/v1/utilization/fileCount',
+    [],
+    {
+      onError: (error) => showDataFetchError(error)
+    }
+  );
 
-  function loadData() {
-    setLoading(true);
-    const { requests, controller } = PromiseAllSettledGetHelper([
-      '/api/v1/utilization/fileCount',
-      '/api/v1/utilization/containerCount'
-    ], cancelInsightSignal.current);
+  const containerCountAPI = useApiData<any[]>(
+    '/api/v1/utilization/containerCount',
+    [],
+    {
+      onError: (error) => showDataFetchError(error)
+    }
+  );
 
-    cancelInsightSignal.current = controller;
-    requests.then(axios.spread((
-      fileCountResponse: Awaited<Promise<any>>,
-      containerCountResponse: Awaited<Promise<any>>
-    ) => {
-      let fileAPIError;
-      let containerAPIError;
-      let responseError = [
-        fileCountResponse,
-        containerCountResponse
-      ].filter((resp) => resp.status === 'rejected');
+  const loading = fileCountAPI.loading || containerCountAPI.loading;
 
-      if (responseError.length !== 0) {
-        responseError.forEach((err) => {
-          if (err.reason.toString().includes('CancelledError')) {
-            throw new CanceledError('canceled', 'ERR_CANCELED');
-          } else {
-            if (err.reason.config.url.includes("fileCount")) {
-              fileAPIError = err.reason.toString();
+  // Process the API responses when they're available
+  useEffect(() => {
+    if (!fileCountAPI.loading && !containerCountAPI.loading) {
+      
+      // Extract errors
+      const fileAPIError = fileCountAPI.error;
+      const containerAPIError = containerCountAPI.error;
+
+      // Process fileCount response only if successful
+      let volumeBucketMap = new Map<string, Set<string>>();
+      let volumeOptions: Option[] = [];
+      
+      if (fileCountAPI.data && fileCountAPI.data.length > 0) {
+        // Construct volume -> bucket[] map for populating filters
+        volumeBucketMap = fileCountAPI.data.reduce(
+          (map: Map<string, Set<string>>, current: FileCountResponse) => {
+            const volume = current.volume;
+            const bucket = current.bucket;
+            if (map.has(volume)) {
+              const buckets = Array.from(map.get(volume)!);
+              map.set(volume, new Set<string>([...buckets, bucket]));
             } else {
-              containerAPIError = err.reason.toString();
+              map.set(volume, new Set<string>().add(bucket));
             }
-          }
-        });
+            return map;
+          },
+          new Map<string, Set<string>>()
+        );
+        volumeOptions = Array.from(volumeBucketMap.keys()).map(k => ({
+          label: k,
+          value: k
+        }));
       }
-
-      // Construct volume -> bucket[] map for populating filters
-      // Ex: vol1 -> [bucket1, bucket2], vol2 -> [bucket1]
-      const volumeBucketMap: Map<string, Set<string>> = fileCountResponse.value?.data?.reduce(
-        (map: Map<string, Set<string>>, current: FileCountResponse) => {
-          const volume = current.volume;
-          const bucket = current.bucket;
-          if (map.has(volume)) {
-            const buckets = Array.from(map.get(volume)!);
-            map.set(volume, new Set<string>([...buckets, bucket]));
-          } else {
-            map.set(volume, new Set<string>().add(bucket));
-          }
-          return map;
-        },
-        new Map<string, Set<string>>()
-      );
-      const volumeOptions: Option[] = Array.from(volumeBucketMap.keys()).map(k => ({
-        label: k,
-        value: k
-      }));
 
       setState({
         ...state,
-        volumeBucketMap: volumeBucketMap,
-        volumeOptions: volumeOptions,
-        fileCountError: fileAPIError,
-        containerSizeError: containerAPIError
+        volumeBucketMap,
+        volumeOptions,
+        fileCountError: fileAPIError || undefined,
+        containerSizeError: containerAPIError || undefined
       });
+      
       setPlotResponse({
-        fileCountResponse: fileCountResponse.value?.data ?? [{
+        fileCountResponse: fileCountAPI.data || [{
           volume: '',
           bucket: '',
           fileSize: 0,
           count: 0
         }],
-        containerCountResponse: containerCountResponse.value?.data ?? [{
+        containerCountResponse: containerCountAPI.data || [{
           containerSize: 0,
           count: 0
         }]
       });
-      setLoading(false);
-    })).catch(error => {
-      setLoading(false);
-      showDataFetchError((error as AxiosError).toString());
-    })
-  }
-
-  React.useEffect(() => {
-    loadData();
-
-    return (() => {
-      cancelInsightSignal.current && cancelInsightSignal.current.abort();
-    })
-  }, []);
+    }
+  }, [
+    fileCountAPI.loading,
+    containerCountAPI.loading,
+    fileCountAPI.data,
+    containerCountAPI.data,
+    fileCountAPI.error,
+    containerCountAPI.error
+  ]);  
 
   return (
     <>

@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.recon;
 
+import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
+import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_ITERATE_BATCH_SIZE;
@@ -29,6 +31,7 @@ import static org.mockito.Mockito.mock;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -40,6 +43,9 @@ import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -53,18 +59,22 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
+import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.recon.api.OMDBInsightEndpoint;
+import org.apache.hadoop.ozone.recon.api.ReconGlobalMetricsService;
 import org.apache.hadoop.ozone.recon.api.types.KeyInsightInfoResponse;
 import org.apache.hadoop.ozone.recon.api.types.NSSummary;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
-import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,40 +88,41 @@ public class TestReconInsightsForDeletedDirectories {
       LoggerFactory.getLogger(TestReconInsightsForDeletedDirectories.class);
 
   private static MiniOzoneCluster cluster;
-  private static FileSystem fs;
+  private FileSystem fs;
   private static OzoneClient client;
   private static ReconService recon;
+  private static OzoneConfiguration conf;
 
   @BeforeAll
   public static void init() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
+    conf = new OzoneConfiguration();
     conf.setInt(OZONE_DIR_DELETING_SERVICE_INTERVAL, 1000000);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 10000000,
         TimeUnit.MILLISECONDS);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     recon = new ReconService(conf);
     cluster = MiniOzoneCluster.newBuilder(conf)
-        .setNumDatanodes(3)
+        .setNumDatanodes(5)
         .addService(recon)
         .build();
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
 
-    // create a volume and a bucket to be used by OzoneFileSystem
-    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client,
-        BucketLayout.FILE_SYSTEM_OPTIMIZED);
-    String volumeName = bucket.getVolumeName();
-    String bucketName = bucket.getName();
-
-    String rootPath = String.format("%s://%s.%s/",
-        OzoneConsts.OZONE_URI_SCHEME, bucketName, volumeName);
-
-    // Set the fs.defaultFS and start the filesystem
-    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
     // Set the number of keys to be processed during batch operate.
     conf.setInt(OZONE_FS_ITERATE_BATCH_SIZE, 5);
+  }
 
-    fs = FileSystem.get(conf);
+  /**
+   * Provides a list of replication configurations (RATIS and EC)
+   * to be used for parameterized tests.
+   *
+   * @return List of replication configurations as Arguments.
+   */
+  static List<Arguments> replicationConfigs() {
+    return Arrays.asList(
+        Arguments.of(ReplicationConfig.fromTypeAndFactor(RATIS, THREE)),
+        Arguments.of(new ECReplicationConfig("RS-3-2-1024k"))
+    );
   }
 
   @AfterAll
@@ -120,7 +131,6 @@ public class TestReconInsightsForDeletedDirectories {
     if (cluster != null) {
       cluster.shutdown();
     }
-    IOUtils.closeQuietly(fs);
   }
 
   @AfterEach
@@ -132,6 +142,8 @@ public class TestReconInsightsForDeletedDirectories {
         fs.delete(fileStatus.getPath(), true);
       }
     });
+
+    IOUtils.closeQuietly(fs);
   }
 
   /**
@@ -143,9 +155,16 @@ public class TestReconInsightsForDeletedDirectories {
    *      ├── ...
    *      └── file10
    */
-  @Test
-  public void testGetDeletedDirectoryInfo()
+  @ParameterizedTest
+  @MethodSource("replicationConfigs")
+  public void testGetDeletedDirectoryInfo(ReplicationConfig replicationConfig)
       throws Exception {
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        new DefaultReplicationConfig(replicationConfig));
+    String rootPath = String.format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucket.getName(),
+        bucket.getVolumeName());
+    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+    fs = FileSystem.get(conf);
 
     // Create a directory structure with 10 files in dir1.
     Path dir1 = new Path("/dir1");
@@ -209,6 +228,7 @@ public class TestReconInsightsForDeletedDirectories {
       // Assert that the directory dir1 has 10 sub-files and size of 1000 bytes.
       assertEquals(10, summary.getNumOfFiles());
       assertEquals(10, summary.getSizeOfFiles());
+      assertEquals(QuotaUtil.getReplicatedSize(10, replicationConfig), summary.getReplicatedSizeOfFiles());
     }
 
     // Delete the entire directory dir1.
@@ -226,9 +246,14 @@ public class TestReconInsightsForDeletedDirectories {
         (ReconNamespaceSummaryManagerImpl) recon.getReconServer()
             .getReconNamespaceSummaryManager();
 
+    ReconGlobalMetricsService reconGlobalMetricsService =
+        new ReconGlobalMetricsService(mock(ReconGlobalStatsManager.class),
+            reconOmMetadataManagerInstance, reconNamespaceSummaryManager);
+
     OMDBInsightEndpoint omdbInsightEndpoint =
         new OMDBInsightEndpoint(reconSCM, reconOmMetadataManagerInstance,
-            mock(GlobalStatsDao.class), reconNamespaceSummaryManager);
+            mock(ReconGlobalStatsManager.class),
+            reconNamespaceSummaryManager, reconGlobalMetricsService);
 
     // Fetch the deleted directory info from Recon OmDbInsightEndpoint.
     Response deletedDirInfo = omdbInsightEndpoint.getDeletedDirInfo(-1, "");
@@ -236,6 +261,7 @@ public class TestReconInsightsForDeletedDirectories {
         (KeyInsightInfoResponse) deletedDirInfo.getEntity();
     // Assert the size of deleted directory is 10.
     assertEquals(10, entity.getUnreplicatedDataSize());
+    assertEquals(QuotaUtil.getReplicatedSize(10, replicationConfig), entity.getReplicatedDataSize());
 
     // Cleanup the tables.
     cleanupTables();
@@ -253,9 +279,16 @@ public class TestReconInsightsForDeletedDirectories {
    *      │   │   └── file3
    *
    */
-  @Test
-  public void testGetDeletedDirectoryInfoForNestedDirectories()
+  @ParameterizedTest
+  @MethodSource("replicationConfigs")
+  public void testGetDeletedDirectoryInfoForNestedDirectories(ReplicationConfig replicationConfig)
       throws Exception {
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        new DefaultReplicationConfig(replicationConfig));
+    String rootPath = String.format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucket.getName(),
+        bucket.getVolumeName());
+    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+    fs = FileSystem.get(conf);
 
     // Create a directory structure with 10 files and 3 nested directories.
     Path path = new Path("/dir1/dir2/dir3");
@@ -302,13 +335,19 @@ public class TestReconInsightsForDeletedDirectories {
     // Create an Instance of OMDBInsightEndpoint.
     OzoneStorageContainerManager reconSCM =
         recon.getReconServer().getReconStorageContainerManager();
+
     ReconNamespaceSummaryManagerImpl namespaceSummaryManager =
         (ReconNamespaceSummaryManagerImpl) recon.getReconServer()
             .getReconNamespaceSummaryManager();
 
+    ReconGlobalMetricsService reconGlobalMetricsService =
+        new ReconGlobalMetricsService(mock(ReconGlobalStatsManager.class),
+            reconOmMetadataManagerInstance, namespaceSummaryManager);
+
     OMDBInsightEndpoint omdbInsightEndpoint =
         new OMDBInsightEndpoint(reconSCM, reconOmMetadataManagerInstance,
-            mock(GlobalStatsDao.class), namespaceSummaryManager);
+            mock(ReconGlobalStatsManager.class), namespaceSummaryManager,
+            reconGlobalMetricsService);
 
     // Delete the entire root directory dir1.
     fs.delete(new Path("/dir1/dir2/dir3"), true);
@@ -325,6 +364,7 @@ public class TestReconInsightsForDeletedDirectories {
         (KeyInsightInfoResponse) deletedDirInfo.getEntity();
     // Assert the size of deleted directory is 3.
     assertEquals(3, entity.getUnreplicatedDataSize());
+    assertEquals(QuotaUtil.getReplicatedSize(3, replicationConfig), entity.getReplicatedDataSize());
 
     // Cleanup the tables.
     cleanupTables();
@@ -351,9 +391,18 @@ public class TestReconInsightsForDeletedDirectories {
    *        ├── ...
    *        └── file10
    */
-  @Test
-  public void testGetDeletedDirectoryInfoWithMultipleSubdirectories()
+  @ParameterizedTest
+  @MethodSource("replicationConfigs")
+  public void testGetDeletedDirectoryInfoWithMultipleSubdirectories(ReplicationConfig replicationConfig)
       throws Exception {
+    OzoneBucket bucket = TestDataUtil.createVolumeAndBucket(client, BucketLayout.FILE_SYSTEM_OPTIMIZED,
+        new DefaultReplicationConfig(replicationConfig));
+    String rootPath = String.format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucket.getName(),
+        bucket.getVolumeName());
+    // Set the fs.defaultFS and start the filesystem
+    conf.set(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY, rootPath);
+    fs = FileSystem.get(conf);
+
     int numSubdirectories = 10;
     int filesPerSubdirectory = 10;
 
@@ -379,14 +428,21 @@ public class TestReconInsightsForDeletedDirectories {
     ReconOMMetadataManager reconOmMetadataManagerInstance =
         (ReconOMMetadataManager) recon.getReconServer()
             .getOzoneManagerServiceProvider().getOMMetadataManagerInstance();
+
+    ReconGlobalMetricsService reconGlobalMetricsService =
+        new ReconGlobalMetricsService(mock(ReconGlobalStatsManager.class),
+            reconOmMetadataManagerInstance, namespaceSummaryManager);
+
     OMDBInsightEndpoint omdbInsightEndpoint =
         new OMDBInsightEndpoint(reconSCM, reconOmMetadataManagerInstance,
-            mock(GlobalStatsDao.class), namespaceSummaryManager);
+            mock(ReconGlobalStatsManager.class), namespaceSummaryManager,
+            reconGlobalMetricsService);
     Response deletedDirInfo = omdbInsightEndpoint.getDeletedDirInfo(-1, "");
     KeyInsightInfoResponse entity =
         (KeyInsightInfoResponse) deletedDirInfo.getEntity();
     // Assert the size of deleted directory is 100.
     assertEquals(100, entity.getUnreplicatedDataSize());
+    assertEquals(QuotaUtil.getReplicatedSize(100, replicationConfig), entity.getReplicatedDataSize());
 
     // Cleanup the tables.
     cleanupTables();

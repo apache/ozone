@@ -21,6 +21,10 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Res
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.createDbInstancesForTestIfNeeded;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.google.common.base.Preconditions;
 import java.io.File;
@@ -30,9 +34,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentSkipListSet;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -110,6 +116,25 @@ public class TestOzoneContainer {
     }
   }
 
+  /**
+   * Create a mock {@link HddsVolume} to track container IDs.
+   */
+  private HddsVolume mockHddsVolume(String storageId) {
+    HddsVolume volume = mock(HddsVolume.class);
+    when(volume.getStorageID()).thenReturn(storageId);
+
+    ConcurrentSkipListSet<Long> containerIds = new ConcurrentSkipListSet<>();
+
+    doAnswer(inv -> {
+      Long containerId = inv.getArgument(0);
+      containerIds.add(containerId);
+      return null;
+    }).when(volume).addContainer(any(Long.class));
+
+    when(volume.getContainerIterator()).thenAnswer(inv -> containerIds.iterator());
+    return volume;
+  }
+
   @ContainerTestVersionInfo.ContainerTest
   public void testBuildContainerMap(ContainerTestVersionInfo versionInfo)
       throws Exception {
@@ -117,9 +142,14 @@ public class TestOzoneContainer {
     // Format the volumes
     List<HddsVolume> volumes =
         StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList());
+    
+    // Create mock volumes with tracking, mapped by storage ID
+    Map<String, HddsVolume> mockVolumeMap = new HashMap<>();
     for (HddsVolume volume : volumes) {
       volume.format(clusterId);
       commitSpaceMap.put(getVolumeKey(volume), Long.valueOf(0));
+      // Create mock for each real volume
+      mockVolumeMap.put(volume.getStorageID(), mockHddsVolume(volume.getStorageID()));
     }
     List<KeyValueContainerData> containerDatas = new ArrayList<>();
     // Add containers to disk
@@ -140,6 +170,12 @@ public class TestOzoneContainer {
           keyValueContainerData, conf);
       keyValueContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
       myVolume = keyValueContainer.getContainerData().getVolume();
+      
+      // Track container in mock volume
+      HddsVolume mockVolume = mockVolumeMap.get(myVolume.getStorageID());
+      if (mockVolume != null) {
+        mockVolume.addContainer(i);
+      }
 
       freeBytes = addBlocks(keyValueContainer, 2, 3, 65536);
 
@@ -158,7 +194,13 @@ public class TestOzoneContainer {
     assertEquals(numTestContainers, containerset.containerCount());
     verifyCommittedSpace(ozoneContainer);
     // container usage here, nrOfContainer * blocks * chunksPerBlock * datalen
-    assertEquals(10 * 2 * 3 * 65536, ozoneContainer.gatherContainerUsages(volumes.get(0)));
+    // Use mock volumes to verify container usage
+    long totalUsage = 0;
+    for (HddsVolume volume : volumes) {
+      HddsVolume mockVolume = mockVolumeMap.get(volume.getStorageID());
+      totalUsage += ozoneContainer.gatherContainerUsages(mockVolume);
+    }
+    assertEquals(10 * 2 * 3 * 65536, totalUsage);
     Set<Long> missingContainers = new HashSet<>();
     for (int i = 0; i < numTestContainers; i++) {
       if (i % 2 == 0) {

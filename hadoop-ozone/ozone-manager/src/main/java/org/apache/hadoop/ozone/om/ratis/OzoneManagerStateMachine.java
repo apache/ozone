@@ -26,7 +26,9 @@ import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
@@ -34,6 +36,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.utils.NettyMetrics;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.AuditLoggerType;
+import org.apache.hadoop.ozone.audit.OMSystemAction;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
@@ -85,6 +90,10 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneManagerStateMachine.class);
+  private static final AuditLogger AUDIT = new AuditLogger(AuditLoggerType.OMSYSTEMLOGGER);
+  private static final String AUDIT_PARAM_PREVIOUS_LEADER = "previousLeader";
+  private static final String AUDIT_PARAM_NEW_LEADER = "newLeader";
+  private RaftPeerId previousLeaderId = null;
   private final SimpleStateMachineStorage storage =
       new SimpleStateMachineStorage();
   private final OzoneManager ozoneManager;
@@ -169,8 +178,20 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
       // warmup cache
       ozoneManager.initializeEdekCache(ozoneManager.getConfiguration());
     }
+    // Store the previous leader before updating
+    RaftPeerId actualPreviousLeader = previousLeaderId;
+
+    // Update the previous leader for next time
+    previousLeaderId = newLeaderId;
     // Initialize OMHAMetrics
     ozoneManager.omHAMetricsInit(newLeaderId.toString());
+
+    Map<String, String> auditParams = new LinkedHashMap<>();
+    auditParams.put(AUDIT_PARAM_PREVIOUS_LEADER,
+        actualPreviousLeader != null ? String.valueOf(actualPreviousLeader) : "NONE");
+    auditParams.put(AUDIT_PARAM_NEW_LEADER, String.valueOf(newLeaderId));
+    AUDIT.logWriteSuccess(ozoneManager.buildAuditMessageForSuccess(OMSystemAction.LEADER_CHANGE, auditParams));
+
     LOG.info("{}: leader changed to {}", groupMemberId, newLeaderId);
   }
 

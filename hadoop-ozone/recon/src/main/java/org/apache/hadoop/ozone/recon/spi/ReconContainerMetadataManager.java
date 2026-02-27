@@ -50,16 +50,6 @@ public interface ReconContainerMetadataManager {
       throws IOException;
 
   /**
-   * Store the container to Key prefix mapping into the Recon Container DB.
-   *
-   * @param containerKeyPrefix the containerId, key-prefix tuple.
-   * @param count              Count of Keys with that prefix.
-   */
-  @Deprecated
-  void storeContainerKeyMapping(ContainerKeyPrefix containerKeyPrefix,
-                                Integer count) throws IOException;
-
-  /**
    * Returns staged DB container metadata manager.
    *
    * @param stagedReconDbStore staged Recon DB store
@@ -84,16 +74,6 @@ public interface ReconContainerMetadataManager {
   void batchStoreContainerKeyMapping(BatchOperation batch,
                                      ContainerKeyPrefix containerKeyPrefix,
                                      Integer count) throws IOException;
-
-  /**
-   * Store the containerID -&gt; no. of keys count into the container DB store.
-   *
-   * @param containerID the containerID.
-   * @param count count of the keys within the given containerID.
-   * @throws IOException
-   */
-  @Deprecated
-  void storeContainerKeyCount(Long containerID, Long count) throws IOException;
 
   /**
    * Store the containerID -&gt; no. of keys count into a batch.

@@ -312,6 +312,51 @@ public class TestListInfoSubcommand {
         "Exception message should contain '" + expectedErrorMessagePart + "' but was: " + thrown.getMessage());
   }
 
+  @Test
+  public void testVolumeCounters() throws Exception {
+    ScmClient scmClient = mock(ScmClient.class);
+    List<HddsProtos.Node> nodes = getNodeDetails();
+
+    // Create nodes with volume counts
+    List<HddsProtos.Node> nodesWithVolumeCounts = new ArrayList<>();
+    for (int i = 0; i < nodes.size(); i++) {
+      HddsProtos.Node originalNode = nodes.get(i);
+      HddsProtos.Node nodeWithVolumes = HddsProtos.Node.newBuilder(originalNode)
+          .setTotalVolumeCount(10 + i)
+          .setHealthyVolumeCount(8 + i)
+          .build();
+      nodesWithVolumeCounts.add(nodeWithVolumes);
+    }
+
+    when(scmClient.queryNode(any(), any(), any(), any())).thenReturn(nodesWithVolumeCounts);
+    when(scmClient.listPipelines()).thenReturn(new ArrayList<>());
+
+    // ----- JSON output test -----
+    CommandLine c = new CommandLine(cmd);
+    c.parseArgs("--json");
+    cmd.execute(scmClient);
+    JsonNode root = mapper.readTree(outContent.toString(DEFAULT_ENCODING));
+    
+    assertTrue(root.isArray(), "JSON output should be an array");
+    assertEquals(4, root.size(), "Expected 4 nodes in JSON output");
+
+    for (JsonNode node : root) {
+      assertTrue(node.has("totalVolumeCount"), "JSON should include totalVolumeCount field");
+      assertTrue(node.has("healthyVolumeCount"), "JSON should include healthyVolumeCount field");
+    }
+
+    outContent.reset();
+    
+    // ----- Text output test -----
+    c = new CommandLine(cmd);
+    c.parseArgs();
+    cmd.execute(scmClient);
+    String output = outContent.toString(DEFAULT_ENCODING);
+    
+    assertTrue(output.contains("Total volume count:"), "Should display total volume count");
+    assertTrue(output.contains("Healthy volume count:"), "Should display healthy volume count");
+  }
+
   private void validateOrdering(JsonNode root, String orderDirection) {
     for (int i = 0; i < root.size() - 1; i++) {
       long usedCurrent = root.get(i).get("used").asLong();

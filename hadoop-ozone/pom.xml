@@ -17,15 +17,17 @@
   <parent>
     <groupId>org.apache.ozone</groupId>
     <artifactId>ozone-main</artifactId>
-    <version>2.1.0-SNAPSHOT</version>
+    <version>2.2.0-SNAPSHOT</version>
   </parent>
   <artifactId>ozone</artifactId>
-  <version>2.1.0-SNAPSHOT</version>
+  <version>2.2.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <name>Apache Ozone</name>
   <description>Apache Ozone Project</description>
   <modules>
     <module>cli-admin</module>
+    <module>cli-debug</module>
+    <module>cli-repair</module>
     <module>cli-shell</module>
     <module>client</module>
     <module>common</module>
@@ -42,6 +44,7 @@
     <module>interface-client</module>
     <module>interface-storage</module>
     <module>mini-cluster</module>
+    <module>multitenancy-ranger</module>
     <module>ozone-manager</module>
     <module>ozonefs</module>
     <module>ozonefs-common</module>
@@ -103,12 +106,6 @@
 
   <profiles>
     <profile>
-      <id>docker-build</id>
-      <properties>
-        <docker.image>${user.name}/ozone:${project.version}</docker.image>
-      </properties>
-    </profile>
-    <profile>
       <id>build-with-ozonefs</id>
       <activation>
         <property>
@@ -118,7 +115,6 @@
       <modules>
         <module>ozonefs-hadoop2</module>
         <module>ozonefs-hadoop3</module>
-        <module>ozonefs-hadoop3-client</module>
         <module>ozonefs-shaded</module>
       </modules>
     </profile>

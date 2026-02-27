@@ -47,6 +47,8 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconFileMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTask.RebuildState;
@@ -107,11 +109,14 @@ public class TestNSSummaryTaskControllerIntegration {
     when(mockTaskStatusUpdaterManager.getTaskStatusUpdater(any())).thenReturn(mockTaskStatusUpdater);
 
     ReconContainerMetadataManager reconContainerMgr = mock(ReconContainerMetadataManager.class);
+    ReconGlobalStatsManager reconGlobalStatsManager = mock(ReconGlobalStatsManager.class);
+    ReconFileMetadataManager reconFileMetadataManager = mock(ReconFileMetadataManager.class);
     ReconDBProvider reconDbProvider = mock(ReconDBProvider.class);
     when(reconDbProvider.getDbStore()).thenReturn(mock(DBStore.class));
     when(reconDbProvider.getStagedReconDBProvider()).thenReturn(reconDbProvider);
     taskController = new ReconTaskControllerImpl(ozoneConfiguration, java.util.Collections.emptySet(),
-        mockTaskStatusUpdaterManager, reconDbProvider, reconContainerMgr, mockNamespaceSummaryManager);
+        mockTaskStatusUpdaterManager, reconDbProvider, reconContainerMgr, mockNamespaceSummaryManager,
+        reconGlobalStatsManager, reconFileMetadataManager);
     taskController.start(); // Initialize the executor service
     taskController.registerTask(nsSummaryTask);
     taskController.registerTask(mockOtherTask);

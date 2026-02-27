@@ -30,7 +30,6 @@ import java.io.IOException;
 import java.time.ZonedDateTime;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -45,6 +44,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMHeartbeatResponseProto;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
+import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.ozone.container.common.helpers.DeletedContainerBlocksSummary;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine;
 import org.apache.hadoop.ozone.container.common.statemachine.EndpointStateMachine.EndPointStates;
@@ -61,6 +61,7 @@ import org.apache.hadoop.ozone.protocol.commands.RefreshVolumeUsageCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 import org.apache.hadoop.ozone.protocol.commands.SetNodeOperationalStateCommand;
+import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -242,14 +243,16 @@ public class HeartbeatEndpointTask
    */
   private void addQueuedCommandCounts(
       SCMHeartbeatRequestProto.Builder requestBuilder) {
-    Map<SCMCommandProto.Type, Integer> commandCount =
+    EnumCounters<SCMCommandProto.Type> commandCount =
         context.getParent().getQueuedCommandCount();
     CommandQueueReportProto.Builder reportProto =
         CommandQueueReportProto.newBuilder();
-    for (Map.Entry<SCMCommandProto.Type, Integer> entry
-        : commandCount.entrySet()) {
-      reportProto.addCommand(entry.getKey())
-          .addCount(entry.getValue());
+    for (SCMCommandProto.Type type : SCMCommandProto.Type.values()) {
+      long count = commandCount.get(type);
+      if (count > 0) {
+        reportProto.addCommand(type)
+            .addCount((int) count);
+      }
     }
     requestBuilder.setCommandQueueReport(reportProto.build());
   }
@@ -423,6 +426,8 @@ public class HeartbeatEndpointTask
             + " Interrupt HEARTBEAT and transit to GETVERSION state.");
       }
       rpcEndpoint.setState(EndPointStates.GETVERSION);
+      // trigger immediate GETVERSION
+      context.getParent().setNextHB(Time.monotonicNow());
     } else {
       if (LOG.isDebugEnabled()) {
         LOG.debug("Illegal state {} found, expecting {}.",

@@ -106,9 +106,6 @@ public class TestOmMetrics {
   private final OMException exception =
       new OMException("dummyException", OMException.ResultCodes.TIMEOUT);
   private OzoneClient client;
-  /**
-   * Create a MiniDFSCluster for testing.
-   */
 
   @BeforeAll
   public void setup() throws Exception {
@@ -132,9 +129,6 @@ public class TestOmMetrics {
         .getClientProxy().getOzoneManagerClient();
   }
 
-  /**
-   * Shutdown MiniDFSCluster.
-   */
   @AfterAll
   public void shutdown() {
     IOUtils.closeQuietly(client);
@@ -972,9 +966,11 @@ public class TestOmMetrics {
 
   private OmKeyArgs createKeyArgs(String volumeName, String bucketName,
       ReplicationConfig repConfig) throws IOException {
+    int dataLength = 10;
     OmKeyLocationInfo keyLocationInfo = new OmKeyLocationInfo.Builder()
         .setBlockID(new BlockID(new ContainerBlockID(1, 1)))
         .setPipeline(MockPipeline.createSingleNodePipeline())
+        .setLength(dataLength)
         .build();
     keyLocationInfo.setCreateVersion(0);
 
@@ -986,6 +982,7 @@ public class TestOmMetrics {
         .setKeyName(keyName)
         .setAcls(Lists.emptyList())
         .setReplicationConfig(repConfig)
+        .setDataSize(dataLength)
         .setOwnerName(UserGroupInformation.getCurrentUser().getShortUserName())
         .build();
   }

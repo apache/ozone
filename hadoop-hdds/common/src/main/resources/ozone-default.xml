@@ -209,6 +209,15 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.disk.balancer.enabled</name>
+    <value>false</value>
+    <tag>OZONE, DATANODE, DISKBALANCER</tag>
+    <description>If this property is set to true, then the Disk Balancer
+      feature is enabled on Datanodes, and users can use
+      this service. By default, this is disabled.
+    </description>
+  </property>
+  <property>
     <name>hdds.datanode.volume.choosing.policy</name>
     <value>org.apache.hadoop.ozone.container.common.volume.CapacityVolumeChoosingPolicy</value>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
@@ -371,7 +380,6 @@
       defined with postfix (ns,ms,s,m,h,d)</description>
   </property>
 
-
   <property>
     <name>hdds.prometheus.endpoint.enabled</name>
     <value>true</value>
@@ -464,6 +472,18 @@
     <tag>OZONE, CLIENT</tag>
     <description>Socket timeout for Ozone client. Unit could be defined with
       postfix (ns,ms,s,m,h,d)</description>
+  </property>
+  <property>
+    <name>ozone.client.elastic.byte.buffer.pool.max.size</name>
+    <value>16GB</value>
+    <tag>OZONE, CLIENT</tag>
+    <description>
+      The maximum total size of buffers that can be cached in the client-side
+      ByteBufferPool. This pool is used heavily during EC read and write operations.
+      Setting a limit prevents unbounded memory growth in long-lived rpc clients
+      like the S3 Gateway. Once this limit is reached, used buffers are not
+      put back to the pool and will be garbage collected.
+    </description>
   </property>
   <property>
     <name>ozone.key.deleting.limit.per.task</name>
@@ -639,20 +659,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.om.volume.listall.allowed</name>
-    <value>true</value>
-    <tag>OM, MANAGEMENT</tag>
-    <description>
-      Allows everyone to list all volumes when set to true. Defaults to true.
-      When set to false, non-admin users can only list the volumes they have
-      access to. Admins can always list all volumes. Note that this config
-      only applies to OzoneNativeAuthorizer. For other authorizers, admin
-      needs to set policies accordingly to allow all volume listing
-      e.g. for Ranger, a new policy with special volume "/" can be added to
-      allow group public LIST access.
-    </description>
-  </property>
-  <property>
     <name>ozone.om.db.dirs</name>
     <value/>
     <tag>OZONE, OM, STORAGE, PERFORMANCE</tag>
@@ -687,6 +693,14 @@
       For production clusters or any time you care about performance, it is
       recommended that ozone.om.db.dirs, ozone.scm.db.dirs and
       hdds.container.ratis.datanode.storage.dir be configured separately.
+    </description>
+  </property>
+  <property>
+    <name>ozone.path.deleting.limit.per.task</name>
+    <value>20000</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>A maximum number of paths(dirs/files) to be deleted by
+      directory deleting service per time interval.
     </description>
   </property>
   <property>
@@ -769,13 +783,13 @@
     </description>
   </property>
   <property>
-    <name>ozone.scm.block.deletion.max.retry</name>
-    <value>4096</value>
+    <name>ozone.scm.block.deletion.per.dn.distribution.factor</name>
+    <value>8</value>
     <tag>OZONE, SCM</tag>
     <description>
-      SCM wraps up many blocks in a deletion transaction and sends that to data
-      node for physical deletion periodically. This property determines how many
-      times SCM is going to retry sending a deletion operation to the data node.
+      Factor with which number of delete blocks sent to each datanode in every interval.
+      If total number of DNs are 100 and hdds.scm.block.deletion.per-interval.max is 500000
+      Then maximum 500000/(100/8) = 40000 blocks will be sent to each DN in every interval.
     </description>
   </property>
   <property>
@@ -1736,6 +1750,16 @@
   </property>
 
   <property>
+    <name>hdds.scm.safemode.log.interval</name>
+    <value>1m</value>
+    <tag>HDDS,SCM,OPERATION</tag>
+    <description>
+      Interval at which SCM logs safemode status while SCM is in safemode.
+      Default is 1 minute.
+    </description>
+  </property>
+
+  <property>
     <name>hdds.container.action.max.limit</name>
     <value>20</value>
     <tag>DATANODE</tag>
@@ -2194,13 +2218,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.om.ratis.server.pending.write.byte-limit</name>
-    <value>64MB</value>
-    <tag>OZONE, DEBUG, OM, RATIS</tag>
-    <description>Maximum byte size of all pending write requests.
-    </description>
-  </property>
-  <property>
     <name>ozone.om.ratis.server.pending.write.element-limit</name>
     <value>4096</value>
     <tag>OZONE, DEBUG, OM, RATIS</tag>
@@ -2303,7 +2320,7 @@
   </property>
   <property>
     <name>ozone.om.ratis.snapshot.max.total.sst.size</name>
-    <value>100000000</value>
+    <value>10737418240</value>
     <tag>OZONE, OM, RATIS</tag>
     <description>
       Max size of SST files in OM Ratis Snapshot tarball.
@@ -2343,7 +2360,6 @@
     <tag>OZONE, OM, MANAGEMENT</tag>
     <description>
       The maximum number of filesystem snapshot allowed in an Ozone Manager.
-      This limit is set to 65000 because the ext4 filesystem limits the number of hard links per file to 65,000.
     </description>
   </property>
 
@@ -2762,6 +2778,14 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.db.config.path</name>
+    <value/>
+    <tag>OZONE, CONTAINER, STORAGE</tag>
+    <description>
+      Path to an ini configuration file for RocksDB on datanode component.
+    </description>
+  </property>
+  <property>
     <name>hdds.priv.key.file.name</name>
     <value>private.pem</value>
     <tag>X509, SECURITY</tag>
@@ -2978,7 +3002,14 @@
       Comma separated list of users and groups allowed to access reconfigure protocol.
     </description>
   </property>
-
+  <property>
+    <name>hdds.security.client.datanode.disk.balancer.protocol.acl</name>
+    <value>*</value>
+    <tag>SECURITY</tag>
+    <description>
+      Comma separated list of users and groups allowed to access disk balancer protocol.
+    </description>
+  </property>
   <property>
     <name>hdds.datanode.http.auth.kerberos.principal</name>
     <value>HTTP/_HOST@REALM</value>
@@ -3095,9 +3126,9 @@
       Expert only. Ozone RpcClient attempts talking to each OzoneManager
       ipc.client.connect.max.retries (default = 10) number of times before
       failing over to another OzoneManager, if available. This parameter
-      represents the number of times the client will failover before giving
-      up. This value is kept high so that client does not give up trying to
-      connect to OMs easily.
+      represents the number of times per request the client will failover
+      before giving up. This value is kept high so that client does not
+      give up trying to connect to OMs easily.
     </description>
   </property>
   <property>
@@ -3108,6 +3139,13 @@
       to contact OM. Wait time increases linearly if same OM is retried
       again. If retrying on multiple OMs proxies in round robin fashion, the
       wait time is introduced after all the OM proxies have been attempted once.
+    </description>
+  </property>
+  <property>
+    <name>ozone.client.follower.read.enabled</name>
+    <value>false</value>
+    <description>
+      Enable client to read from OM followers.
     </description>
   </property>
   <property>
@@ -3509,6 +3547,24 @@
     </description>
   </property>
   <property>
+    <name>ozone.recon.dn.metrics.collection.minimum.api.delay</name>
+    <value>30s</value>
+    <tag>OZONE, RECON, DN</tag>
+    <description>
+      Minimum delay in API to start a new task for Jmx collection.
+      It behaves like a rate limiter to avoid unnecessary task creation.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.dn.metrics.collection.timeout</name>
+    <value>10m</value>
+    <tag>OZONE, RECON, DN</tag>
+    <description>
+      Maximum time taken for the api to complete.
+      If it exceeds pending tasks will be cancelled.
+    </description>
+  </property>
+  <property>
     <name>ozone.scm.datanode.admin.monitor.interval</name>
     <value>30s</value>
     <tag>SCM</tag>
@@ -3762,10 +3818,25 @@
     </description>
   </property>
   <property>
+    <name>ozone.snapshot.defrag.limit.per.task</name>
+    <value>1</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>The maximum number of snapshots that would be defragmented in
+      each task run of snapshot defragmentation service.
+    </description>
+  </property>
+  <property>
     <name>ozone.snapshot.filtering.service.interval</name>
     <value>1m</value>
     <tag>OZONE, PERFORMANCE, OM</tag>
     <description>Time interval of the SST File filtering service from Snapshot.
+    </description>
+  </property>
+  <property>
+    <name>ozone.snapshot.defrag.service.interval</name>
+    <value>-1</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>Task interval of snapshot defragmentation service.
     </description>
   </property>
   <property>
@@ -3782,6 +3853,13 @@
     <value>300000ms</value>
     <tag>OZONE, PERFORMANCE,OM</tag>
     <description>A timeout value of sst filtering service.
+    </description>
+  </property>
+  <property>
+    <name>ozone.snapshot.defrag.service.timeout</name>
+    <value>300s</value>
+    <tag>OZONE, PERFORMANCE,OM</tag>
+    <description>Timeout value of a run of snapshot defragmentation service.
     </description>
   </property>
 
@@ -4302,6 +4380,43 @@
   </property>
     
   <property>
+    <name>ozone.recon.filesizecount.flush.db.max.threshold</name>
+    <value>200000</value>
+    <tag>OZONE, RECON, PERFORMANCE</tag>
+    <description>
+      Maximum threshold number of entries to hold in memory for File Size Count task in hashmap before flushing to
+      recon derby DB
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.recon.task.reprocess.max.iterators</name>
+    <value>5</value>
+    <tag>OZONE, RECON, PERFORMANCE</tag>
+    <description>
+      Maximum number of iterator threads to use for parallel table iteration during reprocess
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.recon.task.reprocess.max.workers</name>
+    <value>20</value>
+    <tag>OZONE, RECON, PERFORMANCE</tag>
+    <description>
+      Maximum number of worker threads to use for parallel table processing during reprocess
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.recon.task.reprocess.max.keys.in.memory</name>
+    <value>2000</value>
+    <tag>OZONE, RECON, PERFORMANCE</tag>
+    <description>
+      Maximum number of keys to batch in memory before handing to worker threads during parallel reprocess
+    </description>
+  </property>
+    
+  <property>
     <name>ozone.recon.heatmap.provider</name>
     <value></value>
     <tag>OZONE, RECON</tag>
@@ -4752,8 +4867,8 @@
   </property>
   <property>
     <name>hdds.datanode.kerberos.principal</name>
-    <value/>
-    <tag>OZONE, DATANODE</tag>
+    <value>dn/_HOST@REALM</value>
+    <tag>OZONE, SECURITY, KERBEROS, DATANODE</tag>
     <description>
       The Datanode service principal. This is typically set to
       dn/_HOST@REALM.TLD. Each Datanode will substitute _HOST with its
@@ -4818,5 +4933,20 @@
     <description>When KeyProvider is configured, the max retries allowed to attempt
       warm up edek cache if none of key successful on OM start up.
     </description>
+  </property>
+  <property>
+    <name>ozone.om.hierarchical.resource.locks.soft.limit</name>
+    <value>1024</value>
+    <description>Soft limit for number of lock objects that could be idle in the pool.</description>
+  </property>
+  <property>
+    <name>ozone.om.hierarchical.resource.locks.hard.limit</name>
+    <value>10000</value>
+    <description>Maximum number of lock objects that could be present in the pool.</description>
+  </property>
+  <property>
+    <name>ozone.om.snapshot.local.data.manager.service.interval</name>
+    <value>5m</value>
+    <description>Interval for cleaning up orphan snapshot local data versions corresponding to snapshots</description>
   </property>
 </configuration>

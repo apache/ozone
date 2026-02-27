@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.helpers;
 
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_URI_DELIMITER;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
 
 import jakarta.annotation.Nonnull;
 import java.nio.file.Paths;
@@ -26,6 +27,7 @@ import java.util.UUID;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.util.Time;
 import org.slf4j.Logger;
@@ -97,32 +99,79 @@ public final class OzoneFSUtils {
   }
 
   /**
-   * Whether the pathname is valid.  Currently prohibits relative paths,
-   * names which contain a ":" or "//", or other non-canonical paths.
+   * Core validation logic for key path components.
+   * Checks for invalid characters: ".", "..", ":", "/", and "//" in the middle.
+   *
+   * @param path the path to validate
+   * @param allowLeadingSlash whether leading slash is allowed (true) or invalid (false)
+   * @return true if path components are valid, false otherwise
    */
-  public static boolean isValidName(String src) {
-    // Path must be absolute.
-    if (!src.startsWith(Path.SEPARATOR)) {
-      return false;
-    }
-
-    // Check for ".." "." ":" "/"
-    String[] components = StringUtils.split(src, '/');
-    for (int i = 0; i < components.length; i++) {
-      String element = components[i];
-      if (element.equals(".")  ||
-          (element.contains(":"))  ||
-          (element.contains("/") || element.equals(".."))) {
+  private static boolean validateKeyPathComponents(String path, boolean allowLeadingSlash) {
+    if (allowLeadingSlash) {
+      if (!path.startsWith(Path.SEPARATOR)) {
         return false;
       }
-      // The string may start or end with a /, but not have
-      // "//" in the middle.
-      if (element.isEmpty() && i != components.length - 1 &&
-          i != 0) {
+    } else {
+      if (path.startsWith(Path.SEPARATOR)) {
+        return false;
+      }
+    }
+
+    String[] components = StringUtils.split(path, '/');
+    for (int i = 0; i < components.length; i++) {
+      String element = components[i];
+      if (element.equals(".") ||
+          element.contains(":") ||
+          element.contains("/") ||
+          element.equals("..")) {
+        return false;
+      }
+
+      // The string may end with a /, but not have "//" in the middle.
+      if (element.isEmpty() && i != components.length - 1) {
+        // Allow empty at start for absolute paths (e.g., "/a/b" → ["", "a", "b"])
+        // This is needed for isValidName but not for isValidKeyPath (which rejects leading slashes)
+        if (allowLeadingSlash && i == 0) {
+          continue;
+        }
         return false;
       }
     }
     return true;
+  }
+
+  /**
+   * Whether the pathname is valid.  Currently prohibits relative paths,
+   * names which contain a ":" or "//", or other non-canonical paths.
+   */
+  public static boolean isValidName(String path) {
+    return validateKeyPathComponents(path, true);
+  }
+
+  /**
+   * Whether the pathname is valid.  Check key names which contain a
+   * ":", ".", "..", "//", "". If it has any of these characters throws
+   * OMException, else return the path.
+   *
+   * @param path the path to validate
+   * @param throwOnEmpty whether to throw exception if path is empty
+   * @return the path if valid
+   * @throws OMException if path is invalid
+   */
+  public static String isValidKeyPath(String path, boolean throwOnEmpty) throws OMException {
+    if (path.isEmpty()) {
+      if (throwOnEmpty) {
+        throw new OMException("Invalid KeyPath, empty keyName",
+            INVALID_KEY_NAME);
+      }
+      return path;
+    }
+
+    if (!validateKeyPathComponents(path, false)) {
+      throw new OMException("Invalid KeyPath " + path, INVALID_KEY_NAME);
+    }
+
+    return path;
   }
 
   /**

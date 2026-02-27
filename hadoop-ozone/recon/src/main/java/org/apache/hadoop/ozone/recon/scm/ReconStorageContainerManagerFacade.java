@@ -85,6 +85,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMNodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SequenceIdGenerator;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBTransactionBufferImpl;
+import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.node.DeadNodeHandler;
@@ -689,6 +690,21 @@ public class ReconStorageContainerManagerFacade
 
   @Override
   public ReconfigurationHandler getReconfigurationHandler() {
+    return null;
+  }
+
+  @Override
+  public SCMMetadataStore getScmMetadataStore() {
+    return null;
+  }
+
+  @Override
+  public SCMHAManager getScmHAManager() {
+    return null;
+  }
+
+  @Override
+  public SequenceIdGenerator getSequenceIdGen() {
     return null;
   }
 

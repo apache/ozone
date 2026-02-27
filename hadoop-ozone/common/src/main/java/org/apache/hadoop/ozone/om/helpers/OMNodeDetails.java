@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.helpers;
 
-import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT;
+import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_HTTP_ENDPOINT_V2;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_FLUSH;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
@@ -189,7 +189,7 @@ public final class OMNodeDetails extends NodeDetails {
       URIBuilder urlBuilder = new URIBuilder().
           setScheme(isHttp ? "http" : "https").
           setHost(isHttp ? getHttpAddress() : getHttpsAddress()).
-          setPath(OZONE_DB_CHECKPOINT_HTTP_ENDPOINT).
+          setPath(OZONE_DB_CHECKPOINT_HTTP_ENDPOINT_V2).
           addParameter(OZONE_DB_CHECKPOINT_INCLUDE_SNAPSHOT_DATA, "true").
           addParameter(OZONE_DB_CHECKPOINT_REQUEST_FLUSH,
               flush ? "true" : "false");

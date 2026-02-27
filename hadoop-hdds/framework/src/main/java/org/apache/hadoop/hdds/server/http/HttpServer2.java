@@ -44,6 +44,7 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -59,7 +60,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.io.FileUtils;
-import org.apache.hadoop.HadoopIllegalArgumentException;
 import org.apache.hadoop.conf.ConfServlet;
 import org.apache.hadoop.conf.Configuration.IntegerRanges;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
@@ -456,7 +456,7 @@ public final class HttpServer2 implements FilterContainer {
     }
 
     public HttpServer2 build() throws IOException {
-      Preconditions.checkNotNull(name, "name is not set");
+      Objects.requireNonNull(name, "name is not set");
       Preconditions.checkState(!endpoints.isEmpty(), "No endpoints specified");
 
       if (hostName == null) {
@@ -509,7 +509,7 @@ public final class HttpServer2 implements FilterContainer {
           connector = createHttpsChannelConnector(server.webServer,
               httpConfig);
         } else {
-          throw new HadoopIllegalArgumentException(
+          throw new IllegalArgumentException(
               "unknown scheme for endpoint:" + ep);
         }
         connector.setHost(ep.getHost());
@@ -605,7 +605,7 @@ public final class HttpServer2 implements FilterContainer {
   }
 
   private void initializeWebServer(Builder builder) throws IOException {
-    Preconditions.checkNotNull(webAppContext);
+    Objects.requireNonNull(webAppContext, "webAppContext == null");
 
     int maxThreads = builder.conf.getInt(HTTP_MAX_THREADS_KEY, -1);
     // If HTTP_MAX_THREADS is not configured, QueueThreadPool() will use the

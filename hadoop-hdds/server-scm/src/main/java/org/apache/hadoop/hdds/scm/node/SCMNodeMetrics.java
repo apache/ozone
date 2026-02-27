@@ -132,6 +132,7 @@ public final class SCMNodeMetrics implements MetricsSource {
   public void getMetrics(MetricsCollector collector, boolean all) {
     Map<String, Map<String, Integer>> nodeCount = managerMXBean.getNodeCount();
     Map<String, Long> nodeInfo = managerMXBean.getNodeInfo();
+    Map<String, String> nodeStatistics = managerMXBean.getNodeStatistics();
     int totalNodeCount = 0;
     /**
      * Loop over the Node map and create a metric for the cross product of all
@@ -156,6 +157,15 @@ public final class SCMNodeMetrics implements MetricsSource {
     metrics.addGauge(
         Interns.info("AllNodes", "Number of datanodes"), totalNodeCount);
 
+    String nonWritableNodes = nodeStatistics.get("NonWritableNodes");
+    if (nonWritableNodes != null) {
+      metrics.addGauge(
+          Interns.info("NonWritableNodes", "Number of datanodes that cannot accept new writes because " +
+              "they are either not in IN_SERVICE and HEALTHY state, cannot allocate new containers or " +
+              "cannot write to existing containers."),
+          Integer.parseInt(nonWritableNodes));
+    }
+
     for (Map.Entry<String, Long> e : nodeInfo.entrySet()) {
       metrics.addGauge(
           Interns.info(e.getKey(), diskMetricDescription(e.getKey())),
@@ -172,18 +182,25 @@ public final class SCMNodeMetrics implements MetricsSource {
     } else if (metric.indexOf("Decommissioned") >= 0) {
       sb.append(" decommissioned");
     }
+    if ("TotalFilesystemCapacity".equals(metric)) {
+      return "Total raw filesystem capacity";
+    } else if ("TotalFilesystemUsed".equals(metric)) {
+      return "Total raw filesystem used space";
+    } else if ("TotalFilesystemAvailable".equals(metric)) {
+      return "Total raw filesystem available space";
+    }
     if (metric.indexOf("DiskCapacity") >= 0) {
-      sb.append(" disk capacity");
+      sb.append(" disk capacity (Ozone usable)");
     } else if (metric.indexOf("DiskUsed") >= 0) {
-      sb.append(" disk capacity used");
+      sb.append(" disk capacity used (Ozone)");
     } else if (metric.indexOf("DiskRemaining") >= 0) {
-      sb.append(" disk capacity remaining");
+      sb.append(" disk capacity remaining (Ozone)");
     } else if (metric.indexOf("SSDCapacity") >= 0) {
-      sb.append(" SSD capacity");
+      sb.append(" SSD capacity (Ozone)");
     } else if (metric.indexOf("SSDUsed") >= 0) {
-      sb.append(" SSD capacity used");
+      sb.append(" SSD capacity used (Ozone)");
     } else if (metric.indexOf("SSDRemaining") >= 0) {
-      sb.append(" SSD capacity remaining");
+      sb.append(" SSD capacity remaining (Ozone)");
     }
     return sb.toString();
   }

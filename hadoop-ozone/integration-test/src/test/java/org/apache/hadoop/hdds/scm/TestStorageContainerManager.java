@@ -25,6 +25,7 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_SAFEMODE_PIPELINE_C
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.mockRemoteUser;
 import static org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils.setInternalState;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
+import static org.apache.hadoop.ozone.common.BlockGroup.SIZE_NOT_AVAILABLE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -64,11 +65,13 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
+import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
@@ -91,7 +94,6 @@ import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.RatisUtil;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
-import org.apache.hadoop.hdds.scm.ha.SCMHANodeDetails;
 import org.apache.hadoop.hdds.scm.ha.SCMHAUtils;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServerImpl;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
@@ -118,6 +120,7 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.OzoneTestUtils;
 import org.apache.hadoop.ozone.TestDataUtil;
+import org.apache.hadoop.ozone.common.DeletedBlock;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
@@ -179,7 +182,7 @@ public class TestStorageContainerManager {
 
       StorageContainerManager scm = cluster.getStorageContainerManager();
       List<File> directories = Arrays.asList(
-          new File(SCMHAUtils.getRatisStorageDir(scm.getConfiguration())),
+          new File(SCMHAUtils.getSCMRatisDirectory(scm.getConfiguration())),
           scm.getScmMetadataStore().getStore().getDbLocation(),
           new File(scm.getScmStorageConfig().getStorageDir())
       );
@@ -267,7 +270,7 @@ public class TestStorageContainerManager {
       OzoneTestUtils.closeContainers(keyInfo.getKeyLocationVersions(),
           cluster.getStorageContainerManager());
     }
-    Map<Long, List<Long>> containerBlocks = createDeleteTXLog(
+    Map<Long, List<DeletedBlock>> containerBlocks = createDeleteTXLog(
         cluster.getStorageContainerManager(),
         delLog, keyLocations, cluster);
 
@@ -285,10 +288,12 @@ public class TestStorageContainerManager {
     // but unknown block IDs.
     for (Long containerID : containerBlocks.keySet()) {
       // Add 2 TXs per container.
-      Map<Long, List<Long>> deletedBlocks = new HashMap<>();
-      List<Long> blocks = new ArrayList<>();
-      blocks.add(RandomUtils.secure().randomLong());
-      blocks.add(RandomUtils.secure().randomLong());
+      Map<Long, List<DeletedBlock>> deletedBlocks = new HashMap<>();
+      List<DeletedBlock> blocks = new ArrayList<>();
+      blocks.add(new DeletedBlock(new BlockID(containerID, RandomUtils.secure().randomLong()),
+          SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
+      blocks.add(new DeletedBlock(new BlockID(containerID, RandomUtils.secure().randomLong()),
+          SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
       deletedBlocks.put(containerID, blocks);
       addTransactions(cluster.getStorageContainerManager(), delLog,
           deletedBlocks);
@@ -303,7 +308,7 @@ public class TestStorageContainerManager {
       try {
         cluster.getStorageContainerManager().getScmHAManager()
             .asSCMHADBTransactionBuffer().flush();
-        return delLog.getFailedTransactions(-1, 0).isEmpty();
+        return delLog.getNumOfValidTransactions() == 0;
       } catch (IOException e) {
         return false;
       }
@@ -333,7 +338,6 @@ public class TestStorageContainerManager {
         TimeUnit.MILLISECONDS);
     conf.setTimeDuration(HDDS_COMMAND_STATUS_REPORT_INTERVAL, 200,
         TimeUnit.MILLISECONDS);
-    conf.setInt(ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 5);
     // Reset container provision size, otherwise only one container
     // is created by default.
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT, 10 * KEY_COUNT);
@@ -405,7 +409,6 @@ public class TestStorageContainerManager {
     int numKeys = 15;
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 1, TimeUnit.SECONDS);
-    conf.setInt(ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 5);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
         100, TimeUnit.MILLISECONDS);
     ScmConfig scmConfig = conf.getObject(ScmConfig.class);
@@ -466,7 +469,7 @@ public class TestStorageContainerManager {
     }
   }
 
-  private Map<Long, List<Long>> createDeleteTXLog(
+  private Map<Long, List<DeletedBlock>> createDeleteTXLog(
       StorageContainerManager scm,
       DeletedBlockLog delLog,
       Map<String, OmKeyInfo> keyLocations, MiniOzoneCluster cluster)
@@ -491,17 +494,17 @@ public class TestStorageContainerManager {
         getAllBlocks(cluster, containerNames).size());
 
     // Create a deletion TX for each key.
-    Map<Long, List<Long>> containerBlocks = Maps.newHashMap();
+    Map<Long, List<DeletedBlock>> containerBlocks = Maps.newHashMap();
     for (OmKeyInfo info : keyLocations.values()) {
       List<OmKeyLocationInfo> list =
           info.getLatestVersionLocations().getLocationList();
       list.forEach(location -> {
         if (containerBlocks.containsKey(location.getContainerID())) {
           containerBlocks.get(location.getContainerID())
-              .add(location.getBlockID().getLocalID());
+              .add(new DeletedBlock(location.getBlockID(), SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
         } else {
-          List<Long> blks = Lists.newArrayList();
-          blks.add(location.getBlockID().getLocalID());
+          List<DeletedBlock> blks = Lists.newArrayList();
+          blks.add(new DeletedBlock(location.getBlockID(), SIZE_NOT_AVAILABLE, SIZE_NOT_AVAILABLE));
           containerBlocks.put(location.getContainerID(), blks);
         }
       });
@@ -599,17 +602,11 @@ public class TestStorageContainerManager {
     Path scmPath = tempDir.resolve("scm-meta");
 
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, scmPath.toString());
-    SCMStorageConfig scmStore = new SCMStorageConfig(conf);
     String clusterId = UUID.randomUUID().toString();
-    String scmId = UUID.randomUUID().toString();
-    scmStore.setClusterId(clusterId);
-    scmStore.setScmId(scmId);
-    scmStore.setSCMHAFlag(true);
-    // writes the version file properties
-    scmStore.initialize();
-    SCMRatisServerImpl.initialize(clusterId, scmId,
-        SCMHANodeDetails.loadSCMHAConfig(conf, scmStore)
-            .getLocalNodeDetails(), conf);
+    // Use scmInit to initialize SCM properly (creates all required directories)
+    StorageContainerManager.scmInit(conf, clusterId);
+    SCMStorageConfig scmStore = new SCMStorageConfig(conf);
+    String scmId = scmStore.getScmId();
     StorageContainerManager scm = HddsTestUtils.getScmSimple(conf);
     try {
       scm.start();
@@ -660,7 +657,6 @@ public class TestStorageContainerManager {
     int numKeys = 15;
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 1, TimeUnit.SECONDS);
-    conf.setInt(ScmConfigKeys.OZONE_SCM_BLOCK_DELETION_MAX_RETRY, 5);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL,
         100, TimeUnit.MILLISECONDS);
     conf.setInt(ScmConfigKeys.OZONE_SCM_PIPELINE_OWNER_CONTAINER_COUNT,
@@ -878,7 +874,7 @@ public class TestStorageContainerManager {
 
   private void addTransactions(StorageContainerManager scm,
       DeletedBlockLog delLog,
-      Map<Long, List<Long>> containerBlocksMap)
+      Map<Long, List<DeletedBlock>> containerBlocksMap)
       throws IOException, TimeoutException {
     delLog.addTransactions(containerBlocksMap);
     scm.getScmHAManager().asSCMHADBTransactionBuffer().flush();
@@ -911,9 +907,9 @@ public class TestStorageContainerManager {
   }
 
   public boolean verifyBlocksWithTxnTable(MiniOzoneCluster cluster,
-      Map<Long, List<Long>> containerBlocks)
+      Map<Long, List<DeletedBlock>> containerBlocks)
       throws IOException {
-    for (Map.Entry<Long, List<Long>> entry : containerBlocks.entrySet()) {
+    for (Map.Entry<Long, List<DeletedBlock>> entry : containerBlocks.entrySet()) {
       KeyValueContainerData cData = getContainerMetadata(cluster, entry.getKey());
       try (DBHandle db = BlockUtils.getDB(cData, cluster.getConf())) {
         DatanodeStore ds = db.getStore();
@@ -928,7 +924,9 @@ public class TestStorageContainerManager {
             txnsInTxnTable) {
           conID.addAll(txn.getValue().getLocalIDList());
         }
-        if (!conID.equals(containerBlocks.get(entry.getKey()))) {
+        List<Long> localIDList = containerBlocks.get(entry.getKey()).stream()
+            .map(b -> b.getBlockID().getLocalID()).collect(Collectors.toList());
+        if (!conID.equals(localIDList)) {
           return false;
         }
       }

@@ -111,10 +111,10 @@ public class TestReconNamespaceSummaryManagerImpl {
 
   private void putThreeNSMetadata() throws IOException {
     HashMap<Long, NSSummary> hmap = new HashMap<>();
-    hmap.put(1L, new NSSummary(1, 2, testBucket, TEST_CHILD_DIR, "dir1", -1));
-    hmap.put(2L, new NSSummary(3, 4, testBucket, TEST_CHILD_DIR, "dir2", -1));
-    hmap.put(3L, new NSSummary(5, 6, testBucket, TEST_CHILD_DIR, "dir3", -1));
-    RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
+    hmap.put(1L, new NSSummary(1, 2, 2 * 3, testBucket, TEST_CHILD_DIR, "dir1", -1));
+    hmap.put(2L, new NSSummary(3, 4, 4 * 3, testBucket, TEST_CHILD_DIR, "dir2", -1));
+    hmap.put(3L, new NSSummary(5, 6, 6 * 3, testBucket, TEST_CHILD_DIR, "dir3", -1));
+    RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation();
     for (Map.Entry entry: hmap.entrySet()) {
       reconNamespaceSummaryManager.batchStoreNSSummaries(rdbBatchOperation,
               (long)entry.getKey(), (NSSummary)entry.getValue());

@@ -48,6 +48,8 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconFileMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
 import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdater;
@@ -85,8 +87,11 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     when(reconDbProvider.getStagedReconDBProvider()).thenReturn(reconDbProvider);
     ReconContainerMetadataManager reconContainerMgr = mock(ReconContainerMetadataManager.class);
     ReconNamespaceSummaryManager nsSummaryManager = mock(ReconNamespaceSummaryManager.class);
+    ReconGlobalStatsManager reconGlobalStatsManager = mock(ReconGlobalStatsManager.class);
+    ReconFileMetadataManager reconFileMetadataManager = mock(ReconFileMetadataManager.class);
     reconTaskController = new ReconTaskControllerImpl(ozoneConfiguration, new HashSet<>(),
-        reconTaskStatusUpdaterManagerMock, reconDbProvider, reconContainerMgr, nsSummaryManager);
+        reconTaskStatusUpdaterManagerMock, reconDbProvider, reconContainerMgr, nsSummaryManager,
+        reconGlobalStatsManager, reconFileMetadataManager);
     reconTaskController.start();
   }
 
@@ -390,8 +395,11 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     when(reconDbProvider.getStagedReconDBProvider()).thenReturn(reconDbProvider);
     ReconContainerMetadataManager reconContainerMgr = mock(ReconContainerMetadataManager.class);
     ReconNamespaceSummaryManager nsSummaryManager = mock(ReconNamespaceSummaryManager.class);
+    ReconGlobalStatsManager reconGlobalStatsManager = mock(ReconGlobalStatsManager.class);
+    ReconFileMetadataManager reconFileMetadataManager = mock(ReconFileMetadataManager.class);
     ReconTaskControllerImpl testController = new ReconTaskControllerImpl(ozoneConfiguration, new HashSet<>(),
-        reconTaskStatusUpdaterManagerMock, reconDbProvider, reconContainerMgr, nsSummaryManager);
+        reconTaskStatusUpdaterManagerMock, reconDbProvider, reconContainerMgr, nsSummaryManager,
+        reconGlobalStatsManager, reconFileMetadataManager);
     // Don't start async processing
     
     // Add some events to buffer first
@@ -757,7 +765,7 @@ public class TestReconTaskControllerImpl extends AbstractReconSqlDBTest {
     assertFalse(controllerSpy.hasTasksFailed(), "tasksFailed should remain false after successful reinitialization");
     
     // Verify cleanup was called on the checkpointed manager
-    verify(mockCheckpointedManager, times(1)).stop();
+    verify(mockCheckpointedManager, times(1)).close();
   }
 
   /**

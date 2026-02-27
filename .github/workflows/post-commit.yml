@@ -18,10 +18,12 @@ on:
     types: [opened, ready_for_review, synchronize]
   push:
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ci-${{ github.event.pull_request.number || case(github.repository == 'apache/ozone', github.sha, github.ref_name) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || github.repository != 'apache/ozone' }}
 jobs:
   CI:
-    if: github.event_name == 'pull_request' || !startsWith(github.ref_name, 'dependabot')
+    if: github.event_name == 'pull_request'
+      || (github.repository == 'apache/ozone' && !startsWith(github.ref_name, 'dependabot'))
+      || (github.repository != 'apache/ozone' && github.ref_name != 'master')
     uses: ./.github/workflows/ci.yml
     secrets: inherit

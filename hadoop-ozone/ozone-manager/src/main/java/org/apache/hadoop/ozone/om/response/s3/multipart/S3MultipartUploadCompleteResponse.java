@@ -53,7 +53,9 @@ public class S3MultipartUploadCompleteResponse extends OmKeyResponse {
   private OmKeyInfo omKeyInfo;
   private List<OmKeyInfo> allKeyInfoToRemove;
   private OmBucketInfo omBucketInfo;
+  private long bucketId;
 
+  @SuppressWarnings("parameternumber")
   public S3MultipartUploadCompleteResponse(
       @Nonnull OMResponse omResponse,
       @Nonnull String multipartKey,
@@ -61,13 +63,15 @@ public class S3MultipartUploadCompleteResponse extends OmKeyResponse {
       @Nonnull OmKeyInfo omKeyInfo,
       @Nonnull List<OmKeyInfo> allKeyInfoToRemove,
       @Nonnull BucketLayout bucketLayout,
-      OmBucketInfo omBucketInfo) {
+      OmBucketInfo omBucketInfo,
+      long bucketId) {
     super(omResponse, bucketLayout);
     this.allKeyInfoToRemove = allKeyInfoToRemove;
     this.multipartKey = multipartKey;
     this.multipartOpenKey = multipartOpenKey;
     this.omKeyInfo = omKeyInfo;
     this.omBucketInfo = omBucketInfo;
+    this.bucketId = bucketId;
   }
 
   /**
@@ -100,7 +104,7 @@ public class S3MultipartUploadCompleteResponse extends OmKeyResponse {
         String deleteKey = omMetadataManager.getOzoneDeletePathKey(
             keyInfoToRemove.getObjectID(), multipartKey);
         omMetadataManager.getDeletedTable().putWithBatch(batchOperation,
-            deleteKey, new RepeatedOmKeyInfo(keyInfoToRemove));
+            deleteKey, new RepeatedOmKeyInfo(keyInfoToRemove, bucketId));
       }
     }
 

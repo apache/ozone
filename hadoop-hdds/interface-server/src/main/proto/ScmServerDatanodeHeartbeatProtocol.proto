@@ -182,6 +182,13 @@ message StorageReportProto {
   optional bool failed = 7 [default = false];
   optional uint64 committed = 8 [default = 0];
   optional uint64 freeSpaceToSpare = 9 [default = 0];
+  optional uint64 reserved = 10;
+  /*
+   Raw filesystem stats (as reported by the local filesystem). These represent the real device
+   capacity/available, independent of Ozone's reserved-space adjustment.
+   */
+  optional uint64 fsCapacity = 11 [default = 0];
+  optional uint64 fsAvailable = 12 [default = 0];
 }
 
 message MetadataStorageReportProto {
@@ -338,7 +345,6 @@ message SCMCommandProto {
   optional ReconstructECContainersCommandProto reconstructECContainersCommandProto = 12;
   optional ReconcileContainerCommandProto reconcileContainerCommandProto = 13;
 
-
   // If running upon Ratis, holds term of underlying RaftServer iff current
   // SCM is a leader. If running without Ratis, holds SCMContext.INVALID_TERM.
   optional int64 term = 15;
@@ -367,7 +373,10 @@ message DeletedBlocksTransaction {
   required int64 containerID = 2;
   repeated int64 localID = 3;
   // the retry time of sending deleting command to datanode.
-  required int32 count = 4;
+  // We don't have to store the retry count in DB.
+  optional int32 count = 4 [deprecated=true];
+  optional uint64 totalBlockSize = 5;
+  optional uint64 totalBlockReplicatedSize = 6;
 }
 
 // ACK message datanode sent to SCM, contains the result of

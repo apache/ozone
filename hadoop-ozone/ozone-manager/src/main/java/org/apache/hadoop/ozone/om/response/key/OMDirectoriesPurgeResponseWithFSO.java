@@ -22,11 +22,14 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_INFO_TABLE;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_DB_CONTENT_LOCK;
 
+import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
@@ -35,11 +38,14 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshot;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
+import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
+import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.request.key.OMDirectoriesPurgeRequestWithFSO;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -85,9 +91,15 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
       OmSnapshotManager omSnapshotManager =
           ((OmMetadataManagerImpl) metadataManager)
               .getOzoneManager().getOmSnapshotManager();
-
+      IOzoneManagerLock lock = metadataManager.getLock();
+      UUID fromSnapshotId = fromSnapshotInfo.getSnapshotId();
+      OMLockDetails lockDetails = lock.acquireReadLock(SNAPSHOT_DB_CONTENT_LOCK, fromSnapshotId.toString());
+      if (!lockDetails.isLockAcquired()) {
+        throw new OMException("Unable to acquire read lock on " + SNAPSHOT_DB_CONTENT_LOCK + " for snapshot: " +
+            fromSnapshotId, OMException.ResultCodes.INTERNAL_ERROR);
+      }
       try (UncheckedAutoCloseableSupplier<OmSnapshot>
-          rcFromSnapshotInfo = omSnapshotManager.getSnapshot(fromSnapshotInfo.getSnapshotId())) {
+          rcFromSnapshotInfo = omSnapshotManager.getSnapshot(fromSnapshotId)) {
         OmSnapshot fromSnapshot = rcFromSnapshotInfo.get();
         DBStore fromSnapshotStore = fromSnapshot.getMetadataManager()
             .getStore();
@@ -97,6 +109,8 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
           processPaths(metadataManager, fromSnapshot.getMetadataManager(), batchOp, writeBatch);
           fromSnapshotStore.commitBatchOperation(writeBatch);
         }
+      } finally {
+        lock.releaseReadLock(SNAPSHOT_DB_CONTENT_LOCK, fromSnapshotId.toString());
       }
       metadataManager.getSnapshotInfoTable().putWithBatch(batchOp, fromSnapshotInfo.getTableKey(), fromSnapshotInfo);
     } else {
@@ -143,7 +157,8 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
       }
 
       for (OzoneManagerProtocolProtos.KeyInfo key : deletedSubFilesList) {
-        OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(key);
+        OmKeyInfo keyInfo = OmKeyInfo.getFromProtobuf(key)
+            .withCommittedKeyDeletedFlag(true);
         String ozoneDbKey = keySpaceOmMetadataManager.getOzonePathKey(volumeId,
             bucketId, keyInfo.getParentObjectID(), keyInfo.getFileName());
         keySpaceOmMetadataManager.getKeyTable(getBucketLayout())
@@ -154,7 +169,7 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
               keyInfo.getKeyName(), ozoneDbKey);
         }
 
-        RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(
+        RepeatedOmKeyInfo repeatedOmKeyInfo = OmUtils.prepareKeyForDelete(bucketId,
             keyInfo, keyInfo.getUpdateID());
 
         String deletedKey = keySpaceOmMetadataManager
@@ -184,5 +199,10 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
         }
       }
     }
+  }
+
+  @VisibleForTesting
+  public Map<Pair<String, String>, OmBucketInfo> getVolBucketInfoMap() {
+    return volBucketInfoMap;
   }
 }

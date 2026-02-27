@@ -6866,5 +6866,150 @@
     "selectedRowKeys": [
       "b5907812-a5f2-11ea-bb37-0242ac130011"
     ]
+  },
+  "utilization": {
+    "globalStorage": {
+        "totalUsedSpace": 30679040,
+        "totalFreeSpace": 539776978944,
+        "totalCapacity": 879519597390
+    },
+    "globalNamespace": {
+        "totalUsedSpace": 12349932,
+        "totalKeys": 1576
+    },
+    "usedSpaceBreakdown": {
+        "openKeyBytes": {
+          "totalOpenKeyBytes": 19255266,
+          "openKeyAndFileBytes": 19255266,
+          "multipartOpenKeyBytes": 0
+        },
+        "committedKeyBytes": 1249923,
+        "preAllocatedContainerBytes": 1022024
+    },
+    "dataNodeUsage": [
+        {
+            "datanodeUuid": "1bf314dc-3eba-4774-9dbc-6d957cc7670b",
+            "hostName": "ozone-datanode-7.ozone_default",
+            "capacity": 125645656770,
+            "used": 4382720,
+            "remaining": 77110996992,
+            "committed": 0,
+            "minimumFreeSpace": 104857600,
+            "reserved": 12565822
+        },
+        {
+            "datanodeUuid": "8adead67-85a6-4ba9-942f-cd313f1472f9",
+            "hostName": "ozone-datanode-6.ozone_default",
+            "capacity": 125645656770,
+            "used": 4382720,
+            "remaining": 77110996992,
+            "committed": 0,
+            "minimumFreeSpace": 104857600,
+            "reserved": 12565822
+        },
+        {
+            "datanodeUuid": "953b91f4-c03a-45d8-9fbe-142887531cb1",
+            "hostName": "ozone-datanode-5.ozone_default",
+            "capacity": 125645656770,
+            "used": 4382720,
+            "remaining": 77110996992,
+            "committed": 0,
+            "minimumFreeSpace": 104857600,
+            "reserved": 12565822
+        },
+        {
+            "datanodeUuid": "44617070-a300-48af-a0e3-117167b008b6",
+            "hostName": "ozone-datanode-2.ozone_default",
+            "capacity": 125645656770,
+            "used": 4382720,
+            "remaining": 77110996992,
+            "committed": 0,
+            "minimumFreeSpace": 104857600,
+            "reserved": 12565822
+        },
+        {
+            "datanodeUuid": "d3ade292-6ec1-47b2-bd9e-045c1acc2c29",
+            "hostName": "ozone-datanode-1.ozone_default",
+            "capacity": 125645656770,
+            "used": 4382720,
+            "remaining": 77110996992,
+            "committed": 0,
+            "minimumFreeSpace": 104857600,
+            "reserved": 12565822
+        },
+        {
+            "datanodeUuid": "149a1640-e600-4e98-b62d-397804059f0e",
+            "hostName": "ozone-datanode-3.ozone_default",
+            "capacity": 125645656770,
+            "used": 4382720,
+            "remaining": 77110996992,
+            "committed": 0,
+            "minimumFreeSpace": 104857600,
+            "reserved": 12565822
+        },
+        {
+            "datanodeUuid": "17e2562a-dae8-416f-a749-7d4e8a0a781e",
+            "hostName": "ozone-datanode-4.ozone_default",
+            "capacity": 125645656770,
+            "used": 4382720,
+            "remaining": 77110996992,
+            "committed": 0,
+            "minimumFreeSpace": 104857600,
+            "reserved": 12565822
+        }
+    ]
+  },
+  "pendingDeletionDN": {
+    "status": "FINISHED",
+    "totalPendingDeletionSize": 12203,
+    "pendingDeletionPerDataNode": [
+      {
+        "hostName": "ozone-datanode-5.ozone_default",
+        "datanodeUuid": "953b91f4-c03a-45d8-9fbe-142887531cb1",
+        "pendingBlockSize": 1200
+      },
+      {
+        "hostName": "ozone-datanode-3.ozone_default",
+        "datanodeUuid": "149a1640-e600-4e98-b62d-397804059f0e",
+        "pendingBlockSize": 803
+      },
+      {
+        "hostName": "ozone-datanode-4.ozone_default",
+        "datanodeUuid": "17e2562a-dae8-416f-a749-7d4e8a0a781e",
+        "pendingBlockSize": -1
+      },
+      {
+        "hostName": "ozone-datanode-7.ozone_default",
+        "datanodeUuid": "1bf314dc-3eba-4774-9dbc-6d957cc7670b",
+        "pendingBlockSize": 2200
+      },
+      {
+        "hostName": "ozone-datanode-1.ozone_default",
+        "datanodeUuid": "d3ade292-6ec1-47b2-bd9e-045c1acc2c29",
+        "pendingBlockSize": -1
+      },
+      {
+        "hostName": "ozone-datanode-2.ozone_default",
+        "datanodeUuid": "44617070-a300-48af-a0e3-117167b008b6",
+        "pendingBlockSize": 300
+      },
+      {
+        "hostName": "ozone-datanode-6.ozone_default",
+        "datanodeUuid": "8adead67-85a6-4ba9-942f-cd313f1472f9",
+        "pendingBlockSize": 2730
+      }
+    ],
+    "totalNodesQueried": 7,
+    "totalNodeQueriesFailed": 2
+  },
+  "pendingDeletionOM": {
+    "totalSize": 240430,
+    "pendingDirectorySize": 120040,
+    "pendingKeySize": 120390
+  },
+  "pendingDeletionSCM": {
+    "totalBlocksize": 24030,
+    "totalReplicatedBlockSize": 120040,
+    "totalBlocksCount": 120390
   }
 }

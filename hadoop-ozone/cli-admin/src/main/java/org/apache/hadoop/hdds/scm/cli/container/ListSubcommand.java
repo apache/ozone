@@ -26,7 +26,6 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.google.common.base.Strings;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.List;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -38,6 +37,7 @@ import org.apache.hadoop.hdds.scm.cli.ScmSubcommand;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerListResult;
+import org.apache.hadoop.hdds.server.JsonUtils;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Help.Visibility;
 import picocli.CommandLine.Option;
@@ -117,8 +117,7 @@ public class ListSubcommand extends ScmSubcommand {
             ScmConfigKeys.OZONE_SCM_CONTAINER_LIST_MAX_COUNT_DEFAULT);
 
     // Use SequenceWriter to output JSON array format for all cases
-    SequenceWriter sequenceWriter = WRITER.writeValues(new NonClosingOutputStream(System.out));
-    sequenceWriter.init(true); // Initialize as a JSON array
+    SequenceWriter sequenceWriter = JsonUtils.getStdoutSequenceWriter();
 
     if (!all) {
       // Regular listing with count limit
@@ -180,40 +179,5 @@ public class ListSubcommand extends ScmSubcommand {
             result.getContainerInfoList().get(fetchedCount - 1).getContainerID() + 1;
       }
     } while (fetchedCount > 0);
-  }
-
-  // TODO HDDS-13593 Remove this in favor of JsonUtils#getStdoutSequenceWriter.
-  private static class NonClosingOutputStream extends OutputStream {
-
-    private final OutputStream delegate;
-
-    NonClosingOutputStream(OutputStream delegate) {
-      this.delegate = delegate;
-    }
-
-    @Override
-    public void write(int b) throws IOException {
-      delegate.write(b);
-    }
-
-    @Override
-    public void write(byte[] b) throws IOException {
-      delegate.write(b);
-    }
-
-    @Override
-    public void write(byte[] b, int off, int len) throws IOException {
-      delegate.write(b, off, len);
-    }
-
-    @Override
-    public void flush() throws IOException {
-      delegate.flush();
-    }
-
-    @Override
-    public void close() {
-      // Ignore close to keep the underlying stream open
-    }
   }
 }

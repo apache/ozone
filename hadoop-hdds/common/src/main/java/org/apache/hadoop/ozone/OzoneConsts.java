@@ -65,6 +65,7 @@ public final class OzoneConsts {
   public static final String OZONE_ACL_CREATE = "c";
   public static final String OZONE_ACL_READ_ACL = "x";
   public static final String OZONE_ACL_WRITE_ACL = "y";
+  public static final String OZONE_ACL_ASSUME_ROLE = "m";
 
   public static final String OZONE_DATE_FORMAT =
       "EEE, dd MMM yyyy HH:mm:ss zzz";
@@ -75,6 +76,8 @@ public final class OzoneConsts {
       "/serviceList";
   public static final String OZONE_DB_CHECKPOINT_HTTP_ENDPOINT =
       "/dbCheckpoint";
+  public static final String OZONE_DB_CHECKPOINT_HTTP_ENDPOINT_V2 =
+      "/v2/dbCheckpoint";
 
   // Ozone File System scheme
   public static final String OZONE_URI_SCHEME = "o3fs";
@@ -140,8 +143,8 @@ public final class OzoneConsts {
   public static final String BLOCK_COMMIT_SEQUENCE_ID = "#BCSID";
   public static final String BLOCK_COUNT = "#BLOCKCOUNT";
   public static final String CONTAINER_BYTES_USED = "#BYTESUSED";
-  public static final String PENDING_DELETE_BLOCK_COUNT =
-      "#PENDINGDELETEBLOCKCOUNT";
+  public static final String PENDING_DELETE_BLOCK_COUNT = "#PENDINGDELETEBLOCKCOUNT";
+  public static final String PENDING_DELETE_BLOCK_BYTES = "#PENDINGDELETEBLOCKBYTES";
   public static final String CONTAINER_DATA_CHECKSUM = "#DATACHECKSUM";
 
   /**
@@ -196,6 +199,9 @@ public final class OzoneConsts {
    */
   public static final String OZONE_SCM_DATANODE_ID_FILE_DEFAULT = "datanode.id";
 
+  public static final String
+      OZONE_SCM_DATANODE_DISK_BALANCER_INFO_FILE_DEFAULT = "diskBalancer.info";
+
   /**
    * The ServiceListJSONServlet context attribute where OzoneManager
    * instance gets stored.
@@ -208,9 +214,10 @@ public final class OzoneConsts {
   public static final String OM_SLD_VERSION = "version";
   public static final String OM_SLD_CHECKSUM = "checksum";
   public static final String OM_SLD_IS_SST_FILTERED = "isSSTFiltered";
-  public static final String OM_SLD_LAST_COMPACTION_TIME = "lastCompactionTime";
-  public static final String OM_SLD_NEEDS_COMPACTION = "needsCompaction";
+  public static final String OM_SLD_LAST_DEFRAG_TIME = "lastDefragTime";
+  public static final String OM_SLD_NEEDS_DEFRAG = "needsDefrag";
   public static final String OM_SLD_VERSION_SST_FILE_INFO = "versionSstFileInfos";
+  public static final String OM_SLD_SNAP_ID = "snapshotId";
   public static final String OM_SLD_PREV_SNAP_ID = "previousSnapshotId";
   public static final String OM_SLD_VERSION_META_SST_FILES = "sstFiles";
   public static final String OM_SLD_VERSION_META_PREV_SNAP_VERSION = "previousSnapshotVersion";
@@ -218,6 +225,8 @@ public final class OzoneConsts {
   public static final String OM_SST_FILE_INFO_START_KEY = "startKey";
   public static final String OM_SST_FILE_INFO_END_KEY = "endKey";
   public static final String OM_SST_FILE_INFO_COL_FAMILY = "columnFamily";
+  public static final String OM_SLD_TXN_INFO = "transactionInfo";
+  public static final String OM_SLD_DB_TXN_SEQ_NUMBER = "dbTxSequenceNumber";
 
   // YAML fields for .container files
   public static final String CONTAINER_ID = "containerID";
@@ -260,6 +269,8 @@ public final class OzoneConsts {
   public static final String DST_KEY = "dstKey";
   public static final String USED_BYTES = "usedBytes";
   public static final String USED_NAMESPACE = "usedNamespace";
+  public static final String SNAPSHOT_USED_BYTES = "snapshotUsedBytes";
+  public static final String SNAPSHOT_USED_NAMESPACE = "snapshotUsedNamespace";
   public static final String QUOTA_IN_BYTES = "quotaInBytes";
   public static final String QUOTA_IN_NAMESPACE = "quotaInNamespace";
   public static final String OBJECT_ID = "objectID";
@@ -515,6 +526,7 @@ public final class OzoneConsts {
   public static final String OM_SNAPSHOT_DIR = "db.snapshots";
   public static final String OM_SNAPSHOT_CHECKPOINT_DIR = OM_SNAPSHOT_DIR
       + OM_KEY_PREFIX + "checkpointState";
+  public static final String OM_SNAPSHOT_CHECKPOINT_DEFRAGGED_DIR = "checkpointStateDefragged";
   public static final String OM_SNAPSHOT_DIFF_DIR = OM_SNAPSHOT_DIR
       + OM_KEY_PREFIX + "diffState";
 
@@ -555,6 +567,7 @@ public final class OzoneConsts {
    * the OMDBCheckpoint functions.
    */
   public static final String OM_SNAPSHOT_SEPARATOR = "-";
+  public static final String HARDLINK_SEPARATOR = "\t";
 
   private OzoneConsts() {
     // Never Constructed

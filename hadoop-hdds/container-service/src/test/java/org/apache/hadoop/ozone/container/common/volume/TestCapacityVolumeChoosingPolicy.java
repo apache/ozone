@@ -129,7 +129,7 @@ public class TestCapacityVolumeChoosingPolicy {
     String msg = e.getMessage();
     assertThat(msg)
         .contains("No volumes have enough space for a new container.  " +
-            "Most available space: 250 bytes");
+            "Most available space: 240 bytes");
   }
 
   @Test

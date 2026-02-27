@@ -742,7 +742,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
     String volumeName = "vol-" + volumeNumber + "-"
         + RandomStringUtils.secure().nextNumeric(5);
     LOG.trace("Creating volume: {}", volumeName);
-    try (AutoCloseable scope = TracingUtil
+    try (TracingUtil.TraceCloseable scope = TracingUtil
         .createActivatedSpan("createVolume")) {
       long start = System.nanoTime();
       objectStore.createVolume(volumeName);
@@ -774,7 +774,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
         RandomStringUtils.secure().nextNumeric(5);
     LOG.trace("Creating bucket: {} in volume: {}",
         bucketName, volume.getName());
-    try (AutoCloseable scope = TracingUtil
+    try (TracingUtil.TraceCloseable scope = TracingUtil
         .createActivatedSpan("createBucket")) {
 
       long start = System.nanoTime();
@@ -817,7 +817,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
     LOG.trace("Adding key: {} in bucket: {} of volume: {}",
         keyName, bucketName, volumeName);
     try {
-      try (AutoCloseable scope = TracingUtil.createActivatedSpan("createKey")) {
+      try (TracingUtil.TraceCloseable scope = TracingUtil.createActivatedSpan("createKey")) {
         long keyCreateStart = System.nanoTime();
         try (OzoneOutputStream os = bucket.createKey(keyName, keySize.toBytes(),
             replicationConfig, new HashMap<>())) {
@@ -867,7 +867,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
     OzoneVolume volume = getVolume(volumeNumber);
     String volumeName = volume.getName();
     LOG.trace("Cleaning volume: {}", volumeName);
-    try (AutoCloseable scope = TracingUtil
+    try (TracingUtil.TraceCloseable scope = TracingUtil
         .createActivatedSpan("cleanVolume")) {
       objectStore.deleteVolume(volumeName);
       numberOfVolumesCleaned.getAndIncrement();

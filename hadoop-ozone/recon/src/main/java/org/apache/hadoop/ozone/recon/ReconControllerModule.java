@@ -51,11 +51,15 @@ import org.apache.hadoop.ozone.recon.scm.ReconStorageConfig;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.spi.OzoneManagerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconFileMetadataManager;
+import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconContainerMetadataManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconDBProvider;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconFileMetadataManagerImpl;
+import org.apache.hadoop.ozone.recon.spi.impl.ReconGlobalStatsManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.ReconNamespaceSummaryManagerImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTaskFSO;
@@ -88,8 +92,15 @@ public class ReconControllerModule extends AbstractModule {
   private static final Logger LOG =
       LoggerFactory.getLogger(ReconControllerModule.class);
 
+  private final ReconServer reconServer;
+
+  public ReconControllerModule(ReconServer reconServer) {
+    this.reconServer = reconServer;
+  }
+
   @Override
   protected void configure() {
+    bind(ReconServer.class).toInstance(reconServer);
     bind(OzoneConfiguration.class).toProvider(ConfigurationProvider.class);
     bind(ReconHttpServer.class).in(Singleton.class);
     bind(ReconStorageConfig.class).in(Singleton.class);
@@ -101,6 +112,10 @@ public class ReconControllerModule extends AbstractModule {
     bind(ContainerHealthSchemaManager.class).in(Singleton.class);
     bind(ReconContainerMetadataManager.class)
         .to(ReconContainerMetadataManagerImpl.class).in(Singleton.class);
+    bind(ReconFileMetadataManager.class)
+        .to(ReconFileMetadataManagerImpl.class).in(Singleton.class);
+    bind(ReconGlobalStatsManager.class)
+        .to(ReconGlobalStatsManagerImpl.class).in(Singleton.class);
     bind(ReconNamespaceSummaryManager.class)
         .to(ReconNamespaceSummaryManagerImpl.class).in(Singleton.class);
     bind(OzoneManagerServiceProvider.class)

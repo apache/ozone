@@ -21,6 +21,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.commons.lang3.StringUtils.isNotEmpty;
 import static org.apache.commons.lang3.StringUtils.leftPad;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
+import static org.apache.hadoop.hdds.utils.db.IteratorType.KEY_AND_VALUE;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
@@ -28,6 +29,7 @@ import static org.apache.hadoop.ozone.OzoneConsts.COMPACTION_LOG_TABLE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ENABLE_FILESYSTEM_PATHS;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
@@ -99,13 +101,14 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.CompactionLogEntryProto;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.apache.hadoop.hdds.utils.db.DBProfile;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileIterator;
+import org.apache.hadoop.hdds.utils.db.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedOptions;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileIterator;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRawSSTFileReader;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksObjectUtils;
 import org.apache.hadoop.hdfs.protocol.SnapshotDiffReport;
@@ -127,6 +130,7 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
+import org.apache.hadoop.ozone.om.IOmMetadataReader;
 import org.apache.hadoop.ozone.om.KeyManagerImpl;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMStorage;
@@ -157,6 +161,7 @@ import org.apache.ozone.rocksdiff.CompactionNode;
 import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.tag.Slow;
+import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -219,9 +224,6 @@ public abstract class TestOmSnapshot {
     }
   }
 
-  /**
-   * Create a MiniDFSCluster for testing.
-   */
   private void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.setBoolean(OZONE_OM_ENABLE_FILESYSTEM_PATHS, enabledFileSystemPaths);
@@ -234,6 +236,7 @@ public abstract class TestOmSnapshot {
     conf.setInt(OMStorage.TESTING_INIT_LAYOUT_VERSION_KEY, OMLayoutFeature.BUCKET_LAYOUT_SUPPORT.layoutVersion());
     conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
     conf.setInt(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, -1);
+    conf.setTimeDuration(OZONE_OM_SNAPSHOT_CACHE_CLEANUP_SERVICE_RUN_INTERVAL, 100, TimeUnit.MILLISECONDS);
     if (!disableNativeDiff) {
       conf.setTimeDuration(OZONE_OM_SNAPSHOT_COMPACTION_DAG_PRUNE_DAEMON_RUN_INTERVAL, 0, TimeUnit.SECONDS);
     }
@@ -244,7 +247,7 @@ public abstract class TestOmSnapshot {
     cluster.waitForClusterToBeReady();
     client = cluster.newClient();
     // create a volume and a bucket to be used by OzoneFileSystem
-    ozoneBucket = TestDataUtil.createVolumeAndBucket(client, bucketLayout, createLinkedBucket);
+    ozoneBucket = TestDataUtil.createVolumeAndBucket(client, bucketLayout, null, createLinkedBucket);
     if (createLinkedBucket) {
       this.linkedBuckets.put(ozoneBucket.getName(), ozoneBucket.getSourceBucket());
     }
@@ -1990,7 +1993,7 @@ public abstract class TestOmSnapshot {
         .get(SnapshotInfo.getTableKey(volName, linkedBuckets.getOrDefault(buckName, buckName), snapshotName));
     String snapshotDirName =
         OmSnapshotManager.getSnapshotPath(ozoneManager.getConfiguration(),
-            snapshotInfo) + OM_KEY_PREFIX + "CURRENT";
+            snapshotInfo, 0) + OM_KEY_PREFIX + "CURRENT";
     GenericTestUtils
         .waitFor(() -> new File(snapshotDirName).exists(), 1000, 120000);
     return snapshotKeyPrefix;
@@ -2048,10 +2051,10 @@ public abstract class TestOmSnapshot {
   @Test
   public void testSnapshotOpensWithDisabledAutoCompaction() throws Exception {
     String snapPrefix = createSnapshot(volumeName, bucketName);
-    try (RDBStore snapshotDBStore = (RDBStore)
-        ((OmSnapshot) cluster.getOzoneManager().getOmSnapshotManager()
-            .getActiveFsMetadataOrSnapshot(volumeName, bucketName, snapPrefix).get())
-            .getMetadataManager().getStore()) {
+    try (UncheckedAutoCloseableSupplier<IOmMetadataReader> snapshotSupplier =
+             cluster.getOzoneManager().getOmSnapshotManager()
+        .getActiveFsMetadataOrSnapshot(volumeName, bucketName, snapPrefix)) {
+      RDBStore snapshotDBStore = (RDBStore)((OmSnapshot)snapshotSupplier.get()).getMetadataManager().getStore();
       for (String table : snapshotDBStore.getTableNames().values()) {
         assertTrue(snapshotDBStore.getDb().getColumnFamily(table)
             .getHandle().getDescriptor()
@@ -2176,15 +2179,15 @@ public abstract class TestOmSnapshot {
     assertNotNull(activeDbStore.getRocksDBCheckpointDiffer());
     assertEquals(2,  activeDbStore.getDbOptions().listeners().size());
 
-    OmSnapshot omSnapshot = (OmSnapshot) cluster.getOzoneManager()
+    try (UncheckedAutoCloseableSupplier<IOmMetadataReader> omSnapshot = cluster.getOzoneManager()
         .getOmSnapshotManager()
-        .getActiveFsMetadataOrSnapshot(volumeName, bucketName, snapshotName).get();
-
-    RDBStore snapshotDbStore =
-        (RDBStore) omSnapshot.getMetadataManager().getStore();
-    // RocksDBCheckpointDiffer should be null for snapshot DB store.
-    assertNull(snapshotDbStore.getRocksDBCheckpointDiffer());
-    assertEquals(0, snapshotDbStore.getDbOptions().listeners().size());
+        .getActiveFsMetadataOrSnapshot(volumeName, bucketName, snapshotName)) {
+      RDBStore snapshotDbStore =
+          (RDBStore) ((OmSnapshot)omSnapshot.get()).getMetadataManager().getStore();
+      // RocksDBCheckpointDiffer should be null for snapshot DB store.
+      assertNull(snapshotDbStore.getRocksDBCheckpointDiffer());
+      assertEquals(0, snapshotDbStore.getDbOptions().listeners().size());
+    }
   }
 
   @Test
@@ -2520,12 +2523,12 @@ public abstract class TestOmSnapshot {
                 java.nio.file.Path file = sstBackUpDir.resolve(f.getFileName() + ".sst");
                 if (COLUMN_FAMILIES_TO_TRACK_IN_DAG.contains(f.getColumnFamily()) && java.nio.file.Files.exists(file)) {
                   assertTrue(f.isPruned());
-                  try (ManagedRawSSTFileReader<byte[]> sstFileReader = new ManagedRawSSTFileReader<>(
+                  try (ManagedRawSSTFileReader sstFileReader = new ManagedRawSSTFileReader(
                           managedOptions, file.toFile().getAbsolutePath(), 2 * 1024 * 1024);
-                       ManagedRawSSTFileIterator<byte[]> itr = sstFileReader.newIterator(
-                           keyValue -> keyValue.getValue(), null, null)) {
+                       ManagedRawSSTFileIterator<CodecBuffer> itr = sstFileReader.newIterator(
+                           ManagedRawSSTFileIterator.KeyValue::getValue, null, null, KEY_AND_VALUE)) {
                     while (itr.hasNext()) {
-                      assertEquals(0, itr.next().length);
+                      assertEquals(0, itr.next().readableBytes());
                     }
                   }
                 } else {

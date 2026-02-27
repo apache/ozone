@@ -452,10 +452,6 @@ public final class ScmConfigKeys {
   public static final boolean
       OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE_DEFAULT = true;
 
-  public static final String OZONE_SCM_BLOCK_DELETION_MAX_RETRY =
-      "ozone.scm.block.deletion.max.retry";
-  public static final int OZONE_SCM_BLOCK_DELETION_MAX_RETRY_DEFAULT = 4096;
-
   public static final String OZONE_SCM_BLOCK_DELETION_PER_DN_DISTRIBUTION_FACTOR =
       "ozone.scm.block.deletion.per.dn.distribution.factor";
 

@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.recon.upgrade;
 
 import java.util.Arrays;
-import java.util.EnumMap;
 import java.util.Optional;
 import java.util.Set;
 import org.reflections.Reflections;
@@ -34,12 +33,12 @@ public enum ReconLayoutFeature {
   UNHEALTHY_CONTAINER_REPLICA_MISMATCH(2, "Adding replica mismatch state to the unhealthy container table"),
 
   // HDDS-13432: Materialize NSSummary totals and rebuild tree on upgrade
-  NSSUMMARY_AGGREGATED_TOTALS(3, "Aggregated totals for NSSummary and auto-rebuild on upgrade");
+  NSSUMMARY_AGGREGATED_TOTALS(3, "Aggregated totals for NSSummary and auto-rebuild on upgrade"),
+  REPLICATED_SIZE_OF_FILES(4, "Adds replicatedSizeOfFiles to NSSummary");
 
   private final int version;
   private final String description;
-  private final EnumMap<ReconUpgradeAction.UpgradeActionType, ReconUpgradeAction> actions =
-      new EnumMap<>(ReconUpgradeAction.UpgradeActionType.class);
+  private ReconUpgradeAction action;
 
   ReconLayoutFeature(final int version, String description) {
     this.version = version;
@@ -55,28 +54,29 @@ public enum ReconLayoutFeature {
   }
 
   /**
-   * Retrieves the upgrade action for the specified {@link ReconUpgradeAction.UpgradeActionType}.
+   * Retrieves the upgrade action for this feature.
    *
-   * @param type The type of the upgrade action (e.g., FINALIZE).
    * @return An {@link Optional} containing the upgrade action if present.
    */
-  public Optional<ReconUpgradeAction> getAction(ReconUpgradeAction.UpgradeActionType type) {
-    return Optional.ofNullable(actions.get(type));
+  public Optional<ReconUpgradeAction> getAction() {
+    return Optional.ofNullable(action);
   }
 
   /**
-   * Associates a given upgrade action with a specific upgrade phase for this feature.
+   * Associates a given upgrade action with this feature. Only the first upgrade action registered will be used.
    *
-   * @param type The phase/type of the upgrade action.
-   * @param action The upgrade action to associate with this feature.
+   * @param upgradeAction The upgrade action to associate with this feature.
    */
-  public void addAction(ReconUpgradeAction.UpgradeActionType type, ReconUpgradeAction action) {
-    actions.put(type, action);
+  public void addAction(ReconUpgradeAction upgradeAction) {
+    // Required by SpotBugs since this setter exists in an enum.
+    if (this.action == null) {
+      this.action = upgradeAction;
+    }
   }
 
   /**
    * Scans the classpath for all classes annotated with {@link UpgradeActionRecon}
-   * and registers their upgrade actions for the corresponding feature and phase.
+   * and registers their upgrade actions for the corresponding feature.
    * This method dynamically loads and registers all upgrade actions based on their
    * annotations.
    */
@@ -88,7 +88,7 @@ public enum ReconLayoutFeature {
       try {
         ReconUpgradeAction action = (ReconUpgradeAction) actionClass.getDeclaredConstructor().newInstance();
         UpgradeActionRecon annotation = actionClass.getAnnotation(UpgradeActionRecon.class);
-        annotation.feature().addAction(annotation.type(), action);
+        annotation.feature().addAction(action);
       } catch (Exception e) {
         throw new RuntimeException("Failed to register upgrade action: " + actionClass.getSimpleName(), e);
       }
