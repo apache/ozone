@@ -727,7 +727,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
     private HddsProtos.NodeOperationalState persistedOpState;
     private long persistedOpStateExpiryEpochSec = 0;
     private int initialVersion;
-    private int currentVersion = HDDSVersion.CURRENT_VERSION;
+    private int currentVersion = HDDSVersion.SOFTWARE_VERSION.serialize();
 
     /**
      * Default private constructor. To create Builder instance use
