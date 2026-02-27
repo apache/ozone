@@ -86,6 +86,7 @@ message ScmContainerLocationRequest {
   optional GetMetricsRequestProto getMetricsRequest = 47;
   optional ContainerBalancerStatusInfoRequestProto containerBalancerStatusInfoRequest = 48;
   optional ReconcileContainerRequestProto reconcileContainerRequest = 49;
+  optional SCMListContainerIDsRequestProto scmListContainerIDsRequest = 50;
 }
 
 message ScmContainerLocationResponse {
@@ -143,6 +144,7 @@ message ScmContainerLocationResponse {
   optional GetMetricsResponseProto getMetricsResponse = 47;
   optional ContainerBalancerStatusInfoResponseProto containerBalancerStatusInfoResponse = 48;
   optional ReconcileContainerResponseProto reconcileContainerResponse = 49;
+  optional SCMListContainerIDsResponseProto scmListContainerIDsResponse = 50;
 
   enum Status {
     OK = 1;
@@ -199,6 +201,7 @@ enum Type {
   GetMetrics = 43;
   GetContainerBalancerStatusInfo = 44;
   ReconcileContainer = 45;
+  ListContainerIDs = 46;
 }
 
 /**
@@ -286,6 +289,17 @@ message GetContainerWithPipelineBatchResponseProto {
 
 message GetExistContainerWithPipelinesInBatchResponseProto {
   repeated ContainerWithPipeline containerWithPipelines = 1;
+}
+
+message SCMListContainerIDsRequestProto {
+  required uint32 count = 1;
+  optional ContainerID startContainerID = 2;
+  optional LifeCycleState state = 3;
+  optional string traceID = 4;
+}
+
+message SCMListContainerIDsResponseProto {
+  repeated ContainerID containerIDs = 1;
 }
 
 message SCMListContainerRequestProto {

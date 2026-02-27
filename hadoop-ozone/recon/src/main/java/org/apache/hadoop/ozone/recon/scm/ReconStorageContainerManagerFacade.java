@@ -68,7 +68,7 @@ import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.container.CloseContainerEventHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerActionsHandler;
-import org.apache.hadoop.hdds.scm.container.ContainerInfo;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.IncrementalContainerReportHandler;
@@ -536,32 +536,31 @@ public class ReconStorageContainerManagerFacade
       throws IOException {
     if (isSyncDataFromSCMRunning.compareAndSet(false, true)) {
       try {
-        List<ContainerInfo> containers = containerManager.getContainers();
+        List<ContainerID> containerIDs = containerManager.getContainerIDs();
 
         long totalContainerCount = scmServiceProvider.getContainerCount(
             HddsProtos.LifeCycleState.CLOSED);
         long containerCountPerCall =
             getContainerCountPerCall(totalContainerCount);
-        long startContainerId = 1;
+        ContainerID startContainerId = ContainerID.valueOf(1);
         long retrievedContainerCount = 0;
         if (totalContainerCount > 0) {
           while (retrievedContainerCount < totalContainerCount) {
-            List<ContainerInfo> listOfContainers = scmServiceProvider.
-                getListOfContainers(startContainerId,
+            List<ContainerID> listOfContainers = scmServiceProvider.
+                getListOfContainerIDs(startContainerId,
                     Long.valueOf(containerCountPerCall).intValue(),
                     HddsProtos.LifeCycleState.CLOSED);
             if (null != listOfContainers && !listOfContainers.isEmpty()) {
               LOG.info("Got list of containers from SCM : " +
                   listOfContainers.size());
-              listOfContainers.forEach(containerInfo -> {
-                long containerID = containerInfo.getContainerID();
+              listOfContainers.forEach(containerID -> {
                 boolean isContainerPresentAtRecon =
-                    containers.contains(containerInfo);
+                    containerIDs.contains(containerID);
                 if (!isContainerPresentAtRecon) {
                   try {
                     ContainerWithPipeline containerWithPipeline =
                         scmServiceProvider.getContainerWithPipeline(
-                            containerID);
+                            containerID.getId());
                     containerManager.addNewContainer(containerWithPipeline);
                   } catch (IOException e) {
                     LOG.error("Could not get container with pipeline " +
@@ -569,8 +568,8 @@ public class ReconStorageContainerManagerFacade
                   }
                 }
               });
-              startContainerId = listOfContainers.get(
-                  listOfContainers.size() - 1).getContainerID() + 1;
+              long lastID = listOfContainers.get(listOfContainers.size() - 1).getId();
+              startContainerId = ContainerID.valueOf(lastID + 1);
             } else {
               LOG.info("No containers found at SCM in CLOSED state");
               return false;
