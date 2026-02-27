@@ -97,12 +97,14 @@ Split MPU metadata into:
 message MultipartPartInfo {
   required string partName = 1;
   required uint32 partNumber = 2;
-  required uint64 dataSize = 3;
-  required uint64 modificationTime = 4;
-  repeated KeyLocationList keyLocationList = 5;
-  repeated hadoop.hdds.KeyValue metadata = 6;
-  optional FileEncryptionInfoProto fileEncryptionInfo = 7;
-  optional FileChecksumProto fileChecksum = 8;
+  repeated KeyLocationList keyLocationList = 6;
+  required uint64 dataSize = 7;
+  required uint64 modificationTime = 8;
+  required uint64 objectID = 9;
+  required uint64 updateID = 10;
+  repeated hadoop.hdds.KeyValue metadata = 11;
+  optional FileEncryptionInfoProto fileEncryptionInfo = 12;
+  optional FileChecksumProto fileChecksum = 13;
 }
 ```
 
@@ -134,12 +136,17 @@ Keep `multipartInfoTable` for MPU metadata, and store part rows in `multipartPar
   * `uploadId` (`String`)
   * `partNumber` (`int32`)
 * Persisted key bytes are encoded as:
-  * `uploadId(UTF-8 bytes)` + `0x00` + `partNumber(4-byte big-endian int)`
+  * `uploadId(UTF-8 bytes)` + `'/' (0x2f)` + `partNumber(4-byte big-endian int)`
 * Prefix scan for all parts in one upload uses:
-  * `uploadId(UTF-8 bytes)` + `0x00`
+  * `uploadId(UTF-8 bytes)` + `'/' (0x2f)`
 
 ```text
-Note: The null byte separator ensures that the "uploadId" is properly delimited from the "partNumber" in the byte encoding, allowing for correct lexicographical ordering.
+`OmMultipartPartKey.toString()` returns:
+  - full key:   "<uploadId>/<partNumber>"
+  - prefix key: "<uploadId>" (used only as in-memory prefix object)
+
+Example:
+  OmMultipartPartKey.of("abc123-uuid-456", 2).toString() == "abc123-uuid-456/2"
 ```
 
 The parts are stored in lexicographical order by uploadID and part number, which complies with the S3 specifications for ordering of ListPart and ListMultipartUpload operations.
@@ -157,10 +164,10 @@ message MultipartKeyInfo {
     optional uint64 parentID = 8;
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 9;
     optional uint32 schemaVersion = 10; // default 0
-    // Following is pulled in from part info as these will not change for a given part number
-    required string volumeName = 11;
-    required string bucketName = 12;
-    required string keyName = 13;
+    // this is being pull up from the part information as this wil not change per part for a given key
+    optional string volumeName = 11;
+    optional string bucketName = 12;
+    optional string keyName = 13;
 }
 ```
 
@@ -217,12 +224,15 @@ OmMultipartKeyInfo {
 `multipartPartsTable` (logical keys):
 ```text
 Key:   OmMultipartPartKey{uploadId="abc123-uuid-456", partNumber=1}
+      String form: "abc123-uuid-456/1"
 Value: OmMultipartPartInfo{partNumber=1, partName=".../part1", ...}
 
 Key:   OmMultipartPartKey{uploadId="abc123-uuid-456", partNumber=2}
+      String form: "abc123-uuid-456/2"
 Value: OmMultipartPartInfo{partNumber=2, partName=".../part2", ...}
 ...
 Key:   OmMultipartPartKey{uploadId="abc123-uuid-456", partNumber=10}
+      String form: "abc123-uuid-456/10"
 Value: OmMultipartPartInfo{partNumber=10, partName=".../part10", ...}
 ```
 
@@ -231,8 +241,8 @@ Value: OmMultipartPartInfo{partNumber=10, partName=".../part10", ...}
 uploadId = "abc123-uuid-456"
 partNumber = 2
 
-encodedKey = [61 62 63 31 32 33 2d 75 75 69 64 2d 34 35 36 00 00 00 00 02]
-             [--------------uploadId UTF-8---------------][00][--int32 BE--]
+encodedKey = [61 62 63 31 32 33 2d 75 75 69 64 2d 34 35 36 2f 00 00 00 02]
+             [--------------uploadId UTF-8---------------][2f][-int32 BE-]
 ```
 
 #### 2.1.2 Alternative Approach: Add `multipartMetadataTable` + `multipartPartsTable`
@@ -356,7 +366,7 @@ After:  partKeyInfoList=[{part=1,size=64MB},{part=2,size=40MB}]
   * `schemaVersion=0`: same old inline behavior.
   * `schemaVersion=1`:
     * create `multipartPartKey = OmMultipartPartKey(uploadId, partNumber)`,
-    * write `multipartPartTable[multipartPartKey] = OmMultipartPartInfo{openKey, partName, partNumber, size, metadata, locations}`
+    * write `multipartPartTable[multipartPartKey] = OmMultipartPartInfo{openKey, partName, partNumber, dataSize, modificationTime, objectID, updateID, metadata, keyLocationList, fileEncryptionInfo?, fileChecksum?}`
     * keep current part open key in `openKeyTable` (needed later by list/complete/abort),
     * if overwriting an existing part row, delete old part open key and adjust quota.
 * `multipartInfoTable[multipartKey]` is still updated for metadata/updateID.
@@ -365,7 +375,7 @@ After:  partKeyInfoList=[{part=1,size=64MB},{part=2,size=40MB}]
 Example (`schemaVersion=1`):
 ```text
 multipartPartTable[OmMultipartPartKey{uploadId="upload-001", partNumber=2}] ->
-  OmMultipartPartInfo{partNumber=2, openKey=/vol1/b1/fileA#client-77, size=40MB}
+  OmMultipartPartInfo{partNumber=2, openKey=/vol1/b1/fileA#client-77, dataSize=40MB}
 ```
 
 ##### Multipart Upload Complete
@@ -392,8 +402,8 @@ Complete [1,2,3] -> keyTable[/vol1/b1/fileA] written, MPU rows removed
   * `schemaVersion=0`: use inline `partKeyInfoMap`.
   * `schemaVersion=1`:
     * scan `multipartPartTable` with prefix `OmMultipartPartKey.prefix(uploadId)`,
-    * rebuild `PartKeyInfo` view from `OmMultipartPartInfo`,
-    * pull block locations from stored part metadata / open keys as needed.
+    * rebuild `PartKeyInfo` view directly from `OmMultipartPartInfo` (including locations, metadata, objectID/updateID, and optional encryption/checksum fields),
+    * track part open keys from part metadata for cleanup.
 * Perform same user-facing validation (order, existence, eTag/partName, min size).
 * Commit final key to `keyTable`.
 * Cleanup:
