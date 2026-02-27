@@ -18,7 +18,9 @@
 package org.apache.hadoop.ozone.om;
 
 import static java.util.UUID.randomUUID;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_KEY;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.DIRECTORY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_ALREADY_EXISTS;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.NOT_A_FILE;
@@ -26,8 +28,10 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PART
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -188,7 +192,7 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends TestOzoneManag
   @Test
   void testLinearizableReadConsistency() throws Exception {
     // Setup another client
-    OzoneConfiguration clientConf = OzoneConfiguration.of(getConf());
+    OzoneConfiguration clientConf = new OzoneConfiguration(getConf());
     clientConf.setBoolean(OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, true);
     OzoneClient anotherClient = null;
     try {
@@ -469,5 +473,99 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends TestOzoneManag
     assertEquals(leaderOMNodeId, omResponse.getLeaderOMNodeId());
     // There should not be any change in the leader proxy's next proxy OM node ID
     assertEquals(initialNextProxyOmNodeId, omFailoverProxyProvider.getNextProxyOMNodeId());
+  }
+
+  @Test
+  void testClientWithFollowerReadDisabled() throws Exception {
+    // Setup a client with follower read disabled
+    OzoneConfiguration clientConf = new OzoneConfiguration(getConf());
+    clientConf.setBoolean(OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, false);
+    OzoneClient leaderOnlyClient = null;
+    try {
+      // This will trigger getServiceId so the client should point to the leader
+      leaderOnlyClient = OzoneClientFactory.getRpcClient(getOmServiceId(), clientConf);
+      ObjectStore leaderOnlyObjectStore = leaderOnlyClient.getObjectStore();
+      assertNull(OmTestUtil.getFollowerReadFailoverProxyProvider(leaderOnlyObjectStore));
+      HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> leaderProxyProvider =
+          OmTestUtil.getFailoverProxyProvider(leaderOnlyObjectStore);
+
+      // The OMFailoverProxyProvider will point to the current leader OM node.
+      OzoneManager currentLeader = getCluster().getOMLeader();
+      assertNotNull(currentLeader);
+      String leaderOMNodeId = currentLeader.getOMNodeId();
+
+      assertNotNull(leaderOMNodeId);
+      assertEquals(leaderOMNodeId, leaderProxyProvider.getCurrentProxyOMNodeId());
+
+      // Try to transfer leadership
+      OzoneManager newLeader = getCluster().transferOMLeadershipToAnotherNode(currentLeader);
+      assertNotEquals(currentLeader.getOMNodeId(), newLeader.getOMNodeId());
+
+      // Do some reads and ensure that the client will failover to the new leader
+      leaderOnlyObjectStore.getS3Volume();
+      assertEquals(newLeader.getOMNodeId(), leaderProxyProvider.getCurrentProxyOMNodeId());
+    } finally {
+      IOUtils.closeQuietly(leaderOnlyClient);
+    }
+
+  }
+
+  @Test
+  void testClientWithLinearizableLeaderRead() throws Exception {
+    OzoneConfiguration clientConf = new OzoneConfiguration(getConf());
+    clientConf.setBoolean(OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, false);
+    clientConf.set(OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_KEY, "LINEARIZABLE_LEADER_ONLY");
+
+    OzoneClient ozoneClient = null;
+    try {
+      ozoneClient = OzoneClientFactory.getRpcClient(clientConf);
+      ObjectStore objectStore = ozoneClient.getObjectStore();
+      HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> leaderFailoverProxyProvider =
+          OmTestUtil.getFailoverProxyProvider(objectStore);
+      OzoneManager leaderOM = getCluster().getOMLeader();
+      long previousLinearizableRead = leaderOM.getMetrics().getNumLinearizableRead();
+
+      // Trigger linearizable leader read
+      objectStore.listVolumes("");
+
+      // Get the leader OM node ID
+      String leaderOMNodeId = leaderFailoverProxyProvider.getCurrentProxyOMNodeId();
+
+      assertEquals(leaderOM.getOMNodeId(), leaderOMNodeId);
+      leaderOM.getMetrics().getNumLinearizableRead();
+      long currentLinearizableRead = leaderOM.getMetrics().getNumLinearizableRead();
+      assertThat(currentLinearizableRead).isGreaterThan(previousLinearizableRead);
+    } finally {
+      IOUtils.closeQuietly(ozoneClient);
+    }
+  }
+
+  @Test
+  void testClientWithLocalLeaseEnabled() throws Exception {
+    OzoneConfiguration clientConf = new OzoneConfiguration(getConf());
+    clientConf.setBoolean(OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY, true);
+    clientConf.set(OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_KEY, "LOCAL_LEASE");
+    OzoneClient ozoneClient = null;
+    try {
+      ozoneClient = OzoneClientFactory.getRpcClient(clientConf);
+      ObjectStore objectStore = ozoneClient.getObjectStore();
+      HadoopRpcOMFollowerReadFailoverProxyProvider followerReadFailoverProxyProvider =
+          OmTestUtil.getFollowerReadFailoverProxyProvider(objectStore);
+      assertNotNull(followerReadFailoverProxyProvider);
+      assertTrue(followerReadFailoverProxyProvider.isUseFollowerRead());
+
+      String currentOMNodeId = followerReadFailoverProxyProvider.getCurrentProxy().getNodeId();
+      OzoneManager ozoneManager = getCluster().getOzoneManager(currentOMNodeId);
+      assertNotNull(ozoneManager);
+      assertEquals(currentOMNodeId, ozoneManager.getOMNodeId());
+
+      long previousLocalLeaseSuccess = ozoneManager.getMetrics().getNumFollowerReadLocalLeaseSuccess();
+
+      objectStore.listVolumes("");
+      long currentLocalLeaseSuccess = ozoneManager.getMetrics().getNumFollowerReadLocalLeaseSuccess();
+      assertThat(currentLocalLeaseSuccess).isGreaterThan(previousLocalLeaseSuccess);
+    } finally {
+      IOUtils.closeQuietly(ozoneClient);
+    }
   }
 }
