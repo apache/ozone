@@ -277,5 +277,6 @@ public class OMException extends IOException {
     TOO_MANY_SNAPSHOTS,
 
     REVOKED_TOKEN,
+    MALFORMED_POLICY_DOCUMENT,
   }
 }

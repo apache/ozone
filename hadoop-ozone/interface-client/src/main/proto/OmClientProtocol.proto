@@ -578,6 +578,7 @@ enum Status {
     TOO_MANY_SNAPSHOTS = 98;
 
     REVOKED_TOKEN = 99;
+    MALFORMED_POLICY_DOCUMENT = 100;
 }
 
 /**

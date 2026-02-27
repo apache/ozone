@@ -73,6 +73,7 @@ public class TestS3STSEndpoint {
   private static final String ROLE_USER_ARN = "arn:aws:sts::123456789012:assumed-role/test-role/" + ROLE_SESSION_NAME;
   private static final String STS_NS = "https://sts.amazonaws.com/doc/2011-06-15/";
   private static final String AWS_FAULT_NS = "http://webservices.amazon.com/AWSFault/2005-15-09";
+  private static final String REQUEST_ID = "test-request-id";
 
   @BeforeEach
   public void setup() throws Exception {
@@ -105,7 +106,7 @@ public class TestS3STSEndpoint {
     auditLogger = mock(AuditLogger.class);
     endpoint.setAuditLogger(auditLogger);
     
-    when(requestIdentifier.getRequestId()).thenReturn("test-request-id");
+    when(requestIdentifier.getRequestId()).thenReturn(REQUEST_ID);
     endpoint.setRequestIdentifier(requestIdentifier);
 
     SignatureInfo signatureInfo = new SignatureInfo.Builder(SignatureInfo.Version.V4)
@@ -212,8 +213,7 @@ public class TestS3STSEndpoint {
     assertEquals(400, ex.getHttpCode());
     verifyNoInteractions(auditLogger);
 
-    final String requestId = "test-request-id";
-    ex.setRequestId(requestId);
+    ex.setRequestId(REQUEST_ID);
     assertStsErrorXml(ex.toXml(), AWS_FAULT_NS, "Sender", "InvalidAction",
         "Could not find operation UnsupportedAction for version 2011-06-15");
   }
@@ -226,8 +226,7 @@ public class TestS3STSEndpoint {
     assertEquals(400, ex.getHttpCode());
     verifyNoInteractions(auditLogger);
 
-    final String requestId = "test-request-id";
-    ex.setRequestId(requestId);
+    ex.setRequestId(REQUEST_ID);
     assertStsErrorXml(ex.toXml(), AWS_FAULT_NS, "Sender", "InvalidAction",
         "Could not find operation UnsupportedAction for version NO_VERSION_SPECIFIED");
   }
@@ -241,8 +240,7 @@ public class TestS3STSEndpoint {
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
     verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
 
-    final String requestId = "test-request-id";
-    ex.setRequestId(requestId);
+    ex.setRequestId(REQUEST_ID);
     assertStsErrorXml(ex.toXml(), AWS_FAULT_NS, "Sender", "InvalidAction",
         "Could not find operation AssumeRole for version 2000-01-01");
   }
@@ -256,8 +254,7 @@ public class TestS3STSEndpoint {
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
     verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
 
-    final String requestId = "test-request-id";
-    ex.setRequestId(requestId);
+    ex.setRequestId(REQUEST_ID);
     assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", "Invalid Value: DurationSeconds");
   }
 
@@ -285,8 +282,7 @@ public class TestS3STSEndpoint {
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
     verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
 
-    final String requestId = "test-request-id";
-    ex.setRequestId(requestId);
+    ex.setRequestId(REQUEST_ID);
     assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError",
         "Value '" + tooLargePolicy + "' at 'policy' failed to satisfy constraint: Member " +
         "must have length less than or equal to 2048");
@@ -302,8 +298,7 @@ public class TestS3STSEndpoint {
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
     verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
 
-    final String requestId = "test-request-id";
-    ex.setRequestId(requestId);
+    ex.setRequestId(REQUEST_ID);
     assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError",
         "Invalid role ARN (does not start with arn:aws:iam::)");
   }
@@ -317,8 +312,7 @@ public class TestS3STSEndpoint {
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
     verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
 
-    final String requestId = "test-request-id";
-    ex.setRequestId(requestId);
+    ex.setRequestId(REQUEST_ID);
     assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", "Value null at 'roleArn'");
   }
 
@@ -333,8 +327,7 @@ public class TestS3STSEndpoint {
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
     verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
 
-    final String requestId = "test-request-id";
-    ex.setRequestId(requestId);
+    ex.setRequestId(REQUEST_ID);
     assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", "Invalid role ARN: missing role name");
   }
 
@@ -349,8 +342,7 @@ public class TestS3STSEndpoint {
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
     verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
 
-    final String requestId = "test-request-id";
-    ex.setRequestId(requestId);
+    ex.setRequestId(REQUEST_ID);
     assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", "Invalid AWS account ID in ARN"
     );
   }
@@ -363,8 +355,7 @@ public class TestS3STSEndpoint {
     assertEquals(501, ex.getHttpCode());
     verifyNoInteractions(auditLogger);
 
-    final String requestId = "test-request-id";
-    ex.setRequestId(requestId);
+    ex.setRequestId(REQUEST_ID);
     assertStsErrorXml(ex.toXml(), AWS_FAULT_NS, "Sender", "InvalidAction",
         "Operation GetSessionToken is not supported yet.");
   }
@@ -378,8 +369,7 @@ public class TestS3STSEndpoint {
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
     verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
 
-    final String requestId = "test-request-id";
-    ex.setRequestId(requestId);
+    ex.setRequestId(REQUEST_ID);
     assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", "Value null at 'roleSessionName'");
   }
 
@@ -393,8 +383,7 @@ public class TestS3STSEndpoint {
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
     verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
 
-    final String requestId = "test-request-id";
-    ex.setRequestId(requestId);
+    ex.setRequestId(REQUEST_ID);
     assertStsErrorXml(
         ex.toXml(), STS_NS, "Sender", "ValidationError", "1 validation error detected: " +
         "Invalid character '/' in RoleSessionName: it must be 2-64 characters long and contain only alphanumeric " +
@@ -411,8 +400,7 @@ public class TestS3STSEndpoint {
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
     verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
 
-    final String requestId = "test-request-id";
-    ex.setRequestId(requestId);
+    ex.setRequestId(REQUEST_ID);
     assertStsErrorXml(
         ex.toXml(), STS_NS, "Sender", "ValidationError", "1 validation error detected: Invalid RoleSessionName " +
         "length 1: it must be 2-64 characters long and contain only alphanumeric characters and +, =, ,, ., @, -");
@@ -429,8 +417,7 @@ public class TestS3STSEndpoint {
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
     verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
 
-    final String requestId = "test-request-id";
-    ex.setRequestId(requestId);
+    ex.setRequestId(REQUEST_ID);
     assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", "Invalid role ARN (unexpected field count)");
   }
 
@@ -446,8 +433,7 @@ public class TestS3STSEndpoint {
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
     verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
 
-    final String requestId = "test-request-id";
-    ex.setRequestId(requestId);
+    ex.setRequestId(REQUEST_ID);
     assertStsErrorXml(ex.toXml(), STS_NS, "Receiver", "InternalFailure", "An internal error has occurred.");
   }
 
@@ -463,10 +449,74 @@ public class TestS3STSEndpoint {
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
     verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
 
-    final String requestId = "test-request-id";
-    ex.setRequestId(requestId);
+    ex.setRequestId(REQUEST_ID);
     assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "AccessDenied",
         "User is not authorized to perform: sts:AssumeRole on resource: " + ROLE_ARN);
+  }
+
+  @Test
+  public void testStsUnsupportedOperationWhenBackendThrowsNotSupportedOperation() throws Exception {
+    when(objectStore.assumeRole(anyString(), anyString(), anyInt(), any(), anyString()))
+        .thenThrow(new OMException("Operation is not supported", OMException.ResultCodes.NOT_SUPPORTED_OPERATION));
+
+    final OSTSException ex = assertThrows(OSTSException.class, () ->
+        endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+
+    assertEquals(501, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
+
+    ex.setRequestId(REQUEST_ID);
+    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "UnsupportedOperation", "Operation is not supported");
+  }
+
+  @Test
+  public void testStsUnsupportedOperationWhenBackendThrowsFeatureNotEnabled() throws Exception {
+    when(objectStore.assumeRole(anyString(), anyString(), anyInt(), any(), anyString()))
+        .thenThrow(new OMException("Feature is not enabled", OMException.ResultCodes.FEATURE_NOT_ENABLED));
+
+    final OSTSException ex = assertThrows(OSTSException.class, () ->
+        endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+
+    assertEquals(501, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
+
+    ex.setRequestId(REQUEST_ID);
+    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "UnsupportedOperation", "Feature is not enabled");
+  }
+
+  @Test
+  public void testStsValidationErrorWhenBackendThrowsInvalidRequest() throws Exception {
+    when(objectStore.assumeRole(anyString(), anyString(), anyInt(), any(), anyString()))
+        .thenThrow(new OMException("Invalid request parameter", OMException.ResultCodes.INVALID_REQUEST));
+
+    final OSTSException ex = assertThrows(OSTSException.class, () ->
+        endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+
+    assertEquals(400, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
+
+    ex.setRequestId(REQUEST_ID);
+    assertStsErrorXml(ex.toXml(), STS_NS, "Sender", "ValidationError", "Invalid request parameter");
+  }
+
+  @Test
+  public void testStsMalformedPolicyDocumentWhenBackendThrowsMalformedPolicyDocument() throws Exception {
+    when(objectStore.assumeRole(anyString(), anyString(), anyInt(), any(), anyString()))
+        .thenThrow(new OMException("Malformed session policy", OMException.ResultCodes.MALFORMED_POLICY_DOCUMENT));
+
+    final OSTSException ex = assertThrows(OSTSException.class, () ->
+        endpoint.get("AssumeRole", ROLE_ARN, ROLE_SESSION_NAME, 3600, "2011-06-15", null));
+
+    assertEquals(400, ex.getHttpCode());
+    verify(auditLogger).logWriteFailure(any(AuditMessage.class));
+    verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
+
+    ex.setRequestId(REQUEST_ID);
+    assertStsErrorXml(
+        ex.toXml(), STS_NS, "Sender", "MalformedPolicyDocument", "Malformed session policy");
   }
 
   @Test
@@ -481,8 +531,7 @@ public class TestS3STSEndpoint {
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
     verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
 
-    final String requestId = "test-request-id";
-    ex.setRequestId(requestId);
+    ex.setRequestId(REQUEST_ID);
     assertStsErrorXml(ex.toXml(), STS_NS, "Receiver", "InternalFailure", "An internal error has occurred.");
   }
 
@@ -500,8 +549,7 @@ public class TestS3STSEndpoint {
     verify(auditLogger).logWriteFailure(any(AuditMessage.class));
     verify(auditLogger, never()).logWriteSuccess(any(AuditMessage.class));
 
-    final String requestId = "test-request-id";
-    ex.setRequestId(requestId);
+    ex.setRequestId(REQUEST_ID);
 
     final String xml = ex.toXml();
     // The order of individual validation errors is not guaranteed because it's a HashSet, so check
@@ -540,6 +588,6 @@ public class TestS3STSEndpoint {
     assertTrue(message.contains(expectedMessageContains), "Expected message to contain: " + expectedMessageContains);
 
     final String requestId = doc.getElementsByTagName("RequestId").item(0).getTextContent();
-    assertEquals("test-request-id", requestId);
+    assertEquals(REQUEST_ID, requestId);
   }
 }
