@@ -572,8 +572,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
     builder.setPersistedOpStateExpiry(persistedOpStateExpiryEpochSec);
 
     final boolean handlesUnknownPorts =
-        ClientVersion.deserialize(clientVersion)
-        .compareTo(VERSION_HANDLES_UNKNOWN_DN_PORTS) >= 0;
+        VERSION_HANDLES_UNKNOWN_DN_PORTS.isSupportedBy(clientVersion);
     final int requestedPortCount = filterPorts.size();
     final boolean maySkip = requestedPortCount > 0;
     for (Port port : ports) {
