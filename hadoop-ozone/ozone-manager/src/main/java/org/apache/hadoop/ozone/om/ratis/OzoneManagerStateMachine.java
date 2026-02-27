@@ -567,7 +567,13 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
             "term index: {}", leaderNodeId, firstTermIndexInLog);
 
     return CompletableFuture.supplyAsync(
-        () -> ozoneManager.installSnapshotFromLeader(leaderNodeId),
+        () -> {
+          try {
+            return ozoneManager.installSnapshotFromLeader(leaderNodeId);
+          } catch (IOException e) {
+            throw new java.util.concurrent.CompletionException(e);
+          }
+        },
         installSnapshotExecutor);
   }
 

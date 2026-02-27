@@ -1047,6 +1047,46 @@ public class TestOMRatisSnapshots {
     assertLogCapture(logCapture, msg);
   }
 
+  @Test
+  public void testInstallSnapshotFromLeaderFailedDownloadCleanupSucceeds()
+      throws Exception {
+    final String leaderOMNodeId = OmTestUtil.getCurrentOmProxyNodeId(objectStore);
+    OzoneManager leaderOM = cluster.getOzoneManager(leaderOMNodeId);
+    String followerNodeId = leaderOM.getPeerNodes().get(0).getNodeId();
+    if (cluster.isOMActive(followerNodeId)) {
+      followerNodeId = leaderOM.getPeerNodes().get(1).getNodeId();
+    }
+    OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
+    File candidateDir = followerOM.getOmSnapshotProvider().getCandidateDir();
+    assertTrue(candidateDir.exists(),
+        "Candidate dir should exist before download attempt");
+
+    // Inject fault: throw on first pause (after first download part, before untar)
+    FaultInjector faultInjector =
+        new ThrowOnPauseFaultInjector("Simulated download failure for test");
+    followerOM.getOmSnapshotProvider().setInjector(faultInjector);
+
+    // Advance leader so follower will need install snapshot when started
+    OzoneManagerRatisServer leaderRatisServer = leaderOM.getOmRatisServer();
+    writeKeysToIncreaseLogIndex(leaderRatisServer, 100);
+
+    // Start follower - Ratis will trigger install snapshot
+    cluster.startInactiveOM(followerNodeId);
+
+    // Wait for install snapshot attempt to complete (download fails, cleanup runs)
+    GenericTestUtils.waitFor(() -> {
+      return !candidateDir.exists() || (candidateDir.list() != null && candidateDir.list().length == 0);
+    }, 500, 10_000);
+
+    // Verify cleanup succeeded: candidate dir is empty
+    String[] filesInCandidate = candidateDir.exists() ? candidateDir.list() : new String[0];
+    assertNotNull(filesInCandidate);
+    assertEquals(0, filesInCandidate.length,
+        "Candidate dir should be cleaned after failed download");
+    // Clear injector
+    followerOM.getOmSnapshotProvider().setInjector(null);
+  }
+
   /**
    * Moves all contents from the checkpoint location into the omDbDir.
    * This reorganizes the checkpoint structure so that all checkpoint files
@@ -1310,6 +1350,23 @@ public class TestOMRatisSnapshots {
     @Override
     public void reset() throws IOException {
       init();
+    }
+  }
+
+  /**
+   * FaultInjector that throws IOException on pause(), simulating a download failure
+   * after the first part completes. Used to test cleanup on failed download.
+   */
+  private static class ThrowOnPauseFaultInjector extends FaultInjector {
+    private final IOException toThrow;
+
+    ThrowOnPauseFaultInjector(String message) {
+      this.toThrow = new IOException(message);
+    }
+
+    @Override
+    public void pause() throws IOException {
+      throw toThrow;
     }
   }
 }
