@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.utils;
 
-import com.google.common.base.Supplier;
 import com.google.common.util.concurrent.Striped;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -39,18 +38,6 @@ public final class SimpleStriped {
   }
 
   /**
-   * Creates a {@code Striped<L>} with eagerly initialized, strongly referenced
-   * locks. Every lock is obtained from the passed supplier.
-   *
-   * @param stripes the minimum number of stripes (locks) required.
-   * @param supplier a {@code Supplier<L>} object to obtain locks from.
-   * @return a new {@code Striped<L>}.
-   */
-  public static <L> Striped<L> custom(int stripes, Supplier<L> supplier) {
-    return Striped.custom(stripes, supplier);
-  }
-
-  /**
    * Creates a {@code Striped<ReadWriteLock>} with eagerly initialized,
    * strongly referenced read-write locks. Every lock is reentrant.
    *
@@ -60,7 +47,7 @@ public final class SimpleStriped {
    */
   public static Striped<ReadWriteLock> readWriteLock(int stripes,
       boolean fair) {
-    return custom(stripes, () -> new ReentrantReadWriteLock(fair));
+    return Striped.custom(stripes, () -> new ReentrantReadWriteLock(fair));
   }
 
 }

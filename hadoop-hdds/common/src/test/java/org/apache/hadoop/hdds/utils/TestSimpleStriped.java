@@ -21,9 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 import com.google.common.util.concurrent.Striped;
-import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.junit.jupiter.api.Test;
 
@@ -51,16 +49,4 @@ public class TestSimpleStriped {
     assertNotEquals(lock, striped.get("key2"));
   }
 
-  @Test
-  void testCustomStripes() {
-    int size = 128;
-    Striped<Lock> striped = SimpleStriped.custom(size,
-        ReentrantLock::new);
-    assertEquals(128, striped.size());
-    Lock lock = striped.get("key1");
-    // Ensure same key return same lock.
-    assertEquals(lock, striped.get("key1"));
-    // And different key (probably) return a different lock/
-    assertNotEquals(lock, striped.get("key2"));
-  }
 }
