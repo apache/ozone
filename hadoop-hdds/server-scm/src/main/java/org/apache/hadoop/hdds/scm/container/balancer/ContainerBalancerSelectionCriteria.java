@@ -160,9 +160,9 @@ public class ContainerBalancerSelectionCriteria {
   public boolean shouldBeExcluded(ContainerID containerID,
       DatanodeDetails node, long sizeMovedAlready) {
     ContainerInfo container;
-    //if any container is excluded only those should be used
+    //If includeContainers is specified, exclude containers not in the include list
     if (!includeContainers.isEmpty() && !includeContainers.contains(containerID)) {
-      return true; // Exclude if not in include list
+      return true;
     }
     try {
       container = containerManager.getContainer(containerID);

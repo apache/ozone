@@ -93,7 +93,7 @@ public final class ContainerBalancerConfiguration {
 
   @Config(key = "hdds.container.balancer.include.containers", type = ConfigType.STRING, defaultValue =
       "", tags = {ConfigTag.BALANCER}, description = "List of container IDs " +
-      "to include to balancing. For example \"1, 4, 5\" or \"1,4,5\".")
+      "to include in balancing. For example \"1, 4, 5\" or \"1,4,5\".")
   private String includeContainers = "";
 
   @Config(key = "hdds.container.balancer.move.timeout", type = ConfigType.TIME, defaultValue = "65m",
@@ -470,7 +470,7 @@ public final class ContainerBalancerConfiguration {
         networkTopologyEnable,
         "Whether to Trigger Refresh Datanode Usage Info",
         triggerDuEnable,
-        "Container IDs to Include to Balancing",
+        "Container IDs to Include in Balancing",
         includeContainers.equals("") ? "None" : includeContainers,
         "Container IDs to Exclude from Balancing",
         excludeContainers.equals("") ? "None" : excludeContainers,

@@ -144,7 +144,7 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
             configuration.getMoveNetworkTopologyEnable(),
             "Whether to Trigger Refresh Datanode Usage Info",
             configuration.getTriggerDuBeforeMoveEnable(),
-            "Container IDs to Include to Balancing",
+            "Container IDs to Include in Balancing",
             configuration.getIncludeContainers().isEmpty() ? "None" : configuration.getIncludeContainers(),
             "Container IDs to Exclude from Balancing",
             configuration.getExcludeContainers().isEmpty() ? "None" : configuration.getExcludeContainers(),

@@ -80,7 +80,7 @@ class TestContainerBalancerSubCommand {
       "Interval between each Iteration                    0min\n" +
       "Whether to Enable Network Topology                 false\n" +
       "Whether to Trigger Refresh Datanode Usage Info     false\n" +
-      "Container IDs to Include to Balancing              None\n" +
+      "Container IDs to Include in Balancing              None\n" +
       "Container IDs to Exclude from Balancing            None\n" +
       "Datanodes Specified to be Balanced                 None\n" +
       "Datanodes Excluded from Balancing                  None";
