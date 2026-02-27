@@ -22,8 +22,8 @@ import static java.net.HttpURLConnection.HTTP_OK;
 import static org.apache.hadoop.ozone.OzoneConsts.MULTIPART_FORM_DATA_BOUNDARY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_CHECKPOINT_USE_V2_DEFAULT;
-import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_CHECKPOINT_USE_V2_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_PROVIDER_CONNECTION_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_PROVIDER_CONNECTION_TIMEOUT_KEY;
@@ -95,7 +95,7 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
     this.httpPolicy = httpPolicy;
     this.spnegoEnabled = spnegoEnabled;
     this.connectionFactory = connectionFactory;
-    this.useV2CheckpointApi = OZONE_OM_DB_CHECKPOINT_USE_V2_DEFAULT;
+    this.useV2CheckpointApi = OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_DEFAULT;
   }
 
   public OmRatisSnapshotProvider(MutableConfigurationSource conf,
@@ -104,8 +104,8 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
     LOG.info("Initializing OM Snapshot Provider");
     this.peerNodesMap = new ConcurrentHashMap<>();
     peerNodesMap.putAll(peerNodeDetails);
-    this.useV2CheckpointApi = conf.getBoolean(OZONE_OM_DB_CHECKPOINT_USE_V2_KEY,
-        OZONE_OM_DB_CHECKPOINT_USE_V2_DEFAULT);
+    this.useV2CheckpointApi = conf.getBoolean(OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_KEY,
+        OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_DEFAULT);
 
     this.httpPolicy = HttpConfig.getHttpPolicy(conf);
     this.spnegoEnabled = conf.get(OZONE_OM_HTTP_AUTH_TYPE, "simple")

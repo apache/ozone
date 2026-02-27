@@ -83,7 +83,7 @@ public class TestOMBootstrap {
   @BeforeEach
   public void init() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    conf.setBoolean(OMConfigKeys.OZONE_OM_DB_CHECKPOINT_USE_V2_KEY, useV2Checkpoint);
+    conf.setBoolean(OMConfigKeys.OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_KEY, useV2Checkpoint);
     conf.setInt(OMConfigKeys.OZONE_OM_RATIS_LOG_PURGE_GAP, 5);
     conf.setStorageSize(OMConfigKeys.OZONE_OM_RATIS_SEGMENT_SIZE_KEY, 16, StorageUnit.KB);
     conf.setStorageSize(OMConfigKeys.OZONE_OM_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY, 16, StorageUnit.KB);
