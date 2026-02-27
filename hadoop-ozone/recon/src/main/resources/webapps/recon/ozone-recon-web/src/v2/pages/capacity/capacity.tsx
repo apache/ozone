@@ -322,7 +322,7 @@ const Capacity: React.FC<object> = () => {
             title: totalCapacityDesc,
             value: storageDistribution.data.globalStorage.totalOzoneCapacity,
           }, {
-            title: 'OZONE USED SPACE',
+            title: 'USED SPACE',
             value: storageDistribution.data.globalStorage.totalOzoneUsedSpace,
             color: '#f4a233'
           }, {
