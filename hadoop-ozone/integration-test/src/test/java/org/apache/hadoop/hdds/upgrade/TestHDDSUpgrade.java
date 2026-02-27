@@ -23,7 +23,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_RATIS_PIPELINE_LIMIT;
@@ -312,10 +311,7 @@ public class TestHDDSUpgrade {
         cluster.getStorageContainerManagersList(),
             NUM_CONTAINERS_CREATED, NUM_DATA_NODES);
 
-    // All datanodes on the SCM should have moved to HEALTHY-READONLY state.
-    TestHddsUpgradeUtils.testDataNodesStateOnSCM(
-        cluster.getStorageContainerManagersList(), NUM_DATA_NODES,
-        HEALTHY_READONLY, HEALTHY);
+    TestHddsUpgradeUtils.testDataNodesStateOnSCM(cluster.getStorageContainerManagersList(), NUM_DATA_NODES, HEALTHY);
 
     // Verify the SCM has driven all the DataNodes through Layout Upgrade.
     // In the happy path case, no containers should have been quasi closed as
@@ -872,16 +868,14 @@ public class TestHDDSUpgrade {
     // Due to timing constraint also allow a "HEALTHY" state.
     loadSCMState();
     TestHddsUpgradeUtils.testDataNodesStateOnSCM(
-        cluster.getStorageContainerManagersList(), NUM_DATA_NODES,
-        HEALTHY_READONLY, HEALTHY);
+        cluster.getStorageContainerManagersList(), NUM_DATA_NODES, HEALTHY);
 
     // Need to wait for post finalization heartbeat from DNs.
     LambdaTestUtils.await(600000, 500, () -> {
       try {
         loadSCMState();
         TestHddsUpgradeUtils.testDataNodesStateOnSCM(
-            cluster.getStorageContainerManagersList(), NUM_DATA_NODES,
-            HEALTHY, null);
+            cluster.getStorageContainerManagersList(), NUM_DATA_NODES, HEALTHY);
         sleep(100);
       } catch (Throwable ex) {
         LOG.info(ex.getMessage());

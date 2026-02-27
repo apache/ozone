@@ -17,35 +17,42 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
+import java.util.Objects;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.scm.ha.SCMService.Event;
+import org.apache.hadoop.hdds.scm.ha.SCMService;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
+import org.apache.hadoop.hdds.scm.net.NetworkTopology;
 import org.apache.hadoop.hdds.server.events.EventHandler;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Handles Read Only healthy to healthy node event. (Possibly due to a
- * datanode having finalized)
+ * Handles non healthy to healthy node event.
  */
-public class ReadOnlyHealthyToHealthyNodeHandler
-    implements EventHandler<DatanodeDetails> {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(ReadOnlyHealthyToHealthyNodeHandler.class);
+public class UnhealthyToHealthyNodeHandler implements EventHandler<DatanodeDetails> {
 
+  private static final Logger LOG = LoggerFactory.getLogger(UnhealthyToHealthyNodeHandler.class);
   private final SCMServiceManager serviceManager;
+  private final NodeManager nodeManager;
 
-  public ReadOnlyHealthyToHealthyNodeHandler(SCMServiceManager serviceManager) {
+  public UnhealthyToHealthyNodeHandler(NodeManager nodeManager, SCMServiceManager serviceManager) {
     this.serviceManager = serviceManager;
+    this.nodeManager = nodeManager;
   }
 
   @Override
-  public void onMessage(DatanodeDetails datanodeDetails,
-                        EventPublisher publisher) {
-    LOG.info("Datanode {} moved to HEALTHY state.",
-        datanodeDetails);
-    serviceManager.notifyEventTriggered(
-        Event.UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED);
+  public void onMessage(DatanodeDetails datanodeDetails, EventPublisher publisher) {
+    LOG.info("Datanode {} moved to HEALTHY state.", datanodeDetails);
+
+    //add node back if it is not present in networkTopology
+    NetworkTopology nt = nodeManager.getClusterNetworkTopologyMap();
+    if (!nt.contains(datanodeDetails)) {
+      nt.add(datanodeDetails);
+      // make sure after DN is added back into topology, DatanodeDetails
+      // instance returned from nodeStateManager has parent correctly set.
+      Objects.requireNonNull(nodeManager.getNode(datanodeDetails.getID()).getParent(), "Parent == null");
+    }
+    serviceManager.notifyEventTriggered(SCMService.Event.UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED);
   }
 }
