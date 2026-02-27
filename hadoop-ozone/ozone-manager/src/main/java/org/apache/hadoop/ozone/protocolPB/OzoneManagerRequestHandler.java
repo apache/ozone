@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.protocolPB;
 
+import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERMISSION_DENIED;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.FILESYSTEM_SNAPSHOT;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.HBASE_SUPPORT;
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.MULTITENANCY_SCHEMA;
@@ -167,6 +169,7 @@ import org.apache.hadoop.ozone.snapshot.ListSnapshotResponse;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.ozone.util.PayloadUtils;
 import org.apache.hadoop.ozone.util.ProtobufUtils;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -303,19 +306,12 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         responseBuilder.setPrepareStatusResponse(prepareStatusResponse);
         break;
       case Prepare:
-        // Prepare functionality is no longer supported. An empty successful transaction is returned for compatibility
-        // with older clients and upgrade processes.
-        PrepareResponse prepareResponse = PrepareResponse.newBuilder()
-            .setTxnID(0)  // Dummy transaction ID
-            .build();
+        PrepareResponse prepareResponse = prepare();
         responseBuilder.setPrepareResponse(prepareResponse);
         responseBuilder.setMessage("Prepare is no longer required in this version");
         break;
       case CancelPrepare:
-        // Cancel Prepare functionality is no longer supported. An empty successful transaction is returned for
-        // compatibility with older clients and upgrade processes.
-        CancelPrepareResponse cancelPrepareResponse = CancelPrepareResponse.newBuilder()
-            .build();
+        CancelPrepareResponse cancelPrepareResponse = cancelPrepare();
         responseBuilder.setCancelPrepareResponse(cancelPrepareResponse);
         responseBuilder.setMessage("Cancel Prepare is no longer required in this version");
         break;
@@ -1389,11 +1385,43 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .build();
   }
 
-  private PrepareStatusResponse getPrepareStatus() {
+  private PrepareStatusResponse getPrepareStatus() throws IOException {
+    UserGroupInformation ugi = getRemoteUser();
+    if (!impl.isAdmin(ugi)) {
+      throw new OMException("Access denied for user " + ugi +
+          ". Superuser privilege is required to get prepare status for OM.", PERMISSION_DENIED);
+    }
+
     // Prepare is no longer used, always return PREPARE_COMPLETED for backward compatibility
     return PrepareStatusResponse.newBuilder()
         .setStatus(PrepareStatusResponse.PrepareStatus.PREPARE_COMPLETED)
         .setCurrentTxnIndex(0).build();
+  }
+
+  private PrepareResponse prepare() throws IOException {
+    // Prepare functionality is no longer supported. An empty successful transaction is returned for compatibility
+    // with older clients and upgrade processes.
+    UserGroupInformation ugi = getRemoteUser();
+    if (!impl.isAdmin(ugi)) {
+      throw new OMException("Access denied for user " + ugi
+          + ". Superuser privilege is required to prepare OM.", PERMISSION_DENIED);
+    }
+
+    return PrepareResponse.newBuilder()
+        .setTxnID(0)  // Dummy transaction ID
+        .build();
+  }
+
+  private CancelPrepareResponse cancelPrepare() throws IOException {
+    // Cancel Prepare functionality is no longer supported. An empty successful transaction is returned for
+    // compatibility with older clients and upgrade processes.
+    UserGroupInformation ugi = getRemoteUser();
+    if (!impl.isAdmin(ugi)) {
+      throw new OMException("Access denied for user " + ugi
+          + ". Superuser privilege is required to cancel prepare for OM.", PERMISSION_DENIED);
+    }
+
+    return CancelPrepareResponse.newBuilder().build();
   }
 
   private GetS3VolumeContextResponse getS3VolumeContext()
