@@ -272,6 +272,9 @@ public class TestHealthyPipelineSafeModeRule {
           .getSafeModeRule(HealthyPipelineSafeModeRule.class);
 
       //No need of pipeline events.
+      firePipelineEvent(pipeline1, eventQueue);
+      firePipelineEvent(pipeline2, eventQueue);
+      firePipelineEvent(pipeline3, eventQueue);
       GenericTestUtils.waitFor(() -> healthyPipelineSafeModeRule.validate(),
           1000, 5000);
 
@@ -344,6 +347,7 @@ public class TestHealthyPipelineSafeModeRule {
       HealthyPipelineSafeModeRule healthyPipelineSafeModeRule =
           SafeModeRuleFactory.getInstance()
               .getSafeModeRule(HealthyPipelineSafeModeRule.class);
+      healthyPipelineSafeModeRule.setValidateBasedOnReportProcessing(false);
 
       firePipelineEvent(pipeline1, eventQueue);
       assertTrue(healthyPipelineSafeModeRule.validate());

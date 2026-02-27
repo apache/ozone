@@ -231,7 +231,7 @@ public class TestSCMSafeModeManager {
   }
 
   private OzoneConfiguration createConf(double healthyPercent,
-      double oneReplicaPercent) {
+                                        double oneReplicaPercent) {
     OzoneConfiguration conf = new OzoneConfiguration(config);
     conf.setDouble(HddsConfigKeys.
         HDDS_SCM_SAFEMODE_HEALTHY_PIPELINE_THRESHOLD_PCT, healthyPercent);
@@ -333,10 +333,10 @@ public class TestSCMSafeModeManager {
 
     assertTrue(scmSafeModeManager.getInSafeMode());
     assertEquals(1, scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value());
-    // Note: HealthyPipelineSafeModeRule may already be satisfied at this point
-    // since it validates by directly querying the pipeline manager, and all
-    // test pipelines are created as healthy. We only check if it's unsatisfied
-    // when the rule can't be immediately met.
+    if (healthyPipelinePercent > 0) {
+      validateRuleStatus("HealthyPipelineSafeModeRule",
+          "healthy Ratis/THREE pipelines");
+    }
     validateRuleStatus("OneReplicaPipelineSafeModeRule",
         "reported Ratis/THREE pipelines with at least one datanode");
 
@@ -360,24 +360,21 @@ public class TestSCMSafeModeManager {
     // Because even if no pipelines are there, and threshold we set to zero,
     // we shall a get an event when datanode is registered. In that case,
     // validate will return true, and add this to validatedRules.
-    if (Math.max(healthyPipelineThresholdCount, oneReplicaThresholdCount) == 0 && !pipelines.isEmpty()) {
+    if (Math.max(healthyPipelinePercent, oneReplicaThresholdCount) == 0) {
       firePipelineEvent(pipelineManager, pipelines.get(0));
     }
 
-    // HealthyPipelineSafeModeRule now validates by directly querying the pipeline manager,
-    // so the healthy pipeline count is already at maximum. We only need to fire pipeline
-    // events for OneReplicaPipelineSafeModeRule.
-    // The healthy pipeline count should already be at the maximum (all pipelines are healthy)
-    int actualHealthyPipelines = pipelines.size();
-    assertEquals(actualHealthyPipelines,
-        scmSafeModeManager.getSafeModeMetrics()
-            .getCurrentHealthyPipelinesCount().value());
-
-    // Fire events for OneReplicaPipelineSafeModeRule
-    for (int i = 0; i < pipelines.size(); i++) {
+    for (int i = 0; i < Math.max(healthyPipelineThresholdCount,
+        Math.min(oneReplicaThresholdCount, pipelines.size())); i++) {
       firePipelineEvent(pipelineManager, pipelines.get(i));
 
-      // Only check one replica count if we haven't exceeded the threshold yet
+      if (i < healthyPipelineThresholdCount) {
+        checkHealthy(i + 1);
+        assertEquals(i + 1,
+            scmSafeModeManager.getSafeModeMetrics()
+                .getCurrentHealthyPipelinesCount().value());
+      }
+
       if (i < oneReplicaThresholdCount) {
         checkOpen(i + 1);
         assertEquals(i + 1,
@@ -386,34 +383,20 @@ public class TestSCMSafeModeManager {
       }
     }
 
-    // Verify final healthy pipeline count (unchanged since start)
-    assertEquals(actualHealthyPipelines,
+    assertEquals(healthyPipelineThresholdCount,
         scmSafeModeManager.getSafeModeMetrics()
             .getCurrentHealthyPipelinesCount().value());
 
-    // Verify one replica count
-    int expectedOneReplicaCount = Math.min(oneReplicaThresholdCount, pipelines.size());
-    assertEquals(expectedOneReplicaCount,
+    assertEquals(oneReplicaThresholdCount,
         scmSafeModeManager.getSafeModeMetrics()
             .getCurrentPipelinesWithAtleastOneReplicaCount().value());
 
-    // Safe mode should only exit if we have enough pipelines to satisfy all thresholds
-    // If either threshold is higher than available pipelines, safe mode will remain active
-    if (healthyPipelineThresholdCount <= pipelines.size() &&
-        oneReplicaThresholdCount <= pipelines.size()) {
-      GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
-          100, 1000 * 5);
-      GenericTestUtils.waitFor(() ->
-              scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value() == 0,
-          100, 1000 * 5);
-    } else {
-      // Verify safe mode remains active when insufficient pipelines exist
-      assertTrue(scmSafeModeManager.getInSafeMode(),
-          "Safe mode should remain active when insufficient pipelines exist. " +
-          "Required healthy: " + healthyPipelineThresholdCount + ", " +
-          "Required oneReplica: " + oneReplicaThresholdCount + ", " +
-          "Available: " + pipelines.size());
-    }
+
+    GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
+        100, 1000 * 5);
+    GenericTestUtils.waitFor(() ->
+            scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value() == 0,
+        100, 1000 * 5);
   }
 
   /**
@@ -432,6 +415,13 @@ public class TestSCMSafeModeManager {
     }
   }
 
+  private void checkHealthy(int expectedCount) throws Exception {
+    final HealthyPipelineSafeModeRule pipelineRule = SafeModeRuleFactory.getInstance()
+        .getSafeModeRule(HealthyPipelineSafeModeRule.class);
+    GenericTestUtils.waitFor(() -> pipelineRule.getCurrentHealthyPipelineCount() == expectedCount,
+        100,  5000);
+  }
+
   private void checkOpen(int expectedCount) throws Exception {
     final OneReplicaPipelineSafeModeRule pipelineRule = SafeModeRuleFactory.getInstance()
         .getSafeModeRule(OneReplicaPipelineSafeModeRule.class);
@@ -440,29 +430,29 @@ public class TestSCMSafeModeManager {
   }
 
   private void firePipelineEvent(PipelineManager pipelineManager,
-      Pipeline pipeline) throws Exception {
+                                 Pipeline pipeline) throws Exception {
     pipelineManager.openPipeline(pipeline.getId());
     queue.fireEvent(SCMEvents.OPEN_PIPELINE,
         pipelineManager.getPipeline(pipeline.getId()));
 
     for (DatanodeDetails dn : pipeline.getNodes()) {
       List<StorageContainerDatanodeProtocolProtos.
-              PipelineReport> reports = new ArrayList<>();
+          PipelineReport> reports = new ArrayList<>();
       HddsProtos.PipelineID pipelineID = pipeline.getId().getProtobuf();
       reports.add(StorageContainerDatanodeProtocolProtos
-              .PipelineReport.newBuilder()
-              .setPipelineID(pipelineID)
-              .setIsLeader(true)
-              .build());
+          .PipelineReport.newBuilder()
+          .setPipelineID(pipelineID)
+          .setIsLeader(true)
+          .build());
       StorageContainerDatanodeProtocolProtos
-              .PipelineReportsProto.Builder pipelineReportsProto =
-              StorageContainerDatanodeProtocolProtos
-                      .PipelineReportsProto.newBuilder();
+          .PipelineReportsProto.Builder pipelineReportsProto =
+          StorageContainerDatanodeProtocolProtos
+              .PipelineReportsProto.newBuilder();
       pipelineReportsProto.addAllPipelineReport(reports);
       queue.fireEvent(SCMEvents.PIPELINE_REPORT, new
-              SCMDatanodeHeartbeatDispatcher
-                      .PipelineReportFromDatanode(dn,
-              pipelineReportsProto.build()));
+          SCMDatanodeHeartbeatDispatcher
+              .PipelineReportFromDatanode(dn,
+          pipelineReportsProto.build()));
     }
   }
 
@@ -658,7 +648,7 @@ public class TestSCMSafeModeManager {
   }
 
   private void testContainerThreshold(List<ContainerInfo> dnContainers,
-      double expectedThreshold)
+                                      double expectedThreshold)
       throws Exception {
     SCMDatanodeProtocolServer.NodeRegistrationContainerReport nodeRegistrationContainerReport =
         HddsTestUtils.createNodeRegistrationContainerReport(dnContainers);
@@ -669,7 +659,7 @@ public class TestSCMSafeModeManager {
     final RatisContainerSafeModeRule containerRule = SafeModeRuleFactory.getInstance()
         .getSafeModeRule(RatisContainerSafeModeRule.class);
     GenericTestUtils.waitFor(() ->
-        containerRule.getCurrentContainerThreshold() == expectedThreshold,
+            containerRule.getCurrentContainerThreshold() == expectedThreshold,
         100, 2000 * 9);
   }
 
@@ -687,7 +677,7 @@ public class TestSCMSafeModeManager {
    * @throws Exception The thrown exception message.
    */
   private void testECContainerThreshold(List<ContainerInfo> dnContainers,
-      double expectedThreshold, int dataBlockNum) throws Exception {
+                                        double expectedThreshold, int dataBlockNum) throws Exception {
 
     // Step1. We need to ensure the number of confirmed EC data blocks
     // based on the quantity of dataBlockNum.
@@ -746,7 +736,7 @@ public class TestSCMSafeModeManager {
         HddsTestUtils.createNodeRegistrationContainerReport(containers);
     queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT, nodeRegistrationContainerReport);
     queue.fireEvent(SCMEvents.CONTAINER_REGISTRATION_REPORT, nodeRegistrationContainerReport);
-      
+
 
     assertTrue(scmSafeModeManager.getInSafeMode());
     assertEquals(1, scmSafeModeManager.getSafeModeMetrics().getScmInSafeMode().value());
@@ -903,7 +893,7 @@ public class TestSCMSafeModeManager {
     MockNodeManager mockNodeManager = new MockNodeManager(true, 3);
     ContainerManager containerManager = mock(ContainerManager.class);
     when(containerManager.getContainers(ReplicationType.RATIS)).thenReturn(new ArrayList<>());
-    
+
     PipelineManagerImpl pipelineManager = PipelineManagerImpl.newPipelineManager(
         conf,
         SCMHAManagerStub.getInstance(true),
@@ -933,7 +923,7 @@ public class TestSCMSafeModeManager {
       // Verify periodic logging is active while in safe mode
       verifyPeriodicLoggingActive(logCapturer);
       logCapturer.clearOutput();
-      
+
       SCMDatanodeProtocolServer.NodeRegistrationContainerReport nodeReport =
           HddsTestUtils.createNodeRegistrationContainerReport(new ArrayList<>());
       queue.fireEvent(SCMEvents.NODE_REGISTRATION_CONT_REPORT, nodeReport);
@@ -941,14 +931,14 @@ public class TestSCMSafeModeManager {
       queue.processAll(5000);
       GenericTestUtils.waitFor(() -> scmSafeModeManager.getPreCheckComplete(), 100, 5000);
       assertThat(logCapturer.getOutput()).contains("SCM SafeMode Status | state=PRE_CHECKS_PASSED");
-      
+
       Pipeline pipeline = pipelineManager.createPipeline(
           RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
       pipeline = pipelineManager.getPipeline(pipeline.getId());
       MockRatisPipelineProvider.markPipelineHealthy(pipeline);
       firePipelineEvent(pipelineManager, pipeline);
       queue.processAll(5000);
-      
+
       GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(), 100, 5000);
 
       // Verify final summary was logged with OUT_OF_SAFE_MODE state
@@ -957,12 +947,12 @@ public class TestSCMSafeModeManager {
       assertThat(exitLog).contains("Stopped periodic Safe Mode logging");
       assertThat(exitLog).contains("SCM exiting safe mode");
       assertFalse(scmSafeModeManager.getInSafeMode());
-      
+
     } finally {
       logCapturer.stopCapturing();
     }
   }
-  
+
   /**
    * Verifies that periodic safe mode logging is working.
    * Checks that status messages are being logged at the configured interval.

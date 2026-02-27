@@ -68,6 +68,10 @@ public class SafeModeMetrics {
     this.numHealthyPipelinesThreshold.set(val);
   }
 
+  public void incCurrentHealthyPipelinesCount() {
+    this.currentHealthyPipelinesCount.incr();
+  }
+
   public void setNumCurrentHealthyPipelines(long val) {
     this.currentHealthyPipelinesCount.set(val);
   }
