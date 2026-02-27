@@ -167,8 +167,8 @@ public class OmConfig extends ReconfigurableConfig {
       type = ConfigType.LONG,
       tags = {ConfigTag.OM, ConfigTag.PERFORMANCE, ConfigTag.HA, ConfigTag.RATIS},
       description = "If the log lag between leader OM and follower OM is larger " +
-          "than this number, the follower OM is not up-to-date. Setting this to -1 " +
-          "allows read to return immediately (infinity log lag)."
+          "than this number, the follower OM is not up-to-date. " +
+          "Setting this to -1 to allow infinite lag."
   )
   private long followerReadLocalLeaseLogLimit;
 
@@ -179,7 +179,7 @@ public class OmConfig extends ReconfigurableConfig {
       tags = {ConfigTag.OM, ConfigTag.PERFORMANCE, ConfigTag.HA, ConfigTag.RATIS},
       description = " If the lag time Ms between leader OM and follower OM is larger " +
           "than this number, the follower OM is not up-to-date. " +
-          "By default, it's set to Ratis RPC timeout value." +
+          "By default, it's set to Ratis RPC timeout value. " +
           "Setting this to -1 to allow infinite lag."
   )
   private long followerReadLocalLeaseTimeMs;
