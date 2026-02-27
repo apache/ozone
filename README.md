@@ -75,7 +75,7 @@ export AWS_SECRET_ACCESS_KEY=c261b6ecabf7d37d5f9ded654b1c724adac9bd9f13e247a235e
 ```
 
 - Then we can create a bucket and upload a file to it:
-```
+```bash
 aws s3api --endpoint http://localhost:9878/ create-bucket --bucket=wordcount
 # create a temporary file to upload to Ozone via S3 support 
 ls -1 > /tmp/testfile
@@ -88,9 +88,9 @@ If you need a more realistic cluster, you can [download](https://ozone.apache.or
 
 After you untar the binary:
 
-```
+```bash
 cd compose/ozone
-docker-compose up -d --scale datanode=3
+docker compose up -d --scale datanode=3
 ```
 
 The `compose` folder contains different sets of configured clusters (secure, HA, mapreduce example), you can check the various subfolders for more examples.
@@ -103,15 +103,15 @@ Ozone is a first class citizen of the Cloud-Native environments. The binary pack
 
 Ozone can be built with [Apache Maven](https://maven.apache.org):
 
-```
+```bash
 mvn clean install -DskipTests
 ```
 
 And can be started with the help of Docker:
 
-```
+```bash
 cd hadoop-ozone/dist/target/ozone-*/compose/ozone
-docker-compose up -d --scale datanode=3
+docker compose up -d --scale datanode=3
 ```
 For more information, you can check the [Contribution guideline](./CONTRIBUTING.md)
 

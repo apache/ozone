@@ -47,14 +47,14 @@ public class OMDBArchiver {
 
   private Path tmpDir;
   private Map<String, File> filesToWriteIntoTarball;
-  private Map<String, String> hardLinkFileMap;
+  private final Map<String, String> hardLinkFileMap;
   private static final Logger LOG = LoggerFactory.getLogger(OMDBArchiver.class);
   private boolean completed;
 
   public OMDBArchiver() {
     this.tmpDir = null;
     this.filesToWriteIntoTarball = new HashMap<>();
-    this.hardLinkFileMap = null;
+    this.hardLinkFileMap = new HashMap<>();
     this.completed = false;
   }
 
@@ -66,16 +66,16 @@ public class OMDBArchiver {
     return tmpDir;
   }
 
-  public Map<String, String> getHardLinkFileMap() {
-    return hardLinkFileMap;
-  }
-
   public Map<String, File> getFilesToWriteIntoTarball() {
     return filesToWriteIntoTarball;
   }
 
-  public void setHardLinkFileMap(Map<String, String> hardLinkFileMap) {
-    this.hardLinkFileMap = hardLinkFileMap;
+  public void recordHardLinkMapping(String absolutePath, String fileId) {
+    hardLinkFileMap.put(absolutePath, fileId);
+  }
+
+  public void removeHardLinkMapping(String absolutePath) {
+    hardLinkFileMap.remove(absolutePath);
   }
 
   public boolean isCompleted() {

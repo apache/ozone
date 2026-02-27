@@ -87,10 +87,6 @@ public final class DatanodeStorageReport {
     return reserved;
   }
 
-  public static Builder newBuilder() {
-    return new Builder();
-  }
-
   public long getFilesystemCapacity() {
     return filesystemCapacity;
   }
@@ -101,6 +97,10 @@ public final class DatanodeStorageReport {
 
   public long getFilesystemAvailable() {
     return filesystemAvailable;
+  }
+
+  public static Builder newBuilder() {
+    return new Builder();
   }
 
   /**

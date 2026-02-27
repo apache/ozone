@@ -23,7 +23,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
-import org.apache.hadoop.ozone.common.Storage;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -50,10 +49,6 @@ public class TestDefaultUpgradeFinalizationExecutor {
       @Override
       public void finalizeLayoutFeature(LayoutFeature layoutFeatture,
           Object service) {
-      }
-
-      @Override
-      public void runPrefinalizeStateActions(Storage storage, Object service) {
       }
     };
 
@@ -84,11 +79,6 @@ public class TestDefaultUpgradeFinalizationExecutor {
 
           @Override
           public void finalizeLayoutFeature(LayoutFeature lf, Object service) {
-          }
-
-          @Override
-          public void runPrefinalizeStateActions(Storage storage,
-                                                 Object service) {
           }
         };
 

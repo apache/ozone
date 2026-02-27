@@ -6881,7 +6881,11 @@
         "totalKeys": 1576
     },
     "usedSpaceBreakdown": {
-        "openKeyBytes": 19255266,
+        "openKeyBytes": {
+          "totalOpenKeyBytes": 19255266,
+          "openKeyAndFileBytes": 19255266,
+          "multipartOpenKeyBytes": 0
+        },
         "committedKeyBytes": 1249923
     },
     "dataNodeUsage": [

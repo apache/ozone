@@ -45,7 +45,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public class UsedSpaceBreakDown {
 
   @JsonProperty("openKeyBytes")
-  private long openKeyBytes;
+  private OpenKeyBytesInfo openKeyBytes;
 
   @JsonProperty("committedKeyBytes")
   private long committedKeyBytes;
@@ -53,12 +53,12 @@ public class UsedSpaceBreakDown {
   public UsedSpaceBreakDown() {
   }
 
-  public UsedSpaceBreakDown(long openKeyBytes, long committedKeyBytes) {
+  public UsedSpaceBreakDown(OpenKeyBytesInfo openKeyBytes, long committedKeyBytes) {
     this.openKeyBytes = openKeyBytes;
     this.committedKeyBytes = committedKeyBytes;
   }
 
-  public long getOpenKeyBytes() {
+  public OpenKeyBytesInfo getOpenKeyBytes() {
     return openKeyBytes;
   }
 

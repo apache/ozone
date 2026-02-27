@@ -46,7 +46,7 @@ type CapacityState = {
 
 const Capacity: React.FC<object> = () => {
   const PENDING_POLL_INTERVAL = 5 * 1000;
-  const DN_CSV_DOWNLOAD_URL = '/api/v1/pendingDeletion/download';
+  const DN_CSV_DOWNLOAD_URL = '/api/v1/storageDistribution/download';
   const DN_STATUS_URL = '/api/v1/pendingDeletion?component=dn';
   const DOWNLOAD_POLL_TIMEOUT_MS = 10 * 60 * 1000;
 
@@ -228,7 +228,7 @@ const Capacity: React.FC<object> = () => {
       </>
     }>
       <CheckCircleFilled style={{ color: '#1ea57a', marginRight: 8, fontSize: 14 }} />
-        Datanodes  
+        Datanodes
     </Popover>
   );
 
@@ -280,6 +280,26 @@ const Capacity: React.FC<object> = () => {
   const dnSelectorTitle = (
     <span>
       Node Selector <WrappedInfoIcon title={nodeSelectorMessage} />
+    </span>
+  );
+
+  const openKeyUsageBreakdown = (
+    <span>
+      OPEN KEYS
+      <Popover
+        title="Open Key Breakdown"
+        placement='topLeft'
+        content={
+          <div className='openkeys-space-breakdown'>
+            Open Key/File Bytes
+            <Tag color='blue'>{filesize(storageDistribution.data.usedSpaceBreakdown.openKeyBytes?.openKeyAndFileBytes ?? 0, {round: 1})}</Tag>
+            Multipart Key Bytes
+            <Tag color='orange'>{filesize(storageDistribution.data.usedSpaceBreakdown.openKeyBytes?.multipartOpenKeyBytes ?? 0, {round: 1})}</Tag>
+          </div>
+        }
+      >
+        <InfoCircleOutlined style={{ color: '#2f84d8', fontSize: 12, marginLeft: 4 }} />
+      </Popover>
     </span>
   );
 
@@ -341,8 +361,8 @@ const Capacity: React.FC<object> = () => {
             title: 'TOTAL',
             value: storageDistribution.data.globalStorage.totalOzoneUsedSpace
           }, {
-            title: 'OPEN KEYS',
-            value: storageDistribution.data.usedSpaceBreakdown.openKeyBytes,
+            title: openKeyUsageBreakdown,
+            value: storageDistribution.data.usedSpaceBreakdown.openKeyBytes?.totalOpenKeyBytes ?? 0,
             color: '#f47c2d'
           }, {
             title: 'COMMITTED KEYS',
@@ -361,7 +381,7 @@ const Capacity: React.FC<object> = () => {
             ),
             value: (
               omPendingDeletes.data.totalSize
-              + scmPendingDeletes.data.totalBlocksize
+              + scmPendingDeletes.data.totalReplicatedBlockSize
               + (dnPendingDeletes.data.totalPendingDeletionSize ?? 0)
             ),
             color: "#10073b"
@@ -386,10 +406,10 @@ const Capacity: React.FC<object> = () => {
               }]
             }, {
               title: 'STORAGE CONTAINER MANAGER',
-              size: scmPendingDeletes.data.totalBlocksize,
+              size: scmPendingDeletes.data.totalReplicatedBlockSize,
               breakdown: [{
                 label: 'BLOCKS',
-                value: scmPendingDeletes.data.totalBlocksize,
+                value: scmPendingDeletes.data.totalReplicatedBlockSize,
                 color: '#f4a233'
               }]
             }, {

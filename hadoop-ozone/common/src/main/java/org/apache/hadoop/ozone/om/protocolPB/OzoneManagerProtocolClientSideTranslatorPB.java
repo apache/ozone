@@ -29,7 +29,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.protobuf.ByteString;
-import com.google.protobuf.ProtoUtils;
+import com.google.protobuf.UnsafeByteOperations;
 import jakarta.annotation.Nonnull;
 import java.io.IOException;
 import java.time.Instant;
@@ -2488,9 +2488,13 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   @Override
   public EchoRPCResponse echoRPCReq(byte[] payloadReq, int payloadSizeRespBytes,
                                     boolean writeToRatis) throws IOException {
+
+    ByteString payload = payloadReq != null && payloadReq.length > 0
+        ? UnsafeByteOperations.unsafeWrap(payloadReq) : ByteString.EMPTY;
+
     EchoRPCRequest echoRPCRequest =
             EchoRPCRequest.newBuilder()
-                    .setPayloadReq(ProtoUtils.unsafeByteString(payloadReq))
+                    .setPayloadReq(payload)
                     .setPayloadSizeResp(payloadSizeRespBytes)
                     .setReadOnly(!writeToRatis)
                     .build();

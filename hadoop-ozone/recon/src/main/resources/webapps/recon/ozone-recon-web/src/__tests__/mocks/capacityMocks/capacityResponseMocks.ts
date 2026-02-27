@@ -30,7 +30,11 @@ export const StorageDistribution = {
     totalKeys: 12
   },
   usedSpaceBreakdown: {
-    openKeyBytes: 1024,
+    openKeyBytes: {
+      totalOpenKeyBytes: 1024,
+      openKeyAndFileBytes: 512,
+      multipartOpenKeyBytes: 512
+    },
     committedKeyBytes: 2048
   },
   dataNodeUsage: [

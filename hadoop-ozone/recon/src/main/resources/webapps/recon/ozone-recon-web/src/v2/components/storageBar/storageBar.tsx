@@ -45,6 +45,7 @@ const StorageBar: React.FC<StorageReportProps> = ({
   filesystemCapacity,
   filesystemUsed,
   filesystemAvailable,
+  reserved,
   showMeta = false,
   strokeWidth = 3
 }) => {
@@ -58,6 +59,7 @@ const StorageBar: React.FC<StorageReportProps> = ({
   const fsUsed = hasFilesystemView
     ? (filesystemUsed !== undefined ? filesystemUsed : (fsCap as number) - (fsAvail as number))
     : undefined;
+  const fsReserved = hasFilesystemView ? (reserved as number) : undefined;
   const tooltip = (
     <>
       <table cellPadding={5}>
@@ -75,6 +77,10 @@ const StorageBar: React.FC<StorageReportProps> = ({
               <tr>
                 <td>Filesystem Available</td>
                 <td><strong>{size(fsAvail as number)}</strong></td>
+              </tr>
+              <tr>
+                <td>Filesystem Reserved</td>
+                <td><strong>{size(fsReserved)}</strong></td>
               </tr>
             </>
           )}
