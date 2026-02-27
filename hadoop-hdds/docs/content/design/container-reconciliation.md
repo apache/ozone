@@ -170,7 +170,7 @@ index 718e2a108c7..d8d508af356 100644
 
 
 ```
-This is written as a file to avoid bloating the RocksDB instance which is in the IO path.
+This is written as a file to avoid bloating the RocksDB instance which is in the I/O path.
 
 ## APIs
 

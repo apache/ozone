@@ -9,7 +9,7 @@ and offers a client tool to inject errors.
 
 Development Status                                                              
 ------------------
-Currently this service can inject errors on the IO path. The next step would be
+Currently this service can inject errors on the I/O path. The next step would be
 to add ability to inject similar errors on the network path as well.
 
 Supported Platforms                                                             
@@ -81,7 +81,7 @@ This will build following binaries:
     mountpoint above. Currently it supports,
     - Injecting delays on various filesystem interfaces.
     - Injecting a specific failure on a specific path for a specific operation.
-    - Simulate temporary or on-disk data corruption on IO path.
+    - Simulate temporary or on-disk data corruption on I/O path.
     - Resetting specific or all the failures injected so far.
 
 - some unit test binaries

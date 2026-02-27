@@ -112,7 +112,7 @@ This helps the client correctly engage in secure communication protocols with Oz
 
 When issuing DistCp commands (or other HDFS-compatible commands like `hdfs dfs -ls`) against an Ozone cluster in a different Kerberos realm than the client or source/destination cluster, Ozone 1.x versions may produce an error similar to:
 
-    24/02/07 18:47:36 INFO retry.RetryInvocationHandler: com.google.protobuf.ServiceException: java.io.IOException: DestHost:destPort host1.dst.example.com:9862, LocalHost:localPort host1.src.example.com/10.140.99.144:0. Failed on local exception: java.io.IOException: Couldn't set up IO streams: java.lang.IllegalArgumentException: Server has invalid Kerberos principal: om/host1.dst.example.com@DST.LOCAL, expecting: OM/host1.dst.example.com@REALM, while invoking $Proxy10.submitRequest over nodeId=om26,nodeAddress=host1.dst.example.com:9862 after 3 failover attempts. Trying to failover immediately.
+    24/02/07 18:47:36 INFO retry.RetryInvocationHandler: com.google.protobuf.ServiceException: java.io.IOException: DestHost:destPort host1.dst.example.com:9862, LocalHost:localPort host1.src.example.com/10.140.99.144:0. Failed on local exception: java.io.IOException: Couldn't set up I/O streams: java.lang.IllegalArgumentException: Server has invalid Kerberos principal: om/host1.dst.example.com@DST.LOCAL, expecting: OM/host1.dst.example.com@REALM, while invoking $Proxy10.submitRequest over nodeId=om26,nodeAddress=host1.dst.example.com:9862 after 3 failover attempts. Trying to failover immediately.
 
 
 **Cause:**

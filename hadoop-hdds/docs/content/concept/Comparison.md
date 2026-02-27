@@ -42,14 +42,14 @@ Ozone shines when users are in need of an Apache licensed, strongly consistent s
 
 ## Proprietary Scale-Out Storage Comparison
 
-| Tech                    | Type             | Consistency | Scale                | Big Data Integration | Performance Focus                    | Notes                                                                 |
-|-------------------------|------------------|-------------|----------------------|----------------------|--------------------------------------|----------------------------------------------------------------------|
-| **Isilon (Dell PowerScale)** | File (Scale-Out NAS) | Strong      | PBs, billions of files | Indirect             | High throughput, good mixed IO       | Enterprise NAS, POSIX compliant, good for mixed workloads, backup, analytics |
-| **VAST**                | File / Object    | Strong      | PBs                  | Yes, AI workloads    | Ultra-low latency, all-flash NVMe    | All-flash, NFS/S3, great for AI/ML and large unstructured datasets   |
-| **WEKA**                | Parallel File    | Strong      | PBs                  | HPC, AI              | Ultra-low latency, high IOPS         | High-performance file, GPU clusters, NFS/SMB/S3                      |
-| **Spectrum Scale (GPFS)** | File (POSIX)     | Strong      | PBs                  | HPC, AI              | High throughput, scale-out metadata  | IBM, used in HPC/AI, policy tiering, good POSIX compliance           |
-| **Scality**             | Object           | Strong      | PBs                  | Some                 | Good throughput for large objects    | Enterprise S3 API, multi-region, backup archives, hybrid cloud       |
-| **Cloudian**            | Object           | Strong      | PBs                  | Some                 | Good throughput for backup/archive   | S3-compatible object storage, ransomware protection, hybrid cloud    |
+| Tech                    | Type             | Consistency | Scale                | Big Data Integration | Performance Focus                   | Notes                                                                 |
+|-------------------------|------------------|-------------|----------------------|----------------------|-------------------------------------|----------------------------------------------------------------------|
+| **Isilon (Dell PowerScale)** | File (Scale-Out NAS) | Strong      | PBs, billions of files | Indirect             | High throughput, good mixed I/O     | Enterprise NAS, POSIX compliant, good for mixed workloads, backup, analytics |
+| **VAST**                | File / Object    | Strong      | PBs                  | Yes, AI workloads    | Ultra-low latency, all-flash NVMe   | All-flash, NFS/S3, great for AI/ML and large unstructured datasets   |
+| **WEKA**                | Parallel File    | Strong      | PBs                  | HPC, AI              | Ultra-low latency, high IOPS        | High-performance file, GPU clusters, NFS/SMB/S3                      |
+| **Spectrum Scale (GPFS)** | File (POSIX)     | Strong      | PBs                  | HPC, AI              | High throughput, scale-out metadata | IBM, used in HPC/AI, policy tiering, good POSIX compliance           |
+| **Scality**             | Object           | Strong      | PBs                  | Some                 | Good throughput for large objects   | Enterprise S3 API, multi-region, backup archives, hybrid cloud       |
+| **Cloudian**            | Object           | Strong      | PBs                  | Some                 | Good throughput for backup/archive  | S3-compatible object storage, ransomware protection, hybrid cloud    |
 
 
 The proprietary systems offer enterprise-grade quality, but they often require proprietary or certified hardware.

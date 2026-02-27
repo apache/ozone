@@ -141,7 +141,7 @@ The drawback with this approach is that this would double the number of hardlink
 
 ## Recommendations
 
-Approach 1 is the most optimized solution as it balances the amount of time under the lock by minimising the amount of IO ops inside the lock by introducing another threshold config to track this. Moreover taking this approach will also need the most minimal amount of code change as it doesn’t differ from the current approach by much. While approach 2 might look simpler but this would imply revamping the entire bootstrap logic currently in place and moreover this approach might increase the total amount of time inside the lock which would imply blocking the double buffer thread of extended amounts of time if it comes to this situation, which approach 1 tries to avoid.  
+Approach 1 is the most optimized solution as it balances the amount of time under the lock by minimising the amount of I/O ops inside the lock by introducing another threshold config to track this. Moreover taking this approach will also need the most minimal amount of code change as it doesn’t differ from the current approach by much. While approach 2 might look simpler but this would imply revamping the entire bootstrap logic currently in place and moreover this approach might increase the total amount of time inside the lock which would imply blocking the double buffer thread of extended amounts of time if it comes to this situation, which approach 1 tries to avoid.  
  
 
 Final approach implemented is the Approach 1.1
