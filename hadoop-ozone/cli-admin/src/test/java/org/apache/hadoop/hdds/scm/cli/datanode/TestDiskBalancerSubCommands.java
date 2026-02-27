@@ -234,6 +234,25 @@ public class TestDiskBalancerSubCommands {
   }
 
   @Test
+  public void testStartDiskBalancerWithDuplicateHostnames() throws Exception {
+    DiskBalancerStartSubcommand cmd = new DiskBalancerStartSubcommand();
+    doNothing().when(mockProtocol).startDiskBalancer(any(DiskBalancerConfigurationProto.class));
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("host-1", "host-1", "host-2");
+      cmd.call();
+
+      // output should show each host only once
+      String output = outContent.toString(DEFAULT_ENCODING);
+      Pattern p = Pattern.compile("Started DiskBalancer on nodes: \\[host-1, host-2\\]");
+      Matcher m = p.matcher(output);
+      assertTrue(m.find());
+    }
+  }
+
+  @Test
   public void testStartDiskBalancerWithStdin() throws Exception {
     DiskBalancerStartSubcommand cmd = new DiskBalancerStartSubcommand();
     doNothing().when(mockProtocol).startDiskBalancer(any(DiskBalancerConfigurationProto.class));

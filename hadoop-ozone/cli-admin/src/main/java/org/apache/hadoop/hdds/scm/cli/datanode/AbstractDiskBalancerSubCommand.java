@@ -162,7 +162,7 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
     try (ScmClient scmClient = new ContainerOperationClient(new OzoneConfiguration())) {
       return DiskBalancerSubCommandUtil.getAllOperableNodesClientRpcAddress(scmClient);
     } catch (IOException e) {
-      System.err.println("Error querying SCM for in-service datanodes: %n" + e.getMessage());
+      System.err.printf("Error querying SCM for in-service datanodes. %n%s%n", e.getMessage());
       return null;
     }
   }
