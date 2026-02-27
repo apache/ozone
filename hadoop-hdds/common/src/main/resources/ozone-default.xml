@@ -85,8 +85,9 @@
     <name>hdds.container.chunk.write.sync</name>
     <value>false</value>
     <tag>OZONE, CONTAINER, MANAGEMENT</tag>
-    <description>Determines whether the chunk writes in the container happen as
-      sync I/0 or buffered I/O operation.
+    <description>For the deprecated FilePerChunkStrategy, this determines whether the chunk writes
+      in the container happen as sync I/0 or buffered I/O operation. For FilePerBlockStrategy, this
+      sync I/O operation only happens before block file is closed.
     </description>
   </property>
   <property>
