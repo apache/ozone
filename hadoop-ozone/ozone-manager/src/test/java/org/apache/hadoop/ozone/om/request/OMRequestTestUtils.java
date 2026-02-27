@@ -1374,7 +1374,8 @@ public final class OMRequestTestUtils {
               .setKey(deletedKey.getKey())
               .addAllKeyInfos(
                   deletedKey.getValue().stream()
-                  .map(omKeyInfo -> omKeyInfo.getProtobuf(ClientVersion.CURRENT.serialize())).collect(Collectors.toList()))
+                      .map(omKeyInfo -> omKeyInfo.getProtobuf(ClientVersion.CURRENT.serialize()))
+                      .collect(Collectors.toList()))
               .build();
       deletedMoveKeys.add(snapshotMoveKeyInfos);
     }

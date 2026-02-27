@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.hdds;
 
-import org.apache.hadoop.ozone.ClientVersion;
-
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toMap;
 
