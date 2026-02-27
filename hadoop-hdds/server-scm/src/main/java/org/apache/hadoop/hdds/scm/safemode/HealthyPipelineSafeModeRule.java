@@ -68,8 +68,8 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
   private final NodeManager nodeManager;
 
   HealthyPipelineSafeModeRule(EventQueue eventQueue,
-                              PipelineManager pipelineManager, SCMSafeModeManager manager,
-                              ConfigurationSource configuration, SCMContext scmContext, NodeManager nodeManager) {
+      PipelineManager pipelineManager, SCMSafeModeManager manager,
+      ConfigurationSource configuration, SCMContext scmContext, NodeManager nodeManager) {
     super(manager, eventQueue);
     this.pipelineManager = pipelineManager;
     this.scmContext = scmContext;
@@ -230,11 +230,11 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
     if (refresh) {
       LOG.info("Refreshed total pipeline count is {}, healthy pipeline " +
-              "threshold count is {}", pipelineCount,
+          "threshold count is {}", pipelineCount,
           healthyPipelineThresholdCount);
     } else {
       LOG.info("Total pipeline count is {}, healthy pipeline " +
-              "threshold count is {}", pipelineCount,
+          "threshold count is {}", pipelineCount,
           healthyPipelineThresholdCount);
     }
 

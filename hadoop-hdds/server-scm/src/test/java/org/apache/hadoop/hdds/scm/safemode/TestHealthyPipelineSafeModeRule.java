@@ -50,6 +50,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.ozone.test.GenericTestUtils;
+import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -181,6 +182,9 @@ public class TestHealthyPipelineSafeModeRule {
       HealthyPipelineSafeModeRule healthyPipelineSafeModeRule = SafeModeRuleFactory.getInstance()
           .getSafeModeRule(HealthyPipelineSafeModeRule.class);
 
+      // No datanodes have sent pipelinereport from datanode
+      assertFalse(healthyPipelineSafeModeRule.validate());
+
       // Fire pipeline report from all datanodes in first pipeline, as here we
       // have 3 pipelines, 10% is 0.3, when doing ceil it is 1. So, we should
       // validate should return true after fire pipeline event
@@ -271,10 +275,18 @@ public class TestHealthyPipelineSafeModeRule {
       HealthyPipelineSafeModeRule healthyPipelineSafeModeRule = SafeModeRuleFactory.getInstance()
           .getSafeModeRule(HealthyPipelineSafeModeRule.class);
 
-      //No need of pipeline events.
+      // No pipeline event have sent to SCMSafemodeManager
+      assertFalse(healthyPipelineSafeModeRule.validate());
+
+      // fire event with pipeline create status with ratis type and factor 1
+      // pipeline, validate() should return false
       firePipelineEvent(pipeline1, eventQueue);
+
+      assertFalse(healthyPipelineSafeModeRule.validate());
+
       firePipelineEvent(pipeline2, eventQueue);
       firePipelineEvent(pipeline3, eventQueue);
+
       GenericTestUtils.waitFor(() -> healthyPipelineSafeModeRule.validate(),
           1000, 5000);
 
@@ -447,12 +459,20 @@ public class TestHealthyPipelineSafeModeRule {
           nodeManager, pipelineManager, containerManager, serviceManager, eventQueue, scmContext);
       scmSafeModeManager.start();
 
+      LogCapturer logCapturer = LogCapturer.captureLogs(
+          HealthyPipelineSafeModeRule.class);
+
       HealthyPipelineSafeModeRule healthyPipelineSafeModeRule = SafeModeRuleFactory.getInstance()
           .getSafeModeRule(HealthyPipelineSafeModeRule.class);
 
       // Fire the pipeline report
       firePipelineEvent(pipeline, eventQueue);
-      assertFalse(healthyPipelineSafeModeRule.isPipelineHealthy(pipeline));
+
+      // Wait for log message indicating the pipeline's DN is in bad health.
+      GenericTestUtils.waitFor(
+          () -> logCapturer.getOutput().contains("are either in bad health or un-registered with SCMs"),
+          100, 5000);
+
       // Ensure the rule is NOT satisfied due to unhealthy DN
       assertFalse(healthyPipelineSafeModeRule.validate());
     } finally {
