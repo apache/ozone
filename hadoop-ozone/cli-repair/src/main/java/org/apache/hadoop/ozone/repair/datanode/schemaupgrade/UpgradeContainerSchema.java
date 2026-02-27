@@ -144,8 +144,8 @@ public class UpgradeContainerSchema extends RepairTool {
           "Please upgrade your software version, no less than %s," +
               " current metadata layout version is %s," +
               " software layout version is %s",
-          HDDSLayoutFeature.DATANODE_SCHEMA_V3.name(),
-          metadataLayoutFeature.name(), softwareLayoutFeature.name());
+          HDDSLayoutFeature.DATANODE_SCHEMA_V3.toString(),
+          metadataLayoutFeature.toString(), softwareLayoutFeature.toString());
       return;
     }
 

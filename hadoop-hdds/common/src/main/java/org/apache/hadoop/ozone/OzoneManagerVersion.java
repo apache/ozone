@@ -62,7 +62,7 @@ public enum OzoneManagerVersion implements ComponentVersion {
 
   private static final Map<Integer, OzoneManagerVersion> BY_PROTO_VALUE =
       Arrays.stream(values())
-          .collect(toMap(OzoneManagerVersion::toProtoValue, identity()));
+          .collect(toMap(OzoneManagerVersion::serialize, identity()));
 
   private final int version;
   private final String description;
@@ -78,8 +78,13 @@ public enum OzoneManagerVersion implements ComponentVersion {
   }
 
   @Override
-  public int toProtoValue() {
+  public int serialize() {
     return version;
+  }
+
+  @Override
+  public String toString() {
+    return name() + " (" + serialize() + ")";
   }
 
   public static OzoneManagerVersion fromProtoValue(int value) {

@@ -40,7 +40,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.hadoop.ozone.common.Storage;
-import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeAction;
 import org.apache.hadoop.ozone.upgrade.UpgradeException.ResultCodes;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
@@ -259,13 +258,13 @@ public abstract class BasicUpgradeFinalizer
       Optional<? extends UpgradeAction> action) throws UpgradeException {
 
     if (!action.isPresent()) {
-      emitNOOPMsg(feature.name());
+      emitNOOPMsg(feature.toString());
     } else {
       LOG.info("Running finalization actions for layout feature: {}", feature);
       try {
         action.get().execute(component);
       } catch (Exception e) {
-        logFinalizationFailureAndThrow(e, feature.name());
+        logFinalizationFailureAndThrow(e, feature.toString());
       }
     }
   }

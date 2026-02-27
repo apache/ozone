@@ -231,7 +231,7 @@ class TestBlockOutputStreamCorrectness {
 
       if (!request.hasVersion()) {
         request = ContainerCommandRequestProto.newBuilder(request)
-            .setVersion(ClientVersion.CURRENT.toProtoValue()).build();
+            .setVersion(ClientVersion.CURRENT.serialize()).build();
       }
       final ContainerCommandResponseProto.Builder builder =
           ContainerCommandResponseProto.newBuilder()

@@ -17,39 +17,16 @@
 
 package org.apache.hadoop.ozone.upgrade;
 
-import java.util.Optional;
-import org.apache.hadoop.ozone.Versioned;
+import org.apache.hadoop.hdds.ComponentVersion;
 
 /**
  * Generic Layout feature interface for Ozone.
  */
-public interface LayoutFeature extends Versioned {
-  String name();
-
+public interface LayoutFeature extends ComponentVersion {
   int layoutVersion();
 
-  String description();
-
-  default Optional<? extends UpgradeAction> action() {
-    return Optional.empty();
-  }
-
-  /**
-   * Generic UpgradeAction interface. An upgrade action is an operation that
-   * is run at least once as a pre-requisite to finalizing a layout feature.
-   * @param <T>
-   */
-  interface UpgradeAction<T> {
-
-    default String name() {
-      return getClass().getSimpleName();
-    }
-
-    void execute(T arg) throws Exception;
-  }
-
   @Override
-  default int version() {
+  default int serialize() {
     return this.layoutVersion();
   }
 }

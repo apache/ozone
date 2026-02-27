@@ -103,7 +103,7 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
     // return true only if all DataNodes in the pipeline are on a version
     // that supports for reading a block by streaming chunks..
     for (DatanodeDetails dn : pipeline.getNodes()) {
-      if (dn.getCurrentVersion() < STREAM_BLOCK_SUPPORT.toProtoValue()) {
+      if (dn.getCurrentVersion() < STREAM_BLOCK_SUPPORT.serialize()) {
         return false;
       }
     }

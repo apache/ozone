@@ -286,7 +286,7 @@ public class BlockOutputStream extends OutputStream {
     for (DatanodeDetails dn : pipeline.getNodes()) {
       LOG.debug("dn = {}, version = {}", dn, dn.getCurrentVersion());
       if (dn.getCurrentVersion() <
-              COMBINED_PUTBLOCK_WRITECHUNK_RPC.toProtoValue()) {
+              COMBINED_PUTBLOCK_WRITECHUNK_RPC.serialize()) {
         return false;
       }
     }

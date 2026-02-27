@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
  * in tandem with the corresponding version manager, and Storage.
  * @param <T> The service type which the implementation is bound to, this
  *           defines the type that is provided to {@link LayoutFeature}'s
- *           {@link org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeAction}
+ *           {@link org.apache.hadoop.ozone.upgrade.UpgradeAction}
  */
 @InterfaceAudience.Private
 @InterfaceStability.Evolving
@@ -46,7 +46,7 @@ public interface UpgradeFinalizer<T> {
    * Finalize the metadata upgrade.
    * The provided client ID will be eligible to get the status messages,
    * the service provided will be provided to the
-   * {@link org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeAction}s of
+ * {@link org.apache.hadoop.ozone.upgrade.UpgradeAction}s of
    * the {@link LayoutFeature}s being finalized.
    * @param upgradeClientID the initiating client's identifier.
    * @param service the service on which we run finalization.

@@ -44,7 +44,7 @@ public enum HDDSVersion implements ComponentVersion {
 
   private static final Map<Integer, HDDSVersion> BY_PROTO_VALUE =
       Arrays.stream(values())
-          .collect(toMap(HDDSVersion::toProtoValue, identity()));
+          .collect(toMap(HDDSVersion::serialize, identity()));
 
   private final int version;
   private final String description;
@@ -60,8 +60,13 @@ public enum HDDSVersion implements ComponentVersion {
   }
 
   @Override
-  public int toProtoValue() {
+  public int serialize() {
     return version;
+  }
+
+  @Override
+  public String toString() {
+    return name() + " (" + serialize() + ")";
   }
 
   public static HDDSVersion fromProtoValue(int value) {

@@ -469,7 +469,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
       builder.setCurrentVersion(datanodeDetailsProto.getCurrentVersion());
     } else {
       // fallback to version 1 if not present
-      builder.setCurrentVersion(HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE.toProtoValue());
+      builder.setCurrentVersion(HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE.serialize());
     }
     return builder;
   }

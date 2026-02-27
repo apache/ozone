@@ -17,28 +17,21 @@
 
 package org.apache.hadoop.hdds;
 
-import org.apache.hadoop.ozone.Versioned;
+import java.util.Optional;
+import org.apache.hadoop.ozone.upgrade.UpgradeAction;
 
 /**
  * Base type for component version enums.
  */
-public interface ComponentVersion extends Versioned {
+public interface ComponentVersion {
+  int serialize();
 
   /**
-   * Returns the description of the version enum value.
    * @return the description of the version enum value.
    */
   String description();
 
-  /**
-   * Returns the value that represents the enum in a protocol message
-   * transferred over the wire.
-   * @return the version associated with the enum value.
-   */
-  int toProtoValue();
-
-  @Override
-  default int version() {
-    return toProtoValue();
+  default Optional<? extends UpgradeAction> action() {
+    return Optional.empty();
   }
 }

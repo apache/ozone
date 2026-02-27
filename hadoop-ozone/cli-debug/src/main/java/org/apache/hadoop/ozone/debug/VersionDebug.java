@@ -63,7 +63,7 @@ public class VersionDebug implements Callable<Void>, DebugSubcommand {
     return ImmutableSortedMap.of(
         "componentVersion", ImmutableSortedMap.of(
             "name", version.name(),
-            "protoValue", version.toProtoValue()
+            "protoValue", version.serialize()
         )
     );
   }

@@ -66,7 +66,7 @@ public class TestComponentVersionInvariants {
   public void testFuturVersionHasMinusOneAsProtoRepresentation(
       ComponentVersion[] values, ComponentVersion defaultValue,
       ComponentVersion futureValue) {
-    assertEquals(-1, futureValue.toProtoValue());
+    assertEquals(-1, futureValue.serialize());
 
   }
 
@@ -76,7 +76,7 @@ public class TestComponentVersionInvariants {
   public void testDefaultVersionHasZeroAsProtoRepresentation(
       ComponentVersion[] values, ComponentVersion defaultValue,
       ComponentVersion futureValue) {
-    assertEquals(0, defaultValue.toProtoValue());
+    assertEquals(0, defaultValue.serialize());
   }
 
   // versions are increasing monotonically by one
@@ -85,10 +85,10 @@ public class TestComponentVersionInvariants {
   public void testAssignedProtoRepresentations(
       ComponentVersion[] values, ComponentVersion defaultValue,
       ComponentVersion futureValue) {
-    int startValue = defaultValue.toProtoValue();
+    int startValue = defaultValue.serialize();
     // we skip the future version at the last position
     for (int i = 0; i < values.length - 1; i++) {
-      assertEquals(values[i].toProtoValue(), startValue++);
+      assertEquals(values[i].serialize(), startValue++);
     }
     assertEquals(values.length, ++startValue);
   }
