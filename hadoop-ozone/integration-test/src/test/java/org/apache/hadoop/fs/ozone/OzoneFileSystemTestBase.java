@@ -19,10 +19,13 @@ package org.apache.hadoop.fs.ozone;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_REPLICATION_TYPE;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.net.URI;
@@ -39,6 +42,7 @@ import org.apache.hadoop.fs.contract.ContractTestUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.ozone.client.OzoneKeyDetails;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 
 /**
  * Common test cases for Ozone file systems.
@@ -204,6 +208,63 @@ public abstract class OzoneFileSystemTestBase {
     } finally {
       // Cleanup
       fs.delete(parent, true);
+    }
+  }
+
+  void createDoesNotAddParentDirKeys(Path grandparent) throws Exception {
+    Path parent = new Path(grandparent, "parent");
+    Path child = new Path(parent, "child");
+    FileSystem fs = getFs();
+    ContractTestUtils.touch(fs, child);
+
+    OzoneKeyDetails key = getKey(child, false);
+    String expectedKeyName = getChildKeyName(child);
+    assertEquals(key.getName(), expectedKeyName);
+
+    // Creating a child should not add parent keys to the bucket
+    try {
+      getKey(parent, true);
+    } catch (OMException ome) {
+      assertEquals(KEY_NOT_FOUND, ome.getResult());
+    }
+
+    // List status on the parent should show the child file
+    assertEquals(1L, fs.listStatus(parent).length, "List status of parent should include the 1 child file");
+    assertTrue(fs.getFileStatus(parent).isDirectory(), "Parent directory does not appear to be a directory");
+
+    // Cleanup
+    fs.delete(grandparent, true);
+  }
+
+  abstract String getChildKeyName(Path child);
+
+  void listStatusIteratorOnRoot(Path root) throws Exception {
+    Path dir1 = new Path(root, "dir1");
+    Path dir12 = new Path(dir1, "dir12");
+    Path dir2 = new Path(root, "dir2");
+    FileSystem fs = getFs();
+    try {
+      fs.mkdirs(dir12);
+      fs.mkdirs(dir2);
+
+      // ListStatusIterator on root should return dir1
+      // (even though /dir1 key does not exist)and dir2 only.
+      // dir12 is not an immediate child of root and hence should not be listed.
+      RemoteIterator<FileStatus> it = fs.listStatusIterator(root);
+      int iCount = 0;
+      while (it.hasNext()) {
+        iCount++;
+        FileStatus fileStatus = it.next();
+        assertNotNull(fileStatus);
+        // Verify that dir12 is not included in the result
+        // of the listStatusIterator on root.
+        assertNotEquals(fileStatus, dir12.toString());
+      }
+      assertEquals(2, iCount, "FileStatus should return only the immediate children");
+    } finally {
+      // Cleanup
+      fs.delete(dir2, true);
+      fs.delete(dir1, true);
     }
   }
 

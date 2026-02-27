@@ -27,9 +27,7 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 import org.apache.hadoop.fs.FileUtil;
@@ -86,15 +84,14 @@ public class TestOMDBArchiver {
     omdbArchiver.setTmpDir(tmpDir);
     assertThat(omdbArchiver.getFilesToWriteIntoTarball()).isNotNull();
     assertThat(omdbArchiver.getTmpDir()).isEqualTo(tmpDir);
-    Map<String, String> hardLinkFileMap = new HashMap<String, String>();
     for (int i = 0; i < 10; i++) {
       String fileName = "hardlink-" + i;
       File dummyFile = new File(tmpDir.toFile(), fileName);
       Files.write(dummyFile.toPath(), "dummy".getBytes(StandardCharsets.UTF_8));
       omdbArchiver.getFilesToWriteIntoTarball().put(fileName, dummyFile);
-      hardLinkFileMap.put(dummyFile.getAbsolutePath(), dummyFile.getName());
+      omdbArchiver.recordHardLinkMapping(dummyFile.getAbsolutePath(),
+          dummyFile.getName());
     }
-    omdbArchiver.setHardLinkFileMap(hardLinkFileMap);
 
     File tarFile = new File(folder.toFile(), "test-archive.tar");
     OzoneConfiguration conf = new OzoneConfiguration();
