@@ -312,7 +312,6 @@
                     <artifactItem>
                       <groupId>org.apache.ozone</groupId>
                       <artifactId>hdds-test-utils</artifactId>
-                      <classifier>tests</classifier>
                     </artifactItem>
                   </artifactItems>
                 </configuration>

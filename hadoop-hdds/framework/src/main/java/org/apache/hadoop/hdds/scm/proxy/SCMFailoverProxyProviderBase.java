@@ -193,6 +193,17 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
         .map(proxyInfo -> proxyInfo.proxy).collect(Collectors.toList());
   }
 
+  public synchronized T getProxyForNode(String nodeId) throws IOException {
+    ProxyInfo<T> proxyInfo = scmProxies.get(nodeId);
+    if (proxyInfo == null) {
+      if (!scmProxyInfoMap.containsKey(nodeId)) {
+        throw new IOException("Unknown SCM node ID: " + nodeId);
+      }
+      proxyInfo = createSCMProxy(nodeId);
+    }
+    return proxyInfo.proxy;
+  }
+
   @Override
   public synchronized void performFailover(T newLeader) {
     if (updatedLeaderNodeID != null) {

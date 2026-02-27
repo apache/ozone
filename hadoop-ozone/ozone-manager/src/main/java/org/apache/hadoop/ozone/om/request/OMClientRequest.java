@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om.request;
 
-import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_KEY_NAME;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.UNAUTHORIZED;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -45,6 +44,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OMAuditLogger;
+import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.lock.OMLockDetails;
 import org.apache.hadoop.ozone.om.protocolPB.grpc.GrpcClientConstants;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
@@ -94,8 +94,7 @@ public abstract class OMClientRequest implements RequestAuditor {
   }
 
   public OMClientRequest(OMRequest omRequest) {
-    Objects.requireNonNull(omRequest, "omRequest == null");
-    this.omRequest = omRequest;
+    this.omRequest = Objects.requireNonNull(omRequest);
     this.omLockDetails.clear();
   }
 
@@ -566,39 +565,7 @@ public abstract class OMClientRequest implements RequestAuditor {
    * OMException, else return the path.
    */
   public static String isValidKeyPath(String path) throws OMException {
-    boolean isValid = true;
-
-    // If keyName is empty string throw error.
-    if (path.isEmpty()) {
-      throw new OMException("Invalid KeyPath, empty keyName" + path,
-          INVALID_KEY_NAME);
-    } else if (path.startsWith("/")) {
-      isValid = false;
-    } else {
-      // Check for ".." "." ":" "/"
-      String[] components = StringUtils.split(path, '/');
-      for (int i = 0; i < components.length; i++) {
-        String element = components[i];
-        if (element.equals(".") ||
-            (element.contains(":")) ||
-            (element.contains("/") || element.equals(".."))) {
-          isValid = false;
-          break;
-        }
-
-        // The string may end with a /, but not have
-        // "//" in the middle.
-        if (element.isEmpty() && i != components.length - 1) {
-          isValid = false;
-        }
-      }
-    }
-
-    if (isValid) {
-      return path;
-    } else {
-      throw new OMException("Invalid KeyPath " + path, INVALID_KEY_NAME);
-    }
+    return OzoneFSUtils.isValidKeyPath(path, true);
   }
 
   public OMLockDetails getOmLockDetails() {

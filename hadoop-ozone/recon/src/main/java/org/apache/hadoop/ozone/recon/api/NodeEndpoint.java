@@ -181,6 +181,7 @@ public class NodeEndpoint {
         .setUsed(nodeStat.getScmUsed().get())
         .setRemaining(nodeStat.getRemaining().get())
         .setCommitted(nodeStat.getCommitted().get())
+        .setReserved(nodeStat.getReserved().get())
         .setMinimumFreeSpace(nodeStat.getFreeSpaceToSpare().get());
 
     if (fsUsage != null) {

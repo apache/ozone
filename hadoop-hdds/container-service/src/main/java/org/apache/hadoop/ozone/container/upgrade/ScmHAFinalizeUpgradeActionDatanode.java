@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.container.upgrade;
 
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.SCM_HA;
-import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeActionHdds.Component.DATANODE;
 
 import java.io.File;
@@ -38,8 +37,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Action to run upgrade flow for SCM HA exactly once.
  */
-@UpgradeActionHdds(feature = SCM_HA, component = DATANODE,
-    type = ON_FINALIZE)
+@UpgradeActionHdds(feature = SCM_HA, component = DATANODE)
 public class ScmHAFinalizeUpgradeActionDatanode
     implements HDDSUpgradeAction<DatanodeStateMachine> {
   private static final Logger LOG =
