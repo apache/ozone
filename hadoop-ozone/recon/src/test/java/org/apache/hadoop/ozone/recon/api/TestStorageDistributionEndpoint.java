@@ -131,8 +131,12 @@ public class TestStorageDistributionEndpoint {
     assertEquals(OZONE_CAPACITY * 3, distributionResponse.getGlobalStorage().getTotalCapacity());
     assertEquals(totalNameSpace, distributionResponse.getGlobalNamespace().getTotalUsedSpace());
     assertEquals(EXPECTED_GLOBAL_TOTAL_KEYS, distributionResponse.getGlobalNamespace().getTotalKeys());
+    assertEquals(OPEN_KEY_BYTES,
+        distributionResponse.getUsedSpaceBreakDown().getOpenKeyBytes().getOpenKeyAndFileBytes());
+    assertEquals(OPEN_MPU_KEY_BYTES,
+        distributionResponse.getUsedSpaceBreakDown().getOpenKeyBytes().getMultipartOpenKeyBytes());
     assertEquals(OPEN_KEY_BYTES + OPEN_MPU_KEY_BYTES,
-        distributionResponse.getUsedSpaceBreakDown().getOpenKeyBytes());
+        distributionResponse.getUsedSpaceBreakDown().getOpenKeyBytes().getTotalOpenKeyBytes());
     assertEquals(EXPECTED_COMMITTED_KEY_BYTES,
         distributionResponse.getUsedSpaceBreakDown().getCommittedKeyBytes());
     assertEquals(COMMITTED * 3,
