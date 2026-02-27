@@ -180,7 +180,7 @@ public class OmConfig extends ReconfigurableConfig {
       description = " If the lag time Ms between leader OM and follower OM is larger " +
           "than this number, the follower OM is not up-to-date. " +
           "By default, it's set to Ratis RPC timeout value." +
-          "Setting this to -1 allows read to return immediately."
+          "Setting this to -1 to allow infinite lag."
   )
   private long followerReadLocalLeaseTimeMs;
 
