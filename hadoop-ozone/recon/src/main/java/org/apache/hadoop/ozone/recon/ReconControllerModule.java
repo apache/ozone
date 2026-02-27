@@ -78,7 +78,7 @@ import org.apache.ozone.recon.schema.generated.tables.daos.ContainerCountBySizeD
 import org.apache.ozone.recon.schema.generated.tables.daos.FileCountBySizeDao;
 import org.apache.ozone.recon.schema.generated.tables.daos.GlobalStatsDao;
 import org.apache.ozone.recon.schema.generated.tables.daos.ReconTaskStatusDao;
-import org.apache.ozone.recon.schema.generated.tables.daos.UnhealthyContainersV2Dao;
+import org.apache.ozone.recon.schema.generated.tables.daos.UnhealthyContainersDao;
 import org.apache.ratis.protocol.ClientId;
 import org.jooq.Configuration;
 import org.jooq.DAO;
@@ -162,7 +162,7 @@ public class ReconControllerModule extends AbstractModule {
         ImmutableList.of(
             FileCountBySizeDao.class,
             ReconTaskStatusDao.class,
-            UnhealthyContainersV2Dao.class,
+            UnhealthyContainersDao.class,
             GlobalStatsDao.class,
             ClusterGrowthDailyDao.class,
             ContainerCountBySizeDao.class

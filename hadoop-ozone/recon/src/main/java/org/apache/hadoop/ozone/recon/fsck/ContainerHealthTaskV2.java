@@ -101,7 +101,7 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
    * <ul>
    *   <li>Processes all containers in batch using inherited health check chain</li>
    *   <li>Captures ALL unhealthy containers (no 100-sample limit)</li>
-   *   <li>Stores results in UNHEALTHY_CONTAINERS_V2 table</li>
+   *   <li>Stores results in UNHEALTHY_CONTAINERS table</li>
    * </ul>
    */
   @Override

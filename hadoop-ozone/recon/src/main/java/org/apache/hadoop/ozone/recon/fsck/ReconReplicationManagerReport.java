@@ -37,7 +37,7 @@ import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
  * for debugging/UI display.</p>
  *
  * <p>Recon, however, needs to track per-container health states for ALL containers
- * to populate its UNHEALTHY_CONTAINERS_V2 table. This extended report removes
+ * to populate its UNHEALTHY_CONTAINERS table. This extended report removes
  * the sampling limitation while maintaining backward compatibility by still
  * calling the parent's incrementAndSample() method.</p>
  *

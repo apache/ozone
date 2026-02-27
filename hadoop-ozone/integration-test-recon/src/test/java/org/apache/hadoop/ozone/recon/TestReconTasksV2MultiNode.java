@@ -31,7 +31,7 @@ import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManagerV2.
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
-import org.apache.ozone.recon.schema.ContainerSchemaDefinitionV2;
+import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -83,7 +83,7 @@ public class TestReconTasksV2MultiNode {
     // Ensure each test starts from a clean unhealthy-container table.
     reconContainerManager.getContainerSchemaManagerV2().clearAllUnhealthyContainerRecords();
     // Ensure Recon has initialized pipeline state before assertions.
-    LambdaTestUtils.await(60000, 5000,
+    LambdaTestUtils.await(60000, 300,
         () -> (!reconPipelineManager.getPipelines().isEmpty()));
   }
 
@@ -131,7 +131,7 @@ public class TestReconTasksV2MultiNode {
     List<UnhealthyContainerRecordV2> underReplicatedContainers =
         reconContainerManager.getContainerSchemaManagerV2()
             .getUnhealthyContainers(
-                ContainerSchemaDefinitionV2.UnHealthyContainerStates.UNDER_REPLICATED,
+                ContainerSchemaDefinition.UnHealthyContainerStates.UNDER_REPLICATED,
                 0L, 0L, 1000);
 
     // Should be empty in normal operation (all replicas healthy)
@@ -170,7 +170,7 @@ public class TestReconTasksV2MultiNode {
     List<UnhealthyContainerRecordV2> overReplicatedContainers =
         reconContainerManager.getContainerSchemaManagerV2()
             .getUnhealthyContainers(
-                ContainerSchemaDefinitionV2.UnHealthyContainerStates.OVER_REPLICATED,
+                ContainerSchemaDefinition.UnHealthyContainerStates.OVER_REPLICATED,
                 0L, 0L, 1000);
     // Should be empty in normal operation
     assertEquals(0, overReplicatedContainers.size());

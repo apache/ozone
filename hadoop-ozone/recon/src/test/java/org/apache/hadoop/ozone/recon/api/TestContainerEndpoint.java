@@ -113,7 +113,7 @@ import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTaskFSO;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTaskOBS;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithFSO;
 import org.apache.hadoop.ozone.recon.tasks.ReconOmTask;
-import org.apache.ozone.recon.schema.ContainerSchemaDefinitionV2.UnHealthyContainerStates;
+import org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

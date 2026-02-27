@@ -270,7 +270,7 @@ public class ReconStorageContainerManagerFacade
     PipelineSyncTask pipelineSyncTask = new PipelineSyncTask(pipelineManager, nodeManager,
         scmServiceProvider, reconTaskConfig, taskStatusUpdaterManager);
 
-    // Create ContainerHealthTaskV2 (always runs, writes to UNHEALTHY_CONTAINERS_V2)
+    // Create ContainerHealthTaskV2 (always runs, writes to UNHEALTHY_CONTAINERS)
     LOG.info("Creating ContainerHealthTaskV2");
     containerHealthTaskV2 = new ContainerHealthTaskV2(
         reconTaskConfig,

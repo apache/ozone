@@ -82,7 +82,7 @@ import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.util.SeekableIterator;
-import org.apache.ozone.recon.schema.ContainerSchemaDefinitionV2;
+import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -339,7 +339,7 @@ public class ContainerEndpoint {
   ) {
     List<MissingContainerMetadata> missingContainers = new ArrayList<>();
     containerHealthSchemaManagerV2.getUnhealthyContainers(
-            ContainerSchemaDefinitionV2.UnHealthyContainerStates.MISSING,
+            ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
             0L, 0L, limit)
         .forEach(container -> {
           long containerID = container.getContainerId();
@@ -392,13 +392,14 @@ public class ContainerEndpoint {
       @QueryParam(RECON_QUERY_MAX_CONTAINER_ID) long maxContainerId,
       @DefaultValue(PREV_CONTAINER_ID_DEFAULT_VALUE)
       @QueryParam(RECON_QUERY_MIN_CONTAINER_ID) long minContainerId) {
-    return getUnhealthyContainersV2(state, limit, maxContainerId, minContainerId);
+    return getUnhealthyContainersFromSchema(state, limit, maxContainerId,
+        minContainerId);
   }
 
   /**
-   * V2 implementation - reads from UNHEALTHY_CONTAINERS_V2 table.
+   * V2 implementation - reads from UNHEALTHY_CONTAINERS table.
    */
-  private Response getUnhealthyContainersV2(
+  private Response getUnhealthyContainersFromSchema(
       String state,
       int limit,
       long maxContainerId,
@@ -407,11 +408,11 @@ public class ContainerEndpoint {
     List<UnhealthyContainersSummary> summary = new ArrayList<>();
 
     try {
-      ContainerSchemaDefinitionV2.UnHealthyContainerStates v2State = null;
+      ContainerSchemaDefinition.UnHealthyContainerStates v2State = null;
 
       if (state != null) {
         // Convert V1 state string to V2 enum
-        v2State = ContainerSchemaDefinitionV2.UnHealthyContainerStates.valueOf(state);
+        v2State = ContainerSchemaDefinition.UnHealthyContainerStates.valueOf(state);
       }
 
       // Get summary from V2 table and convert to V1 format
@@ -498,7 +499,8 @@ public class ContainerEndpoint {
       @QueryParam(RECON_QUERY_MAX_CONTAINER_ID) long maxContainerId,
       @DefaultValue(PREV_CONTAINER_ID_DEFAULT_VALUE)
       @QueryParam(RECON_QUERY_MIN_CONTAINER_ID) long minContainerId) {
-    return getUnhealthyContainers(null, limit, maxContainerId, minContainerId);
+    return getUnhealthyContainersFromSchema(null, limit, maxContainerId,
+        minContainerId);
   }
 
   /**

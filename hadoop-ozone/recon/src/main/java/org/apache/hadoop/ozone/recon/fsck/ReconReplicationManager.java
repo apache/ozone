@@ -41,7 +41,7 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManagerV2;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManagerV2.UnhealthyContainerRecordV2;
 import org.apache.hadoop.util.Time;
-import org.apache.ozone.recon.schema.ContainerSchemaDefinitionV2.UnHealthyContainerStates;
+import org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,7 +52,7 @@ import org.slf4j.LoggerFactory;
  * <ol>
  *   <li>Uses NoOpsContainerReplicaPendingOps stub (no pending operations tracking)</li>
  *   <li>Overrides processAll() to capture ALL container health states (no 100-sample limit)</li>
- *   <li>Stores results in Recon's UNHEALTHY_CONTAINERS_V2 table</li>
+ *   <li>Stores results in Recon's UNHEALTHY_CONTAINERS table</li>
  *   <li>Does not issue replication commands (read-only monitoring)</li>
  * </ol>
  *
@@ -268,7 +268,7 @@ public class ReconReplicationManager extends ReplicationManager {
    *   <li>Process each container using inherited health check chain (SCM logic)</li>
    *   <li>Additionally check for REPLICA_MISMATCH (Recon-specific)</li>
    *   <li>Capture ALL unhealthy container IDs per health state (no sampling limit)</li>
-   *   <li>Store results in Recon's UNHEALTHY_CONTAINERS_V2 table</li>
+   *   <li>Store results in Recon's UNHEALTHY_CONTAINERS table</li>
    * </ol>
    *
    * <p><b>Differences from SCM's processAll():</b></p>

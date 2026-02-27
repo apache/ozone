@@ -51,7 +51,7 @@ import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
 import org.apache.hadoop.ozone.recon.spi.ReconGlobalStatsManager;
 import org.apache.hadoop.ozone.recon.tasks.GlobalStatsValue;
 import org.apache.hadoop.ozone.recon.tasks.OmTableInsightTask;
-import org.apache.ozone.recon.schema.ContainerSchemaDefinitionV2;
+import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -101,7 +101,7 @@ public class ClusterStateEndpoint {
     List<ContainerHealthSchemaManagerV2.UnhealthyContainerRecordV2> missingContainers =
         containerHealthSchemaManagerV2
         .getUnhealthyContainers(
-            ContainerSchemaDefinitionV2.UnHealthyContainerStates.MISSING,
+            ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
             0L, 0L, MISSING_CONTAINER_COUNT_LIMIT);
 
     containerStateCounts.setMissingContainerCount(
