@@ -48,8 +48,7 @@ import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.event.Level;
@@ -58,13 +57,12 @@ import org.slf4j.event.Level;
  * Integration Tests for Recon SCM tasks using ContainerHealthTaskV2.
  */
 public class TestReconTasks {
-  private static MiniOzoneCluster cluster;
-  private static OzoneConfiguration conf;
-  private static ReconService recon;
-  private static ReconContainerManager reconContainerManager;
+  private MiniOzoneCluster cluster;
+  private OzoneConfiguration conf;
+  private ReconService recon;
 
-  @BeforeAll
-  public static void init() throws Exception {
+  @BeforeEach
+  public void init() throws Exception {
     conf = new OzoneConfiguration();
     conf.set(HDDS_CONTAINER_REPORT_INTERVAL, "5s");
     conf.set(HDDS_PIPELINE_REPORT_INTERVAL, "5s");
@@ -83,23 +81,12 @@ public class TestReconTasks {
         .build();
     cluster.waitForClusterToBeReady();
     cluster.waitForPipelineTobeReady(ONE, 30000);
-
-    ReconStorageContainerManagerFacade reconScm =
-        (ReconStorageContainerManagerFacade)
-            recon.getReconServer().getReconStorageContainerManager();
-    reconContainerManager = (ReconContainerManager) reconScm.getContainerManager();
     GenericTestUtils.setLogLevel(SCMDatanodeHeartbeatDispatcher.class,
         Level.DEBUG);
   }
 
-  @BeforeEach
-  public void cleanupBeforeEach() {
-    reconContainerManager.getContainerSchemaManagerV2()
-        .clearAllUnhealthyContainerRecords();
-  }
-
-  @AfterAll
-  public static void shutdown() {
+  @AfterEach
+  public void shutdown() {
     if (cluster != null) {
       cluster.shutdown();
     }
