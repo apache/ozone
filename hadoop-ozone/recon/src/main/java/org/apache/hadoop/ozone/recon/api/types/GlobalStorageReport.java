@@ -22,10 +22,58 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 /**
  * Represents a report detailing global storage usage metrics.
  *
- * This class provides information about the total used space,
- * total free space, and the total storage capacity. It is used
- * to encapsulate and transport these metrics, which can assist
- * in monitoring and analyzing storage allocation and usage.
+ * <p>This class encapsulates aggregated storage metrics across the cluster
+ * and defines the relationship between filesystem capacity, reserved space,
+ * and Ozone-managed storage.</p>
+ *
+ * <h3>Storage Hierarchy</h3>
+ *
+ * <pre>
+ * {@code
+ * Global Storage Layout
+ *
+ * |<------------------------ totalFileSystemCapacity ------------------------->|
+ * |<-- totalReservedSpace -->|<----------- totalOzoneCapacity ---------------->|
+ *                            |<-totalOzoneUsedSpace->|<- totalOzoneFreeSpace ->|
+ *
+ *
+ * Relationships:
+ *
+ * totalFileSystemCapacity = totalOzoneCapacity + totalReservedSpace
+ *
+ * totalOzoneCapacity = totalOzoneUsedSpace + totalOzoneFreeSpace
+ * }
+ * </pre>
+ *
+ * <h3>Metric Definitions</h3>
+ *
+ * <ul>
+ *   <li><b>totalFileSystemCapacity</b>:
+ *       Total OS-reported filesystem capacity across all datanodes.</li>
+ *
+ *   <li><b>totalReservedSpace</b>:
+ *       Space reserved and not available for Ozone allocation.</li>
+ *
+ *   <li><b>totalOzoneCapacity</b>:
+ *       Portion of filesystem capacity available for Ozone
+ *       (i.e., filesystem capacity minus reserved space).</li>
+ *
+ *   <li><b>totalOzoneUsedSpace</b>:
+ *       Space currently consumed by Ozone data.</li>
+ *
+ *   <li><b>totalOzoneFreeSpace</b>:
+ *       Remaining allocatable space within Ozone capacity.</li>
+ *
+ *   <li><b>totalOzonePreAllocatedContainerSpace</b>:
+ *       Space pre-allocated for containers but not yet fully utilized.</li>
+ *
+ *   <li><b>totalMinimumFreeSpace</b>:
+ *       Minimum free space that must be maintained as per configuration.</li>
+ * </ul>
+ *
+ * <p>This differentiation helps in understanding how raw filesystem capacity
+ * is divided between reserved space and Ozone-managed space, and further how
+ * Ozone capacity is split between used and free storage.</p>
  */
 public class GlobalStorageReport {
 
