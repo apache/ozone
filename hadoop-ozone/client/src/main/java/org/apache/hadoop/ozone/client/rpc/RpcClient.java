@@ -344,11 +344,11 @@ public class RpcClient implements ClientProtocol {
   }
 
   public static OzoneManagerVersion getOmVersion(ServiceInfoEx info) {
-    OzoneManagerVersion version = OzoneManagerVersion.CURRENT;
+    OzoneManagerVersion version = OzoneManagerVersion.SOFTWARE_VERSION;
     for (ServiceInfo si : info.getServiceInfoList()) {
       if (si.getNodeType() == HddsProtos.NodeType.OM) {
         OzoneManagerVersion current =
-            OzoneManagerVersion.fromProtoValue(si.getProtobuf().getOMVersion());
+            OzoneManagerVersion.deserialize(si.getProtobuf().getOMVersion());
         if (version.compareTo(current) > 0) {
           version = current;
         }
@@ -376,7 +376,7 @@ public class RpcClient implements ClientProtocol {
       if (s.getNodeType() == HddsProtos.NodeType.OM) {
         OzoneManagerVersion omv =
             OzoneManagerVersion
-                .fromProtoValue(s.getProtobuf().getOMVersion());
+                .deserialize(s.getProtobuf().getOMVersion());
         if (minimumVersion.compareTo(omv) > 0) {
           return false;
         } else {

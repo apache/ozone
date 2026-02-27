@@ -110,7 +110,7 @@ public class TestPipelineDatanodesIntersection {
         Pipeline pipeline = provider.create(RatisReplicationConfig.getInstance(
             ReplicationFactor.THREE));
         HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-            ClientVersion.CURRENT_VERSION);
+            ClientVersion.CURRENT.serialize());
         stateManager.addPipeline(pipelineProto);
         nodeManager.addPipeline(pipeline);
         List<Pipeline> overlapPipelines = RatisPipelineUtils

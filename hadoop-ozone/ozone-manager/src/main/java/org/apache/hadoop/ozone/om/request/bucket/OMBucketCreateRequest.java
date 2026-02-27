@@ -481,8 +481,8 @@ public class OMBucketCreateRequest extends OMClientRequest {
   )
   public static OMRequest setDefaultBucketLayoutForOlderClients(OMRequest req,
       ValidationContext ctx) {
-    if (ClientVersion.fromProtoValue(req.getVersion())
-        .compareTo(ClientVersion.BUCKET_LAYOUT_SUPPORT) < 0) {
+    if (!ClientVersion.BUCKET_LAYOUT_SUPPORT.isSupportedBy(
+        req.getVersion())) {
       // Older client will default bucket layout to LEGACY to
       // make its operations backward compatible.
       return changeBucketLayout(req, BucketLayout.LEGACY);

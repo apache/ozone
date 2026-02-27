@@ -85,7 +85,7 @@ public class MockPipelineManager implements PipelineManager {
     }
 
     stateManager.addPipeline(pipeline.getProtobufMessage(
-        ClientVersion.CURRENT_VERSION));
+        ClientVersion.CURRENT.serialize()));
     return pipeline;
   }
 
@@ -109,7 +109,7 @@ public class MockPipelineManager implements PipelineManager {
   public void addEcPipeline(Pipeline pipeline)
       throws IOException {
     stateManager.addPipeline(pipeline.getProtobufMessage(
-        ClientVersion.CURRENT_VERSION));
+        ClientVersion.CURRENT.serialize()));
   }
 
   @Override

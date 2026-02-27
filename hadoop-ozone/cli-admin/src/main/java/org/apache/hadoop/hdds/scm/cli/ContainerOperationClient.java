@@ -238,7 +238,7 @@ public class ContainerOperationClient implements ScmClient {
       HddsProtos.QueryScope queryScope, String poolName)
       throws IOException {
     return storageContainerLocationClient.queryNode(opState, nodeState,
-        queryScope, poolName, ClientVersion.CURRENT_VERSION);
+        queryScope, poolName, ClientVersion.CURRENT.serialize());
   }
 
   @Override
@@ -437,7 +437,7 @@ public class ContainerOperationClient implements ScmClient {
   public List<ContainerReplicaInfo> getContainerReplicas(long containerId) throws IOException {
     List<HddsProtos.SCMContainerReplicaProto> protos =
         storageContainerLocationClient.getContainerReplicas(containerId,
-            ClientVersion.CURRENT_VERSION);
+            ClientVersion.CURRENT.serialize());
     List<ContainerReplicaInfo> replicas = new ArrayList<>();
     for (HddsProtos.SCMContainerReplicaProto p : protos) {
       replicas.add(ContainerReplicaInfo.fromProto(p));
@@ -558,14 +558,14 @@ public class ContainerOperationClient implements ScmClient {
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       String address, String uuid) throws IOException {
     return storageContainerLocationClient.getDatanodeUsageInfo(address,
-        uuid, ClientVersion.CURRENT_VERSION);
+        uuid, ClientVersion.CURRENT.serialize());
   }
 
   @Override
   public List<HddsProtos.DatanodeUsageInfoProto> getDatanodeUsageInfo(
       boolean mostUsed, int count) throws IOException {
     return storageContainerLocationClient.getDatanodeUsageInfo(mostUsed, count,
-        ClientVersion.CURRENT_VERSION);
+        ClientVersion.CURRENT.serialize());
   }
 
   @Override

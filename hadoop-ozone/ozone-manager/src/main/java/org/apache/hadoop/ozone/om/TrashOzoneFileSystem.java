@@ -435,7 +435,7 @@ public class TrashOzoneFileSystem extends FileSystem {
        createOMRequest(OzoneManagerProtocolProtos.Type cmdType) throws IOException {
     return OzoneManagerProtocolProtos.OMRequest.newBuilder()
         .setClientId(CLIENT_ID.toString())
-        .setVersion(ClientVersion.CURRENT_VERSION)
+        .setVersion(ClientVersion.CURRENT.serialize())
         .setUserInfo(getUserInfo())
         .setCmdType(cmdType);
   }

@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
-import static org.apache.hadoop.ozone.ClientVersion.CURRENT_VERSION;
+import static org.apache.hadoop.ozone.ClientVersion.CURRENT;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -94,7 +94,7 @@ public abstract class TestScmApplyTransactionFailure implements HATests.TestCase
         replication, PipelineState.OPEN).get(0);
 
     HddsProtos.Pipeline pipelineToCreate =
-        existing.getProtobufMessage(CURRENT_VERSION);
+        existing.getProtobufMessage(CURRENT.serialize());
     Throwable ex = assertThrows(SCMException.class,
         () -> pipelineManager.getStateManager().addPipeline(
             pipelineToCreate));

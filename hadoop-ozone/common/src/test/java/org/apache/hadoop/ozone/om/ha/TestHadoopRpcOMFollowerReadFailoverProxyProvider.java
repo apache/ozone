@@ -447,7 +447,7 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
     req.setKeyArgs(keyArgs);
 
     OMRequest omRequest = OMRequest.newBuilder()
-        .setVersion(ClientVersion.CURRENT_VERSION)
+        .setVersion(ClientVersion.CURRENT.serialize())
         .setClientId(ClientId.randomId().toString())
         .setCmdType(Type.CreateKey)
         .setCreateKeyRequest(req)
@@ -466,7 +466,7 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
         .setKeyArgs(keyArgs);
 
     OMRequest omRequest = OMRequest.newBuilder()
-        .setVersion(ClientVersion.CURRENT_VERSION)
+        .setVersion(ClientVersion.CURRENT.serialize())
         .setClientId(ClientId.randomId().toString())
         .setCmdType(Type.GetKeyInfo)
         .setGetKeyInfoRequest(req)

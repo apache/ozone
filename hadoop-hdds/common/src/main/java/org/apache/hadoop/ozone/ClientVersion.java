@@ -21,7 +21,6 @@ import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toMap;
 
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.Map;
 import org.apache.hadoop.hdds.ComponentVersion;
 
@@ -46,9 +45,8 @@ public enum ClientVersion implements ComponentVersion {
       + " unknown client version has arrived from the client.");
 
   public static final ClientVersion CURRENT = latest();
-  public static final int CURRENT_VERSION = CURRENT.version;
 
-  private static final Map<Integer, ClientVersion> BY_PROTO_VALUE =
+  private static final Map<Integer, ClientVersion> BY_VALUE =
       Arrays.stream(values())
           .collect(toMap(ClientVersion::serialize, identity()));
 
@@ -70,18 +68,24 @@ public enum ClientVersion implements ComponentVersion {
     return version;
   }
 
+  public static ClientVersion deserialize(int value) {
+    return BY_VALUE.getOrDefault(value, FUTURE_VERSION);
+  }
+
+  @Override
+  public boolean isSupportedBy(int serializedVersion) {
+    // In order for the other serialized version to support this version's features,
+    // the other version must be equal or larger to this version.
+    return deserialize(serializedVersion).compareTo(this) >= 0;
+  }
+
   @Override
   public String toString() {
     return name() + " (" + serialize() + ")";
   }
 
-  public static ClientVersion fromProtoValue(int value) {
-    return BY_PROTO_VALUE.getOrDefault(value, FUTURE_VERSION);
-  }
-
   private static ClientVersion latest() {
-    return Arrays.stream(ClientVersion.values())
-        .max(Comparator.comparingInt(ComponentVersion::serialize)).orElse(null);
+    ClientVersion[] versions = ClientVersion.values();
+    return versions[versions.length - 2];
   }
-
 }

@@ -41,7 +41,7 @@ class TestDatanodeUsageInfo {
     );
 
     DatanodeUsageInfo info = new DatanodeUsageInfo(dn, stat);
-    DatanodeUsageInfoProto proto = info.toProto(ClientVersion.CURRENT_VERSION);
+    DatanodeUsageInfoProto proto = info.toProto(ClientVersion.CURRENT.serialize());
 
     assertThat(proto.hasFsCapacity()).isFalse();
     assertThat(proto.hasFsAvailable()).isFalse();
@@ -59,7 +59,7 @@ class TestDatanodeUsageInfo {
     DatanodeUsageInfo info = new DatanodeUsageInfo(dn, stat);
     info.setFilesystemUsage(2000L, 1500L);
 
-    DatanodeUsageInfoProto proto = info.toProto(ClientVersion.CURRENT_VERSION);
+    DatanodeUsageInfoProto proto = info.toProto(ClientVersion.CURRENT.serialize());
 
     assertThat(proto.hasFsCapacity()).isTrue();
     assertThat(proto.hasFsAvailable()).isTrue();

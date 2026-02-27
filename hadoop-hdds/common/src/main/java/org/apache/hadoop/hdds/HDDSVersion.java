@@ -39,10 +39,9 @@ public enum HDDSVersion implements ComponentVersion {
   FUTURE_VERSION(-1, "Used internally in the client when the server side is "
       + " newer and an unknown server version has arrived to the client.");
 
-  public static final HDDSVersion CURRENT = latest();
-  public static final int CURRENT_VERSION = CURRENT.version;
+  public static final HDDSVersion SOFTWARE_VERSION = latest();
 
-  private static final Map<Integer, HDDSVersion> BY_PROTO_VALUE =
+  private static final Map<Integer, HDDSVersion> BY_VALUE =
       Arrays.stream(values())
           .collect(toMap(HDDSVersion::serialize, identity()));
 
@@ -64,13 +63,20 @@ public enum HDDSVersion implements ComponentVersion {
     return version;
   }
 
+  public static HDDSVersion deserialize(int value) {
+    return BY_VALUE.getOrDefault(value, FUTURE_VERSION);
+  }
+
+  @Override
+  public boolean isSupportedBy(int serializedVersion) {
+    // In order for the other serialized version to support this version's features,
+    // the other version must be equal or larger to this version.
+    return deserialize(serializedVersion).compareTo(this) >= 0;
+  }
+
   @Override
   public String toString() {
     return name() + " (" + serialize() + ")";
-  }
-
-  public static HDDSVersion fromProtoValue(int value) {
-    return BY_PROTO_VALUE.getOrDefault(value, FUTURE_VERSION);
   }
 
   private static HDDSVersion latest() {

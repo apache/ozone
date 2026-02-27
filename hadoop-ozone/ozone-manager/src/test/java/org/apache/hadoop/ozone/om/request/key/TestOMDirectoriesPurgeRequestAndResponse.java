@@ -207,14 +207,14 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
 
     for (OmKeyInfo purgeFile : purgeDeletedFiles) {
       purgePathsRequest.addDeletedSubFiles(
-          purgeFile.getProtobuf(true, ClientVersion.CURRENT_VERSION));
+          purgeFile.getProtobuf(true, ClientVersion.CURRENT.serialize()));
     }
 
     // Add these directories to deletedDirTable, so that its sub-paths will be
     // traversed in next iteration to ensure cleanup all sub-children.
     for (OmKeyInfo dir : markDirsAsDeleted) {
       purgePathsRequest.addMarkDeletedSubDirs(
-          dir.getProtobuf(ClientVersion.CURRENT_VERSION));
+          dir.getProtobuf(ClientVersion.CURRENT.serialize()));
     }
 
     return purgePathsRequest.build();

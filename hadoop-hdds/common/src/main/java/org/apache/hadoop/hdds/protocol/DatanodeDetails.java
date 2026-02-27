@@ -517,7 +517,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
    */
   @JsonIgnore
   public HddsProtos.DatanodeDetailsProto getProtoBufMessage() {
-    return toProto(ClientVersion.CURRENT_VERSION);
+    return toProto(ClientVersion.CURRENT.serialize());
   }
 
   public HddsProtos.DatanodeDetailsProto toProto(int clientVersion) {
@@ -572,8 +572,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
     builder.setPersistedOpStateExpiry(persistedOpStateExpiryEpochSec);
 
     final boolean handlesUnknownPorts =
-        ClientVersion.fromProtoValue(clientVersion)
-        .compareTo(VERSION_HANDLES_UNKNOWN_DN_PORTS) >= 0;
+        VERSION_HANDLES_UNKNOWN_DN_PORTS.isSupportedBy(clientVersion);
     final int requestedPortCount = filterPorts.size();
     final boolean maySkip = requestedPortCount > 0;
     for (Port port : ports) {
@@ -727,7 +726,7 @@ public class DatanodeDetails extends NodeImpl implements Comparable<DatanodeDeta
     private HddsProtos.NodeOperationalState persistedOpState;
     private long persistedOpStateExpiryEpochSec = 0;
     private int initialVersion;
-    private int currentVersion = HDDSVersion.CURRENT_VERSION;
+    private int currentVersion = HDDSVersion.SOFTWARE_VERSION.serialize();
 
     /**
      * Default private constructor. To create Builder instance use
