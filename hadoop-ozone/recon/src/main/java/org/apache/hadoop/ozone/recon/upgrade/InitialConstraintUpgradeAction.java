@@ -23,80 +23,75 @@ import static org.apache.ozone.recon.schema.SqlDbUtils.TABLE_EXISTS_CHECK;
 import static org.jooq.impl.DSL.field;
 import static org.jooq.impl.DSL.name;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Arrays;
-import java.util.LinkedHashSet;
-import java.util.Set;
 import javax.sql.DataSource;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
 import org.jooq.DSLContext;
-import org.jooq.exception.DataAccessException;
 import org.jooq.impl.DSL;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Upgrade action for the INITIAL schema version to ensure unhealthy-container
- * state constraints are aligned with the currently supported state set.
+ * Upgrade action for the INITIAL schema version, which manages constraints
+ * for the UNHEALTHY_CONTAINERS table.
  */
 @UpgradeActionRecon(feature = INITIAL_VERSION)
 public class InitialConstraintUpgradeAction implements ReconUpgradeAction {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(InitialConstraintUpgradeAction.class);
+  private static final Logger LOG = LoggerFactory.getLogger(InitialConstraintUpgradeAction.class);
+  private DSLContext dslContext;
 
   @Override
   public void execute(DataSource source) throws SQLException {
     try (Connection conn = source.getConnection()) {
-      DSLContext dslContext = DSL.using(conn);
-      updateConstraintIfTableExists(dslContext, conn,
-          UNHEALTHY_CONTAINERS_TABLE_NAME);
+      if (!TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
+        return;
+      }
+      dslContext = DSL.using(conn);
+      // Drop the existing constraint
+      dropConstraint();
+      // Add the updated constraint with all enum states
+      addUpdatedConstraint();
     } catch (SQLException e) {
       throw new SQLException("Failed to execute InitialConstraintUpgradeAction", e);
     }
   }
 
-  private void updateConstraintIfTableExists(
-      DSLContext dslContext, Connection conn, String tableName) {
-    if (!TABLE_EXISTS_CHECK.test(conn, tableName)) {
-      return;
-    }
-
-    dropConstraintIfPresent(dslContext, tableName, tableName + "ck1");
-    dropConstraintIfPresent(dslContext, tableName, tableName + "_ck1");
-    addUpdatedConstraint(dslContext, tableName);
+  /**
+   * Drops the existing constraint from the UNHEALTHY_CONTAINERS table.
+   */
+  private void dropConstraint() {
+    String constraintName = UNHEALTHY_CONTAINERS_TABLE_NAME + "ck1";
+    dslContext.alterTable(UNHEALTHY_CONTAINERS_TABLE_NAME)
+        .dropConstraint(constraintName)
+        .execute();
+    LOG.debug("Dropped the existing constraint: {}", constraintName);
   }
 
-  private void dropConstraintIfPresent(
-      DSLContext dslContext, String tableName, String constraintName) {
-    try {
-      dslContext.alterTable(tableName).dropConstraint(constraintName).execute();
-      LOG.info("Dropped existing constraint {} on {}", constraintName, tableName);
-    } catch (DataAccessException ignored) {
-      LOG.debug("Constraint {} does not exist on {}", constraintName, tableName);
-    }
-  }
+  /**
+   * Adds the updated constraint directly within this class.
+   */
+  private void addUpdatedConstraint() {
+    String[] enumStates = Arrays
+        .stream(ContainerSchemaDefinition.UnHealthyContainerStates.values())
+        .map(Enum::name)
+        .toArray(String[]::new);
 
-  private void addUpdatedConstraint(DSLContext dslContext, String tableName) {
-    String[] enumStates = getSupportedStates();
-    String constraintName = tableName + "_ck1";
-    dslContext.alterTable(tableName)
-        .add(DSL.constraint(constraintName)
+    dslContext.alterTable(ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME)
+        .add(DSL.constraint(ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME + "ck1")
             .check(field(name("container_state"))
                 .in(enumStates)))
         .execute();
-    LOG.info("Updated unhealthy-container constraint {} on {}", constraintName,
-        tableName);
+
+    LOG.info("Added the updated constraint to the UNHEALTHY_CONTAINERS table for enum state values: {}",
+        Arrays.toString(enumStates));
   }
 
-  private String[] getSupportedStates() {
-    Set<String> states = new LinkedHashSet<>();
-    Arrays.stream(ContainerSchemaDefinition.UnHealthyContainerStates.values())
-        .map(Enum::name)
-        .forEach(states::add);
-    // Preserve compatibility with rows created by legacy V1 schema.
-    states.add("ALL_REPLICAS_BAD");
-    return states.toArray(new String[0]);
+  @VisibleForTesting
+  public void setDslContext(DSLContext dslContext) {
+    this.dslContext = dslContext;
   }
 }
