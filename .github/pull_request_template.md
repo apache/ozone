@@ -17,6 +17,17 @@ Examples of well-written pull requests:
 * [#5283](https://github.com/apache/ozone/pull/5283)
 * [#5300](https://github.com/apache/ozone/pull/5300)
 
+## Does this contribution contain AI-generated code?
+  If you used AI tools (such as GitHub Copilot, ChatGPT, Claude, etc.) to assist with this contribution, please let us know:
+  - [ ] Yes, this PR contains AI-generated code
+  - [ ] No AI-generated code
+
+  If yes, please provide:
+  * Tools used: [e.g., GitHub Copilot, ChatGPT, Claude, etc.]
+  * Prompt(s) used (if applicable): [brief description of the prompts]
+
+  For more details, see [ASF Generative Tooling Guidance](https://www.apache.org/legal/generative-tooling.html).
+
 ## What is the link to the Apache JIRA
 
 Please create an issue in ASF JIRA before opening a pull request, and you need to set the title of the pull
