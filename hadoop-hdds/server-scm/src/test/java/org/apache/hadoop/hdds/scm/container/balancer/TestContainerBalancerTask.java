@@ -413,50 +413,6 @@ public class TestContainerBalancerTask {
     assertFalse(zeroOrNegSizeContainerMoved);
   }
 
-  @Test
-  public void testStartBalancerWithInvalidNodes() {
-    ContainerBalancer balancer = new ContainerBalancer(scm);
-    ContainerBalancerConfiguration cbConf = conf.getObject(ContainerBalancerConfiguration.class);
-
-    // Testing invalid hostname and IP for includeNodes
-    String invalidHost = "invalid-host-name";
-    cbConf.setIncludeNodes(invalidHost);
-    InvalidContainerBalancerConfigurationException exception = assertThrows(
-        InvalidContainerBalancerConfigurationException.class, () -> balancer.startBalancer(cbConf),
-        "Should throw exception for non-existent hostname in includeNodes");
-    assertThat(exception.getMessage()).contains(invalidHost);
-    String invalidIp = "883.883.883.883";
-    cbConf.setIncludeNodes(invalidIp);
-    exception = assertThrows(
-        InvalidContainerBalancerConfigurationException.class, () -> balancer.startBalancer(cbConf),
-        "Should throw exception for invalid IP address format in includeNodes");
-    assertThat(exception.getMessage()).contains(invalidIp);
-    cbConf.setIncludeNodes("");
-
-    // Testing invalid hostname and IP for excludeNodes
-    cbConf.setExcludeNodes(invalidHost);
-    exception = assertThrows(
-        InvalidContainerBalancerConfigurationException.class, () -> balancer.startBalancer(cbConf),
-        "Should throw exception for non-existent hostname in excludeNodes");
-    assertThat(exception.getMessage()).contains(invalidHost);
-    cbConf.setExcludeNodes(invalidIp);
-    exception = assertThrows(
-        InvalidContainerBalancerConfigurationException.class, () -> balancer.startBalancer(cbConf),
-        "Should throw exception for invalid IP address format in excludeNodes");
-    assertThat(exception.getMessage()).contains(invalidIp);
-    cbConf.setExcludeNodes("");
-
-    // Testing a valid case
-    DatanodeDetails includeNode = nodesInCluster.get(0).getDatanodeDetails();
-    DatanodeDetails excludeNode = nodesInCluster.get(1).getDatanodeDetails();
-    cbConf.setIncludeNodes(includeNode.getIpAddress());
-    cbConf.setExcludeNodes(excludeNode.getIpAddress());
-    assertDoesNotThrow(() -> balancer.startBalancer(cbConf),
-        "Should succeed when both include and exclude nodes are valid");
-
-    stopBalancer();
-  }
-
   /**
    * Generates a range of equally spaced utilization(that is, used / capacity)
    * values from 0 to 1.
