@@ -24,7 +24,6 @@ import java.util.Collections;
 import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -162,7 +161,6 @@ public class FinalizationManagerImpl implements FinalizationManager {
    * Builds a {@link FinalizationManagerImpl}.
    */
   public static class Builder {
-    private OzoneConfiguration conf;
     private HDDSLayoutVersionManager versionManager;
     private SCMStorageConfig storage;
     private SCMHAManager scmHAManager;
@@ -171,11 +169,6 @@ public class FinalizationManagerImpl implements FinalizationManager {
 
     public Builder() {
       executor = new DefaultUpgradeFinalizationExecutor<>();
-    }
-
-    public Builder setConfiguration(OzoneConfiguration configuration) {
-      this.conf = configuration;
-      return this;
     }
 
     public Builder setLayoutVersionManager(
@@ -207,7 +200,6 @@ public class FinalizationManagerImpl implements FinalizationManager {
     }
 
     public FinalizationManagerImpl build() throws IOException {
-      Objects.requireNonNull(conf, "conf == null");
       Objects.requireNonNull(versionManager, "versionManager == null");
       Objects.requireNonNull(storage, "storage == null");
       Objects.requireNonNull(scmHAManager, "scmHAManager == null");

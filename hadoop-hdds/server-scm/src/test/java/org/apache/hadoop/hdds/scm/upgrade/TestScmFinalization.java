@@ -20,7 +20,6 @@ package org.apache.hadoop.hdds.scm.upgrade;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.matches;
@@ -29,16 +28,13 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
-import java.util.Arrays;
 import java.util.UUID;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.metadata.DBTransactionBuffer;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationCheckpoint;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
@@ -196,8 +192,6 @@ public class TestScmFinalization {
     SCMStorageConfig storage = mock(SCMStorageConfig.class);
     SCMContext scmContext = SCMContext.emptyContext();
     scmContext.setFinalizationCheckpoint(initialCheckpoint);
-    PipelineManager pipelineManager =
-        getMockPipelineManager(initialCheckpoint);
 
     FinalizationStateManager stateManager =
         new FinalizationStateManagerTestImpl.Builder()
@@ -209,7 +203,6 @@ public class TestScmFinalization {
 
     FinalizationManager manager = new FinalizationManagerTestImpl.Builder()
         .setFinalizationStateManager(stateManager)
-        .setConfiguration(new OzoneConfiguration())
         .setLayoutVersionManager(versionManager)
         .setStorage(storage)
         .setHAManager(SCMHAManagerStub.getInstance(true))
@@ -225,8 +218,7 @@ public class TestScmFinalization {
     assertEquals(getStatusFromCheckpoint(initialCheckpoint).status(),
         status.status());
 
-    InOrder inOrder = inOrder(buffer, pipelineManager, nodeManager,
-        storage);
+    InOrder inOrder = inOrder(buffer, nodeManager, storage);
 
     // Once the initial checkpoint's operations are crossed, this count will
     // be increased to 1 to indicate where finalization should have resumed
@@ -320,15 +312,4 @@ public class TestScmFinalization {
     }
   }
 
-  private PipelineManager getMockPipelineManager(
-      FinalizationCheckpoint inititalCheckpoint) {
-    PipelineManager pipelineManager = mock(PipelineManager.class);
-    // After finalization, SCM will wait for at least one pipeline to be
-    // created. It does not care about the contents of the pipeline list, so
-    // just return something with length >= 1.
-    when(pipelineManager.getPipelines(any(),
-        any())).thenReturn(Arrays.asList(null, null, null));
-
-    return pipelineManager;
-  }
 }

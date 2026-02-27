@@ -715,7 +715,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       finalizationExecutor = new DefaultUpgradeFinalizationExecutor<>();
     }
     finalizationManager = new FinalizationManagerImpl.Builder()
-        .setConfiguration(conf)
         .setLayoutVersionManager(scmLayoutVersionManager)
         .setStorage(scmStorageConfig)
         .setHAManager(scmHAManager)
@@ -788,7 +787,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
               );
     }
 
-    finalizationManager.buildUpgradeContext(scmNodeManager,   scmContext);
+    finalizationManager.buildUpgradeContext(scmNodeManager, scmContext);
 
     ReplicationManager.ReplicationManagerConfiguration rmConf =
         conf.getObject(ReplicationManager.ReplicationManagerConfiguration.class);
