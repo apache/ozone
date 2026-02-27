@@ -47,10 +47,8 @@ import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_METRICS_TEMP_FILE;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_RATIS_SNAPSHOT_DIR;
-import static org.apache.hadoop.ozone.OzoneConsts.PREPARE_MARKER_KEY;
 import static org.apache.hadoop.ozone.OzoneConsts.RPC_PORT;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_CA_CERT_STORAGE_DIR;
-import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DEFAULT_BUCKET_LAYOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_DIR_DELETING_SERVICE_INTERVAL;
@@ -100,7 +98,6 @@ import static org.apache.hadoop.ozone.om.s3.S3SecretStoreConfigurationKeys.DEFAU
 import static org.apache.hadoop.ozone.om.s3.S3SecretStoreConfigurationKeys.S3_SECRET_STORAGE_TYPE;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerInterServiceProtocolProtos.OzoneManagerInterService;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneManagerService;
-import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 import static org.apache.hadoop.security.UserGroupInformation.getCurrentUser;
 import static org.apache.hadoop.util.ExitUtil.terminate;
 import static org.apache.hadoop.util.Time.monotonicNow;
@@ -465,8 +462,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   private final boolean isS3MultiTenancyEnabled;
   private final boolean isStrictS3;
   private ExitManager exitManager;
-
-  private OzoneManagerPrepareState prepareState;
 
   private boolean isBootstrapping = false;
   private boolean isForcedBootstrapping = false;
@@ -1018,12 +1013,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
           updateLayoutVersionInDB(versionManager, metadataManager);
         }
       }
-
-      instantiatePrepareStateAfterSnapshot();
-    } else {
-      // Prepare state depends on the transaction ID of metadataManager after a
-      // restart.
-      instantiatePrepareStateOnStartup();
     }
   }
 
@@ -4878,102 +4867,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public OMLayoutVersionManager getVersionManager() {
     return versionManager;
-  }
-
-  public OzoneManagerPrepareState getPrepareState() {
-    return prepareState;
-  }
-
-  /**
-   * Determines if the prepare gate should be enabled on this OM after OM
-   * is restarted.
-   * This must be done after metadataManager is instantiated
-   * and before the RPC server is started.
-   */
-  private void instantiatePrepareStateOnStartup()
-      throws IOException {
-    TransactionInfo txnInfo = metadataManager.getTransactionInfoTable()
-        .get(TRANSACTION_INFO_KEY);
-    if (txnInfo == null) {
-      // No prepare request could be received if there are not transactions.
-      prepareState = new OzoneManagerPrepareState(configuration);
-    } else {
-      prepareState = new OzoneManagerPrepareState(configuration,
-          txnInfo.getTransactionIndex());
-      TransactionInfo dbPrepareValue =
-          metadataManager.getTransactionInfoTable().get(PREPARE_MARKER_KEY);
-
-      boolean hasMarkerFile =
-          (prepareState.getState().getStatus() ==
-              PrepareStatus.PREPARE_COMPLETED);
-      boolean hasDBMarker = (dbPrepareValue != null);
-
-      if (hasDBMarker) {
-        long dbPrepareIndex = dbPrepareValue.getTransactionIndex();
-
-        if (hasMarkerFile) {
-          long prepareFileIndex = prepareState.getState().getIndex();
-          // If marker and DB prepare index do not match, use the DB value
-          // since this is synced through Ratis, to avoid divergence.
-          if (prepareFileIndex != dbPrepareIndex) {
-            LOG.warn("Prepare marker file index {} does not match DB prepare " +
-                "index {}. Writing DB index to prepare file and maintaining " +
-                "prepared state.", prepareFileIndex, dbPrepareIndex);
-            prepareState.finishPrepare(dbPrepareIndex);
-          }
-          // Else, marker and DB are present and match, so OM is prepared.
-        } else {
-          // Prepare cancelled with startup flag to remove marker file.
-          // Persist this to the DB.
-          // If the startup flag is used it should be used on all OMs to avoid
-          // divergence.
-          metadataManager.getTransactionInfoTable().delete(PREPARE_MARKER_KEY);
-        }
-      } else if (hasMarkerFile) {
-        // Marker file present but no DB entry present.
-        // This should never happen. If a prepare request fails partway
-        // through, OM should replay it so both the DB and marker file exist.
-        throw new OMException("Prepare marker file found on startup without " +
-            "a corresponding database entry. Corrupt prepare state.",
-            ResultCodes.PREPARE_FAILED);
-      }
-      // Else, no DB or marker file, OM is not prepared.
-    }
-  }
-
-  /**
-   * Determines if the prepare gate should be enabled on this OM after OM
-   * receives a snapshot.
-   */
-  private void instantiatePrepareStateAfterSnapshot()
-      throws IOException {
-    TransactionInfo txnInfo = metadataManager.getTransactionInfoTable()
-        .get(TRANSACTION_INFO_KEY);
-    if (txnInfo == null) {
-      // No prepare request could be received if there are not transactions.
-      prepareState = new OzoneManagerPrepareState(configuration);
-    } else {
-      prepareState = new OzoneManagerPrepareState(configuration,
-          txnInfo.getTransactionIndex());
-      TransactionInfo dbPrepareValue =
-          metadataManager.getTransactionInfoTable().get(PREPARE_MARKER_KEY);
-
-      boolean hasDBMarker = (dbPrepareValue != null);
-
-      if (hasDBMarker) {
-        // Snapshot contained a prepare request to apply.
-        // Update the in memory prepare gate and marker file index.
-        // If we have already done this, the operation is idempotent.
-        long dbPrepareIndex = dbPrepareValue.getTransactionIndex();
-        prepareState.restorePrepareFromIndex(dbPrepareIndex,
-            txnInfo.getTransactionIndex());
-      } else {
-        // No DB marker.
-        // Deletes marker file if exists, otherwise does nothing if we were not
-        // already prepared.
-        prepareState.cancelPrepare();
-      }
-    }
   }
 
   public int getMinMultipartUploadPartSize() {

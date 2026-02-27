@@ -18,10 +18,6 @@
 package org.apache.hadoop.ozone.om.ratis;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -37,22 +33,14 @@ import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
-import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyArgs;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareRequest;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareRequestArgs;
-import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PrepareStatusResponse.PrepareStatus;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.UserInfo;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.ratis.proto.RaftProtos;
 import org.apache.ratis.protocol.Message;
-import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.server.raftlog.LogProtoUtils;
 import org.apache.ratis.statemachine.TransactionContext;
@@ -72,7 +60,6 @@ public class TestOzoneManagerStateMachine {
   private Path tempDir;
 
   private OzoneManagerStateMachine ozoneManagerStateMachine;
-  private OzoneManagerPrepareState prepareState;
   private AuditLogger auditLogger;
 
   @BeforeEach
@@ -80,9 +67,6 @@ public class TestOzoneManagerStateMachine {
     OzoneManagerRatisServer ozoneManagerRatisServer =
         mock(OzoneManagerRatisServer.class);
     OzoneManager ozoneManager = mock(OzoneManager.class);
-    // Allow testing of prepare pre-append gate.
-    when(ozoneManager.isAdmin(any(UserGroupInformation.class)))
-        .thenReturn(true);
 
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.set(OMConfigKeys.OZONE_OM_DB_DIRS,
@@ -95,8 +79,6 @@ public class TestOzoneManagerStateMachine {
     auditLogger = mock(AuditLogger.class);
 
     when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
-    prepareState = new OzoneManagerPrepareState(conf);
-    when(ozoneManager.getPrepareState()).thenReturn(prepareState);
 
     when(ozoneManagerRatisServer.getOzoneManager()).thenReturn(ozoneManager);
     when(ozoneManager.getTransactionInfo()).thenReturn(mock(TransactionInfo.class));
@@ -162,77 +144,6 @@ public class TestOzoneManagerStateMachine {
 
     assertTermIndex(0, 3, ozoneManagerStateMachine.getLastAppliedTermIndex());
     assertTermIndex(0, 3, ozoneManagerStateMachine.getLastNotifiedTermIndex());
-  }
-
-  @Test
-  public void testPreAppendTransaction() throws Exception {
-    // Submit write request.
-    KeyArgs args = KeyArgs
-        .newBuilder()
-        .setVolumeName("volume")
-        .setBucketName("bucket")
-        .setKeyName("key")
-        .build();
-    OMRequest createKeyRequest = OMRequest.newBuilder()
-        .setCreateKeyRequest(CreateKeyRequest.newBuilder().setKeyArgs(args))
-        .setCmdType(Type.CreateKey)
-        .setClientId("123")
-        .setUserInfo(UserInfo
-            .newBuilder()
-            .setUserName("user")
-            .setHostName("localhost")
-            .setRemoteAddress("127.0.0.1"))
-        .build();
-    // Without prepare enabled, the txn should be returned unaltered.
-    TransactionContext submittedTrx = mockTransactionContext(createKeyRequest);
-    TransactionContext returnedTrx =
-        ozoneManagerStateMachine.preAppendTransaction(submittedTrx);
-    assertSame(submittedTrx, returnedTrx);
-
-    assertEquals(PrepareStatus.NOT_PREPARED, prepareState.getState().getStatus());
-
-    // Submit prepare request.
-    OMRequest prepareRequest = OMRequest.newBuilder()
-        .setPrepareRequest(
-            PrepareRequest.newBuilder()
-                .setArgs(PrepareRequestArgs.getDefaultInstance()))
-        .setCmdType(Type.Prepare)
-        .setClientId("123")
-        .setUserInfo(UserInfo
-            .newBuilder()
-            .setUserName("user")
-            .setHostName("localhost")
-            .setRemoteAddress("127.0.0.1"))
-        .build();
-
-    submittedTrx = mockTransactionContext(prepareRequest);
-    returnedTrx = ozoneManagerStateMachine.preAppendTransaction(submittedTrx);
-    assertSame(submittedTrx, returnedTrx);
-
-    // Prepare should be started.
-    assertEquals(PrepareStatus.PREPARE_GATE_ENABLED,
-        prepareState.getState().getStatus());
-
-    // Submitting a write request should now fail.
-    StateMachineException smEx =
-        assertThrows(StateMachineException.class,
-            () -> ozoneManagerStateMachine.preAppendTransaction(mockTransactionContext(createKeyRequest)),
-            "Expected StateMachineException to be thrown when submitting write request while prepared.");
-    assertFalse(smEx.leaderShouldStepDown());
-
-    Throwable cause = smEx.getCause();
-    OMException omException = assertInstanceOf(OMException.class, cause);
-    assertEquals(omException.getResult(), OMException.ResultCodes.NOT_SUPPORTED_OPERATION_WHEN_PREPARED);
-
-    // Should be able to prepare again without issue.
-    submittedTrx = mockTransactionContext(prepareRequest);
-    returnedTrx = ozoneManagerStateMachine.preAppendTransaction(submittedTrx);
-    assertSame(submittedTrx, returnedTrx);
-
-    assertEquals(PrepareStatus.PREPARE_GATE_ENABLED, prepareState.getState().getStatus());
-
-    // Cancel prepare is handled in the cancel request apply txn step, not
-    // the pre-append state machine step, so it is tested in other classes.
   }
 
   @Test

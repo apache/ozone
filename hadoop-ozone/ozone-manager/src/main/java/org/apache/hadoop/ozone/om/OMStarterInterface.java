@@ -34,7 +34,4 @@ public interface OMStarterInterface {
 
   void bootstrap(OzoneConfiguration conf, boolean force) throws IOException,
       AuthenticationException;
-
-  void startAndCancelPrepare(OzoneConfiguration conf) throws IOException,
-      AuthenticationException;
 }
