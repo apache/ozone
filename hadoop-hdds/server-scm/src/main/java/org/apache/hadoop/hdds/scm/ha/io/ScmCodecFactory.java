@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.lang3.ClassUtils;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
@@ -48,7 +49,9 @@ public final class ScmCodecFactory {
     codecs.put(X509Certificate.class, new ScmX509CertificateCodec());
     codecs.put(com.google.protobuf.ByteString.class, new ScmNonShadedByteStringCodec());
     codecs.put(ByteString.class, new ScmByteStringCodec());
+    codecs.put(HddsProtos.PipelineState.class, new ScmHddsPipelineStateCodec());
     codecs.put(ManagedSecretKey.class, new ScmManagedSecretKeyCodec());
+    codecs.put(HddsProtos.LifeCycleEvent.class, new ScmHddsLifeCycleEventCodec());
   }
 
   private ScmCodecFactory() { }
