@@ -84,6 +84,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
@@ -227,7 +228,8 @@ public class TestKeyManagerImpl {
             any(ReplicationConfig.class),
             anyString(),
             any(ExcludeList.class),
-            anyString())).thenThrow(
+            anyString(),
+            any(StorageType.class))).thenThrow(
                 new SCMException("SafeModePrecheck failed for allocateBlock",
             ResultCodes.SAFE_MODE_EXCEPTION));
     createVolume(VOLUME_NAME);
