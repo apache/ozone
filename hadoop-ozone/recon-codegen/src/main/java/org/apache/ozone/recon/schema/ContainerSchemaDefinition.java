@@ -33,12 +33,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Schema definition for unhealthy containers.
+ * Class used to create tables that are required for tracking containers.
  */
 @Singleton
 public class ContainerSchemaDefinition implements ReconSchemaDefinition {
-  private static final Logger LOG =
-      LoggerFactory.getLogger(ContainerSchemaDefinition.class);
+  private static final Logger LOG = LoggerFactory.getLogger(ContainerSchemaDefinition.class);
 
   public static final String UNHEALTHY_CONTAINERS_TABLE_NAME =
       "UNHEALTHY_CONTAINERS";
@@ -58,11 +57,14 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
     Connection conn = dataSource.getConnection();
     dslContext = DSL.using(conn);
     if (!TABLE_EXISTS_CHECK.test(conn, UNHEALTHY_CONTAINERS_TABLE_NAME)) {
-      LOG.info("UNHEALTHY_CONTAINERS is missing, creating new one.");
+      LOG.info("UNHEALTHY_CONTAINERS is missing creating new one.");
       createUnhealthyContainersTable();
     }
   }
 
+  /**
+   * Create the Missing Containers table.
+   */
   private void createUnhealthyContainersTable() {
     dslContext.createTableIfNotExists(UNHEALTHY_CONTAINERS_TABLE_NAME)
         .column(CONTAINER_ID, SQLDataType.BIGINT.nullable(false))
@@ -79,8 +81,7 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
                 .in(UnHealthyContainerStates.values())))
         .execute();
     dslContext.createIndex("idx_container_state")
-        .on(DSL.table(UNHEALTHY_CONTAINERS_TABLE_NAME),
-            DSL.field(name(CONTAINER_STATE)))
+        .on(DSL.table(UNHEALTHY_CONTAINERS_TABLE_NAME), DSL.field(name(CONTAINER_STATE)))
         .execute();
   }
 
@@ -93,17 +94,17 @@ public class ContainerSchemaDefinition implements ReconSchemaDefinition {
   }
 
   /**
-   * ENUM describing the allowed container states in the unhealthy containers
-   * table.
+   * ENUM describing the allowed container states which can be stored in the
+   * unhealthy containers table.
    */
   public enum UnHealthyContainerStates {
     MISSING,
+    EMPTY_MISSING,
     UNDER_REPLICATED,
     OVER_REPLICATED,
     MIS_REPLICATED,
-    REPLICA_MISMATCH,
-    EMPTY_MISSING,
-    NEGATIVE_SIZE,
-    ALL_REPLICAS_BAD
+    ALL_REPLICAS_BAD,
+    NEGATIVE_SIZE, // Added new state to track containers with negative sizes
+    REPLICA_MISMATCH
   }
 }

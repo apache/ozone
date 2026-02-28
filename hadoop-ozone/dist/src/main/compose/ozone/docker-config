@@ -66,5 +66,3 @@ no_proxy=om,scm,s3g,recon,kdc,localhost,127.0.0.1
 
 # Explicitly enable filesystem snapshot feature for this Docker compose cluster
 OZONE-SITE.XML_ozone.filesystem.snapshot.enabled=true
-#OZONE-SITE.XML_ozone.recon.container.health.use.scm.report=true
-OZONE-SITE.XML_ozone.recon.task.missingcontainer.interval=10s
