@@ -27,8 +27,8 @@ import java.util.Map;
 import java.util.function.IntFunction;
 import org.apache.commons.lang3.ClassUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineState;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
@@ -60,8 +60,8 @@ public final class ScmCodecFactory {
     putEnum(NodeType.class, NodeType::forNumber);
   }
 
-  static <T extends Enum<T> & ProtocolMessageEnum> void putEnum
-      (Class<T> enumClass, IntFunction<T> forNumber) {
+  static <T extends Enum<T> & ProtocolMessageEnum> void putEnum(
+      Class<T> enumClass, IntFunction<T> forNumber) {
     codecs.put(enumClass, new ScmEnumCodec<>(enumClass, forNumber));
   }
 

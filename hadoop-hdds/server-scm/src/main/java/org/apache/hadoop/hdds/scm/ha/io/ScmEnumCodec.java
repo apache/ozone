@@ -36,7 +36,7 @@ class ScmEnumCodec<T extends Enum<T> & ProtocolMessageEnum> implements ScmCodec<
 
   ScmEnumCodec(Class<T> enumClass, IntFunction<T> forNumber) {
     Preconditions.assertTrue(enumClass.isEnum());
-    for(T constant : enumClass.getEnumConstants()) {
+    for (T constant : enumClass.getEnumConstants()) {
       Preconditions.assertSame(constant, forNumber.apply(constant.getNumber()), "constant");
     }
 
