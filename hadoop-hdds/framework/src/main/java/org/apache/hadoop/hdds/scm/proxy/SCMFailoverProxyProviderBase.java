@@ -333,6 +333,9 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
           }
         }
 
+        // Print user-facing retry messages for all attempts
+        printRetryMessage(e, failover);
+
         if (SCMHAUtils.checkRetriableWithNoFailoverException(e)) {
           setUpdatedLeaderNodeID();
         } else {
@@ -346,5 +349,38 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
 
   public synchronized void setUpdatedLeaderNodeID() {
     this.updatedLeaderNodeID = getCurrentProxySCMNodeId();
+  }
+
+  /**
+   * Print user-facing retry message to stderr.
+   * Shows connection attempts and failover progress.
+   *
+   * @param exception the exception that triggered the retry
+   * @param failoverCount the number of failover attempts made so far
+   */
+  private void printRetryMessage(Exception exception, int failoverCount) {
+    Throwable cause = exception.getCause();
+    String exceptionType = cause != null ?
+        cause.getClass().getSimpleName() : exception.getClass().getSimpleName();
+
+    // Extract concise error message
+    String errorMsg;
+    if (cause != null && cause.getMessage() != null) {
+      String fullMsg = cause.getMessage();
+      int colonIndex = fullMsg.indexOf(':');
+      errorMsg = colonIndex > 0 && colonIndex < 100 ?
+          fullMsg.substring(0, colonIndex) : fullMsg;
+    } else {
+      errorMsg = exception.getMessage();
+    }
+
+    System.err.printf("%s: %s, while invoking %s over %s. " +
+        "Retrying after %d failover attempt(s). Sleeping for %dms.%n",
+        exceptionType,
+        errorMsg,
+        protocolClass.getSimpleName(),
+        getCurrentProxySCMNodeId(),
+        failoverCount,
+        getRetryInterval());
   }
 }
