@@ -168,12 +168,15 @@ public class ContainerHealthSchemaManagerV2 {
   }
 
   /**
-   * Batch delete SCM-tracked states for multiple containers.
+   * Batch delete all health states for multiple containers.
    * This deletes all states generated from SCM/Recon health scans:
    * MISSING, EMPTY_MISSING, UNDER_REPLICATED, OVER_REPLICATED,
-   * MIS_REPLICATED and NEGATIVE_SIZE for all containers in the list in a
-   * single transaction.
-   * REPLICA_MISMATCH is NOT deleted as it's tracked locally by Recon.
+   * MIS_REPLICATED, NEGATIVE_SIZE and REPLICA_MISMATCH for all containers
+   * in the list in a single transaction.
+   *
+   * <p>REPLICA_MISMATCH is included here because it is re-evaluated on every
+   * scan cycle (just like the SCM-sourced states); omitting it would leave
+   * stale REPLICA_MISMATCH records in the table after a mismatch is resolved.
    *
    * @param containerIds List of container IDs to delete states for
    */
@@ -192,13 +195,14 @@ public class ContainerHealthSchemaManagerV2 {
               UnHealthyContainerStates.UNDER_REPLICATED.toString(),
               UnHealthyContainerStates.OVER_REPLICATED.toString(),
               UnHealthyContainerStates.MIS_REPLICATED.toString(),
-              UnHealthyContainerStates.NEGATIVE_SIZE.toString()))
+              UnHealthyContainerStates.NEGATIVE_SIZE.toString(),
+              UnHealthyContainerStates.REPLICA_MISMATCH.toString()))
           .execute();
-      LOG.debug("Batch deleted {} SCM-tracked state records for {} containers",
+      LOG.debug("Batch deleted {} health state records for {} containers",
           deleted, containerIds.size());
     } catch (Exception e) {
-      LOG.error("Failed to batch delete SCM states for {} containers", containerIds.size(), e);
-      throw new RuntimeException("Failed to batch delete SCM states", e);
+      LOG.error("Failed to batch delete health states for {} containers", containerIds.size(), e);
+      throw new RuntimeException("Failed to batch delete health states", e);
     }
   }
 
