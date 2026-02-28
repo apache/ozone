@@ -19,8 +19,7 @@ package org.apache.hadoop.hdds.scm.ha.io;
 
 import com.google.common.primitives.Ints;
 import com.google.protobuf.ProtocolMessageEnum;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.function.IntFunction;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
@@ -33,16 +32,16 @@ import org.apache.ratis.util.Preconditions;
  */
 class ScmEnumCodec<T extends Enum<T> & ProtocolMessageEnum> implements ScmCodec<T> {
   private final Class<T> enumClass;
-  private final Map<Integer, T> byNumber = new HashMap<>();
+  private final IntFunction<T> forNumber;
 
-  ScmEnumCodec(Class<T> enumClass) {
-    Preconditions.assertTrue(enumClass.isEnum(), "enumClass is not an enum: " + enumClass);
-    this.enumClass = enumClass;
-
-    // Build number -> enum constant map (no reflection)
-    for (T e : enumClass.getEnumConstants()) {
-      byNumber.put(e.getNumber(), e);
+  ScmEnumCodec(Class<T> enumClass, IntFunction<T> forNumber) {
+    Preconditions.assertTrue(enumClass.isEnum());
+    for(T constant : enumClass.getEnumConstants()) {
+      Preconditions.assertSame(constant, forNumber.apply(constant.getNumber()), "constant");
     }
+
+    this.enumClass = enumClass;
+    this.forNumber = forNumber;
   }
 
   @Override
@@ -61,7 +60,7 @@ class ScmEnumCodec<T extends Enum<T> & ProtocolMessageEnum> implements ScmCodec<
               + StringUtils.bytes2String(value.asReadOnlyByteBuffer()), e);
     }
 
-    final T decoded = byNumber.get(n);
+    final T decoded = forNumber.apply(n);
     if (decoded == null) {
       throw new InvalidProtocolBufferException(
           "Unknown enum number for " + enumClass.getName() + ": " + n);
