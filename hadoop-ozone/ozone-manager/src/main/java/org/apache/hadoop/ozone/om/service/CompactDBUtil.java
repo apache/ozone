@@ -67,6 +67,7 @@ public final class CompactDBUtil {
         compactTable(metadataManager, tableName);
       } catch (Exception e) {
         LOG.warn("Failed to compact column family: {}", tableName, e);
+        throw new RuntimeException("Compaction failed for column family: " + tableName, e);
       }
     });
   }
