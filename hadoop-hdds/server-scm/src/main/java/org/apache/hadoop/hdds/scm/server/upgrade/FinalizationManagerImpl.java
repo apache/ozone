@@ -24,11 +24,9 @@ import java.util.Collections;
 import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -50,8 +48,6 @@ public class FinalizationManagerImpl implements FinalizationManager {
   private SCMUpgradeFinalizer upgradeFinalizer;
   private SCMUpgradeFinalizationContext context;
   private SCMStorageConfig storage;
-  private OzoneConfiguration conf;
-  private HDDSLayoutVersionManager versionManager;
   private final FinalizationStateManager finalizationStateManager;
   private ThreadFactory threadFactory;
 
@@ -78,23 +74,16 @@ public class FinalizationManagerImpl implements FinalizationManager {
 
   private void initCommonFields(Builder builder) {
     this.storage = builder.storage;
-    this.versionManager = builder.versionManager;
-    this.conf = builder.conf;
-    this.upgradeFinalizer = new SCMUpgradeFinalizer(this.versionManager,
-        builder.executor);
+    this.upgradeFinalizer = new SCMUpgradeFinalizer(builder.versionManager, builder.executor);
   }
 
   @Override
   public void buildUpgradeContext(NodeManager nodeManager,
-                                  PipelineManager pipelineManager,
-                                  SCMContext scmContext) {
+      SCMContext scmContext) {
     this.context = new SCMUpgradeFinalizationContext.Builder()
             .setStorage(this.storage)
             .setFinalizationStateManager(finalizationStateManager)
-            .setConfiguration(conf)
             .setNodeManager(nodeManager)
-            .setPipelineManager(pipelineManager)
-            .setLayoutVersionManager(versionManager)
             .setSCMContext(scmContext)
             .build();
 
@@ -172,7 +161,6 @@ public class FinalizationManagerImpl implements FinalizationManager {
    * Builds a {@link FinalizationManagerImpl}.
    */
   public static class Builder {
-    private OzoneConfiguration conf;
     private HDDSLayoutVersionManager versionManager;
     private SCMStorageConfig storage;
     private SCMHAManager scmHAManager;
@@ -181,11 +169,6 @@ public class FinalizationManagerImpl implements FinalizationManager {
 
     public Builder() {
       executor = new DefaultUpgradeFinalizationExecutor<>();
-    }
-
-    public Builder setConfiguration(OzoneConfiguration configuration) {
-      this.conf = configuration;
-      return this;
     }
 
     public Builder setLayoutVersionManager(
@@ -217,7 +200,6 @@ public class FinalizationManagerImpl implements FinalizationManager {
     }
 
     public FinalizationManagerImpl build() throws IOException {
-      Objects.requireNonNull(conf, "conf == null");
       Objects.requireNonNull(versionManager, "versionManager == null");
       Objects.requireNonNull(storage, "storage == null");
       Objects.requireNonNull(scmHAManager, "scmHAManager == null");
