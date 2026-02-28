@@ -73,7 +73,7 @@ jobs:
             exit 0
           fi
           
-          TARGET_FILE="$TARGET_DIR/05-appendix.md"
+          TARGET_FILE="$TARGET_DIR/99-appendix.md"
           echo "Checking against $TARGET_FILE"
           
           # Copy new file to target location
