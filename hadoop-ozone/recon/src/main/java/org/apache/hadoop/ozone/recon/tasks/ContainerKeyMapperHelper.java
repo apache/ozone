@@ -167,7 +167,7 @@ public abstract class ContainerKeyMapperHelper {
       
       try (ParallelTableIteratorOperation<String, OmKeyInfo> keyIter =
                new ParallelTableIteratorOperation<>(omMetadataManager, omKeyInfoTable,
-                   StringCodec.get(), maxIterators, maxWorkers, maxKeysInMemory, perWorkerThreshold)) {
+                   StringCodec.get(), maxIterators, perWorkerThreshold)) {
         keyIter.performTaskOnTableVals(taskName, null, null, kvOperation);
       }
 
