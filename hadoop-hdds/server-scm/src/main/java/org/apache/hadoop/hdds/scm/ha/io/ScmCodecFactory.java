@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
+import com.google.protobuf.ProtocolMessageEnum;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
@@ -35,24 +36,29 @@ import org.apache.ratis.thirdparty.com.google.protobuf.Message;
  */
 public final class ScmCodecFactory {
 
-  private static Map<Class<?>, ScmCodec> codecs = new HashMap<>();
+  private static final Map<Class<?>, ScmCodec<?>> CODECS = new HashMap<>();
 
   static {
-    codecs.put(com.google.protobuf.Message.class, new ScmNonShadedGeneratedMessageCodec());
-    codecs.put(Message.class, new ScmGeneratedMessageCodec());
-    codecs.put(List.class, new ScmListCodec());
-    codecs.put(Integer.class, new ScmIntegerCodec());
-    codecs.put(Long.class, new ScmLongCodec());
-    codecs.put(String.class, new ScmStringCodec());
-    codecs.put(Boolean.class, new ScmBooleanCodec());
-    codecs.put(BigInteger.class, new ScmBigIntegerCodec());
-    codecs.put(X509Certificate.class, new ScmX509CertificateCodec());
-    codecs.put(com.google.protobuf.ByteString.class, new ScmNonShadedByteStringCodec());
-    codecs.put(ByteString.class, new ScmByteStringCodec());
-    codecs.put(HddsProtos.PipelineState.class, new ScmHddsPipelineStateCodec());
-    codecs.put(ManagedSecretKey.class, new ScmManagedSecretKeyCodec());
-    codecs.put(HddsProtos.LifeCycleEvent.class, new ScmHddsLifeCycleEventCodec());
-    codecs.put(HddsProtos.NodeType.class, new ScmHddsNodeTypeCodec());
+    CODECS.put(com.google.protobuf.Message.class, new ScmNonShadedGeneratedMessageCodec());
+    CODECS.put(Message.class, new ScmGeneratedMessageCodec());
+    CODECS.put(List.class, new ScmListCodec());
+    CODECS.put(Integer.class, new ScmIntegerCodec());
+    CODECS.put(Long.class, new ScmLongCodec());
+    CODECS.put(String.class, new ScmStringCodec());
+    CODECS.put(Boolean.class, new ScmBooleanCodec());
+    CODECS.put(BigInteger.class, new ScmBigIntegerCodec());
+    CODECS.put(X509Certificate.class, new ScmX509CertificateCodec());
+    CODECS.put(com.google.protobuf.ByteString.class, new ScmNonShadedByteStringCodec());
+    CODECS.put(ByteString.class, new ScmByteStringCodec());
+    CODECS.put(ManagedSecretKey.class, new ScmManagedSecretKeyCodec());
+
+    putEnum(HddsProtos.LifeCycleEvent.class);
+    putEnum(HddsProtos.PipelineState.class);
+    putEnum(HddsProtos.NodeType.class);
+  }
+
+  static void putEnum(Class<? extends ProtocolMessageEnum> enumClass) {
+    CODECS.put(enumClass, new ScmEnumCodec<>(enumClass));
   }
 
   private ScmCodecFactory() { }
@@ -64,8 +70,8 @@ public final class ScmCodecFactory {
     classes.addAll(ClassUtils.getAllSuperclasses(type));
     classes.addAll(ClassUtils.getAllInterfaces(type));
     for (Class<?> clazz : classes) {
-      if (codecs.containsKey(clazz)) {
-        return codecs.get(clazz);
+      if (CODECS.containsKey(clazz)) {
+        return CODECS.get(clazz);
       }
     }
     throw new InvalidProtocolBufferException(
