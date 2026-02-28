@@ -91,7 +91,7 @@ public class DiskBalancerService extends BackgroundService {
       LoggerFactory.getLogger(DiskBalancerService.class);
 
   public static final String DISK_BALANCER_DIR = "diskBalancer";
-  private static long replicaDeletionDelayMills = 60 * 60 * 1000L; // 60 minutes
+  private long replicaDeletionDelay;
 
   private OzoneContainer ozoneContainer;
   private final ConfigurationSource conf;
@@ -162,6 +162,8 @@ public class DiskBalancerService extends BackgroundService {
       throw new IOException(e);
     }
 
+    replicaDeletionDelay = conf.getObject(DiskBalancerConfiguration.class)
+        .getReplicaDeletionDelay();
     metrics = DiskBalancerServiceMetrics.create();
 
     loadDiskBalancerInfo();
@@ -617,7 +619,7 @@ public class DiskBalancerService extends BackgroundService {
         }
         if (moveSucceeded) {
           // Add current old container to pendingDeletionContainers.
-          pendingDeletionContainers.put(System.currentTimeMillis() + replicaDeletionDelayMills, container);
+          pendingDeletionContainers.put(System.currentTimeMillis() + replicaDeletionDelay, container);
           ContainerLogger.logMoveSuccess(containerId, sourceVolume,
               destVolume, containerSize, Time.monotonicNow() - startTime);
         }
@@ -657,7 +659,7 @@ public class DiskBalancerService extends BackgroundService {
       container.delete();
       container.getContainerData().getVolume().decrementUsedSpace(containerData.getBytesUsed());
       LOG.info("Deleted expired container {} after delay {} ms.",
-          containerData.getContainerID(), replicaDeletionDelayMills);
+          containerData.getContainerID(), replicaDeletionDelay);
     } catch (IOException ex) {
       LOG.warn("Failed to delete old container {} after it's marked as DELETED. " +
           "It will be handled by background scanners.", container.getContainerData().getContainerID(), ex);
@@ -824,7 +826,7 @@ public class DiskBalancerService extends BackgroundService {
   }
 
   @VisibleForTesting
-  public static void setReplicaDeletionDelayMills(long durationMills) {
-    replicaDeletionDelayMills = durationMills;
+  public void setReplicaDeletionDelay(long durationMills) {
+    this.replicaDeletionDelay = durationMills;
   }
 }

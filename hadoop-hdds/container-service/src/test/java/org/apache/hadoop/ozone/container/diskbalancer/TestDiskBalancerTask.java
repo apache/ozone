@@ -246,7 +246,7 @@ public class TestDiskBalancerTask {
     conf.setFromObject(diskBalancerConfiguration);
     diskBalancerService = new DiskBalancerServiceTestImpl(ozoneContainer,
         100, conf, 1);
-    DiskBalancerService.setReplicaDeletionDelayMills(0);
+    diskBalancerService.setReplicaDeletionDelay(0);
     KeyValueContainer.setInjector(kvFaultInjector);
   }
 
@@ -592,7 +592,7 @@ public class TestDiskBalancerTask {
       throws IOException, InterruptedException {
     setLayoutAndSchemaForTest(versionInfo);
     long delay = 2000L; // 2 second delay
-    DiskBalancerService.setReplicaDeletionDelayMills(delay);
+    diskBalancerService.setReplicaDeletionDelay(delay);
 
     Container container = createContainer(CONTAINER_ID, sourceVolume, State.CLOSED);
     KeyValueContainerData keyValueContainerData = (KeyValueContainerData) container.getContainerData();
