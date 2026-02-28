@@ -4505,7 +4505,6 @@
       Interval in MINUTES by Recon to request SCM DB Snapshot.
     </description>
   </property>
-
   <property>
     <name>ozone.om.snapshot.compaction.dag.max.time.allowed</name>
     <value>30d</value>
