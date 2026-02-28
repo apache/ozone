@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.utils.io;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -29,7 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** {@link RandomAccessFile} and its {@link FileChannel}. */
-public class RandomAccessFileChannel {
+public class RandomAccessFileChannel implements Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(RandomAccessFileChannel.class);
 
   private File blockFile;
@@ -47,9 +48,12 @@ public class RandomAccessFileChannel {
   /** Open the given file in read-only mode. */
   public synchronized void open(File file) throws FileNotFoundException {
     Preconditions.assertNull(blockFile, "blockFile");
-    blockFile = Objects.requireNonNull(file, "blockFile == null");
-    raf = new RandomAccessFile(blockFile, "r");
-    channel = raf.getChannel();
+    final File f = Objects.requireNonNull(file, "blockFile == null");
+    final RandomAccessFile newRaf = new RandomAccessFile(f, "r");
+    final FileChannel newChannel = newRaf.getChannel();
+    blockFile = f;
+    raf = newRaf;
+    channel = newChannel;
   }
 
   /** Similar to {@link FileChannel#position(long)}. */
@@ -86,22 +90,31 @@ public class RandomAccessFileChannel {
    * In case of exception, this method catches the exception, logs a warning message,
    * and then continue closing the remaining resources.
    */
+  @Override
   public synchronized void close() {
-    if (blockFile == null) {
+    final File fileToClose = blockFile;
+    if (fileToClose == null) {
       return;
     }
     blockFile = null;
+
     try {
-      channel.close();
-      channel = null;
+      if (channel != null) {
+        channel.close();
+      }
     } catch (IOException e) {
-      LOG.warn("Failed to close channel for {}", blockFile, e);
+      LOG.warn("Failed to close channel for {}", fileToClose, e);
+    } finally {
+      channel = null;
     }
     try {
-      raf.close();
-      raf = null;
+      if (raf != null) {
+        raf.close();
+      }
     } catch (IOException e) {
-      LOG.warn("Failed to close RandomAccessFile for {}", blockFile, e);
+      LOG.warn("Failed to close RandomAccessFile for {}", fileToClose, e);
+    } finally {
+      raf = null;
     }
   }
 }
