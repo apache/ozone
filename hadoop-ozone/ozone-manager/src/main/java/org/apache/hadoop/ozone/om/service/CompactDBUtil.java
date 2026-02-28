@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.service;
 
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedCompactRangeOptions;
@@ -67,7 +68,7 @@ public final class CompactDBUtil {
         compactTable(metadataManager, tableName);
       } catch (Exception e) {
         LOG.warn("Failed to compact column family: {}", tableName, e);
-        throw new RuntimeException("Compaction failed for column family: " + tableName, e);
+        throw new CompletionException("Compaction failed for column family: " + tableName, e);
       }
     });
   }

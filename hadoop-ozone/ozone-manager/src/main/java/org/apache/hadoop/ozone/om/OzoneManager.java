@@ -143,6 +143,8 @@ import java.util.StringTokenizer;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -5381,7 +5383,19 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public void compactOMDB(String columnFamily) throws IOException {
     checkAdminUserPrivilege("compact column family " + columnFamily);
-    CompactDBUtil.compactTableAsync(metadataManager, columnFamily);
+    CompletableFuture<Void> compactFuture =
+        CompactDBUtil.compactTableAsync(metadataManager, columnFamily);
+    compactFuture.whenComplete((result, throwable) -> {
+      if (throwable == null) {
+        LOG.info("Compaction request for column family \"{}\" completed successfully.",
+            columnFamily);
+      } else {
+        Throwable cause = throwable instanceof CompletionException
+            && throwable.getCause() != null ? throwable.getCause() : throwable;
+        LOG.error("Compaction request for column family \"{}\" failed.",
+            columnFamily, cause);
+      }
+    });
   }
 
   public OMExecutionFlow getOmExecutionFlow() {
