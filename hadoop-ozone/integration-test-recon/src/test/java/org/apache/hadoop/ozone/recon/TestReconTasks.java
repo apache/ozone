@@ -127,6 +127,8 @@ public class TestReconTasks {
     ReconStorageContainerManagerFacade reconScm =
         (ReconStorageContainerManagerFacade)
             recon.getReconServer().getReconStorageContainerManager();
+    ReconContainerMetadataManager reconContainerMetadataManager =
+        recon.getReconServer().getReconContainerMetadataManager();
     StorageContainerManager scm = cluster.getStorageContainerManager();
     PipelineManager reconPipelineManager = reconScm.getPipelineManager();
     PipelineManager scmPipelineManager = scm.getPipelineManager();
@@ -141,6 +143,12 @@ public class TestReconTasks {
         RatisReplicationConfig.getInstance(ONE), "test");
     long containerID = containerInfo.getContainerID();
     Pipeline pipeline = scmPipelineManager.getPipeline(containerInfo.getPipelineID());
+
+    // Ensure this is treated as MISSING (not EMPTY_MISSING) when DN goes down.
+    try (RDBBatchOperation batch = RDBBatchOperation.newAtomicOperation()) {
+      reconContainerMetadataManager.batchStoreContainerKeyCounts(batch, containerID, 2L);
+      reconContainerMetadataManager.commitBatchOperation(batch);
+    }
 
     XceiverClientGrpc client = new XceiverClientGrpc(pipeline, conf);
     runTestOzoneContainerViaDataNode(containerID, client);
