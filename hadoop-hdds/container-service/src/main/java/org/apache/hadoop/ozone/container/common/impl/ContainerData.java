@@ -571,7 +571,9 @@ public abstract class ContainerData {
 
   public void updateWriteStats(long bytesWritten, boolean overwrite) {
     getStatistics().updateWrite(bytesWritten, overwrite);
-    incrWriteBytes(bytesWritten);
+    if (!overwrite) {
+      incrWriteBytes(bytesWritten);
+    }
   }
 
   @Override
