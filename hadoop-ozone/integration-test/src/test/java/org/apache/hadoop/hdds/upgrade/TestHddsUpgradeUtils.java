@@ -38,7 +38,6 @@ import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationCheckpoint;
 import org.apache.hadoop.ozone.HddsDatanodeService;
-import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.ozone.test.GenericTestUtils;
@@ -130,9 +129,7 @@ public final class TestHddsUpgradeUtils {
     int countContainers = 0;
     for (HddsDatanodeService dataNode : datanodes) {
       DatanodeStateMachine dsm = dataNode.getDatanodeStateMachine();
-      for (Container<?> ignored : dsm.getContainer().getController().getContainers()) {
-        countContainers++;
-      }
+      countContainers += dsm.getContainer().getContainerSet().containerCount();
     }
     assertThat(countContainers).isGreaterThanOrEqualTo(1);
   }
@@ -171,11 +168,7 @@ public final class TestHddsUpgradeUtils {
       assertEquals(dnVersionManager.getSoftwareLayoutVersion(),
           dnVersionManager.getMetadataLayoutVersion());
       assertThat(dnVersionManager.getMetadataLayoutVersion()).isGreaterThanOrEqualTo(1);
-
-      for (Container<?> ignored :
-          dsm.getContainer().getController().getContainers()) {
-        countContainers++;
-      }
+      countContainers += dsm.getContainer().getContainerSet().containerCount();
     }
     assertThat(countContainers).isGreaterThanOrEqualTo(numContainers);
   }
