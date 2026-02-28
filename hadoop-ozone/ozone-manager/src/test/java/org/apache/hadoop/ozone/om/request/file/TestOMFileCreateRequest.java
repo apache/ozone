@@ -53,6 +53,7 @@ import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -730,7 +731,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     verify(scmBlockLocationProtocol, atLeastOnce())
         .allocateBlock(anyLong(), anyInt(),
             any(ReplicationConfig.class), anyString(),
-            any(ExcludeList.class), anyString());
+            any(ExcludeList.class), anyString(), any(StorageType.class));
 
     // Verify key locations are present in the response
     assertTrue(modifiedOmRequest.hasCreateFileRequest());
@@ -764,7 +765,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     when(scmBlockLocationProtocol.allocateBlock(
             anyLong(), anyInt(),
             any(ReplicationConfig.class), anyString(),
-            any(ExcludeList.class), anyString()))
+            any(ExcludeList.class), anyString(), any(StorageType.class)))
         .thenAnswer(invocation -> {
           int num = invocation.getArgument(1);
           List<AllocatedBlock> allocatedBlocks = new ArrayList<>(num);
@@ -802,7 +803,7 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     verify(scmBlockLocationProtocol, atLeastOnce())
         .allocateBlock(anyLong(), anyInt(),
             any(ReplicationConfig.class), anyString(),
-            any(ExcludeList.class), anyString());
+            any(ExcludeList.class), anyString(), any(StorageType.class));
 
     // Verify key locations are present in the response
     assertTrue(modifiedOmRequest.hasCreateFileRequest());

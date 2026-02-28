@@ -289,6 +289,7 @@ public final class OzoneConsts {
   public static final String MAX_NUM_OF_BUCKETS = "maxNumOfBuckets";
   public static final String HAS_SNAPSHOT = "hasSnapshot";
   public static final String STORAGE_TYPE = "storageType";
+  public static final String STORAGE_POLICY = "storagePolicy";
   public static final String RESOURCE_TYPE = "resourceType";
   public static final String IS_VERSION_ENABLED = "isVersionEnabled";
   public static final String CREATION_TIME = "creationTime";

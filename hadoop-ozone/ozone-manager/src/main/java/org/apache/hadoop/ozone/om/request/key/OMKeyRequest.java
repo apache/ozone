@@ -55,6 +55,8 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.OzoneStoragePolicy;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -190,7 +192,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
       ReplicationConfig replicationConfig, ExcludeList excludeList,
       long requestedSize, long scmBlockSize, int preallocateBlocksMax,
       boolean grpcBlockTokenEnabled, String serviceID, OMMetrics omMetrics,
-      boolean shouldSortDatanodes, UserInfo userInfo)
+      boolean shouldSortDatanodes, UserInfo userInfo,
+      StorageType storageType)
       throws IOException {
     int dataGroupSize = replicationConfig instanceof ECReplicationConfig
         ? ((ECReplicationConfig) replicationConfig).getData() : 1;
@@ -204,11 +207,13 @@ public abstract class OMKeyRequest extends OMClientRequest {
 
     List<OmKeyLocationInfo> locationInfos = new ArrayList<>(numBlocks);
     String remoteUser = getRemoteUser().getShortUserName();
+    LOG.debug("Allocating block with storageType={} for replication={}",
+        storageType, replicationConfig);
     List<AllocatedBlock> allocatedBlocks;
     try {
       allocatedBlocks = scmClient.getBlockClient()
           .allocateBlock(scmBlockSize, numBlocks, replicationConfig, serviceID,
-              excludeList, clientMachine);
+              excludeList, clientMachine, storageType);
     } catch (SCMException ex) {
       omMetrics.incNumBlockAllocateCallFails();
       if (ex.getResult()
@@ -232,6 +237,14 @@ public abstract class OMKeyRequest extends OMClientRequest {
       locationInfos.add(builder.build());
     }
     return locationInfos;
+  }
+
+  protected static OzoneStoragePolicy resolveEffectiveStoragePolicy(
+      @Nullable OmBucketInfo bucketInfo, OzoneManager ozoneManager) {
+    if (bucketInfo != null && bucketInfo.getStoragePolicy() != null) {
+      return bucketInfo.getStoragePolicy();
+    }
+    return ozoneManager.getDefaultStoragePolicy();
   }
 
   /* Optimize ugi lookup for RPC operations to avoid a trip through

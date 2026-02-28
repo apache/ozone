@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
+import org.apache.hadoop.hdds.protocol.OzoneStoragePolicy;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -89,5 +90,36 @@ public class TestOmBucketArgs {
 
     assertEquals(EC,
         argsFromProto.getDefaultReplicationConfig().getType());
+  }
+
+  @Test
+  public void testStoragePolicyRoundTrip() {
+    OmBucketArgs bucketArgs = OmBucketArgs.newBuilder()
+        .setBucketName("bucket")
+        .setVolumeName("volume")
+        .setStoragePolicy(OzoneStoragePolicy.HOT)
+        .build();
+
+    assertEquals(OzoneStoragePolicy.HOT, bucketArgs.getStoragePolicy());
+
+    OmBucketArgs argsFromProto = OmBucketArgs.getFromProtobuf(
+        bucketArgs.getProtobuf());
+
+    assertEquals(OzoneStoragePolicy.HOT, argsFromProto.getStoragePolicy());
+  }
+
+  @Test
+  public void testStoragePolicyNullByDefault() {
+    OmBucketArgs bucketArgs = OmBucketArgs.newBuilder()
+        .setBucketName("bucket")
+        .setVolumeName("volume")
+        .build();
+
+    assertNull(bucketArgs.getStoragePolicy());
+
+    OmBucketArgs argsFromProto = OmBucketArgs.getFromProtobuf(
+        bucketArgs.getProtobuf());
+
+    assertNull(argsFromProto.getStoragePolicy());
   }
 }

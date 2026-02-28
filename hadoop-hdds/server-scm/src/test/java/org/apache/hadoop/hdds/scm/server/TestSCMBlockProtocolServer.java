@@ -44,8 +44,12 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.AllocateScmBlockRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.AllocateScmBlockResponseProto;
 import org.apache.hadoop.hdds.scm.HddsTestUtils;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.block.DeletedBlockLog;
@@ -80,6 +84,7 @@ public class TestSCMBlockProtocolServer {
   private StorageContainerManager scm;
   private NodeManager nodeManager;
   private ScmBlockLocationProtocolServerSideTranslatorPB service;
+  private BlockManagerStub blockManagerStub;
   private static final int NODE_COUNT = 10;
 
   private static final Map<String, String> EDGE_NODES = ImmutableMap.of(
@@ -90,16 +95,23 @@ public class TestSCMBlockProtocolServer {
   private static class BlockManagerStub implements BlockManager {
 
     private final List<DatanodeDetails> datanodes;
+    private volatile StorageType lastStorageType;
 
     BlockManagerStub(List<DatanodeDetails> datanodes) {
       assertNotNull(datanodes, "Datanodes cannot be null");
       this.datanodes = datanodes;
     }
 
+    StorageType getLastStorageType() {
+      return lastStorageType;
+    }
+
     @Override
     public AllocatedBlock allocateBlock(long size,
         ReplicationConfig replicationConfig, String owner,
-        ExcludeList excludeList) throws IOException, TimeoutException {
+        ExcludeList excludeList, StorageType storageType)
+        throws IOException, TimeoutException {
+      this.lastStorageType = storageType;
       List<DatanodeDetails> nodes = new ArrayList<>(datanodes);
       Collections.shuffle(nodes);
       Pipeline pipeline;
@@ -174,10 +186,11 @@ public class TestSCMBlockProtocolServer {
     config.set(StaticMapping.KEY_HADOOP_CONFIGURED_NODE_MAPPING,
         String.join(",", nodeMapping));
 
+    blockManagerStub = new BlockManagerStub(datanodes);
     SCMConfigurator configurator = new SCMConfigurator();
     configurator.setSCMHAManager(SCMHAManagerStub.getInstance(true));
     configurator.setScmContext(SCMContext.emptyContext());
-    configurator.setScmBlockManager(new BlockManagerStub(datanodes));
+    configurator.setScmBlockManager(blockManagerStub);
     scm = HddsTestUtils.getScm(config, configurator);
     scm.start();
     scm.exitSafeMode();
@@ -336,6 +349,81 @@ public class TestSCMBlockProtocolServer {
         }
       }
     }
+  }
+
+  @Test
+  void testAllocateBlockPassesStorageType() throws IOException {
+    final ReplicationConfig replicationConfig = RatisReplicationConfig
+        .getInstance(ReplicationFactor.THREE);
+    final long blockSize = 128 * MB;
+
+    server.allocateBlock(blockSize, 1, replicationConfig, "o",
+        new ExcludeList(), "", StorageType.SSD);
+    assertEquals(StorageType.SSD, blockManagerStub.getLastStorageType());
+
+    server.allocateBlock(blockSize, 1, replicationConfig, "o",
+        new ExcludeList(), "", StorageType.ARCHIVE);
+    assertEquals(StorageType.ARCHIVE, blockManagerStub.getLastStorageType());
+  }
+
+  @Test
+  void testAllocateBlockDefaultStorageType() throws IOException {
+    final ReplicationConfig replicationConfig = RatisReplicationConfig
+        .getInstance(ReplicationFactor.THREE);
+    final long blockSize = 128 * MB;
+
+    // 6-param overload should default to DISK
+    server.allocateBlock(blockSize, 1, replicationConfig, "o",
+        new ExcludeList(), "");
+    assertEquals(StorageType.DEFAULT, blockManagerStub.getLastStorageType());
+  }
+
+  @Test
+  void testStorageTypeProtoRoundTrip() throws IOException {
+    final ReplicationConfig replicationConfig = RatisReplicationConfig
+        .getInstance(ReplicationFactor.THREE);
+    final long blockSize = 128 * MB;
+
+    // Build a proto request with storageType = SSD
+    AllocateScmBlockRequestProto request = AllocateScmBlockRequestProto
+        .newBuilder()
+        .setSize(blockSize)
+        .setNumBlocks(1)
+        .setType(replicationConfig.getReplicationType())
+        .setFactor(ReplicationFactor.THREE)
+        .setOwner("o")
+        .setExcludeList(new ExcludeList().getProtoBuf())
+        .setStorageType(StorageTypeProto.SSD)
+        .build();
+
+    AllocateScmBlockResponseProto response =
+        service.allocateScmBlock(request, ClientVersion.CURRENT_VERSION);
+    assertNotNull(response);
+    assertEquals(1, response.getBlocksCount());
+    assertEquals(StorageType.SSD, blockManagerStub.getLastStorageType());
+  }
+
+  @Test
+  void testStorageTypeProtoDefaultWhenUnset() throws IOException {
+    final ReplicationConfig replicationConfig = RatisReplicationConfig
+        .getInstance(ReplicationFactor.THREE);
+    final long blockSize = 128 * MB;
+
+    // Build a proto request WITHOUT storageType
+    AllocateScmBlockRequestProto request = AllocateScmBlockRequestProto
+        .newBuilder()
+        .setSize(blockSize)
+        .setNumBlocks(1)
+        .setType(replicationConfig.getReplicationType())
+        .setFactor(ReplicationFactor.THREE)
+        .setOwner("o")
+        .setExcludeList(new ExcludeList().getProtoBuf())
+        .build();
+
+    AllocateScmBlockResponseProto response =
+        service.allocateScmBlock(request, ClientVersion.CURRENT_VERSION);
+    assertNotNull(response);
+    assertEquals(StorageType.DEFAULT, blockManagerStub.getLastStorageType());
   }
 
   private List<String> getNetworkNames() {

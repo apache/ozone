@@ -64,6 +64,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.KeyValue;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -1120,12 +1121,12 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     verify(scmBlockLocationProtocol, never())
         .allocateBlock(anyLong(), anyInt(),
             any(ReplicationConfig.class), anyString(),
-            any(ExcludeList.class), anyString());
+            any(ExcludeList.class), anyString(), any(StorageType.class));
 
     verify(scmBlockLocationProtocol, never())
         .allocateBlock(anyLong(), anyInt(),
             any(ReplicationConfig.class), anyString(),
-            any(ExcludeList.class), anyString());
+            any(ExcludeList.class), anyString(), any(StorageType.class));
 
     assertTrue(modifiedOmRequest.hasCreateKeyRequest());
     CreateKeyRequest responseCreateKeyRequest =
@@ -1161,7 +1162,7 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     when(scmBlockLocationProtocol.allocateBlock(
             anyLong(), anyInt(),
             any(ReplicationConfig.class), anyString(),
-            any(ExcludeList.class), anyString()))
+            any(ExcludeList.class), anyString(), any(StorageType.class)))
         .thenAnswer(invocation -> {
           int num = invocation.getArgument(1);
           List<AllocatedBlock> allocatedBlocks = new ArrayList<>(num);
@@ -1197,12 +1198,12 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     verify(scmBlockLocationProtocol, never())
         .allocateBlock(anyLong(), anyInt(),
             any(ReplicationConfig.class), anyString(),
-            any(ExcludeList.class), anyString());
+            any(ExcludeList.class), anyString(), any(StorageType.class));
 
     verify(scmBlockLocationProtocol, never())
         .allocateBlock(anyLong(), anyInt(),
             any(ReplicationConfig.class), anyString(),
-            any(ExcludeList.class), anyString());
+            any(ExcludeList.class), anyString(), any(StorageType.class));
 
     assertTrue(modifiedOmRequest.hasCreateKeyRequest());
     CreateKeyRequest responseCreateKeyRequest =

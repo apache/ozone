@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.AddSCMRequest;
@@ -87,7 +88,7 @@ public interface ScmBlockLocationProtocol extends Closeable {
        ReplicationConfig replicationConfig, String owner,
        ExcludeList excludeList) throws IOException {
     return allocateBlock(size, numBlocks, replicationConfig, owner,
-        excludeList, null);
+        excludeList, null, StorageType.DEFAULT);
   }
 
   /**
@@ -107,9 +108,17 @@ public interface ScmBlockLocationProtocol extends Closeable {
    * @return allocated block accessing info (key, pipeline).
    * @throws IOException
    */
+  default List<AllocatedBlock> allocateBlock(long size, int numBlocks,
+      ReplicationConfig replicationConfig, String owner,
+      ExcludeList excludeList, String clientMachine) throws IOException {
+    return allocateBlock(size, numBlocks, replicationConfig, owner,
+        excludeList, clientMachine, StorageType.DEFAULT);
+  }
+
   List<AllocatedBlock> allocateBlock(long size, int numBlocks,
       ReplicationConfig replicationConfig, String owner,
-      ExcludeList excludeList, String clientMachine) throws IOException;
+      ExcludeList excludeList, String clientMachine,
+      StorageType storageType) throws IOException;
 
   /**
    * Delete blocks for a set of object keys.

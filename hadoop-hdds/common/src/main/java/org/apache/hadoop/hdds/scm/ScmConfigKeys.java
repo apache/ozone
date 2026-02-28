@@ -445,6 +445,11 @@ public final class ScmConfigKeys {
   public static final String OZONE_SCM_PIPELINE_SCRUB_INTERVAL_DEFAULT =
       "150s";
 
+  public static final String OZONE_SCM_PIPELINE_CREATION_STORAGE_TYPE_AWARE =
+      "ozone.scm.pipeline.creation.storage-type-aware.enabled";
+  public static final boolean
+      OZONE_SCM_PIPELINE_CREATION_STORAGE_TYPE_AWARE_DEFAULT = false;
+
   // Allow SCM to auto create factor ONE ratis pipeline.
   public static final String OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE =
       "ozone.scm.pipeline.creation.auto.factor.one";

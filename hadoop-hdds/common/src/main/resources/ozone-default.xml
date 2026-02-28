@@ -1694,6 +1694,19 @@
     </description>
   </property>
   <property>
+    <name>ozone.scm.pipeline.creation.storage-type-aware.enabled</name>
+    <value>false</value>
+    <tag>OZONE, SCM, PIPELINE</tag>
+    <description>
+      If enabled, the background pipeline creator will proactively create
+      storage-type-constrained pipelines for each StorageType (SSD, DISK,
+      ARCHIVE) in addition to untyped pipelines. This ensures that
+      pipelines suitable for HOT/WARM/COLD storage policies are available
+      when containers need to be allocated. Only enable on clusters that
+      use storage tiering with mixed StorageType datanodes.
+    </description>
+  </property>
+  <property>
     <name>hdds.scm.safemode.threshold.pct</name>
     <value>0.99</value>
     <tag>HDDS,SCM,OPERATION</tag>
@@ -4215,6 +4228,28 @@
       FILE_SYSTEM_OPTIMIZED: This layout allows the bucket to support atomic rename/delete operations and
       also allows interoperability between S3 and FS APIs. Keys written via S3 API with a "/" delimiter
       will create intermediate directories.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.storage.policy.enabled</name>
+    <value>false</value>
+    <tag>OZONE, MANAGEMENT</tag>
+    <description>
+      When enabled, Ozone Manager will resolve and enforce storage policies
+      (HOT, WARM, COLD, ALL_SSD) on buckets and keys. When disabled, all
+      storage policy metadata is ignored and default placement is used.
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.default.storage.policy</name>
+    <value>WARM</value>
+    <tag>OZONE, MANAGEMENT</tag>
+    <description>
+      Default storage policy used by Ozone Manager when a client does not
+      specify a storage policy. Supported values are HOT, WARM, COLD,
+      ALL_SSD.
     </description>
   </property>
 

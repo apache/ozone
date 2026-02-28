@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.utils.UniqueId;
@@ -141,6 +142,9 @@ public class OMKeyCreateRequest extends OMKeyRequest {
               bucketInfo.getDefaultReplicationConfig(),
               ozoneManager);
 
+      final StorageType storageType = resolveEffectiveStoragePolicy(
+          bucketInfo, ozoneManager).getPrimaryStorageType();
+
       // TODO: Here we are allocating block with out any check for
       //  bucket/key/volume or not and also with out any authorization checks.
       //  As for a client for the first time this can be executed on any OM,
@@ -163,7 +167,8 @@ public class OMKeyCreateRequest extends OMKeyRequest {
                 ozoneManager.getOMServiceId(),
                 ozoneManager.getMetrics(),
                 keyArgs.getSortDatanodes(),
-                userInfo));
+                userInfo,
+                storageType));
         effectiveDataSize = requestedSize;
       }
 

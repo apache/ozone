@@ -25,11 +25,14 @@ import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.NODE_ADDRESS_UPDATE
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.PRE_CHECK_COMPLETED;
 import static org.apache.hadoop.hdds.scm.ha.SCMService.Event.UNHEALTHY_TO_HEALTHY_NODE_HANDLER_TRIGGERED;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.time.Clock;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Lock;
@@ -40,6 +43,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -88,6 +92,7 @@ public class BackgroundPipelineCreator implements SCMService {
   private final AtomicBoolean running = new AtomicBoolean(false);
   private final long intervalInMillis;
   private final Clock clock;
+  private final boolean storageTypeAwareCreation;
 
   BackgroundPipelineCreator(PipelineManager pipelineManager,
       ConfigurationSource conf, SCMContext scmContext, Clock clock) {
@@ -109,6 +114,10 @@ public class BackgroundPipelineCreator implements SCMService {
         ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL,
         ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
+
+    this.storageTypeAwareCreation = conf.getBoolean(
+        ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_STORAGE_TYPE_AWARE,
+        ScmConfigKeys.OZONE_SCM_PIPELINE_CREATION_STORAGE_TYPE_AWARE_DEFAULT);
 
     threadName = scmContext.threadNamePrefix() + THREAD_NAME;
   }
@@ -203,7 +212,8 @@ public class BackgroundPipelineCreator implements SCMService {
     return true;
   }
 
-  private void createPipelines() throws RuntimeException {
+  @VisibleForTesting
+  void createPipelines() throws RuntimeException {
     // TODO: #CLUTIL Different replication factor may need to be supported
     HddsProtos.ReplicationType type = HddsProtos.ReplicationType.valueOf(
         conf.get(OzoneConfigKeys.OZONE_REPLICATION_TYPE,
@@ -212,8 +222,7 @@ public class BackgroundPipelineCreator implements SCMService {
         ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE,
         ScmConfigKeys.OZONE_SCM_PIPELINE_AUTO_CREATE_FACTOR_ONE_DEFAULT);
 
-    List<ReplicationConfig> list =
-        new ArrayList<>();
+    List<ReplicationConfig> replicationConfigs = new ArrayList<>();
     for (HddsProtos.ReplicationFactor factor : HddsProtos.ReplicationFactor
         .values()) {
       if (factor == ReplicationFactor.ZERO) {
@@ -233,10 +242,20 @@ public class BackgroundPipelineCreator implements SCMService {
         // Skip this iteration for creating pipeline
         continue;
       }
-      list.add(replicationConfig);
+      replicationConfigs.add(replicationConfig);
     }
 
-    LoopingIterator it = new LoopingIterator(list);
+    if (storageTypeAwareCreation) {
+      createTypedPipelines(replicationConfigs);
+    } else {
+      createUntypedPipelines(replicationConfigs);
+    }
+
+    LOG.debug("BackgroundPipelineCreator createPipelines finished.");
+  }
+
+  private void createUntypedPipelines(List<ReplicationConfig> configs) {
+    LoopingIterator it = new LoopingIterator(configs);
     while (it.hasNext()) {
       ReplicationConfig replicationConfig =
           (ReplicationConfig) it.next();
@@ -251,8 +270,46 @@ public class BackgroundPipelineCreator implements SCMService {
         it.remove();
       }
     }
+  }
 
-    LOG.debug("BackgroundPipelineCreator createPipelines finished.");
+  private void createTypedPipelines(List<ReplicationConfig> configs) {
+    // Build (ReplicationConfig, StorageType) pairs: for each config,
+    // one null entry (untyped) plus one per concrete StorageType.
+    StorageType[] storageTypes = {
+        StorageType.SSD, StorageType.DISK, StorageType.ARCHIVE
+    };
+    List<Map.Entry<ReplicationConfig, StorageType>> pairs = new ArrayList<>();
+    for (ReplicationConfig config : configs) {
+      pairs.add(new AbstractMap.SimpleEntry<>(config, null));
+      for (StorageType st : storageTypes) {
+        pairs.add(new AbstractMap.SimpleEntry<>(config, st));
+      }
+    }
+
+    LoopingIterator it = new LoopingIterator(pairs);
+    while (it.hasNext()) {
+      @SuppressWarnings("unchecked")
+      Map.Entry<ReplicationConfig, StorageType> entry =
+          (Map.Entry<ReplicationConfig, StorageType>) it.next();
+
+      try {
+        Pipeline pipeline;
+        if (entry.getValue() == null) {
+          pipeline = pipelineManager.createPipeline(entry.getKey());
+        } else {
+          pipeline = pipelineManager.createPipeline(
+              entry.getKey(), entry.getValue());
+        }
+        LOG.info("Created new pipeline {} with StorageType {}",
+            pipeline, entry.getValue());
+      } catch (IOException ioe) {
+        it.remove();
+      } catch (Throwable t) {
+        LOG.error("Error while creating pipelines for StorageType "
+            + entry.getValue(), t);
+        it.remove();
+      }
+    }
   }
 
   @Override

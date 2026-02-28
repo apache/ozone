@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -41,6 +42,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
@@ -56,6 +58,7 @@ import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
 import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.CodecException;
@@ -266,6 +269,33 @@ public class PipelineManagerImpl implements PipelineManager {
     } finally {
       releaseWriteLock();
     }
+  }
+
+  @Override
+  public Pipeline createPipeline(ReplicationConfig replicationConfig,
+      StorageType storageType) throws IOException {
+    if (storageType == null) {
+      return createPipeline(replicationConfig);
+    }
+    // Compute excluded nodes: all healthy nodes that do NOT have the
+    // requested StorageType.
+    List<DatanodeDetails> allHealthy =
+        nodeManager.getNodes(NodeStatus.inServiceHealthy());
+    Set<UUID> qualifiedNodeIds =
+        PipelineStorageTypeFilter.getNodesWithStorageType(
+            nodeManager, storageType);
+
+    if (qualifiedNodeIds.isEmpty()) {
+      throw new IOException("No healthy nodes with StorageType "
+          + storageType + " available for pipeline creation");
+    }
+
+    List<DatanodeDetails> excludedNodes = allHealthy.stream()
+        .filter(dn -> !qualifiedNodeIds.contains(dn.getUuid()))
+        .collect(Collectors.toList());
+
+    return createPipeline(replicationConfig, excludedNodes,
+        Collections.emptyList());
   }
 
   private void checkIfPipelineCreationIsAllowed(

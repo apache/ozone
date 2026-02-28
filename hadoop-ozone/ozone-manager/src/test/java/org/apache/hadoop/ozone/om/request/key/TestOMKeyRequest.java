@@ -42,6 +42,8 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.OzoneStoragePolicy;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -164,6 +166,7 @@ public class TestOMKeyRequest {
         .thenReturn(true);
     when(ozoneManager.getBucketInfo(anyString(), anyString())).thenReturn(
         new OmBucketInfo.Builder().setVolumeName("").setBucketName("").build());
+    when(ozoneManager.getDefaultStoragePolicy()).thenReturn(OzoneStoragePolicy.WARM);
     doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
 
     AuditMessage mockAuditMessage = mock(AuditMessage.class);
@@ -221,7 +224,7 @@ public class TestOMKeyRequest {
     when(scmBlockLocationProtocol.allocateBlock(anyLong(), anyInt(),
         any(ReplicationConfig.class),
         anyString(), any(ExcludeList.class),
-        anyString())).thenAnswer(invocation -> {
+        anyString(), any(StorageType.class))).thenAnswer(invocation -> {
           int num = invocation.getArgument(1);
           List<AllocatedBlock> allocatedBlocks = new ArrayList<>(num);
           for (int i = 0; i < num; i++) {

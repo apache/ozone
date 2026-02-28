@@ -22,12 +22,14 @@ import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PipelineRequestInformation;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,20 +45,44 @@ public class WritableRatisContainerProvider
   private final PipelineManager pipelineManager;
   private final PipelineChoosePolicy pipelineChoosePolicy;
   private final ContainerManager containerManager;
+  private final NodeManager nodeManager;
+
+  public WritableRatisContainerProvider(
+      PipelineManager pipelineManager,
+      ContainerManager containerManager,
+      PipelineChoosePolicy pipelineChoosePolicy,
+      NodeManager nodeManager) {
+    this.pipelineManager = pipelineManager;
+    this.containerManager = containerManager;
+    this.pipelineChoosePolicy = pipelineChoosePolicy;
+    this.nodeManager = nodeManager;
+  }
 
   public WritableRatisContainerProvider(
       PipelineManager pipelineManager,
       ContainerManager containerManager,
       PipelineChoosePolicy pipelineChoosePolicy) {
-    this.pipelineManager = pipelineManager;
-    this.containerManager = containerManager;
-    this.pipelineChoosePolicy = pipelineChoosePolicy;
+    this(pipelineManager, containerManager, pipelineChoosePolicy, null);
   }
 
   @Override
   public ContainerInfo getContainer(final long size,
       ReplicationConfig repConfig, String owner, ExcludeList excludeList)
       throws IOException {
+    return getContainerInternal(size, repConfig, owner, excludeList, null);
+  }
+
+  @Override
+  public ContainerInfo getContainer(final long size,
+      ReplicationConfig repConfig, String owner, ExcludeList excludeList,
+      StorageType storageType) throws IOException {
+    return getContainerInternal(size, repConfig, owner, excludeList,
+        storageType);
+  }
+
+  private ContainerInfo getContainerInternal(final long size,
+      ReplicationConfig repConfig, String owner, ExcludeList excludeList,
+      StorageType storageType) throws IOException {
     /*
       Here is the high level logic.
 
@@ -77,10 +103,13 @@ public class WritableRatisContainerProvider
     //in downstream managers.
 
     PipelineRequestInformation req =
-        PipelineRequestInformation.Builder.getBuilder().setSize(size).build();
+        PipelineRequestInformation.Builder.getBuilder()
+            .setSize(size)
+            .setStorageType(storageType)
+            .build();
 
     ContainerInfo containerInfo =
-        getContainer(repConfig, owner, excludeList, req);
+        getContainer(repConfig, owner, excludeList, req, storageType);
     if (containerInfo != null) {
       return containerInfo;
     }
@@ -126,7 +155,8 @@ public class WritableRatisContainerProvider
 
     // If Exception occurred or successful creation of pipeline do one
     // final try to fetch pipelines.
-    containerInfo = getContainer(repConfig, owner, excludeList, req);
+    containerInfo = getContainer(repConfig, owner, excludeList, req,
+        storageType);
     if (containerInfo != null) {
       return containerInfo;
     }
@@ -143,7 +173,8 @@ public class WritableRatisContainerProvider
 
   @Nullable
   private ContainerInfo getContainer(ReplicationConfig repConfig, String owner,
-      ExcludeList excludeList, PipelineRequestInformation req) {
+      ExcludeList excludeList, PipelineRequestInformation req,
+      StorageType storageType) {
     // Acquire pipeline manager lock, to avoid any updates to pipeline
     // while allocate container happens. This is to avoid scenario like
     // mentioned in HDDS-5655.
@@ -151,6 +182,10 @@ public class WritableRatisContainerProvider
     try {
       List<Pipeline> availablePipelines = findPipelinesByState(repConfig,
           excludeList, Pipeline.PipelineState.OPEN);
+      if (nodeManager != null) {
+        availablePipelines = PipelineStorageTypeFilter.filter(
+            availablePipelines, nodeManager, storageType);
+      }
       return selectContainer(availablePipelines, req, owner, excludeList);
     } finally {
       pipelineManager.releaseReadLock();
