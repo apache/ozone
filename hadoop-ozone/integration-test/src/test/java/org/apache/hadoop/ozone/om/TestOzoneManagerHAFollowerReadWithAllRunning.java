@@ -72,6 +72,7 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.VolumeInfo;
 import org.apache.hadoop.ozone.protocolPB.OzoneManagerProtocolServerSideTranslatorPB;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -190,6 +191,7 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends TestOzoneManag
    * to immediately see the changes.
    */
   @Test
+  @Flaky("HDDS-14741")
   void testLinearizableReadConsistency() throws Exception {
     // Setup another client
     OzoneConfiguration clientConf = new OzoneConfiguration(getConf());
