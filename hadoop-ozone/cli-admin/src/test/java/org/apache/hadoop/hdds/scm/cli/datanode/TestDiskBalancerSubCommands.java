@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
@@ -42,6 +43,7 @@ import java.util.regex.Pattern;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDiskBalancerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerConfigurationProto;
@@ -136,6 +138,35 @@ public class TestDiskBalancerSubCommands {
     mockedUtil.when(() -> DiskBalancerSubCommandUtil
         .getSingleNodeDiskBalancerProxy(anyString()))
         .thenReturn(mockProtocol);
+    // Mock getDatanodeHostAndIp(ScmClient, String) to return the address as-is for tests
+    mockedUtil.when(() -> DiskBalancerSubCommandUtil
+        .getDatanodeHostAndIp(any(), anyString()))
+        .thenAnswer(invocation -> {
+          String address = invocation.getArgument(1);
+          return address; // Return address as-is for tests
+        });
+    // Mock extractHostIpAndPort to return test data
+    mockedUtil.when(() -> DiskBalancerSubCommandUtil
+        .extractHostIpAndPort(any(HddsProtos.DatanodeDetailsProto.class)))
+        .thenAnswer(invocation -> {
+          HddsProtos.DatanodeDetailsProto proto = invocation.getArgument(0);
+          return new String[]{
+              proto.getHostName(),
+              proto.getIpAddress(),
+              String.valueOf(19864)
+          };
+        });
+    // Mock getDatanodeHostAndIp(String, String, int) to format the output
+    // Return value is used by Mockito internally for mock setup
+    mockedUtil.when(() -> {
+      @SuppressWarnings("RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT")
+      String ignored = DiskBalancerSubCommandUtil
+          .getDatanodeHostAndIp(anyString(), anyString(), anyInt());
+      // Use the value to avoid "ignored return value" static analysis warnings.
+      System.out.println(ignored);
+    }).thenAnswer(invocation -> invocation.getArgument(0) + " (" +
+        invocation.getArgument(1) + ":" +
+        invocation.getArgument(2) + ")");
     
     return new DiskBalancerMocks(mockedConf, mockedClient, mockedUtil);
   }
@@ -198,6 +229,25 @@ public class TestDiskBalancerSubCommands {
 
       Pattern p = Pattern.compile("Started DiskBalancer on nodes: \\[host-1, host-2, host-3\\]");
       Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+      assertTrue(m.find());
+    }
+  }
+
+  @Test
+  public void testStartDiskBalancerWithDuplicateHostnames() throws Exception {
+    DiskBalancerStartSubcommand cmd = new DiskBalancerStartSubcommand();
+    doNothing().when(mockProtocol).startDiskBalancer(any(DiskBalancerConfigurationProto.class));
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("host-1", "host-1", "host-2");
+      cmd.call();
+
+      // output should show each host only once
+      String output = outContent.toString(DEFAULT_ENCODING);
+      Pattern p = Pattern.compile("Started DiskBalancer on nodes: \\[host-1, host-2\\]");
+      Matcher m = p.matcher(output);
       assertTrue(m.find());
     }
   }
@@ -633,6 +683,10 @@ public class TestDiskBalancerSubCommands {
     DatanodeDetailsProto nodeProto = DatanodeDetailsProto.newBuilder()
         .setHostName(hostname)
         .setIpAddress("127.0.0.1")
+        .addPorts(HddsProtos.Port.newBuilder()
+            .setName("CLIENT_RPC")
+            .setValue(19864)
+            .build())
         .build();
 
     DiskBalancerConfigurationProto configProto = DiskBalancerConfigurationProto.newBuilder()
@@ -684,6 +738,10 @@ public class TestDiskBalancerSubCommands {
     DatanodeDetailsProto nodeProto = DatanodeDetailsProto.newBuilder()
         .setHostName(hostname)
         .setIpAddress("127.0.0.1")
+        .addPorts(HddsProtos.Port.newBuilder()
+            .setName("CLIENT_RPC")
+            .setValue(19864)
+            .build())
         .build();
 
     return DatanodeDiskBalancerInfoProto.newBuilder()

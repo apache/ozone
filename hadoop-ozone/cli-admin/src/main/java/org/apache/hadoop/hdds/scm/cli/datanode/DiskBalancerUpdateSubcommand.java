@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import static java.util.stream.Collectors.toList;
+
 import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -74,7 +76,9 @@ public class DiskBalancerUpdateSubcommand extends AbstractDiskBalancerSubCommand
       diskBalancerProxy.updateDiskBalancerConfiguration(config);
       
       Map<String, Object> result = new LinkedHashMap<>();
-      result.put("datanode", hostName);
+      // Format datanode string with hostname if available
+      String formattedDatanode = formatDatanodeDisplayName(hostName);
+      result.put("datanode", formattedDatanode);
       result.put("action", "update");
       result.put("status", "success");
       Map<String, Object> configMap = getConfigurationMap();
@@ -117,7 +121,9 @@ public class DiskBalancerUpdateSubcommand extends AbstractDiskBalancerSubCommand
       // Simpler message for batch mode
       if (!failedNodes.isEmpty()) {
         System.err.printf("Failed to update DiskBalancer configuration on nodes: [%s]%n",
-            String.join(", ", failedNodes));
+            String.join(", ", failedNodes.stream()
+                .map(this::formatDatanodeDisplayName)
+                .collect(toList())));
       } else {
         System.out.println("Updated DiskBalancer configuration on all IN_SERVICE nodes.");
       }
@@ -125,11 +131,15 @@ public class DiskBalancerUpdateSubcommand extends AbstractDiskBalancerSubCommand
       // Detailed message for specific nodes
       if (!successNodes.isEmpty()) {
         System.out.printf("Updated DiskBalancer configuration on nodes: [%s]%n", 
-            String.join(", ", successNodes));
+            String.join(", ", successNodes.stream()
+                .map(this::formatDatanodeDisplayName)
+                .collect(toList())));
       }
       if (!failedNodes.isEmpty()) {
         System.err.printf("Failed to update DiskBalancer configuration on nodes: [%s]%n", 
-            String.join(", ", failedNodes));
+            String.join(", ", failedNodes.stream()
+                .map(this::formatDatanodeDisplayName)
+                .collect(toList())));
       }
     }
   }

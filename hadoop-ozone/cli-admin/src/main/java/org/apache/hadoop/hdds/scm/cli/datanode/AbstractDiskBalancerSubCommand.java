@@ -20,8 +20,10 @@ package org.apache.hadoop.hdds.scm.cli.datanode;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -74,6 +76,10 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
       return null;
     }
 
+    // Remove duplicates while preserving order
+    Set<String> uniqueDatanodes = new LinkedHashSet<>(targetDatanodes);
+    List<String> deduplicatedDatanodes = new ArrayList<>(uniqueDatanodes);
+
     // Track if we're using batch mode for display
     isBatchMode = options.isInServiceDatanodes();
 
@@ -83,7 +89,7 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
     List<Object> jsonResults = new ArrayList<>();
     
     // Execute commands and collect results
-    for (String dn : targetDatanodes) {
+    for (String dn : deduplicatedDatanodes) {
       try {
         Object result = executeCommand(dn);
         successNodes.add(dn);
@@ -156,7 +162,7 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
     try (ScmClient scmClient = new ContainerOperationClient(new OzoneConfiguration())) {
       return DiskBalancerSubCommandUtil.getAllOperableNodesClientRpcAddress(scmClient);
     } catch (IOException e) {
-      System.err.println("Error querying SCM for in-service datanodes: %n" + e.getMessage());
+      System.err.printf("Error querying SCM for in-service datanodes. %n%s%n", e.getMessage());
       return null;
     }
   }
@@ -220,7 +226,9 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
    */
   private Map<String, Object> createErrorResult(String datanode, String errorMsg) {
     Map<String, Object> errorResult = new LinkedHashMap<>();
-    errorResult.put("datanode", datanode);
+    // Format datanode string with hostname if available
+    String formattedDatanode = formatDatanodeDisplayName(datanode);
+    errorResult.put("datanode", formattedDatanode);
     errorResult.put("action", getActionName());
     errorResult.put("status", "failure");
     errorResult.put("errorMsg", errorMsg);
@@ -232,6 +240,22 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
     }
     
     return errorResult;
+  }
+
+  /**
+   * Format a datanode address string to include hostname if available.
+   * Queries SCM to get the hostname for the given IP address and port.
+   * 
+   * @param address the datanode address in "ip:port" format
+   * @return formatted string "hostname (ip:port)" or "ip:port" if hostname is not available
+   */
+  protected String formatDatanodeDisplayName(String address) {
+    try (ScmClient scmClient = new ContainerOperationClient(new OzoneConfiguration())) {
+      return DiskBalancerSubCommandUtil.getDatanodeHostAndIp(scmClient, address);
+    } catch (IOException e) {
+      // If SCM query fails, return original address
+      return address;
+    }
   }
 }
 
