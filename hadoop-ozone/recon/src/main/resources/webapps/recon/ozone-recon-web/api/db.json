@@ -6869,9 +6869,12 @@
   },
   "utilization": {
     "globalStorage": {
-        "totalUsedSpace": 30679040,
-        "totalFreeSpace": 539776978944,
-        "totalCapacity": 879519597390
+      "totalFileSystemCapacity": 879788032846,
+      "totalReservedSpace": 268435456,
+      "totalOzoneCapacity": 879519597390,
+      "totalOzoneFreeSpace": 539776978944,
+      "totalOzoneUsedSpace": 30679040,
+      "totalOzonePreAllocatedContainerSpace":1022024
     },
     "globalNamespace": {
         "totalUsedSpace": 12349932,
@@ -6883,8 +6886,7 @@
           "openKeyAndFileBytes": 19255266,
           "multipartOpenKeyBytes": 0
         },
-        "committedKeyBytes": 1249923,
-        "preAllocatedContainerBytes": 1022024
+        "committedKeyBytes": 1249923
     },
     "dataNodeUsage": [
         {
