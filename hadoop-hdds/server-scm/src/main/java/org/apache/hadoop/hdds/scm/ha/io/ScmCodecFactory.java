@@ -57,7 +57,7 @@ public final class ScmCodecFactory {
     putEnum(HddsProtos.NodeType.class);
   }
 
-  static void putEnum(Class<? extends ProtocolMessageEnum> enumClass) {
+  static <T extends Enum<T> & ProtocolMessageEnum> void putEnum(Class<T> enumClass) {
     CODECS.put(enumClass, new ScmEnumCodec<>(enumClass));
   }
 

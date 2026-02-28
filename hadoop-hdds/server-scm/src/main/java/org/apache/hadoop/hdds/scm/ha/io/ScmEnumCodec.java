@@ -19,6 +19,8 @@ package org.apache.hadoop.hdds.scm.ha.io;
 
 import com.google.common.primitives.Ints;
 import com.google.protobuf.ProtocolMessageEnum;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
@@ -26,16 +28,21 @@ import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 import org.apache.ratis.util.Preconditions;
 
 /**
- * {@link ScmCodec} for {@link ProtocolMessageEnum} objects.
+ * {@link ScmCodec} for protobuf {@link ProtocolMessageEnum} objects.
+ * Stores protobuf enum number (wire value) and restores via number lookup.
  */
-class ScmEnumCodec<T extends ProtocolMessageEnum> implements ScmCodec<T> {
+class ScmEnumCodec<T extends Enum<T> & ProtocolMessageEnum> implements ScmCodec<T> {
   private final Class<T> enumClass;
-  private final T[] values;
+  private final Map<Integer, T> byNumber = new HashMap<>();
 
   ScmEnumCodec(Class<T> enumClass) {
-    Preconditions.assertTrue(enumClass.isEnum(), "values is not an enum");
+    Preconditions.assertTrue(enumClass.isEnum(), "enumClass is not an enum: " + enumClass);
     this.enumClass = enumClass;
-    this.values = enumClass.getEnumConstants();
+
+    // Build number -> enum constant map (no reflection)
+    for (T e : enumClass.getEnumConstants()) {
+      byNumber.put(e.getNumber(), e);
+    }
   }
 
   @Override
@@ -53,9 +60,12 @@ class ScmEnumCodec<T extends ProtocolMessageEnum> implements ScmCodec<T> {
           "Failed to deserialize enum " + enumClass + ": "
               + StringUtils.bytes2String(value.asReadOnlyByteBuffer()), e);
     }
-    if (n < 0 || n > values.length) {
-      throw new InvalidProtocolBufferException("Invalid enum index for " + enumClass + ": " + n);
+
+    final T decoded = byNumber.get(n);
+    if (decoded == null) {
+      throw new InvalidProtocolBufferException(
+          "Unknown enum number for " + enumClass.getName() + ": " + n);
     }
-    return values[n];
+    return decoded;
   }
 }
