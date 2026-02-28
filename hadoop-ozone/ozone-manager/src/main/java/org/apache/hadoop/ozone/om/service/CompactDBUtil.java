@@ -48,17 +48,16 @@ public final class CompactDBUtil {
       RocksDatabase rocksDatabase =
           ((RDBStore) omMetadataManager.getStore()).getDb();
 
-      try {
-        RocksDatabase.ColumnFamily columnFamily =
-            rocksDatabase.getColumnFamily(tableName);
-        rocksDatabase.compactRange(columnFamily, null, null, options);
-        LOG.info("Compaction of column family: {} completed in {} ms",
-            tableName, Time.monotonicNow() - startTime);
-      } catch (NullPointerException ex) {
+      RocksDatabase.ColumnFamily columnFamily =
+          rocksDatabase.getColumnFamily(tableName);
+      if (columnFamily == null) {
         LOG.error("Unable to trigger compaction for \"{}\". Column family not found ",
             tableName);
         throw new IOException("Column family \"" + tableName + "\" not found.");
       }
+      rocksDatabase.compactRange(columnFamily, null, null, options);
+      LOG.info("Compaction of column family: {} completed in {} ms",
+          tableName, Time.monotonicNow() - startTime);
     }
   }
 
