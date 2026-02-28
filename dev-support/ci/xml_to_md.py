@@ -107,9 +107,11 @@ This page provides a comprehensive overview of the configuration keys available 
 """
 
   for prop in sorted(properties.values(), key=lambda p: p.name):
-    # Escape pipe characters in description to prevent breaking the table
+    # Escape pipe characters and wrap {placeholders} in backticks
     description = prop.description.replace('|', '\\|')
-    value = prop.value if prop.value else ''
+    description = re.sub(r'(\$)?\{([^}]+)\}', r'`\1{\2}`', description)
+    value = prop.value.replace('|', '\\|') if prop.value else ''
+    value = re.sub(r'(\$)?\{([^}]+)\}', r'`\1{\2}`', value) if value else ''
     
     markdown += f"| `{prop.name}` | {value} | {prop.tag} | {description} |\n"
   
