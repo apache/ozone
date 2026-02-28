@@ -143,6 +143,8 @@ import java.util.StringTokenizer;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -281,7 +283,7 @@ import org.apache.hadoop.ozone.om.ratis_snapshot.OmRatisSnapshotProvider;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.s3.S3SecretCacheProvider;
 import org.apache.hadoop.ozone.om.s3.S3SecretStoreProvider;
-import org.apache.hadoop.ozone.om.service.CompactDBService;
+import org.apache.hadoop.ozone.om.service.CompactDBUtil;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.om.service.QuotaRepairTask;
@@ -5380,7 +5382,19 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public void compactOMDB(String columnFamily) throws IOException {
     checkAdminUserPrivilege("compact column family " + columnFamily);
-    new CompactDBService(this).compact(columnFamily);
+    CompletableFuture<Void> compactFuture =
+        CompactDBUtil.compactTableAsync(metadataManager, columnFamily);
+    compactFuture.whenComplete((result, throwable) -> {
+      if (throwable == null) {
+        LOG.info("Compaction request for column family \"{}\" completed successfully.",
+            columnFamily);
+      } else {
+        Throwable cause = throwable instanceof CompletionException
+            && throwable.getCause() != null ? throwable.getCause() : throwable;
+        LOG.error("Compaction request for column family \"{}\" failed.",
+            columnFamily, cause);
+      }
+    });
   }
 
   public OMExecutionFlow getOmExecutionFlow() {
