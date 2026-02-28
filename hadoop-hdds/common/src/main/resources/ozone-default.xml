@@ -179,6 +179,14 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.data.dir.permissions</name>
+    <value>700</value>
+    <description>Permissions for the datanode data directories where actual file blocks are stored.
+      The permissions can be either octal or symbolic. If the default permissions are not set
+      then the default value of 700 will be used.
+    </description>
+  </property>
+  <property>
     <name>hdds.datanode.container.db.dir</name>
     <value/>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
@@ -674,11 +682,11 @@
   </property>
   <property>
     <name>ozone.om.db.dirs.permissions</name>
-    <value>750</value>
+    <value>700</value>
     <description>
       Permissions for the metadata directories for Ozone Manager. The
       permissions have to be octal or symbolic. If the default permissions are not set
-      then the default value of 750 will be used.
+      then the default value of 700 will be used.
     </description>
   </property>
   <property>
@@ -705,7 +713,7 @@
   </property>
   <property>
     <name>ozone.metadata.dirs.permissions</name>
-    <value>750</value>
+    <value>700</value>
     <description>
       Permissions for the metadata directories for fallback location for SCM, OM, Recon and DataNodes
       to store their metadata. The permissions have to be octal or symbolic. This is the fallback used in case the
@@ -750,11 +758,11 @@
   </property>
   <property>
     <name>ozone.scm.db.dirs.permissions</name>
-    <value>750</value>
+    <value>700</value>
     <description>
       Permissions for the metadata directories for Storage Container Manager. The
       permissions can either be octal or symbolic. If the default permissions are not set
-      then the default value of 750 will be used.
+      then the default value of 700 will be used.
     </description>
   </property>
   <property>
@@ -3360,11 +3368,11 @@
   </property>
   <property>
     <name>ozone.recon.db.dirs.permissions</name>
-    <value>750</value>
+    <value>700</value>
     <description>
       Permissions for the metadata directories for Recon. The
       permissions can either be octal or symbolic. If the default permissions are not set
-      then the default value of 750 will be used.
+      then the default value of 700 will be used.
     </description>
   </property>
   <property>
