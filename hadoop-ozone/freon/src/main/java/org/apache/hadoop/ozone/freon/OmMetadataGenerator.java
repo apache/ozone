@@ -44,8 +44,9 @@ import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageSize;
-import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
+import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
+import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFollowerReadFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs.Builder;
@@ -54,6 +55,10 @@ import org.apache.hadoop.ozone.om.helpers.OzoneAclUtil;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatusLight;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
+import org.apache.hadoop.ozone.om.protocolPB.Hadoop3OmTransport;
+import org.apache.hadoop.ozone.om.protocolPB.OmTransport;
+import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTranslatorPB;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
@@ -134,15 +139,28 @@ public class OmMetadataGenerator extends BaseFreonGenerator
   )
   private String omServiceID;
 
+  @Option(
+      names = "--clients",
+      description = "The number of Ozone clients used. If zero or less, " +
+          "will fallback to 1",
+      defaultValue = "1")
+  private int clientsNo;
+
+  @Option(
+      names = "--enable-follower-read-affinity",
+      description = "Only useful when OM follower reads is enabled. " +
+          "If this is enabled, the clients will be initialized to only point " +
+          "to the OM followers in a round-robin fashion. If disabled, " +
+          "each client points to a random OM node, including leader.",
+      defaultValue = "false"
+  )
+  private boolean enableFollowerAffinity;
+
   @Mixin
   private FreonReplicationOptions replication;
 
-  private OzoneManagerProtocol ozoneManagerClient;
-
   private ThreadLocal<OmKeyArgs.Builder> omKeyArgsBuilder;
-
-  private OzoneBucket bucket;
-
+  private OzoneClient[] ozoneClients;
   private ContentGenerator contentGenerator;
   private final byte[] readBuffer = new byte[4096];
   private ReplicationConfig replicationConfig;
@@ -165,18 +183,42 @@ public class OmMetadataGenerator extends BaseFreonGenerator
     OzoneConfiguration conf = createOzoneConfiguration();
     replicationConfig = replication.fromParamsOrConfig(conf);
 
-    try (OzoneClient rpcClient = createOzoneClient(omServiceID, conf)) {
-      ensureVolumeAndBucketExist(rpcClient, volumeName, bucketName);
-      ozoneManagerClient = createOmClient(conf, omServiceID);
-      bucket = rpcClient.getObjectStore().getVolume(volumeName)
-          .getBucket(bucketName);
+    if (clientsNo <= 0) {
+      clientsNo = 1;
+    }
+
+    try (OzoneClient ozClient = createOzoneClient(omServiceID, conf)) {
+      ensureVolumeAndBucketExist(ozClient, volumeName, bucketName);
+
+      ozoneClients = new OzoneClient[clientsNo];
+      List<String> followerOMNodeIds = null;
+      int currentFollowerAffinityIndex = 0;
+      if (enableFollowerAffinity) {
+        followerOMNodeIds = getOMFollowerNodeIds(ozClient);
+      }
+      for (int i = 0; i < clientsNo; i++) {
+        OzoneClient ozoneClient = createOzoneClient(omServiceID, conf);
+        if (enableFollowerAffinity) {
+          // Point the client proxy to the followers in a round-robin fashion
+          // This balances the read loads on the OM followers
+          changeInitialProxyForFollowerRead(ozoneClient,
+              followerOMNodeIds.get(currentFollowerAffinityIndex));
+          currentFollowerAffinityIndex = (currentFollowerAffinityIndex + 1) % followerOMNodeIds.size();
+        }
+        ozoneClients[i] = ozoneClient;
+      }
       runTests(this::applyOperation);
     } finally {
-      if (ozoneManagerClient != null) {
-        ozoneManagerClient.close();
-        omKeyArgsBuilder.remove();
+      if (ozoneClients != null) {
+        for (OzoneClient ozoneClient : ozoneClients) {
+          if (ozoneClient != null) {
+            ozoneClient.close();
+          }
+        }
       }
+      omKeyArgsBuilder.remove();
     }
+
     return null;
   }
 
@@ -201,7 +243,7 @@ public class OmMetadataGenerator extends BaseFreonGenerator
     // if --ops is A,B,C --opsnum is 3,2,1
     // so the operations will be [A, A, A, B, B, C]
     // so the thread with seq id [0, 2] will execute A,
-    // the thread with seq id [3, 4] will execute A,
+    // the thread with seq id [3, 4] will execute B,
     // the thread with seq id [5, 5] will execute C
     operations = new Operation[getThreadNo()];
     for (int i = 0; i < ops.size(); i++) {
@@ -311,14 +353,21 @@ public class OmMetadataGenerator extends BaseFreonGenerator
       counter = ThreadLocalRandom.current().nextLong(getTestNo());
     }
     final String keyName = getPath(counter);
+    // Use counter instead of thread sequence ID so that a single operation can be
+    // executed by different clients in mixed operations scenario
+    final OzoneClient ozoneClient = getOzoneClient(counter);
+    final ClientProtocol clientProtocol = ozoneClient.getProxy();
+    final OzoneManagerProtocol ozoneManagerClient = clientProtocol.getOzoneManagerClient();
     switch (operation) {
     case CREATE_KEY:
       getMetrics().timer(operation.name()).time(() -> performWriteOperation(() ->
-          bucket.createKey(keyName, dataSize.toBytes(), replicationConfig, emptyMap()), contentGenerator));
+          clientProtocol.createKey(volumeName, bucketName, keyName, dataSize.toBytes(),
+              replicationConfig, emptyMap()), contentGenerator));
       break;
     case CREATE_STREAM_KEY:
       getMetrics().timer(operation.name()).time(() -> performWriteOperation(() ->
-          bucket.createStreamKey(keyName, dataSize.toBytes(), replicationConfig, emptyMap()), contentGenerator));
+          clientProtocol.createStreamKey(volumeName, bucketName, keyName, dataSize.toBytes(),
+              replicationConfig, emptyMap()), contentGenerator));
       break;
     case LOOKUP_KEY:
       keyArgs = omKeyArgsBuilder.get().setKeyName(keyName).build();
@@ -334,18 +383,22 @@ public class OmMetadataGenerator extends BaseFreonGenerator
       getMetrics().timer(operation.name()).time(() -> ozoneManagerClient.getKeyInfo(keyArgs, false));
       break;
     case READ_KEY:
-      getMetrics().timer(operation.name()).time(() -> performReadOperation(() -> bucket.readKey(keyName), readBuffer));
+      getMetrics().timer(operation.name()).time(() -> performReadOperation(() ->
+          clientProtocol.getKey(volumeName, bucketName, keyName), readBuffer));
       break;
     case READ_FILE:
-      getMetrics().timer(operation.name()).time(() -> performReadOperation(() -> bucket.readFile(keyName), readBuffer));
+      getMetrics().timer(operation.name()).time(() -> performReadOperation(() ->
+          clientProtocol.readFile(volumeName, bucketName, keyName), readBuffer));
       break;
     case CREATE_FILE:
       getMetrics().timer(operation.name()).time(() -> performWriteOperation(() ->
-          bucket.createFile(keyName, dataSize.toBytes(), replicationConfig, true, false), contentGenerator));
+          clientProtocol.createFile(volumeName, bucketName, keyName, dataSize.toBytes(),
+              replicationConfig, true, false), contentGenerator));
       break;
     case CREATE_STREAM_FILE:
       getMetrics().timer(operation.name()).time(() -> performWriteOperation(() ->
-          bucket.createStreamFile(keyName, dataSize.toBytes(), replicationConfig, true, false), contentGenerator));
+          clientProtocol.createStreamFile(volumeName, bucketName, keyName, dataSize.toBytes(),
+              replicationConfig, true, false), contentGenerator));
       break;
     case LOOKUP_FILE:
       keyArgs = omKeyArgsBuilder.get().setKeyName(keyName).build();
@@ -414,6 +467,11 @@ public class OmMetadataGenerator extends BaseFreonGenerator
     }
   }
 
+  private OzoneClient getOzoneClient(long counter) {
+    int index = (int) (counter % ozoneClients.length);
+    return ozoneClients[index];
+  }
+
   @FunctionalInterface
   interface WriteOperation {
     OutputStream createStream() throws IOException;
@@ -463,5 +521,45 @@ public class OmMetadataGenerator extends BaseFreonGenerator
     INFO_BUCKET,
     INFO_VOLUME,
     MIXED,
+  }
+
+  private List<String> getOMFollowerNodeIds(OzoneClient ozoneClient) throws IOException {
+    List<OMRoleInfo> omRoleInfos = ozoneClient.getProxy().getOmRoleInfos();
+    String leaderOMNodeId = null;
+    List<String> followerOMNodeIds = new ArrayList<>();
+    for (OMRoleInfo omRoleInfo : omRoleInfos) {
+      if (omRoleInfo.getServerRole().equals("LEADER")) {
+        if (leaderOMNodeId != null) {
+          // This situation should be rare
+          throw new IllegalStateException("There are more than one leader detected, please retry again");
+        }
+        leaderOMNodeId = omRoleInfo.getNodeId();
+      } else if (omRoleInfo.getServerRole().equals("FOLLOWER")) {
+        followerOMNodeIds.add(omRoleInfo.getNodeId());
+      }
+    }
+    if (followerOMNodeIds.isEmpty()) {
+      throw new IllegalArgumentException("There is no follower in the OM service, please retry again");
+    }
+    return followerOMNodeIds;
+  }
+
+  private void changeInitialProxyForFollowerRead(OzoneClient ozoneClient, String omNodeId) {
+    OzoneManagerProtocolClientSideTranslatorPB ozoneManagerClient =
+        (OzoneManagerProtocolClientSideTranslatorPB)
+            ozoneClient.getProxy().getOzoneManagerClient();
+
+    OmTransport transport = ozoneManagerClient.getTransport();
+
+    if (transport instanceof Hadoop3OmTransport) {
+      Hadoop3OmTransport hadoop3OmTransport =
+          (Hadoop3OmTransport) ozoneManagerClient.getTransport();
+      HadoopRpcOMFollowerReadFailoverProxyProvider followerReadFailoverProxyProvider =
+          hadoop3OmTransport.getOmFollowerReadFailoverProxyProvider();
+
+      if (followerReadFailoverProxyProvider != null) {
+        followerReadFailoverProxyProvider.changeInitialProxyForTest(omNodeId);
+      }
+    }
   }
 }
