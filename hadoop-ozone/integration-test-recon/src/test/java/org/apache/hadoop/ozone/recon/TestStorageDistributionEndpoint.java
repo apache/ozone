@@ -35,7 +35,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -63,6 +65,7 @@ import org.apache.hadoop.ozone.client.ObjectStore;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneVolume;
+import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.DBHandle;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
@@ -73,6 +76,8 @@ import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
+import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
+import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.recon.api.DataNodeMetricsService;
 import org.apache.hadoop.ozone.recon.api.types.DataNodeMetricsServiceResponse;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
@@ -167,6 +172,8 @@ public class TestStorageDistributionEndpoint {
     volume.createBucket("bucket1", bucketArgs);
     OzoneBucket bucket = volume.getBucket("bucket1");
 
+    createOpenKeysAndMultipartKeys(volume.getName(), bucket.getName(), replicationConfig);
+
     String rootPath = String.format("%s://%s.%s/", OzoneConsts.OZONE_URI_SCHEME, bucket.getName(),
         bucket.getVolumeName());
 
@@ -204,6 +211,34 @@ public class TestStorageDistributionEndpoint {
     GenericTestUtils.waitFor(this::verifyPendingDeletionAfterKeyDeletionOnDnFailure, 2000, 60000);
   }
 
+  private void createOpenKeysAndMultipartKeys(String volumeName,
+      String bucketName, ReplicationConfig config) throws Exception {
+    ObjectStore objectStore = client.getObjectStore();
+    OzoneManagerProtocol ozoneManagerClient =
+        client.getObjectStore().getClientProxy().getOzoneManagerClient();
+
+    OmKeyArgs openKey = new OmKeyArgs.Builder()
+        .setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setKeyName("openkey1")
+        .setReplicationConfig(config)
+        .setDataSize(10)// this sets unreplicated size; replicated = 10 * 3 = 30
+        .setAcls(new ArrayList<>())
+        .setOwnerName("ownerName")
+        .build();
+    ozoneManagerClient.openKey(openKey);
+    //Create a Multipart open key
+    OmMultipartInfo multipartInfo = objectStore.getClientProxy()
+        .initiateMultipartUpload(volumeName, bucketName, "mpukey1",
+            config, new HashMap<>());
+
+    OzoneOutputStream partStream = objectStore.getClientProxy()
+        .createMultipartKey(volumeName, bucketName, "mpukey1",
+            10L, 1, multipartInfo.getUploadID());
+    partStream.write(new byte[10]);
+    partStream.close();
+  }
+
   private boolean verifyStorageDistributionAfterKeyCreation() {
     try {
       StringBuilder urlBuilder = new StringBuilder();
@@ -213,13 +248,24 @@ public class TestStorageDistributionEndpoint {
           MAPPER.readValue(response, StorageCapacityDistributionResponse.class);
 
       assertEquals(20, storageResponse.getGlobalNamespace().getTotalKeys());
-      assertEquals(60, storageResponse.getGlobalNamespace().getTotalUsedSpace());
-      assertEquals(0, storageResponse.getUsedSpaceBreakDown().getOpenKeyBytes());
+      assertEquals(120, storageResponse.getGlobalNamespace().getTotalUsedSpace());
+      assertEquals(60, storageResponse.getUsedSpaceBreakDown().getOpenKeyBytes().getTotalOpenKeyBytes());
+      assertEquals(30, storageResponse.getUsedSpaceBreakDown().getOpenKeyBytes().getMultipartOpenKeyBytes());
+      assertEquals(30, storageResponse.getUsedSpaceBreakDown().getOpenKeyBytes().getOpenKeyAndFileBytes());
       assertEquals(60, storageResponse.getUsedSpaceBreakDown().getCommittedKeyBytes());
       assertEquals(3, storageResponse.getDataNodeUsage().size());
       List<DatanodeStorageReport> reports = storageResponse.getDataNodeUsage();
       List<HddsProtos.DatanodeUsageInfoProto> scmReports =
           scm.getClientProtocolServer().getDatanodeUsageInfo(true, 3, 1);
+
+      long totalReserved = 0;
+      long totalMinFreeSpace = 0;
+      long totalPreAllocated = 0;
+      long totalFileSystemCapacity = 0;
+      long totalOzoneCapacity = 0;
+      long totalOzoneUsedSpace = 0;
+      long totalRemaining = 0;
+
       for (DatanodeStorageReport report : reports) {
         for (HddsProtos.DatanodeUsageInfoProto scmReport : scmReports) {
           if (scmReport.getNode().getUuid().equals(report.getDatanodeUuid())) {
@@ -231,9 +277,23 @@ public class TestStorageDistributionEndpoint {
             assertEquals(scmReport.getCommitted(), report.getCommitted());
             assertEquals(scmReport.getFsAvailable(), report.getFilesystemAvailable());
             assertEquals(scmReport.getFsCapacity(), report.getFilesystemCapacity());
+            totalReserved += scmReport.getReserved();
+            totalMinFreeSpace += scmReport.getFreeSpaceToSpare();
+            totalPreAllocated += scmReport.getCommitted();
+            totalFileSystemCapacity += scmReport.getFsCapacity();
+            totalOzoneCapacity += scmReport.getCapacity();
+            totalOzoneUsedSpace += scmReport.getUsed();
+            totalRemaining += scmReport.getRemaining();
           }
         }
       }
+      assertEquals(totalReserved, storageResponse.getGlobalStorage().getTotalReservedSpace());
+      assertEquals(totalMinFreeSpace, storageResponse.getGlobalStorage().getTotalMinimumFreeSpace());
+      assertEquals(totalPreAllocated, storageResponse.getGlobalStorage().getTotalOzonePreAllocatedContainerSpace());
+      assertEquals(totalOzoneCapacity, storageResponse.getGlobalStorage().getTotalOzoneCapacity());
+      assertEquals(totalOzoneUsedSpace, storageResponse.getGlobalStorage().getTotalOzoneUsedSpace());
+      assertEquals(totalFileSystemCapacity, storageResponse.getGlobalStorage().getTotalFileSystemCapacity());
+      assertEquals(totalRemaining, storageResponse.getGlobalStorage().getTotalOzoneFreeSpace());
       return true;
     } catch (Exception e) {
       LOG.debug("Waiting for storage distribution assertions to pass", e);

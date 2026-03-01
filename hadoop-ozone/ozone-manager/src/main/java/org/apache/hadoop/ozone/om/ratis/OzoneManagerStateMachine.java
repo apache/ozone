@@ -73,7 +73,6 @@ import org.apache.ratis.server.storage.RaftStorage;
 import org.apache.ratis.statemachine.SnapshotInfo;
 import org.apache.ratis.statemachine.TransactionContext;
 import org.apache.ratis.statemachine.impl.BaseStateMachine;
-import org.apache.ratis.statemachine.impl.SimpleStateMachineStorage;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.IOUtils;
@@ -94,8 +93,6 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
   private static final String AUDIT_PARAM_PREVIOUS_LEADER = "previousLeader";
   private static final String AUDIT_PARAM_NEW_LEADER = "newLeader";
   private RaftPeerId previousLeaderId = null;
-  private final SimpleStateMachineStorage storage =
-      new SimpleStateMachineStorage();
   private final OzoneManager ozoneManager;
   private RequestHandler handler;
   private volatile OzoneManagerDoubleBuffer ozoneManagerDoubleBuffer;
@@ -135,15 +132,32 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     this.nettyMetrics = NettyMetrics.create();
   }
 
+  @VisibleForTesting
+  OzoneManagerStateMachine(OzoneManager ozoneManager,
+      OzoneManagerDoubleBuffer doubleBuffer,
+      RequestHandler handler,
+      ExecutorService executorService,
+      NettyMetrics nettyMetrics) {
+    this.isTracingEnabled = false;
+    this.ozoneManager = ozoneManager;
+    this.threadPrefix = "";
+    this.ozoneManagerDoubleBuffer = doubleBuffer;
+    this.handler = handler;
+    this.executorService = executorService;
+    ThreadFactory installSnapshotThreadFactory = new ThreadFactoryBuilder()
+        .setNameFormat("TestInstallSnapshotThread").build();
+    this.installSnapshotExecutor =
+        HadoopExecutors.newSingleThreadExecutor(installSnapshotThreadFactory);
+    this.nettyMetrics = nettyMetrics;
+  }
+
   /**
    * Initializes the State Machine with the given server, group and storage.
    */
   @Override
-  public void initialize(RaftServer server, RaftGroupId id,
-      RaftStorage raftStorage) throws IOException {
+  public void initialize(RaftServer server, RaftGroupId id, RaftStorage raftStorage) throws IOException {
     getLifeCycle().startAndTransition(() -> {
       super.initialize(server, id, raftStorage);
-      storage.init(raftStorage);
       LOG.info("{}: initialize {} with {}", getId(), id, getLastAppliedTermIndex());
     });
   }
@@ -419,7 +433,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     }
   }
 
-  private Message processResponse(OMResponse omResponse) {
+  @VisibleForTesting
+  Message processResponse(OMResponse omResponse) {
     if (!omResponse.getSuccess()) {
       // INTERNAL_ERROR or METADATA_ERROR are considered as critical errors.
       // In such cases, OM must be terminated instead of completing the future exceptionally,
@@ -593,7 +608,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
    * @param request OMRequest
    * @return response from OM
    */
-  private OMResponse runCommand(OMRequest request, TermIndex termIndex) {
+  @VisibleForTesting
+  OMResponse runCommand(OMRequest request, TermIndex termIndex) {
     try {
       ExecutionContext context = ExecutionContext.of(termIndex.getIndex(), termIndex);
       final OMClientResponse omClientResponse = handler.handleWriteRequest(
@@ -617,7 +633,8 @@ public class OzoneManagerStateMachine extends BaseStateMachine {
     return null;
   }
 
-  private OMResponse createErrorResponse(
+  @VisibleForTesting
+  OMResponse createErrorResponse(
       OMRequest omRequest, IOException exception, TermIndex termIndex) {
     OMResponse.Builder omResponseBuilder = OMResponse.newBuilder()
         .setStatus(OzoneManagerRatisUtils.exceptionToResponseStatus(exception))

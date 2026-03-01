@@ -23,6 +23,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaLoader.NodeSchemaLoadResult;
 import org.slf4j.Logger;
@@ -137,5 +139,15 @@ public final class NodeSchemaManager {
       return newPath.toString();
     }
     return null;
+  }
+
+  static Node fromProtobuf(HddsProtos.NetworkNode networkNode) {
+    if (networkNode.hasDatanodeDetails()) {
+      return DatanodeDetails.getFromProtoBuf(networkNode.getDatanodeDetails());
+    } else if (networkNode.hasInnerNode()) {
+      return InnerNodeImpl.fromProtobuf(networkNode.getInnerNode());
+    } else {
+      return null;
+    }
   }
 }

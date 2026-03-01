@@ -29,8 +29,13 @@ import org.apache.hadoop.fs.FileEncryptionInfo;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.metrics2.lib.MutableRate;
+import org.apache.hadoop.ozone.audit.AuditLogger;
+import org.apache.hadoop.ozone.audit.AuditMessage;
+import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.ListKeysLightResult;
 import org.apache.hadoop.ozone.om.helpers.ListKeysResult;
@@ -40,10 +45,12 @@ import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OzoneFileStatus;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.server.protocol.TermIndex;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 /**
@@ -241,5 +248,67 @@ public class TestOzoneManagerRequestHandler {
     Assertions.assertEquals(2, basicKeyInfoList.size());
     Assertions.assertTrue(basicKeyInfoList.get(0).getIsEncrypted(), "encrypted-key should have isEncrypted=true");
     Assertions.assertFalse(basicKeyInfoList.get(1).getIsEncrypted(), "normal-key should have isEncrypted=false");
+  }
+
+  /**
+   * Verify that when handleWriteRequestImpl encounters an exception during
+   * validateAndUpdateCache, the audit logger is called with the correct
+   * Transaction index and Command type in the audit message.
+   */
+  @Test
+  public void testWriteRequestExceptionAuditLog() {
+    OzoneManagerRequestHandler handler = getRequestHandler(10);
+    OzoneManager ozoneManager = handler.getOzoneManager();
+
+    // Set up audit logger mock
+    AuditLogger auditLogger = Mockito.mock(AuditLogger.class);
+    Mockito.when(ozoneManager.getAuditLogger()).thenReturn(auditLogger);
+
+    // Set up perf metrics (needed by captureLatencyNs)
+    OMPerformanceMetrics perfMetrics = Mockito.mock(OMPerformanceMetrics.class);
+    Mockito.when(perfMetrics.getValidateAndUpdateCacheLatencyNs())
+        .thenReturn(Mockito.mock(MutableRate.class));
+    Mockito.when(ozoneManager.getPerfMetrics()).thenReturn(perfMetrics);
+
+    // Disable ACLs so preExecute doesn't need ACL setup
+    Mockito.when(ozoneManager.getAclsEnabled()).thenReturn(false);
+
+    // Leave getMetrics() returning null -> NPE in validateAndUpdateCache
+    // when OMVolumeCreateRequest calls ozoneManager.getMetrics().incNumVolumeCreates()
+
+    // Build a CreateVolume OMRequest
+    OzoneManagerProtocolProtos.VolumeInfo volInfo =
+        OzoneManagerProtocolProtos.VolumeInfo.newBuilder()
+            .setAdminName("admin").setOwnerName("owner")
+            .setVolume("testVol").build();
+    OzoneManagerProtocolProtos.OMRequest omRequest =
+        OzoneManagerProtocolProtos.OMRequest.newBuilder()
+            .setCreateVolumeRequest(
+                OzoneManagerProtocolProtos.CreateVolumeRequest.newBuilder()
+                    .setVolumeInfo(volInfo))
+            .setCmdType(OzoneManagerProtocolProtos.Type.CreateVolume)
+            .setClientId("test-client")
+            .setUserInfo(OzoneManagerProtocolProtos.UserInfo.newBuilder()
+                .setUserName("testUser").setHostName("localhost")
+                .setRemoteAddress("127.0.0.1"))
+            .build();
+
+    ExecutionContext context = ExecutionContext.of(10, TermIndex.valueOf(1, 10));
+
+    // handleWriteRequestImpl should throw (NPE from null getMetrics())
+    // but the catch block logs the audit message first
+    Assertions.assertThrows(NullPointerException.class,
+        () -> handler.handleWriteRequestImpl(omRequest, context));
+
+    // Verify auditLogger.logWrite was called with correct content
+    ArgumentCaptor<AuditMessage> captor =
+        ArgumentCaptor.forClass(AuditMessage.class);
+    Mockito.verify(auditLogger).logWrite(captor.capture());
+
+    String formatted = captor.getValue().getFormattedMessage();
+    Assertions.assertTrue(formatted.contains("Transaction") && formatted.contains("10"),
+        "Audit message should contain Transaction 10, got: " + formatted);
+    Assertions.assertTrue(formatted.contains("Command") && formatted.contains("CreateVolume"),
+        "Audit message should contain Command CreateVolume, got: " + formatted);
   }
 }

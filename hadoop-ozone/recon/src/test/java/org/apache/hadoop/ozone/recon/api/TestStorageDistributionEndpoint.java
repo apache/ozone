@@ -126,17 +126,21 @@ public class TestStorageDistributionEndpoint {
     long totalNameSpace = PENDING_KEY_SIZE + PENDING_DIRECTORY_SIZE + OPEN_KEY_BYTES +
         OPEN_MPU_KEY_BYTES + EXPECTED_COMMITTED_KEY_BYTES;
 
-    assertEquals(OZONE_USED * 3, distributionResponse.getGlobalStorage().getTotalUsedSpace());
-    assertEquals(OZONE_REMAINING * 3, distributionResponse.getGlobalStorage().getTotalFreeSpace());
-    assertEquals(OZONE_CAPACITY * 3, distributionResponse.getGlobalStorage().getTotalCapacity());
+    assertEquals(OZONE_USED * 3, distributionResponse.getGlobalStorage().getTotalOzoneUsedSpace());
+    assertEquals(OZONE_REMAINING * 3, distributionResponse.getGlobalStorage().getTotalOzoneFreeSpace());
+    assertEquals(OZONE_CAPACITY * 3, distributionResponse.getGlobalStorage().getTotalOzoneCapacity());
     assertEquals(totalNameSpace, distributionResponse.getGlobalNamespace().getTotalUsedSpace());
     assertEquals(EXPECTED_GLOBAL_TOTAL_KEYS, distributionResponse.getGlobalNamespace().getTotalKeys());
+    assertEquals(OPEN_KEY_BYTES,
+        distributionResponse.getUsedSpaceBreakDown().getOpenKeyBytes().getOpenKeyAndFileBytes());
+    assertEquals(OPEN_MPU_KEY_BYTES,
+        distributionResponse.getUsedSpaceBreakDown().getOpenKeyBytes().getMultipartOpenKeyBytes());
     assertEquals(OPEN_KEY_BYTES + OPEN_MPU_KEY_BYTES,
-        distributionResponse.getUsedSpaceBreakDown().getOpenKeyBytes());
+        distributionResponse.getUsedSpaceBreakDown().getOpenKeyBytes().getTotalOpenKeyBytes());
     assertEquals(EXPECTED_COMMITTED_KEY_BYTES,
         distributionResponse.getUsedSpaceBreakDown().getCommittedKeyBytes());
     assertEquals(COMMITTED * 3,
-        distributionResponse.getUsedSpaceBreakDown().getPreAllocatedContainerBytes());
+        distributionResponse.getGlobalStorage().getTotalOzonePreAllocatedContainerSpace());
     for (int i = 0; i < 3; i++) {
       DatanodeStorageReport report = distributionResponse.getDataNodeUsage().get(i);
       assertEquals(OZONE_CAPACITY, report.getCapacity());

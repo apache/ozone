@@ -109,7 +109,7 @@ public class InnerNodeImpl extends NodeImpl implements InnerNode {
         String networkName = childrenMapProto.hasNetworkName() ?
             childrenMapProto.getNetworkName() : null;
         Node node = childrenMapProto.hasNetworkNode() ?
-            Node.fromProtobuf(childrenMapProto.getNetworkNode()) : null;
+            NodeSchemaManager.fromProtobuf(childrenMapProto.getNetworkNode()) : null;
         newChildrenMap.put(networkName, node);
       }
       this.childrenMap = newChildrenMap;

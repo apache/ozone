@@ -29,8 +29,7 @@ import {
   datanodesPendingDeletionDesc,
   nodeSelectorMessage,
   otherUsedSpaceDesc,
-  ozoneUsedSpaceDesc,
-  totalCapacityDesc
+  ozoneUsedSpaceDesc
 } from '@/v2/pages/capacity/constants/descriptions.constants';
 import WrappedInfoIcon from '@/v2/pages/capacity/components/WrappedInfoIcon';
 import filesize from 'filesize';
@@ -229,7 +228,7 @@ const Capacity: React.FC<object> = () => {
       </>
     }>
       <CheckCircleFilled style={{ color: '#1ea57a', marginRight: 8, fontSize: 14 }} />
-        Datanodes  
+        Datanodes
     </Popover>
   );
 
@@ -253,9 +252,54 @@ const Capacity: React.FC<object> = () => {
     </span>
   );
 
+  const totalCapacityDesc = (
+    <span>
+      TOTAL CAPACITY
+      <Popover
+        title="Capacity Breakdown"
+        placement="topLeft"
+        content={
+            <>
+              <div className='unused-space-breakdown'>
+                File System Capacity
+                <Tag color='blue'>{filesize(storageDistribution.data.globalStorage.totalFileSystemCapacity, { round: 1 })}</Tag>
+                Reserved Space
+                <Tag color='orange'>{filesize(storageDistribution.data.globalStorage.totalReservedSpace, { round: 1 })}</Tag>
+              </div>
+              <div className="capacity-info">
+                Ozone Capacity shows how much usable space is available after subtracting the reserved space from the file system capacity.
+              </div>
+            </>
+        }
+      >
+        <InfoCircleOutlined style={{ color: '#2f84d8', fontSize: 12, marginLeft: 4 }} />
+      </Popover>
+    </span>
+  );
+
   const dnSelectorTitle = (
     <span>
       Node Selector <WrappedInfoIcon title={nodeSelectorMessage} />
+    </span>
+  );
+
+  const openKeyUsageBreakdown = (
+    <span>
+      OPEN KEYS
+      <Popover
+        title="Open Key Breakdown"
+        placement='topLeft'
+        content={
+          <div className='openkeys-space-breakdown'>
+            Open Key/File Bytes
+            <Tag color='blue'>{filesize(storageDistribution.data.usedSpaceBreakdown.openKeyBytes?.openKeyAndFileBytes ?? 0, {round: 1})}</Tag>
+            Multipart Key Bytes
+            <Tag color='orange'>{filesize(storageDistribution.data.usedSpaceBreakdown.openKeyBytes?.multipartOpenKeyBytes ?? 0, {round: 1})}</Tag>
+          </div>
+        }
+      >
+        <InfoCircleOutlined style={{ color: '#2f84d8', fontSize: 12, marginLeft: 4 }} />
+      </Popover>
     </span>
   );
 
@@ -275,16 +319,11 @@ const Capacity: React.FC<object> = () => {
           title='Ozone Capacity'
           loading={storageDistribution.loading}
           items={[{
-            title: (
-              <span>
-                TOTAL
-                <WrappedInfoIcon title={totalCapacityDesc} />
-              </span>
-            ),
-            value: storageDistribution.data.globalStorage.totalCapacity,
+            title: totalCapacityDesc,
+            value: storageDistribution.data.globalStorage.totalOzoneCapacity,
           }, {
-            title: 'OZONE USED SPACE',
-            value: storageDistribution.data.globalStorage.totalUsedSpace,
+            title: 'USED SPACE',
+            value: storageDistribution.data.globalStorage.totalOzoneUsedSpace,
             color: '#f4a233'
           }, {
             title: (
@@ -294,18 +333,18 @@ const Capacity: React.FC<object> = () => {
               </span>
             ),
             value: (
-              storageDistribution.data.globalStorage.totalCapacity
-              - storageDistribution.data.globalStorage.totalFreeSpace
-              - storageDistribution.data.globalStorage.totalUsedSpace
+              storageDistribution.data.globalStorage.totalOzoneCapacity
+              - storageDistribution.data.globalStorage.totalOzoneFreeSpace
+              - storageDistribution.data.globalStorage.totalOzoneUsedSpace
             ),
             color: '#11073a'
           }, {
             title: 'CONTAINER PRE-ALLOCATED',
-            value: storageDistribution.data.usedSpaceBreakdown.preAllocatedContainerBytes,
+            value: storageDistribution.data.globalStorage.totalOzonePreAllocatedContainerSpace,
             color: '#f47b2d'
           }, {
             title: 'REMAINING SPACE',
-            value: storageDistribution.data.globalStorage.totalFreeSpace,
+            value: storageDistribution.data.globalStorage.totalOzoneFreeSpace,
             color: '#4553ee'
           }]}
         />
@@ -320,10 +359,10 @@ const Capacity: React.FC<object> = () => {
           loading={storageDistribution.loading}
           items={[{
             title: 'TOTAL',
-            value: storageDistribution.data.globalStorage.totalUsedSpace
+            value: storageDistribution.data.globalStorage.totalOzoneUsedSpace
           }, {
-            title: 'OPEN KEYS',
-            value: storageDistribution.data.usedSpaceBreakdown.openKeyBytes,
+            title: openKeyUsageBreakdown,
+            value: storageDistribution.data.usedSpaceBreakdown.openKeyBytes?.totalOpenKeyBytes ?? 0,
             color: '#f47c2d'
           }, {
             title: 'COMMITTED KEYS',
