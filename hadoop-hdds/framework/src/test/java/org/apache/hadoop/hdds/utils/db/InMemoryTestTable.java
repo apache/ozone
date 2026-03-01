@@ -91,6 +91,11 @@ public class InMemoryTestTable<KEY, VALUE> implements Table<KEY, VALUE> {
   }
 
   @Override
+  public void deleteRangeWithBatch(BatchOperation batch, KEY beginKey, KEY endKey) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public void deleteRange(KEY beginKey, KEY endKey) {
     map.subMap(beginKey, endKey).clear();
   }

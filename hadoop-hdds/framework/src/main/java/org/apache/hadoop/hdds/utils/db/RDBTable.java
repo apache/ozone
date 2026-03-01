@@ -212,6 +212,15 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
+  public void deleteRangeWithBatch(BatchOperation batch, byte[] beginKey, byte[] endKey) {
+    if (batch instanceof RDBBatchOperation) {
+      ((RDBBatchOperation) batch).deleteRange(family, beginKey, endKey);
+    } else {
+      throw new IllegalArgumentException("batch should be RDBBatchOperation");
+    }
+  }
+
+  @Override
   public KeyValueIterator<byte[], byte[]> iterator(byte[] prefix, IteratorType type)
       throws RocksDatabaseException {
     return new RDBStoreByteArrayIterator(db.newIterator(family, false), this,
