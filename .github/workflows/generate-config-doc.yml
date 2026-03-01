@@ -22,7 +22,7 @@ on:
         required: true
 
 jobs:
-  generate:
+  generate-config-doc:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout project
