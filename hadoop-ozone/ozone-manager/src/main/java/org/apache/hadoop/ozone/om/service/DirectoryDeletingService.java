@@ -56,6 +56,7 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskResult;
 import org.apache.hadoop.hdds.utils.IOUtils;
@@ -440,8 +441,9 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     if (purgeDeletedDir != null) {
       remainNum.addAndGet(-1);
     }
-    return Optional.of(wrapPurgeRequest(volumeBucketId.getVolumeId(), volumeBucketId.getBucketId(),
-        purgeDeletedDir, subFiles, subDirs));
+    return Optional.of(
+        wrapPurgeRequest(volumeBucketId.getVolumeId(), volumeBucketId.getBucketId(), purgeDeletedDir, subFiles, subDirs,
+            subDirDeleteResult.getKeyRanges(), subFileDeleteResult.getKeyRanges()));
   }
 
   private OzoneManagerProtocolProtos.PurgePathRequest wrapPurgeRequest(
@@ -449,7 +451,9 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
       final long bucketId,
       final String purgeDeletedDir,
       final List<OmKeyInfo> purgeDeletedFiles,
-      final List<OmKeyInfo> markDirsAsDeleted) {
+      final List<OmKeyInfo> markDirsAsDeleted,
+      List<DeleteKeysResult.ExclusiveRange> dirExclusiveRanges,
+      List<DeleteKeysResult.ExclusiveRange> fileExclusiveRanges) {
     // Put all keys to be purged in a list
     PurgePathRequest.Builder purgePathsRequest = PurgePathRequest.newBuilder();
     purgePathsRequest.setVolumeId(volumeId);
@@ -469,6 +473,16 @@ public class DirectoryDeletingService extends AbstractKeyDeletingService {
     for (OmKeyInfo dir : markDirsAsDeleted) {
       purgePathsRequest.addMarkDeletedSubDirs(
           dir.getProtobuf(ClientVersion.CURRENT_VERSION));
+    }
+
+    for (DeleteKeysResult.ExclusiveRange range : dirExclusiveRanges) {
+      purgePathsRequest.addDeleteRangeSubDirs(
+          HddsProtos.KeyValue.newBuilder().setKey(range.getStartKey()).setValue(range.getExclusiveEndKey()).build());
+    }
+
+    for (DeleteKeysResult.ExclusiveRange range : fileExclusiveRanges) {
+      purgePathsRequest.addDeleteRangeSubFiles(
+          HddsProtos.KeyValue.newBuilder().setKey(range.getStartKey()).setValue(range.getExclusiveEndKey()).build());
     }
 
     return purgePathsRequest.build();

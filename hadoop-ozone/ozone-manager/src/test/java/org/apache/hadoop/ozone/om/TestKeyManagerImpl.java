@@ -21,7 +21,10 @@ import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_DIR_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DELETED_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.SNAPSHOT_RENAMED_TABLE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -36,10 +39,14 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.MapBackedTableIterator;
+import org.apache.hadoop.hdds.utils.db.StringInMemoryTestTable;
 import org.apache.hadoop.hdds.utils.db.Table;
+import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.ratis.util.function.CheckedFunction;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -230,5 +237,193 @@ public class TestKeyManagerImpl {
     } else {
       assertEquals(expectedEntries, km.getDeletedDirEntries(volumeName, bucketName, numberOfEntries));
     }
+  }
+
+  @Test
+  public void testGetPendingDeletionSubFilesAllReclaimableNoLimit() throws Exception {
+    OzoneConfiguration configuration = new OzoneConfiguration();
+    OMMetadataManager omMetadataManager = Mockito.mock(OMMetadataManager.class);
+    KeyManagerImpl km = new KeyManagerImpl(null, null, omMetadataManager, configuration, null, null, null);
+
+    String prefix = "/vol1/buck1/dir1/";
+    java.util.NavigableMap<String, OmKeyInfo> values = new java.util.TreeMap<>();
+    // Three reclaimable children under the same parent
+    OmKeyInfo f1 = OMRequestTestUtils.createOmKeyInfo("vol1", "buck1", "file1", null).build();
+    OmKeyInfo f2 = OMRequestTestUtils.createOmKeyInfo("vol1", "buck1", "file2", null).build();
+    OmKeyInfo f3 = OMRequestTestUtils.createOmKeyInfo("vol1", "buck1", "file3", null).build();
+    values.put(prefix + "file1", f1);
+    values.put(prefix + "file2", f2);
+    values.put(prefix + "file3", f3);
+
+    Table<String, OmKeyInfo> fileTable = new StringInMemoryTestTable<>(values, "fileTable");
+    Mockito.when(omMetadataManager.getFileTable()).thenReturn(fileTable);
+    Mockito.when(omMetadataManager.getOzonePathKey(anyLong(), anyLong(), anyLong(), eq(""))).thenReturn(prefix);
+
+    OmKeyInfo parent = OMRequestTestUtils.createOmKeyInfo("vol1", "buck1", "dir1", null).setObjectID(100L).build();
+
+    CheckedFunction<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter = kv -> true;
+
+    DeleteKeysResult result = km.getPendingDeletionSubFiles(1L, 1L, parent, filter, 10);
+
+    // All 3 files reclaimable
+    assertEquals(3, result.getKeysToDelete().size());
+    assertTrue(result.isProcessedKeys());
+
+    List<DeleteKeysResult.ExclusiveRange> ranges = result.getKeyRanges();
+    assertEquals(1, ranges.size());
+    assertEquals(prefix + "file1", ranges.get(0).getStartKey());
+    // End key must be lexicographically higher than the parent prefix
+    assertEquals(org.apache.hadoop.hdds.StringUtils.getLexicographicallyHigherString(prefix),
+        ranges.get(0).getExclusiveEndKey());
+  }
+
+  @Test
+  public void testGetPendingDeletionSubFilesMixedReclaimableWithGap() throws Exception {
+    OzoneConfiguration configuration = new OzoneConfiguration();
+    OMMetadataManager omMetadataManager = Mockito.mock(OMMetadataManager.class);
+    KeyManagerImpl km = new KeyManagerImpl(null, null, omMetadataManager, configuration, null, null, null);
+
+    String prefix = "/vol1/buck1/dir1/";
+    java.util.NavigableMap<String, OmKeyInfo> values = new java.util.TreeMap<>();
+    OmKeyInfo f1 = OMRequestTestUtils.createOmKeyInfo("vol1", "buck1", "file1", null).build();
+    OmKeyInfo f2 = OMRequestTestUtils.createOmKeyInfo("vol1", "buck1", "file2", null).build();
+    OmKeyInfo f3 = OMRequestTestUtils.createOmKeyInfo("vol1", "buck1", "file3", null).build();
+    OmKeyInfo f4 = OMRequestTestUtils.createOmKeyInfo("vol1", "buck1", "file4", null).build();
+    OmKeyInfo f5 = OMRequestTestUtils.createOmKeyInfo("vol1", "buck1", "file5", null).build();
+    values.put(prefix + "file1", f1);
+    values.put(prefix + "file2", f2);
+    values.put(prefix + "file3", f3);
+    values.put(prefix + "file4", f4);
+    values.put(prefix + "file5", f5);
+
+    Table<String, OmKeyInfo> fileTable = new StringInMemoryTestTable<>(values, "fileTable");
+    Mockito.when(omMetadataManager.getFileTable()).thenReturn(fileTable);
+    Mockito.when(omMetadataManager.getOzonePathKey(anyLong(), anyLong(), anyLong(), eq(""))).thenReturn(prefix);
+
+    OmKeyInfo parent = OMRequestTestUtils.createOmKeyInfo("vol1", "buck1", "dir1", null).setObjectID(100L).build();
+
+    // file3 is NOT reclaimable; others are
+    CheckedFunction<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter =
+        kv -> !kv.getValue().getKeyName().endsWith("file3");
+
+    DeleteKeysResult result = km.getPendingDeletionSubFiles(1L, 1L, parent, filter, 10);
+
+    assertEquals(4, result.getKeysToDelete().size()); // 1,2,4,5
+    assertTrue(result.isProcessedKeys());
+
+    List<DeleteKeysResult.ExclusiveRange> ranges = result.getKeyRanges();
+    assertEquals(2, ranges.size());
+
+    DeleteKeysResult.ExclusiveRange r1 = ranges.get(0);
+    DeleteKeysResult.ExclusiveRange r2 = ranges.get(1);
+
+    assertEquals(prefix + "file1", r1.getStartKey());
+    assertEquals(prefix + "file3", r1.getExclusiveEndKey());
+
+    assertEquals(prefix + "file4", r2.getStartKey());
+    assertEquals(org.apache.hadoop.hdds.StringUtils.getLexicographicallyHigherString(prefix), r2.getExclusiveEndKey());
+  }
+
+  @Test
+  public void testGetPendingDeletionSubFilesLimitHitsInsideRun() throws Exception {
+    OzoneConfiguration configuration = new OzoneConfiguration();
+    OMMetadataManager omMetadataManager = Mockito.mock(OMMetadataManager.class);
+    KeyManagerImpl km = new KeyManagerImpl(null, null, omMetadataManager, configuration, null, null, null);
+
+    String prefix = "/vol1/buck1/dir1/";
+    java.util.NavigableMap<String, OmKeyInfo> values = new java.util.TreeMap<>();
+    OmKeyInfo f1 = OMRequestTestUtils.createOmKeyInfo("vol1", "buck1", "file1", null).build();
+    OmKeyInfo f2 = OMRequestTestUtils.createOmKeyInfo("vol1", "buck1", "file2", null).build();
+    OmKeyInfo f3 = OMRequestTestUtils.createOmKeyInfo("vol1", "buck1", "file3", null).build();
+    values.put(prefix + "file1", f1);
+    values.put(prefix + "file2", f2);
+    values.put(prefix + "file3", f3);
+
+    Table<String, OmKeyInfo> fileTable = new StringInMemoryTestTable<>(values, "fileTable");
+    Mockito.when(omMetadataManager.getFileTable()).thenReturn(fileTable);
+    Mockito.when(omMetadataManager.getOzonePathKey(anyLong(), anyLong(), anyLong(), eq(""))).thenReturn(prefix);
+
+    OmKeyInfo parent = OMRequestTestUtils.createOmKeyInfo("vol1", "buck1", "dir1", null).setObjectID(100L).build();
+
+    CheckedFunction<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter = kv -> true;
+
+    // remainingNum = 2 -> we only pick file1, file2; file3 is still in iterator
+    DeleteKeysResult result = km.getPendingDeletionSubFiles(1L, 1L, parent, filter, 2);
+
+    assertEquals(2, result.getKeysToDelete().size());
+    assertFalse(result.isProcessedKeys());
+
+    List<DeleteKeysResult.ExclusiveRange> ranges = result.getKeyRanges();
+    assertEquals(1, ranges.size());
+    assertEquals(prefix + "file1", ranges.get(0).getStartKey());
+    assertEquals(prefix + "file3", ranges.get(0).getExclusiveEndKey()); // [file1, file3)
+  }
+
+  @Test
+  public void testGetPendingDeletionSubFilesFirstNonReclaimable() throws Exception {
+    OzoneConfiguration configuration = new OzoneConfiguration();
+    OMMetadataManager omMetadataManager = Mockito.mock(OMMetadataManager.class);
+    KeyManagerImpl km = new KeyManagerImpl(null, null, omMetadataManager, configuration, null, null, null);
+
+    String prefix = "/vol1/buck1/dir1/";
+    java.util.NavigableMap<String, OmKeyInfo> values = new java.util.TreeMap<>();
+    OmKeyInfo f1 = OMRequestTestUtils.createOmKeyInfo("vol1", "buck1", "file1", null).build();
+    OmKeyInfo f2 = OMRequestTestUtils.createOmKeyInfo("vol1", "buck1", "file2", null).build();
+    values.put(prefix + "file1", f1);
+    values.put(prefix + "file2", f2);
+
+    Table<String, OmKeyInfo> fileTable = new StringInMemoryTestTable<>(values, "fileTable");
+    Mockito.when(omMetadataManager.getFileTable()).thenReturn(fileTable);
+    Mockito.when(omMetadataManager.getOzonePathKey(anyLong(), anyLong(), anyLong(), eq(""))).thenReturn(prefix);
+
+    OmKeyInfo parent = OMRequestTestUtils.createOmKeyInfo("vol1", "buck1", "dir1", null).setObjectID(100L).build();
+
+    // file1 not reclaimable, file2 reclaimable
+    CheckedFunction<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter =
+        kv -> kv.getValue().getKeyName().endsWith("file2");
+
+    DeleteKeysResult result = km.getPendingDeletionSubFiles(1L, 1L, parent, filter, 10);
+
+    assertEquals(1, result.getKeysToDelete().size());
+    assertTrue(result.isProcessedKeys());
+
+    List<DeleteKeysResult.ExclusiveRange> ranges = result.getKeyRanges();
+    assertEquals(1, ranges.size());
+    assertEquals(prefix + "file2", ranges.get(0).getStartKey());
+    assertEquals(org.apache.hadoop.hdds.StringUtils.getLexicographicallyHigherString(prefix),
+        ranges.get(0).getExclusiveEndKey());
+  }
+
+  @Test
+  public void testGetPendingDeletionSubDirsFirstNonReclaimable() throws Exception {
+    OzoneConfiguration configuration = new OzoneConfiguration();
+    OMMetadataManager omMetadataManager = Mockito.mock(OMMetadataManager.class);
+    KeyManagerImpl km = new KeyManagerImpl(null, null, omMetadataManager, configuration, null, null, null);
+
+    String prefix = "/vol1/buck1/dir1/";
+    OmKeyInfo parent = OMRequestTestUtils.createOmKeyInfo("vol1", "buck1", "dir1", null).setObjectID(100L).build();
+    java.util.NavigableMap<String, OmDirectoryInfo> values = new java.util.TreeMap<>();
+    OmDirectoryInfo d2 = OMRequestTestUtils.createOmDirectoryInfo("dir2", 101, parent.getParentObjectID());
+    OmDirectoryInfo d3 = OMRequestTestUtils.createOmDirectoryInfo("dir3", 102, parent.getParentObjectID());
+    values.put(prefix + "dir2", d2);
+    values.put(prefix + "dir3", d3);
+
+    Table<String, OmDirectoryInfo> dirTable = new StringInMemoryTestTable<>(values, "directoryTable");
+    Mockito.when(omMetadataManager.getDirectoryTable()).thenReturn(dirTable);
+    Mockito.when(omMetadataManager.getOzonePathKey(anyLong(), anyLong(), anyLong(), eq(""))).thenReturn(prefix);
+
+    CheckedFunction<Table.KeyValue<String, OmKeyInfo>, Boolean, IOException> filter =
+        kv -> kv.getValue().getKeyName().endsWith("dir3");
+
+    DeleteKeysResult result = km.getPendingDeletionSubDirs(1L, 1L, parent, filter, 10);
+
+    assertEquals(1, result.getKeysToDelete().size());
+    assertTrue(result.isProcessedKeys());
+
+    List<DeleteKeysResult.ExclusiveRange> ranges = result.getKeyRanges();
+    assertEquals(1, ranges.size());
+    assertEquals(prefix + "dir3", ranges.get(0).getStartKey());
+    assertEquals(org.apache.hadoop.hdds.StringUtils.getLexicographicallyHigherString(prefix),
+        ranges.get(0).getExclusiveEndKey());
   }
 }

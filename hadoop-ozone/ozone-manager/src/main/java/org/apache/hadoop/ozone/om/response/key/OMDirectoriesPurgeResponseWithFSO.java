@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.OmUtils;
@@ -147,13 +148,17 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
         deletedSpaceOmMetadataManager.getDeletedDirTable().putWithBatch(deletedSpaceBatchOperation,
             ozoneDeleteKey, keyInfo);
 
-        keySpaceOmMetadataManager.getDirectoryTable().deleteWithBatch(keySpaceBatchOperation,
-            ozoneDbKey);
-
         if (LOG.isDebugEnabled()) {
           LOG.debug("markDeletedDirList KeyName: {}, DBKey: {}",
               keyInfo.getKeyName(), ozoneDbKey);
         }
+      }
+
+      for (HddsProtos.KeyValue keyRanges : path.getDeleteRangeSubDirsList()) {
+        keySpaceOmMetadataManager.getDirectoryTable()
+            .deleteRangeWithBatch(keySpaceBatchOperation, keyRanges.getKey(), keyRanges.getValue());
+        LOG.debug("Sub Directory delete range Start Key(inclusive): {} and End Key(exclusive): {}", keyRanges.getKey(),
+            keyRanges.getValue());
       }
 
       for (OzoneManagerProtocolProtos.KeyInfo key : deletedSubFilesList) {
@@ -161,11 +166,9 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
             .withCommittedKeyDeletedFlag(true);
         String ozoneDbKey = keySpaceOmMetadataManager.getOzonePathKey(volumeId,
             bucketId, keyInfo.getParentObjectID(), keyInfo.getFileName());
-        keySpaceOmMetadataManager.getKeyTable(getBucketLayout())
-            .deleteWithBatch(keySpaceBatchOperation, ozoneDbKey);
 
         if (LOG.isDebugEnabled()) {
-          LOG.info("Move keyName:{} to DeletedTable DBKey: {}",
+          LOG.debug("Move keyName:{} to DeletedTable DBKey: {}",
               keyInfo.getKeyName(), ozoneDbKey);
         }
 
@@ -180,6 +183,13 @@ public class OMDirectoriesPurgeResponseWithFSO extends OmKeyResponse {
 
         deletedSpaceOmMetadataManager.getDeletedTable().putWithBatch(deletedSpaceBatchOperation,
             deletedKey, repeatedOmKeyInfo);
+      }
+
+      for (HddsProtos.KeyValue keyRanges : path.getDeleteRangeSubFilesList()) {
+        keySpaceOmMetadataManager.getKeyTable(getBucketLayout())
+            .deleteRangeWithBatch(keySpaceBatchOperation, keyRanges.getKey(), keyRanges.getValue());
+        LOG.debug("Sub File delete range Start Key(inclusive): {} and End Key(exclusive): {}", keyRanges.getKey(),
+            keyRanges.getValue());
       }
 
       if (!openKeyInfoMap.isEmpty()) {

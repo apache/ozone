@@ -1475,6 +1475,8 @@ message PurgePathRequest {
   optional string deletedDir = 3;
   repeated KeyInfo deletedSubFiles = 4;
   repeated KeyInfo markDeletedSubDirs = 5;
+  repeated hadoop.hdds.KeyValue deleteRangeSubFiles = 6;
+  repeated hadoop.hdds.KeyValue deleteRangeSubDirs = 7;
 }
 
 message DeleteOpenKeysRequest {
