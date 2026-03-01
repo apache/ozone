@@ -140,7 +140,7 @@ public final class OmSnapshotManager implements AutoCloseable {
    * families before compaction.
    */
   public static final Set<String> COLUMN_FAMILIES_TO_TRACK_IN_SNAPSHOT =
-      RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK_IN_DAG;
+      RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK;
 
   private final long diffCleanupServiceInterval;
   private final int maxOpenSstFilesInSnapshotDb;

@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.om.snapshot;
 import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_DB_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED;
 import static org.apache.hadoop.ozone.om.lock.OMLockDetails.EMPTY_DETAILS_LOCK_NOT_ACQUIRED;
-import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK_IN_DAG;
+import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES_TO_TRACK;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.CacheLoader;
@@ -83,7 +83,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
   }
 
   private boolean shouldCompactTable(String tableName) {
-    return !COLUMN_FAMILIES_TO_TRACK_IN_DAG.contains(tableName);
+    return !COLUMN_FAMILIES_TO_TRACK.contains(tableName);
   }
 
   /**

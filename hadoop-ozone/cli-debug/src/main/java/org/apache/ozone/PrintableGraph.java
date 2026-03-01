@@ -17,8 +17,6 @@
 
 package org.apache.ozone.graph;
 
-import com.google.common.graph.EndpointPair;
-import com.google.common.graph.MutableGraph;
 import com.mxgraph.layout.hierarchical.mxHierarchicalLayout;
 import com.mxgraph.layout.mxIGraphLayout;
 import com.mxgraph.util.mxCellRenderer;
@@ -26,23 +24,36 @@ import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.List;
 import javax.imageio.ImageIO;
 import org.apache.commons.collections4.CollectionUtils;
-import org.apache.ozone.rocksdiff.CompactionNode;
+import org.apache.ozone.rocksdiff.FlushLinkedList;
+import org.apache.ozone.rocksdiff.FlushNode;
 import org.jgrapht.Graph;
 import org.jgrapht.ext.JGraphXAdapter;
 import org.jgrapht.graph.DefaultDirectedGraph;
 
 /**
- * Wrapped over {@link Graph} to get an image of {@link MutableGraph}.
+ * Wrapper to generate a visual graph image from {@link FlushLinkedList}.
+ * The graph represents flush operations in time order, with each node
+ * being an L0 SST file created by a flush operation.
  */
 public class PrintableGraph {
 
+  private static final String DATE_FORMAT_PATTERN = "yyyy-MM-dd HH:mm:ss";
+
   private final Graph<String, Edge> graph;
 
-  public PrintableGraph(MutableGraph<CompactionNode> guavaGraph,
-                        GraphType graphType) {
-    this.graph = getGraph(guavaGraph, graphType);
+  /**
+   * Create a printable graph from a FlushLinkedList.
+   *
+   * @param flushLinkedList The flush linked list to visualize
+   * @param graphType       How to label the nodes
+   */
+  public PrintableGraph(FlushLinkedList flushLinkedList, GraphType graphType) {
+    this.graph = getGraphFromFlushList(flushLinkedList, graphType);
   }
 
   public void generateImage(String fileName) throws IOException {
@@ -64,36 +75,56 @@ public class PrintableGraph {
   }
 
   /**
-   * Convert guava's {@link MutableGraph} to jgrapht's {@link Graph}.
+   * Convert a FlushLinkedList to a jgrapht Graph.
+   * The graph is a simple timeline where each flush node connects
+   * to the next one in chronological order.
+   *
+   * @param flushLinkedList The flush list to convert
+   * @param graphType       How to label the nodes
+   * @return A directed graph representing the flush timeline
    */
-  public Graph<String, Edge> getGraph(
-      MutableGraph<CompactionNode> guavaGraph,
-      GraphType graphType
-  ) {
+  private Graph<String, Edge> getGraphFromFlushList(
+      FlushLinkedList flushLinkedList,
+      GraphType graphType) {
 
-    Graph<String, Edge> jgrapht =
-        new DefaultDirectedGraph<>(Edge.class);
+    Graph<String, Edge> jgrapht = new DefaultDirectedGraph<>(Edge.class);
 
-    for (CompactionNode node : guavaGraph.nodes()) {
+    List<FlushNode> flushNodes = flushLinkedList.getFlushNodes();
+
+    if (flushNodes.isEmpty()) {
+      return jgrapht;
+    }
+
+    // Add all vertices
+    for (FlushNode node : flushNodes) {
       jgrapht.addVertex(getVertex(node, graphType));
     }
 
-    for (EndpointPair<CompactionNode> edge : guavaGraph.edges()) {
-      jgrapht.addEdge(getVertex(edge.source(), graphType),
-          getVertex(edge.target(), graphType));
+    // Add edges connecting consecutive nodes in time order
+    for (int i = 0; i < flushNodes.size() - 1; i++) {
+      FlushNode current = flushNodes.get(i);
+      FlushNode next = flushNodes.get(i + 1);
+      jgrapht.addEdge(
+          getVertex(current, graphType),
+          getVertex(next, graphType));
     }
 
     return jgrapht;
   }
 
-  private String getVertex(CompactionNode node, GraphType graphType) {
+  private String getVertex(FlushNode node, GraphType graphType) {
     switch (graphType) {
-    case KEY_SIZE:
-      return
-          node.getFileName() + "::" + node.getTotalNumberOfKeys();
-    case CUMULATIVE_SIZE:
-      return
-          node.getFileName() + "::" + node.getCumulativeKeysReverseTraversal();
+    case SEQUENCE_NUMBER:
+      return node.getFileName() + "\nseq=" + node.getSnapshotGeneration();
+    case FLUSH_TIME:
+      SimpleDateFormat dateFormat = new SimpleDateFormat(DATE_FORMAT_PATTERN);
+      String formattedTime = dateFormat.format(new Date(node.getFlushTime()));
+      return node.getFileName() + "\n" + formattedTime;
+    case DETAILED:
+      return String.format("%s%nseq=%d%ncf=%s",
+          node.getFileName(),
+          node.getSnapshotGeneration(),
+          node.getColumnFamily());
     case FILE_NAME:
     default:
       return node.getFileName();
@@ -101,22 +132,27 @@ public class PrintableGraph {
   }
 
   /**
-   * Enum to print different type of node's name in the graph image.
+   * Enum to specify how to label nodes in the graph image.
    */
   public enum GraphType {
     /**
-     * To use SST file name as node name.
+     * Show only SST file name.
      */
     FILE_NAME,
 
     /**
-     * To use SST file name and total key in the file as node name.
+     * Show SST file name and sequence number.
      */
-    KEY_SIZE,
+    SEQUENCE_NUMBER,
 
     /**
-     * To use SST file name and cumulative key as node name.
+     * Show SST file name and flush timestamp.
      */
-    CUMULATIVE_SIZE
+    FLUSH_TIME,
+
+    /**
+     * Show SST file name, sequence number, and column family.
+     */
+    DETAILED
   }
 }

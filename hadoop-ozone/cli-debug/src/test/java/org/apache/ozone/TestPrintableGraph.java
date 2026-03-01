@@ -19,39 +19,28 @@ package org.apache.ozone.graph;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.Mockito.when;
 
-import com.google.common.graph.MutableGraph;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-import org.apache.ozone.rocksdiff.CompactionNode;
-import org.junit.jupiter.api.extension.ExtendWith;
+import org.apache.ozone.rocksdiff.FlushLinkedList;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
  * This class is used for testing the PrintableGraph class.
  * It contains methods to test the generation and printing of graphs with different types.
  */
-@ExtendWith(MockitoExtension.class)
 public class TestPrintableGraph {
   @TempDir
   private Path dir;
 
-  @Mock
-  private MutableGraph<CompactionNode> mutableGraph;
-
   @ParameterizedTest
   @EnumSource(PrintableGraph.GraphType.class)
   void testPrintNoGraphMessage(PrintableGraph.GraphType graphType) {
-    PrintableGraph graph = new PrintableGraph(mutableGraph, graphType);
+    FlushLinkedList flushLinkedList = new FlushLinkedList();
+    PrintableGraph graph = new PrintableGraph(flushLinkedList, graphType);
     try {
       graph.generateImage(dir.resolve(graphType.name()).toString());
     } catch (IOException e) {
@@ -62,15 +51,19 @@ public class TestPrintableGraph {
   @ParameterizedTest
   @EnumSource(PrintableGraph.GraphType.class)
   void testPrintActualGraph(PrintableGraph.GraphType graphType) throws IOException {
-    Set<CompactionNode> nodes = Stream.of(
-        new CompactionNode("fileName1", 100, "startKey1", "endKey1", "columnFamily1"),
-        new CompactionNode("fileName2", 200, "startKey2", "endKey2", null),
-        new CompactionNode("fileName3", 300, null, "endKey3", "columnFamily3"),
-        new CompactionNode("fileName4", 400, "startKey4", null, "columnFamily4")
-    ).collect(Collectors.toSet());
-    when(mutableGraph.nodes()).thenReturn(nodes);
+    FlushLinkedList flushLinkedList = new FlushLinkedList();
 
-    PrintableGraph graph = new PrintableGraph(mutableGraph, graphType);
+    // Add flush nodes in time order
+    flushLinkedList.addFlush("000001", 100, 1000L,
+        "startKey1", "endKey1", "keyTable");
+    flushLinkedList.addFlush("000002", 200, 2000L,
+        "startKey2", "endKey2", "directoryTable");
+    flushLinkedList.addFlush("000003", 300, 3000L,
+        "startKey3", "endKey3", "fileTable");
+    flushLinkedList.addFlush("000004", 400, 4000L,
+        "startKey4", "endKey4", "keyTable");
+
+    PrintableGraph graph = new PrintableGraph(flushLinkedList, graphType);
     graph.generateImage(dir.resolve(graphType.name()).toString());
 
     assertTrue(Files.exists(dir.resolve(graphType.name())), "Graph hasn't been generated");

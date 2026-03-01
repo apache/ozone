@@ -44,6 +44,7 @@ import org.apache.hadoop.ozone.om.service.SnapshotDeletingService;
 import org.apache.hadoop.ozone.security.OzoneTokenIdentifier;
 import org.apache.hadoop.ozone.storage.proto.OzoneManagerStorageProtos.PersistedUserVolumeInfo;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
+import org.apache.ozone.compaction.log.FlushLogEntry;
 
 /**
  * OM database definitions.
@@ -315,6 +316,13 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
           StringCodec.get(),
           CompactionLogEntry.getCodec());
 
+  public static final String FLUSH_LOG_TABLE = "flushLogTable";
+  /** flushLogTable: dbTrxId-flushTime :- flushLogEntry. */
+  public static final DBColumnFamilyDefinition<String, FlushLogEntry> FLUSH_LOG_TABLE_DEF
+      = new DBColumnFamilyDefinition<>(FLUSH_LOG_TABLE,
+          StringCodec.get(),
+          FlushLogEntry.getCodec());
+
   //---------------------------------------------------------------------------
   private static final Map<String, DBColumnFamilyDefinition<?, ?>> COLUMN_FAMILIES
       = DBColumnFamilyDefinition.newUnmodifiableMap(
@@ -335,6 +343,7 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
           SNAPSHOT_INFO_TABLE_DEF,
           SNAPSHOT_RENAMED_TABLE_DEF,
           COMPACTION_LOG_TABLE_DEF,
+          FLUSH_LOG_TABLE_DEF,
           TENANT_ACCESS_ID_TABLE_DEF,
           TENANT_STATE_TABLE_DEF,
           TRANSACTION_INFO_TABLE_DEF,
