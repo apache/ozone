@@ -447,7 +447,7 @@ public abstract class TestOzoneManagerHAFollowerRead {
           // Linearizable read will fail with ReadIndexException if the follower does not recognize any leader
           // or leader is uncontactable. It will throw ReadException if the read submitted to Ratis encounters
           // timeout.
-          assertThat(e).hasMessageFindingMatch("OMRead(Index)?Exception");
+          assertThat(e).hasMessageFindingMatch("Read(Index)?Exception");
         } else if (e instanceof ConnectException) {
           assertThat(e).hasMessageContaining("Connection refused");
         } else {
