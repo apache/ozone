@@ -161,8 +161,10 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
           MULTIPART_FORM_DATA_BOUNDARY;
       connection.setRequestProperty("Content-Type", contentTypeValue);
       connection.setDoOutput(true);
-      writeFormData(connection,
-          HAUtils.getExistingFiles(getCandidateDir()));
+
+      List<String> existingFiles = useV2CheckpointApi ? HAUtils.getExistingFiles(getCandidateDir())
+          : HAUtils.getExistingSstFilesRelativeToDbDir(getCandidateDir());
+      writeFormData(connection, existingFiles);
 
       connection.connect();
       int errorCode = connection.getResponseCode();
