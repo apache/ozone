@@ -60,6 +60,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRespon
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.UpgradeFinalizationStatus;
 import org.apache.hadoop.hdds.scm.protocolPB.OzonePBHelper;
 import org.apache.hadoop.hdds.utils.FaultInjector;
+import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.OzoneManagerPrepareState;
@@ -94,8 +95,7 @@ import org.apache.hadoop.ozone.om.helpers.TenantUserList;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.request.util.OmResponseUtil;
-import org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator;
-import org.apache.hadoop.ozone.om.request.validation.ValidationCondition;
+import org.apache.hadoop.ozone.om.request.validation.OMClientVersionValidator;
 import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
 import org.apache.hadoop.ozone.om.upgrade.DisallowedUntilLayoutVersion;
@@ -657,10 +657,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return keyInfo.toProtobuf(clientVersion);
   }
 
-  @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+  @OMClientVersionValidator(
       processingPhase = RequestProcessingPhase.POST_PROCESS,
-      requestType = Type.LookupKey
+      requestType = Type.LookupKey,
+      applyBefore = ClientVersion.ERASURE_CODING_SUPPORT
   )
   public static OMResponse disallowLookupKeyResponseWithECReplicationConfig(
       OMRequest req, OMResponse resp, ValidationContext ctx)
@@ -684,10 +684,10 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp;
   }
 
-  @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+  @OMClientVersionValidator(
       processingPhase = RequestProcessingPhase.POST_PROCESS,
-      requestType = Type.LookupKey
+      requestType = Type.LookupKey,
+      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT
   )
   public static OMResponse disallowLookupKeyWithBucketLayout(
       OMRequest req, OMResponse resp, ValidationContext ctx)
@@ -771,8 +771,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp.build();
   }
 
-  @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+  @OMClientVersionValidator(
+      applyBefore = ClientVersion.ERASURE_CODING_SUPPORT,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.ListKeys
   )
@@ -798,8 +798,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp;
   }
 
-  @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+  @OMClientVersionValidator(
+      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.ListKeys
   )
@@ -839,8 +839,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp;
   }
 
-  @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+  @OMClientVersionValidator(
+      applyBefore = ClientVersion.ERASURE_CODING_SUPPORT,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.ListTrash
   )
@@ -869,8 +869,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp;
   }
 
-  @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+  @OMClientVersionValidator(
+      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.ListTrash
   )
@@ -1085,8 +1085,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return response;
   }
 
-  @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+  @OMClientVersionValidator(
+      applyBefore = ClientVersion.ERASURE_CODING_SUPPORT,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.GetFileStatus
   )
@@ -1114,8 +1114,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp;
   }
 
-  @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+  @OMClientVersionValidator(
+      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.GetFileStatus
   )
@@ -1163,8 +1163,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
         .build();
   }
 
-  @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+  @OMClientVersionValidator(
+      applyBefore = ClientVersion.ERASURE_CODING_SUPPORT,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.LookupFile
   )
@@ -1191,8 +1191,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp;
   }
 
-  @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+  @OMClientVersionValidator(
+      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.LookupFile
   )
@@ -1273,8 +1273,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return listStatusLightResponseBuilder.build();
   }
 
-  @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+  @OMClientVersionValidator(
+      applyBefore = ClientVersion.ERASURE_CODING_SUPPORT,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.ListStatus
   )
@@ -1301,8 +1301,8 @@ public class OzoneManagerRequestHandler implements RequestHandler {
     return resp;
   }
 
-  @RequestFeatureValidator(
-      conditions = ValidationCondition.OLDER_CLIENT_REQUESTS,
+  @OMClientVersionValidator(
+      applyBefore = ClientVersion.BUCKET_LAYOUT_SUPPORT,
       processingPhase = RequestProcessingPhase.POST_PROCESS,
       requestType = Type.ListStatus
   )

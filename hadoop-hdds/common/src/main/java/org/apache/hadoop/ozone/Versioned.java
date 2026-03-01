@@ -17,9 +17,17 @@
 
 package org.apache.hadoop.ozone;
 
+import java.util.Comparator;
+
 /**
  * Base class defining the version in the entire system.
  */
 public interface Versioned {
+  Comparator<Versioned> VERSIONED_COMPARATOR = Comparator.comparingInt(Versioned::version);
+
   int version();
+
+  static Comparator<Versioned> versionComparator() {
+    return VERSIONED_COMPARATOR;
+  }
 }
