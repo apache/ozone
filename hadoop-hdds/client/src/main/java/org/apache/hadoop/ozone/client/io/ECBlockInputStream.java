@@ -435,6 +435,12 @@ public class ECBlockInputStream extends BlockExtendedInputStream {
           + " from blockGroup " + stream.getBlockID() + " index "
           + currentStreamIndex() + 1);
     }
+
+    if (actualRead != expectedRead) {
+      throw new IOException(String.format(
+          "Inconsistent read for blockID=%s index=%d expectedRead=%d actualRead=%d",
+          stream.getBlockID(), currentStreamIndex() + 1, expectedRead, actualRead));
+    }
     return actualRead;
   }
 
