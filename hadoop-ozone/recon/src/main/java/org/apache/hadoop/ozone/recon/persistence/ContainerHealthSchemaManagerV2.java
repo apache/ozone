@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.apache.ozone.recon.schema.generated.tables.daos.UnhealthyContainersDao;
@@ -51,6 +52,20 @@ public class ContainerHealthSchemaManagerV2 {
   private static final Logger LOG =
       LoggerFactory.getLogger(ContainerHealthSchemaManagerV2.class);
   private static final int BATCH_INSERT_CHUNK_SIZE = 1000;
+
+  /**
+   * Maximum number of container IDs to include in a single
+   * {@code DELETE … WHERE container_id IN (…)} statement.
+   *
+   * <p>Derby's SQL compiler translates each prepared statement into a Java
+   * class.  A large IN-predicate generates a deeply nested expression tree
+   * whose compiled bytecode can exceed the JVM hard limit of 65,535 bytes
+   * per method (ERROR XBCM4).  Empirically, 5,000 IDs combined with the
+   * 7-state container_state IN-predicate generates ~148 KB — more than
+   * twice the limit.  1,000 IDs stays well under ~30 KB, providing a safe
+   * 2× margin.</p>
+   */
+  static final int MAX_DELETE_CHUNK_SIZE = 1_000;
 
   private final UnhealthyContainersDao unhealthyContainersV2Dao;
   private final ContainerSchemaDefinition containerSchemaDefinitionV2;
@@ -172,11 +187,20 @@ public class ContainerHealthSchemaManagerV2 {
    * This deletes all states generated from SCM/Recon health scans:
    * MISSING, EMPTY_MISSING, UNDER_REPLICATED, OVER_REPLICATED,
    * MIS_REPLICATED, NEGATIVE_SIZE and REPLICA_MISMATCH for all containers
-   * in the list in a single transaction.
+   * in the list.
    *
    * <p>REPLICA_MISMATCH is included here because it is re-evaluated on every
    * scan cycle (just like the SCM-sourced states); omitting it would leave
    * stale REPLICA_MISMATCH records in the table after a mismatch is resolved.
+   *
+   * <p><b>Derby bytecode limit:</b> Derby translates each SQL statement into
+   * a Java class whose methods must each stay under the JVM 64 KB bytecode
+   * limit.  A single {@code IN} predicate with more than ~2,000 values (when
+   * combined with the 7-state container_state filter) overflows this limit
+   * and causes {@code ERROR XBCM4}.  This method automatically partitions
+   * {@code containerIds} into chunks of at most {@value #MAX_DELETE_CHUNK_SIZE}
+   * IDs so callers never need to worry about the limit, regardless of how
+   * many containers a scan cycle processes.
    *
    * @param containerIds List of container IDs to delete states for
    */
@@ -186,24 +210,36 @@ public class ContainerHealthSchemaManagerV2 {
     }
 
     DSLContext dslContext = containerSchemaDefinitionV2.getDSLContext();
-    try {
-      int deleted = dslContext.deleteFrom(UNHEALTHY_CONTAINERS)
-          .where(UNHEALTHY_CONTAINERS.CONTAINER_ID.in(containerIds))
-          .and(UNHEALTHY_CONTAINERS.CONTAINER_STATE.in(
-              UnHealthyContainerStates.MISSING.toString(),
-              UnHealthyContainerStates.EMPTY_MISSING.toString(),
-              UnHealthyContainerStates.UNDER_REPLICATED.toString(),
-              UnHealthyContainerStates.OVER_REPLICATED.toString(),
-              UnHealthyContainerStates.MIS_REPLICATED.toString(),
-              UnHealthyContainerStates.NEGATIVE_SIZE.toString(),
-              UnHealthyContainerStates.REPLICA_MISMATCH.toString()))
-          .execute();
-      LOG.debug("Batch deleted {} health state records for {} containers",
-          deleted, containerIds.size());
-    } catch (Exception e) {
-      LOG.error("Failed to batch delete health states for {} containers", containerIds.size(), e);
-      throw new RuntimeException("Failed to batch delete health states", e);
+    int totalDeleted = 0;
+
+    // Chunk the container IDs so each DELETE statement stays within Derby's
+    // generated-bytecode limit (MAX_DELETE_CHUNK_SIZE IDs per statement).
+    for (int from = 0; from < containerIds.size(); from += MAX_DELETE_CHUNK_SIZE) {
+      int to = Math.min(from + MAX_DELETE_CHUNK_SIZE, containerIds.size());
+      List<Long> chunk = containerIds.subList(from, to);
+
+      try {
+        int deleted = dslContext.deleteFrom(UNHEALTHY_CONTAINERS)
+            .where(UNHEALTHY_CONTAINERS.CONTAINER_ID.in(chunk))
+            .and(UNHEALTHY_CONTAINERS.CONTAINER_STATE.in(
+                UnHealthyContainerStates.MISSING.toString(),
+                UnHealthyContainerStates.EMPTY_MISSING.toString(),
+                UnHealthyContainerStates.UNDER_REPLICATED.toString(),
+                UnHealthyContainerStates.OVER_REPLICATED.toString(),
+                UnHealthyContainerStates.MIS_REPLICATED.toString(),
+                UnHealthyContainerStates.NEGATIVE_SIZE.toString(),
+                UnHealthyContainerStates.REPLICA_MISMATCH.toString()))
+            .execute();
+        totalDeleted += deleted;
+      } catch (Exception e) {
+        LOG.error("Failed to batch delete health states for {} containers (chunk {}-{})",
+            chunk.size(), from, to, e);
+        throw new RuntimeException("Failed to batch delete health states", e);
+      }
     }
+
+    LOG.debug("Batch deleted {} health state records for {} containers",
+        totalDeleted, containerIds.size());
   }
 
   /**
@@ -263,10 +299,21 @@ public class ContainerHealthSchemaManagerV2 {
     query.addOrderBy(orderField);
     query.addLimit(limit);
 
+    // Pre-buffer `limit` rows per JDBC round-trip instead of Derby's default of 1 row.
+    query.fetchSize(limit);
+
     try {
-      return query.fetchInto(UnhealthyContainersRecord.class).stream()
-          .sorted(Comparator.comparingLong(UnhealthyContainersRecord::getContainerId))
-          .map(record -> new UnhealthyContainerRecordV2(
+      Stream<UnhealthyContainersRecord> stream =
+          query.fetchInto(UnhealthyContainersRecord.class).stream();
+
+      if (maxContainerId > 0) {
+        // Reverse-pagination path: SQL orders DESC (to get the last `limit` rows before
+        // maxContainerId); re-sort to ASC so callers always see ascending container IDs.
+        stream = stream.sorted(Comparator.comparingLong(UnhealthyContainersRecord::getContainerId));
+      }
+      // Forward-pagination path: SQL already orders ASC — no Java re-sort needed.
+
+      return stream.map(record -> new UnhealthyContainerRecordV2(
               record.getContainerId(),
               record.getContainerState(),
               record.getInStateSince(),
