@@ -332,7 +332,7 @@ public interface Table<KEY, VALUE> {
   /**
    * Class used to represent the key and value pair of a db entry.
    */
-  final class KeyValue<K, V> {
+  class KeyValue<K, V> {
     private final K key;
     private final V value;
     private final int valueByteSize;
@@ -379,6 +379,20 @@ public interface Table<KEY, VALUE> {
     }
   }
 
+  /**
+   * Class used to represent the key and value pair of a db entry which also supports closeable function to cleanup
+   * resources associated with the entry.
+   */
+  abstract class CloseableKeyValue<K, V> extends KeyValue<K, V> implements AutoCloseable {
+
+    private CloseableKeyValue(K key, V value, int valueByteSize) {
+      super(key, value, valueByteSize);
+    }
+
+    @Override
+    public abstract void close();
+  }
+
   static <K, V> KeyValue<K, V> newKeyValue(K key, V value) {
     return newKeyValue(key, value, -1);
   }
@@ -387,9 +401,27 @@ public interface Table<KEY, VALUE> {
     return new KeyValue<>(key, value, valueByteSize);
   }
 
+  static <K, V> CloseableKeyValue<K, V> newCloseableKeyValue(K key, V value, int valueByteSize, Runnable closeAction) {
+    return new CloseableKeyValue<K, V>(key, value, valueByteSize) {
+      @Override
+      public void close() {
+        closeAction.run();
+      }
+    };
+  }
+
+  static <K, V> CloseableKeyValue<K, V> newCloseableKeyValue(K key, V value, Runnable closeAction) {
+    return newCloseableKeyValue(key, value, -1, closeAction);
+  }
+
   /** A {@link TableIterator} to iterate {@link KeyValue}s. */
   interface KeyValueIterator<KEY, VALUE>
       extends TableIterator<KEY, KeyValue<KEY, VALUE>> {
+
+  }
+
+  /** A {@link TableIterator} to iterate {@link CloseableKeyValue}s. */
+  interface CloseableKeyValueIterator<K, V> extends TableIterator<K, CloseableKeyValue<K, V>> {
 
   }
 }

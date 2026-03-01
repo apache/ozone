@@ -17,29 +17,33 @@
 
 package org.apache.hadoop.hdds.utils.db;
 
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.hadoop.hdds.utils.db.Table.KeyValue;
+import org.apache.hadoop.hdds.utils.db.Table.KeyValueIterator;
+import org.apache.hadoop.hdds.utils.db.managed.ManagedReadOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.ratis.util.Preconditions;
+import org.apache.ratis.util.function.CheckedFunction;
 
 /**
  * Implement {@link RDBStoreAbstractIterator} using {@link CodecBuffer}.
  */
-class RDBStoreCodecBufferIterator extends RDBStoreAbstractIterator<CodecBuffer> {
+class RDBStoreCodecBufferIterator extends RDBStoreAbstractIterator<CodecBuffer, KeyValue<CodecBuffer, CodecBuffer>>
+    implements KeyValueIterator<CodecBuffer, CodecBuffer> {
 
   private final Buffer keyBuffer;
   private final Buffer valueBuffer;
   private final AtomicBoolean closed = new AtomicBoolean();
 
-  RDBStoreCodecBufferIterator(ManagedRocksIterator iterator, RDBTable table,
-      CodecBuffer prefix, IteratorType type) {
-    super(iterator, table, prefix, type);
+  RDBStoreCodecBufferIterator(
+      CheckedFunction<ManagedReadOptions, ManagedRocksIterator, RocksDatabaseException> itrSupplier, RDBTable table,
+      byte[] prefix, IteratorType type) throws RocksDatabaseException {
+    super(itrSupplier, table, prefix, type);
 
     final String name = table != null ? table.getName() : null;
     this.keyBuffer = new Buffer(
         new CodecBuffer.Capacity(name + "-iterator-key", 1 << 10),
-        // it has to read key for matching prefix.
-        getType().readKey() || prefix != null ? buffer -> getRocksDBIterator().get().key(buffer) : null);
+        getType().readKey() ? buffer -> getRocksDBIterator().get().key(buffer) : null);
     this.valueBuffer = new Buffer(
         new CodecBuffer.Capacity(name + "-iterator-value", 4 << 10),
         getType().readValue() ? buffer -> getRocksDBIterator().get().value(buffer) : null);
@@ -51,16 +55,9 @@ class RDBStoreCodecBufferIterator extends RDBStoreAbstractIterator<CodecBuffer> 
   }
 
   @Override
-  CodecBuffer key() {
+  KeyValue<CodecBuffer, CodecBuffer> getKeyValue() {
     assertOpen();
-    return keyBuffer.getFromDb();
-  }
-
-  @Override
-  Table.KeyValue<CodecBuffer, CodecBuffer> getKeyValue() {
-    assertOpen();
-    final CodecBuffer key = getType().readKey() ? key() : null;
-    return Table.newKeyValue(key, valueBuffer.getFromDb());
+    return Table.newKeyValue(keyBuffer.getFromDb(), valueBuffer.getFromDb());
   }
 
   @Override
@@ -76,23 +73,9 @@ class RDBStoreCodecBufferIterator extends RDBStoreAbstractIterator<CodecBuffer> 
   }
 
   @Override
-  boolean startsWithPrefix(CodecBuffer key) {
-    assertOpen();
-    final CodecBuffer prefix = getPrefix();
-    if (prefix == null) {
-      return true;
-    }
-    if (key == null) {
-      return false;
-    }
-    return key.startsWith(prefix);
-  }
-
-  @Override
   public void close() {
     if (closed.compareAndSet(false, true)) {
       super.close();
-      Optional.ofNullable(getPrefix()).ifPresent(CodecBuffer::release);
       keyBuffer.release();
       valueBuffer.release();
     }

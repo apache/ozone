@@ -232,7 +232,7 @@ public class TestTypedRDBTableStore {
   @Test
   public void testIteratorOnException() throws Exception {
     RDBTable rdbTable = mock(RDBTable.class);
-    when(rdbTable.iterator((CodecBuffer) null, IteratorType.KEY_AND_VALUE))
+    when(rdbTable.newCodecBufferIterator(null, IteratorType.KEY_AND_VALUE))
         .thenThrow(new RocksDatabaseException());
     final Table<String, String> testTable = new TypedTable<>(rdbTable,
         StringCodec.get(), StringCodec.get(), CacheType.PARTIAL_CACHE);

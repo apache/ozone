@@ -400,10 +400,10 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   @Override
   public KeyValueIterator<KEY, VALUE> iterator(KEY prefix, IteratorType type)
       throws RocksDatabaseException, CodecException {
+    final byte[] prefixBytes = encodeKey(prefix);
     if (supportCodecBuffer) {
-      return newCodecBufferTableIterator(prefix, type);
+      return newCodecBufferTableIterator(rawTable.newCodecBufferIterator(prefixBytes, type));
     } else {
-      final byte[] prefixBytes = encodeKey(prefix);
       return new TypedTableIterator(rawTable.iterator(prefixBytes, type));
     }
   }
@@ -491,27 +491,6 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
   @VisibleForTesting
   TableCache<KEY, VALUE> getCache() {
     return cache;
-  }
-
-  private RawIterator<CodecBuffer> newCodecBufferTableIterator(KEY prefix, IteratorType type)
-      throws RocksDatabaseException, CodecException {
-    final CodecBuffer encoded = encodeKeyCodecBuffer(prefix);
-    final CodecBuffer prefixBuffer;
-    if (encoded != null && encoded.readableBytes() == 0) {
-      encoded.release();
-      prefixBuffer = null;
-    } else {
-      prefixBuffer = encoded;
-    }
-
-    try {
-      return newCodecBufferTableIterator(rawTable.iterator(prefixBuffer, type));
-    } catch (Throwable t) {
-      if (prefixBuffer != null) {
-        prefixBuffer.release();
-      }
-      throw t;
-    }
   }
 
   private RawIterator<CodecBuffer> newCodecBufferTableIterator(KeyValueIterator<CodecBuffer, CodecBuffer> i) {
