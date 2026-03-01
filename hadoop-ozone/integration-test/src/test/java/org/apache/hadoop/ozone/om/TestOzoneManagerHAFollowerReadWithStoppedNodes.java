@@ -115,7 +115,7 @@ public class TestOzoneManagerHAFollowerReadWithStoppedNodes extends TestOzoneMan
     createVolumeTest(false);
     createKeyTest(false);
 
-    // Read requests will fail with either OMReadIndexException or OMReadException
+    // Read requests will fail with either ReadIndexException or ReadException
     listVolumes(false);
   }
 

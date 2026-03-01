@@ -444,8 +444,8 @@ public abstract class TestOzoneManagerHAFollowerRead {
         // ConnectException. Otherwise, we would get a RemoteException from the
         // last running OM as it would fail to get a quorum.
         if (e instanceof RemoteException) {
-          // Linearizable read will fail with OMReadIndexException if the follower does not recognize any leader
-          // or leader is uncontactable. It will throw OMReadException if the read submitted to Ratis encounters
+          // Linearizable read will fail with ReadIndexException if the follower does not recognize any leader
+          // or leader is uncontactable. It will throw ReadException if the read submitted to Ratis encounters
           // timeout.
           assertThat(e).hasMessageFindingMatch("OMRead(Index)?Exception");
         } else if (e instanceof ConnectException) {

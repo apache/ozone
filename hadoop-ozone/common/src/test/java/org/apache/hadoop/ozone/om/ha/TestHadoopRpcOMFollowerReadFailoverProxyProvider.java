@@ -58,8 +58,6 @@ import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
-import org.apache.hadoop.ozone.om.exceptions.OMReadException;
-import org.apache.hadoop.ozone.om.exceptions.OMReadIndexException;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.CreateKeyRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.GetKeyInfoRequest;
@@ -556,7 +554,7 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
             if (isThrowReadIndexException) {
               throw new ServiceException(
                   new RemoteException(
-                      OMReadIndexException.class.getCanonicalName(),
+                      ReadIndexException.class.getCanonicalName(),
                       "ReadIndex exception"
                   )
               );
@@ -564,7 +562,7 @@ public class TestHadoopRpcOMFollowerReadFailoverProxyProvider {
             if (isThrowReadException) {
               throw new ServiceException(
                   new RemoteException(
-                      OMReadException.class.getCanonicalName(),
+                      ReadException.class.getCanonicalName(),
                       "ReadException"
                   )
               );

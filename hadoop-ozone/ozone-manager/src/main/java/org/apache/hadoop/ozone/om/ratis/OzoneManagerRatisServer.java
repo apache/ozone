@@ -63,8 +63,6 @@ import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
-import org.apache.hadoop.ozone.om.exceptions.OMReadException;
-import org.apache.hadoop.ozone.om.exceptions.OMReadIndexException;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
 import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
@@ -614,16 +612,12 @@ public final class OzoneManagerRatisServer {
 
       ReadIndexException readIndexException = reply.getReadIndexException();
       if (readIndexException != null) {
-        throw new ServiceException(
-            OMReadIndexException.convertToOMReadIndexException(
-                readIndexException, getRaftPeerId()));
+        throw new ServiceException(readIndexException);
       }
 
       ReadException readException = reply.getReadException();
       if (readException != null) {
-        throw new ServiceException(
-            OMReadException.convertToOMReadException(
-                readException, getRaftPeerId()));
+        throw new ServiceException(readException);
       }
 
       StateMachineException stateMachineException =

@@ -42,11 +42,11 @@ import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
-import org.apache.hadoop.ozone.om.exceptions.OMReadException;
-import org.apache.hadoop.ozone.om.exceptions.OMReadIndexException;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.SecretManager;
+import org.apache.ratis.protocol.exceptions.ReadException;
+import org.apache.ratis.protocol.exceptions.ReadIndexException;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -440,16 +440,16 @@ public abstract class OMFailoverProxyProviderBase<T> implements
    * Unwrap the exception and return the wrapped ReadIndexException if any.
    *
    * @param exception exception to unwrap.
-   * @return the unwrapped OMReadIndexException or null if the wrapped
-   *         exception is not OMReadIndexException.
+   * @return the unwrapped ReadIndexException or null if the wrapped
+   *         exception is not ReadIndexException.
    */
-  public static OMReadIndexException getReadIndexException(Exception exception) {
+  public static ReadIndexException getReadIndexException(Exception exception) {
     Throwable cause = exception.getCause();
     if (cause instanceof RemoteException) {
       IOException ioException =
           ((RemoteException) cause).unwrapRemoteException();
-      if (ioException instanceof OMReadIndexException) {
-        return (OMReadIndexException) ioException;
+      if (ioException instanceof ReadIndexException) {
+        return (ReadIndexException) ioException;
       }
     }
     return null;
@@ -459,16 +459,16 @@ public abstract class OMFailoverProxyProviderBase<T> implements
    * Unwrap the exception and return the wrapped ReadException if any.
    *
    * @param exception exception to unwrap.
-   * @return the unwrapped OMReadException or null if the wrapped
-   *         exception is not OMReadException.
+   * @return the unwrapped ReadException or null if the wrapped
+   *         exception is not ReadException.
    */
-  public static OMReadException getReadException(Exception exception) {
+  public static ReadException getReadException(Exception exception) {
     Throwable cause = exception.getCause();
     if (cause instanceof RemoteException) {
       IOException ioException =
           ((RemoteException) cause).unwrapRemoteException();
-      if (ioException instanceof OMReadException) {
-        return (OMReadException) ioException;
+      if (ioException instanceof ReadException) {
+        return (ReadException) ioException;
       }
     }
     return null;

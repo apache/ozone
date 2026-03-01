@@ -40,12 +40,12 @@ import org.apache.hadoop.ipc_.RpcNoSuchProtocolException;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
-import org.apache.hadoop.ozone.om.exceptions.OMReadException;
-import org.apache.hadoop.ozone.om.exceptions.OMReadIndexException;
 import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyHint;
+import org.apache.ratis.protocol.exceptions.ReadException;
+import org.apache.ratis.protocol.exceptions.ReadIndexException;
 import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -307,16 +307,16 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
                 throw e;
               }
 
-              OMReadIndexException readIndexException = getReadIndexException(e);
+              ReadIndexException readIndexException = getReadIndexException(e);
               if (readIndexException != null) {
                 // This should trigger failover in the following shouldFailover
-                LOG.debug("Encountered OMReadIndexException from {}. ", current.proxyInfo);
+                LOG.debug("Encountered ReadIndexException from {}. ", current.proxyInfo);
               }
 
-              OMReadException readException = getReadException(e);
+              ReadException readException = getReadException(e);
               if (readException != null) {
                 // This should trigger failover in the following shouldFailover
-                LOG.debug("Encountered OMReadException from {}. ", current.proxyInfo);
+                LOG.debug("Encountered ReadException from {}. ", current.proxyInfo);
               }
             }
 
