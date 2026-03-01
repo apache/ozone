@@ -85,8 +85,8 @@ public class TestOmRatisSnapshotProvider {
       AuthenticationException {
     URL omCheckpointUrl = mock(URL.class);
     StringBuilder sb = getStringBuilder();
-    when(leader.getOMDBCheckpointEndpointUrl(anyBoolean(), anyBoolean()))
-        .thenReturn(omCheckpointUrl);
+    when(leader.getOMDBCheckpointEndpointUrl(anyBoolean(),
+        anyBoolean(), anyBoolean())).thenReturn(omCheckpointUrl);
 
     HttpURLConnection connection = mock(HttpURLConnection.class);
     when(connectionFactory.openConnection(any(URL.class), anyBoolean()))

@@ -98,6 +98,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.Parameter;
+import org.junit.jupiter.params.ParameterizedClass;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.rocksdb.RocksDB;
 import org.rocksdb.RocksDBException;
 import org.slf4j.Logger;
@@ -107,6 +110,8 @@ import org.slf4j.event.Level;
 /**
  * Tests the Ratis snapshots feature in OM.
  */
+@ParameterizedClass
+@ValueSource(booleans = {false, true})
 public class TestOMRatisSnapshots {
   // tried up to 1000 snapshots and this test works, but some of the
   //  timeouts have to be increased.
@@ -131,7 +136,8 @@ public class TestOMRatisSnapshots {
   private static final BucketLayout TEST_BUCKET_LAYOUT =
       BucketLayout.OBJECT_STORE;
   private OzoneClient client;
-  private GenericTestUtils.PrintStreamCapturer output;
+  @Parameter
+  private boolean useInodeBasedCheckpoint;
 
   @BeforeEach
   public void init(TestInfo testInfo) throws Exception {
@@ -141,6 +147,7 @@ public class TestOMRatisSnapshots {
         StorageUnit.KB);
     conf.setStorageSize(OMConfigKeys.
         OZONE_OM_RATIS_SEGMENT_PREALLOCATED_SIZE_KEY, 16, StorageUnit.KB);
+    conf.setBoolean(OMConfigKeys.OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_KEY, useInodeBasedCheckpoint);
     long snapshotThreshold = SNAPSHOT_THRESHOLD;
     // TODO: refactor tests to run under a new class with different configs.
     if (testInfo.getTestMethod().isPresent() &&
@@ -148,7 +155,6 @@ public class TestOMRatisSnapshots {
             .equals("testInstallSnapshot")) {
       snapshotThreshold = SNAPSHOT_THRESHOLD * 10;
       AuditLogTestUtils.enableAuditLog();
-      output = GenericTestUtils.captureOut();
     }
     conf.setLong(
         OMConfigKeys.OZONE_OM_RATIS_SNAPSHOT_AUTO_TRIGGER_THRESHOLD_KEY,
@@ -213,8 +219,8 @@ public class TestOMRatisSnapshots {
     List<Set<String>> sstSetList = new ArrayList<>();
     FaultInjector faultInjector =
         new SnapshotMaxSizeInjector(leaderOM,
-            followerOM.getOmSnapshotProvider().getSnapshotDir(),
-            sstSetList, tempDir);
+            followerOM.getOmSnapshotProvider().getSnapshotDir(), sstSetList,
+            tempDir, useInodeBasedCheckpoint);
     followerOM.getOmSnapshotProvider().setInjector(faultInjector);
 
     // Create some snapshots, each with new keys
@@ -288,8 +294,10 @@ public class TestOMRatisSnapshots {
 
     assertLogCapture(logCapture,
         "Install Checkpoint is finished");
-    assertThat(output.get()).contains("op=DB_CHECKPOINT_INSTALL {\"leaderId\":\"" + leaderOMNodeId + "\",\"term\":\"" +
-        leaderOMSnapshotTermIndex, "\"lastAppliedIndex\":\"" + followerOMLastAppliedIndex);
+    String toMatch = String.format(
+        "op=DB_CHECKPOINT_INSTALL {\"leaderId\":\"%s\",\"term\":\"%d\",\"lastAppliedIndex\":\"%d\"}",
+        leaderOMNodeId, leaderOMSnapshotTermIndex, followerOMLastAppliedIndex);
+    assertTrue(AuditLogTestUtils.auditLogContains(toMatch));
 
     // Read & Write after snapshot installed.
     List<String> newKeys = writeKeys(1);
@@ -313,11 +321,16 @@ public class TestOMRatisSnapshots {
     // Confirm that there was no overlap of sst files
     // between the individual tarballs.
     assertEquals(sstFileUnion.size(), sstFileCount);
-
-    output.reset();
   }
 
   private void checkSnapshot(OzoneManager leaderOM, OzoneManager followerOM,
+      String snapshotName,
+      List<String> keys, SnapshotInfo snapshotInfo) throws RocksDBException, IOException {
+    checkSnapshot(volumeName, bucketName, leaderOM, followerOM, snapshotName, keys, snapshotInfo);
+  }
+
+  static void checkSnapshot(String volumeName, String bucketName,
+      OzoneManager leaderOM, OzoneManager followerOM,
                              String snapshotName,
                              List<String> keys, SnapshotInfo snapshotInfo)
       throws IOException, RocksDBException {
@@ -1040,6 +1053,46 @@ public class TestOMRatisSnapshots {
     assertLogCapture(logCapture, msg);
   }
 
+  @Test
+  public void testInstallSnapshotFromLeaderFailedDownloadCleanupSucceeds()
+      throws Exception {
+    final String leaderOMNodeId = OmTestUtil.getCurrentOmProxyNodeId(objectStore);
+    OzoneManager leaderOM = cluster.getOzoneManager(leaderOMNodeId);
+    String followerNodeId = leaderOM.getPeerNodes().get(0).getNodeId();
+    if (cluster.isOMActive(followerNodeId)) {
+      followerNodeId = leaderOM.getPeerNodes().get(1).getNodeId();
+    }
+    OzoneManager followerOM = cluster.getOzoneManager(followerNodeId);
+    File candidateDir = followerOM.getOmSnapshotProvider().getCandidateDir();
+    assertTrue(candidateDir.exists(),
+        "Candidate dir should exist before download attempt");
+
+    // Inject fault: throw on first pause (after first download part, before untar)
+    FaultInjector faultInjector =
+        new ThrowOnPauseFaultInjector("Simulated download failure for test");
+    followerOM.getOmSnapshotProvider().setInjector(faultInjector);
+
+    // Advance leader so follower will need install snapshot when started
+    OzoneManagerRatisServer leaderRatisServer = leaderOM.getOmRatisServer();
+    writeKeysToIncreaseLogIndex(leaderRatisServer, 100);
+
+    // Start follower - Ratis will trigger install snapshot
+    cluster.startInactiveOM(followerNodeId);
+
+    // Wait for install snapshot attempt to complete (download fails, cleanup runs)
+    GenericTestUtils.waitFor(() -> {
+      return !candidateDir.exists() || (candidateDir.list() != null && candidateDir.list().length == 0);
+    }, 500, 10_000);
+
+    // Verify cleanup succeeded: candidate dir is empty
+    String[] filesInCandidate = candidateDir.exists() ? candidateDir.list() : new String[0];
+    assertNotNull(filesInCandidate);
+    assertEquals(0, filesInCandidate.length,
+        "Candidate dir should be cleaned after failed download");
+    // Clear injector
+    followerOM.getOmSnapshotProvider().setInjector(null);
+  }
+
   /**
    * Moves all contents from the checkpoint location into the omDbDir.
    * This reorganizes the checkpoint structure so that all checkpoint files
@@ -1097,6 +1150,12 @@ public class TestOMRatisSnapshots {
 
   private SnapshotInfo createOzoneSnapshot(OzoneManager leaderOM, String name)
       throws IOException {
+    return createOzoneSnapshot(objectStore, volumeName, bucketName, leaderOM, name);
+  }
+
+  static SnapshotInfo createOzoneSnapshot(ObjectStore objectStore, String volumeName, String bucketName,
+      OzoneManager leaderOM, String name)
+      throws IOException {
     objectStore.createSnapshot(volumeName, bucketName, name);
 
     String tableKey = SnapshotInfo.getTableKey(volumeName,
@@ -1130,6 +1189,10 @@ public class TestOMRatisSnapshots {
   }
 
   private List<String> writeKeys(long keyCount) throws IOException {
+    return writeKeys(ozoneBucket, keyCount);
+  }
+
+  static List<String> writeKeys(OzoneBucket ozoneBucket, long keyCount) throws IOException {
     List<String> keys = new ArrayList<>();
     long index = 0;
     while (index < keyCount) {
@@ -1193,13 +1256,16 @@ public class TestOMRatisSnapshots {
     private final File snapshotDir;
     private final List<Set<String>> sstSetList;
     private final Path tempDir;
+    private boolean useInodeBasedCheckpoint;
 
     SnapshotMaxSizeInjector(OzoneManager om, File snapshotDir,
-                            List<Set<String>> sstSetList, Path tempDir) {
+                            List<Set<String>> sstSetList, Path tempDir,
+        boolean useInodeBasedCheckpoint) {
       this.om = om;
       this.snapshotDir = snapshotDir;
       this.sstSetList = sstSetList;
       this.tempDir = tempDir;
+      this.useInodeBasedCheckpoint = useInodeBasedCheckpoint;
       init();
     }
 
@@ -1234,7 +1300,7 @@ public class TestOMRatisSnapshots {
     private long getSizeOfSstFiles(File tarball) throws IOException {
       FileUtil.unTar(tarball, tempDir.toFile());
       InodeMetadataRocksDBCheckpoint obtainedCheckpoint =
-          new InodeMetadataRocksDBCheckpoint(tempDir);
+          new InodeMetadataRocksDBCheckpoint(tempDir, useInodeBasedCheckpoint);
       assertNotNull(obtainedCheckpoint);
       Path omDbDir = Paths.get(obtainedCheckpoint.getCheckpointLocation().toString(), OM_DB_NAME);
       assertNotNull(omDbDir);
@@ -1293,6 +1359,23 @@ public class TestOMRatisSnapshots {
     @Override
     public void reset() throws IOException {
       init();
+    }
+  }
+
+  /**
+   * FaultInjector that throws IOException on pause(), simulating a download failure
+   * after the first part completes. Used to test cleanup on failed download.
+   */
+  private static class ThrowOnPauseFaultInjector extends FaultInjector {
+    private final IOException toThrow;
+
+    ThrowOnPauseFaultInjector(String message) {
+      this.toThrow = new IOException(message);
+    }
+
+    @Override
+    public void pause() throws IOException {
+      throw toThrow;
     }
   }
 }

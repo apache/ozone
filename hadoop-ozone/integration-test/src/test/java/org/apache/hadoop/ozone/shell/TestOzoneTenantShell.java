@@ -36,6 +36,7 @@ import java.nio.file.Path;
 import java.security.PrivilegedExceptionAction;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
@@ -353,7 +354,9 @@ public class TestOzoneTenantShell {
   @SuppressWarnings("methodlength")
   public void testOzoneTenantBasicOperations() throws IOException {
 
-    List<String> lines = FileUtils.readLines(AUDIT_LOG_FILE, (String)null);
+    List<String> lines = FileUtils.readLines(AUDIT_LOG_FILE, (String) null).stream()
+        .filter(line -> !line.contains("OMSystemAudit"))
+            .collect(Collectors.toList());
     assertEquals(0, lines.size());
 
     executeHA(tenantShell, new String[] {"list"});

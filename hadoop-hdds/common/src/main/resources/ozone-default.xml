@@ -1604,6 +1604,15 @@
   </property>
 
   <property>
+    <name>ozone.om.db.checkpoint.use.inode.based.transfer</name>
+    <value>true</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Denotes if the OM bootstrap inode based transfer implementation is set as default.
+    </description>
+  </property>
+
+  <property>
     <name>hdds.datanode.plugins</name>
     <value/>
     <description>
