@@ -57,6 +57,16 @@ jobs:
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           
           git clone --depth=1 --branch=master https://github.com/${{ github.repository_owner }}/ozone-site.git ozone-site
+          
+          # Check if automated-config-doc-update branch exists remotely
+          cd ozone-site
+          if git ls-remote --heads origin automated-config-doc-update | grep -q automated-config-doc-update; then
+            echo "PR branch exists, checking it out for comparison"
+            git fetch --depth=1 origin automated-config-doc-update
+            git checkout -B automated-config-doc-update FETCH_HEAD
+          else
+            echo "PR branch does not exist, staying on master for comparison"
+          fi
 
       - name: Check if documentation changed
         if: steps.check-site-repo.outputs.exists == 'true'
