@@ -35,6 +35,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocolPB.SCMSecurityProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.ha.InterSCMGrpcClient;
@@ -182,6 +183,13 @@ public class StorageContainerServiceProviderImpl
     reconUtils.untarCheckpointFile(targetFile, untarredDbDir);
     FileUtils.deleteQuietly(targetFile);
     return new RocksDBCheckpoint(untarredDbDir);
+  }
+
+  @Override
+  public List<ContainerID> getListOfContainerIDs(
+      ContainerID startContainerID, int count, HddsProtos.LifeCycleState state)
+      throws IOException {
+    return scmClient.getListOfContainerIDs(startContainerID, count, state);
   }
 
   @Override

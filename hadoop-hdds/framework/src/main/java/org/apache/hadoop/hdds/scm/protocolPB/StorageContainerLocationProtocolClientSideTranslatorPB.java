@@ -36,6 +36,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -109,6 +110,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMDeleteContainerRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerIDsRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerIDsResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
@@ -1241,6 +1244,33 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   @Override
   public void close() {
     RPC.stopProxy(rpcProxy);
+  }
+
+  @Override
+  public List<ContainerID> getListOfContainerIDs(
+      ContainerID startContainerID, int count, HddsProtos.LifeCycleState state)
+      throws IOException {
+    Preconditions.checkState(startContainerID.getId() >= 0,
+        "Container ID cannot be negative.");
+    Preconditions.checkState(count > 0,
+        "Container count must be greater than 0.");
+    SCMListContainerIDsRequestProto.Builder builder = SCMListContainerIDsRequestProto
+        .newBuilder();
+    builder.setStartContainerID(startContainerID.getProtobuf());
+    builder.setCount(count);
+    builder.setTraceID(TracingUtil.exportCurrentSpan());
+    builder.setState(state);
+
+    SCMListContainerIDsRequestProto request = builder.build();
+
+    SCMListContainerIDsResponseProto response =
+        submitRequest(Type.ListContainerIDs,
+            builder1 -> builder1.setScmListContainerIDsRequest(request))
+            .getScmListContainerIDsResponse();
+    return response.getContainerIDsList()
+        .stream()
+        .map(ContainerID::getFromProtobuf)
+        .collect(Collectors.toList());
   }
 
   @Override

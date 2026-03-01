@@ -55,6 +55,43 @@ public interface ContainerManager {
     return getContainers(ContainerID.valueOf(0), Integer.MAX_VALUE);
   }
 
+  default List<ContainerID> getContainerIDs() {
+    return getContainerIDs(ContainerID.valueOf(0), Integer.MAX_VALUE);
+  }
+
+  /**
+   * Returns container IDs under certain conditions.
+   * Search container IDs from start ID(exclusive),
+   * The max size of the searching range cannot exceed the
+   * value of count.
+   *
+   * @param startID start containerID, &gt;=0,
+   * start searching at the head if 0.
+   * @param count count must be &gt;= 0
+   *              Usually the count will be replaced with a very big
+   *              value instead of being unlimited in case the db is very big.
+   *
+   * @return a list of container IDs.
+   */
+  List<ContainerID> getContainerIDs(ContainerID startID, int count);
+
+  /**
+   * Returns container IDs under certain conditions.
+   * Search container IDs from start ID(exclusive),
+   * The max size of the searching range cannot exceed the
+   * value of count.
+   *
+   * @param startID start containerID, &gt;=0,
+   * start searching at the head if 0.
+   * @param count count must be &gt;= 0
+   *              Usually the count will be replaced with a very big
+   *              value instead of being unlimited in case the db is very big.
+   * @param state container state
+   *
+   * @return a list of container IDs.
+   */
+  List<ContainerID> getContainerIDs(ContainerID startID, int count, LifeCycleState state);
+
   /**
    * Returns containers under certain conditions.
    * Search container IDs from start ID(exclusive),

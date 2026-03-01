@@ -142,6 +142,21 @@ public class ContainerManagerImpl implements ContainerManager {
   }
 
   @Override
+  public List<ContainerID> getContainerIDs(final ContainerID startID,
+                                           final int count) {
+    scmContainerManagerMetrics.incNumListContainersOps();
+    return containerStateManager.getContainerIDs(startID, count);
+  }
+
+  @Override
+  public List<ContainerID> getContainerIDs(final ContainerID startID,
+                                           final int count,
+                                           final LifeCycleState state) {
+    scmContainerManagerMetrics.incNumListContainersOps();
+    return containerStateManager.getContainerIDs(state, startID, count);
+  }
+
+  @Override
   public List<ContainerInfo> getContainers(final ContainerID startID,
                                            final int count) {
     scmContainerManagerMetrics.incNumListContainersOps();

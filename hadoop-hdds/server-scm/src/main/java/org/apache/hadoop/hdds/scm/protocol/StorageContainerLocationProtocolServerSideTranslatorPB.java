@@ -17,10 +17,16 @@
 
 package org.apache.hadoop.hdds.scm.protocol;
 
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoRequestProto;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DatanodeUsageInfoRequestProto;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerCountRequestProto;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.NodeQueryRequestProto;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineRequestProto;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto.Error.errorPipelineAlreadyExists;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.PipelineResponseProto.Error.success;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto.Status.CONTAINER_ALREADY_CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto.Status.CONTAINER_ALREADY_CLOSING;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerIDsRequestProto;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.GetContainer;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.GetContainerWithPipeline;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.GetContainerWithPipelineBatch;
@@ -117,6 +123,7 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMCloseContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMDeleteContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMDeleteContainerResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerIDsResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SCMListContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.SafeModeRuleStatusProto;
@@ -752,6 +759,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
             .setStatus(Status.OK)
             .setReconcileContainerResponse(reconcileContainer(request.getReconcileContainerRequest()))
             .build();
+      case ListContainerIDs:
+        return ScmContainerLocationResponse.newBuilder()
+            .setCmdType(request.getCmdType())
+            .setStatus(Status.OK)
+            .setScmListContainerIDsResponse(listContainerIDs(request.getScmListContainerIDsRequest()))
+            .build();
       default:
         throw new IllegalArgumentException(
             "Unknown command type: " + request.getCmdType());
@@ -908,7 +921,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   }
 
   public NodeQueryResponseProto queryNode(
-      StorageContainerLocationProtocolProtos.NodeQueryRequestProto request,
+      NodeQueryRequestProto request,
       int clientVersion) throws IOException {
 
     HddsProtos.NodeOperationalState opState = null;
@@ -958,7 +971,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   }
 
   public PipelineResponseProto allocatePipeline(
-      StorageContainerLocationProtocolProtos.PipelineRequestProto request,
+      PipelineRequestProto request,
       int clientVersion) throws IOException {
     Pipeline pipeline = impl.createReplicationPipeline(
         request.getReplicationType(), request.getReplicationFactor(),
@@ -1234,7 +1247,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   }
 
   public ContainerBalancerStatusInfoResponseProto getContainerBalancerStatusInfo(
-          StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoRequestProto request)
+          ContainerBalancerStatusInfoRequestProto request)
           throws IOException {
     return impl.getContainerBalancerStatusInfo();
   }
@@ -1305,7 +1318,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   }
 
   public DatanodeUsageInfoResponseProto getDatanodeUsageInfo(
-      StorageContainerLocationProtocolProtos.DatanodeUsageInfoRequestProto
+      DatanodeUsageInfoRequestProto
           request, int clientVersion) throws IOException {
     List<HddsProtos.DatanodeUsageInfoProto> infoList;
 
@@ -1324,7 +1337,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   }
 
   public GetContainerCountResponseProto getContainerCount(
-      StorageContainerLocationProtocolProtos.GetContainerCountRequestProto
+      GetContainerCountRequestProto
       request) throws IOException {
 
     return GetContainerCountResponseProto.newBuilder()
@@ -1333,7 +1346,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   }
 
   public GetContainerCountResponseProto getClosedContainerCount(
-      StorageContainerLocationProtocolProtos.GetContainerCountRequestProto
+      GetContainerCountRequestProto
           request) throws IOException {
 
     return GetContainerCountResponseProto.newBuilder()
@@ -1396,4 +1409,23 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     return ReconcileContainerResponseProto.getDefaultInstance();
   }
 
+  public SCMListContainerIDsResponseProto listContainerIDs(SCMListContainerIDsRequestProto request) throws IOException {
+    ContainerID startContainerID = ContainerID.valueOf(0);
+
+    if (request.hasStartContainerID()) {
+      startContainerID = ContainerID.valueOf(request.getStartContainerID().getId());
+    }
+
+    SCMListContainerIDsResponseProto.Builder builder =
+        SCMListContainerIDsResponseProto.newBuilder();
+
+    List<ContainerID> containerIDs = impl.getListOfContainerIDs(
+        startContainerID, request.getCount(), request.getState());
+
+    containerIDs.stream()
+        .map(ContainerID::getProtobuf)
+        .forEach(builder::addContainerIDs);
+
+    return builder.build();
+  }
 }

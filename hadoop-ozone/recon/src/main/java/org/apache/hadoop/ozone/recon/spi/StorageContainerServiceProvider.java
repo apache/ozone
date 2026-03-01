@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon.spi;
 import java.io.IOException;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
@@ -78,6 +79,20 @@ public interface StorageContainerServiceProvider {
    * @return DBCheckpoint from SCM.
    */
   DBCheckpoint getSCMDBSnapshot();
+
+  /**
+   * Get the list of container IDs from SCM. This is an RPC call.
+   *
+   * @param startContainerID the start container id
+   * @param count the number of containers to return
+   * @param state the containers in given state to be returned
+   * @return the list of container IDs from SCM in a given state
+   * @throws IOException
+   */
+  List<ContainerID> getListOfContainerIDs(ContainerID startContainerID,
+                                          int count,
+                                          HddsProtos.LifeCycleState state)
+      throws IOException;
 
   /**
    * Get the list of containers from SCM. This is a RPC call.

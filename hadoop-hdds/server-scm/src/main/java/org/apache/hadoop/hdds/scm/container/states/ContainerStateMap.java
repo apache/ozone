@@ -109,6 +109,14 @@ public class ContainerStateMap {
       return entry == null ? null : entry.getInfo();
     }
 
+    List<ContainerID> getContainerIDs(ContainerID start, int count) {
+      Objects.requireNonNull(start, "start == null");
+      Preconditions.assertTrue(count >= 0, "count < 0");
+      return map.tailMap(start).keySet().stream()
+          .limit(count)
+          .collect(Collectors.toList());
+    }
+
     List<ContainerInfo> getInfos(ContainerID start, int count) {
       Objects.requireNonNull(start, "start == null");
       Preconditions.assertTrue(count >= 0, "count < 0");
@@ -258,6 +266,24 @@ public class ContainerStateMap {
     lifeCycleStateMap.update(currentState, newState, containerID);
     LOG.trace("Updated the container {} from {} to {}", containerID, currentState, newState);
     currentInfo.setState(newState);
+  }
+
+  public List<ContainerID> getContainerIDs(ContainerID start, int count) {
+    return containerMap.getContainerIDs(start, count);
+  }
+
+  /**
+   *
+   * @param state the state of the containers
+   * @param start the start id
+   * @param count the maximum size of the returned list
+   * @return a list of sorted {@link ContainerID}s
+   */
+  public List<ContainerID> getContainerIDs(LifeCycleState state, ContainerID start, int count) {
+    Preconditions.assertTrue(count >= 0, "count < 0");
+    return lifeCycleStateMap.tailMap(state, start).keySet().stream()
+        .limit(count)
+        .collect(Collectors.toList());
   }
 
   public List<ContainerInfo> getContainerInfos(ContainerID start, int count) {

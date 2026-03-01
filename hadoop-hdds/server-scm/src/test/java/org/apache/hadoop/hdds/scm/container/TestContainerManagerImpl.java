@@ -277,6 +277,21 @@ public class TestContainerManagerImpl {
   }
 
   @Test
+  void testGetContainerIds() throws IOException {
+    assertEquals(emptyList(), containerManager.getContainerIDs());
+
+    List<ContainerID> ids = new ArrayList<>();
+    for (int i = 0; i < 10; i++) {
+      ContainerInfo container = containerManager.allocateContainer(
+          RatisReplicationConfig.getInstance(ReplicationFactor.THREE), "admin");
+      ids.add(container.containerID());
+    }
+
+    assertEquals(ids, containerManager.getContainerIDs(ContainerID.MIN, 10));
+    assertEquals(ids.subList(0, 5), containerManager.getContainerIDs(ContainerID.MIN, 5));
+  }
+
+  @Test
   void testGetContainers() throws Exception {
     assertEquals(emptyList(), containerManager.getContainers());
 

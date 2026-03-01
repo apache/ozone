@@ -1507,6 +1507,28 @@ public class SCMClientProtocolServer implements
   }
 
   @Override
+  public List<ContainerID> getListOfContainerIDs(
+      ContainerID startContainerID, int count, HddsProtos.LifeCycleState state)
+      throws IOException {
+
+    final Map<String, String> auditMap = Maps.newHashMap();
+    auditMap.put("startContainerID", String.valueOf(startContainerID));
+    auditMap.put("count", String.valueOf(count));
+    auditMap.put("state", String.valueOf(state));
+    try {
+      List<ContainerID> results = scm.getContainerManager().getContainerIDs(
+          startContainerID, count, state);
+      AUDIT.logReadSuccess(buildAuditMessageForSuccess(
+          SCMAction.LIST_CONTAINER, auditMap));
+      return results;
+    } catch (Exception ex) {
+      AUDIT.logReadFailure(buildAuditMessageForFailure(
+          SCMAction.LIST_CONTAINER, auditMap, ex));
+      throw ex;
+    }
+  }
+
+  @Override
   public List<ContainerInfo> getListOfContainers(
       long startContainerID, int count, HddsProtos.LifeCycleState state)
       throws IOException {
