@@ -189,8 +189,8 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   private final UnderReplicatedProcessor underReplicatedProcessor;
   private final OverReplicatedProcessor overReplicatedProcessor;
   private final HealthCheck containerCheckChain;
-  private final ReplicationQueue nullReplicationQueue =
-      new NullReplicationQueue();
+  private final ReplicationQueue noOpsReplicationQueue =
+      new MonitoringReplicationQueue();
 
   /**
    * Constructs ReplicationManager instance with the given configuration.
@@ -1006,7 +1006,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   public boolean checkContainerStatus(ContainerInfo containerInfo,
       ReplicationManagerReport report) throws ContainerNotFoundException {
     report.increment(containerInfo.getState());
-    return processContainer(containerInfo, nullReplicationQueue, report, true);
+    return processContainer(containerInfo, noOpsReplicationQueue, report, true);
   }
 
   /**

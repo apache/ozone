@@ -97,7 +97,7 @@ import org.apache.hadoop.ozone.recon.api.types.MissingContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
-import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManagerV2;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
@@ -114,7 +114,6 @@ import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTaskOBS;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithFSO;
 import org.apache.hadoop.ozone.recon.tasks.ReconOmTask;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
-import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainers;
 import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -141,7 +140,7 @@ public class TestContainerEndpoint {
   private ReconContainerMetadataManager reconContainerMetadataManager;
   private ContainerEndpoint containerEndpoint;
   private boolean isSetupDone = false;
-  private ContainerHealthSchemaManager containerHealthSchemaManager;
+  private ContainerHealthSchemaManagerV2 containerHealthSchemaManager;
   private ReconOMMetadataManager reconOMMetadataManager;
   private OzoneConfiguration omConfiguration;
 
@@ -198,7 +197,7 @@ public class TestContainerEndpoint {
             .addBinding(StorageContainerServiceProvider.class,
                 mock(StorageContainerServiceProviderImpl.class))
             .addBinding(ContainerEndpoint.class)
-            .addBinding(ContainerHealthSchemaManager.class)
+            .addBinding(ContainerHealthSchemaManagerV2.class)
             .build();
 
     OzoneStorageContainerManager ozoneStorageContainerManager =
@@ -211,7 +210,7 @@ public class TestContainerEndpoint {
         reconTestInjector.getInstance(ReconContainerMetadataManager.class);
     containerEndpoint = reconTestInjector.getInstance(ContainerEndpoint.class);
     containerHealthSchemaManager =
-        reconTestInjector.getInstance(ContainerHealthSchemaManager.class);
+        reconTestInjector.getInstance(ContainerHealthSchemaManagerV2.class);
     this.reconNamespaceSummaryManager =
         reconTestInjector.getInstance(ReconNamespaceSummaryManager.class);
 
@@ -950,8 +949,8 @@ public class TestContainerEndpoint {
   public void testUnhealthyContainersFilteredResponse()
       throws IOException, TimeoutException {
     String missing = UnHealthyContainerStates.MISSING.toString();
-    String emptyMissing = UnHealthyContainerStates.EMPTY_MISSING.toString();
-    String negativeSize = UnHealthyContainerStates.NEGATIVE_SIZE.toString(); // For NEGATIVE_SIZE state
+    String emptyMissing = "EMPTY_MISSING";
+    String negativeSize = "NEGATIVE_SIZE";
 
     // Initial empty response verification
     Response response = containerEndpoint
@@ -973,8 +972,6 @@ public class TestContainerEndpoint {
     uuid3 = newDatanode("host3", "127.0.0.3");
     uuid4 = newDatanode("host4", "127.0.0.4");
     createUnhealthyRecords(5, 4, 3, 2, 1);
-    createEmptyMissingUnhealthyRecords(2); // For EMPTY_MISSING state
-    createNegativeSizeUnhealthyRecords(2); // For NEGATIVE_SIZE state
 
     // Check for unhealthy containers
     response = containerEndpoint.getUnhealthyContainers(missing, 1000, 0, 0);
@@ -1000,19 +997,19 @@ public class TestContainerEndpoint {
       assertEquals(missing, r.getContainerState());
     }
 
-    // Check for empty missing containers, should return zero
+    // Compatibility: legacy states should be valid filters and return empty.
     Response filteredEmptyMissingResponse = containerEndpoint
         .getUnhealthyContainers(emptyMissing, 1000, 0, 0);
     responseObject = (UnhealthyContainersResponse) filteredEmptyMissingResponse.getEntity();
     records = responseObject.getContainers();
     assertEquals(0, records.size());
 
-    // Check for negative size containers, should return zero
     Response filteredNegativeSizeResponse = containerEndpoint
         .getUnhealthyContainers(negativeSize, 1000, 0, 0);
     responseObject = (UnhealthyContainersResponse) filteredNegativeSizeResponse.getEntity();
     records = responseObject.getContainers();
     assertEquals(0, records.size());
+
   }
 
   @Test
@@ -1128,22 +1125,6 @@ public class TestContainerEndpoint {
     return uuid;
   }
 
-  private void createEmptyMissingUnhealthyRecords(int emptyMissing) {
-    int cid = 0;
-    for (int i = 0; i < emptyMissing; i++) {
-      createUnhealthyRecord(++cid, UnHealthyContainerStates.EMPTY_MISSING.toString(),
-          3, 3, 0, null, false);
-    }
-  }
-
-  private void createNegativeSizeUnhealthyRecords(int negativeSize) {
-    int cid = 0;
-    for (int i = 0; i < negativeSize; i++) {
-      createUnhealthyRecord(++cid, UnHealthyContainerStates.NEGATIVE_SIZE.toString(),
-          3, 3, 0, null, false); // Added for NEGATIVE_SIZE state
-    }
-  }
-
   private void createUnhealthyRecords(int missing, int overRep, int underRep,
                                       int misRep, int dataChecksum) {
     int cid = 0;
@@ -1176,18 +1157,11 @@ public class TestContainerEndpoint {
   private void createUnhealthyRecord(int id, String state, int expected,
                                      int actual, int delta, String reason, boolean dataChecksumMismatch) {
     long cID = Integer.toUnsignedLong(id);
-    UnhealthyContainers missing = new UnhealthyContainers();
-    missing.setContainerId(cID);
-    missing.setContainerState(state);
-    missing.setInStateSince(12345L);
-    missing.setActualReplicaCount(actual);
-    missing.setExpectedReplicaCount(expected);
-    missing.setReplicaDelta(delta);
-    missing.setReason(reason);
-
-    ArrayList<UnhealthyContainers> missingList = new ArrayList<>();
-    missingList.add(missing);
-    containerHealthSchemaManager.insertUnhealthyContainerRecords(missingList);
+    ArrayList<ContainerHealthSchemaManagerV2.UnhealthyContainerRecordV2> records =
+        new ArrayList<>();
+    records.add(new ContainerHealthSchemaManagerV2.UnhealthyContainerRecordV2(
+        cID, state, 12345L, expected, actual, delta, reason));
+    containerHealthSchemaManager.insertUnhealthyContainerRecords(records);
 
     long differentChecksum = dataChecksumMismatch ? 2345L : 1234L;
 
