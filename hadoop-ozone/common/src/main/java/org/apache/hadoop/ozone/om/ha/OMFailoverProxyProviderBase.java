@@ -45,6 +45,8 @@ import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.security.AccessControlException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.SecretManager;
+import org.apache.ratis.protocol.exceptions.ReadException;
+import org.apache.ratis.protocol.exceptions.ReadIndexException;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -429,6 +431,44 @@ public abstract class OMFailoverProxyProviderBase<T> implements
           ((RemoteException) cause).unwrapRemoteException();
       if (ioException instanceof OMNotLeaderException) {
         return (OMNotLeaderException) ioException;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Unwrap the exception and return the wrapped ReadIndexException if any.
+   *
+   * @param exception exception to unwrap.
+   * @return the unwrapped ReadIndexException or null if the wrapped
+   *         exception is not ReadIndexException.
+   */
+  public static ReadIndexException getReadIndexException(Exception exception) {
+    Throwable cause = exception.getCause();
+    if (cause instanceof RemoteException) {
+      IOException ioException =
+          ((RemoteException) cause).unwrapRemoteException();
+      if (ioException instanceof ReadIndexException) {
+        return (ReadIndexException) ioException;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Unwrap the exception and return the wrapped ReadException if any.
+   *
+   * @param exception exception to unwrap.
+   * @return the unwrapped ReadException or null if the wrapped
+   *         exception is not ReadException.
+   */
+  public static ReadException getReadException(Exception exception) {
+    Throwable cause = exception.getCause();
+    if (cause instanceof RemoteException) {
+      IOException ioException =
+          ((RemoteException) cause).unwrapRemoteException();
+      if (ioException instanceof ReadException) {
+        return (ReadException) ioException;
       }
     }
     return null;

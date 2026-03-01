@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.om.ha;
 
 import static org.apache.hadoop.ozone.om.ha.OMFailoverProxyProviderBase.getLeaderNotReadyException;
 import static org.apache.hadoop.ozone.om.ha.OMFailoverProxyProviderBase.getNotLeaderException;
+import static org.apache.hadoop.ozone.om.ha.OMFailoverProxyProviderBase.getReadException;
+import static org.apache.hadoop.ozone.om.ha.OMFailoverProxyProviderBase.getReadIndexException;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.RpcController;
@@ -42,6 +44,8 @@ import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyHint;
+import org.apache.ratis.protocol.exceptions.ReadException;
+import org.apache.ratis.protocol.exceptions.ReadIndexException;
 import org.apache.ratis.util.Preconditions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -301,6 +305,18 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
                 // Throw here to trigger retry since we already communicate to the leader
                 // If we break here instead, we will retry the same leader again without waiting
                 throw e;
+              }
+
+              ReadIndexException readIndexException = getReadIndexException(e);
+              if (readIndexException != null) {
+                // This should trigger failover in the following shouldFailover
+                LOG.debug("Encountered ReadIndexException from {}. ", current.proxyInfo);
+              }
+
+              ReadException readException = getReadException(e);
+              if (readException != null) {
+                // This should trigger failover in the following shouldFailover
+                LOG.debug("Encountered ReadException from {}. ", current.proxyInfo);
               }
             }
 

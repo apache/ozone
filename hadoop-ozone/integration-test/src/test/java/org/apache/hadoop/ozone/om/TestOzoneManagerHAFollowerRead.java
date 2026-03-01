@@ -434,6 +434,31 @@ public abstract class TestOzoneManagerHAFollowerRead {
     }
   }
 
+  protected void listVolumes(boolean checkSuccess)
+      throws Exception {
+    try {
+      getObjectStore().getClientProxy().listVolumes(null, null, 100);
+    } catch (IOException e) {
+      if (!checkSuccess) {
+        // If the last OM to be tried by the RetryProxy is down, we would get
+        // ConnectException. Otherwise, we would get a RemoteException from the
+        // last running OM as it would fail to get a quorum.
+        if (e instanceof RemoteException) {
+          // Linearizable read will fail with ReadIndexException if the follower does not recognize any leader
+          // or leader is uncontactable. It will throw ReadException if the read submitted to Ratis encounters
+          // timeout.
+          assertThat(e).hasMessageFindingMatch("Read(Index)?Exception");
+        } else if (e instanceof ConnectException) {
+          assertThat(e).hasMessageContaining("Connection refused");
+        } else {
+          assertThat(e).hasMessageContaining("Could not determine or connect to OM Leader");
+        }
+      } else {
+        throw e;
+      }
+    }
+  }
+
   protected void waitForLeaderToBeReady()
       throws InterruptedException, TimeoutException {
     // Wait for Leader Election timeout

@@ -90,6 +90,8 @@ import org.apache.ratis.protocol.SetConfigurationRequest;
 import org.apache.ratis.protocol.exceptions.LeaderNotReadyException;
 import org.apache.ratis.protocol.exceptions.LeaderSteppingDownException;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
+import org.apache.ratis.protocol.exceptions.ReadException;
+import org.apache.ratis.protocol.exceptions.ReadIndexException;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
@@ -606,6 +608,16 @@ public final class OzoneManagerRatisServer {
       LeaderSteppingDownException leaderSteppingDownException = reply.getLeaderSteppingDownException();
       if (leaderSteppingDownException != null) {
         throw new ServiceException(new OMNotLeaderException(leaderSteppingDownException.getMessage()));
+      }
+
+      ReadIndexException readIndexException = reply.getReadIndexException();
+      if (readIndexException != null) {
+        throw new ServiceException(readIndexException);
+      }
+
+      ReadException readException = reply.getReadException();
+      if (readException != null) {
+        throw new ServiceException(readException);
       }
 
       StateMachineException stateMachineException =
