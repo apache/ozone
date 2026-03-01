@@ -1150,4 +1150,38 @@ public class TestOmSnapshotLocalDataManager {
     // you would use the YamlSerializer
     snapshotLocalDataYamlSerializer.save(filePath.toFile(), localData);
   }
+
+  /**
+   * Tests the fix for the NoSuchFileException : when a purged snapshot (last in chain)
+   * has all its versions removed and YAML deleted by orphan check, it must NOT be
+   * re-added to snapshotToBeCheckedForOrphans. Otherwise the next orphan check run
+   * would try to load the deleted YAML and throw NoSuchFileException.
+   *
+   */
+  @Test
+  public void testPurgedSnapshotNotReAddedAfterYamlDeleted() throws Exception {
+    localDataManager = getNewOmSnapshotLocalDataManager();
+    List<UUID> snapshotIds = createSnapshotLocalData(localDataManager, 2);
+    UUID secondSnapId = snapshotIds.get(1);
+    // Simulate purge: set transactionInfo on S2's YAML (purge does this before orphan check runs)
+    try (WritableOmSnapshotLocalDataProvider writableProvider =
+             localDataManager.getWritableOmSnapshotLocalData(secondSnapId)) {
+      writableProvider.setTransactionInfo(TransactionInfo.valueOf(1, 1));
+      writableProvider.commit();
+    }
+    // S2 is last in chain - mark as purged so all versions get removed
+    purgedSnapshotIdMap.put(secondSnapId, true);
+    // Simulate purge adding S2 to orphan check list
+    localDataManager.getSnapshotToBeCheckedForOrphans().clear();
+    localDataManager.getSnapshotToBeCheckedForOrphans().put(secondSnapId, 1);
+    // Run full orphan check
+    java.lang.reflect.Method method = OmSnapshotLocalDataManager.class.getDeclaredMethod(
+        "checkOrphanSnapshotVersions", OMMetadataManager.class,
+        org.apache.hadoop.ozone.om.SnapshotChainManager.class);
+    method.setAccessible(true);
+    method.invoke(localDataManager, omMetadataManager, null);
+    // S2 should NOT be in the map
+    assertFalse(localDataManager.getSnapshotToBeCheckedForOrphans().containsKey(secondSnapId),
+        "Purged snapshot should not be re-added after YAML deleted");
+  }
 }
