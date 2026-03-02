@@ -25,12 +25,16 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancerConfiguration;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementCapacity;
 import org.apache.ozone.test.GenericTestUtils;
@@ -89,12 +93,13 @@ public class TestContainerBalancerOperations {
     Optional<Boolean> networkTopologyEnable = Optional.of(false);
     Optional<String> includeNodes = Optional.of("");
     Optional<String> excludeNodes = Optional.of("");
+    Optional<String> excludeContainers = Optional.of("");
     containerBalancerClient.startContainerBalancer(threshold, iterations,
         maxDatanodesPercentageToInvolvePerIteration,
         maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
         maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
         moveReplicationTimeout, networkTopologyEnable, includeNodes,
-        excludeNodes);
+        excludeNodes, excludeContainers);
     running = containerBalancerClient.getContainerBalancerStatus();
     assertTrue(running);
 
@@ -116,7 +121,7 @@ public class TestContainerBalancerOperations {
         maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
         maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
         moveReplicationTimeout, networkTopologyEnable, includeNodes,
-        excludeNodes);
+        excludeNodes, excludeContainers);
     running = containerBalancerClient.getContainerBalancerStatus();
     assertTrue(running);
 
@@ -143,6 +148,7 @@ public class TestContainerBalancerOperations {
     //CLI option for iterations and balancing interval is not passed
     Optional<Integer> iterations = Optional.empty();
     Optional<Integer> balancingInterval = Optional.empty();
+    String excludedContainersList = "1,2,3";
 
     //CLI options are passed
     Optional<Double> threshold = Optional.of(0.1);
@@ -156,12 +162,13 @@ public class TestContainerBalancerOperations {
     Optional<Boolean> networkTopologyEnable = Optional.of(true);
     Optional<String> includeNodes = Optional.of("");
     Optional<String> excludeNodes = Optional.of("");
+    Optional<String> excludeContainers = Optional.of(excludedContainersList);
     containerBalancerClient.startContainerBalancer(threshold, iterations,
             maxDatanodesPercentageToInvolvePerIteration,
             maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
             maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
             moveReplicationTimeout, networkTopologyEnable, includeNodes,
-            excludeNodes);
+            excludeNodes, excludeContainers);
     running = containerBalancerClient.getContainerBalancerStatus();
     assertTrue(running);
 
@@ -178,6 +185,9 @@ public class TestContainerBalancerOperations {
     //If config value is added in ozone-site.xml and CLI option is passed
     //then it takes the CLI option.
     assertEquals(100, config.getMaxDatanodesPercentageToInvolvePerIteration());
+
+    //Verifies that the 'excludeContainers' passed via CLI overrides the default empty set
+    assertEquals(parseContainerIDs(excludedContainersList), config.getExcludeContainers());
 
     containerBalancerClient.stopContainerBalancer();
     running = containerBalancerClient.getContainerBalancerStatus();
@@ -207,12 +217,13 @@ public class TestContainerBalancerOperations {
     Optional<Boolean> networkTopologyEnable = Optional.of(false);
     Optional<String> includeNodes = Optional.of("");
     Optional<String> excludeNodes = Optional.of("");
+    Optional<String> excludeContainers = Optional.of("");
     containerBalancerClient.startContainerBalancer(threshold, iterations,
         maxDatanodesPercentageToInvolvePerIteration,
         maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
         maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
         moveReplicationTimeout, networkTopologyEnable, includeNodes,
-        excludeNodes);
+        excludeNodes, excludeContainers);
     running = containerBalancerClient.getContainerBalancerStatus();
     assertTrue(running);
 
@@ -222,5 +233,12 @@ public class TestContainerBalancerOperations {
 
     // Calling stop balancer again should not throw an exception
     assertDoesNotThrow(() -> containerBalancerClient.stopContainerBalancer());
+  }
+
+  private Set<ContainerID> parseContainerIDs(String containerList) {
+    return Arrays.stream(containerList.split(","))
+        .map(Long::parseLong)
+        .map(ContainerID::valueOf)
+        .collect(Collectors.toSet());
   }
 }

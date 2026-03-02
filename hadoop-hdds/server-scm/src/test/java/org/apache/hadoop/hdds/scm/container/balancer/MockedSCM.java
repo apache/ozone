@@ -36,12 +36,14 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.PlacementPolicyValidateProxy;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplicaNotFoundException;
 import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
@@ -265,6 +267,11 @@ public final class MockedSCM {
       Mockito
           .when(mockedManager.manager.isContainerReplicatingOrDeleting(Mockito.any(ContainerID.class)))
           .thenReturn(false);
+
+      Mockito.when(mockedManager.manager.getContainerReplicationHealth(
+          Mockito.any(ContainerInfo.class), Mockito.anySet())).thenAnswer(invocationOnMock ->
+              new ContainerHealthResult.HealthyResult(
+                  invocationOnMock.getArgument(0, ContainerInfo.class)));
 
       Mockito
           .when(mockedManager.manager.getClock())

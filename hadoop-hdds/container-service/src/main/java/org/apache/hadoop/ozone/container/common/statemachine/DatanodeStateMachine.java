@@ -369,7 +369,6 @@ public class DatanodeStateMachine implements Closeable {
     reportManager.init();
     initCommandHandlerThread(conf);
 
-    upgradeFinalizer.runPrefinalizeStateActions(layoutStorage, this);
     LOG.info("Ozone container server started.");
     while (context.getState() != DatanodeStates.SHUTDOWN) {
       try {

@@ -29,6 +29,7 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProt
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.ListContainer;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.Type.ListPipelines;
 import static org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol.ADMIN_COMMAND_TYPE;
+import static org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol.FOLLOWER_READABLE_COMMAND_TYPES;
 
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
@@ -209,9 +210,12 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
   @Override
   public ScmContainerLocationResponse submitRequest(RpcController controller,
       ScmContainerLocationRequest request) throws ServiceException {
-    // not leader or not belong to admin command.
+    // Trigger not leader exception unless:
+    // This is the leader node, or this is an admin command, 
+    // or this is a follower-readable command.
     if (!scm.checkLeader()
-        && !ADMIN_COMMAND_TYPE.contains(request.getCmdType())) {
+        && !ADMIN_COMMAND_TYPE.contains(request.getCmdType())
+        && !FOLLOWER_READABLE_COMMAND_TYPES.contains(request.getCmdType())) {
       RatisUtil.checkRatisException(
           scm.getScmHAManager().getRatisServer().triggerNotLeaderException(),
           scm.getClientRpcPort(), scm.getScmId(), scm.getHostname(), ROLE_TYPE);
@@ -1141,6 +1145,7 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
     Optional<Boolean> networkTopologyEnable = Optional.empty();
     Optional<String> includeNodes = Optional.empty();
     Optional<String> excludeNodes = Optional.empty();
+    Optional<String> excludeContainers = Optional.empty();
 
     if (request.hasThreshold()) {
       threshold = Optional.of(request.getThreshold());
@@ -1201,12 +1206,16 @@ public final class StorageContainerLocationProtocolServerSideTranslatorPB
       excludeNodes = Optional.of(request.getExcludeNodes());
     }
 
+    if (request.hasExcludeContainers()) {
+      excludeContainers = Optional.of(request.getExcludeContainers());
+    }
+
     return impl.startContainerBalancer(threshold, iterations,
         maxDatanodesPercentageToInvolvePerIteration,
         maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
         maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
         moveReplicationTimeout, networkTopologyEnable, includeNodes,
-        excludeNodes);
+        excludeNodes, excludeContainers);
   }
 
   public StopContainerBalancerResponseProto stopContainerBalancer(

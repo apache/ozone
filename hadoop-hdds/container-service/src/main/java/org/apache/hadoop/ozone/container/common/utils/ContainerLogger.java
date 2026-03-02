@@ -214,6 +214,7 @@ public final class ContainerLogger {
         "SrcVolume=" + sourceVolume,
         "DestVolume=" + destinationVolume,
         "Size=" + containerSize + " bytes",
-        "TimeTaken=" + timeTaken + " ms");
+        "TimeTaken=" + timeTaken + " ms",
+        "Container is moved from SrcVolume to DestVolume");
   }
 }

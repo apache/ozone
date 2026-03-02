@@ -28,7 +28,8 @@
     <docker.hadoop.image>ghcr.io/apache/hadoop</docker.hadoop.image>
     <!-- suffix appended to Hadoop version to get Docker image version -->
     <docker.hadoop.image.flavor>-lean</docker.hadoop.image.flavor>
-    <docker.ozone-runner.version>20250625-2-jdk21</docker.ozone-runner.version>
+    <docker.ozone-runner.client.version>20260207-1-jdk8</docker.ozone-runner.client.version>
+    <docker.ozone-runner.version>20260206-2-jdk21</docker.ozone-runner.version>
     <docker.ozone-testkr5b.image>ghcr.io/apache/ozone-testkrb5:20241129-1</docker.ozone-testkr5b.image>
     <docker.ozone.image>apache/ozone</docker.ozone.image>
     <!-- suffix appended to Ozone version to get Docker image version; only used in xcompat test, to avoid old centos-based images -->
@@ -65,6 +66,16 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>ozone-cli-admin</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-cli-debug</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ozone</groupId>
+      <artifactId>ozone-cli-repair</artifactId>
       <scope>runtime</scope>
     </dependency>
     <dependency>
@@ -203,22 +214,6 @@
             </configuration>
           </execution>
           <execution>
-            <id>copy-and-filter-dockerfile</id>
-            <goals>
-              <goal>copy-resources</goal>
-            </goals>
-            <phase>compile</phase>
-            <configuration>
-              <outputDirectory>${project.build.directory}</outputDirectory>
-              <resources>
-                <resource>
-                  <directory>src/main/docker</directory>
-                  <filtering>true</filtering>
-                </resource>
-              </resources>
-            </configuration>
-          </execution>
-          <execution>
             <id>copy-k8s</id>
             <goals>
               <goal>copy-resources</goal>
@@ -317,7 +312,6 @@
                     <artifactItem>
                       <groupId>org.apache.ozone</groupId>
                       <artifactId>hdds-test-utils</artifactId>
-                      <classifier>tests</classifier>
                     </artifactItem>
                   </artifactItems>
                 </configuration>
@@ -367,54 +361,6 @@
       </build>
     </profile>
 
-    <profile>
-      <id>docker-build</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>io.fabric8</groupId>
-            <artifactId>docker-maven-plugin</artifactId>
-            <configuration>
-              <images>
-                <image>
-                  <name>${docker.image}</name>
-                  <build>
-                    <dockerFileDir>${project.build.directory}/ozone-${project.version}</dockerFileDir>
-                  </build>
-                </image>
-              </images>
-            </configuration>
-            <executions>
-              <execution>
-                <goals>
-                  <goal>build</goal>
-                </goals>
-                <phase>package</phase>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-    <profile>
-      <id>docker-push</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>io.fabric8</groupId>
-            <artifactId>docker-maven-plugin</artifactId>
-            <executions>
-              <execution>
-                <goals>
-                  <goal>push</goal>
-                </goals>
-                <phase>package</phase>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
     <profile>
       <id>dist</id>
       <build>

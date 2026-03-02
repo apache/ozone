@@ -38,6 +38,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_LISTENER_NODES_KE
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_PORT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyProto.READ_CONSISTENCY_UNSPECIFIED;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -171,28 +172,6 @@ public final class OmUtils {
       // The specified confKey is not set
       return null;
     }
-  }
-
-  /**
-   * Retrieve the socket address that should be used by clients to connect
-   * to OM.
-   * @param conf
-   * @return Target InetSocketAddress for the OM service endpoint.
-   */
-  public static InetSocketAddress getOmAddressForClients(
-      ConfigurationSource conf) {
-    final Optional<String> host = getHostNameFromConfigKeys(conf,
-        OZONE_OM_ADDRESS_KEY);
-
-    if (!host.isPresent()) {
-      throw new IllegalArgumentException(
-          OZONE_OM_ADDRESS_KEY + " must be defined. See" +
-              " https://wiki.apache.org/hadoop/Ozone#Configuration for" +
-              " details on configuring Ozone.");
-    }
-
-    return NetUtils.createSocketAddr(
-        host.get() + ":" + getOmRpcPort(conf));
   }
 
   /**
@@ -1148,5 +1127,11 @@ public final class OmUtils {
       LOG.error("Failure in resolving OM host address", e);
       throw e;
     }
+  }
+
+  public static boolean specifiedReadConsistency(OMRequest request) {
+    return request.hasReadConsistencyHint()
+        && request.getReadConsistencyHint().hasReadConsistency()
+        && request.getReadConsistencyHint().getReadConsistency() != READ_CONSISTENCY_UNSPECIFIED;
   }
 }

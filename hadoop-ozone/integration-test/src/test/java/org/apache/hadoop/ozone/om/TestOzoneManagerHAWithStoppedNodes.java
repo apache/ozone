@@ -71,7 +71,6 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.log4j.Logger;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.protocol.ClientId;
@@ -495,7 +494,6 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
         omFailoverProxyProvider.getWaitTime());
   }
 
-  @Flaky("HDDS-11353")
   @Test
   void testOMHAMetrics() throws Exception {
     // Get leader OM
@@ -512,6 +510,11 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     getCluster().shutdownOzoneManager(leaderOM);
     getCluster().restartOzoneManager(leaderOM, true);
     waitForLeaderToBeReady();
+
+    // Do some writes so that the old leader can receive AppendEntries
+    // which will trigger notifyLeaderChanged, instead of relying on
+    // AppendEntries
+    setupBucket();
 
     // Get the new leader
     OzoneManager newLeaderOM = getCluster().getOMLeader();

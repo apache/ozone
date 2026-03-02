@@ -209,7 +209,7 @@ public class DeletedBlockLogImpl
    *  leader.
    */
   public void onBecomeLeader() {
-    transactionStatusManager.clear();
+    transactionStatusManager.onBecomeLeader();
   }
 
   /**
