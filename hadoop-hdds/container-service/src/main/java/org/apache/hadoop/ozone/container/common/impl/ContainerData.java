@@ -402,7 +402,7 @@ public abstract class ContainerData {
    * Also decrement committed bytes against the bytes written.
    * @param bytes the number of bytes write into the container.
    */
-  private void incrWriteBytes(long bytes) {
+  public void incrWriteBytes(long bytes) {
     /*
        Increase the cached Used Space in VolumeInfo as it
        maybe not updated, DU or DedicatedDiskSpaceUsage runs
@@ -672,6 +672,14 @@ public abstract class ContainerData {
       }
       writeCount++;
       writeBytes += length;
+    }
+
+    /**
+     * Increment blockBytes by the given delta.
+     * This is used for overwrite operations that extend the file.
+     */
+    public synchronized void incrementBlockBytes(long delta) {
+      blockBytes += delta;
     }
 
     public synchronized void decDeletion(long deletedBytes, long processedBytes, long deletedBlockCount,

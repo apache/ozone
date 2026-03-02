@@ -273,7 +273,7 @@ public class TestFilePerBlockStrategy extends CommonChunkManagerTestCases {
     long afterOverwriteBlockBytes = containerData.getBytesUsed();
 
     long expectedDelta = (2 + overwriteData.length) - initialData.length; // 8 - 4 = 4
-    long expectedWriteBytes = initialData.length + overwriteData.length + expectedDelta;
+    long expectedWriteBytes = initialData.length + overwriteData.length; // 4 + 6 = 10
 
     assertEquals(afterFirstWriteUsedSpace + expectedDelta, afterOverwriteUsedSpace);
     assertEquals(afterFirstWriteBlockBytes + expectedDelta, afterOverwriteBlockBytes);
