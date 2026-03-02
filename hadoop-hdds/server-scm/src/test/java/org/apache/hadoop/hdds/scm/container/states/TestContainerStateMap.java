@@ -73,7 +73,4 @@ class TestContainerStateMap {
         .setReplicationConfig(StandaloneReplicationConfig.getInstance(THREE))
         .build();
   }
-
-
-
 }

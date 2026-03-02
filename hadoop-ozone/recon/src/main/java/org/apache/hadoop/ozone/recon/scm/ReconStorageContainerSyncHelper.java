@@ -105,7 +105,4 @@ class ReconStorageContainerSyncHelper {
             hadoopRPCSize / (double) CONTAINER_METADATA_SIZE));
     return containerCountPerCall;
   }
-
-
-
 }
