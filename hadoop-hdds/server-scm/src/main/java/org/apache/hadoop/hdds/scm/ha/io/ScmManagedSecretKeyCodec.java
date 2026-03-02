@@ -26,17 +26,17 @@ import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 /**
  * A codec for {@link ManagedSecretKey} objects.
  */
-public class ScmManagedSecretKeyCodec implements ScmCodec {
+public class ScmManagedSecretKeyCodec implements ScmCodec<ManagedSecretKey> {
   @Override
-  public ByteString serialize(Object object)
+  public ByteString serialize(ManagedSecretKey object)
       throws InvalidProtocolBufferException {
-    ManagedSecretKey secretKey = (ManagedSecretKey) object;
+    ManagedSecretKey secretKey = object;
     return UnsafeByteOperations.unsafeWrap(
         secretKey.toProtobuf().toByteString().asReadOnlyByteBuffer());
   }
 
   @Override
-  public Object deserialize(Class<?> type, ByteString value)
+  public ManagedSecretKey deserialize(Class<?> type, ByteString value)
       throws InvalidProtocolBufferException {
     try {
       SCMSecretKeyProtocolProtos.ManagedSecretKey message =

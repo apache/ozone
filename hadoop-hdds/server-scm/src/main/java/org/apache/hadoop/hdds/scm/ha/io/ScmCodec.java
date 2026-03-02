@@ -21,13 +21,14 @@ import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 
 /**
- * Codec interface to marshall/unmarshall data to/from {@link ByteString}.
+ * To serialize/deserialize Java objects to/from protobuf ByteString for SCM HA.
+ *
+ * @param <T>
  */
-public interface ScmCodec {
+public interface ScmCodec<T> {
 
-  ByteString serialize(Object object) throws InvalidProtocolBufferException;
+  ByteString serialize(T object) throws InvalidProtocolBufferException;
 
-  Object deserialize(Class<?> type, ByteString value)
-      throws InvalidProtocolBufferException;
+  T deserialize(Class<?> type, ByteString value) throws InvalidProtocolBufferException;
 
 }

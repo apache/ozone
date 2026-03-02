@@ -25,15 +25,15 @@ import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 /**
  * {@link ScmCodec} for {@code String} objects.
  */
-public class ScmStringCodec implements ScmCodec {
+public class ScmStringCodec implements ScmCodec<String> {
   @Override
-  public ByteString serialize(Object object) {
+  public ByteString serialize(String object) {
     // getBytes returns a new array
-    return UnsafeByteOperations.unsafeWrap(((String) object).getBytes(UTF_8));
+    return UnsafeByteOperations.unsafeWrap(object.getBytes(UTF_8));
   }
 
   @Override
-  public Object deserialize(Class<?> type, ByteString value) {
+  public String deserialize(Class<?> type, ByteString value) {
     return new String(value.toByteArray(), UTF_8);
   }
 }

@@ -19,23 +19,20 @@ package org.apache.hadoop.hdds.scm.ha.io;
 
 import com.google.common.primitives.Ints;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 
 /**
  * Encodes/decodes an integer to a byte string.
  */
-public class ScmIntegerCodec implements ScmCodec {
+public class ScmIntegerCodec implements ScmCodec<Integer> {
   @Override
-  public ByteString serialize(Object object)
-      throws InvalidProtocolBufferException {
+  public ByteString serialize(Integer object) {
     // toByteArray returns a new array
-    return UnsafeByteOperations.unsafeWrap(Ints.toByteArray((Integer) object));
+    return UnsafeByteOperations.unsafeWrap(Ints.toByteArray(object));
   }
 
   @Override
-  public Object deserialize(Class<?> type, ByteString value)
-      throws InvalidProtocolBufferException {
+  public Integer deserialize(Class<?> type, ByteString value) {
     return Ints.fromByteArray(value.toByteArray());
   }
 }

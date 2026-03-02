@@ -28,13 +28,13 @@ import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 /**
  * Codec for type X509Certificate.
  */
-public class ScmX509CertificateCodec implements ScmCodec {
+public class ScmX509CertificateCodec implements ScmCodec<X509Certificate> {
   @Override
-  public ByteString serialize(Object object)
+  public ByteString serialize(X509Certificate object)
       throws InvalidProtocolBufferException {
     try {
       String certString =
-          CertificateCodec.getPEMEncodedString((X509Certificate) object);
+          CertificateCodec.getPEMEncodedString(object);
       // getBytes returns a new array
       return UnsafeByteOperations.unsafeWrap(certString.getBytes(UTF_8));
     } catch (Exception ex) {
@@ -44,7 +44,7 @@ public class ScmX509CertificateCodec implements ScmCodec {
   }
 
   @Override
-  public Object deserialize(Class< ? > type, ByteString value)
+  public X509Certificate deserialize(Class< ? > type, ByteString value)
       throws InvalidProtocolBufferException {
     try {
       String pemEncodedCert = new String(value.toByteArray(), UTF_8);

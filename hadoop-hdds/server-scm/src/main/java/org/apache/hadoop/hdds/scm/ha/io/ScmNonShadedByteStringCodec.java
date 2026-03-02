@@ -18,26 +18,21 @@
 package org.apache.hadoop.hdds.scm.ha.io;
 
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 
 /**
  * {@link ScmCodec} implementation for non-shaded
  * {@link com.google.protobuf.ByteString} objects.
  */
-public class ScmNonShadedByteStringCodec implements ScmCodec {
+public class ScmNonShadedByteStringCodec implements ScmCodec<com.google.protobuf.ByteString> {
 
   @Override
-  public ByteString serialize(Object object)
-      throws InvalidProtocolBufferException {
-    return UnsafeByteOperations.unsafeWrap(
-        ((com.google.protobuf.ByteString) object).asReadOnlyByteBuffer());
+  public ByteString serialize(com.google.protobuf.ByteString object) {
+    return UnsafeByteOperations.unsafeWrap(object.asReadOnlyByteBuffer());
   }
 
   @Override
-  public Object deserialize(Class<?> type, ByteString value)
-      throws InvalidProtocolBufferException {
-    return com.google.protobuf.UnsafeByteOperations.
-        unsafeWrap(value.asReadOnlyByteBuffer());
+  public com.google.protobuf.ByteString deserialize(Class<?> type, ByteString value) {
+    return com.google.protobuf.UnsafeByteOperations.unsafeWrap(value.asReadOnlyByteBuffer());
   }
 }

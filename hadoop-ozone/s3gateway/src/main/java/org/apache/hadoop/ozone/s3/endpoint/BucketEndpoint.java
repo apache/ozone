@@ -97,13 +97,15 @@ public class BucketEndpoint extends EndpointBase {
   public Response get(
       @PathParam(BUCKET) String bucketName
   ) throws OS3Exception, IOException {
-    long startNanos = Time.monotonicNowNanos();
-    S3GAction s3GAction = S3GAction.GET_BUCKET;
-    PerformanceStringBuilder perf = new PerformanceStringBuilder();
+    S3RequestContext context = new S3RequestContext(this, S3GAction.GET_BUCKET);
+
+    long startNanos = context.getStartNanos();
+    S3GAction s3GAction = context.getAction();
+    PerformanceStringBuilder perf = context.getPerf();
 
     // Chain of responsibility: let each handler try to handle the request
     for (BucketOperationHandler handler : handlers) {
-      Response response = handler.handleGetRequest(bucketName);
+      Response response = handler.handleGetRequest(context, bucketName);
       if (response != null) {
         return response;  // Handler handled the request
       }
@@ -299,9 +301,11 @@ public class BucketEndpoint extends EndpointBase {
       InputStream body
   ) throws IOException, OS3Exception {
 
+    S3RequestContext context = new S3RequestContext(this, S3GAction.CREATE_BUCKET);
+
     // Chain of responsibility: let each handler try to handle the request
     for (BucketOperationHandler handler : handlers) {
-      Response response = handler.handlePutRequest(bucketName, body);
+      Response response = handler.handlePutRequest(context, bucketName, body);
       if (response != null) {
         return response;  // Handler handled the request
       }
@@ -400,8 +404,10 @@ public class BucketEndpoint extends EndpointBase {
   @DELETE
   public Response delete(@PathParam(BUCKET) String bucketName)
       throws IOException, OS3Exception {
+    S3RequestContext context = new S3RequestContext(this, S3GAction.DELETE_BUCKET);
+
     for (BucketOperationHandler handler : handlers) {
-      Response response = handler.handleDeleteRequest(bucketName);
+      Response response = handler.handleDeleteRequest(context, bucketName);
       if (response != null) {
         return response;
       }
@@ -507,7 +513,7 @@ public class BucketEndpoint extends EndpointBase {
     addHandler(new BucketCrudHandler());
   }
 
-  private <T extends EndpointBase & BucketOperationHandler> void addHandler(T handler) {
+  private void addHandler(BucketOperationHandler handler) {
     copyDependenciesTo(handler);
     handlers.add(handler);
   }
