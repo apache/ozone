@@ -69,6 +69,14 @@ public class TestFailoverWithSCMHA {
 
   private static final long SNAPSHOT_THRESHOLD = 5;
 
+  private static final String[][] OZONE_ADMIN_SCM_COMMANDS = {
+      {"datanode", "list"},
+      {"pipeline", "list"},
+      {"scm", "roles"},
+      {"container", "list"},
+      {"safemode", "status"}
+  };
+
   @BeforeEach
   public void init() throws Exception {
     conf = new OzoneConfiguration();
@@ -216,14 +224,6 @@ public class TestFailoverWithSCMHA {
       assertFalse(protobuf.getShouldRun());
     }
   }
-
-  private static final String[][] OZONE_ADMIN_SCM_COMMANDS = {
-      {"datanode", "list"},
-      {"pipeline", "list"},
-      {"scm", "roles"},
-      {"container", "list"},
-      {"safemode", "status"}
-  };
 
   /**
    * Verifies that when SCMs are unavailable, the CLI shows retry messages
