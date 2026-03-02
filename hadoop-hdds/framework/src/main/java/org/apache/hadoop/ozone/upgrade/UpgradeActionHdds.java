@@ -22,10 +22,9 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
-import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType;
 
 /**
- * Annotation to specify upgrade action run during specific phases.
+ * Annotation to specify upgrade action run during HDDS (SCM or Datanode) finalization.
  */
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
@@ -33,8 +32,6 @@ public @interface UpgradeActionHdds {
   HDDSLayoutFeature feature();
 
   Component component();
-
-  UpgradeActionType type();
 
   /**
    * Simple enum to denote if an action is for the SCM or the DN.

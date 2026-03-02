@@ -82,6 +82,7 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshotLocalData;
 import org.apache.hadoop.ozone.om.OmSnapshotLocalDataYaml;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
+import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.om.lock.DAGLeveledResource;
 import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager;
@@ -1024,6 +1025,48 @@ public class TestOmSnapshotLocalDataManager {
       }
     } else {
       assertEquals(ImmutableSet.of(), localDataManager.getVersionNodeMapUnmodifiable().keySet());
+    }
+  }
+
+  /**
+   * Regression test for NullPointerException in OmSnapshotManager#createCacheLoader.
+   * <p>
+   * isSnapshotPurged() now falls back to transactionInfo when getTableKey() returns null.
+   * A null transactionInfo means no purge was ever recorded for this snapshot in its YAML,
+   * so the snapshot is treated as active and the orphan check should correctly skip it.
+   */
+  @Test
+  public void testCheckOrphanSnapshotVersionsWithStaleSnapshotChain() throws IOException {
+    localDataManager = getNewOmSnapshotLocalDataManager();
+    UUID snapshotId = createSnapshotLocalData(localDataManager, 1).get(0);
+
+    // Snapshot must be in versionNodeMap before the orphan check.
+    assertNotNull(localDataManager.getVersionNodeMapUnmodifiable().get(snapshotId));
+
+    // Use the real isSnapshotPurged
+    snapshotUtilMock.when(() -> OmSnapshotManager.isSnapshotPurged(any(), any(), any(), any()))
+        .thenCallRealMethod();
+
+    // Simulate a stale SnapshotChainManager: getTableKey returns null for the
+    // snapshot because the snapshot chain has not been correctly updated
+    SnapshotChainManager staleChain = mock(SnapshotChainManager.class);
+    when(staleChain.getTableKey(snapshotId)).thenReturn(null);
+
+    localDataManager.checkOrphanSnapshotVersions(omMetadataManager, staleChain, snapshotId);
+
+    // Before the fix: isSnapshotPurged returned true for any null tableKey, so the snapshot
+    // was removed from versionNodeMap. getMeta() then returned null, causing NullPointerException
+
+    // After the fix: null transactionInfo means no purge has been recorded, assuming active snapshot.
+    // versionNodeMap entry will survive the orphan check. getMeta() will be non-null.
+
+    assertNotNull(localDataManager.getVersionNodeMapUnmodifiable().get(snapshotId),
+        "Active snapshot was removed erroneously from versionNodeMap due to stale SnapshotChainManager");
+
+    try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataMetaProvider provider =
+             localDataManager.getOmSnapshotLocalDataMeta(snapshotId)) {
+      assertNotNull(provider.getMeta(),
+          "getMeta() returned null. Calling getVersion() on it throws NullPointerException");
     }
   }
 

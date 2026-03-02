@@ -176,7 +176,7 @@ function ozonecmd_case
     ;;
     tenant)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.tenant.TenantShell
-      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-cli-shell"
     ;;
     csi)
       OZONE_SUBCMD_SUPPORTDAEMONIZATION="true"
@@ -196,7 +196,7 @@ function ozonecmd_case
     ;;
     daemonlog)
       OZONE_CLASSNAME=org.apache.hadoop.hdds.utils.LogLevel
-      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="hdds-server-framework"
     ;;
     insight)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.insight.Insight
@@ -222,13 +222,13 @@ function ozonecmd_case
     debug)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.debug.OzoneDebug
       OZONE_DEBUG_OPTS="${OZONE_DEBUG_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
-      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-cli-debug"
     ;;
     repair)
       check_running_ozone_services
       OZONE_CLASSNAME=org.apache.hadoop.ozone.repair.OzoneRepair
       OZONE_DEBUG_OPTS="${OZONE_DEBUG_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
-      OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+      OZONE_RUN_ARTIFACT_NAME="ozone-cli-repair"
     ;;
     ratis)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.OzoneRatis

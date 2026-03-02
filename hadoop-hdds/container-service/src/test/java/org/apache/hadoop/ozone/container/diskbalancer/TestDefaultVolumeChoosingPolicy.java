@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.diskbalancer;
 
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.HDDS_DATANODE_DIR_KEY;
 import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.getVolumeUsages;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -233,11 +234,9 @@ public class TestDefaultVolumeChoosingPolicy {
    * @param volumes List of volumes to add to volume set
    */
   private void setupVolumeSet(List<HddsVolume> volumes) throws IOException {
-    // Create volume set without any default volumes from configuration
     // Use a clean configuration to avoid loading default volumes
     OzoneConfiguration testConf = new OzoneConfiguration();
-    // Explicitly set HDDS_DATANODE_DIR_KEY to empty to prevent default volumes
-    testConf.set("hdds.datanode.dir.key", "");
+    testConf.set(HDDS_DATANODE_DIR_KEY, baseDir.resolve("defaultVolume").toString());
     volumeSet = new MutableVolumeSet(datanodeUuid, testConf, null,
         StorageVolume.VolumeType.DATA_VOLUME, null);
 
