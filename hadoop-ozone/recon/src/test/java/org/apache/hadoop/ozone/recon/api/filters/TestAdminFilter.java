@@ -209,7 +209,7 @@ public class TestAdminFilter {
     HttpServletResponse mockResponse = mock(HttpServletResponse.class);
     FilterChain mockFilterChain = mock(FilterChain.class);
 
-    ReconAdminFilter filter = new ReconAdminFilter(mockReconServer);
+    ReconAdminFilter filter = new ReconAdminFilter(mockReconServer, conf);
     filter.init(null);
     filter.doFilter(mockRequest, mockResponse, mockFilterChain);
 

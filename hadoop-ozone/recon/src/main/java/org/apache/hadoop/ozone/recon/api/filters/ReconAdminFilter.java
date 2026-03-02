@@ -30,9 +30,6 @@ import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.recon.ReconConfigKeys;
-import org.apache.hadoop.hdds.server.OzoneAdmins;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneSecurityUtil;
 import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -50,10 +47,12 @@ public class ReconAdminFilter implements Filter {
       LoggerFactory.getLogger(ReconAdminFilter.class);
 
   private final ReconServer reconServer;
+  private final OzoneConfiguration conf;
 
   @Inject
-  ReconAdminFilter(ReconServer reconServer) {
+  ReconAdminFilter(ReconServer reconServer, OzoneConfiguration conf) {
     this.reconServer = reconServer;
+    this.conf = conf;
   }
 
   @Override
@@ -103,6 +102,11 @@ public class ReconAdminFilter implements Filter {
   public void destroy() { }
 
   private boolean hasPermission(UserGroupInformation user) {
+    // Check authorization first - only check admin if authorization is enabled
+    if (!isAdminAuthorizationEnabled()) {
+      return true;  // Authorization disabled, allow all
+    }
+    
     return reconServer.isAdmin(user);
   }
 
