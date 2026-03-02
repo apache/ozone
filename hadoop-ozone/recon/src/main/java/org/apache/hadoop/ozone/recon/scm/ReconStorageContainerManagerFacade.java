@@ -62,18 +62,15 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
 import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.block.BlockManager;
 import org.apache.hadoop.hdds.scm.container.CloseContainerEventHandler;
 import org.apache.hadoop.hdds.scm.container.ContainerActionsHandler;
-import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.IncrementalContainerReportHandler;
 import org.apache.hadoop.hdds.scm.container.balancer.ContainerBalancer;
-import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementPolicyFactory;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.SCMContainerPlacementMetrics;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
@@ -170,6 +167,7 @@ public class ReconStorageContainerManagerFacade
 
   private AtomicBoolean isSyncDataFromSCMRunning;
   private final String threadNamePrefix;
+  private final ReconStorageContainerSyncHelper containerSyncHelper;
 
   // To Do :- Refactor the constructor in a separate JIRA
   @Inject
@@ -352,6 +350,12 @@ public class ReconStorageContainerManagerFacade
     reconSafeModeMgrTask = new ReconSafeModeMgrTask(
         containerManager, nodeManager, safeModeManager,
         reconTaskConfig, ozoneConfiguration);
+
+    containerSyncHelper = new ReconStorageContainerSyncHelper(
+        scmServiceProvider,
+        ozoneConfiguration,
+        containerManager
+    );
   }
 
   /**
@@ -534,71 +538,13 @@ public class ReconStorageContainerManagerFacade
   }
 
   public boolean syncWithSCMContainerInfo()
-      throws IOException {
+      throws Exception {
     if (isSyncDataFromSCMRunning.compareAndSet(false, true)) {
-      try {
-        List<ContainerID> containerIDs = containerManager.getContainerIDs();
-
-        long totalContainerCount = scmServiceProvider.getContainerCount(
-            HddsProtos.LifeCycleState.CLOSED);
-        long containerCountPerCall =
-            getContainerCountPerCall(totalContainerCount);
-        ContainerID startContainerId = ContainerID.valueOf(1);
-        long retrievedContainerCount = 0;
-        if (totalContainerCount > 0) {
-          while (retrievedContainerCount < totalContainerCount) {
-            List<ContainerID> listOfContainers = scmServiceProvider.
-                getListOfContainerIDs(startContainerId,
-                    Long.valueOf(containerCountPerCall).intValue(),
-                    HddsProtos.LifeCycleState.CLOSED);
-            if (null != listOfContainers && !listOfContainers.isEmpty()) {
-              LOG.info("Got list of containers from SCM : " +
-                  listOfContainers.size());
-              listOfContainers.forEach(containerID -> {
-                boolean isContainerPresentAtRecon =
-                    containerIDs.contains(containerID);
-                if (!isContainerPresentAtRecon) {
-                  try {
-                    ContainerWithPipeline containerWithPipeline =
-                        scmServiceProvider.getContainerWithPipeline(
-                            containerID.getId());
-                    containerManager.addNewContainer(containerWithPipeline);
-                  } catch (IOException e) {
-                    LOG.error("Could not get container with pipeline " +
-                        "for container : {}", containerID);
-                  }
-                }
-              });
-              long lastID = listOfContainers.get(listOfContainers.size() - 1).getId();
-              startContainerId = ContainerID.valueOf(lastID + 1);
-            } else {
-              LOG.info("No containers found at SCM in CLOSED state");
-              return false;
-            }
-            retrievedContainerCount += containerCountPerCall;
-          }
-        }
-      } catch (IOException e) {
-        LOG.error("Unable to refresh Recon SCM DB Snapshot. ", e);
-        return false;
-      }
+      return containerSyncHelper.syncWithSCMContainerInfo();
     } else {
       LOG.debug("SCM DB sync is already running.");
       return false;
     }
-    return true;
-  }
-
-  private long getContainerCountPerCall(long totalContainerCount) {
-    // Assumption of size of 1 container info object here is 1 MB
-    long containersMetaDataTotalRpcRespSizeMB =
-        CONTAINER_METADATA_SIZE * totalContainerCount;
-    long hadoopRPCSize = ozoneConfiguration.getInt(IPC_MAXIMUM_DATA_LENGTH, IPC_MAXIMUM_DATA_LENGTH_DEFAULT);
-    long containerCountPerCall = containersMetaDataTotalRpcRespSizeMB <=
-        hadoopRPCSize ? totalContainerCount :
-        Math.round(Math.floor(
-            hadoopRPCSize / (double) CONTAINER_METADATA_SIZE));
-    return containerCountPerCall;
   }
 
   private void deleteOldSCMDB() throws IOException {

@@ -109,14 +109,6 @@ public class ContainerStateMap {
       return entry == null ? null : entry.getInfo();
     }
 
-    List<ContainerID> getContainerIDs(ContainerID start, int count) {
-      Objects.requireNonNull(start, "start == null");
-      Preconditions.assertTrue(count >= 0, "count < 0");
-      return map.tailMap(start).keySet().stream()
-          .limit(count)
-          .collect(Collectors.toList());
-    }
-
     List<ContainerInfo> getInfos(ContainerID start, int count) {
       Objects.requireNonNull(start, "start == null");
       Preconditions.assertTrue(count >= 0, "count < 0");
@@ -266,10 +258,6 @@ public class ContainerStateMap {
     lifeCycleStateMap.update(currentState, newState, containerID);
     LOG.trace("Updated the container {} from {} to {}", containerID, currentState, newState);
     currentInfo.setState(newState);
-  }
-
-  public List<ContainerID> getContainerIDs(ContainerID start, int count) {
-    return containerMap.getContainerIDs(start, count);
   }
 
   /**

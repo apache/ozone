@@ -266,13 +266,6 @@ public final class ContainerStateManagerImpl
   }
 
   @Override
-  public List<ContainerID> getContainerIDs(ContainerID start, int count) {
-    try (AutoCloseableLock ignored = readLock()) {
-      return containers.getContainerIDs(start, count);
-    }
-  }
-
-  @Override
   public List<ContainerID> getContainerIDs(LifeCycleState state, ContainerID start, int count) {
     try (AutoCloseableLock ignored = readLock()) {
       return containers.getContainerIDs(state, start, count);

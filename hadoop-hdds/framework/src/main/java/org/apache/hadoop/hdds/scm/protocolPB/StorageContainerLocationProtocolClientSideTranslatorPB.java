@@ -1274,13 +1274,6 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   }
 
   @Override
-  public List<ContainerInfo> getListOfContainers(
-      long startContainerID, int count, HddsProtos.LifeCycleState state)
-      throws IOException {
-    return listContainer(startContainerID, count, state).getContainerInfoList();
-  }
-
-  @Override
   public DecommissionScmResponseProto decommissionScm(
       String scmId) throws IOException {
 
