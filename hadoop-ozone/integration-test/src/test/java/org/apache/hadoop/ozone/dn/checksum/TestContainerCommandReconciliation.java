@@ -57,6 +57,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_KEYTAB_F
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_KERBEROS_PRINCIPAL_KEY;
 import static org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod.KERBEROS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -68,6 +69,7 @@ import java.net.InetAddress;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
@@ -482,6 +484,130 @@ public class TestContainerCommandReconciliation {
         newContainerChecksumInfo.getContainerMerkleTree());
     assertEquals(oldDataChecksum, newContainerChecksumInfo.getContainerMerkleTree().getDataChecksum());
     TestHelper.validateData(KEY_NAME, data, store, volume, bucket);
+  }
+
+  /**
+   * Setup:
+   * - Both peers: Simulate BlockDeletingService — delete DB metadata + chunk files, then call
+   *               addDeletedBlocks to mark blocks as deleted in their merkle trees.
+   * - sutDn (DN under test): Only remove DB metadata (chunk files remain on disk as orphans).
+   *
+   * When sutDn reconciles with a peer, the diff finds blockIDs with deleted=true in the peer's tree
+   * that sutDn's tree doesn't have, triggering deleteBlockForReconciliation to clean up orphaned chunk files.
+   *
+   * Note: DB metadata is removed (not just marking deleted) because the current checksum computation
+   * does not include the deleted flag — removing blockIDs from the tree forces the diff to detect divergence.
+   */
+  @Test
+  @Flaky("HDDS-13401")
+  public void testReconcileDeletedBlocks() throws Exception {
+    // Step 1: Write data and close the container on all 3 DNs.
+    String volume = UUID.randomUUID().toString();
+    String bucket = UUID.randomUUID().toString();
+    Pair<Long, byte[]> containerAndData = getDataAndContainer(true, 20 * 1024 * 1024, volume, bucket);
+    long containerID = containerAndData.getLeft();
+
+    List<DatanodeDetails> dataNodeDetails = cluster.getStorageContainerManager().getContainerManager()
+        .getContainerReplicas(ContainerID.valueOf(containerID))
+        .stream().map(ContainerReplica::getDatanodeDetails)
+        .collect(Collectors.toList());
+    assertEquals(3, dataNodeDetails.size());
+
+    // sutDn: the DN under test — will have orphaned chunk files cleaned up during reconciliation.
+    HddsDatanodeService sutDn = cluster.getHddsDatanode(dataNodeDetails.get(0));
+    DatanodeStateMachine sutDsm = sutDn.getDatanodeStateMachine();
+    Container<?> sutContainer = sutDsm.getContainer().getContainerSet().getContainer(containerID);
+    KeyValueContainerData sutContainerData = (KeyValueContainerData) sutContainer.getContainerData();
+    KeyValueHandler sutHandler = (KeyValueHandler) sutDsm.getContainer().getDispatcher()
+        .getHandler(ContainerProtos.ContainerType.KeyValueContainer);
+
+    // Use sutDn's block list as the source of truth (all replicas are identical at this point).
+    List<BlockData> allBlocks = sutHandler.getBlockManager().listBlock(sutContainer, -1, 100);
+    assertTrue(allBlocks.size() > 1, "Container should have more than 1 block for this test");
+
+    List<BlockData> blocksToDelete = new ArrayList<>();
+    for (int i = 0; i < allBlocks.size(); i += 2) {
+      blocksToDelete.add(allBlocks.get(i));
+    }
+
+    // Step 2: Both peers — simulate BlockDeletingService: delete DB + chunks, then mark deleted in tree.
+    for (int i = 1; i <= 2; i++) {
+      HddsDatanodeService peerDn = cluster.getHddsDatanode(dataNodeDetails.get(i));
+      DatanodeStateMachine peerDsm = peerDn.getDatanodeStateMachine();
+      Container<?> peerContainer = peerDsm.getContainer().getContainerSet().getContainer(containerID);
+      KeyValueContainerData peerContainerData = (KeyValueContainerData) peerContainer.getContainerData();
+      KeyValueHandler peerHandler = (KeyValueHandler) peerDsm.getContainer().getDispatcher()
+          .getHandler(ContainerProtos.ContainerType.KeyValueContainer);
+      String peerChunksPath = peerContainer.getContainerData().getChunksPath();
+
+      try (DBHandle db = BlockUtils.getDB(peerContainerData, conf);
+           BatchOperation op = db.getStore().getBatchHandler().initBatchOperation()) {
+        for (BlockData blockData : blocksToDelete) {
+          long localID = blockData.getLocalID();
+          db.getStore().getBlockDataTable().deleteWithBatch(op, peerContainerData.getBlockKey(localID));
+          Files.deleteIfExists(Paths.get(peerChunksPath + "/" + localID + ".block"));
+        }
+        db.getStore().getBatchHandler().commitBatchOperation(op);
+        db.getStore().flushDB();
+      }
+      peerHandler.getChecksumManager().addDeletedBlocks(peerContainerData, blocksToDelete);
+      peerDsm.getContainer().getContainerSet().scanContainerWithoutGap(containerID, TEST_SCAN);
+    }
+
+    // Step 3: sutDn — remove DB metadata only (keep chunk files on disk as orphans), then scan.
+    String sutChunksPath = sutContainer.getContainerData().getChunksPath();
+    try (DBHandle db = BlockUtils.getDB(sutContainerData, conf);
+         BatchOperation op = db.getStore().getBatchHandler().initBatchOperation()) {
+      for (BlockData blockData : blocksToDelete) {
+        db.getStore().getBlockDataTable().deleteWithBatch(op,
+            sutContainerData.getBlockKey(blockData.getLocalID()));
+      }
+      db.getStore().getBatchHandler().commitBatchOperation(op);
+      db.getStore().flushDB();
+    }
+    sutDsm.getContainer().getContainerSet().scanContainerWithoutGap(containerID, TEST_SCAN);
+
+    waitForDataChecksumsAtSCM(containerID, 2);
+
+    // Step 4: Verify chunk files still exist on sutDn before reconciliation.
+    for (BlockData bd : blocksToDelete) {
+      assertTrue(Files.exists(Paths.get(sutChunksPath + "/" + bd.getLocalID() + ".block")),
+          "Chunk file for block " + bd.getLocalID() + " should still exist on sutDn before reconciliation");
+    }
+
+    // Step 5: Trigger reconciliation.
+    cluster.getStorageContainerLocationClient().reconcileContainer(containerID);
+
+    // Step 6: Wait for reconciliation to delete the orphaned chunk files on sutDn.
+    GenericTestUtils.waitFor(() -> {
+      for (BlockData bd : blocksToDelete) {
+        if (Files.exists(Paths.get(sutChunksPath + "/" + bd.getLocalID() + ".block"))) {
+          return false;
+        }
+      }
+      return true;
+    }, 1000, 120000);
+
+    // Step 7: Verify chunk files are physically deleted from sutDn.
+    for (BlockData bd : blocksToDelete) {
+      assertFalse(Files.exists(Paths.get(sutChunksPath + "/" + bd.getLocalID() + ".block")),
+          "Chunk file for block " + bd.getLocalID()
+              + " should be physically deleted from sutDn by deleteBlockForReconciliation");
+    }
+
+    // Verify deleted blocks are marked as deleted in sutDn's merkle tree.
+    ContainerProtos.ContainerChecksumInfo sutFinalInfo = readChecksumFile(sutContainer.getContainerData());
+    for (BlockData bd : blocksToDelete) {
+      long blockID = bd.getLocalID();
+      ContainerProtos.BlockMerkleTree blockTree =
+          sutFinalInfo.getContainerMerkleTree().getBlockMerkleTreeList().stream()
+              .filter(b -> b.getBlockID() == blockID)
+              .findFirst()
+              .orElseThrow(() -> new AssertionError(
+                  "Block " + blockID + " should be in sutDn's tree (as deleted) after reconciliation"));
+      assertTrue(blockTree.getDeleted(),
+          "Block " + blockID + " should be marked deleted in sutDn's tree after reconciliation");
+    }
   }
 
   @Test

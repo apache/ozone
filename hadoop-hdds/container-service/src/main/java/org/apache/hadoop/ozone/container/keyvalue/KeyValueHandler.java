@@ -123,6 +123,8 @@ import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.FaultInjector;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.db.BatchOperation;
+import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -1747,9 +1749,16 @@ public class KeyValueHandler extends Handler {
         }
 
         // Merge block deletes from the peer that do not match our list of deleted blocks.
+        // In addition to updating the merkle tree, also delete the actual block data from our container.
         for (ContainerDiffReport.DeletedBlock deletedBlock : diffReport.getDivergedDeletedBlocks()) {
           updatedTreeWriter.setDeletedBlock(deletedBlock.getBlockID(), deletedBlock.getDataChecksum());
           numDivergedDeletedBlocksUpdated++;
+          try {
+            deleteBlockForReconciliation(kvContainer, deletedBlock.getBlockID());
+          } catch (IOException e) {
+            LOG.error("Error while deleting diverged deleted block {} in container {} during reconciliation",
+                deletedBlock.getBlockID(), containerID, e);
+          }
         }
 
         // Based on repaired done with this peer, write the updated merkle tree to the container.
@@ -2009,6 +2018,72 @@ public class KeyValueHandler extends Handler {
         return false;
       }
       return true;
+    }
+  }
+
+  /**
+   * Called during reconciliation to delete block data and chunk files for a block that a peer has already deleted.
+   * This handles the case where some replicas miss block delete transactions from SCM.
+   * If the block metadata exists in RocksDB, chunk files are deleted, the block key is removed from the DB,
+   * and container stats are updated. If the block metadata does not exist in RocksDB (already deleted or never
+   * existed), falls back to deleteUnreferenced to clean up any orphaned chunk files.
+   */
+  @VisibleForTesting
+  void deleteBlockForReconciliation(KeyValueContainer container, long localBlockID) throws IOException {
+    KeyValueContainerData containerData = container.getContainerData();
+    long containerID = containerData.getContainerID();
+
+    container.writeLock();
+    try (DBHandle db = BlockUtils.getDB(containerData, conf)) {
+      String blockKey = containerData.getBlockKey(localBlockID);
+      BlockData blockData = db.getStore().getBlockDataTable().get(blockKey);
+
+      if (blockData == null) {
+        // Block metadata not in DB, but chunk files may still be on disk.
+        LOG.debug("Block {} not found in DB for container {}. Attempting to clean up unreferenced chunk files.",
+            localBlockID, containerID);
+        try {
+          deleteUnreferenced(container, localBlockID);
+        } catch (IOException e) {
+          LOG.warn("Failed to delete unreferenced files for block {} of container {}",
+              localBlockID, containerID, e);
+        }
+        return;
+      }
+
+      // Delete chunk files from disk.
+      deleteBlock(container, blockData);
+      long releasedBytes = KeyValueContainerUtil.getBlockLengthTryCatch(blockData);
+
+      // Remove block metadata from DB and update counters.
+      try (BatchOperation batch = db.getStore().getBatchHandler().initBatchOperation()) {
+        db.getStore().getBlockDataTable().deleteWithBatch(batch, blockKey);
+        // Also remove from lastChunkInfoTable for schema V2/V3.
+        if (!containerData.hasSchema(OzoneConsts.SCHEMA_V1)) {
+          db.getStore().getLastChunkInfoTable().deleteWithBatch(batch, blockKey);
+        }
+
+        // Update DB counters. These blocks were not marked as pending deletion by SCM, so we only
+        // decrement bytesUsed and blockCount. pendingDeleteBlockCount is not affected.
+        Table<String, Long> metadataTable = db.getStore().getMetadataTable();
+        final ContainerData.BlockByteAndCounts stats = containerData.getStatistics().getBlockByteAndCounts();
+        metadataTable.putWithBatch(batch, containerData.getBytesUsedKey(), stats.getBytes() - releasedBytes);
+        metadataTable.putWithBatch(batch, containerData.getBlockCountKey(), stats.getCount() - 1);
+        db.getStore().getBatchHandler().commitBatchOperation(batch);
+      }
+
+      // Update in-memory stats (only bytesUsed and blockCount, not pendingDeletion).
+      containerData.getStatistics().decDeletion(releasedBytes, 0, 1, 0);
+      containerData.getVolume().decrementUsedSpace(releasedBytes);
+
+      if (!container.hasBlocks()) {
+        containerData.markAsEmpty();
+      }
+
+      LOG.info("Deleted block {} ({} bytes) from container {} during reconciliation",
+          localBlockID, releasedBytes, containerID);
+    } finally {
+      container.writeUnlock();
     }
   }
 
