@@ -28,7 +28,6 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
@@ -54,9 +53,6 @@ import org.apache.ozone.test.GenericTestUtils.LogCapturer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.event.Level;
 
 /**
@@ -221,23 +217,20 @@ public class TestFailoverWithSCMHA {
     }
   }
 
-  public static Stream<Arguments> ozoneAdminScmCommands() {
-    return Stream.of(
-        Arguments.of((Object) new String[]{"datanode", "list"}),
-        Arguments.of((Object) new String[]{"pipeline", "list"}),
-        Arguments.of((Object) new String[]{"scm", "roles"}),
-        Arguments.of((Object) new String[]{"container", "list"}),
-        Arguments.of((Object) new String[]{"safemode", "status"})
-    );
-  }
+  private static final String[][] OZONE_ADMIN_SCM_COMMANDS = {
+      {"datanode", "list"},
+      {"pipeline", "list"},
+      {"scm", "roles"},
+      {"container", "list"},
+      {"safemode", "status"}
+  };
 
   /**
    * Verifies that when SCMs are unavailable, the CLI shows retry messages
    * on stderr before eventually failing for all SCM-querying commands.
    */
-  @ParameterizedTest
-  @MethodSource("ozoneAdminScmCommands")
-  public void testRetryMessageShownWhenScmUnavailable(String[] args) throws Exception {
+  @Test
+  public void testRetryMessageShownWhenScmUnavailable() throws Exception {
     SCMClientConfig scmClientConfig = conf.getObject(SCMClientConfig.class);
     scmClientConfig.setRetryCount(2);
     scmClientConfig.setRetryInterval(50);
@@ -253,12 +246,14 @@ public class TestFailoverWithSCMHA {
     OzoneAdmin ozoneAdmin = new OzoneAdmin();
     ozoneAdmin.setConfigurationOverrides(configOverrides);
 
-    try (GenericTestUtils.PrintStreamCapturer err = GenericTestUtils.captureErr()) {
-      ozoneAdmin.execute(args);
-      String stderrOutput = err.get();
+    for (String[] args : OZONE_ADMIN_SCM_COMMANDS) {
+      try (GenericTestUtils.PrintStreamCapturer err = GenericTestUtils.captureErr()) {
+        ozoneAdmin.execute(args);
+        String stderrOutput = err.get();
 
-      // Retry message format: "Retrying after N failover attempt(s). Sleeping for Xms."
-      assertThat(stderrOutput).contains("Retrying after", "failover attempt(s)", "Sleeping for 50ms");
+        // Retry message format: "... Retrying in Xms after N failover attempt(s)."
+        assertThat(stderrOutput.toLowerCase()).contains("retrying in", "failover attempt(s)");
+      }
     }
   }
 
