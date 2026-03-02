@@ -36,7 +36,9 @@ import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -132,19 +134,16 @@ public class TestDiskBalancerSubCommands {
     
     MockedStatic<DiskBalancerSubCommandUtil> mockedUtil = 
         mockStatic(DiskBalancerSubCommandUtil.class);
+    Map<String, String> addressToDisplay = new LinkedHashMap<>();
+    for (String addr : inServiceDatanodes) {
+      addressToDisplay.put(addr, addr);
+    }
     mockedUtil.when(() -> DiskBalancerSubCommandUtil
         .getAllOperableNodesClientRpcAddress(any()))
-        .thenReturn(inServiceDatanodes);
+        .thenReturn(addressToDisplay);
     mockedUtil.when(() -> DiskBalancerSubCommandUtil
         .getSingleNodeDiskBalancerProxy(anyString()))
         .thenReturn(mockProtocol);
-    // Mock getDatanodeHostAndIp(ScmClient, String) to return the address as-is for tests
-    mockedUtil.when(() -> DiskBalancerSubCommandUtil
-        .getDatanodeHostAndIp(any(), anyString()))
-        .thenAnswer(invocation -> {
-          String address = invocation.getArgument(1);
-          return address; // Return address as-is for tests
-        });
     // Mock extractHostIpAndPort to return test data
     mockedUtil.when(() -> DiskBalancerSubCommandUtil
         .extractHostIpAndPort(any(HddsProtos.DatanodeDetailsProto.class)))

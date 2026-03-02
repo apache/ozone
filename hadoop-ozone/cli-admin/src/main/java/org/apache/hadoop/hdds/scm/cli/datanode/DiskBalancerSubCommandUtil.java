@@ -21,11 +21,10 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_PORT_DE
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState;
 
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
-import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
@@ -88,20 +87,20 @@ final class DiskBalancerSubCommandUtil {
   }
 
   /**
-   * Retrieves all IN_SERVICE datanode addresses from SCM.
+   * Retrieves all IN_SERVICE datanode addresses with their hostnames from SCM.
    * Used for batch operations with --in-service-datanodes flag.
-   * 
+   *
    * @param scmClient the SCM client
-   * @return list of datanode addresses in "ip:port" format
+   * @return map of address (ip:port) to display string (hostname (ip:port) or ip:port)
    * @throws IOException if SCM query fails
    */
-  public static List<String> getAllOperableNodesClientRpcAddress(
+  public static Map<String, String> getAllOperableNodesClientRpcAddress(
       ScmClient scmClient) throws IOException {
     List<HddsProtos.Node> nodes = scmClient.queryNode(
         NodeOperationalState.IN_SERVICE, HddsProtos.NodeState.HEALTHY,
         HddsProtos.QueryScope.CLUSTER, "");
 
-    List<String> addresses = new ArrayList<>();
+    Map<String, String> addressToDisplay = new LinkedHashMap<>();
     for (HddsProtos.Node node : nodes) {
       DatanodeDetails details =
           DatanodeDetails.getFromProtoBuf(node.getNodeID());
@@ -110,8 +109,10 @@ final class DiskBalancerSubCommandUtil {
       }
       Port port = details.getPort(Port.Name.CLIENT_RPC);
       if (port != null) {
-        // Use IP address for reliable connection (hostnames with underscores may not be valid)
-        addresses.add(details.getIpAddress() + ":" + port.getValue());
+        String address = details.getIpAddress() + ":" + port.getValue();
+        String display = getDatanodeHostAndIp(
+            details.getHostName(), details.getIpAddress(), port.getValue());
+        addressToDisplay.put(address, display);
       } else {
         System.out.printf("host: %s(%s) %s port not found%n",
             details.getHostName(), details.getIpAddress(),
@@ -119,7 +120,7 @@ final class DiskBalancerSubCommandUtil {
       }
     }
 
-    return addresses;
+    return addressToDisplay;
   }
 
   /**
@@ -141,52 +142,6 @@ final class DiskBalancerSubCommandUtil {
   }
 
   /**
-   * Gets the hostname and IP address for a datanode given its address (hostname or IP) and port.
-   * Queries SCM to find the matching datanode and returns both hostname and IP address.
-   * Internal helper method used by getDatanodeHostAndIp(ScmClient, String).
-   * 
-   * @param scmClient the SCM client
-   * @param address the hostname or IP address of the datanode
-   * @param port the port of the datanode
-   * @return array with [hostname, ipAddress] if found, null otherwise
-   */
-  private static String[] getHostnameAndIpFromAddress(ScmClient scmClient,
-      String address, int port) {
-    try {
-      // Resolve hostname to IP if it's a hostname (not an IP address)
-      String ipToMatch = address;
-      try {
-        // Try to resolve - if it's already an IP, getByName will return it
-        InetAddress inetAddr = InetAddress.getByName(address);
-        ipToMatch = inetAddr.getHostAddress();
-      } catch (UnknownHostException e) {
-        // If resolution fails, use original address
-      }
-      
-      List<HddsProtos.Node> nodes = scmClient.queryNode(
-          NodeOperationalState.IN_SERVICE, null,
-          HddsProtos.QueryScope.CLUSTER, "");
-      
-      for (HddsProtos.Node node : nodes) {
-        DatanodeDetails details =
-            DatanodeDetails.getFromProtoBuf(node.getNodeID());
-        Port datanodePort = details.getPort(Port.Name.CLIENT_RPC);
-        if (datanodePort != null && datanodePort.getValue() == port) {
-          String hostname = details.getHostName();
-          String ipAddress = details.getIpAddress();
-          // Match by IP address (more reliable than hostname matching)
-          if (ipToMatch.equals(ipAddress)) {
-            return new String[]{hostname, ipAddress};
-          }
-        }
-      }
-    } catch (IOException e) {
-      // Return null if query fails
-    }
-    return null;
-  }
-
-  /**
    * Returns a formatted string combining hostname and IP address.
    * If hostname is null or empty, returns just "ip:port".
    * 
@@ -204,52 +159,5 @@ final class DiskBalancerSubCommandUtil {
     return addressPort;
   }
 
-  /**
-   * Parses "hostname:port", "ip:port", or "hostname" address, queries SCM to get both hostname and IP.
-   * Returns a formatted string combining hostname and IP address.
-   * 
-   * @param scmClient the SCM client
-   * @param address the datanode address in "hostname:port", "ip:port", or "hostname" format
-   * @return formatted string "hostname (ip:port)" or "ip:port" if hostname is not available
-   */
-  public static String getDatanodeHostAndIp(ScmClient scmClient,
-      String address) {
-    if (address == null || address.isEmpty()) {
-      return address;
-    }
-    
-    String addressPart;
-    int port;
-    
-    // Parse address - handle both "hostname:port" and "hostname" formats
-    String[] parts = address.split(":");
-    if (parts.length == 2) {
-      // Format: "hostname:port" or "ip:port"
-      addressPart = parts[0];
-      try {
-        port = Integer.parseInt(parts[1]);
-      } catch (NumberFormatException e) {
-        return address;
-      }
-    } else if (parts.length == 1) {
-      // Format: "hostname" or "ip" - use default port
-      addressPart = parts[0];
-      port = HDDS_DATANODE_CLIENT_PORT_DEFAULT;
-    } else {
-      // Invalid format
-      return address;
-    }
-    
-    // Query SCM to get both hostname and IP address
-    String[] hostnameAndIp = getHostnameAndIpFromAddress(scmClient, addressPart, port);
-    if (hostnameAndIp != null && hostnameAndIp.length == 2) {
-      String hostname = hostnameAndIp[0];
-      String ipAddress = hostnameAndIp[1];
-      return getDatanodeHostAndIp(hostname, ipAddress, port);
-    }
-    
-    // If not found in SCM, return the original address
-    return address;
-  }
 }
 
