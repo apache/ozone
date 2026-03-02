@@ -86,6 +86,8 @@ public enum ClientVersion implements ComponentVersion {
 
   private static ClientVersion latest() {
     ClientVersion[] versions = ClientVersion.values();
+    // The last entry in the array will be `FUTURE_VERSION`. We want the entry prior to this which defines the latest
+    // version in the software.
     return versions[versions.length - 2];
   }
 }
