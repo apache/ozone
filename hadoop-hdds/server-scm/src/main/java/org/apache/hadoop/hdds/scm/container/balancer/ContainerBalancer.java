@@ -21,6 +21,7 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
@@ -492,6 +493,9 @@ public class ContainerBalancer extends StatefulService {
       LOG.warn(msg);
       throw new InvalidContainerBalancerConfigurationException(msg);
     }
+
+    validateNodeList(conf.getIncludeNodes(), "included");
+    validateNodeList(conf.getExcludeNodes(), "excluded");
   }
 
   public ContainerBalancerMetrics getMetrics() {
@@ -509,5 +513,30 @@ public class ContainerBalancer extends StatefulService {
         "%-30s %s%n" +
         "%-30s %b%n", "Key", "Value", "Running", isBalancerRunning());
     return status + config.toString();
+  }
+
+  /**
+   * Validates if the provided datanodes are known by SCM.
+   *
+   * @param nodes set of datanode hostnames or IP addresses
+   * @param type context label for the error message
+   * @throws InvalidContainerBalancerConfigurationException if a node is unknown
+   */
+  private void validateNodeList(Set<String> nodes, String type)
+      throws InvalidContainerBalancerConfigurationException {
+    if (nodes == null || nodes.isEmpty()) {
+      return;
+    }
+
+    for (String node : nodes) {
+      // Check if SCM knows about this node by hostname or IP
+      if (scm.getScmNodeManager().getNodesByAddress(node).isEmpty()) {
+        String errorMessage = String.format("Invalid configuration: The %s datanode '%s' " +
+                "does not exist or is not registered with SCM. Please check the hostname/IP.",
+            type, node);
+        LOG.warn(errorMessage);
+        throw new InvalidContainerBalancerConfigurationException(errorMessage);
+      }
+    }
   }
 }
