@@ -30,8 +30,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.TimeoutException;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -148,7 +146,7 @@ public class TestOMHALeaderSpecificACLEnforcement {
     testVolumeAndBucketCreationAsUser(true);
     
     // Step 4: Force leadership transfer to another OM node
-    OzoneManager newLeader = transferLeadershipToAnotherNode(currentLeader);
+    OzoneManager newLeader = cluster.transferOMLeadershipToAnotherNode(currentLeader);
     assertNotEquals(leaderNodeId, newLeader.getOMNodeId(), 
         "Leadership should have transferred to a different node");
     
@@ -355,7 +353,7 @@ public class TestOMHALeaderSpecificACLEnforcement {
       assertNotEquals(originalMtime, key.getModificationTime().toEpochMilli(),
           "Modification time should have changed");
 
-      OzoneManager newLeader = transferLeadershipToAnotherNode(currentLeader);
+      OzoneManager newLeader = cluster.transferOMLeadershipToAnotherNode(currentLeader);
       assertNotEquals(leaderNodeId, newLeader.getOMNodeId(),
           "Leadership should have transferred to a different node");
       assertFalse(newLeader.getOmAdminUsernames().contains(TEST_USER),
@@ -383,45 +381,5 @@ public class TestOMHALeaderSpecificACLEnforcement {
     } catch (IOException e) {
       return false;
     }
-  }
-
-  /**
-   * Transfers leadership from current leader to another OM node.
-   * 
-   * @param currentLeader the current leader OM
-   * @return the new leader OM after transfer
-   */
-  private OzoneManager transferLeadershipToAnotherNode(OzoneManager currentLeader) throws Exception {
-    // Get list of all OMs
-    List<OzoneManager> omList = new ArrayList<>(cluster.getOzoneManagersList());
-    
-    // Remove current leader from list
-    omList.remove(currentLeader);
-    
-    // Select the first alternative OM as target
-    OzoneManager targetOM = omList.get(0);
-    String targetNodeId = targetOM.getOMNodeId();
-    
-    // Transfer leadership
-    currentLeader.transferLeadership(targetNodeId);
-    
-    // Wait for leadership transfer to complete
-    GenericTestUtils.waitFor(() -> {
-      try {
-        OzoneManager currentLeaderCheck = cluster.getOMLeader();
-        return !currentLeaderCheck.getOMNodeId().equals(currentLeader.getOMNodeId());
-      } catch (Exception e) {
-        return false;
-      }
-    }, 1000, 30000);
-    
-    // Verify leadership change
-    cluster.waitForLeaderOM();
-    OzoneManager newLeader = cluster.getOMLeader();
-    
-    assertEquals(targetNodeId, newLeader.getOMNodeId(), 
-        "Leadership should have transferred to target OM");
-    
-    return newLeader;
   }
 }

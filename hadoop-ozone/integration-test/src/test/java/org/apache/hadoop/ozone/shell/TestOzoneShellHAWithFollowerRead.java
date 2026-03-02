@@ -19,9 +19,11 @@ package org.apache.hadoop.ozone.shell;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
 import org.apache.ratis.server.RaftServerConfigKeys;
 import org.junit.jupiter.api.Assertions;
@@ -48,6 +50,7 @@ public class TestOzoneShellHAWithFollowerRead extends TestOzoneShellHA {
     conf.setBoolean("ozone.client.hbase.enhancements.allowed", true);
     conf.setBoolean("ozone.om.ha.raft.server.read.leader.lease.enabled", true);
     conf.setBoolean("ozone.om.allow.leader.skip.linearizable.read", true);
+    conf.setBoolean("ozone.client.follower.read.enabled", true);
     conf.setBoolean(OzoneConfigKeys.OZONE_FS_HSYNC_ENABLED, true);
     startKMS();
     startCluster(conf);
@@ -78,22 +81,55 @@ public class TestOzoneShellHAWithFollowerRead extends TestOzoneShellHA {
     OzoneConfiguration newConf1 = new OzoneConfiguration(oldConf);
     newConf1.setBoolean("ozone.om.follower.read.local.lease.enabled", true);
     OzoneConfiguration newConf2 = new OzoneConfiguration(newConf1);
+    // All local lease should fail since the lease time is negative
     newConf2.setLong("ozone.om.follower.read.local.lease.time.ms", -1000);
-
+    OzoneManager omFollower1 = null;
+    OzoneManager omFollower2 = null;
     try {
-      getCluster().getOzoneManager(1).setConfiguration(newConf1);
-      getCluster().getOzoneManager(2).setConfiguration(newConf2);
+      for (OzoneManager om : getCluster().getOzoneManagersList()) {
+        // Leader ignores the local lease and serve the read request
+        // immediately so we should test on followers instead
+        if (!om.isLeaderReady()) {
+          if (omFollower1 == null) {
+            omFollower1 = om;
+          } else {
+            omFollower2 = om;
+            break;
+          }
+        }
+      }
+      assertNotNull(omFollower1, "Cannot find OM follower");
+      assertNotNull(omFollower2, "Cannot find OM follower");
+      omFollower1.setConfiguration(newConf1);
+      omFollower2.setConfiguration(newConf2);
 
       String[] args = new String[]{"volume", "list"};
+      OzoneShell ozoneShell = new OzoneShell();
+      ozoneShell.getOzoneConf().setBoolean("ozone.client.follower.read.enabled", true);
+      ozoneShell.getOzoneConf().set("ozone.client.follower.read.default.consistency", "LOCAL_LEASE");
       for (int i = 0; i < 100; i++) {
-        execute(getOzoneShell(), args);
+        execute(ozoneShell, args);
       }
-      assertThat(getCluster().getOzoneManager(1).getMetrics().getNumFollowerReadLocalLeaseSuccess() > 0).isTrue();
-      assertEquals(0, getCluster().getOzoneManager(2).getMetrics().getNumFollowerReadLocalLeaseSuccess());
-      assertThat(getCluster().getOzoneManager(2).getMetrics().getNumFollowerReadLocalLeaseFailTime() > 0).isTrue();
+      assertThat(omFollower1.getMetrics().getNumFollowerReadLocalLeaseSuccess() > 0).isTrue();
+      // Local lease time is set to negative, for this OM should fail all local lease read requests
+      assertEquals(0, omFollower2.getMetrics().getNumFollowerReadLocalLeaseSuccess());
+      assertThat(omFollower2.getMetrics().getNumFollowerReadLocalLeaseFailTime() > 0).isTrue();
+
+      // Setting the local lease time and log limit to -1 allow infinite lag
+      newConf2.setLong("ozone.om.follower.read.local.lease.time.ms", -1);
+      newConf2.setLong("ozone.om.follower.read.local.lease.log.limit", -1);
+      omFollower2.setConfiguration(newConf2);
+      for (int i = 0; i < 100; i++) {
+        execute(ozoneShell, args);
+      }
+      assertThat(omFollower2.getMetrics().getNumFollowerReadLocalLeaseSuccess() > 0).isTrue();
     } finally {
-      getCluster().getOzoneManager(1).setConfiguration(oldConf);
-      getCluster().getOzoneManager(2).setConfiguration(oldConf);
+      if (omFollower1 != null) {
+        omFollower1.setConfiguration(oldConf);
+      }
+      if (omFollower2 != null) {
+        omFollower2.setConfiguration(oldConf);
+      }
     }
   }
 }
