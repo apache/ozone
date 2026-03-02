@@ -80,7 +80,6 @@ public class TestDiskBalancerContainerChoosingLogic {
   private ContainerSet containerSet;
   private HddsVolume sourceVolume;
   private HddsVolume destVolume1;
-  private HddsVolume destVolume2;
   private Set<ContainerID> inProgressContainerIDs;
   private Map<HddsVolume, Long> deltaMap;
 
@@ -105,7 +104,7 @@ public class TestDiskBalancerContainerChoosingLogic {
     // Create volumes with specific utilization
     sourceVolume = createVolume("source-volume", 0.80);
     destVolume1 = createVolume("dest-volume1", 0.10);
-    destVolume2 = createVolume("dest-volume2", 0.50);
+    HddsVolume destVolume2 = createVolume("dest-volume2", 0.50);
 
     CONF.set(HDDS_DATANODE_DIR_KEY, baseDir.resolve("defaultVolume").toString());
 
@@ -133,6 +132,7 @@ public class TestDiskBalancerContainerChoosingLogic {
     ozoneContainer = mock(OzoneContainer.class);
     ContainerController controller = new ContainerController(containerSet, null);
     when(ozoneContainer.getController()).thenReturn(controller);
+    when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
   }
 
   /**
@@ -221,6 +221,7 @@ public class TestDiskBalancerContainerChoosingLogic {
     OzoneContainer testOzoneContainer = mock(OzoneContainer.class);
     ContainerController testController = new ContainerController(testContainerSet, null);
     when(testOzoneContainer.getController()).thenReturn(testController);
+    when(testOzoneContainer.getContainerSet()).thenReturn(testContainerSet);
     
     // The policy should skip containers 10 and 11 (size 0) and choose container 12
     DiskBalancerVolumeContainerCandidate candidate = policy.chooseVolumesAndContainer(testOzoneContainer,

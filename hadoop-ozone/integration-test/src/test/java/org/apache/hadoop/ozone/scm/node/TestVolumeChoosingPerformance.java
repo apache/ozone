@@ -95,7 +95,6 @@ public class TestVolumeChoosingPerformance {
   // delta sizes for source volumes
   private Map<HddsVolume, Long> deltaSizes = new ConcurrentHashMap<>();
   private Set<ContainerID> inProgressContainerIDs = ConcurrentHashMap.newKeySet();
-  private ContainerSet containerSet;
 
   @BeforeEach
   public void setup() throws Exception {
@@ -298,7 +297,7 @@ public class TestVolumeChoosingPerformance {
   }
 
   private void createContainers() {
-    containerSet = newContainerSet();
+    ContainerSet containerSet = newContainerSet();
     Random random = new Random();
     for (int i = 0; i < NUM_VOLUMES * 10; i++) {
       HddsVolume volume = hddsVolumes.get(i % NUM_VOLUMES);

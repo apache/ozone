@@ -280,6 +280,7 @@ public class TestDiskBalancerVolumeChoosingLogic {
     ozoneContainer = mock(OzoneContainer.class);
     ContainerController controller = new ContainerController(containerSet, null);
     when(ozoneContainer.getController()).thenReturn(controller);
+    when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
   }
 
   private void createContainer(long id, long usedBytes, HddsVolume vol)
