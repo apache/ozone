@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.util.Optional;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -93,7 +94,7 @@ public abstract class TestSCMPipelineMetrics implements NonHATests.TestCase {
         cluster.getStorageContainerManager().getScmBlockManager()
             .allocateBlock(5,
                 RatisReplicationConfig.getInstance(ReplicationFactor.ONE),
-                "Test", new ExcludeList());
+                "Test", new ExcludeList(), StorageType.DEFAULT);
     MetricsRecordBuilder metrics =
         getMetrics(SCMPipelineMetrics.class.getSimpleName());
     Pipeline pipeline = block.getPipeline();

@@ -43,6 +43,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.protocol.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.scm.client.HddsClientUtils;
 import org.apache.hadoop.ozone.OmUtils;
@@ -152,6 +153,8 @@ public class OzoneBucket extends WithMetadata {
    */
   private String owner;
 
+  private OzoneStoragePolicy storagePolicy;
+
   protected OzoneBucket(Builder builder) {
     super(builder);
     this.proxy = builder.proxy;
@@ -191,6 +194,7 @@ public class OzoneBucket extends WithMetadata {
       this.bucketLayout = builder.bucketLayout;
     }
     this.owner = builder.owner;
+    this.storagePolicy = builder.storagePolicy;
   }
 
   /**
@@ -298,6 +302,10 @@ public class OzoneBucket extends WithMetadata {
    */
   public String getOwner() {
     return owner;
+  }
+
+  public OzoneStoragePolicy getStoragePolicy() {
+    return storagePolicy;
   }
 
   public int getListCacheSize() {
@@ -1127,6 +1135,7 @@ public class OzoneBucket extends WithMetadata {
     private long quotaInNamespace;
     private BucketLayout bucketLayout;
     private String owner;
+    private OzoneStoragePolicy storagePolicy;
 
     protected Builder() {
     }
@@ -1220,6 +1229,11 @@ public class OzoneBucket extends WithMetadata {
 
     public Builder setOwner(String owner) {
       this.owner = owner;
+      return this;
+    }
+
+    public Builder setStoragePolicy(OzoneStoragePolicy storagePolicy) {
+      this.storagePolicy = storagePolicy;
       return this;
     }
 

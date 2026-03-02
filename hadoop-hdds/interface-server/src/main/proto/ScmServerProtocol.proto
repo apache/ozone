@@ -161,6 +161,7 @@ message AllocateScmBlockRequestProto {
 
   optional string client = 9;
 
+  optional hadoop.hdds.StorageTypeProto storageType = 10;
 }
 
 /**

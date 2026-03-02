@@ -45,6 +45,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -197,7 +198,8 @@ public class TestBlockManager {
     pipelineManager.createPipeline(replicationConfig);
     HddsTestUtils.openAllRatisPipelines(pipelineManager);
     AllocatedBlock block = blockManager.allocateBlock(DEFAULT_BLOCK_SIZE,
-        replicationConfig, OzoneConsts.OZONE, new ExcludeList());
+        replicationConfig, OzoneConsts.OZONE, new ExcludeList(),
+        StorageType.DEFAULT);
     assertNotNull(block);
   }
 
@@ -216,7 +218,7 @@ public class TestBlockManager {
             .get(0).getId());
     AllocatedBlock block = blockManager
         .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig, OzoneConsts.OZONE,
-            excludeList);
+            excludeList, StorageType.DEFAULT);
     assertNotNull(block);
     for (PipelineID id : excludeList.getPipelineIds()) {
       assertNotEquals(block.getPipeline().getId(), id);
@@ -227,7 +229,7 @@ public class TestBlockManager {
     }
     block = blockManager
         .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig, OzoneConsts.OZONE,
-            excludeList);
+            excludeList, StorageType.DEFAULT);
     assertNotNull(block);
     assertThat(excludeList.getPipelineIds()).contains(block.getPipeline().getId());
   }
@@ -249,7 +251,7 @@ public class TestBlockManager {
           future.complete(blockManager
               .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig,
                   OzoneConsts.OZONE,
-                  new ExcludeList()));
+                  new ExcludeList(), StorageType.DEFAULT));
         } catch (IOException e) {
           future.completeExceptionally(e);
         }
@@ -287,7 +289,7 @@ public class TestBlockManager {
           AllocatedBlock block = blockManager
               .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig,
                   OzoneConsts.OZONE,
-                  new ExcludeList());
+                  new ExcludeList(), StorageType.DEFAULT);
           long containerId = block.getBlockID().getContainerID();
           if (!allocatedBlockMap.containsKey(containerId)) {
             blockList = new ArrayList<>();
@@ -343,7 +345,7 @@ public class TestBlockManager {
           AllocatedBlock block = blockManager
               .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig,
                   OzoneConsts.OZONE,
-                  new ExcludeList());
+                  new ExcludeList(), StorageType.DEFAULT);
           long containerId = block.getBlockID().getContainerID();
           if (!allocatedBlockMap.containsKey(containerId)) {
             blockList = new ArrayList<>();
@@ -403,7 +405,7 @@ public class TestBlockManager {
           AllocatedBlock block = blockManager
               .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig,
                   OzoneConsts.OZONE,
-                  new ExcludeList());
+                  new ExcludeList(), StorageType.DEFAULT);
           long containerId = block.getBlockID().getContainerID();
           if (!allocatedBlockMap.containsKey(containerId)) {
             blockList = new ArrayList<>();
@@ -439,7 +441,8 @@ public class TestBlockManager {
     long size = 6 * GB;
     Throwable t = assertThrows(IOException.class, () ->
         blockManager.allocateBlock(size,
-            replicationConfig, OzoneConsts.OZONE, new ExcludeList()));
+            replicationConfig, OzoneConsts.OZONE, new ExcludeList(),
+            StorageType.DEFAULT));
     assertEquals("Unsupported block size: " + size,
         t.getMessage());
   }
@@ -450,7 +453,8 @@ public class TestBlockManager {
     // Test1: In safe mode expect an SCMException.
     Throwable t = assertThrows(IOException.class, () ->
         blockManager.allocateBlock(DEFAULT_BLOCK_SIZE,
-            replicationConfig, OzoneConsts.OZONE, new ExcludeList()));
+            replicationConfig, OzoneConsts.OZONE, new ExcludeList(),
+            StorageType.DEFAULT));
     assertEquals("SafeModePrecheck failed for allocateBlock",
         t.getMessage());
   }
@@ -459,7 +463,8 @@ public class TestBlockManager {
   public void testAllocateBlockSucInSafeMode() throws Exception {
     // Test2: Exit safe mode and then try allocateBock again.
     assertNotNull(blockManager.allocateBlock(DEFAULT_BLOCK_SIZE,
-        replicationConfig, OzoneConsts.OZONE, new ExcludeList()));
+        replicationConfig, OzoneConsts.OZONE, new ExcludeList(),
+        StorageType.DEFAULT));
   }
 
   @Test
@@ -472,14 +477,14 @@ public class TestBlockManager {
 
     AllocatedBlock allocatedBlock = blockManager
         .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig, OzoneConsts.OZONE,
-            new ExcludeList());
+            new ExcludeList(), StorageType.DEFAULT);
     // block should be allocated in different pipelines
     GenericTestUtils.waitFor(() -> {
       try {
         AllocatedBlock block = blockManager
             .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig,
                 OzoneConsts.OZONE,
-                new ExcludeList());
+                new ExcludeList(), StorageType.DEFAULT);
         return !block.getPipeline().getId()
             .equals(allocatedBlock.getPipeline().getId());
       } catch (IOException e) {
@@ -525,7 +530,7 @@ public class TestBlockManager {
         blockManager
             .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig,
                 OzoneConsts.OZONE,
-                new ExcludeList());
+                new ExcludeList(), StorageType.DEFAULT);
       } catch (IOException e) {
       }
       return verifyNumberOfContainersInPipelines(
@@ -550,7 +555,7 @@ public class TestBlockManager {
         blockManager
             .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig,
                 OzoneConsts.OZONE,
-                new ExcludeList());
+                new ExcludeList(), StorageType.DEFAULT);
       } catch (IOException e) {
       }
       return verifyNumberOfContainersInPipelines(
@@ -567,7 +572,37 @@ public class TestBlockManager {
     assertEquals(0, pipelineManager.getPipelines(replicationConfig).size());
     assertNotNull(blockManager
         .allocateBlock(DEFAULT_BLOCK_SIZE, replicationConfig, OzoneConsts.OZONE,
-            new ExcludeList()));
+            new ExcludeList(), StorageType.DEFAULT));
+  }
+
+  /**
+   * Integration test: verifies the full BlockManagerImpl → WritableContainerFactory
+   * → WritableRatisContainerProvider → PipelineStorageTypeFilter chain.
+   * MockNodeManager reports only DISK volumes. Requesting SSD should fail
+   * because the filter removes all existing pipelines, and newly created
+   * pipelines also contain DISK-only nodes so they too get filtered on
+   * the second attempt.
+   */
+  @Test
+  public void testAllocateBlockWithNonMatchingStorageTypeFails()
+      throws Exception {
+    pipelineManager.createPipeline(replicationConfig);
+    HddsTestUtils.openAllRatisPipelines(pipelineManager);
+
+    // Verify DISK allocation works (baseline — all nodes report DISK)
+    AllocatedBlock diskBlock = blockManager.allocateBlock(
+        DEFAULT_BLOCK_SIZE, replicationConfig, OzoneConsts.OZONE,
+        new ExcludeList(), StorageType.DISK);
+    assertNotNull(diskBlock);
+
+    // SSD allocation should fail: MockNodeManager nodes only have DISK
+    // volumes, so the PipelineStorageTypeFilter removes all pipelines,
+    // pipeline creation adds another DISK-only pipeline which also gets
+    // filtered, resulting in IOException.
+    assertThrows(IOException.class,
+        () -> blockManager.allocateBlock(DEFAULT_BLOCK_SIZE,
+            replicationConfig, OzoneConsts.OZONE,
+            new ExcludeList(), StorageType.SSD));
   }
 
   private class DatanodeCommandHandler implements

@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import net.jcip.annotations.Immutable;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
+import org.apache.hadoop.hdds.protocol.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -69,6 +70,8 @@ public final class BucketArgs {
 
   private final String owner;
 
+  private final OzoneStoragePolicy storagePolicy;
+
   /**
    * Bucket Layout.
    */
@@ -86,6 +89,7 @@ public final class BucketArgs {
     quotaInNamespace = b.quotaInNamespace;
     bucketLayout = b.bucketLayout;
     owner = b.owner;
+    storagePolicy = b.storagePolicy;
     defaultReplicationConfig = b.defaultReplicationConfig;
   }
 
@@ -185,6 +189,10 @@ public final class BucketArgs {
     return owner;
   }
 
+  public OzoneStoragePolicy getStoragePolicy() {
+    return storagePolicy;
+  }
+
   /**
    * Builder for OmBucketInfo.
    */
@@ -200,6 +208,7 @@ public final class BucketArgs {
     private long quotaInNamespace;
     private BucketLayout bucketLayout;
     private String owner;
+    private OzoneStoragePolicy storagePolicy;
     private DefaultReplicationConfig defaultReplicationConfig;
 
     public Builder() {
@@ -265,6 +274,11 @@ public final class BucketArgs {
 
     public BucketArgs.Builder setOwner(String ownerName) {
       owner = ownerName;
+      return this;
+    }
+
+    public BucketArgs.Builder setStoragePolicy(OzoneStoragePolicy policy) {
+      storagePolicy = policy;
       return this;
     }
 

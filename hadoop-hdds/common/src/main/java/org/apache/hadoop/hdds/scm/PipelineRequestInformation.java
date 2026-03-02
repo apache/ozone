@@ -17,17 +17,21 @@
 
 package org.apache.hadoop.hdds.scm;
 
+import org.apache.hadoop.hdds.protocol.StorageType;
+
 /**
  * The information of the request of pipeline.
  */
 public final class PipelineRequestInformation {
   private final long size;
+  private final StorageType storageType;
 
   /**
    * Builder for PipelineRequestInformation.
    */
   public static class Builder {
     private long size;
+    private StorageType storageType;
 
     public static Builder getBuilder() {
       return new Builder();
@@ -43,16 +47,26 @@ public final class PipelineRequestInformation {
       return this;
     }
 
+    public Builder setStorageType(StorageType st) {
+      this.storageType = st;
+      return this;
+    }
+
     public PipelineRequestInformation build() {
-      return new PipelineRequestInformation(size);
+      return new PipelineRequestInformation(size, storageType);
     }
   }
 
-  private PipelineRequestInformation(long size) {
+  private PipelineRequestInformation(long size, StorageType storageType) {
     this.size = size;
+    this.storageType = storageType;
   }
 
   public long getSize() {
     return size;
+  }
+
+  public StorageType getStorageType() {
+    return storageType;
   }
 }

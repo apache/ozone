@@ -42,6 +42,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -164,6 +165,7 @@ public class TestOMKeyRequest {
         .thenReturn(true);
     when(ozoneManager.getBucketInfo(anyString(), anyString())).thenReturn(
         new OmBucketInfo.Builder().setVolumeName("").setBucketName("").build());
+    when(ozoneManager.getDefaultStoragePolicy()).thenReturn(OzoneStoragePolicy.WARM);
     doNothing().when(auditLogger).logWrite(any(AuditMessage.class));
 
     AuditMessage mockAuditMessage = mock(AuditMessage.class);

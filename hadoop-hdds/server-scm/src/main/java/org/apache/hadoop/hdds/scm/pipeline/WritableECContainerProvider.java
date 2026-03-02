@@ -34,6 +34,7 @@ import org.apache.hadoop.hdds.conf.ConfigType;
 import org.apache.hadoop.hdds.conf.PostConstruct;
 import org.apache.hadoop.hdds.conf.ReconfigurableConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.PipelineRequestInformation;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -93,6 +94,20 @@ public class WritableECContainerProvider
   public ContainerInfo getContainer(final long size,
       ECReplicationConfig repConfig, String owner, ExcludeList excludeList)
       throws IOException {
+    return getContainerInternal(size, repConfig, owner, excludeList, null);
+  }
+
+  @Override
+  public ContainerInfo getContainer(final long size,
+      ECReplicationConfig repConfig, String owner, ExcludeList excludeList,
+      StorageType storageType) throws IOException {
+    return getContainerInternal(size, repConfig, owner, excludeList,
+        storageType);
+  }
+
+  private ContainerInfo getContainerInternal(final long size,
+      ECReplicationConfig repConfig, String owner, ExcludeList excludeList,
+      StorageType storageType) throws IOException {
     int maximumPipelines = getMaximumPipelines(repConfig);
     int openPipelineCount;
     synchronized (this) {
@@ -115,12 +130,15 @@ public class WritableECContainerProvider
     }
     List<Pipeline> existingPipelines = pipelineManager.getPipelines(
         repConfig, Pipeline.PipelineState.OPEN);
+    existingPipelines = PipelineStorageTypeFilter.filter(
+        existingPipelines, nodeManager, storageType);
     final int pipelineCount = existingPipelines.size();
     LOG.debug("Checking existing pipelines: {}", existingPipelines);
 
     PipelineRequestInformation pri =
         PipelineRequestInformation.Builder.getBuilder()
             .setSize(size)
+            .setStorageType(storageType)
             .build();
     while (!existingPipelines.isEmpty()) {
       int pipelineIndex =

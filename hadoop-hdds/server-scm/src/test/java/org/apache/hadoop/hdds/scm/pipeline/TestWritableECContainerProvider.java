@@ -35,6 +35,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
@@ -55,7 +56,10 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.StorageReportProto;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -70,6 +74,9 @@ import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
+import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.WritableECContainerProvider.WritableECContainerProviderConfig;
 import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.CapacityPipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.HealthyPipelineChoosePolicy;
@@ -78,6 +85,7 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -574,6 +582,237 @@ public class TestWritableECContainerProvider {
     return (long)conf.getStorageSize(
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, BYTES);
+  }
+
+  @ParameterizedTest
+  @MethodSource("policies")
+  void testNullStorageTypeSkipsFilter(PipelineChoosePolicy policy)
+      throws IOException {
+    provider = createSubject(policy);
+    // Null storageType should behave identically to the 4-param method —
+    // both succeed without error
+    ContainerInfo container4 = provider.getContainer(
+        1, repConfig, OWNER, new ExcludeList());
+    assertNotNull(container4);
+
+    ContainerInfo container5 = provider.getContainer(
+        1, repConfig, OWNER, new ExcludeList(), null);
+    assertNotNull(container5);
+  }
+
+  @ParameterizedTest
+  @MethodSource("policies")
+  void testStorageTypeDiskMatchesDefaultNodes(PipelineChoosePolicy policy)
+      throws IOException {
+    provider = createSubject(policy);
+    // MockNodeManager reports DISK by default (null StorageTypeProto
+    // defaults to DISK), so filtering for DISK should succeed
+    ContainerInfo container = provider.getContainer(
+        1, repConfig, OWNER, new ExcludeList(), StorageType.DISK);
+    assertNotNull(container);
+  }
+
+  /**
+   * Tests that StorageType filtering actually rejects pipelines whose nodes
+   * don't have the requested type. Uses fully mocked components to control
+   * exactly which storage types each node reports, and prevents new pipeline
+   * creation so the test can't pass via the fallback allocation path.
+   */
+  @Test
+  void testStorageTypeFilterRejectsNonMatchingPipelines()
+      throws IOException {
+    // Create 5 EC nodes (3+2)
+    List<DatanodeDetails> nodes = new ArrayList<>();
+    for (int i = 0; i < 5; i++) {
+      nodes.add(MockDatanodeDetails.randomDatanodeDetails());
+    }
+    Map<DatanodeDetails, Integer> replicaIndexes = new HashMap<>();
+    for (int i = 0; i < nodes.size(); i++) {
+      replicaIndexes.put(nodes.get(i), i + 1);
+    }
+
+    Pipeline pipeline = Pipeline.newBuilder()
+        .setState(Pipeline.PipelineState.OPEN)
+        .setId(PipelineID.randomId())
+        .setReplicationConfig(repConfig)
+        .setNodes(nodes)
+        .setReplicaIndexes(replicaIndexes)
+        .build();
+
+    ContainerInfo containerInfo = createContainer(pipeline, repConfig, 1L);
+
+    // Mock PipelineManager: one open pipeline, createPipeline always fails
+    PipelineManager pm = mock(PipelineManager.class);
+    when(pm.getPipelineCount(repConfig, Pipeline.PipelineState.OPEN))
+        .thenReturn(100); // at max, skip initial allocateContainer
+    when(pm.getPipelines(repConfig, Pipeline.PipelineState.OPEN))
+        .thenReturn(new ArrayList<>(Collections.singletonList(pipeline)));
+    when(pm.getContainersInPipeline(pipeline.getId()))
+        .thenReturn(new java.util.TreeSet<>(
+            Collections.singleton(containerInfo.containerID())));
+
+    // Mock ContainerManager
+    ContainerManager cm = mock(ContainerManager.class);
+    when(cm.getContainer(containerInfo.containerID()))
+        .thenReturn(containerInfo);
+    when(cm.getMatchingContainer(anyLong(), anyString(), any(Pipeline.class)))
+        .thenReturn(containerInfo);
+
+    // Mock NodeManager: all nodes report only DISK
+    NodeManager nm = mock(NodeManager.class);
+    when(nm.getNodes(NodeStatus.inServiceHealthy())).thenReturn(nodes);
+    when(nm.getNodeCount(NodeStatus.inServiceHealthy())).thenReturn(
+        nodes.size());
+    for (DatanodeDetails dn : nodes) {
+      DatanodeInfo info = mock(DatanodeInfo.class);
+      when(info.getStorageReports()).thenReturn(
+          Collections.singletonList(createDiskStorageReport()));
+      when(nm.getDatanodeInfo(dn)).thenReturn(info);
+    }
+
+    WritableECContainerProvider ecProvider = new WritableECContainerProvider(
+        providerConf, getMaxContainerSize(), nm, pm, cm,
+        new RandomPipelineChoosePolicy());
+
+    // null storageType: filter is no-op, should return the container
+    ContainerInfo result = ecProvider.getContainer(
+        1, repConfig, OWNER, new ExcludeList(), null);
+    assertNotNull(result);
+    assertEquals(containerInfo.containerID(), result.containerID());
+
+    // DISK storageType: all nodes have DISK, pipeline should pass filter
+    result = ecProvider.getContainer(
+        1, repConfig, OWNER, new ExcludeList(), StorageType.DISK);
+    assertNotNull(result);
+    assertEquals(containerInfo.containerID(), result.containerID());
+
+    // SSD storageType: no nodes have SSD, filter removes the pipeline.
+    // Since openPipelineCount >= maximumPipelines and nodeCount <=
+    // maximumPipelines, the fallback allocateContainer is also blocked.
+    assertThrows(IOException.class,
+        () -> ecProvider.getContainer(
+            1, repConfig, OWNER, new ExcludeList(), StorageType.SSD));
+  }
+
+  /**
+   * Tests that filtering works correctly with a mix of SSD and DISK
+   * pipelines — the SSD pipeline is returned when SSD is requested, and
+   * the DISK pipeline is returned when DISK is requested.
+   */
+  @Test
+  void testStorageTypeFilterSelectsCorrectPipeline()
+      throws IOException {
+    // Create two sets of nodes: SSD nodes and DISK nodes
+    List<DatanodeDetails> ssdNodes = new ArrayList<>();
+    List<DatanodeDetails> diskNodes = new ArrayList<>();
+    for (int i = 0; i < 5; i++) {
+      ssdNodes.add(MockDatanodeDetails.randomDatanodeDetails());
+      diskNodes.add(MockDatanodeDetails.randomDatanodeDetails());
+    }
+
+    Map<DatanodeDetails, Integer> ssdIndexes = new HashMap<>();
+    Map<DatanodeDetails, Integer> diskIndexes = new HashMap<>();
+    for (int i = 0; i < 5; i++) {
+      ssdIndexes.put(ssdNodes.get(i), i + 1);
+      diskIndexes.put(diskNodes.get(i), i + 1);
+    }
+
+    Pipeline ssdPipeline = Pipeline.newBuilder()
+        .setState(Pipeline.PipelineState.OPEN)
+        .setId(PipelineID.randomId())
+        .setReplicationConfig(repConfig)
+        .setNodes(ssdNodes)
+        .setReplicaIndexes(ssdIndexes)
+        .build();
+
+    Pipeline diskPipeline = Pipeline.newBuilder()
+        .setState(Pipeline.PipelineState.OPEN)
+        .setId(PipelineID.randomId())
+        .setReplicationConfig(repConfig)
+        .setNodes(diskNodes)
+        .setReplicaIndexes(diskIndexes)
+        .build();
+
+    ContainerInfo ssdContainer = createContainer(ssdPipeline, repConfig, 1L);
+    ContainerInfo diskContainer = createContainer(diskPipeline, repConfig, 2L);
+
+    // Mock PipelineManager with both pipelines
+    PipelineManager pm = mock(PipelineManager.class);
+    when(pm.getPipelineCount(repConfig, Pipeline.PipelineState.OPEN))
+        .thenReturn(100);
+    when(pm.getPipelines(repConfig, Pipeline.PipelineState.OPEN))
+        .thenReturn(new ArrayList<>(
+            java.util.Arrays.asList(ssdPipeline, diskPipeline)));
+    when(pm.getContainersInPipeline(ssdPipeline.getId()))
+        .thenReturn(new java.util.TreeSet<>(
+            Collections.singleton(ssdContainer.containerID())));
+    when(pm.getContainersInPipeline(diskPipeline.getId()))
+        .thenReturn(new java.util.TreeSet<>(
+            Collections.singleton(diskContainer.containerID())));
+
+    // Mock ContainerManager
+    ContainerManager cm = mock(ContainerManager.class);
+    when(cm.getContainer(ssdContainer.containerID()))
+        .thenReturn(ssdContainer);
+    when(cm.getContainer(diskContainer.containerID()))
+        .thenReturn(diskContainer);
+
+    // Mock NodeManager
+    List<DatanodeDetails> allNodes = new ArrayList<>();
+    allNodes.addAll(ssdNodes);
+    allNodes.addAll(diskNodes);
+    NodeManager nm = mock(NodeManager.class);
+    when(nm.getNodes(NodeStatus.inServiceHealthy())).thenReturn(allNodes);
+    when(nm.getNodeCount(NodeStatus.inServiceHealthy()))
+        .thenReturn(allNodes.size());
+    for (DatanodeDetails dn : ssdNodes) {
+      DatanodeInfo info = mock(DatanodeInfo.class);
+      when(info.getStorageReports()).thenReturn(
+          Collections.singletonList(createSsdStorageReport()));
+      when(nm.getDatanodeInfo(dn)).thenReturn(info);
+    }
+    for (DatanodeDetails dn : diskNodes) {
+      DatanodeInfo info = mock(DatanodeInfo.class);
+      when(info.getStorageReports()).thenReturn(
+          Collections.singletonList(createDiskStorageReport()));
+      when(nm.getDatanodeInfo(dn)).thenReturn(info);
+    }
+
+    WritableECContainerProvider ecProvider = new WritableECContainerProvider(
+        providerConf, getMaxContainerSize(), nm, pm, cm,
+        new RandomPipelineChoosePolicy());
+
+    // Request SSD: should get the SSD pipeline's container
+    ContainerInfo result = ecProvider.getContainer(
+        1, repConfig, OWNER, new ExcludeList(), StorageType.SSD);
+    assertEquals(ssdPipeline.getId(), result.getPipelineID());
+
+    // Request DISK: should get the DISK pipeline's container
+    result = ecProvider.getContainer(
+        1, repConfig, OWNER, new ExcludeList(), StorageType.DISK);
+    assertEquals(diskPipeline.getId(), result.getPipelineID());
+  }
+
+  private static StorageReportProto createDiskStorageReport() {
+    return StorageReportProto.newBuilder()
+        .setStorageUuid("uuid-" + java.util.UUID.randomUUID())
+        .setStorageLocation("/data")
+        .setCapacity(100L * 1024 * 1024 * 1024)
+        .setScmUsed(10L * 1024 * 1024 * 1024)
+        .setRemaining(90L * 1024 * 1024 * 1024)
+        .setStorageType(StorageTypeProto.DISK)
+        .build();
+  }
+
+  private static StorageReportProto createSsdStorageReport() {
+    return StorageReportProto.newBuilder()
+        .setStorageUuid("uuid-" + java.util.UUID.randomUUID())
+        .setStorageLocation("/ssd")
+        .setCapacity(100L * 1024 * 1024 * 1024)
+        .setScmUsed(10L * 1024 * 1024 * 1024)
+        .setRemaining(90L * 1024 * 1024 * 1024)
+        .setStorageType(StorageTypeProto.SSD)
+        .build();
   }
 
 }

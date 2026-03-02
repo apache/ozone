@@ -38,6 +38,7 @@ import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.AllocateBlockResponse;
 import org.apache.hadoop.hdds.protocol.proto.ScmBlockLocationProtocolProtos.AllocateScmBlockRequestProto;
@@ -173,7 +174,8 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
       long size, int num,
       ReplicationConfig replicationConfig,
       String owner, ExcludeList excludeList,
-      String clientMachine
+      String clientMachine,
+      StorageType storageType
   ) throws IOException {
     Preconditions.checkArgument(size > 0, "block size must be greater than 0");
 
@@ -187,6 +189,10 @@ public final class ScmBlockLocationProtocolClientSideTranslatorPB
 
     if (StringUtils.isNotEmpty(clientMachine)) {
       requestBuilder.setClient(clientMachine);
+    }
+
+    if (storageType != null) {
+      requestBuilder.setStorageType(storageType.toProto());
     }
 
     switch (replicationConfig.getReplicationType()) {

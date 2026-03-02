@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.om;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
+import org.apache.hadoop.hdds.protocol.OzoneStoragePolicy;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.ratis.util.TimeDuration;
 
@@ -372,6 +373,18 @@ public final class OMConfigKeys {
       BucketLayout.FILE_SYSTEM_OPTIMIZED.name();
   public static final String OZONE_BUCKET_LAYOUT_OBJECT_STORE =
       BucketLayout.OBJECT_STORE.name();
+
+  // Storage policy tiering feature toggle.
+  public static final String OZONE_STORAGE_POLICY_ENABLED =
+      "ozone.storage.policy.enabled";
+  public static final boolean OZONE_STORAGE_POLICY_ENABLED_DEFAULT = false;
+
+  // Default storage policy used by Ozone Manager when a client does not
+  // specify a storage policy.
+  public static final String OZONE_DEFAULT_STORAGE_POLICY =
+      "ozone.default.storage.policy";
+  public static final String OZONE_DEFAULT_STORAGE_POLICY_DEFAULT =
+      OzoneStoragePolicy.WARM.name();
 
   /**
    * Configuration properties for Directory Deleting Service.
