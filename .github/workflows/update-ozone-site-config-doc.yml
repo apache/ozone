@@ -40,6 +40,7 @@ jobs:
             echo "ozone-site repository not found for $REPO_OWNER, skipping"
           fi
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO_OWNER: "${{ github.repository_owner }}"
       
       - name: Checkout ozone-site repository
