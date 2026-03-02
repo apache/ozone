@@ -51,12 +51,12 @@ jobs:
           
           git clone --depth=1 --branch=master https://github.com/${{ github.repository_owner }}/ozone-site.git ozone-site
           
-          # Check if automated-config-doc-update branch exists remotely
+          # Check if $BRANCH_NAME branch exists remotely
           cd ozone-site
-          if git ls-remote --heads origin automated-config-doc-update | grep -q automated-config-doc-update; then
+          if git ls-remote --heads origin $BRANCH_NAME | grep -q $BRANCH_NAME; then
             echo "PR branch exists, checking it out for comparison"
-            git fetch --depth=1 origin automated-config-doc-update
-            git checkout -B automated-config-doc-update FETCH_HEAD
+            git fetch --depth=1 origin $BRANCH_NAME
+            git checkout -B $BRANCH_NAME FETCH_HEAD
           else
             echo "PR branch does not exist, staying on master for comparison"
           fi
@@ -121,8 +121,6 @@ jobs:
         if: steps.check-changes.outputs.changed == 'true'
         run: |
           cd ozone-site
-          
-          # Use single branch name
           
           echo "Current branch: $(git branch --show-current)"
           echo "Current commit: $(git rev-parse HEAD)"
