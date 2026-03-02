@@ -18,6 +18,9 @@
 package org.apache.hadoop.ozone.scm.node;
 
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
+import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.getIdealUsage;
+import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.getVolumeUsages;
+import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.newVolumeFixedUsage;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -30,7 +33,9 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
@@ -41,6 +46,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
@@ -52,15 +58,14 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerD
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.ozone.container.ContainerTestHelper;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
-import org.apache.hadoop.ozone.container.common.impl.ContainerDataScanOrder;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
-import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.VolumeFixedUsage;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultVolumeContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
@@ -73,9 +78,9 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * This class tests the ContainerChoosingPolicy.
+ * This class tests the container selection logic performance.
  */
-public class TestContainerChoosingPolicy {
+public class TestContainerChoosingPerformance {
 
   private static final int NUM_VOLUMES = 20;
   private static final int NUM_CONTAINERS = 100000;
@@ -92,15 +97,17 @@ public class TestContainerChoosingPolicy {
   private List<HddsVolume> volumes;
   private ContainerSet containerSet;
   private OzoneContainer ozoneContainer;
-  private ContainerChoosingPolicy containerChoosingPolicy;
+  private DefaultVolumeContainerChoosingPolicy volumeContainerChoosingPolicy;
   private ExecutorService executor;
   private MutableVolumeSet volumeSet;
 
   // Simulate containers currently being balanced (in progress)
   private Set<ContainerID> inProgressContainerIDs = ConcurrentHashMap.newKeySet();
+  private Map<HddsVolume, Long> deltaMap = new ConcurrentHashMap<>();
 
   @BeforeEach
   public void setup() throws Exception {
+    CONF.set("hdds.datanode.volume.min.free.space", "10MB");
     containerSet = newContainerSet();
     createVolumes();
     createContainers();
@@ -108,7 +115,7 @@ public class TestContainerChoosingPolicy {
     ContainerController containerController = new ContainerController(containerSet, null);
     when(ozoneContainer.getController()).thenReturn(containerController);
     when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
-    containerChoosingPolicy = new DefaultContainerChoosingPolicy();
+    volumeContainerChoosingPolicy = new DefaultVolumeContainerChoosingPolicy(new ReentrantLock());
     executor = Executors.newFixedThreadPool(NUM_THREADS);
 
     // Create a spied MutableVolumeSet and inject the test volumes
@@ -138,45 +145,51 @@ public class TestContainerChoosingPolicy {
   @Test
   @Timeout(300)
   public void testConcurrentContainerChoosingPerformance() throws Exception {
-    testPolicyPerformance("ContainerChoosingPolicy", containerChoosingPolicy);
+    testContainerSelectionPerformance();
   }
 
   @Test
   public void testContainerDeletionAfterIteratorGeneration() throws Exception {
-    HddsVolume volume = volumes.get(0);
-    HddsVolume destVolume = volumes.get(1);
-
-    List<Container<?>> containerList = ozoneContainer.getContainerSet().getContainerMap().values().stream()
-        .filter(x -> volume.getStorageID().equals(x.getContainerData().getVolume().getStorageID()))
-        .filter(x -> x.getContainerData().isClosed())
-        .sorted(ContainerDataScanOrder.INSTANCE)
-        .collect(Collectors.toList());
+    // Test that chooseContainer skips in-progress containers and handles deleted containers.
     inProgressContainerIDs.clear();
 
-    ContainerData container = containerChoosingPolicy.chooseContainer(ozoneContainer, volume, destVolume,
-        inProgressContainerIDs, THRESHOLD, volumeSet, null);
-    assertNotNull(container);
-    assertEquals(containerList.get(0).getContainerData().getContainerID(), container.getContainerID());
+    ChooseContainerContext ctx = getChooseContainerContext();
 
-    ozoneContainer.getContainerSet().removeContainer(containerList.get(1).getContainerData().getContainerID());
-    inProgressContainerIDs.add(ContainerID.valueOf(container.getContainerID()));
-    container = containerChoosingPolicy.chooseContainer(ozoneContainer, volume,
-        destVolume, inProgressContainerIDs, THRESHOLD, volumeSet, null);
-    assertEquals(containerList.get(1).getContainerData().getContainerID(), container.getContainerID());
+    // Get source containers in policy order
+    List<Container<?>> policyOrder = getSourceContainersInPolicyOrder(ctx.srcVolume);
+
+    // choose first container
+    ContainerData first = volumeContainerChoosingPolicy.chooseContainer(ozoneContainer, ctx.srcVolume, ctx.dstVolume,
+        ctx.dstUsage, inProgressContainerIDs, ctx.upperThreshold);
+    assertNotNull(first, "Expected to choose a container on first call");
+    assertEquals(policyOrder.get(0).getContainerData().getContainerID(), first.getContainerID());
+
+    // Mark first as in-progress and remove second from containerSet
+    inProgressContainerIDs.add(ContainerID.valueOf(first.getContainerID()));
+    ozoneContainer.getContainerSet().removeContainer(policyOrder.get(1).getContainerData().getContainerID());
+
+    // Second call: policy skips get(0) (in-progress) and get(1) (deleted), returns get(2)
+    ContainerData secondContainer = volumeContainerChoosingPolicy.
+        chooseContainer(ozoneContainer, ctx.srcVolume, ctx.dstVolume,
+        ctx.dstUsage, inProgressContainerIDs, ctx.upperThreshold);
+    assertNotNull(secondContainer, "Expected to choose a container on second call");
+    assertEquals(policyOrder.get(2).getContainerData().getContainerID(), secondContainer.getContainerID());
   }
 
   /**
-   * SuccessCount: Number of successful container choices from the policy.
-   * FailureCount: Failures due to any exceptions thrown during container choice.
+   * Tests container selection performance using chooseContainer directly.
    */
-  private void testPolicyPerformance(String policyName, ContainerChoosingPolicy policy) throws Exception {
+  private void testContainerSelectionPerformance() throws Exception {
+    inProgressContainerIDs.clear();
+    deltaMap.clear();
+
+    ChooseContainerContext ctx = getChooseContainerContext();
+
     CountDownLatch latch = new CountDownLatch(NUM_THREADS);
     AtomicInteger containerChosenCount = new AtomicInteger(0);
     AtomicInteger containerNotChosenCount = new AtomicInteger(0);
     AtomicInteger failureCount = new AtomicInteger(0);
     AtomicLong totalTimeNanos = new AtomicLong(0);
-
-    Random rand = new Random();
 
     for (int i = 0; i < NUM_THREADS; i++) {
       executor.submit(() -> {
@@ -185,18 +198,11 @@ public class TestContainerChoosingPolicy {
           int containerChosen = 0;
           int containerNotChosen = 0;
           int failures = 0;
-          // Choose a random volume
-          HddsVolume srcVolume = volumes.get(rand.nextInt(NUM_VOLUMES));
-          HddsVolume destVolume;
-
-          do {
-            destVolume = volumes.get(rand.nextInt(NUM_VOLUMES));
-          } while (srcVolume.equals(destVolume));
 
           for (int j = 0; j < NUM_ITERATIONS; j++) {
             try {
-              ContainerData c = policy.chooseContainer(ozoneContainer, srcVolume,
-                  destVolume, inProgressContainerIDs, THRESHOLD, volumeSet, null);
+              ContainerData c = volumeContainerChoosingPolicy.chooseContainer(ozoneContainer,
+                  ctx.srcVolume, ctx.dstVolume, ctx.dstUsage, inProgressContainerIDs, ctx.upperThreshold);
               if (c == null) {
                 containerNotChosen++;
               } else {
@@ -228,7 +234,7 @@ public class TestContainerChoosingPolicy {
     double avgTimePerOp = (double) totalTimeNanos.get() / totalOperations;
     double opsPerSec = totalOperations / (totalTimeNanos.get() / 1_000_000_000.0);
 
-    System.out.println("Performance results for " + policyName);
+    System.out.println("Container selection performance results:");
     System.out.println("Total volumes: " + NUM_VOLUMES);
     System.out.println("Total containers: " + NUM_CONTAINERS);
     System.out.println("Total threads: " + NUM_THREADS);
@@ -239,6 +245,42 @@ public class TestContainerChoosingPolicy {
     System.out.println("Total time (ms): " + totalTimeNanos.get() / 1_000_000);
     System.out.println("Average time per operation (ns): " + avgTimePerOp);
     System.out.println("Operations per second: " + opsPerSec);
+    assertTrue(containerChosenCount.get() > 0, "Expected at least some containers to be chosen");
+  }
+
+  private ChooseContainerContext getChooseContainerContext() {
+    List<VolumeFixedUsage> volumeUsages = getVolumeUsages(volumeSet, deltaMap);
+    volumeUsages.sort(Comparator.comparingDouble(VolumeFixedUsage::getUtilization)
+        .thenComparing(v -> v.getVolume().getStorageID()));
+    double idealUsage = getIdealUsage(volumeUsages);
+    double upperThreshold = idealUsage + THRESHOLD / 100.0;
+    HddsVolume srcVolume = volumeUsages.get(volumeUsages.size() - 1).getVolume();
+    HddsVolume dstVolume = volumeUsages.get(0).getVolume();
+    VolumeFixedUsage dstUsage = newVolumeFixedUsage(dstVolume, deltaMap);
+    return new ChooseContainerContext(srcVolume, dstVolume, dstUsage, upperThreshold);
+  }
+
+  private List<Container<?>> getSourceContainersInPolicyOrder(HddsVolume srcVolume) {
+    List<Container<?>> list = new ArrayList<>();
+    ozoneContainer.getController().getContainers(srcVolume).forEachRemaining(list::add);
+    return list.stream()
+        .filter(c -> c.getContainerData().isClosed() && c.getContainerData().getBytesUsed() > 0)
+        .collect(Collectors.toList());
+  }
+
+  private static final class ChooseContainerContext {
+    private final HddsVolume srcVolume;
+    private final HddsVolume dstVolume;
+    private final VolumeFixedUsage dstUsage;
+    private final double upperThreshold;
+
+    ChooseContainerContext(HddsVolume srcVolume, HddsVolume dstVolume,
+        VolumeFixedUsage dstUsage, double upperThreshold) {
+      this.srcVolume = srcVolume;
+      this.dstVolume = dstVolume;
+      this.dstUsage = dstUsage;
+      this.upperThreshold = upperThreshold;
+    }
   }
 
   public void createVolumes() throws IOException {

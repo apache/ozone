@@ -41,15 +41,12 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
 import org.apache.hadoop.hdds.server.ServerUtils;
@@ -69,9 +66,9 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.VolumeFixedUsage;
-import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
-import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
-import org.apache.hadoop.ozone.container.diskbalancer.policy.DiskBalancerVolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultVolumeContainerChoosingPolicy;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.DiskBalancerVolumeContainerCandidate;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.VolumeContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerLocationUtil;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil;
@@ -126,12 +123,10 @@ public class DiskBalancerService extends BackgroundService {
   private Map<HddsVolume, Long> deltaSizes;
   private MutableVolumeSet volumeSet;
 
-  private DiskBalancerVolumeChoosingPolicy volumeChoosingPolicy;
-  private ContainerChoosingPolicy containerChoosingPolicy;
+  private VolumeContainerChoosingPolicy volumeContainerChoosingPolicy;
   private final File diskBalancerInfoFile;
 
   private DiskBalancerServiceMetrics metrics;
-  private long containerDefaultSize;
 
   public DiskBalancerService(OzoneContainer ozoneContainer,
       long serviceCheckInterval, long serviceCheckTimeout, TimeUnit timeUnit,
@@ -148,15 +143,9 @@ public class DiskBalancerService extends BackgroundService {
     inProgressContainers = ConcurrentHashMap.newKeySet();
     deltaSizes = new ConcurrentHashMap<>();
     volumeSet = ozoneContainer.getVolumeSet();
-    containerDefaultSize = (long) conf.getStorageSize(
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
 
     try {
-      volumeChoosingPolicy = VolumeChoosingPolicyFactory.getDiskBalancerPolicy(conf);
-      containerChoosingPolicy = (ContainerChoosingPolicy)
-          conf.getObject(DiskBalancerConfiguration.class)
-              .getContainerChoosingPolicyClass().newInstance();
+      volumeContainerChoosingPolicy = VolumeChoosingPolicyFactory.getDiskBalancerContainerPolicy(conf);
     } catch (Exception e) {
       LOG.error("Got exception when initializing DiskBalancerService", e);
       throw new IOException(e);
@@ -403,25 +392,20 @@ public class DiskBalancerService extends BackgroundService {
     }
 
     for (int i = 0; i < availableTaskCount; i++) {
-      Pair<HddsVolume, HddsVolume> pair = volumeChoosingPolicy
-          .chooseVolume(volumeSet, threshold, deltaSizes, containerDefaultSize);
-      if (pair == null) {
-        continue;
-      }
-      HddsVolume sourceVolume = pair.getLeft(), destVolume = pair.getRight();
-      ContainerData toBalanceContainer = containerChoosingPolicy
-          .chooseContainer(ozoneContainer, sourceVolume, destVolume,
-              inProgressContainers, threshold, volumeSet, deltaSizes);
-      if (toBalanceContainer != null) {
-        DiskBalancerTask task = new DiskBalancerTask(toBalanceContainer, sourceVolume,
-            destVolume);
-        queue.add(task);
-        inProgressContainers.add(ContainerID.valueOf(toBalanceContainer.getContainerID()));
-        deltaSizes.put(sourceVolume, deltaSizes.getOrDefault(sourceVolume, 0L)
-            - toBalanceContainer.getBytesUsed());
-      } else {
-        // release destVolume committed bytes
-        destVolume.incCommittedBytes(0 - containerDefaultSize);
+      DiskBalancerVolumeContainerCandidate candidate = volumeContainerChoosingPolicy.chooseVolumesAndContainer(
+          ozoneContainer, volumeSet, deltaSizes, inProgressContainers, threshold);
+      if (candidate != null) {
+        HddsVolume sourceVolume = candidate.getSourceVolume();
+        HddsVolume destVolume = candidate.getDestVolume();
+        ContainerData toBalanceContainer = candidate.getContainerData();
+        if (toBalanceContainer != null) {
+          DiskBalancerTask task = new DiskBalancerTask(toBalanceContainer, sourceVolume,
+              destVolume);
+          queue.add(task);
+          inProgressContainers.add(ContainerID.valueOf(toBalanceContainer.getContainerID()));
+          deltaSizes.put(sourceVolume, deltaSizes.getOrDefault(sourceVolume, 0L)
+              - toBalanceContainer.getBytesUsed());
+        }
       }
     }
 
@@ -501,7 +485,7 @@ public class DiskBalancerService extends BackgroundService {
       // QUASI_CLOSED is allowed when test mode is enabled, this is done to test in production
       // these containers are rejected.
       State containerState = container.getContainerData().getState();
-      boolean isTestMode = DefaultContainerChoosingPolicy.isTest();
+      boolean isTestMode = DefaultVolumeContainerChoosingPolicy.isTest();
       if (containerState != State.CLOSED && !(isTestMode && containerState == State.QUASI_CLOSED)) {
         LOG.warn("Container {} is in {} state, skipping move process. Only CLOSED containers can be moved.",
             containerId, containerState);
@@ -638,7 +622,7 @@ public class DiskBalancerService extends BackgroundService {
       inProgressContainers.remove(ContainerID.valueOf(containerData.getContainerID()));
       deltaSizes.put(sourceVolume, deltaSizes.get(sourceVolume) +
           containerData.getBytesUsed());
-      destVolume.incCommittedBytes(0 - containerDefaultSize);
+      destVolume.incCommittedBytes(0 - containerData.getBytesUsed());
       long endTime = Time.monotonicNow();
       if (success) {
         metrics.incrSuccessCount(1);
@@ -747,22 +731,13 @@ public class DiskBalancerService extends BackgroundService {
     this.balancedBytesInLastWindow.set(bytes);
   }
 
-  public ContainerChoosingPolicy getContainerChoosingPolicy() {
-    return containerChoosingPolicy;
-  }
-
-  public DiskBalancerVolumeChoosingPolicy getVolumeChoosingPolicy() {
-    return volumeChoosingPolicy;
+  public VolumeContainerChoosingPolicy getVolumeContainerChoosingPolicy() {
+    return volumeContainerChoosingPolicy;
   }
 
   @VisibleForTesting
-  public void setVolumeChoosingPolicy(DiskBalancerVolumeChoosingPolicy volumeChoosingPolicy) {
-    this.volumeChoosingPolicy = volumeChoosingPolicy;
-  }
-
-  @VisibleForTesting
-  public void setContainerChoosingPolicy(ContainerChoosingPolicy containerChoosingPolicy) {
-    this.containerChoosingPolicy = containerChoosingPolicy;
+  public void setVolumeContainerChoosingPolicy(VolumeContainerChoosingPolicy volumeContainerChoosingPolicy) {
+    this.volumeContainerChoosingPolicy = volumeContainerChoosingPolicy;
   }
 
   @VisibleForTesting
