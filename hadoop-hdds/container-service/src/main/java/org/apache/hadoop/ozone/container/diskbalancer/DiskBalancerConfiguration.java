@@ -120,7 +120,7 @@ public final class DiskBalancerConfiguration {
       defaultValue = "5m",
       type = ConfigType.TIME,
       tags = { DATANODE, ConfigTag.DISKBALANCER },
-      description = "The deletion delay after a container is successfully moved from source volume to " +
+      description = "The delay after a container is successfully moved from source volume to " +
           "destination volume before the source container replica is deleted. " +
           "Unit could be defined with postfix (ns,ms,s,m,h,d).")
   private long replicaDeletionDelay = Duration.ofMinutes(5).toMillis();
