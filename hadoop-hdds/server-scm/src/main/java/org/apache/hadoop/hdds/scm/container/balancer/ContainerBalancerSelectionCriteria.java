@@ -260,11 +260,6 @@ public class ContainerBalancerSelectionCriteria {
     this.excludeContainers = excludeContainers;
   }
 
-  public void setIncludeContainers(
-      Set<ContainerID> includeContainers) {
-    this.includeContainers = includeContainers;
-  }
-
   public void addToExcludeDueToFailContainers(ContainerID container) {
     this.excludeContainersDueToFailure.add(container);
   }

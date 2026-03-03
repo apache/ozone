@@ -152,7 +152,6 @@ public class ContainerBalancerStatusSubcommand extends ScmSubcommand {
             configuration.getIncludeDatanodes().isEmpty() ? "None" : configuration.getIncludeDatanodes(),
             "Datanodes Excluded from Balancing",
             configuration.getExcludeDatanodes().isEmpty() ? "None" : configuration.getExcludeDatanodes());
-
   }
 
   private String getPrettyIterationStatusInfo(ContainerBalancerTaskIterationStatusInfoProto iterationStatusInfo) {
