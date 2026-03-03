@@ -26,6 +26,7 @@
   <description>Apache Ozone Distributed Data Store Server Framework</description>
 
   <properties>
+    <classpath.skip>false</classpath.skip>
     <!-- hdds-server-framework is used by ozone-cli-admin -->
     <maven.compiler.release>${ozone.java.version.client}</maven.compiler.release>
   </properties>
@@ -127,6 +128,10 @@
     </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>
+      <artifactId>commons-collections4</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
       <artifactId>commons-compress</artifactId>
     </dependency>
     <dependency>
@@ -136,6 +141,10 @@
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-lang3</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-pool2</artifactId>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
@@ -246,6 +255,10 @@
       <artifactId>slf4j-api</artifactId>
     </dependency>
     <dependency>
+      <groupId>org.yaml</groupId>
+      <artifactId>snakeyaml</artifactId>
+    </dependency>
+    <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-annotation-processing</artifactId>
       <scope>provided</scope>
@@ -294,6 +307,11 @@
       <scope>runtime</scope>
     </dependency>
     <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-reload4j</artifactId>
+      <scope>runtime</scope>
+    </dependency>
+    <dependency>
       <groupId>org.xerial.snappy</groupId>
       <artifactId>snappy-java</artifactId>
       <scope>runtime</scope>
@@ -321,7 +339,6 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-test-utils</artifactId>
-      <type>test-jar</type>
       <scope>test</scope>
     </dependency>
     <dependency>

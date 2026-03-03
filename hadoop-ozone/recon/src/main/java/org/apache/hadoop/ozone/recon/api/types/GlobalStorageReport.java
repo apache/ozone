@@ -22,40 +22,180 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 /**
  * Represents a report detailing global storage usage metrics.
  *
- * This class provides information about the total used space,
- * total free space, and the total storage capacity. It is used
- * to encapsulate and transport these metrics, which can assist
- * in monitoring and analyzing storage allocation and usage.
+ * <p>This class encapsulates aggregated storage metrics across the cluster
+ * and defines the relationship between filesystem capacity, reserved space,
+ * and Ozone-managed storage.</p>
+ *
+ * <h3>Storage Hierarchy</h3>
+ *
+ * <pre>
+ * {@code
+ * Global Storage Layout
+ *
+ * |<------------------------ totalFileSystemCapacity ------------------------->|
+ * |<-- totalReservedSpace -->|<----------- totalOzoneCapacity ---------------->|
+ *                            |<-totalOzoneUsedSpace->|<- totalOzoneFreeSpace ->|
+ *
+ *
+ * Relationships:
+ *
+ * totalFileSystemCapacity = totalOzoneCapacity + totalReservedSpace
+ *
+ * totalOzoneCapacity = totalOzoneUsedSpace + totalOzoneFreeSpace
+ * }
+ * </pre>
+ *
+ * <h3>Metric Definitions</h3>
+ *
+ * <ul>
+ *   <li><b>totalFileSystemCapacity</b>:
+ *       Total OS-reported filesystem capacity across all datanodes.</li>
+ *
+ *   <li><b>totalReservedSpace</b>:
+ *       Space reserved and not available for Ozone allocation.</li>
+ *
+ *   <li><b>totalOzoneCapacity</b>:
+ *       Portion of filesystem capacity available for Ozone
+ *       (i.e., filesystem capacity minus reserved space).</li>
+ *
+ *   <li><b>totalOzoneUsedSpace</b>:
+ *       Space currently consumed by Ozone data.</li>
+ *
+ *   <li><b>totalOzoneFreeSpace</b>:
+ *       Remaining allocatable space within Ozone capacity.</li>
+ *
+ *   <li><b>totalOzonePreAllocatedContainerSpace</b>:
+ *       Space pre-allocated for containers but not yet fully utilized.</li>
+ *
+ *   <li><b>totalMinimumFreeSpace</b>:
+ *       Minimum free space that must be maintained as per configuration.</li>
+ * </ul>
+ *
+ * <p>This differentiation helps in understanding how raw filesystem capacity
+ * is divided between reserved space and Ozone-managed space, and further how
+ * Ozone capacity is split between used and free storage.</p>
  */
 public class GlobalStorageReport {
 
-  @JsonProperty("totalUsedSpace")
-  private long totalUsedSpace;
+  @JsonProperty("totalFileSystemCapacity")
+  private long totalFileSystemCapacity;
 
-  @JsonProperty("totalFreeSpace")
-  private long totalFreeSpace;
+  @JsonProperty("totalReservedSpace")
+  private long totalReservedSpace;
 
-  @JsonProperty("totalCapacity")
-  private long totalCapacity;
+  @JsonProperty("totalOzoneCapacity")
+  private long totalOzoneCapacity;
+
+  @JsonProperty("totalOzoneUsedSpace")
+  private long totalOzoneUsedSpace;
+
+  @JsonProperty("totalOzoneFreeSpace")
+  private long totalOzoneFreeSpace;
+
+  @JsonProperty("totalOzonePreAllocatedContainerSpace")
+  private long totalOzonePreAllocatedContainerSpace;
+
+  @JsonProperty("totalMinimumFreeSpace")
+  private long totalMinimumFreeSpace;
+
+  public long getTotalFileSystemCapacity() {
+    return totalFileSystemCapacity;
+  }
+
+  public long getTotalReservedSpace() {
+    return totalReservedSpace;
+  }
+
+  public long getTotalOzoneCapacity() {
+    return totalOzoneCapacity;
+  }
+
+  public long getTotalOzoneUsedSpace() {
+    return totalOzoneUsedSpace;
+  }
+
+  public long getTotalOzoneFreeSpace() {
+    return totalOzoneFreeSpace;
+  }
+
+  public long getTotalOzonePreAllocatedContainerSpace() {
+    return totalOzonePreAllocatedContainerSpace;
+  }
+
+  public long getTotalMinimumFreeSpace() {
+    return totalMinimumFreeSpace;
+  }
 
   public GlobalStorageReport() {
   }
 
-  public GlobalStorageReport(long totalUsedSpace, long totalFreeSpace, long totalCapacity) {
-    this.totalUsedSpace = totalUsedSpace;
-    this.totalFreeSpace = totalFreeSpace;
-    this.totalCapacity = totalCapacity;
+  public GlobalStorageReport(Builder builder) {
+    this.totalFileSystemCapacity = builder.totalReservedSpace + builder.totalOzoneCapacity;
+    this.totalReservedSpace = builder.totalReservedSpace;
+    this.totalOzoneCapacity = builder.totalOzoneCapacity;
+    this.totalOzoneUsedSpace = builder.totalOzoneUsedSpace;
+    this.totalOzoneFreeSpace = builder.totalOzoneFreeSpace;
+    this.totalOzonePreAllocatedContainerSpace = builder.totalOzonePreAllocatedContainerSpace;
+    this.totalMinimumFreeSpace = builder.totalMinimumFreeSpace;
   }
 
-  public long getTotalUsedSpace() {
-    return totalUsedSpace;
+  public static Builder newBuilder() {
+    return new Builder();
   }
 
-  public long getTotalFreeSpace() {
-    return totalFreeSpace;
-  }
+  /**
+   * Builder class for creating an instance of GlobalStorageReport.
+   * Provides a fluent interface to set various storage parameters.
+   */
+  public static final class Builder {
+    private long totalReservedSpace;
+    private long totalOzoneCapacity;
+    private long totalOzoneUsedSpace;
+    private long totalOzoneFreeSpace;
+    private long totalOzonePreAllocatedContainerSpace;
+    private long totalMinimumFreeSpace;
 
-  public long getTotalCapacity() {
-    return totalCapacity;
+    public Builder() {
+      totalReservedSpace = 0;
+      totalOzoneCapacity = 0;
+      totalOzoneUsedSpace = 0;
+      totalOzoneFreeSpace = 0;
+      totalOzonePreAllocatedContainerSpace = 0;
+      totalMinimumFreeSpace = 0;
+    }
+
+    public Builder setTotalReservedSpace(long totalReservedSpace) {
+      this.totalReservedSpace = totalReservedSpace;
+      return this;
+    }
+
+    public Builder setTotalOzoneCapacity(long totalOzoneCapacity) {
+      this.totalOzoneCapacity = totalOzoneCapacity;
+      return this;
+    }
+
+    public Builder setTotalOzoneUsedSpace(long totalOzoneUsedSpace) {
+      this.totalOzoneUsedSpace = totalOzoneUsedSpace;
+      return this;
+    }
+
+    public Builder setTotalOzoneFreeSpace(long totalOzoneFreeSpace) {
+      this.totalOzoneFreeSpace = totalOzoneFreeSpace;
+      return this;
+    }
+
+    public Builder setTotalOzonePreAllocatedContainerSpace(long totalOzonePreAllocatedContainerSpace) {
+      this.totalOzonePreAllocatedContainerSpace = totalOzonePreAllocatedContainerSpace;
+      return this;
+    }
+
+    public Builder setTotalMinimumFreeSpace(long totalMinimumFreeSpace) {
+      this.totalMinimumFreeSpace = totalMinimumFreeSpace;
+      return this;
+    }
+
+    public GlobalStorageReport build() {
+      return new GlobalStorageReport(this);
+    }
   }
 }

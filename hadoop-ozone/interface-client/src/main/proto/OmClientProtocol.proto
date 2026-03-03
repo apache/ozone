@@ -179,6 +179,8 @@ message OMRequest {
 
   optional LayoutVersion layoutVersion = 6;
 
+  optional ReadConsistencyHint readConsistencyHint = 7;
+
   optional CreateVolumeRequest              createVolumeRequest            = 11;
   optional SetVolumePropertyRequest         setVolumePropertyRequest       = 12;
   optional CheckVolumeAccessRequest         checkVolumeAccessRequest       = 13;
@@ -2353,6 +2355,67 @@ message DeleteObjectTaggingRequest {
 }
 
 message DeleteObjectTaggingResponse {
+}
+
+enum ReadConsistencyProto {
+  // Unspecified consistency, the read consistency behavior is decided
+  // by the OM
+  READ_CONSISTENCY_UNSPECIFIED = 0;
+  // Client sends all read requests to OM node that the client believes is the current leader.
+  // If the OM node is not a leader, the OM node throws an exception so the client failover to the OM leader.
+  // OM leader handles the request immediately without doing leadership check to verify
+  // that OM leader is the latest leader. This means here might be a small period of time when there is
+  // a split brain and two OM nodes believe that they are both leaders (i.e. old leader and new leader
+  // where old leader's term < new leader's term).
+  // Without the leadership check, the old OM leader might return stale data
+  // during this small period of time. Therefore, the read consistency is not strictly
+  // linearizable. However, this situation should only happen in rare situations
+  // when the OM Raft group encounters a leader election due to network partition
+  // between the old leader and the other majority quorum (which will elect the new leader).
+  // This consistency is the default consistency for a few reasons
+  // 1. Compatibility: Compatible with the original read behavior
+  // 2. Performance: Fast reads since the leader serves reads immediately
+  // 3. Consistency: It is strongly consistent (linearizable) most of the time, except for rare condition that
+  //                 might cause stale read
+  DEFAULT = 1;
+  // Similar to the Default consistency that all requests can only be handled
+  // by the OM leader, but OM leader will carry out leadership check by sending heartbeats or checking
+  // the leader lease (if leader lease is enabled). This ensures that there are no stale reads.
+  // There might be performance tradeoff due to this leadership check.
+  LINEARIZABLE_LEADER_ONLY = 2;
+  // Client can send read requests to OM followers, but it requires the follower
+  // to carry out ReadIndex protocol to ensure linearizability. Similar to
+  // LinearizableLeaderRead, this consistency guarantee ensures that there are no stale reads.
+  // There might be performance tradeoff due to the ReadIndex protocol.
+  LINEARIZABLE_ALLOW_FOLLOWER = 3;
+  // Client can send read request to OM followers, and the follower only serves
+  // the read requests when these conditions are met
+  // 1. The last RPC elapsed time with the leader is within the time limit
+  // 2. The follower's applied index is within the configurable "lease lag limit"
+  //    compared to the leader's commit index
+  // This creates a form of bounded staleness read based on log index lag.
+  // Note that currently this does not guarantee monotonic reads since it
+  // requires session information of the last seen index. If the client failover
+  // from a leader / fast follower to a slow follower that is still within the bound,
+  // the slow follower can serve data that is more stale than the last seen index.
+  LOCAL_LEASE = 4;
+  // TODO: Support timestamp-based bounded stale reads
+}
+
+// Message to specify the expected read consistency
+// Note that this only acts a hint from the client and the
+// effective read consistency depends whether the OM supports it
+// or whether it is superseded by the OM server-side configuration.
+message ReadConsistencyHint {
+  message LocalLeaseContext {
+    optional uint64 logLimit = 1;
+    optional uint64 leaseTimeMs = 2;
+  }
+
+  optional ReadConsistencyProto readConsistency = 1;
+
+  // Oneof
+  optional LocalLeaseContext localLeaseContext = 2;
 }
 
 /**

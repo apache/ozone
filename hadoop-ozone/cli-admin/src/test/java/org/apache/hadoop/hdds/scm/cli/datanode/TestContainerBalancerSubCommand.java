@@ -449,7 +449,7 @@ class TestContainerBalancerSubCommand {
       throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.startContainerBalancer(
-        null, null, null, null, null, null, null, null, null, null, null, null))
+        null, null, null, null, null, null, null, null, null, null, null, null, null))
         .thenReturn(
             StorageContainerLocationProtocolProtos
                 .StartContainerBalancerResponseProto.newBuilder()
@@ -465,7 +465,7 @@ class TestContainerBalancerSubCommand {
       throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.startContainerBalancer(
-        null, null, null, null, null, null, null, null, null, null, null, null))
+        null, null, null, null, null, null, null, null, null, null, null, null, null))
         .thenReturn(StorageContainerLocationProtocolProtos
             .StartContainerBalancerResponseProto.newBuilder()
             .setStart(false)

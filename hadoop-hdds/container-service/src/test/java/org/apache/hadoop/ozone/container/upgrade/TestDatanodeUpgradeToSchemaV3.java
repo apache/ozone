@@ -94,8 +94,10 @@ public class TestDatanodeUpgradeToSchemaV3 {
   private void setup() throws Exception {
     address = SCMTestUtils.getReuseableAddress();
     conf.setSocketAddr(ScmConfigKeys.OZONE_SCM_NAMES, address);
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
+        tempFolder.resolve("data").toString());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
-        tempFolder.toString());
+        tempFolder.resolve("meta").toString());
   }
 
   @AfterEach
