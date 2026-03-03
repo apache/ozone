@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.client.rpc;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_TEST_AUTHORIZATION_ENABLED;
+import static org.apache.hadoop.hdds.security.SecurityConfig.OZONE_TEST_AUTHORIZATION_ENABLED;
 
 import java.io.IOException;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;

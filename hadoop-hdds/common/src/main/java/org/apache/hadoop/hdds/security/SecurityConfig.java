@@ -75,8 +75,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_AUTHORIZATION_ENABLE
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_AUTHORIZATION_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_TEST_AUTHORIZATION_ENABLED;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_TEST_AUTHORIZATION_ENABLED_DEFAULT;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -108,6 +106,15 @@ public class SecurityConfig {
   private static final Logger LOG =
       LoggerFactory.getLogger(SecurityConfig.class);
   private static volatile Provider provider;
+
+  /**
+   * Test-only configuration property to enable authorization checks without
+   * requiring full security (Kerberos) setup. This is for testing purposes
+   * only.
+   */
+  public static final String OZONE_TEST_AUTHORIZATION_ENABLED = "ozone.test.authorization.enabled";
+  public static final boolean OZONE_TEST_AUTHORIZATION_ENABLED_DEFAULT = false;
+
   private final int size;
   private final String keyAlgo;
   private final String providerString;
