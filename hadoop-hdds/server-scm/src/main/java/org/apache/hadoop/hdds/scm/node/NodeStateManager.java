@@ -59,7 +59,6 @@ import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
 import org.apache.hadoop.ozone.common.statemachine.StateMachine;
-import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.util.Time;
 import org.apache.hadoop.util.concurrent.HadoopExecutors;
 import org.slf4j.Logger;
@@ -141,8 +140,6 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   private long skippedHealthChecks;
 
-  private LayoutVersionManager layoutVersionManager;
-
   /**
    * Constructs a NodeStateManager instance with the given configuration.
    *
@@ -152,9 +149,7 @@ public class NodeStateManager implements Runnable, Closeable {
    */
   public NodeStateManager(ConfigurationSource conf,
                           EventPublisher eventPublisher,
-                          LayoutVersionManager layoutManager,
                           SCMContext scmContext) {
-    this.layoutVersionManager = layoutManager;
     this.nodeStateMap = new NodeStateMap();
     this.node2PipelineMap = new Node2PipelineMap();
     this.eventPublisher = eventPublisher;

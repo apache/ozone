@@ -17,13 +17,10 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -44,10 +41,8 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationCheckpoint;
 import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
-import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -86,13 +81,7 @@ public class TestNodeStateManager {
     scmContext.setFinalizationCheckpoint(
         FinalizationCheckpoint.FINALIZATION_COMPLETE);
     eventPublisher = new MockEventPublisher();
-    int scmSlv = maxLayoutVersion();
-    int scmMlv = maxLayoutVersion();
-    LayoutVersionManager mockVersionManager = mock(HDDSLayoutVersionManager.class);
-    when(mockVersionManager.getMetadataLayoutVersion()).thenReturn(scmMlv);
-    when(mockVersionManager.getSoftwareLayoutVersion()).thenReturn(scmSlv);
-    nsm = new NodeStateManager(conf, eventPublisher, mockVersionManager,
-        scmContext);
+    nsm = new NodeStateManager(conf, eventPublisher, scmContext);
   }
 
   @Test

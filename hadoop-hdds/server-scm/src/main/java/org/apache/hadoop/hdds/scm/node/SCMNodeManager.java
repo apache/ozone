@@ -178,8 +178,7 @@ public class SCMNodeManager implements NodeManager {
       HDDSLayoutVersionManager layoutVersionManager,
       Function<String, String> nodeResolver) {
     this.scmNodeEventPublisher = eventPublisher;
-    this.nodeStateManager = new NodeStateManager(conf, eventPublisher,
-        layoutVersionManager, scmContext);
+    this.nodeStateManager = new NodeStateManager(conf, eventPublisher, scmContext);
     this.version = VersionInfo.getLatestVersion();
     this.commandQueue = new CommandQueue();
     this.scmStorageConfig = scmStorageConfig;
