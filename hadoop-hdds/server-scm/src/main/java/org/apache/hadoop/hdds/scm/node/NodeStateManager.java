@@ -145,7 +145,6 @@ public class NodeStateManager implements Runnable, Closeable {
    *
    * @param conf Configuration
    * @param eventPublisher event publisher
-   * @param layoutManager Layout version manager
    */
   public NodeStateManager(ConfigurationSource conf,
                           EventPublisher eventPublisher,
