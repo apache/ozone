@@ -18,11 +18,12 @@
 package org.apache.hadoop.ozone.om.upgrade;
 
 import static org.apache.hadoop.ozone.om.upgrade.OMLayoutFeature.INITIAL_VERSION;
-import static org.mockito.Mockito.anyString;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 
 /**
@@ -55,8 +56,9 @@ public class OMLayoutFeatureUtil {
   // instance of the layout version manager.
   public LayoutVersionManager getOmVersionManager() throws IOException {
     LayoutVersionManager mockLvm = mock(LayoutVersionManager.class);
-    when(mockLvm.isAllowed(anyString())).thenReturn(false).thenReturn(true);
-    when(mockLvm.getFeature(anyString())).thenReturn(INITIAL_VERSION);
+    when(mockLvm.isAllowed(any(LayoutFeature.class)))
+        .thenReturn(false)
+        .thenReturn(true);
     return mockLvm;
   }
 

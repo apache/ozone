@@ -87,7 +87,7 @@ public class TestKeyValueStreamDataChannel {
               .setContainerID(222).setLocalID(333).build()).build()))
       .setDatanodeUuid("datanodeId")
       .setContainerID(111L)
-      .setVersion(ClientVersion.CURRENT.toProtoValue())
+      .setVersion(ClientVersion.CURRENT.serialize())
       .build();
   static final int PUT_BLOCK_PROTO_SIZE = PUT_BLOCK_PROTO.toByteString().size();
 

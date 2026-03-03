@@ -21,12 +21,12 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import org.apache.hadoop.ozone.Versioned;
+import org.apache.hadoop.hdds.ComponentVersion;
 
 /**
  * Annotations to register a validator. {@code org.apache.ozone.annotations.RegisterValidatorProcessor}
  * enforces other annotation to have the following methods:
- * applyBefore : Returns an enum which implement {@link Versioned}
+ * applyBefore : Returns an enum which implement {@link ComponentVersion}
  * requestType: Returns an Enum value.
  * processingPhase: Returns {@link RequestProcessingPhase}
  */

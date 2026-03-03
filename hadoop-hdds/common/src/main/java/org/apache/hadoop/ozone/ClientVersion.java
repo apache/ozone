@@ -50,7 +50,7 @@ public enum ClientVersion implements ComponentVersion {
 
   private static final Map<Integer, ClientVersion> BY_PROTO_VALUE =
       Arrays.stream(values())
-          .collect(toMap(ClientVersion::toProtoValue, identity()));
+          .collect(toMap(ClientVersion::serialize, identity()));
 
   private final int version;
   private final String description;
@@ -66,8 +66,13 @@ public enum ClientVersion implements ComponentVersion {
   }
 
   @Override
-  public int toProtoValue() {
+  public int serialize() {
     return version;
+  }
+
+  @Override
+  public String toString() {
+    return name() + " (" + serialize() + ")";
   }
 
   public static ClientVersion fromProtoValue(int value) {
@@ -76,7 +81,7 @@ public enum ClientVersion implements ComponentVersion {
 
   private static ClientVersion latest() {
     return Arrays.stream(ClientVersion.values())
-        .max(Comparator.comparingInt(ComponentVersion::toProtoValue)).orElse(null);
+        .max(Comparator.comparingInt(ComponentVersion::serialize)).orElse(null);
   }
 
 }

@@ -45,7 +45,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.hadoop.hdds.DatanodeVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.conf.ConfigurationTarget;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
@@ -61,8 +61,8 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
   private final int numDataVolumes;
   private final String reservedSpace;
   private final Integer layoutVersion;
-  private final DatanodeVersion initialVersion;
-  private final DatanodeVersion currentVersion;
+  private final HDDSVersion initialVersion;
+  private final HDDSVersion currentVersion;
 
   protected UniformDatanodesFactory(Builder builder) {
     numDataVolumes = builder.numDataVolumes;
@@ -111,10 +111,10 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
     }
 
     if (initialVersion != null) {
-      dnConf.setInt(TESTING_DATANODE_VERSION_INITIAL, initialVersion.toProtoValue());
+      dnConf.setInt(TESTING_DATANODE_VERSION_INITIAL, initialVersion.serialize());
     }
     if (currentVersion != null) {
-      dnConf.setInt(TESTING_DATANODE_VERSION_CURRENT, currentVersion.toProtoValue());
+      dnConf.setInt(TESTING_DATANODE_VERSION_CURRENT, currentVersion.serialize());
     }
     dnConf.set(HDDS_RATIS_LEADER_FIRST_ELECTION_MINIMUM_TIMEOUT_DURATION_KEY, "1s");
     dnConf.set(HDDS_INITIAL_HEARTBEAT_INTERVAL, "500ms");
@@ -145,8 +145,8 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
     private int numDataVolumes = 1;
     private String reservedSpace;
     private Integer layoutVersion;
-    private DatanodeVersion initialVersion;
-    private DatanodeVersion currentVersion;
+    private HDDSVersion initialVersion;
+    private HDDSVersion currentVersion;
 
     /**
      * Sets the number of data volumes per datanode.
@@ -174,12 +174,12 @@ public class UniformDatanodesFactory implements MiniOzoneCluster.DatanodeFactory
       return this;
     }
 
-    public Builder setInitialVersion(DatanodeVersion version) {
+    public Builder setInitialVersion(HDDSVersion version) {
       this.initialVersion = version;
       return this;
     }
 
-    public Builder setCurrentVersion(DatanodeVersion version) {
+    public Builder setCurrentVersion(HDDSVersion version) {
       this.currentVersion = version;
       return this;
     }

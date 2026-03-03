@@ -21,7 +21,6 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
-import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
@@ -46,7 +45,6 @@ public interface FinalizationManager {
   FinalizationCheckpoint getCheckpoint();
 
   void buildUpgradeContext(NodeManager nodeManager,
-                                  PipelineManager pipelineManager,
                                   SCMContext scmContext);
 
   void reinitialize(Table<String, String> finalizationStore) throws IOException;

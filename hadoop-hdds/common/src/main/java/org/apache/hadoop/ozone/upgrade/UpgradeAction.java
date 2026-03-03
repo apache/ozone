@@ -15,11 +15,18 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone;
+package org.apache.hadoop.ozone.upgrade;
 
 /**
- * Base class defining the version in the entire system.
+ * Generic UpgradeAction interface. An upgrade action is an operation that
+ * is run at least once as a pre-requisite to finalizing a layout feature.
+ * @param <T> action argument type
  */
-public interface Versioned {
-  int version();
+public interface UpgradeAction<T> {
+
+  default String name() {
+    return getClass().getSimpleName();
+  }
+
+  void execute(T arg) throws Exception;
 }

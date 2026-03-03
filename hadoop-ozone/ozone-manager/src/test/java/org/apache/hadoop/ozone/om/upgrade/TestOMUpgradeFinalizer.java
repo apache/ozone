@@ -194,7 +194,7 @@ public class TestOMUpgradeFinalizer {
 
     OMUpgradeFinalizer finalizer = new OMUpgradeFinalizer(versionManager);
     UpgradeException e = assertThrows(UpgradeException.class, () -> finalizer.finalize(CLIENT_ID, om));
-    assertThat(e.getMessage()).contains(lfs.iterator().next().name());
+    assertThat(e.getMessage()).contains(lfs.iterator().next().toString());
     assertEquals(e.getResult(), LAYOUT_FEATURE_FINALIZATION_FAILED);
     if (finalizer.isFinalizationDone()) {
       when(versionManager.getUpgradeState()).thenReturn(FINALIZATION_DONE);
@@ -232,7 +232,7 @@ public class TestOMUpgradeFinalizer {
 
   private OMLayoutFeature mockFeature(String name, int version) {
     OMLayoutFeature f = mock(OMLayoutFeature.class);
-    lenient().when(f.name()).thenReturn(name);
+    lenient().when(f.toString()).thenReturn(name);
     when(f.layoutVersion()).thenReturn(version);
     return f;
   }

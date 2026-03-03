@@ -25,8 +25,6 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import javax.management.ObjectName;
@@ -49,8 +47,6 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
   private volatile int softwareLayoutVersion; // SLV.
   @VisibleForTesting
   protected final TreeMap<Integer, LayoutFeature> features = new TreeMap<>();
-  @VisibleForTesting
-  protected final Map<String, LayoutFeature> featureMap = new HashMap<>();
   private volatile Status currentUpgradeState;
   // Allows querying upgrade state while an upgrade is in progress.
   // Note that MLV may have been incremented during the upgrade
@@ -109,10 +105,8 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
 
   private void initializeFeatures(T[] lfs) {
     Arrays.stream(lfs).forEach(f -> {
-      Preconditions.checkArgument(!featureMap.containsKey(f.name()));
       Preconditions.checkArgument(!features.containsKey(f.layoutVersion()));
       features.put(f.layoutVersion(), f);
-      featureMap.put(f.name(), f);
     });
   }
 
@@ -188,17 +182,6 @@ public abstract class AbstractLayoutVersionManager<T extends LayoutFeature>
     } finally {
       lock.readLock().unlock();
     }
-  }
-
-  @Override
-  public boolean isAllowed(String featureName) {
-    return featureMap.containsKey(featureName) &&
-        isAllowed(featureMap.get(featureName));
-  }
-
-  @Override
-  public LayoutFeature getFeature(String name) {
-    return featureMap.get(name);
   }
 
   @Override

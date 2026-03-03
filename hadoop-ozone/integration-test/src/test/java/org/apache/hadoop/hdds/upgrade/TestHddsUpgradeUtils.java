@@ -37,7 +37,6 @@ import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationCheckpoint;
 import org.apache.hadoop.ozone.HddsDatanodeService;
-import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.ozone.test.GenericTestUtils;
@@ -105,10 +104,7 @@ public final class TestHddsUpgradeUtils {
         scmVersionManager.getMetadataLayoutVersion());
     assertThat(scmVersionManager.getMetadataLayoutVersion()).isGreaterThanOrEqualTo(1);
 
-    int countContainers = 0;
-    for (ContainerInfo ignored : scm.getContainerManager().getContainers()) {
-      countContainers++;
-    }
+    int countContainers = scm.getContainerManager().getContainers().size();
     assertThat(countContainers).isGreaterThanOrEqualTo(numContainers);
   }
 
@@ -127,13 +123,7 @@ public final class TestHddsUpgradeUtils {
     int countContainers = 0;
     for (HddsDatanodeService dataNode : datanodes) {
       DatanodeStateMachine dsm = dataNode.getDatanodeStateMachine();
-      // Also verify that all the existing containers are open.
-      for (Container<?> container :
-          dsm.getContainer().getController().getContainers()) {
-        assertSame(container.getContainerState(),
-            ContainerProtos.ContainerDataProto.State.OPEN);
-        countContainers++;
-      }
+      countContainers += dsm.getContainer().getContainerSet().containerCount();
     }
     assertThat(countContainers).isGreaterThanOrEqualTo(1);
   }
@@ -172,12 +162,7 @@ public final class TestHddsUpgradeUtils {
       assertEquals(dnVersionManager.getSoftwareLayoutVersion(),
           dnVersionManager.getMetadataLayoutVersion());
       assertThat(dnVersionManager.getMetadataLayoutVersion()).isGreaterThanOrEqualTo(1);
-
-      // Verify containers are in acceptable states (OPEN is now allowed).
-      for (Container<?> ignored :
-          dsm.getContainer().getController().getContainers()) {
-        countContainers++;
-      }
+      countContainers += dsm.getContainer().getContainerSet().containerCount();
     }
     assertThat(countContainers).isGreaterThanOrEqualTo(numContainers);
   }

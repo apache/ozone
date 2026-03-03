@@ -190,7 +190,7 @@ public final class ServiceInfo {
         .setHostname(hostname)
         .addAllServicePorts(servicePorts);
     if (omVersion != null) {
-      builder.setOMVersion(omVersion.toProtoValue());
+      builder.setOMVersion(omVersion.serialize());
     }
     if (nodeType == NodeType.OM && omRoleInfo != null) {
       builder.setOmRole(omRoleInfo);

@@ -54,7 +54,7 @@ import javax.tools.Diagnostic;
 public class RegisterValidatorProcessor extends AbstractProcessor {
 
   public static final String ANNOTATION_SIMPLE_NAME = "RegisterValidator";
-  public static final String VERSION_CLASS_NAME = "org.apache.hadoop.ozone.Version";
+  public static final String VERSION_CLASS_NAME = "org.apache.hadoop.hdds.ComponentVersion";
   public static final String REQUEST_PROCESSING_PHASE_CLASS_NAME = "org.apache.hadoop.ozone.om.request.validation" +
       ".RequestProcessingPhase";
   public static final String APPLY_BEFORE_METHOD_NAME = "applyBefore";

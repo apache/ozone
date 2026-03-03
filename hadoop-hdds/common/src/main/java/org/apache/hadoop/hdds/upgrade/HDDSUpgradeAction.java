@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.upgrade;
 
-import org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeAction;
+import org.apache.hadoop.ozone.upgrade.UpgradeAction;
 
 /**
  * Upgrade Action for SCM and DataNodes.

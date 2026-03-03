@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common.transport.server.ratis;
 
-import static org.apache.hadoop.hdds.DatanodeVersion.SEPARATE_RATIS_PORTS_AVAILABLE;
+import static org.apache.hadoop.hdds.HDDSVersion.SEPARATE_RATIS_PORTS_AVAILABLE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_BYTE_LIMIT_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.HDDS_CONTAINER_RATIS_LOG_APPENDER_QUEUE_NUM_ELEMENTS;
@@ -52,7 +52,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
-import org.apache.hadoop.hdds.DatanodeVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -216,7 +216,7 @@ public final class XceiverServerRatis implements XceiverServerSpi {
         OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT,
         OzoneConfigKeys.HDDS_CONTAINER_RATIS_IPC_PORT_DEFAULT);
 
-    if (DatanodeVersion.fromProtoValue(datanodeDetails.getInitialVersion())
+    if (HDDSVersion.fromProtoValue(datanodeDetails.getInitialVersion())
         .compareTo(SEPARATE_RATIS_PORTS_AVAILABLE) >= 0) {
       adminPort = determinePort(
           OzoneConfigKeys.HDDS_CONTAINER_RATIS_ADMIN_PORT,

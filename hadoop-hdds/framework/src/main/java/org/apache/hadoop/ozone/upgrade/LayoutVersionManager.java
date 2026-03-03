@@ -48,20 +48,6 @@ public interface LayoutVersionManager {
   boolean isAllowed(LayoutFeature layoutFeature);
 
   /**
-   * Is allowed feature?
-   * @param featureName feature name
-   * @return true/false.
-   */
-  boolean isAllowed(String featureName);
-
-  /**
-   * Get Feature given feature name.
-   * @param name Feature name.
-   * @return LayoutFeature instance.
-   */
-  LayoutFeature getFeature(String name);
-
-  /**
    * Get Feature given its layout version.
    * @param layoutVersion Version number of the feature.
    * @return LayoutFeature instance.
