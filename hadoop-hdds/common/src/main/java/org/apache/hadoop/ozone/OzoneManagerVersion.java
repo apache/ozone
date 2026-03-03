@@ -58,9 +58,9 @@ public enum OzoneManagerVersion implements ComponentVersion {
   FUTURE_VERSION(-1, "Used internally in the client when the server side is "
       + " newer and an unknown server version has arrived to the client.");
 
-  public static final OzoneManagerVersion CURRENT = latest();
+  public static final OzoneManagerVersion SOFTWARE_VERSION = latest();
 
-  private static final Map<Integer, OzoneManagerVersion> BY_PROTO_VALUE =
+  private static final Map<Integer, OzoneManagerVersion> BY_VALUE =
       Arrays.stream(values())
           .collect(toMap(OzoneManagerVersion::serialize, identity()));
 
@@ -82,17 +82,26 @@ public enum OzoneManagerVersion implements ComponentVersion {
     return version;
   }
 
+  public static OzoneManagerVersion deserialize(int value) {
+    return BY_VALUE.getOrDefault(value, FUTURE_VERSION);
+  }
+
+  @Override
+  public boolean isSupportedBy(int serializedVersion) {
+    // In order for the other serialized version to support this version's features,
+    // the other version must be equal or larger to this version.
+    return deserialize(serializedVersion).compareTo(this) >= 0;
+  }
+
   @Override
   public String toString() {
     return name() + " (" + serialize() + ")";
   }
 
-  public static OzoneManagerVersion fromProtoValue(int value) {
-    return BY_PROTO_VALUE.getOrDefault(value, FUTURE_VERSION);
-  }
-
   private static OzoneManagerVersion latest() {
     OzoneManagerVersion[] versions = OzoneManagerVersion.values();
+    // The last entry in the array will be `FUTURE_VERSION`. We want the entry prior to this which defines the latest
+    // version in the software.
     return versions[versions.length - 2];
   }
 }

@@ -357,7 +357,7 @@ public class NodeEndpoint {
     Response.ResponseBuilder builder = Response.status(Response.Status.OK);
     Map<String, Object> responseMap = new HashMap<>();
     Stream<HddsProtos.Node> allNodes = scmClient.queryNode(DECOMMISSIONING,
-        null, HddsProtos.QueryScope.CLUSTER, "", ClientVersion.CURRENT_VERSION).stream();
+        null, HddsProtos.QueryScope.CLUSTER, "", ClientVersion.CURRENT.serialize()).stream();
     List<HddsProtos.Node> decommissioningNodes =
         DecommissionUtils.getDecommissioningNodesList(allNodes, uuid, ipAddress);
     String metricsJson = scmClient.getMetrics("Hadoop:service=StorageContainerManager,name=NodeDecommissionMetrics");

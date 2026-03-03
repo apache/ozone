@@ -331,7 +331,7 @@ public class KeyDeletingService extends AbstractKeyDeletingService {
         keyToUpdate.setKey(keyToModify.getKey());
         List<OzoneManagerProtocolProtos.KeyInfo> keyInfos =
             keyToModify.getValue().getOmKeyInfoList().stream()
-                .map(k -> k.getProtobuf(ClientVersion.CURRENT_VERSION))
+                .map(k -> k.getProtobuf(ClientVersion.CURRENT.serialize()))
                 .collect(Collectors.toList());
         keyToUpdate.addAllKeyInfos(keyInfos);
         keyToUpdate.setBucketId(keyToModify.getValue().getBucketId());

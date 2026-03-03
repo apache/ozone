@@ -168,7 +168,7 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends TestOzoneManag
         OzoneManagerProtocolProtos.OMRequest.newBuilder()
             .setCmdType(Type.CreateVolume)
             .setCreateVolumeRequest(req)
-            .setVersion(ClientVersion.CURRENT_VERSION)
+            .setVersion(ClientVersion.CURRENT.serialize())
             .setClientId(randomUUID().toString())
             .build();
 
@@ -456,7 +456,7 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends TestOzoneManag
         OzoneManagerProtocolProtos.OMRequest.newBuilder()
             .setCmdType(Type.ListVolume)
             .setListVolumeRequest(req)
-            .setVersion(ClientVersion.CURRENT_VERSION)
+            .setVersion(ClientVersion.CURRENT.serialize())
             .setClientId(randomUUID().toString())
             .build();
 

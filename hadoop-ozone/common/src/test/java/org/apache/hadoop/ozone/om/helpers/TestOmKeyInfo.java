@@ -60,7 +60,7 @@ public class TestOmKeyInfo {
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
 
     OmKeyInfo keyAfterSerialization = OmKeyInfo.getFromProtobuf(
-        key.getProtobuf(ClientVersion.CURRENT_VERSION));
+        key.getProtobuf(ClientVersion.CURRENT.serialize()));
 
     assertNotNull(keyAfterSerialization);
     assertEquals(key, keyAfterSerialization);
@@ -78,7 +78,7 @@ public class TestOmKeyInfo {
     OmKeyInfo key = createOmKeyInfo(
         RatisReplicationConfig.getInstance(ReplicationFactor.THREE));
     OzoneManagerProtocolProtos.KeyInfo omKeyProto =
-        key.getProtobuf(ClientVersion.CURRENT_VERSION);
+        key.getProtobuf(ClientVersion.CURRENT.serialize());
 
     // No EC Config
     assertFalse(omKeyProto.hasEcReplicationConfig());
@@ -95,7 +95,7 @@ public class TestOmKeyInfo {
     // EC Config
     key = createOmKeyInfo(new ECReplicationConfig(3, 2));
     assertFalse(key.isHsync());
-    omKeyProto = key.getProtobuf(ClientVersion.CURRENT_VERSION);
+    omKeyProto = key.getProtobuf(ClientVersion.CURRENT.serialize());
 
     assertEquals(3,
         omKeyProto.getEcReplicationConfig().getData());

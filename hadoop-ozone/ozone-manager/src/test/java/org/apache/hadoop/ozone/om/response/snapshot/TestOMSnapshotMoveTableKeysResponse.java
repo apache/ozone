@@ -147,13 +147,13 @@ public class TestOMSnapshotMoveTableKeysResponse extends TestSnapshotRequestAndR
           .forEachRemaining(entry -> {
             deletedTable.add(OzoneManagerProtocolProtos.SnapshotMoveKeyInfos.newBuilder().setKey(entry.getKey())
                 .addAllKeyInfos(entry.getValue().getOmKeyInfoList().stream().map(omKeyInfo -> omKeyInfo.getProtobuf(
-                    ClientVersion.CURRENT_VERSION)).collect(Collectors.toList())).build());
+                    ClientVersion.CURRENT.serialize())).collect(Collectors.toList())).build());
           });
 
       snapshot.getMetadataManager().getDeletedDirTable().iterator()
           .forEachRemaining(entry -> {
             deletedDirTable.add(OzoneManagerProtocolProtos.SnapshotMoveKeyInfos.newBuilder().setKey(entry.getKey())
-                .addKeyInfos(entry.getValue().getProtobuf(ClientVersion.CURRENT_VERSION)).build());
+                .addKeyInfos(entry.getValue().getProtobuf(ClientVersion.CURRENT.serialize())).build());
           });
       snapshot.getMetadataManager().getSnapshotRenamedTable().iterator().forEachRemaining(entry -> {
         renamedTable.add(HddsProtos.KeyValue.newBuilder().setKey(entry.getKey()).setValue(entry.getValue()).build());

@@ -18,11 +18,13 @@
 package org.apache.hadoop.hdds;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 
 import java.util.stream.Stream;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.OzoneManagerVersion;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -53,8 +55,7 @@ public class TestComponentVersionInvariants {
   // FUTURE_VERSION is the latest
   @ParameterizedTest
   @MethodSource("values")
-  public void testFutureVersionHasTheHighestOrdinal(
-      ComponentVersion[] values, ComponentVersion defaultValue,
+  public void testFutureVersionHasTheHighestOrdinal(ComponentVersion[] values, ComponentVersion defaultValue,
       ComponentVersion futureValue) {
 
     assertEquals(values[values.length - 1], futureValue);
@@ -63,8 +64,7 @@ public class TestComponentVersionInvariants {
   // FUTURE_VERSION's internal version id is -1
   @ParameterizedTest
   @MethodSource("values")
-  public void testFuturVersionHasMinusOneAsProtoRepresentation(
-      ComponentVersion[] values, ComponentVersion defaultValue,
+  public void testFutureVersionSerializesToMinusOne(ComponentVersion[] values, ComponentVersion defaultValue,
       ComponentVersion futureValue) {
     assertEquals(-1, futureValue.serialize());
 
@@ -73,8 +73,7 @@ public class TestComponentVersionInvariants {
   // DEFAULT_VERSION's internal version id is 0
   @ParameterizedTest
   @MethodSource("values")
-  public void testDefaultVersionHasZeroAsProtoRepresentation(
-      ComponentVersion[] values, ComponentVersion defaultValue,
+  public void testDefaultVersionSerializesToZero(ComponentVersion[] values, ComponentVersion defaultValue,
       ComponentVersion futureValue) {
     assertEquals(0, defaultValue.serialize());
   }
@@ -82,8 +81,7 @@ public class TestComponentVersionInvariants {
   // versions are increasing monotonically by one
   @ParameterizedTest
   @MethodSource("values")
-  public void testAssignedProtoRepresentations(
-      ComponentVersion[] values, ComponentVersion defaultValue,
+  public void testSerializedValuesAreMonotonic(ComponentVersion[] values, ComponentVersion defaultValue,
       ComponentVersion futureValue) {
     int startValue = defaultValue.serialize();
     // we skip the future version at the last position
@@ -91,5 +89,60 @@ public class TestComponentVersionInvariants {
       assertEquals(values[i].serialize(), startValue++);
     }
     assertEquals(values.length, ++startValue);
+  }
+
+  @ParameterizedTest
+  @MethodSource("values")
+  public void testVersionIsSupportedByItself(ComponentVersion[] values, ComponentVersion defaultValue,
+      ComponentVersion futureValue) {
+    for (ComponentVersion value : values) {
+      assertTrue(value.isSupportedBy(value.serialize()));
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("values")
+  public void testOnlyEqualOrHigherVersionsCanSupportAFeature(ComponentVersion[] values, ComponentVersion defaultValue,
+      ComponentVersion futureValue) {
+    int knownVersionCount = values.length - 1;
+    for (int featureIndex = 0; featureIndex < knownVersionCount; featureIndex++) {
+      ComponentVersion requiredFeature = values[featureIndex];
+      for (int providerIndex = 0; providerIndex < knownVersionCount; providerIndex++) {
+        ComponentVersion provider = values[providerIndex];
+        boolean expected = providerIndex >= featureIndex;
+        assertEquals(expected, requiredFeature.isSupportedBy(provider.serialize()));
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("values")
+  public void testFutureVersionSupportsAllKnownVersions(ComponentVersion[] values, ComponentVersion defaultValue,
+      ComponentVersion futureValue) {
+    int unknownFutureVersion = Integer.MAX_VALUE;
+    for (ComponentVersion requiredFeature : values) {
+      assertTrue(requiredFeature.isSupportedBy(unknownFutureVersion));
+    }
+  }
+
+  @Test
+  public void testHDDSVersionSerDes() {
+    for (HDDSVersion version: HDDSVersion.values()) {
+      assertEquals(version, HDDSVersion.deserialize(version.serialize()));
+    }
+  }
+
+  @Test
+  public void testOMVersionSerDes() {
+    for (OzoneManagerVersion version: OzoneManagerVersion.values()) {
+      assertEquals(version, OzoneManagerVersion.deserialize(version.serialize()));
+    }
+  }
+
+  @Test
+  public void testClientVersionSerDes() {
+    for (ClientVersion version: ClientVersion.values()) {
+      assertEquals(version, ClientVersion.deserialize(version.serialize()));
+    }
   }
 }

@@ -135,7 +135,7 @@ public final class OmKeyInfo extends WithParentObjectId
     return new DelegatedCodec<>(
         Proto2Codec.get(KeyInfo.getDefaultInstance()),
         OmKeyInfo::getFromProtobuf,
-        k -> k.getProtobuf(ignorePipeline, ClientVersion.CURRENT_VERSION),
+        k -> k.getProtobuf(ignorePipeline, ClientVersion.CURRENT.serialize()),
         OmKeyInfo.class);
   }
 

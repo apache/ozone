@@ -254,7 +254,7 @@ public class OpenKeyCleanupService extends BackgroundService {
           .setCmdType(Type.CommitKey)
           .setCommitKeyRequest(request)
           .setClientId(clientId.toString())
-          .setVersion(ClientVersion.CURRENT_VERSION)
+          .setVersion(ClientVersion.CURRENT.serialize())
           .build();
     }
 

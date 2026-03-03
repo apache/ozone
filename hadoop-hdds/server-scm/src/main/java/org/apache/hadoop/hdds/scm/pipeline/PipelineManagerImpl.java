@@ -269,7 +269,7 @@ public class PipelineManagerImpl implements PipelineManager {
   private void addPipelineToManager(Pipeline pipeline)
       throws IOException {
     HddsProtos.Pipeline pipelineProto = pipeline.getProtobufMessage(
-        ClientVersion.CURRENT_VERSION);
+        ClientVersion.CURRENT.serialize());
     acquireWriteLock();
     try {
       stateManager.addPipeline(pipelineProto);

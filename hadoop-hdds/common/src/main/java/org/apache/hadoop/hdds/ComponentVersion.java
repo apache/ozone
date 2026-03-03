@@ -24,12 +24,23 @@ import org.apache.hadoop.ozone.upgrade.UpgradeAction;
  * Base type for component version enums.
  */
 public interface ComponentVersion {
+  /**
+   * @return The serialized representation of this version. This is an opaque value which should not be checked or
+   * compared directly.
+   */
   int serialize();
 
   /**
    * @return the description of the version enum value.
    */
   String description();
+
+  /**
+   * Deserializes a ComponentVersion and checks if its feature set is supported by the current ComponentVersion.
+   *
+   * @return true if this version supports the features of otherVersion. False otherwise.
+   */
+  boolean isSupportedBy(int serializedVersion);
 
   default Optional<? extends UpgradeAction> action() {
     return Optional.empty();

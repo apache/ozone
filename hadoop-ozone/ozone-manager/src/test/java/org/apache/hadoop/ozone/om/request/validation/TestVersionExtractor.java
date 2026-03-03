@@ -63,7 +63,7 @@ class TestVersionExtractor {
   @ValueSource(ints = {1, 2, 5, 10, 1000, 10000})
   void testClientVersionExtractorForFutureValues(int futureVersion) {
     OMRequest request = mock(OMRequest.class);
-    when(request.getVersion()).thenReturn(ClientVersion.CURRENT_VERSION + futureVersion);
+    when(request.getVersion()).thenReturn(ClientVersion.CURRENT.serialize() + futureVersion);
     ComponentVersion version =
         VersionExtractor.CLIENT_VERSION_EXTRACTOR.extractVersion(request, null);
     assertEquals(ClientVersion.FUTURE_VERSION, version);

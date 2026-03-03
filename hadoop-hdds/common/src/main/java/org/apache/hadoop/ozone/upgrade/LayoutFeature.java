@@ -29,4 +29,12 @@ public interface LayoutFeature extends ComponentVersion {
   default int serialize() {
     return this.layoutVersion();
   }
+
+  @Override
+  default boolean isSupportedBy(int serializedVersion) {
+    // In order for the other serialized version to support this version's features,
+    // the other version must be equal or larger to this version.
+    // We can compare the values directly since there is no FUTURE_VERSION for layout features.
+    return serializedVersion >= layoutVersion();
+  }
 }

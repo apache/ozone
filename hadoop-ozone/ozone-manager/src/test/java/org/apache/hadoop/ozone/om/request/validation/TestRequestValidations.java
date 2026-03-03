@@ -284,11 +284,11 @@ public class TestRequestValidations {
   }
 
   private int olderClientVersion() {
-    return ClientVersion.CURRENT_VERSION - 1;
+    return ClientVersion.CURRENT.serialize() - 1;
   }
 
   private int currentClientVersion() {
-    return ClientVersion.CURRENT_VERSION;
+    return ClientVersion.CURRENT.serialize();
   }
 
   private OMRequest aCreateKeyRequest(int clientVersion) {

@@ -285,8 +285,8 @@ public class BlockOutputStream extends OutputStream {
     // that supports PutBlock piggybacking.
     for (DatanodeDetails dn : pipeline.getNodes()) {
       LOG.debug("dn = {}, version = {}", dn, dn.getCurrentVersion());
-      if (dn.getCurrentVersion() <
-              COMBINED_PUTBLOCK_WRITECHUNK_RPC.serialize()) {
+      if (!COMBINED_PUTBLOCK_WRITECHUNK_RPC.isSupportedBy(
+          dn.getCurrentVersion())) {
         return false;
       }
     }

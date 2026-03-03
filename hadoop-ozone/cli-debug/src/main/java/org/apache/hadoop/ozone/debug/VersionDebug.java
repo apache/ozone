@@ -52,8 +52,8 @@ public class VersionDebug implements Callable<Void>, DebugSubcommand {
         ),
         "components", ImmutableSortedMap.of(
             "client", asMap(ClientVersion.CURRENT),
-            "datanode", asMap(HDDSVersion.CURRENT),
-            "om", asMap(OzoneManagerVersion.CURRENT)
+            "datanode", asMap(HDDSVersion.SOFTWARE_VERSION),
+            "om", asMap(OzoneManagerVersion.SOFTWARE_VERSION)
         )
     )));
     return null;

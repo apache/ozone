@@ -212,7 +212,7 @@ public final class ServiceInfo {
     return new ServiceInfo(serviceInfo.getNodeType(),
         serviceInfo.getHostname(),
         serviceInfo.getServicePortsList(),
-        OzoneManagerVersion.fromProtoValue(serviceInfo.getOMVersion()),
+        OzoneManagerVersion.deserialize(serviceInfo.getOMVersion()),
         serviceInfo.hasOmRole() ? serviceInfo.getOmRole() : null,
         serviceInfo.hasServerDefaults() ? OzoneFsServerDefaults.getFromProtobuf(
             serviceInfo.getServerDefaults()) : null);

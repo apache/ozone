@@ -460,8 +460,8 @@ public class DatanodeSimulator implements Callable<Void>, FreonSubcommand {
     DatanodeDetails details = DatanodeDetails.newBuilder()
         .setUuid(UUID.randomUUID())
         .build();
-    details.setInitialVersion(HDDSVersion.CURRENT_VERSION);
-    details.setCurrentVersion(HDDSVersion.CURRENT_VERSION);
+    details.setInitialVersion(HDDSVersion.SOFTWARE_VERSION.serialize());
+    details.setCurrentVersion(HDDSVersion.SOFTWARE_VERSION.serialize());
     details.setHostName(HddsUtils.getHostName(config));
     details.setIpAddress(randomIp());
     details.setStandalonePort(0);
@@ -470,7 +470,7 @@ public class DatanodeSimulator implements Callable<Void>, FreonSubcommand {
     details.setVersion(HDDS_VERSION_INFO.getVersion());
     details.setSetupTime(Time.now());
     details.setRevision(HDDS_VERSION_INFO.getRevision());
-    details.setCurrentVersion(HDDSVersion.CURRENT_VERSION);
+    details.setCurrentVersion(HDDSVersion.SOFTWARE_VERSION.serialize());
     return details;
   }
 

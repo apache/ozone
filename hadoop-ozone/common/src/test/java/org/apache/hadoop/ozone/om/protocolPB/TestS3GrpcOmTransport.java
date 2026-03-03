@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.protocolPB;
 
-import static org.apache.hadoop.ozone.ClientVersion.CURRENT_VERSION;
+import static org.apache.hadoop.ozone.ClientVersion.CURRENT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_MAXIMUM_RESPONSE_LENGTH_DEFAULT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -156,7 +156,7 @@ public class TestS3GrpcOmTransport {
 
     final OMRequest omRequest = OMRequest.newBuilder()
         .setCmdType(Type.ServiceList)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(CURRENT.serialize())
         .setClientId("test")
         .setServiceListRequest(req)
         .build();
@@ -176,7 +176,7 @@ public class TestS3GrpcOmTransport {
 
     final OMRequest omRequest = OMRequest.newBuilder()
         .setCmdType(Type.ServiceList)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(CURRENT.serialize())
         .setClientId("test")
         .setServiceListRequest(req)
         .build();
@@ -201,7 +201,7 @@ public class TestS3GrpcOmTransport {
 
     final OMRequest omRequest = OMRequest.newBuilder()
         .setCmdType(Type.ServiceList)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(CURRENT.serialize())
         .setClientId("test")
         .setServiceListRequest(req)
         .build();
@@ -248,7 +248,7 @@ public class TestS3GrpcOmTransport {
 
     final OMRequest omRequest = OMRequest.newBuilder()
         .setCmdType(Type.ServiceList)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(CURRENT.serialize())
         .setClientId("test")
         .setServiceListRequest(req)
         .build();
@@ -276,7 +276,7 @@ public class TestS3GrpcOmTransport {
     ServiceListRequest req = ServiceListRequest.newBuilder().build();
     return OMRequest.newBuilder()
         .setCmdType(Type.ServiceList)
-        .setVersion(CURRENT_VERSION)
+        .setVersion(CURRENT.serialize())
         .setClientId("test")
         .setServiceListRequest(req)
         .build();
