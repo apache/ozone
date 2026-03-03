@@ -757,8 +757,6 @@ public class NodeStateManager implements Runnable, Closeable {
         NodeStatus status = nodeStateMap.getNodeStatus(node.getID());
         switch (status.getHealth()) {
         case HEALTHY:
-          updateNodeLayoutVersionState(node, layoutMisMatchCondition, status,
-              NodeLifeCycleEvent.LAYOUT_MISMATCH);
           // Move the node to STALE if the last heartbeat time is less than
           // configured stale-node interval.
           updateNodeState(node, staleNodeCondition, status,
@@ -871,37 +869,6 @@ public class NodeStateManager implements Runnable, Closeable {
     }
   }
 
-  /**
-   * Updates the node state if the condition satisfies.
-   *
-   * @param node DatanodeInfo
-   * @param condition condition to check
-   * @param status current state of node
-   * @param lifeCycleEvent NodeLifeCycleEvent to be applied if condition
-   *                       matches
-   *
-   * @throws NodeNotFoundException if the node is not present
-   */
-  private void updateNodeLayoutVersionState(DatanodeInfo node,
-                             Predicate<LayoutVersionProto> condition,
-                                            NodeStatus status,
-                                            NodeLifeCycleEvent lifeCycleEvent)
-      throws NodeNotFoundException {
-    try {
-      if (condition.test(node.getLastKnownLayoutVersion())) {
-        NodeState newHealthState = nodeHealthSM.getNextState(status.getHealth(),
-            lifeCycleEvent);
-        NodeStatus newStatus =
-            nodeStateMap.updateNodeHealthState(node.getID(), newHealthState);
-        fireHealthStateEvent(newStatus.getHealth(), node);
-      }
-    } catch (InvalidStateTransitionException e) {
-      LOG.warn("Invalid state transition of node {}." +
-              " Current state: {}, life cycle event: {}",
-          node, status, lifeCycleEvent);
-    }
-  }
-
   @Override
   public void close() {
     executorService.shutdown();
@@ -980,6 +947,6 @@ public class NodeStateManager implements Runnable, Closeable {
    * Node's life cycle events.
    */
   private enum NodeLifeCycleEvent {
-    TIMEOUT, RESTORE, RESURRECT, LAYOUT_MISMATCH, LAYOUT_MATCH
+    TIMEOUT, RESTORE, RESURRECT
   }
 }
