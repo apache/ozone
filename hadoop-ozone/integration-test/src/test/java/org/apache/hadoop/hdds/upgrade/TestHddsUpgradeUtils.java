@@ -186,7 +186,7 @@ public final class TestHddsUpgradeUtils {
       try {
         HddsProtos.NodeState dnState =
             scm.getScmNodeManager().getNodeStatus(dn).getHealth();
-        assertSame(dnState, state);
+        assertSame(state, dnState);
       } catch (NodeNotFoundException e) {
         e.printStackTrace();
         fail("Node not found");
