@@ -329,14 +329,12 @@ public class TestSCMNodeManager {
           SMALLER_MLV_SLV_LAYOUT_PROTO, errorNodeNotPermitted);
       registerWithCapacity(nodeManager,
           LARGER_MLV_SLV_LAYOUT_PROTO, errorNodeNotPermitted);
-      // Nodes with mismatched MLV can join, but should not be allowed in
-      // pipelines.
+      // Nodes with mismatched MLV can join
       DatanodeDetails badMlvNode1 = registerWithCapacity(nodeManager,
           SMALLER_MLV_LAYOUT_PROTO, success);
       DatanodeDetails badMlvNode2 = registerWithCapacity(nodeManager,
           SMALLER_MLV_LAYOUT_PROTO, success);
-      // This node has correct MLV and SLV, so it can join and be used in
-      // pipelines.
+      // This node has correct MLV and SLV
       DatanodeDetails goodNode = registerWithCapacity(nodeManager,
           CORRECT_LAYOUT_PROTO, success);
 
