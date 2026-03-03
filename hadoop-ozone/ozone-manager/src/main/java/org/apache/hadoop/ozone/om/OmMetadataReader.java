@@ -98,7 +98,7 @@ public class OmMetadataReader implements IOmMetadataReader, Auditor {
     this.volumeManager = ozoneManager.getVolumeManager();
     this.prefixManager = prefixManager;
     this.ozoneManager = ozoneManager;
-    this.isAclEnabled = ozoneManager.isObjectAclEnabled();
+    this.isAclEnabled = ozoneManager.getAclsEnabled();
     this.log = log;
     this.audit = audit;
     this.metrics = omMetadataReaderMetrics;

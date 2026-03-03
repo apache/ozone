@@ -143,7 +143,7 @@ public class OMTenantCreateRequest extends OMVolumeRequest {
         .getVolumeKey(volumeName);
 
     // ACL check during preExecute (align with other create requests)
-    if (ozoneManager.isObjectAclEnabled()) {
+    if (ozoneManager.getAclsEnabled()) {
       try {
         checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE,

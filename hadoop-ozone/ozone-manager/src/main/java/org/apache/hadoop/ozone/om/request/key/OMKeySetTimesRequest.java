@@ -79,7 +79,7 @@ public class OMKeySetTimesRequest extends OMKeyRequest {
     OzoneManagerProtocolProtos.KeyArgs newKeyArgs = resolveBucketLink(ozoneManager, keyArgs);
 
     // ACL check during preExecute
-    if (ozoneManager.isObjectAclEnabled()) {
+    if (ozoneManager.getAclsEnabled()) {
       try {
         checkAcls(ozoneManager, OzoneObj.ResourceType.KEY,
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,

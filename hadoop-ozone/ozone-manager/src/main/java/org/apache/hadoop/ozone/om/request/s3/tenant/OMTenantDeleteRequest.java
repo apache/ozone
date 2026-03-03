@@ -113,7 +113,7 @@ public class OMTenantDeleteRequest extends OMVolumeRequest {
     }
 
     // Perform ACL check during preExecute (WRITE_ACL on volume if applicable)
-    if (ozoneManager.isObjectAclEnabled()) {
+    if (ozoneManager.getAclsEnabled()) {
       try {
         checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,

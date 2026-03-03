@@ -81,7 +81,7 @@ public class OMVolumeDeleteRequest extends OMVolumeRequest {
     OMClientResponse omClientResponse = null;
     try {
       // check Acl
-      if (ozoneManager.isObjectAclEnabled()) {
+      if (ozoneManager.getAclsEnabled()) {
         checkAcls(ozoneManager, OzoneObj.ResourceType.VOLUME,
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.DELETE, volume,
             null, null);

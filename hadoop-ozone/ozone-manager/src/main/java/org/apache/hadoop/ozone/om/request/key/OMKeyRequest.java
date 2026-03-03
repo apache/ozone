@@ -621,7 +621,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
   protected void checkBucketAcls(OzoneManager ozoneManager, String volume,
       String bucket, String key, IAccessAuthorizer.ACLType aclType)
       throws IOException {
-    if (ozoneManager.isObjectAclEnabled()) {
+    if (ozoneManager.getAclsEnabled()) {
       checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
           OzoneObj.StoreType.OZONE, aclType,
           volume, bucket, key);
@@ -642,7 +642,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       String bucket, String key, IAccessAuthorizer.ACLType aclType,
       OzoneObj.ResourceType resourceType)
       throws IOException {
-    if (ozoneManager.isObjectAclEnabled()) {
+    if (ozoneManager.getAclsEnabled()) {
       checkAcls(ozoneManager, resourceType, OzoneObj.StoreType.OZONE, aclType,
           volume, bucket, key);
     }
@@ -663,7 +663,7 @@ public abstract class OMKeyRequest extends OMClientRequest {
       String bucket, String key, IAccessAuthorizer.ACLType aclType,
       OzoneObj.ResourceType resourceType, String volumeOwner)
       throws IOException {
-    if (ozoneManager.isObjectAclEnabled()) {
+    if (ozoneManager.getAclsEnabled()) {
       checkAcls(ozoneManager, resourceType, OzoneObj.StoreType.OZONE,
           aclType, volume, bucket, key, volumeOwner,
           ozoneManager.getBucketOwner(volume, bucket, aclType, resourceType));

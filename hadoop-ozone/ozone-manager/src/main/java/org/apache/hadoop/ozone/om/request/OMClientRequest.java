@@ -282,7 +282,7 @@ public abstract class OMClientRequest implements RequestAuditor {
         .setRecursiveAccessCheck(pathViewer.isCheckRecursiveAccess());
 
     // check Acl
-    if (ozoneManager.isObjectAclEnabled()) {
+    if (ozoneManager.getAclsEnabled()) {
       String volumeOwner = ozoneManager.getVolumeOwner(
           obj.getVolumeName(),
           contextBuilder.getAclRights(), obj.getResourceType());

@@ -102,7 +102,7 @@ public class OMBucketCreateRequest extends OMClientRequest {
     OmUtils.validateBucketName(bucketInfo.getBucketName(), strict);
 
     // ACL check during preExecute
-    if (ozoneManager.isObjectAclEnabled()) {
+    if (ozoneManager.getAclsEnabled()) {
       try {
         checkAcls(ozoneManager, OzoneObj.ResourceType.BUCKET,
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.CREATE,

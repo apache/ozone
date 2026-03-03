@@ -221,7 +221,7 @@ public class TestOMVolumeCreateRequest extends TestOMVolumeRequest {
     String adminName = UUID.randomUUID().toString();
     String ownerName = UUID.randomUUID().toString();
 
-    when(ozoneManager.isObjectAclEnabled()).thenReturn(true);
+    when(ozoneManager.getAclsEnabled()).thenReturn(true);
 
     OMRequest originalRequest = createVolumeRequest(volumeName, adminName,
         ownerName, "world::a");

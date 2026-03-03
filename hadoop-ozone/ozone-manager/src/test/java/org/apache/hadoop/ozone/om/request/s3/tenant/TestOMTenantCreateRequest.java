@@ -276,7 +276,7 @@ public class TestOMTenantCreateRequest {
 
   @Test
   public void preExecutePermissionDeniedWhenAclEnabled() throws Exception {
-    when(ozoneManager.isObjectAclEnabled()).thenReturn(true);
+    when(ozoneManager.getAclsEnabled()).thenReturn(true);
 
     final String tenantId = UUID.randomUUID().toString();
     OMRequest originalRequest =

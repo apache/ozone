@@ -113,7 +113,7 @@ public class TestOMTenantDeleteRequest {
 
   @Test
   public void preExecutePermissionDeniedWhenAclEnabled() throws Exception {
-    when(ozoneManager.isObjectAclEnabled()).thenReturn(true);
+    when(ozoneManager.getAclsEnabled()).thenReturn(true);
 
     final String tenantId = UUID.randomUUID().toString();
     final String volumeName = tenantId;

@@ -164,7 +164,7 @@ public class TestOMBucketCreateRequest extends TestBucketRequest {
     String bucketName = UUID.randomUUID().toString();
 
     // Enable ACLs so preExecute path performs ACL checks
-    when(ozoneManager.isObjectAclEnabled()).thenReturn(true);
+    when(ozoneManager.getAclsEnabled()).thenReturn(true);
 
     OMRequest originalRequest = newCreateBucketRequest(
         newBucketInfoBuilder(bucketName, volumeName)).build();

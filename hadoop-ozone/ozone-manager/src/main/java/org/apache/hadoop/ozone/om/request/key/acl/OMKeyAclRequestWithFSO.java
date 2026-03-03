@@ -82,7 +82,7 @@ public abstract class OMKeyAclRequestWithFSO extends OMKeyAclRequest {
       key = objectParser.getKey();
 
       // check Acl
-      if (ozoneManager.isObjectAclEnabled()) {
+      if (ozoneManager.getAclsEnabled()) {
         checkAcls(ozoneManager, OzoneObj.ResourceType.KEY,
             OzoneObj.StoreType.OZONE, IAccessAuthorizer.ACLType.WRITE_ACL,
             volume, bucket, key);

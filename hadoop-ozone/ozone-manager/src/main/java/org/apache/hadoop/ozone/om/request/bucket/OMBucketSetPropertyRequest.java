@@ -133,7 +133,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
     OMClientResponse omClientResponse = null;
     try {
       // check Acl
-      if (ozoneManager.isObjectAclEnabled()) {
+      if (ozoneManager.getAclsEnabled()) {
         checkAclPermission(ozoneManager, volumeName, bucketName);
       }
 
