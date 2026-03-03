@@ -54,7 +54,6 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.node.states.NodeStateMap;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
-import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -145,13 +144,6 @@ public class NodeStateManager implements Runnable, Closeable {
   private LayoutVersionManager layoutVersionManager;
 
   /**
-   * Conditions to check whether a node's metadata layout version matches
-   * that of SCM.
-   */
-  private final Predicate<LayoutVersionProto> layoutMatchCondition;
-  private final Predicate<LayoutVersionProto> layoutMisMatchCondition;
-
-  /**
    * Constructs a NodeStateManager instance with the given configuration.
    *
    * @param conf Configuration
@@ -191,17 +183,6 @@ public class NodeStateManager implements Runnable, Closeable {
 
     skippedHealthChecks = 0;
     checkPaused = false; // accessed only from test functions
-
-    layoutMatchCondition = (layout) ->
-        (layout.getMetadataLayoutVersion() ==
-             layoutVersionManager.getMetadataLayoutVersion()) &&
-            (layout.getSoftwareLayoutVersion() ==
-            layoutVersionManager.getSoftwareLayoutVersion());
-
-    layoutMisMatchCondition = (layout) ->
-        FinalizationManager.shouldTellDatanodesToFinalize(
-            scmContext.getFinalizationCheckpoint()) &&
-            !layoutMatchCondition.test(layout);
 
     scheduleNextHealthCheck();
   }
