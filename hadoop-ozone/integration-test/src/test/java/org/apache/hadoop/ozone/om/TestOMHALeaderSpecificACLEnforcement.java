@@ -21,6 +21,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_AUTHORIZER_CLASS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_TEST_AUTHORIZATION_ENABLED;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERMISSION_DENIED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -185,8 +186,7 @@ public class TestOMHALeaderSpecificACLEnforcement {
   private OzoneConfiguration createBaseConfiguration() throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     
-    // Enable test security mode to allow ACL testing without Kerberos
-    OzoneManager.setTestSecureOmFlag(true);
+    conf.setBoolean(OZONE_TEST_AUTHORIZATION_ENABLED, true);
     
     // Enable ACL for proper permission testing
     conf.setBoolean(OZONE_ACL_ENABLED, true);

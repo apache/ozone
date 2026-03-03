@@ -2387,7 +2387,7 @@
       When true: admin privilege checks are always performed, and object
       ACL checks are controlled by ozone.acl.enabled.
       When false: no authorization checks are performed.
-      Default is true to align with HDFS's dfs.permissions.enabled behavior.
+      Default is true.
     </description>
   </property>
   <property>

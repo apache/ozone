@@ -670,7 +670,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
   private void checkAdminPrivilege(String operation)
       throws IOException {
     // Skip check if authorization is disabled
-    if (!OzoneSecurityUtil.isAuthorizationEnabled(conf)) {
+    if (secConf == null || !secConf.isAuthorizationEnabled()) {
       return;
     }
 

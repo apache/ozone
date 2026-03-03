@@ -32,8 +32,6 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_AUTHORIZATION_ENABLED;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_AUTHORIZATION_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FLEXIBLE_FQDN_RESOLUTION_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_KEY_PREALLOCATION_BLOCKS_MAX;
@@ -428,7 +426,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       new ObjectMapper().readerFor(OmMetricsInfo.class);
   private static final int SHUTDOWN_HOOK_PRIORITY = 30;
   private final File omMetaDir;
-  private boolean isAuthorizationEnabled;
   private boolean isAclEnabled;
   private final boolean isSpnegoEnabled;
   private final SecurityConfig secConfig;
@@ -867,13 +864,11 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * require.
    */
   private void setInstanceVariablesFromConf() {
-    this.isAuthorizationEnabled = configuration.getBoolean(
-        OZONE_AUTHORIZATION_ENABLED,
-        OZONE_AUTHORIZATION_ENABLED_DEFAULT);
     this.isAclEnabled = configuration.getBoolean(OZONE_ACL_ENABLED,
         OZONE_ACL_ENABLED_DEFAULT);
     LOG.info("Authorization enabled: {}, ACL enabled: {}",
-        isAuthorizationEnabled, isAclEnabled);
+        secConfig != null ? secConfig.isAuthorizationEnabled() : false,
+        isAclEnabled);
   }
 
   /**
@@ -2763,13 +2758,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @return true if admin authorization checks should be performed
    */
   public boolean isAdminAuthorizationEnabled() {
-    // ONLY IN TESTS: Allow authorization testing without Kerberos
-    if (testSecureOmFlag) {
-      return isAuthorizationEnabled; // Skip security check
-    }
-
-    // require full security + authorization
-    return OzoneSecurityUtil.isAuthorizationEnabled(configuration);
+    return secConfig != null && secConfig.isAuthorizationEnabled();
   }
 
   /**
@@ -2815,7 +2804,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     boolean auditSuccess = true;
     Map<String, String> auditMap = buildAuditMap(volume);
     try {
-      if (isAclEnabled) {
+      if (isObjectAclEnabled()) {
         omMetadataReader.checkAcls(ResourceType.VOLUME,
             StoreType.OZONE, ACLType.READ, volume,
             null, null);
@@ -2851,7 +2840,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       String prevKey, int maxKeys) throws IOException {
     UserGroupInformation remoteUserUgi =
         ProtobufRpcEngine.Server.getRemoteUser();
-    if (isAclEnabled) {
+    if (isObjectAclEnabled()) {
       if (remoteUserUgi == null) {
         LOG.error("Rpc user UGI is null. Authorization failed.");
         throw new OMException("Rpc user UGI is null. Authorization failed.",
@@ -2866,7 +2855,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     auditMap.put(OzoneConsts.USERNAME, userName);
     try {
       metrics.incNumVolumeLists();
-      if (isAclEnabled) {
+      if (isObjectAclEnabled()) {
         String remoteUserName = remoteUserUgi.getShortUserName();
         // if not admin nor list my own volumes, check ACL.
         if (!remoteUserName.equals(userName) && !isAdmin(remoteUserUgi)) {
@@ -2924,7 +2913,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     auditMap.put(OzoneConsts.USERNAME, null);
     try {
       metrics.incNumVolumeLists();
-      if (isAclEnabled) {
+      if (isObjectAclEnabled()) {
         omMetadataReader.checkAcls(ResourceType.VOLUME,
             StoreType.OZONE, ACLType.LIST,
             OzoneConsts.OZONE_ROOT, null, null);
@@ -2961,7 +2950,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     auditMap.put(OzoneConsts.HAS_SNAPSHOT, String.valueOf(hasSnapshot));
 
     try {
-      if (isAclEnabled) {
+      if (isObjectAclEnabled()) {
         omMetadataReader.checkAcls(ResourceType.VOLUME,
             StoreType.OZONE, ACLType.LIST,
             volumeName, null, null);
@@ -2997,7 +2986,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     Map<String, String> auditMap = buildAuditMap(volume);
     auditMap.put(OzoneConsts.BUCKET, bucket);
     try {
-      if (isAclEnabled) {
+      if (isObjectAclEnabled()) {
         omMetadataReader.checkAcls(ResourceType.BUCKET,
             StoreType.OZONE, ACLType.READ, volume,
             bucket, null);
@@ -3121,7 +3110,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volumeName, bucketName));
       auditMap = buildAuditMap(resolvedBucket.realVolume());
       auditMap.put(OzoneConsts.BUCKET, resolvedBucket.realBucket());
-      if (isAclEnabled) {
+      if (isObjectAclEnabled()) {
         omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
             ACLType.READ, resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
       }
@@ -3152,7 +3141,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volumeName, bucketName));
       auditMap = buildAuditMap(resolvedBucket.realVolume());
       auditMap.put(OzoneConsts.BUCKET, resolvedBucket.realBucket());
-      if (isAclEnabled) {
+      if (isObjectAclEnabled()) {
         omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
             ACLType.LIST, resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
       }
@@ -4669,7 +4658,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       OMClientRequest omClientRequest)
       throws IOException {
     OmBucketInfo resolved;
-    if (isAclEnabled) {
+    if (isObjectAclEnabled()) {
       resolved = resolveBucketLink(requested, new HashSet<>(),
               omClientRequest.createUGIForApi(),
               omClientRequest.getRemoteAddress(),
@@ -4685,7 +4674,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public ResolvedBucket resolveBucketLink(Pair<String, String> requested,
                                           boolean allowDanglingBuckets) throws IOException {
-    return resolveBucketLink(requested, allowDanglingBuckets, isAclEnabled);
+    return resolveBucketLink(requested, allowDanglingBuckets, isObjectAclEnabled());
   }
 
   public ResolvedBucket resolveBucketLink(Pair<String, String> requested,
@@ -4721,7 +4710,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       String hostName,
       boolean allowDanglingBuckets) throws IOException {
     return resolveBucketLink(volumeAndBucket, visited, userGroupInformation, remoteAddress, hostName,
-        allowDanglingBuckets, isAclEnabled);
+        allowDanglingBuckets, isObjectAclEnabled());
   }
 
   /**
@@ -5231,7 +5220,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
       // Updating the volumeName & bucketName in case the bucket is a linked bucket. We need to do this before a
       // permission check, since linked bucket permissions and source bucket permissions could be different.
       ResolvedBucket resolvedBucket = resolveBucketLink(Pair.of(volume, bucket), false);
-      if (isAclEnabled) {
+      if (isObjectAclEnabled()) {
         omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
             ACLType.READ, resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
       }
@@ -5268,7 +5257,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     try {
       ResolvedBucket resolvedBucket = this.resolveBucketLink(Pair.of(volume, bucket), false);
-      if (isAclEnabled) {
+      if (isObjectAclEnabled()) {
         omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE,
             ACLType.READ, resolvedBucket.realVolume(), resolvedBucket.realBucket(), null);
       }
@@ -5305,7 +5294,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
     try {
       ResolvedBucket resolvedBucket = this.resolveBucketLink(Pair.of(volume, bucket), false);
-      if (isAclEnabled) {
+      if (isObjectAclEnabled()) {
         omMetadataReader.checkAcls(ResourceType.BUCKET, StoreType.OZONE, ACLType.LIST, volume, bucket, null);
       }
 

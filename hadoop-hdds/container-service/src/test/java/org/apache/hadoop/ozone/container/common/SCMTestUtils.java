@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.container.common;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_TEST_AUTHORIZATION_ENABLED;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 
@@ -137,6 +138,7 @@ public final class SCMTestUtils {
     conf.setClass(SpaceUsageCheckFactory.Conf.configKeyForClassName(),
         MockSpaceUsageCheckFactory.None.class,
         SpaceUsageCheckFactory.class);
+    conf.setBoolean(OZONE_TEST_AUTHORIZATION_ENABLED, true);
     return conf;
   }
 

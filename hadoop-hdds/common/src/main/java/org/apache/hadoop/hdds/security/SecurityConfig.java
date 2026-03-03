@@ -71,8 +71,12 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_PUBLIC_KEY_
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_SIGNATURE_ALGO;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_SIGNATURE_ALGO_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_AUTHORIZATION_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_AUTHORIZATION_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_TEST_AUTHORIZATION_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_TEST_AUTHORIZATION_ENABLED_DEFAULT;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -136,6 +140,7 @@ public class SecurityConfig {
   private final Duration rootCaCertificatePollingInterval;
   private final boolean autoCARotationEnabled;
   private final Duration expiredCertificateCheckInterval;
+  private final boolean authorizationEnabled;
 
   /**
    * Constructs a SecurityConfig.
@@ -199,6 +204,14 @@ public class SecurityConfig {
     this.isSecurityEnabled = configuration.getBoolean(
         OZONE_SECURITY_ENABLED_KEY,
         OZONE_SECURITY_ENABLED_DEFAULT);
+
+    // Authorization is only effective when security is enabled, unless test mode is enabled
+    boolean testAuthorizationEnabled = configuration.getBoolean(
+        OZONE_TEST_AUTHORIZATION_ENABLED,
+        OZONE_TEST_AUTHORIZATION_ENABLED_DEFAULT);
+    this.authorizationEnabled = (isSecurityEnabled || testAuthorizationEnabled) &&
+        configuration.getBoolean(OZONE_AUTHORIZATION_ENABLED,
+            OZONE_AUTHORIZATION_ENABLED_DEFAULT);
 
     String certDurationString =
         configuration.get(HDDS_X509_DEFAULT_DURATION,
@@ -607,5 +620,16 @@ public class SecurityConfig {
 
   public boolean isTokenEnabled() {
     return blockTokenEnabled || containerTokenEnabled;
+  }
+
+  /**
+   * Check if authorization checks should be performed in Ozone.
+   * Authorization is only effective when security is enabled, unless test mode is enabled.
+   * This controls both admin privilege checks and ACL checks.
+   *
+   * @return true if authorization checks should be performed
+   */
+  public boolean isAuthorizationEnabled() {
+    return authorizationEnabled;
   }
 }

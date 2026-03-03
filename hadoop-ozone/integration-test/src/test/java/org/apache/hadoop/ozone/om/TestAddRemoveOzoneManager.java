@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om;
 
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_TEST_AUTHORIZATION_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_DUMMY_SERVICE_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DECOMMISSIONED_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_SERVER_REQUEST_TIMEOUT_DEFAULT;
@@ -89,7 +90,14 @@ public class TestAddRemoveOzoneManager {
   private OzoneClient client;
 
   private void setupCluster(int numInitialOMs) throws Exception {
+    setupCluster(numInitialOMs, false);
+  }
+
+  private void setupCluster(int numInitialOMs, boolean enableTestAuthorization) throws Exception {
     conf = new OzoneConfiguration();
+    if (enableTestAuthorization) {
+      conf.setBoolean(OZONE_TEST_AUTHORIZATION_ENABLED, true);
+    }
     conf.setInt(OzoneConfigKeys.OZONE_CLIENT_FAILOVER_MAX_ATTEMPTS_KEY, 5);
     cluster = MiniOzoneCluster.newHABuilder(conf)
         .setSCMServiceId(SCM_DUMMY_SERVICE_ID)
@@ -408,9 +416,8 @@ public class TestAddRemoveOzoneManager {
    */
   @Test
   public void testDecommission() throws Exception {
-    OzoneManager.setTestSecureOmFlag(true);
     try {
-      setupCluster(3);
+      setupCluster(3, true);
 
       user = UserGroupInformation.createUserForTesting("user", new String[]{});
       // Stop the 3rd OM and decommission it using non-privileged user
@@ -446,7 +453,7 @@ public class TestAddRemoveOzoneManager {
       assertNotNull(bucket.getKey(key));
 
     } finally {
-      OzoneManager.setTestSecureOmFlag(false);
+      conf.setBoolean(OZONE_TEST_AUTHORIZATION_ENABLED, false);
     }
   }
 

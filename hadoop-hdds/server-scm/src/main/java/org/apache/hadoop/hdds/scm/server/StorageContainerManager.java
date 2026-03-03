@@ -24,8 +24,6 @@ import static org.apache.hadoop.hdds.scm.security.SecretKeyManagerService.isSecr
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_AUTHORIZATION_ENABLED;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_AUTHORIZATION_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_READONLY_ADMINISTRATORS;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_ROOT_CA_COMPONENT_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.SCM_SUB_CA_PREFIX;
@@ -224,13 +222,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
       .getLogger(StorageContainerManager.class);
 
   /**
-   * Test-only flag to enable authorization checks without full Kerberos security.
-   * When true, isAdminAuthorizationEnabled() returns the authorization config
-   * value, allowing tests to verify admin checks without Kerberos setup.
-   */
-  private static boolean testSecureScmFlag = false;
-
-  /**
    * SCM metrics.
    */
   private static SCMMetrics metrics;
@@ -294,8 +285,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   private ContainerTokenSecretManager containerTokenMgr;
 
   private OzoneConfiguration configuration;
-  private final boolean isSecurityEnabled;
-  private final boolean isAuthorizationEnabled;
   private SCMContainerMetrics scmContainerMetrics;
   private SCMContainerPlacementMetrics placementMetrics;
   private PlacementPolicy containerPlacementPolicy;
@@ -368,12 +357,6 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
 
     scmHANodeDetails = SCMHANodeDetails.loadSCMHAConfig(conf, scmStorageConfig);
     configuration = conf;
-    this.isSecurityEnabled = OzoneSecurityUtil.isSecurityEnabled(conf);
-    this.isAuthorizationEnabled = conf.getBoolean(
-        OZONE_AUTHORIZATION_ENABLED,
-        OZONE_AUTHORIZATION_ENABLED_DEFAULT);
-    LOG.info("SCM Security enabled: {}, Authorization enabled: {}",
-        isSecurityEnabled, isAuthorizationEnabled);
     initMetrics();
     initPerfMetrics();
 
@@ -1976,16 +1959,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
    * @return true if admin authorization checks should be performed
    */
   public boolean isAdminAuthorizationEnabled() {
-    // ONLY IN TESTS: Allow authorization testing without Kerberos
-    if (testSecureScmFlag) {
-      return isAuthorizationEnabled;
-    }
-    return OzoneSecurityUtil.isAuthorizationEnabled(configuration);
-  }
-
-  @VisibleForTesting
-  public static void setTestSecureScmFlag(boolean flag) {
-    testSecureScmFlag = flag;
+    return securityConfig != null && securityConfig.isAuthorizationEnabled();
   }
 
   public void checkAdminAccess(UserGroupInformation remoteUser, boolean isRead)

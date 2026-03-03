@@ -23,6 +23,8 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HTTP_SECURITY_ENABLE
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_HTTP_SECURITY_ENABLED_KEY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_TEST_AUTHORIZATION_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_TEST_AUTHORIZATION_ENABLED_DEFAULT;
 
 import java.io.File;
 import java.io.IOException;
@@ -64,14 +66,17 @@ public final class OzoneSecurityUtil {
 
   /**
    * Check if authorization checks should be performed in Ozone.
-   * Authorization is only effective when security is enabled.
+   * Authorization is only effective when security is enabled, unless test mode is enabled.
    * This controls both admin privilege checks and ACL checks.
    *
    * @param conf Configuration source
    * @return true if authorization checks should be performed
    */
   public static boolean isAuthorizationEnabled(ConfigurationSource conf) {
-    return isSecurityEnabled(conf) &&
+    // Check if test mode is enabled (allows authorization without full security)
+    boolean testAuthorizationEnabled = conf.getBoolean(OZONE_TEST_AUTHORIZATION_ENABLED,
+        OZONE_TEST_AUTHORIZATION_ENABLED_DEFAULT);
+    return (isSecurityEnabled(conf) || testAuthorizationEnabled) &&
         conf.getBoolean(OZONE_AUTHORIZATION_ENABLED,
             OZONE_AUTHORIZATION_ENABLED_DEFAULT);
   }

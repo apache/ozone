@@ -469,10 +469,15 @@ public final class OzoneConfigKeys {
       "ozone.acl.enabled";
   public static final boolean OZONE_ACL_ENABLED_DEFAULT =
       false;
-  public static final String OZONE_AUTHORIZATION_ENABLED =
-      "ozone.authorization.enabled";
-  public static final boolean OZONE_AUTHORIZATION_ENABLED_DEFAULT =
-      true;
+  public static final String OZONE_AUTHORIZATION_ENABLED = "ozone.authorization.enabled";
+  public static final boolean OZONE_AUTHORIZATION_ENABLED_DEFAULT = true;
+  /**
+   * Test-only configuration property to enable authorization checks without
+   * requiring full security (Kerberos) setup. This is for testing purposes
+   * only and should not be used in production.
+   */
+  public static final String OZONE_TEST_AUTHORIZATION_ENABLED = "ozone.test.authorization.enabled";
+  public static final boolean OZONE_TEST_AUTHORIZATION_ENABLED_DEFAULT = false;
   public static final String OZONE_S3_VOLUME_NAME =
           "ozone.s3g.volume.name";
   public static final String OZONE_S3_VOLUME_NAME_DEFAULT =
