@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone;
 
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTP;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NODES_KEY;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
@@ -94,6 +95,7 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerProtocolServer;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.SecurityUtil;
@@ -303,7 +305,8 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
       scmServiceId = HddsUtils.getScmServiceId(conf);
 
       reconfigurationHandler =
-          new DatanodeReconfigurationHandler("DN", scmServiceId, conf, this::checkAdminPrivilege)
+          new DatanodeReconfigurationHandler("DN", conf, this::checkAdminPrivilege)
+              .registerPrefix(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY, true, scmServiceId))
               .register(HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX,
                   this::reconfigBlockDeleteThreadMax)
               .register(OZONE_BLOCK_DELETING_SERVICE_WORKERS,

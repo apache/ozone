@@ -48,8 +48,20 @@ public final class ConfUtils {
    * Return configuration key of format key.suffix1.suffix2...suffixN.
    */
   public static String addKeySuffixes(String key, String... suffixes) {
+    return addKeySuffixes(key, false, suffixes);
+  }
+
+  /**
+   * Return configuration key of format key.suffix1.suffix2...suffixN with the option to
+   * add a trailing separator.
+   */
+  public static String addKeySuffixes(String key, boolean withTrailingSeparator, String... suffixes) {
     String keySuffix = concatSuffixes(suffixes);
-    return addSuffix(key, keySuffix);
+    String suffix = addSuffix(key, keySuffix);
+    if (withTrailingSeparator) {
+      suffix = suffix.concat(".");
+    }
+    return suffix;
   }
 
   /**

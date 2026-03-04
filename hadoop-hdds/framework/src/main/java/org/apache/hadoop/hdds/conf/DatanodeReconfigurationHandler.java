@@ -17,10 +17,12 @@
 
 package org.apache.hadoop.hdds.conf;
 
-import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
-
 import java.io.IOException;
-import org.apache.hadoop.ozone.ha.ConfUtils;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.concurrent.ConcurrentSkipListSet;
 import org.apache.ratis.util.function.CheckedConsumer;
 
 /**
@@ -29,23 +31,32 @@ import org.apache.ratis.util.function.CheckedConsumer;
  */
 public class DatanodeReconfigurationHandler extends ReconfigurationHandler {
 
-  private final String scmServiceId;
+  private final Set<String> prefixProperties = new ConcurrentSkipListSet<>();
 
-  public DatanodeReconfigurationHandler(String name, String scmServiceId, OzoneConfiguration config,
+  public DatanodeReconfigurationHandler(String name, OzoneConfiguration config,
       CheckedConsumer<String, IOException> requireAdminPrivilege) {
     super(name, config, requireAdminPrivilege);
-    this.scmServiceId = scmServiceId;
+  }
+
+  public DatanodeReconfigurationHandler registerPrefix(String prefixProperty) {
+    prefixProperties.add(prefixProperty);
+    return this;
   }
 
   @Override
   public boolean isPropertyReconfigurable(String property) {
-    if (scmServiceId != null &&
-        property.startsWith(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY, scmServiceId))) {
-      // Allow reconfiguration for "ozone.scm.address.<service>.<node>"
-      // even if the property has not been registered. This is to allow
-      // SCM migration without datanode restarts.
-      return true;
+    for (String prefixProperty : prefixProperties) {
+      if (property.startsWith(prefixProperty)) {
+        return true;
+      }
     }
     return getReconfigurableProperties().contains(property);
+  }
+
+  @Override
+  public List<String> listReconfigureProperties() throws IOException {
+    Set<String> reconfigureSet = new TreeSet<>(super.listReconfigureProperties());
+    reconfigureSet.addAll(prefixProperties);
+    return new ArrayList<>(reconfigureSet);
   }
 }
