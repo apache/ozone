@@ -319,9 +319,8 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
 
       if (scmServiceId != null) {
         ((DatanodeReconfigurationHandler) reconfigurationHandler)
-            .registerPrefix(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY, true, scmServiceId));
-        reconfigurationHandler.register(OZONE_SCM_NODES_KEY + "." + scmServiceId,
-            this::reconfigScmNodes);
+            .registerPrefix(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY, scmServiceId))
+            .register(OZONE_SCM_NODES_KEY + "." + scmServiceId, this::reconfigScmNodes);
       }
 
       reconfigurationHandler.setReconfigurationCompleteCallback(reconfigurationHandler.defaultLoggingCallback());

@@ -42,7 +42,9 @@ public class DatanodeReconfigurationHandler extends ReconfigurationHandler {
   }
 
   public DatanodeReconfigurationHandler registerPrefix(String prefixProperty) {
-    prefixProperties.add(prefixProperty);
+    prefixProperties.add(
+        prefixProperty.endsWith(".") ? prefixProperty : prefixProperty.concat(".")
+    );
     return this;
   }
 
