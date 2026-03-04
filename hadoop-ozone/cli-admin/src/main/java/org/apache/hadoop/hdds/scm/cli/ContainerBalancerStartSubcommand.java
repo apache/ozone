@@ -127,7 +127,8 @@ public class ContainerBalancerStartSubcommand extends ScmSubcommand {
   private Optional<String> excludeContainers;
 
   @Option(names = {"--include-containers"},
-      description = "Only the containers specified in this list will be included in balancing." +
+      description = "A list of container IDs separated by commas. " +
+          "Only the containers specified in this list will be included in balancing." +
           " If --exclude-containers is also specified, those containers will " +
           "be excluded. This configuration is empty by default " +
           "(specify \"1,2,3\" for container IDs).")
