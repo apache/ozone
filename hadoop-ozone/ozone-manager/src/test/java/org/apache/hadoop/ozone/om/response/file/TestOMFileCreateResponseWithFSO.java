@@ -24,11 +24,13 @@ import java.io.IOException;
 import java.util.ArrayList;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
 import org.apache.hadoop.ozone.om.response.key.TestOMKeyCreateResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 
 /**
  * Tests MKeyCreateResponse - prefix layout1.
@@ -69,5 +71,15 @@ public class TestOMFileCreateResponseWithFSO extends TestOMKeyCreateResponse {
   @Override
   public BucketLayout getBucketLayout() {
     return BucketLayout.FILE_SYSTEM_OPTIMIZED;
+  }
+
+  @Override
+  public Type getCmdType() {
+    return Type.CreateFile;
+  }
+
+  @Override
+  public OmCompletedRequestInfo.OperationArgs getCompletedRequestInfoArgs() {
+    return new OmCompletedRequestInfo.OperationArgs.CreateFileArgs(false, false);
   }
 }

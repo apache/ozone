@@ -45,18 +45,23 @@ public class OMKeyRenameResponseWithFSO extends OMKeyRenameResponse {
   private OmKeyInfo fromKeyParent;
   private OmKeyInfo toKeyParent;
   private OmBucketInfo bucketInfo;
+  private String fromKeyNameInRequest;
+  private String toKeyNameInRequest;
 
   @SuppressWarnings("checkstyle:ParameterNumber")
   public OMKeyRenameResponseWithFSO(@Nonnull OMResponse omResponse,
       String fromDBKey, String toDBKey, OmKeyInfo fromKeyParent,
       OmKeyInfo toKeyParent, @Nonnull OmKeyInfo renameKeyInfo,
       OmBucketInfo bucketInfo,
-      boolean isRenameDirectory, BucketLayout bucketLayout) {
+      boolean isRenameDirectory, BucketLayout bucketLayout,
+      String fromKeyNameInRequest, String toKeyNameInRequest) {
     super(omResponse, fromDBKey, toDBKey, renameKeyInfo, bucketLayout);
     this.isRenameDirectory = isRenameDirectory;
     this.fromKeyParent = fromKeyParent;
     this.toKeyParent = toKeyParent;
     this.bucketInfo = bucketInfo;
+    this.fromKeyNameInRequest = fromKeyNameInRequest;
+    this.toKeyNameInRequest = toKeyNameInRequest;
   }
 
   /**
@@ -124,6 +129,16 @@ public class OMKeyRenameResponseWithFSO extends OMKeyRenameResponse {
   @Override
   public BucketLayout getBucketLayout() {
     return BucketLayout.FILE_SYSTEM_OPTIMIZED;
+  }
+
+  @Override
+  public String getFromKeyNameInRequest() {
+    return fromKeyNameInRequest;
+  }
+
+  @Override
+  public String getToKeyNameInRequest() {
+    return toKeyNameInRequest;
   }
 
   private void addDirToDBBatch(OMMetadataManager metadataManager,

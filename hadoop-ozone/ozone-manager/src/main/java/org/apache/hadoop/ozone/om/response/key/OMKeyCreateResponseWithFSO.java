@@ -25,11 +25,13 @@ import jakarta.annotation.Nonnull;
 import java.util.List;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.file.OMFileCreateResponseWithFSO;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 
 /**
  * Response for CreateKey request - prefix layout.
@@ -54,5 +56,15 @@ public class OMKeyCreateResponseWithFSO extends OMFileCreateResponseWithFSO {
   public OMKeyCreateResponseWithFSO(@Nonnull OMResponse omResponse, @Nonnull
                                     BucketLayout bucketLayout) {
     super(omResponse, bucketLayout);
+  }
+
+  @Override
+  public Type getOperationType() {
+    return Type.CreateKey;
+  }
+
+  @Override
+  public OmCompletedRequestInfo.OperationArgs getCompletedRequestInfoArgs() {
+    return new OmCompletedRequestInfo.OperationArgs.NoArgs();
   }
 }

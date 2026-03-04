@@ -24,10 +24,12 @@ import jakarta.annotation.Nonnull;
 import java.util.List;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.om.response.key.OMKeyCreateResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 
 /**
  * Response for crate file request.
@@ -35,12 +37,19 @@ import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRespo
 @CleanupTableInfo(cleanupTables = {KEY_TABLE, OPEN_KEY_TABLE})
 public class OMFileCreateResponse extends OMKeyCreateResponse {
 
+  private boolean isRecursive;
+  private boolean isOverWrite;
+
   public OMFileCreateResponse(@Nonnull OMResponse omResponse,
       @Nonnull OmKeyInfo omKeyInfo, @Nonnull List<OmKeyInfo> parentKeyInfos,
       long openKeySessionID,
-      @Nonnull OmBucketInfo omBucketInfo) {
+      @Nonnull OmBucketInfo omBucketInfo,
+      boolean isRecursive, boolean isOverWrite) {
     super(omResponse, omKeyInfo, parentKeyInfos, openKeySessionID,
         omBucketInfo);
+
+    this.isRecursive = isRecursive;
+    this.isOverWrite = isOverWrite;
   }
 
   /**
@@ -53,4 +62,13 @@ public class OMFileCreateResponse extends OMKeyCreateResponse {
     checkStatusNotOK();
   }
 
+  @Override
+  public Type getOperationType() {
+    return Type.CreateFile;
+  }
+
+  @Override
+  public OmCompletedRequestInfo.OperationArgs getCompletedRequestInfoArgs() {
+    return new OmCompletedRequestInfo.OperationArgs.CreateFileArgs(isRecursive, isOverWrite);
+  }
 }

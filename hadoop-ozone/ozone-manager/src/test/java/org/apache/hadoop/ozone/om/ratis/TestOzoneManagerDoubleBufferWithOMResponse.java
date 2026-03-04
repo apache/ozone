@@ -33,10 +33,14 @@ import static org.mockito.Mockito.withSettings;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.StorageTypeProto;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -52,6 +56,7 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.execution.flowcontrol.ExecutionContext;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.bucket.OMBucketCreateRequest;
@@ -63,6 +68,7 @@ import org.apache.hadoop.ozone.om.response.bucket.OMBucketDeleteResponse;
 import org.apache.hadoop.ozone.om.response.volume.OMVolumeCreateResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.BucketInfo;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Daemon;
 import org.apache.ozone.test.GenericTestUtils;
@@ -181,6 +187,9 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
     assertEquals(5, omMetadataManager.countRowsInTable(
         omMetadataManager.getBucketTable()));
 
+    assertEquals(16, omMetadataManager.countRowsInTable(
+        omMetadataManager.getCompletedRequestInfoTable()));
+
     // Now after this in our DB we should have 5 buckets and one volume
 
     checkVolume(volumeName, omVolumeCreateResponse);
@@ -191,6 +200,61 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
 
     // Check lastAppliedIndex is updated correctly or not.
     final long expectedIndex = bucketCount + deleteCount + 1;
+    GenericTestUtils.waitFor(() -> assertTransactionInfo(expectedIndex),
+        100, 30000);
+  }
+
+  @Test
+  public void testDoubleBufferWithMixOfTransactionsCapturesCompletedInfoRows() throws Exception {
+    // This test checks count, data in table is correct or not.
+    Queue< OMBucketCreateResponse> bucketQueue =
+        new ConcurrentLinkedQueue<>();
+    Queue< Pair<Long, OMBucketCreateResponse> > bucketWithTxnIdQueue =
+        new ConcurrentLinkedQueue<>();
+
+    String volumeName = UUID.randomUUID().toString();
+    long createVolumeTransactionID = trxId.incrementAndGet();
+    OMVolumeCreateResponse omVolumeCreateResponse =
+        (OMVolumeCreateResponse) createVolume(volumeName,
+            createVolumeTransactionID);
+
+    // do some transactions
+    int bucketCount = 10;
+    for (int i = 0; i < 10; i++) {
+      String bucketName = UUID.randomUUID().toString();
+      long transactionID = trxId.incrementAndGet();
+      OMBucketCreateResponse omBucketCreateResponse = createBucket(volumeName,
+          bucketName, transactionID);
+
+      bucketQueue.add(omBucketCreateResponse);
+      bucketWithTxnIdQueue.add(new ImmutablePair<>(transactionID, omBucketCreateResponse));
+    }
+
+    // We are doing +1 for volume transaction.
+    GenericTestUtils.waitFor(
+        () -> doubleBuffer.getFlushedTransactionCountForTesting() == bucketCount + 1,
+        100, 120000);
+
+    assertEquals(1, omMetadataManager.countRowsInTable(
+        omMetadataManager.getVolumeTable()));
+
+    assertEquals(10, omMetadataManager.countRowsInTable(
+        omMetadataManager.getBucketTable()));
+
+    assertEquals(11, omMetadataManager.countRowsInTable(
+        omMetadataManager.getCompletedRequestInfoTable()));
+
+    // Now after this in our DB we should have one volume + 10 buckets
+    checkVolume(volumeName, omVolumeCreateResponse);
+
+    checkCreateBuckets(bucketQueue);
+
+    // ... and one volume + 10 buckets worth of OmCompletedRequestInfo
+    // objects captured
+    checkCompletedRequestInfos(createVolumeTransactionID, volumeName, bucketWithTxnIdQueue);
+
+    // Check lastAppliedIndex is updated correctly or not.
+    final long expectedIndex = bucketCount + 1;
     GenericTestUtils.waitFor(() -> assertTransactionInfo(expectedIndex),
         100, 30000);
   }
@@ -258,6 +322,9 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
 
     assertEquals(10, omMetadataManager.countRowsInTable(
         omMetadataManager.getBucketTable()));
+
+    assertEquals(32, omMetadataManager.countRowsInTable(
+        omMetadataManager.getCompletedRequestInfoTable()));
 
     // Now after this in our DB we should have 5 buckets and one volume
 
@@ -375,6 +442,54 @@ public class TestOzoneManagerDoubleBufferWithOMResponse {
         fail("testDoubleBufferWithMixOfTransactions failed");
       }
     }));
+  }
+
+  private void checkCompletedRequestInfos(long createVolumeTxnId, String volumeName,
+      Queue<Pair<Long, OMBucketCreateResponse>> bucketQueue) throws Exception {
+
+    List<OmCompletedRequestInfo> ledgerEntries = collectCompletedRequestInfoTableEntries();
+    assertThat(ledgerEntries).hasSize(1 + bucketQueue.size());
+
+    // The first entry should be the CreateVolume response
+    OmCompletedRequestInfo volumeLedgerEntry = ledgerEntries.get(0);
+    assertThat(volumeLedgerEntry.getTrxLogIndex()).isEqualTo(createVolumeTxnId);
+    assertThat(volumeLedgerEntry.getCmdType()).isEqualTo(Type.CreateVolume);
+    assertThat(volumeLedgerEntry.getVolumeName()).isEqualTo(volumeName);
+    assertThat(volumeLedgerEntry.getBucketName()).isEqualTo("");
+    assertThat(volumeLedgerEntry.getKeyName()).isEqualTo("");
+    assertThat(volumeLedgerEntry.getOpArgs()).isEqualTo(
+        new OmCompletedRequestInfo.OperationArgs.NoArgs());
+
+    // Check all subsequent entries (CreateBucket) against the queue of
+    // responses
+    List<OmCompletedRequestInfo> bucketEntries = ledgerEntries.subList(1, ledgerEntries.size());
+    assertThat(bucketEntries).zipSatisfy(bucketQueue, (bucketLedgerEntry, createBucketPair) -> {
+      long createBucketTxnId = createBucketPair.getLeft();
+      OmBucketInfo omBucketInfo = createBucketPair.getRight().getOmBucketInfo();
+
+      assertThat(bucketLedgerEntry.getTrxLogIndex()).isEqualTo(createBucketTxnId);
+      assertThat(bucketLedgerEntry.getCmdType()).isEqualTo(Type.CreateBucket);
+      assertThat(bucketLedgerEntry.getVolumeName()).isEqualTo(volumeName);
+      assertThat(bucketLedgerEntry.getBucketName()).isEqualTo(omBucketInfo.getBucketName());
+      assertThat(bucketLedgerEntry.getKeyName()).isEqualTo("");
+      assertThat(bucketLedgerEntry.getOpArgs()).isEqualTo(
+          new OmCompletedRequestInfo.OperationArgs.NoArgs());
+    });
+  }
+
+  private List<OmCompletedRequestInfo> collectCompletedRequestInfoTableEntries() throws Exception {
+    List<OmCompletedRequestInfo> ledgerEntries = new ArrayList<>();
+
+    try (Table.KeyValueIterator<Long, OmCompletedRequestInfo>
+             tableIter = omMetadataManager.getCompletedRequestInfoTable().iterator()) {
+
+      while (tableIter.hasNext()) {
+        Table.KeyValue<Long, OmCompletedRequestInfo> tableRow = tableIter.next();
+        ledgerEntries.add(tableRow.getValue());
+      }
+    }
+
+    return ledgerEntries;
   }
 
   /**
