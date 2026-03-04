@@ -62,6 +62,7 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.hdds.conf.DatanodeReconfigurationHandler;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -299,8 +300,10 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
         }
       }
 
+      scmServiceId = HddsUtils.getScmServiceId(conf);
+
       reconfigurationHandler =
-          new ReconfigurationHandler("DN", conf, this::checkAdminPrivilege)
+          new DatanodeReconfigurationHandler("DN", scmServiceId, conf, this::checkAdminPrivilege)
               .register(HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX,
                   this::reconfigBlockDeleteThreadMax)
               .register(OZONE_BLOCK_DELETING_SERVICE_WORKERS,
@@ -312,7 +315,6 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
               .register(REPLICATION_STREAMS_LIMIT_KEY,
                   this::reconfigReplicationStreamsLimit);
 
-      scmServiceId = HddsUtils.getScmServiceId(conf);
       if (scmServiceId != null) {
         reconfigurationHandler.register(OZONE_SCM_NODES_KEY + "." + scmServiceId,
             this::reconfigScmNodes);
@@ -573,6 +575,13 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
           } catch (Throwable t) {
             LOG.warn("ServicePlugin {} could not be stopped", plugin, t);
           }
+        }
+      }
+      if (reconfigurationHandler != null) {
+        try {
+          reconfigurationHandler.close();
+        } catch (IOException e) {
+          LOG.error("DatanodeReconfigurationHandler stop failed", e);
         }
       }
       if (datanodeStateMachine != null) {
