@@ -581,13 +581,6 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
           }
         }
       }
-      if (reconfigurationHandler != null) {
-        try {
-          reconfigurationHandler.close();
-        } catch (IOException e) {
-          LOG.error("DatanodeReconfigurationHandler stop failed", e);
-        }
-      }
       if (datanodeStateMachine != null) {
         datanodeStateMachine.stopDaemon();
       }
