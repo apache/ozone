@@ -63,6 +63,8 @@ function ozone_usage
   ozone_add_subcommand "debug" client "Ozone debug tool"
   ozone_add_subcommand "repair" client "Ozone repair tool"
   ozone_add_subcommand "ratis" client "Ozone ratis tool"
+  ozone_add_subcommand "kdiag" client "Kerberos diagnostics tool"
+  ozone_add_subcommand "kerbname" client "translate Kerberos principal to short name"
 
   ozone_generate_usage "${OZONE_SHELL_EXECNAME}" false
 }
@@ -234,6 +236,14 @@ function ozonecmd_case
       OZONE_CLASSNAME=org.apache.hadoop.ozone.shell.OzoneRatis
       OZONE_RUN_ARTIFACT_NAME="ozone-tools"
     ;;
+    kdiag)
+        OZONE_CLASSNAME=org.apache.hadoop.security.KDiag
+        OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+      ;;
+    kerbname)
+     OZONE_CLASSNAME=org.apache.hadoop.ozone.kerberos.KerbName
+     OZONE_RUN_ARTIFACT_NAME="ozone-tools"
+   ;;
     *)
       OZONE_CLASSNAME="${subcmd}"
       if ! ozone_validate_classname "${OZONE_CLASSNAME}"; then
