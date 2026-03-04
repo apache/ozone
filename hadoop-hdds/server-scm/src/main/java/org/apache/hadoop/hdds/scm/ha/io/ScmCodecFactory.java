@@ -42,7 +42,21 @@ public final class ScmCodecFactory {
   private static Map<Class<?>, ScmCodec<?>> codecs = new HashMap<>();
 
   static {
-    codecs.put(com.google.protobuf.Message.class, new ScmNonShadedGeneratedMessageCodec());
+    codecs.put(org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerID.class,
+        new ScmNonShadedGeneratedMessageCodec
+            <>(org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerID.parser()));
+
+    codecs.put(org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineID.class,
+        new ScmNonShadedGeneratedMessageCodec
+            <>(org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineID.parser()));
+
+    codecs.put(org.apache.hadoop.hdds.protocol.proto.HddsProtos.Pipeline.class,
+        new ScmNonShadedGeneratedMessageCodec
+            <>(org.apache.hadoop.hdds.protocol.proto.HddsProtos.Pipeline.parser()));
+
+    codecs.put(org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto.class,
+        new ScmNonShadedGeneratedMessageCodec
+            <>(org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto.parser()));
     codecs.put(Message.class, new ScmGeneratedMessageCodec());
     codecs.put(List.class, new ScmListCodec());
     codecs.put(Integer.class, new ScmIntegerCodec());
