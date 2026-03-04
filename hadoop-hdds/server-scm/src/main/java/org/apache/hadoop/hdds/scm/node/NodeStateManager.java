@@ -679,13 +679,8 @@ public class NodeStateManager implements Runnable, Closeable {
     scheduleNextHealthCheck();
   }
 
-  /**
-   * This method is synchronized to coordinate node state updates between
-   * the upgrade finalization thread and the node health processing
-   * thread that calls this method.
-   */
   @VisibleForTesting
-  public synchronized void checkNodesHealth() {
+  public void checkNodesHealth() {
 
     /*
      *
