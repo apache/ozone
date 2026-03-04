@@ -180,7 +180,7 @@ enum NodeState {
     HEALTHY = 1;
     STALE = 2;
     DEAD = 3;
-    HEALTHY_READONLY = 6;
+    HEALTHY_READONLY = 6; // (deprecated)
 }
 
 enum NodeOperationalState {

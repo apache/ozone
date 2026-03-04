@@ -174,8 +174,6 @@ public class TestSCMNodeMetrics {
 
     assertGauge("InServiceHealthyNodes", 1,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("InServiceHealthyReadonlyNodes", 0,
-        getMetrics(SCMNodeMetrics.class.getSimpleName()));
     assertGauge("InServiceStaleNodes", 0,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
     assertGauge("InServiceDeadNodes", 0,
@@ -246,7 +244,6 @@ public class TestSCMNodeMetrics {
     nodeManager.processHeartbeat(registeredDatanode);
     sleep(4000);
     metricsSource = getMetrics(SCMNodeMetrics.SOURCE_NAME);
-    assertGauge("InServiceHealthyReadonlyNodes", 0, metricsSource);
     assertGauge("InServiceHealthyNodes", 1, metricsSource);
 
   }

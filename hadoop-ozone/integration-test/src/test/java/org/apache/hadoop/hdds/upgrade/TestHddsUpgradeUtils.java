@@ -17,12 +17,11 @@
 
 package org.apache.hadoop.hdds.upgrade;
 
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.ALREADY_FINALIZED;
 import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.FINALIZATION_DONE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -105,11 +104,6 @@ public final class TestHddsUpgradeUtils {
         scmVersionManager.getMetadataLayoutVersion());
     assertThat(scmVersionManager.getMetadataLayoutVersion()).isGreaterThanOrEqualTo(1);
 
-    // SCM will not return from finalization until all HEALTHY datanodes
-    // have completed their finalization (MLV == SLV). This ensures datanodes
-    // are ready to serve requests even though containers may remain OPEN.
-    testDataNodesStateOnSCM(scm, numDatanodes, HEALTHY, HEALTHY_READONLY);
-
     int countContainers = scm.getContainerManager().getContainers().size();
     assertThat(countContainers).isGreaterThanOrEqualTo(numContainers);
   }
@@ -174,10 +168,8 @@ public final class TestHddsUpgradeUtils {
   }
 
   public static void testDataNodesStateOnSCM(List<StorageContainerManager> scms,
-      int expectedDatanodeCount, HddsProtos.NodeState state,
-      HddsProtos.NodeState alternateState) {
-    scms.forEach(scm -> testDataNodesStateOnSCM(scm, expectedDatanodeCount,
-        state, alternateState));
+      int expectedDatanodeCount, HddsProtos.NodeState state) {
+    scms.forEach(scm -> testDataNodesStateOnSCM(scm, expectedDatanodeCount, state));
   }
 
   /*
@@ -188,15 +180,13 @@ public final class TestHddsUpgradeUtils {
    * setting "alternateState = null".
    */
   public static void testDataNodesStateOnSCM(StorageContainerManager scm,
-      int expectedDatanodeCount, HddsProtos.NodeState state,
-      HddsProtos.NodeState alternateState) {
+      int expectedDatanodeCount, HddsProtos.NodeState state) {
     int countNodes = 0;
     for (DatanodeDetails dn : scm.getScmNodeManager().getAllNodes()) {
       try {
         HddsProtos.NodeState dnState =
             scm.getScmNodeManager().getNodeStatus(dn).getHealth();
-        assertTrue((dnState == state) ||
-            (alternateState != null && dnState == alternateState));
+        assertSame(state, dnState);
       } catch (NodeNotFoundException e) {
         e.printStackTrace();
         fail("Node not found");

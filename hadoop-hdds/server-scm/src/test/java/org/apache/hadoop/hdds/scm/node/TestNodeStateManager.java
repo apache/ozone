@@ -17,13 +17,10 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
-import static org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager.maxLayoutVersion;
 import static org.apache.hadoop.ozone.container.upgrade.UpgradeUtils.defaultLayoutVersionProto;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -44,15 +41,11 @@ import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationCheckpoint;
 import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.ozone.container.upgrade.UpgradeUtils;
-import org.apache.hadoop.ozone.upgrade.LayoutVersionManager;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Class to test the NodeStateManager, which is an internal class used by
@@ -60,15 +53,9 @@ import org.slf4j.LoggerFactory;
  */
 public class TestNodeStateManager {
 
-  private static final Logger LOG =
-      LoggerFactory.getLogger(TestNodeStateManager.class);
-
   private NodeStateManager nsm;
   private ConfigurationSource conf;
   private MockEventPublisher eventPublisher;
-  private SCMContext scmContext;
-  private int scmSlv;
-  private int scmMlv;
 
   @BeforeEach
   public void setUp() {
@@ -90,17 +77,11 @@ public class TestNodeStateManager {
     };
     // Make NodeStateManager behave as if SCM has completed finalization,
     // unless a test changes the value of this variable.
-    scmContext = SCMContext.emptyContext();
+    SCMContext scmContext = SCMContext.emptyContext();
     scmContext.setFinalizationCheckpoint(
         FinalizationCheckpoint.FINALIZATION_COMPLETE);
     eventPublisher = new MockEventPublisher();
-    scmSlv = maxLayoutVersion();
-    scmMlv = maxLayoutVersion();
-    LayoutVersionManager mockVersionManager = mock(HDDSLayoutVersionManager.class);
-    when(mockVersionManager.getMetadataLayoutVersion()).thenReturn(scmMlv);
-    when(mockVersionManager.getSoftwareLayoutVersion()).thenReturn(scmSlv);
-    nsm = new NodeStateManager(conf, eventPublisher, mockVersionManager,
-        scmContext);
+    nsm = new NodeStateManager(conf, eventPublisher, scmContext);
   }
 
   @Test
@@ -209,11 +190,11 @@ public class TestNodeStateManager {
     assertEquals(NodeState.DEAD, nsm.getNodeStatus(dn).getHealth());
     assertEquals(SCMEvents.DEAD_NODE, eventPublisher.getLastEvent());
 
-    // Transition to healthy readonly from dead
+    // Transition to healthy from dead
     dni.updateLastHeartbeatTime();
     nsm.checkNodesHealth();
-    assertEquals(NodeState.HEALTHY_READONLY, nsm.getNodeStatus(dn).getHealth());
-    assertEquals(SCMEvents.HEALTHY_READONLY_NODE, eventPublisher.getLastEvent());
+    assertEquals(NodeState.HEALTHY, nsm.getNodeStatus(dn).getHealth());
+    assertEquals(SCMEvents.UNHEALTHY_TO_HEALTHY_NODE, eventPublisher.getLastEvent());
 
     // Make the node stale again, and transition to healthy.
     dni.updateLastHeartbeatTime(now - staleLimit);
@@ -222,36 +203,9 @@ public class TestNodeStateManager {
     assertEquals(SCMEvents.STALE_NODE, eventPublisher.getLastEvent());
     dni.updateLastHeartbeatTime();
     nsm.checkNodesHealth();
-    assertEquals(NodeState.HEALTHY_READONLY, nsm.getNodeStatus(dn).getHealth());
-    assertEquals(SCMEvents.HEALTHY_READONLY_NODE, eventPublisher.getLastEvent());
-
-    // Another health check run should move the node to healthy since its
-    // metadata layout version matches SCM's.
-    nsm.checkNodesHealth();
     assertEquals(NodeState.HEALTHY, nsm.getNodeStatus(dn).getHealth());
-    assertEquals(SCMEvents.HEALTHY_READONLY_TO_HEALTHY_NODE, eventPublisher.getLastEvent());
+    assertEquals(SCMEvents.UNHEALTHY_TO_HEALTHY_NODE, eventPublisher.getLastEvent());
     eventPublisher.clearEvents();
-
-    // Test how node state manager handles datanodes with lower metadata
-    // layout version based on SCM's finalization checkpoint.
-    dni.updateLastKnownLayoutVersion(
-        UpgradeUtils.toLayoutVersionProto(scmMlv - 1, scmSlv));
-    for (FinalizationCheckpoint checkpoint: FinalizationCheckpoint.values()) {
-      scmContext.setFinalizationCheckpoint(checkpoint);
-      LOG.info("Testing datanode state from current SCM finalization " +
-          "checkpoint: {}", checkpoint);
-      nsm.checkNodesHealth();
-
-      // Datanodes should not be moved to healthy readonly until the SCM has
-      // finished updating its metadata layout version as part of finalization.
-      if (checkpoint.hasCrossed(FinalizationCheckpoint.MLV_EQUALS_SLV)) {
-        assertEquals(NodeState.HEALTHY_READONLY, nsm.getNodeStatus(dn).getHealth());
-        assertEquals(SCMEvents.HEALTHY_READONLY_NODE, eventPublisher.getLastEvent());
-      } else {
-        assertEquals(NodeState.HEALTHY, nsm.getNodeStatus(dn).getHealth());
-        assertNull(eventPublisher.getLastEvent());
-      }
-    }
   }
 
   @Test
@@ -296,14 +250,14 @@ public class TestNodeStateManager {
     nsm.addNode(dn, UpgradeUtils.defaultLayoutVersionProto());
 
     // First set the node to decommissioned, then run through all op states in
-    // order and ensure the healthy_to_healthy_readonly event gets fired
+    // order and ensure the unhealthy_to_healthy event gets fired
     nsm.setNodeOperationalState(dn,
         HddsProtos.NodeOperationalState.DECOMMISSIONED);
     for (HddsProtos.NodeOperationalState s :
         HddsProtos.NodeOperationalState.values()) {
       eventPublisher.clearEvents();
       nsm.setNodeOperationalState(dn, s);
-      assertEquals(SCMEvents.HEALTHY_READONLY_TO_HEALTHY_NODE, eventPublisher.getLastEvent());
+      assertEquals(SCMEvents.UNHEALTHY_TO_HEALTHY_NODE, eventPublisher.getLastEvent());
     }
 
     // Now make the node stale and run through all states again ensuring the

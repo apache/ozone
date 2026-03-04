@@ -21,7 +21,6 @@ import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTP;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
-import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY_READONLY;
 import static org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy.hasEnoughSpace;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -179,8 +178,7 @@ public class SCMNodeManager implements NodeManager {
       HDDSLayoutVersionManager layoutVersionManager,
       Function<String, String> nodeResolver) {
     this.scmNodeEventPublisher = eventPublisher;
-    this.nodeStateManager = new NodeStateManager(conf, eventPublisher,
-        layoutVersionManager, scmContext);
+    this.nodeStateManager = new NodeStateManager(conf, eventPublisher, scmContext);
     this.version = VersionInfo.getLatestVersion();
     this.commandQueue = new CommandQueue();
     this.scmStorageConfig = scmStorageConfig;
@@ -970,12 +968,9 @@ public class SCMNodeManager implements NodeManager {
 
     final List<DatanodeInfo> healthyNodes = nodeStateManager
         .getNodes(null, HEALTHY);
-    final List<DatanodeInfo> healthyReadOnlyNodes = nodeStateManager
-        .getNodes(null, HEALTHY_READONLY);
     final List<DatanodeInfo> staleNodes = nodeStateManager
         .getStaleNodes();
     final List<DatanodeInfo> datanodes = new ArrayList<>(healthyNodes);
-    datanodes.addAll(healthyReadOnlyNodes);
     datanodes.addAll(staleNodes);
 
     for (DatanodeInfo dnInfo : datanodes) {
@@ -1113,6 +1108,11 @@ public class SCMNodeManager implements NodeManager {
     for (NodeOperationalState opState : NodeOperationalState.values()) {
       Map<String, Integer> states = new HashMap<>();
       for (NodeState health : NodeState.values()) {
+        if (health == NodeState.HEALTHY_READONLY) {
+          // HEALTHY_READONLY is deprecated and can no longer occur in SCM, but it cannot be removed
+          // from the protobuf for compatibility reasons. Skip it here to avoid confusion.
+          continue;
+        }
         states.put(health.name(), 0);
       }
       nodes.put(opState.name(), states);
