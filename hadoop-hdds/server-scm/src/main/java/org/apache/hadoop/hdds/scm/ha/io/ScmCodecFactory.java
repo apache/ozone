@@ -26,9 +26,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.IntFunction;
 import org.apache.commons.lang3.ClassUtils;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerID;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineState;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineID;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.Pipeline;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
@@ -42,21 +47,16 @@ public final class ScmCodecFactory {
   private static Map<Class<?>, ScmCodec<?>> codecs = new HashMap<>();
 
   static {
-    codecs.put(org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerID.class,
-        new ScmNonShadedGeneratedMessageCodec
-            <>(org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerID.parser()));
-
-    codecs.put(org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineID.class,
-        new ScmNonShadedGeneratedMessageCodec
-            <>(org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineID.parser()));
-
-    codecs.put(org.apache.hadoop.hdds.protocol.proto.HddsProtos.Pipeline.class,
-        new ScmNonShadedGeneratedMessageCodec
-            <>(org.apache.hadoop.hdds.protocol.proto.HddsProtos.Pipeline.parser()));
-
-    codecs.put(org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto.class,
-        new ScmNonShadedGeneratedMessageCodec
-            <>(org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto.parser()));
+    codecs.put(ContainerID.class,
+        new ScmNonShadedGeneratedMessageCodec<>(ContainerID.parser()));
+    codecs.put(PipelineID.class,
+        new ScmNonShadedGeneratedMessageCodec<>(PipelineID.parser()));
+    codecs.put(Pipeline.class,
+        new ScmNonShadedGeneratedMessageCodec<>(Pipeline.parser()));
+    codecs.put(ContainerInfoProto.class,
+        new ScmNonShadedGeneratedMessageCodec<>(ContainerInfoProto.parser()));
+    codecs.put(DeletedBlocksTransaction.class,
+        new ScmNonShadedGeneratedMessageCodec<>(DeletedBlocksTransaction.parser()));
     codecs.put(Message.class, new ScmGeneratedMessageCodec());
     codecs.put(List.class, new ScmListCodec());
     codecs.put(Integer.class, new ScmIntegerCodec());
