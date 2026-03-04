@@ -153,12 +153,22 @@ const FileSizeDistribution: React.FC<FileSizeDistributionProps> = ({
   const { fileCountValues, fileCountMap } = filePlotData;
 
   const filePlotOptions: EChartsOption = {
+    grid: {
+      left: 65,
+      bottom: 60
+    },
     xAxis: {
       type: 'category',
-      data: [...fileCountValues] ?? []
+      data: [...fileCountValues] ?? [],
+      name: 'File Size Range',
+      nameLocation: 'middle',
+      nameGap: 40
     },
     yAxis: {
-      type: 'value'
+      type: 'value',
+      name: 'Number of Files',
+      nameLocation: 'middle',
+      nameGap: 50
     },
     tooltip: {
       trigger: 'item',
