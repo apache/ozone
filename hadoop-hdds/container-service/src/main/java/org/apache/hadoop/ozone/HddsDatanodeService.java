@@ -302,11 +302,8 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
         }
       }
 
-      scmServiceId = HddsUtils.getScmServiceId(conf);
-
       reconfigurationHandler =
           new DatanodeReconfigurationHandler("DN", conf, this::checkAdminPrivilege)
-              .registerPrefix(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY, true, scmServiceId))
               .register(HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX,
                   this::reconfigBlockDeleteThreadMax)
               .register(OZONE_BLOCK_DELETING_SERVICE_WORKERS,
@@ -318,7 +315,11 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
               .register(REPLICATION_STREAMS_LIMIT_KEY,
                   this::reconfigReplicationStreamsLimit);
 
+      scmServiceId = HddsUtils.getScmServiceId(conf);
+
       if (scmServiceId != null) {
+        ((DatanodeReconfigurationHandler) reconfigurationHandler)
+            .registerPrefix(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY, true, scmServiceId));
         reconfigurationHandler.register(OZONE_SCM_NODES_KEY + "." + scmServiceId,
             this::reconfigScmNodes);
       }
