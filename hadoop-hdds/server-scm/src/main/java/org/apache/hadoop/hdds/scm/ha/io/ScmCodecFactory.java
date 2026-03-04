@@ -28,11 +28,12 @@ import java.util.function.IntFunction;
 import org.apache.commons.lang3.ClassUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineState;
-import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.Pipeline;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineID;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -57,6 +58,8 @@ public final class ScmCodecFactory {
         new ScmNonShadedGeneratedMessageCodec<>(ContainerInfoProto.parser()));
     codecs.put(DeletedBlocksTransaction.class,
         new ScmNonShadedGeneratedMessageCodec<>(DeletedBlocksTransaction.parser()));
+    codecs.put(DeletedBlocksTransactionSummary.class,
+        new ScmNonShadedGeneratedMessageCodec<>(DeletedBlocksTransactionSummary.parser()));
     codecs.put(Message.class, new ScmGeneratedMessageCodec());
     codecs.put(List.class, new ScmListCodec());
     codecs.put(Integer.class, new ScmIntegerCodec());
