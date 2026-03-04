@@ -27,7 +27,9 @@ import com.google.inject.Singleton;
 import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
@@ -243,6 +245,43 @@ public class ContainerHealthSchemaManagerV2 {
   }
 
   /**
+   * Returns previous in-state-since timestamps for tracked unhealthy states.
+   * The key is a stable containerId + state tuple.
+   */
+  public Map<ContainerStateKey, Long> getExistingInStateSinceByContainerIds(
+      List<Long> containerIds) {
+    if (containerIds == null || containerIds.isEmpty()) {
+      return new HashMap<>();
+    }
+
+    DSLContext dslContext = containerSchemaDefinitionV2.getDSLContext();
+    Map<ContainerStateKey, Long> existing = new HashMap<>();
+    try {
+      dslContext.select(
+              UNHEALTHY_CONTAINERS.CONTAINER_ID,
+              UNHEALTHY_CONTAINERS.CONTAINER_STATE,
+              UNHEALTHY_CONTAINERS.IN_STATE_SINCE)
+          .from(UNHEALTHY_CONTAINERS)
+          .where(UNHEALTHY_CONTAINERS.CONTAINER_ID.in(containerIds))
+          .and(UNHEALTHY_CONTAINERS.CONTAINER_STATE.in(
+              UnHealthyContainerStates.MISSING.toString(),
+              UnHealthyContainerStates.EMPTY_MISSING.toString(),
+              UnHealthyContainerStates.UNDER_REPLICATED.toString(),
+              UnHealthyContainerStates.OVER_REPLICATED.toString(),
+              UnHealthyContainerStates.MIS_REPLICATED.toString(),
+              UnHealthyContainerStates.NEGATIVE_SIZE.toString(),
+              UnHealthyContainerStates.REPLICA_MISMATCH.toString()))
+          .forEach(record -> existing.put(
+              new ContainerStateKey(record.get(UNHEALTHY_CONTAINERS.CONTAINER_ID),
+                  record.get(UNHEALTHY_CONTAINERS.CONTAINER_STATE)),
+              record.get(UNHEALTHY_CONTAINERS.IN_STATE_SINCE)));
+    } catch (Exception e) {
+      LOG.warn("Failed to load existing inStateSince records. Falling back to current scan time.", e);
+    }
+    return existing;
+  }
+
+  /**
    * Get summary of unhealthy containers grouped by state from V2 table.
    */
   public List<UnhealthyContainersSummaryV2> getUnhealthyContainersSummary() {
@@ -392,6 +431,36 @@ public class ContainerHealthSchemaManagerV2 {
 
     public String getReason() {
       return reason;
+    }
+  }
+
+  /**
+   * Key type for (containerId, state).
+   */
+  public static final class ContainerStateKey {
+    private final long containerId;
+    private final String state;
+
+    public ContainerStateKey(long containerId, String state) {
+      this.containerId = containerId;
+      this.state = state;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (this == other) {
+        return true;
+      }
+      if (!(other instanceof ContainerStateKey)) {
+        return false;
+      }
+      ContainerStateKey that = (ContainerStateKey) other;
+      return containerId == that.containerId && state.equals(that.state);
+    }
+
+    @Override
+    public int hashCode() {
+      return Long.hashCode(containerId) * 31 + state.hashCode();
     }
   }
 

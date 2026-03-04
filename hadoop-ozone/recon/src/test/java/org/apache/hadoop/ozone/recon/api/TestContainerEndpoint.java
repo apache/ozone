@@ -949,8 +949,8 @@ public class TestContainerEndpoint {
   public void testUnhealthyContainersFilteredResponse()
       throws IOException, TimeoutException {
     String missing = UnHealthyContainerStates.MISSING.toString();
-    String emptyMissing = "EMPTY_MISSING";
-    String negativeSize = "NEGATIVE_SIZE";
+    String emptyMissing = UnHealthyContainerStates.EMPTY_MISSING.toString();
+    String negativeSize = UnHealthyContainerStates.NEGATIVE_SIZE.toString();
 
     // Initial empty response verification
     Response response = containerEndpoint

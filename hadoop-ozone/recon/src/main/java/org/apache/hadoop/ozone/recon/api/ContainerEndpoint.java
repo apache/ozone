@@ -83,6 +83,7 @@ import org.apache.hadoop.ozone.recon.spi.ReconContainerMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.util.SeekableIterator;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
+import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -461,17 +462,16 @@ public class ContainerEndpoint {
       List<ContainerHistory> datanodes =
           containerManager.getLatestContainerHistory(containerID,
               containerInfo.getReplicationConfig().getRequiredNodes());
-      return new UnhealthyContainerMetadata(
+      UnhealthyContainers unhealthyContainers = new UnhealthyContainers(
           record.getContainerId(),
           record.getContainerState(),
           record.getInStateSince(),
           record.getExpectedReplicaCount(),
           record.getActualReplicaCount(),
           record.getReplicaDelta(),
-          record.getReason(),
-          datanodes,
-          pipelineID,
-          keyCount);
+          record.getReason());
+      return new UnhealthyContainerMetadata(unhealthyContainers, datanodes,
+          pipelineID, keyCount);
     } catch (IOException ioEx) {
       throw new UncheckedIOException(ioEx);
     }
