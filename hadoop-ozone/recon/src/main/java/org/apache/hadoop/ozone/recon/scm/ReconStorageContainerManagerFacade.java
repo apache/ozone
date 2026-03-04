@@ -136,9 +136,6 @@ public class ReconStorageContainerManagerFacade
 
   private static final Logger LOG = LoggerFactory
       .getLogger(ReconStorageContainerManagerFacade.class);
-  public static final long CONTAINER_METADATA_SIZE = 1 * 1024 * 1024L;
-  private static final String IPC_MAXIMUM_DATA_LENGTH = "ipc.maximum.data.length";
-  private static final int IPC_MAXIMUM_DATA_LENGTH_DEFAULT = 128 * 1024 * 1024;
 
   private final OzoneConfiguration ozoneConfiguration;
   private final ReconDatanodeProtocolServer datanodeProtocolServer;
@@ -537,8 +534,7 @@ public class ReconStorageContainerManagerFacade
     }
   }
 
-  public boolean syncWithSCMContainerInfo()
-      throws Exception {
+  public boolean syncWithSCMContainerInfo() {
     if (isSyncDataFromSCMRunning.compareAndSet(false, true)) {
       return containerSyncHelper.syncWithSCMContainerInfo();
     } else {

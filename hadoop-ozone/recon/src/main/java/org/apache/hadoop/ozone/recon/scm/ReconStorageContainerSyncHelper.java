@@ -17,10 +17,6 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
-import static org.apache.hadoop.fs.CommonConfigurationKeys.IPC_MAXIMUM_DATA_LENGTH;
-import static org.apache.hadoop.fs.CommonConfigurationKeys.IPC_MAXIMUM_DATA_LENGTH_DEFAULT;
-import static org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade.CONTAINER_METADATA_SIZE;
-
 import java.io.IOException;
 import java.util.List;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -32,6 +28,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 class ReconStorageContainerSyncHelper {
+
+  public static final long CONTAINER_METADATA_SIZE = 1 * 1024 * 1024L;
+  private static final String IPC_MAXIMUM_DATA_LENGTH = "ipc.maximum.data.length";
+  private static final int IPC_MAXIMUM_DATA_LENGTH_DEFAULT = 128 * 1024 * 1024;
 
   private static final Logger LOG = LoggerFactory
       .getLogger(ReconStorageContainerSyncHelper.class);
@@ -48,7 +48,7 @@ class ReconStorageContainerSyncHelper {
     this.containerManager = containerManager;
   }
 
-  public boolean syncWithSCMContainerInfo() throws Exception {
+  public boolean syncWithSCMContainerInfo() {
     try {
       long totalContainerCount = scmServiceProvider.getContainerCount(
           HddsProtos.LifeCycleState.CLOSED);

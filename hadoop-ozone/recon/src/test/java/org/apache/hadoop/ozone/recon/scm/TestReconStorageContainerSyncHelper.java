@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -30,6 +31,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.util.Arrays;
 import java.util.Collections;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -80,6 +82,61 @@ class TestReconStorageContainerSyncHelper {
     assertTrue(result);
     verify(mockScmServiceProvider).getContainerWithPipeline(42L);
     verify(mockContainerManager).addNewContainer(cwp);
+  }
+
+  @Test
+  void testContainerMissingFromReconIsAddedWhenMultiplePages() throws Exception {
+    // Force containerCountPerCall = 2 by capping the RPC size to 2MB
+    OzoneConfiguration pagedConf = new OzoneConfiguration();
+    pagedConf.setInt("ipc.maximum.data.length", 2 * 1024 * 1024);
+    ReconStorageContainerSyncHelper pagedHelper = new ReconStorageContainerSyncHelper(
+        mockScmServiceProvider, pagedConf, mockContainerManager);
+
+    // Page 1: containers 1 and 2 (both missing from Recon)
+    ContainerID cid1 = ContainerID.valueOf(1L);
+    ContainerID cid2 = ContainerID.valueOf(2L);
+    ContainerInfo info1 = new ContainerInfo.Builder()
+        .setContainerID(1L).setState(CLOSED)
+        .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
+        .setOwner("test").build();
+    ContainerInfo info2 = new ContainerInfo.Builder()
+        .setContainerID(2L).setState(CLOSED)
+        .setReplicationConfig(StandaloneReplicationConfig.getInstance(ONE))
+        .setOwner("test").build();
+    ContainerWithPipeline cwp1 = new ContainerWithPipeline(info1, null);
+    ContainerWithPipeline cwp2 = new ContainerWithPipeline(info2, null);
+
+    // Page 2: container 3 (already in Recon)
+    ContainerID cid3 = ContainerID.valueOf(3L);
+
+    when(mockScmServiceProvider.getContainerCount(CLOSED)).thenReturn(3L);
+    when(mockScmServiceProvider.getListOfContainerIDs(
+        eq(ContainerID.valueOf(1L)), eq(2), eq(CLOSED)))
+        .thenReturn(Arrays.asList(cid1, cid2));
+    when(mockScmServiceProvider.getListOfContainerIDs(
+        eq(ContainerID.valueOf(3L)), eq(2), eq(CLOSED)))
+        .thenReturn(Collections.singletonList(cid3));
+
+    when(mockContainerManager.containerExist(cid1)).thenReturn(false);
+    when(mockContainerManager.containerExist(cid2)).thenReturn(false);
+    when(mockContainerManager.containerExist(cid3)).thenReturn(true);
+    when(mockScmServiceProvider.getContainerWithPipeline(1L)).thenReturn(cwp1);
+    when(mockScmServiceProvider.getContainerWithPipeline(2L)).thenReturn(cwp2);
+
+    boolean result = pagedHelper.syncWithSCMContainerInfo();
+
+    assertTrue(result);
+    // Page 1: both missing containers were added
+    verify(mockContainerManager).addNewContainer(cwp1);
+    verify(mockContainerManager).addNewContainer(cwp2);
+    // Page 2: present container was skipped
+    verify(mockContainerManager, never()).addNewContainer(
+        argThat(cwp -> cwp.getContainerInfo().getContainerID() == 3L));
+    // Both pages were fetched
+    verify(mockScmServiceProvider).getListOfContainerIDs(
+        eq(ContainerID.valueOf(1L)), eq(2), eq(CLOSED));
+    verify(mockScmServiceProvider).getListOfContainerIDs(
+        eq(ContainerID.valueOf(3L)), eq(2), eq(CLOSED));
   }
 
   @Test
