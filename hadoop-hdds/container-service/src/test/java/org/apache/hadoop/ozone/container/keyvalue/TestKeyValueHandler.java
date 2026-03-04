@@ -923,6 +923,190 @@ public class TestKeyValueHandler {
         .build();
   }
 
+  @Test
+  public void testCreateContainerWithStorageType() throws Exception {
+    final String clusterId = UUID.randomUUID().toString();
+    final String datanodeId = UUID.randomUUID().toString();
+    conf = new OzoneConfiguration();
+
+    // Create SSD and DISK volumes
+    Path ssdPath = tempDir.resolve("ssd");
+    Path diskPath = tempDir.resolve("disk");
+    Files.createDirectories(ssdPath);
+    Files.createDirectories(diskPath);
+
+    final ContainerSet containerSet = spy(newContainerSet());
+    final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
+
+    HddsVolume ssdVolume = new HddsVolume.Builder(ssdPath.toString())
+        .conf(conf).clusterID(clusterId).datanodeUuid(datanodeId)
+        .storageType(org.apache.hadoop.fs.StorageType.SSD)
+        .volumeSet(volumeSet).build();
+    ssdVolume.format(clusterId);
+    ssdVolume.createWorkingDir(clusterId, null);
+    ssdVolume.createTmpDirs(clusterId);
+
+    HddsVolume diskVolume = new HddsVolume.Builder(diskPath.toString())
+        .conf(conf).clusterID(clusterId).datanodeUuid(datanodeId)
+        .storageType(org.apache.hadoop.fs.StorageType.DISK)
+        .volumeSet(volumeSet).build();
+    diskVolume.format(clusterId);
+    diskVolume.createWorkingDir(clusterId, null);
+    diskVolume.createTmpDirs(clusterId);
+
+    when(volumeSet.getVolumesList())
+        .thenReturn(java.util.Arrays.asList(ssdVolume, diskVolume));
+
+    final ContainerMetrics metrics = ContainerMetrics.create(conf);
+    try {
+      final AtomicInteger icrReceived = new AtomicInteger(0);
+      final KeyValueHandler kvHandler = new KeyValueHandler(conf,
+          datanodeId, containerSet, volumeSet, metrics,
+          c -> icrReceived.incrementAndGet(),
+          new ContainerChecksumTreeManager(conf));
+      kvHandler.setClusterID(clusterId);
+
+      // Create container with SSD storageType
+      ContainerCommandRequestProto ssdRequest =
+          ContainerCommandRequestProto.newBuilder()
+              .setCmdType(ContainerProtos.Type.CreateContainer)
+              .setDatanodeUuid(datanodeId)
+              .setCreateContainer(
+                  ContainerProtos.CreateContainerRequestProto.newBuilder()
+                      .setContainerType(ContainerType.KeyValueContainer)
+                      .setStorageType(ContainerProtos.StorageTypeProto.SSD)
+                      .build())
+              .setContainerID(1L)
+              .setPipelineID(UUID.randomUUID().toString())
+              .build();
+
+      ContainerCommandResponseProto response =
+          kvHandler.handleCreateContainer(ssdRequest, null);
+      assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+
+      // Verify container was placed on SSD volume
+      Container<?> createdContainer = containerSet.getContainer(1L);
+      assertNotNull(createdContainer);
+      assertEquals(ssdVolume,
+          createdContainer.getContainerData().getVolume());
+
+      // Create container with DISK storageType
+      ContainerCommandRequestProto diskRequest =
+          ContainerCommandRequestProto.newBuilder()
+              .setCmdType(ContainerProtos.Type.CreateContainer)
+              .setDatanodeUuid(datanodeId)
+              .setCreateContainer(
+                  ContainerProtos.CreateContainerRequestProto.newBuilder()
+                      .setContainerType(ContainerType.KeyValueContainer)
+                      .setStorageType(ContainerProtos.StorageTypeProto.DISK)
+                      .build())
+              .setContainerID(2L)
+              .setPipelineID(UUID.randomUUID().toString())
+              .build();
+
+      response = kvHandler.handleCreateContainer(diskRequest, null);
+      assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+
+      Container<?> diskContainer = containerSet.getContainer(2L);
+      assertNotNull(diskContainer);
+      assertEquals(diskVolume,
+          diskContainer.getContainerData().getVolume());
+    } finally {
+      ssdVolume.getVolumeInfoStats().unregister();
+      ssdVolume.getVolumeIOStats().unregister();
+      diskVolume.getVolumeInfoStats().unregister();
+      diskVolume.getVolumeIOStats().unregister();
+      ContainerMetrics.remove();
+    }
+  }
+
+  @Test
+  public void testStorageTypeProtoSerialization() {
+    // Verify storageType field round-trips in the proto correctly
+    ContainerProtos.CreateContainerRequestProto withSsd =
+        ContainerProtos.CreateContainerRequestProto.newBuilder()
+            .setContainerType(ContainerType.KeyValueContainer)
+            .setStorageType(ContainerProtos.StorageTypeProto.SSD)
+            .build();
+    assertTrue(withSsd.hasStorageType());
+    assertEquals(ContainerProtos.StorageTypeProto.SSD,
+        withSsd.getStorageType());
+
+    ContainerProtos.CreateContainerRequestProto withDisk =
+        ContainerProtos.CreateContainerRequestProto.newBuilder()
+            .setContainerType(ContainerType.KeyValueContainer)
+            .setStorageType(ContainerProtos.StorageTypeProto.DISK)
+            .build();
+    assertEquals(ContainerProtos.StorageTypeProto.DISK,
+        withDisk.getStorageType());
+
+    // Without storageType set - backward compatibility
+    ContainerProtos.CreateContainerRequestProto noStorageType =
+        ContainerProtos.CreateContainerRequestProto.newBuilder()
+            .setContainerType(ContainerType.KeyValueContainer)
+            .build();
+    assertFalse(noStorageType.hasStorageType());
+
+    // Verify round-trip through serialization
+    byte[] bytes = withSsd.toByteArray();
+    try {
+      ContainerProtos.CreateContainerRequestProto deserialized =
+          ContainerProtos.CreateContainerRequestProto.parseFrom(bytes);
+      assertTrue(deserialized.hasStorageType());
+      assertEquals(ContainerProtos.StorageTypeProto.SSD,
+          deserialized.getStorageType());
+    } catch (Exception e) {
+      fail("Proto round-trip failed: " + e.getMessage());
+    }
+  }
+
+  @Test
+  public void testCreateContainerWithoutStorageType() throws Exception {
+    final String clusterId = UUID.randomUUID().toString();
+    final String datanodeId = UUID.randomUUID().toString();
+    conf = new OzoneConfiguration();
+
+    final ContainerSet containerSet = spy(newContainerSet());
+    final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);
+
+    HddsVolume hddsVolume = new HddsVolume.Builder(tempDir.toString())
+        .conf(conf).clusterID(clusterId).datanodeUuid(datanodeId)
+        .volumeSet(volumeSet).build();
+    hddsVolume.format(clusterId);
+    hddsVolume.createWorkingDir(clusterId, null);
+    hddsVolume.createTmpDirs(clusterId);
+
+    when(volumeSet.getVolumesList())
+        .thenReturn(Collections.singletonList(hddsVolume));
+
+    final ContainerMetrics metrics = ContainerMetrics.create(conf);
+    try {
+      final AtomicInteger icrReceived = new AtomicInteger(0);
+      final KeyValueHandler kvHandler = new KeyValueHandler(conf,
+          datanodeId, containerSet, volumeSet, metrics,
+          c -> icrReceived.incrementAndGet(),
+          new ContainerChecksumTreeManager(conf));
+      kvHandler.setClusterID(clusterId);
+
+      // Create container without storageType (original behavior)
+      ContainerCommandRequestProto request = createContainerRequest(
+          datanodeId, 1L);
+
+      ContainerCommandResponseProto response =
+          kvHandler.handleCreateContainer(request, null);
+      assertEquals(ContainerProtos.Result.SUCCESS, response.getResult());
+
+      Container<?> createdContainer = containerSet.getContainer(1L);
+      assertNotNull(createdContainer);
+      assertEquals(hddsVolume,
+          createdContainer.getContainerData().getVolume());
+    } finally {
+      hddsVolume.getVolumeInfoStats().unregister();
+      hddsVolume.getVolumeIOStats().unregister();
+      ContainerMetrics.remove();
+    }
+  }
+
   private KeyValueHandler createKeyValueHandler(Path path) throws IOException {
     final ContainerSet containerSet = newContainerSet();
     final MutableVolumeSet volumeSet = mock(MutableVolumeSet.class);

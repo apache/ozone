@@ -719,7 +719,8 @@ public class TestOmContainerLocationCache {
             any(ReplicationConfig.class),
             anyString(),
             any(ExcludeList.class),
-            anyString()))
+            anyString(),
+            any(org.apache.hadoop.hdds.protocol.StorageType.class)))
         .thenReturn(Collections.singletonList(block));
   }
 
@@ -735,7 +736,8 @@ public class TestOmContainerLocationCache {
             any(ECReplicationConfig.class),
             anyString(),
             any(ExcludeList.class),
-            anyString()))
+            anyString(),
+            any(org.apache.hadoop.hdds.protocol.StorageType.class)))
         .thenReturn(Collections.singletonList(block));
   }
 

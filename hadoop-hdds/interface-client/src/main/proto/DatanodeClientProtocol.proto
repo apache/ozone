@@ -264,6 +264,17 @@ enum ContainerType {
   KeyValueContainer = 1;
 }
 
+/**
+ * Storage type for volume selection on datanodes.
+ * Values mirror StorageTypeProto in hdds.proto.
+ */
+enum StorageTypeProto {
+  DISK = 1;
+  SSD = 2;
+  ARCHIVE = 3;
+  RAM_DISK = 4;
+}
+
 
 // Container Messages.
 message CreateContainerRequestProto {
@@ -271,6 +282,7 @@ message CreateContainerRequestProto {
   optional ContainerType containerType = 3 [default = KeyValueContainer];
   optional int32 replicaIndex = 4;
   optional ContainerDataProto.State state = 5;
+  optional StorageTypeProto storageType = 6;
 }
 
 message CreateContainerResponseProto {

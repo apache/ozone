@@ -730,7 +730,8 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     verify(scmBlockLocationProtocol, atLeastOnce())
         .allocateBlock(anyLong(), anyInt(),
             any(ReplicationConfig.class), anyString(),
-            any(ExcludeList.class), anyString());
+            any(ExcludeList.class), anyString(),
+            any(org.apache.hadoop.hdds.protocol.StorageType.class));
 
     // Verify key locations are present in the response
     assertTrue(modifiedOmRequest.hasCreateFileRequest());
@@ -802,7 +803,8 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
     verify(scmBlockLocationProtocol, atLeastOnce())
         .allocateBlock(anyLong(), anyInt(),
             any(ReplicationConfig.class), anyString(),
-            any(ExcludeList.class), anyString());
+            any(ExcludeList.class), anyString(),
+            any(org.apache.hadoop.hdds.protocol.StorageType.class));
 
     // Verify key locations are present in the response
     assertTrue(modifiedOmRequest.hasCreateFileRequest());

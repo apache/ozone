@@ -100,6 +100,7 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
@@ -475,12 +476,20 @@ public class KeyValueHandler extends Handler {
     KeyValueContainer newContainer = new KeyValueContainer(
         newContainerData, conf);
 
+    // Extract storageType for volume selection on heterogeneous nodes.
+    StorageType requestedStorageType = null;
+    if (request.getCreateContainer().hasStorageType()) {
+      requestedStorageType = StorageType.valueOf(
+          request.getCreateContainer().getStorageType().name());
+    }
+
     boolean created = false;
     Lock containerIdLock = containerCreationLocks.get(containerID);
     containerIdLock.lock();
     try {
       if (containerSet.getContainer(containerID) == null) {
-        newContainer.create(volumeSet, volumeChoosingPolicy, clusterId);
+        newContainer.create(volumeSet, volumeChoosingPolicy, clusterId,
+            requestedStorageType);
         if (RECOVERING == newContainer.getContainerState()) {
           created = containerSet.addContainerByOverwriteMissingContainer(newContainer);
         } else {

@@ -227,7 +227,9 @@ public class TestKeyManagerImpl {
             any(ReplicationConfig.class),
             anyString(),
             any(ExcludeList.class),
-            anyString())).thenThrow(
+            anyString(),
+            any(org.apache.hadoop.hdds.protocol.StorageType.class)))
+        .thenThrow(
                 new SCMException("SafeModePrecheck failed for allocateBlock",
             ResultCodes.SAFE_MODE_EXCEPTION));
     createVolume(VOLUME_NAME);

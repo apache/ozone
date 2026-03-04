@@ -1120,12 +1120,14 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     verify(scmBlockLocationProtocol, never())
         .allocateBlock(anyLong(), anyInt(),
             any(ReplicationConfig.class), anyString(),
-            any(ExcludeList.class), anyString());
+            any(ExcludeList.class), anyString(),
+            any(org.apache.hadoop.hdds.protocol.StorageType.class));
 
     verify(scmBlockLocationProtocol, never())
         .allocateBlock(anyLong(), anyInt(),
             any(ReplicationConfig.class), anyString(),
-            any(ExcludeList.class), anyString());
+            any(ExcludeList.class), anyString(),
+            any(org.apache.hadoop.hdds.protocol.StorageType.class));
 
     assertTrue(modifiedOmRequest.hasCreateKeyRequest());
     CreateKeyRequest responseCreateKeyRequest =
@@ -1197,12 +1199,14 @@ public class TestOMKeyCreateRequest extends TestOMKeyRequest {
     verify(scmBlockLocationProtocol, never())
         .allocateBlock(anyLong(), anyInt(),
             any(ReplicationConfig.class), anyString(),
-            any(ExcludeList.class), anyString());
+            any(ExcludeList.class), anyString(),
+            any(org.apache.hadoop.hdds.protocol.StorageType.class));
 
     verify(scmBlockLocationProtocol, never())
         .allocateBlock(anyLong(), anyInt(),
             any(ReplicationConfig.class), anyString(),
-            any(ExcludeList.class), anyString());
+            any(ExcludeList.class), anyString(),
+            any(org.apache.hadoop.hdds.protocol.StorageType.class));
 
     assertTrue(modifiedOmRequest.hasCreateKeyRequest());
     CreateKeyRequest responseCreateKeyRequest =

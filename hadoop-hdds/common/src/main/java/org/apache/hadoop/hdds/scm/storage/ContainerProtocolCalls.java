@@ -556,7 +556,7 @@ public final class ContainerProtocolCalls  {
    */
   public static void createContainer(XceiverClientSpi client, long containerID,
       String encodedToken) throws IOException {
-    createContainer(client, containerID, encodedToken, null, 0);
+    createContainer(client, containerID, encodedToken, null, 0, null);
   }
 
   /**
@@ -571,6 +571,24 @@ public final class ContainerProtocolCalls  {
       long containerID, String encodedToken,
       ContainerProtos.ContainerDataProto.State state, int replicaIndex)
       throws IOException {
+    createContainer(client, containerID, encodedToken, state, replicaIndex,
+        null);
+  }
+
+  /**
+   * createContainer call that creates a container on the datanode.
+   * @param client  - client
+   * @param containerID - ID of container
+   * @param encodedToken - encodedToken if security is enabled
+   * @param state - state of the container
+   * @param replicaIndex - index position of the container replica
+   * @param storageType - storage type for volume selection on the datanode
+   */
+  public static void createContainer(XceiverClientSpi client,
+      long containerID, String encodedToken,
+      ContainerProtos.ContainerDataProto.State state, int replicaIndex,
+      ContainerProtos.StorageTypeProto storageType)
+      throws IOException {
     ContainerProtos.CreateContainerRequestProto.Builder createRequest =
         ContainerProtos.CreateContainerRequestProto.newBuilder();
     createRequest
@@ -580,6 +598,9 @@ public final class ContainerProtocolCalls  {
     }
     if (replicaIndex > 0) {
       createRequest.setReplicaIndex(replicaIndex);
+    }
+    if (storageType != null) {
+      createRequest.setStorageType(storageType);
     }
 
     String id = client.getPipeline().getFirstNode().getUuidString();

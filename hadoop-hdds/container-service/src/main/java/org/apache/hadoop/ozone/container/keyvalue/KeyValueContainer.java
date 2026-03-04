@@ -53,6 +53,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.FileAlreadyExistsException;
 import org.apache.hadoop.fs.FileUtil;
@@ -148,6 +149,23 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
   @Override
   public void create(VolumeSet volumeSet, VolumeChoosingPolicy
       volumeChoosingPolicy, String clusterId) throws StorageContainerException {
+    create(volumeSet, volumeChoosingPolicy, clusterId, null);
+  }
+
+  /**
+   * Creates a container, filtering volumes by the requested StorageType
+   * before choosing a volume. If no volumes match the requested type,
+   * falls back to all available volumes.
+   *
+   * @param volumeSet the set of available volumes
+   * @param volumeChoosingPolicy policy for choosing among candidate volumes
+   * @param clusterId the cluster ID
+   * @param storageType the requested storage type, or null for no filtering
+   */
+  public void create(VolumeSet volumeSet, VolumeChoosingPolicy
+      volumeChoosingPolicy, String clusterId,
+      org.apache.hadoop.hdds.protocol.StorageType storageType)
+      throws StorageContainerException {
     Objects.requireNonNull(volumeChoosingPolicy, "VolumeChoosingPolicy == null");
     Objects.requireNonNull(volumeSet, "volumeSet == null");
     Objects.requireNonNull(clusterId, "clusterId == null");
@@ -159,6 +177,20 @@ public class KeyValueContainer implements Container<KeyValueContainerData> {
     try {
       List<HddsVolume> volumes
           = StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList());
+      if (storageType != null) {
+        org.apache.hadoop.fs.StorageType fsStorageType =
+            org.apache.hadoop.fs.StorageType.valueOf(storageType.name());
+        List<HddsVolume> filtered = volumes.stream()
+            .filter(v -> v.getStorageType() == fsStorageType)
+            .collect(Collectors.toList());
+        if (!filtered.isEmpty()) {
+          volumes = filtered;
+        } else {
+          LOG.warn("No volumes found with storage type {}, falling back to" +
+              " all volumes for container {}", storageType,
+              containerData.getContainerID());
+        }
+      }
       while (true) {
         HddsVolume containerVolume;
         String hddsVolumeDir;

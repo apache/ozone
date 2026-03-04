@@ -200,6 +200,202 @@ public class TestKeyValueContainer {
         "DB does not exist");
   }
 
+  @ContainerTestVersionInfo.ContainerTest
+  public void testCreateContainerWithStorageTypeFiltering(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+
+    // Create two volumes: one SSD, one DISK
+    File ssdDir = new File(folder, "ssd");
+    File diskDir = new File(folder, "disk");
+    assertTrue(ssdDir.mkdirs());
+    assertTrue(diskDir.mkdirs());
+
+    HddsVolume ssdVolume = new HddsVolume.Builder(ssdDir.toString())
+        .conf(CONF)
+        .datanodeUuid(datanodeId.toString())
+        .storageType(org.apache.hadoop.fs.StorageType.SSD)
+        .build();
+    HddsVolume diskVolume = new HddsVolume.Builder(diskDir.toString())
+        .conf(CONF)
+        .datanodeUuid(datanodeId.toString())
+        .storageType(org.apache.hadoop.fs.StorageType.DISK)
+        .build();
+
+    StorageVolumeUtil.checkVolume(ssdVolume, scmId, scmId, CONF, null, null);
+    StorageVolumeUtil.checkVolume(diskVolume, scmId, scmId, CONF, null, null);
+
+    List<HddsVolume> mixedVolumes = new ArrayList<>();
+    mixedVolumes.add(ssdVolume);
+    mixedVolumes.add(diskVolume);
+
+    VolumeSet mixedVolumeSet = mock(MutableVolumeSet.class);
+    when(mixedVolumeSet.getVolumesList())
+        .thenAnswer(i -> mixedVolumes.stream()
+            .map(v -> (StorageVolume) v)
+            .collect(Collectors.toList()));
+
+    // volumeChoosingPolicy returns the first volume from the filtered list
+    RoundRobinVolumeChoosingPolicy policy =
+        mock(RoundRobinVolumeChoosingPolicy.class);
+    when(policy.chooseVolume(anyList(), anyLong())).thenAnswer(
+        invocation -> {
+          List<HddsVolume> volumes = invocation.getArgument(0);
+          return volumes.get(0);
+        });
+
+    // Request SSD storage type - should only see ssdVolume
+    KeyValueContainerData ssdContainerData = new KeyValueContainerData(100L,
+        layout,
+        (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
+        datanodeId.toString());
+    KeyValueContainer ssdContainer =
+        new KeyValueContainer(ssdContainerData, CONF);
+    ssdContainer.create(mixedVolumeSet, policy, scmId,
+        org.apache.hadoop.hdds.protocol.StorageType.SSD);
+
+    assertEquals(ssdVolume, ssdContainerData.getVolume());
+
+    // Request DISK storage type - should only see diskVolume
+    KeyValueContainerData diskContainerData = new KeyValueContainerData(101L,
+        layout,
+        (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
+        datanodeId.toString());
+    KeyValueContainer diskContainer =
+        new KeyValueContainer(diskContainerData, CONF);
+    diskContainer.create(mixedVolumeSet, policy, scmId,
+        org.apache.hadoop.hdds.protocol.StorageType.DISK);
+
+    assertEquals(diskVolume, diskContainerData.getVolume());
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testCreateContainerWithStorageTypeFallback(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+
+    // Create only DISK volumes - no SSD available
+    File diskDir = new File(folder, "diskonly");
+    assertTrue(diskDir.mkdirs());
+
+    HddsVolume diskVolume = new HddsVolume.Builder(diskDir.toString())
+        .conf(CONF)
+        .datanodeUuid(datanodeId.toString())
+        .storageType(org.apache.hadoop.fs.StorageType.DISK)
+        .build();
+    StorageVolumeUtil.checkVolume(diskVolume, scmId, scmId, CONF, null, null);
+
+    List<HddsVolume> diskOnlyVolumes = new ArrayList<>();
+    diskOnlyVolumes.add(diskVolume);
+
+    VolumeSet diskOnlyVolumeSet = mock(MutableVolumeSet.class);
+    when(diskOnlyVolumeSet.getVolumesList())
+        .thenAnswer(i -> diskOnlyVolumes.stream()
+            .map(v -> (StorageVolume) v)
+            .collect(Collectors.toList()));
+
+    RoundRobinVolumeChoosingPolicy policy =
+        mock(RoundRobinVolumeChoosingPolicy.class);
+    when(policy.chooseVolume(anyList(), anyLong())).thenAnswer(
+        invocation -> {
+          List<HddsVolume> volumes = invocation.getArgument(0);
+          return volumes.get(0);
+        });
+
+    // Request SSD but only DISK is available - should fall back to DISK
+    KeyValueContainerData fallbackData = new KeyValueContainerData(102L,
+        layout,
+        (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
+        datanodeId.toString());
+    KeyValueContainer fallbackContainer =
+        new KeyValueContainer(fallbackData, CONF);
+    fallbackContainer.create(diskOnlyVolumeSet, policy, scmId,
+        org.apache.hadoop.hdds.protocol.StorageType.SSD);
+
+    // Should succeed and use the DISK volume as fallback
+    assertEquals(diskVolume, fallbackData.getVolume());
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testCreateContainerWithNullStorageType(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+    // Null storageType should behave identically to the original create()
+    keyValueContainer.create(volumeSet, volumeChoosingPolicy, scmId, null);
+    keyValueContainerData = keyValueContainer.getContainerData();
+
+    assertNotNull(keyValueContainerData.getMetadataPath());
+    assertNotNull(keyValueContainerData.getChunksPath());
+    assertTrue(keyValueContainer.getContainerFile().exists());
+    assertTrue(keyValueContainer.getContainerDBFile().exists());
+  }
+
+  @ContainerTestVersionInfo.ContainerTest
+  public void testCreateContainerFilteringPassesOnlyMatchingVolumes(
+      ContainerTestVersionInfo versionInfo) throws Exception {
+    init(versionInfo);
+
+    // Create 2 SSD + 1 DISK volumes
+    File ssd1Dir = new File(folder, "ssd1");
+    File ssd2Dir = new File(folder, "ssd2");
+    File diskDir = new File(folder, "disk2");
+    assertTrue(ssd1Dir.mkdirs());
+    assertTrue(ssd2Dir.mkdirs());
+    assertTrue(diskDir.mkdirs());
+
+    HddsVolume ssd1 = new HddsVolume.Builder(ssd1Dir.toString())
+        .conf(CONF).datanodeUuid(datanodeId.toString())
+        .storageType(org.apache.hadoop.fs.StorageType.SSD).build();
+    HddsVolume ssd2 = new HddsVolume.Builder(ssd2Dir.toString())
+        .conf(CONF).datanodeUuid(datanodeId.toString())
+        .storageType(org.apache.hadoop.fs.StorageType.SSD).build();
+    HddsVolume disk = new HddsVolume.Builder(diskDir.toString())
+        .conf(CONF).datanodeUuid(datanodeId.toString())
+        .storageType(org.apache.hadoop.fs.StorageType.DISK).build();
+
+    StorageVolumeUtil.checkVolume(ssd1, scmId, scmId, CONF, null, null);
+    StorageVolumeUtil.checkVolume(ssd2, scmId, scmId, CONF, null, null);
+    StorageVolumeUtil.checkVolume(disk, scmId, scmId, CONF, null, null);
+
+    List<HddsVolume> allVolumes = new ArrayList<>();
+    allVolumes.add(ssd1);
+    allVolumes.add(ssd2);
+    allVolumes.add(disk);
+
+    VolumeSet vs = mock(MutableVolumeSet.class);
+    when(vs.getVolumesList())
+        .thenAnswer(i -> allVolumes.stream()
+            .map(v -> (StorageVolume) v)
+            .collect(Collectors.toList()));
+
+    // Capture which volumes the policy actually sees
+    List<List<HddsVolume>> capturedVolumeLists = new ArrayList<>();
+    RoundRobinVolumeChoosingPolicy policy =
+        mock(RoundRobinVolumeChoosingPolicy.class);
+    when(policy.chooseVolume(anyList(), anyLong())).thenAnswer(
+        invocation -> {
+          List<HddsVolume> volumes = invocation.getArgument(0);
+          capturedVolumeLists.add(new ArrayList<>(volumes));
+          return volumes.get(0);
+        });
+
+    KeyValueContainerData data = new KeyValueContainerData(200L,
+        layout,
+        (long) StorageUnit.GB.toBytes(5), UUID.randomUUID().toString(),
+        datanodeId.toString());
+    KeyValueContainer container = new KeyValueContainer(data, CONF);
+    container.create(vs, policy, scmId,
+        org.apache.hadoop.hdds.protocol.StorageType.SSD);
+
+    // Policy should have received only the 2 SSD volumes, not the DISK one
+    assertEquals(1, capturedVolumeLists.size());
+    List<HddsVolume> receivedVolumes = capturedVolumeLists.get(0);
+    assertEquals(2, receivedVolumes.size());
+    assertTrue(receivedVolumes.contains(ssd1));
+    assertTrue(receivedVolumes.contains(ssd2));
+    assertFalse(receivedVolumes.contains(disk));
+  }
+
   /**
    * Tests repair of containers affected by the bug reported in HDDS-6235.
    */
