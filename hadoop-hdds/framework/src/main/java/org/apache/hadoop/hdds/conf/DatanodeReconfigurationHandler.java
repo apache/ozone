@@ -17,8 +17,11 @@
 
 package org.apache.hadoop.hdds.conf;
 
+import static java.util.Collections.unmodifiableSet;
+
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -41,6 +44,13 @@ public class DatanodeReconfigurationHandler extends ReconfigurationHandler {
   public DatanodeReconfigurationHandler registerPrefix(String prefixProperty) {
     prefixProperties.add(prefixProperty);
     return this;
+  }
+
+  @Override
+  public Set<String> getReconfigurableProperties() {
+    Set<String> properties = new HashSet<>(prefixProperties);
+    properties.addAll(super.getReconfigurableProperties());
+    return unmodifiableSet(properties);
   }
 
   @Override
