@@ -19,17 +19,19 @@ package org.apache.hadoop.ozone.kerberos;
 
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.security.authentication.util.KerberosName;
+
 /**
  * Command line utility to translate Kerberos principals to local user names
  * using the configured {@code hadoop.security.auth_to_local} rules.
- * <p>Example usage:</p>
- * <pre>
+ * Example usage:
  *   ozone kerbname <principal>
- * </pre>
  *
  */
-public class KerbName
-{
+public final class KerbName {
+
+  private KerbName() {
+  }
+
   public static void main(String[] args) throws Exception {
 
     if (args.length == 0) {
@@ -44,8 +46,8 @@ public class KerbName
     }
 
     for (String principal : args) {
-     KerberosName name = new KerberosName(principal);
-     System.out.println("Name: " + name + " to " + name.getShortName());
+      KerberosName name = new KerberosName(principal);
+      System.out.println("Name: " + name + " to " + name.getShortName());
     }
   }
 }
