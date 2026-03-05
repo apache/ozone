@@ -22,7 +22,7 @@ import org.apache.hadoop.hdds.ComponentVersion;
 /**
  * Generic Layout feature interface for Ozone.
  */
-public interface LayoutFeature extends ComponentVersion {
+public interface LayoutFeature<T extends LayoutFeature<T>> extends ComponentVersion<T> {
   int layoutVersion();
 
   @Override

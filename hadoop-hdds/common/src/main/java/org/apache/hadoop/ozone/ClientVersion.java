@@ -22,12 +22,15 @@ import static java.util.stream.Collectors.toMap;
 
 import java.util.Arrays;
 import java.util.Map;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import org.apache.hadoop.hdds.ComponentVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 
 /**
  * Versioning for protocol clients.
  */
-public enum ClientVersion implements ComponentVersion {
+public enum ClientVersion implements ComponentVersion<ClientVersion> {
 
   DEFAULT_VERSION(0, "Initial version"),
 
@@ -44,11 +47,11 @@ public enum ClientVersion implements ComponentVersion {
   FUTURE_VERSION(-1, "Used internally when the server side is older and an"
       + " unknown client version has arrived from the client.");
 
-  public static final ClientVersion CURRENT = latest();
-
-  private static final Map<Integer, ClientVersion> BY_VALUE =
+  private static final SortedMap<Integer, ClientVersion> BY_VALUE =
       Arrays.stream(values())
-          .collect(toMap(ClientVersion::serialize, identity()));
+          .collect(toMap(ClientVersion::serialize, identity(), (v1, v2) -> v1, TreeMap::new));
+
+  public static final ClientVersion CURRENT = BY_VALUE.get(BY_VALUE.lastKey());
 
   private final int version;
   private final String description;
@@ -61,6 +64,16 @@ public enum ClientVersion implements ComponentVersion {
   @Override
   public String description() {
     return description;
+  }
+
+  @Override
+  public ClientVersion nextVersion() {
+    return BY_VALUE.get(version + 1);
+  }
+
+  @Override
+  public Iterable<ClientVersion> nextVersions() {
+    return BY_VALUE.tailMap(version + 1).values();
   }
 
   @Override
@@ -82,12 +95,5 @@ public enum ClientVersion implements ComponentVersion {
   @Override
   public String toString() {
     return name() + " (" + serialize() + ")";
-  }
-
-  private static ClientVersion latest() {
-    ClientVersion[] versions = ClientVersion.values();
-    // The last entry in the array will be `FUTURE_VERSION`. We want the entry prior to this which defines the latest
-    // version in the software.
-    return versions[versions.length - 2];
   }
 }

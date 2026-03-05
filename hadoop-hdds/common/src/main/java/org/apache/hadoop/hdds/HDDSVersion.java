@@ -17,16 +17,20 @@
 
 package org.apache.hadoop.hdds;
 
+import org.apache.hadoop.ozone.OzoneManagerVersion;
+
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toMap;
 
 import java.util.Arrays;
 import java.util.Map;
+import java.util.SortedMap;
+import java.util.TreeMap;
 
 /**
  * Versioning for datanode.
  */
-public enum HDDSVersion implements ComponentVersion {
+public enum HDDSVersion implements ComponentVersion<HDDSVersion> {
 
   DEFAULT_VERSION(0, "Initial version"),
 
@@ -36,14 +40,16 @@ public enum HDDSVersion implements ComponentVersion {
   STREAM_BLOCK_SUPPORT(3,
       "This version has support for reading a block by streaming chunks."),
 
+  ZDU(100, "Version that supports zero downtime upgrade"),
+
   FUTURE_VERSION(-1, "Used internally in the client when the server side is "
       + " newer and an unknown server version has arrived to the client.");
 
-  public static final HDDSVersion SOFTWARE_VERSION = latest();
-
-  private static final Map<Integer, HDDSVersion> BY_VALUE =
+  private static final SortedMap<Integer, HDDSVersion> BY_VALUE =
       Arrays.stream(values())
-          .collect(toMap(HDDSVersion::serialize, identity()));
+          .collect(toMap(HDDSVersion::serialize, identity(), (v1, v2) -> v1, TreeMap::new));
+
+  public static final HDDSVersion SOFTWARE_VERSION = BY_VALUE.get(BY_VALUE.lastKey());
 
   private final int version;
   private final String description;
@@ -56,6 +62,16 @@ public enum HDDSVersion implements ComponentVersion {
   @Override
   public String description() {
     return description;
+  }
+
+  @Override
+  public HDDSVersion nextVersion() {
+    return BY_VALUE.get(version + 1);
+  }
+
+  @Override
+  public Iterable<HDDSVersion> nextVersions() {
+    return BY_VALUE.tailMap(version + 1).values();
   }
 
   @Override
@@ -77,12 +93,5 @@ public enum HDDSVersion implements ComponentVersion {
   @Override
   public String toString() {
     return name() + " (" + serialize() + ")";
-  }
-
-  private static HDDSVersion latest() {
-    HDDSVersion[] versions = HDDSVersion.values();
-    // The last entry in the array will be `FUTURE_VERSION`. We want the entry prior to this which defines the latest
-    // version in the software.
-    return versions[versions.length - 2];
   }
 }

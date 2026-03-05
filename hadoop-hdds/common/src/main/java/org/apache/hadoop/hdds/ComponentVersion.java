@@ -17,13 +17,23 @@
 
 package org.apache.hadoop.hdds;
 
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.Optional;
+import java.util.SortedMap;
+import java.util.TreeMap;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.upgrade.UpgradeAction;
+
+import static java.util.function.Function.identity;
+import static java.util.stream.Collectors.toMap;
 
 /**
  * Base type for component version enums.
  */
-public interface ComponentVersion {
+public interface ComponentVersion<V extends ComponentVersion<V>> extends Comparable<V> {
   /**
    * @return The serialized representation of this version. This is an opaque value which should not be checked or
    * compared directly.
@@ -31,9 +41,19 @@ public interface ComponentVersion {
   int serialize();
 
   /**
-   * @return the description of the version enum value.
+   * @return The description of the version enum value.
    */
   String description();
+
+  /**
+   * @return The next version immediately following this one, or null if there is no such version.
+   */
+  V nextVersion();
+
+  /**
+   * @return All versions immediately following this one, in order, or an empty iterable if there are no more versions.
+   */
+  Iterable<V> nextVersions();
 
   /**
    * Deserializes a ComponentVersion and checks if its feature set is supported by the current ComponentVersion.

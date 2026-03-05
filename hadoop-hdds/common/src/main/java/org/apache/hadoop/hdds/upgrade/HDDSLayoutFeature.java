@@ -17,13 +17,21 @@
 
 package org.apache.hadoop.hdds.upgrade;
 
+import java.util.Arrays;
 import java.util.Optional;
+import java.util.SortedMap;
+import java.util.TreeMap;
+import org.apache.hadoop.hdds.ComponentVersion;
+import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
+
+import static java.util.function.Function.identity;
+import static java.util.stream.Collectors.toMap;
 
 /**
  * List of HDDS Features.
  */
-public enum HDDSLayoutFeature implements LayoutFeature {
+public enum HDDSLayoutFeature implements LayoutFeature<HDDSLayoutFeature> {
   //////////////////////////////  //////////////////////////////
   INITIAL_VERSION(0, "Initial Layout Version"),
   DATANODE_SCHEMA_V2(1, "Datanode RocksDB Schema Version 2 (with column " +
@@ -45,6 +53,10 @@ public enum HDDSLayoutFeature implements LayoutFeature {
   STORAGE_SPACE_DISTRIBUTION(10, "Enhanced block deletion function for storage space distribution feature.");
 
   //////////////////////////////  //////////////////////////////
+
+  private static final SortedMap<Integer, HDDSLayoutFeature> BY_VALUE =
+      Arrays.stream(values())
+          .collect(toMap(HDDSLayoutFeature::serialize, identity(), (v1, v2) -> v1, TreeMap::new));
 
   private final int layoutVersion;
   private final String description;
@@ -88,6 +100,16 @@ public enum HDDSLayoutFeature implements LayoutFeature {
   @Override
   public String description() {
     return description;
+  }
+
+  @Override
+  public HDDSLayoutFeature nextVersion() {
+    return BY_VALUE.get(layoutVersion + 1);
+  }
+
+  @Override
+  public Iterable<HDDSLayoutFeature> nextVersions() {
+    return BY_VALUE.tailMap(layoutVersion + 1).values();
   }
 
   @Override

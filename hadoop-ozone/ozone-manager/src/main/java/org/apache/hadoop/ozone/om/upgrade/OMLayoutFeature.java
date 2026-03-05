@@ -17,13 +17,20 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
+import java.util.Arrays;
 import java.util.Optional;
+import java.util.SortedMap;
+import java.util.TreeMap;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
+
+import static java.util.function.Function.identity;
+import static java.util.stream.Collectors.toMap;
 
 /**
  * List of OM Layout features / versions.
  */
-public enum OMLayoutFeature implements LayoutFeature {
+public enum OMLayoutFeature implements LayoutFeature<OMLayoutFeature> {
   //////////////////////////////  //////////////////////////////
   INITIAL_VERSION(0, "Initial Layout Version"),
 
@@ -47,6 +54,10 @@ public enum OMLayoutFeature implements LayoutFeature {
   SNAPSHOT_DEFRAG(9, "Supporting defragmentation of snapshot");
 
   ///////////////////////////////  /////////////////////////////
+
+  private static final SortedMap<Integer, OMLayoutFeature> BY_VALUE =
+      Arrays.stream(values())
+          .collect(toMap(OMLayoutFeature::serialize, identity(), (v1, v2) -> v1, TreeMap::new));
 
   private final int layoutVersion;
   private final String description;
@@ -82,6 +93,16 @@ public enum OMLayoutFeature implements LayoutFeature {
     if (this.action == null) {
       this.action = upgradeAction;
     }
+  }
+
+  @Override
+  public OMLayoutFeature nextVersion() {
+    return BY_VALUE.get(layoutVersion + 1);
+  }
+
+  @Override
+  public Iterable<OMLayoutFeature> nextVersions() {
+    return BY_VALUE.tailMap(layoutVersion + 1).values();
   }
 
   @Override

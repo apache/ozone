@@ -29,6 +29,7 @@ import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.TypeKind;
+import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
@@ -86,11 +87,13 @@ public class RegisterValidatorProcessor extends AbstractProcessor {
     Types types = processingEnv.getTypeUtils();
     TypeElement expectedReturnInterface = expectedReturnClass == null || expectedReturnClass.equals("") ? null :
         elementUtils.getTypeElement(expectedReturnClass);
+    TypeMirror expectedType = expectedReturnInterface == null
+        ? null : types.erasure(expectedReturnInterface.asType());
     return method.getSimpleName().toString().equals(expectedMethodName) && (expectedReturnType == null ||
         TypeKind.ARRAY.equals(method.getReturnType().getKind()) &&
             types.asElement(((ArrayType)method.getReturnType()).getComponentType()).getKind() == expectedReturnType) &&
         (expectedReturnInterface == null ||
-            types.isAssignable(types.asElement(method.getReturnType()).asType(), expectedReturnInterface.asType()));
+            types.isAssignable(types.erasure(types.asElement(method.getReturnType()).asType()), expectedType));
   }
 
   private boolean validateMethod(ExecutableElement method, String expectedMethodName, ElementKind expectedReturnType,
@@ -99,11 +102,13 @@ public class RegisterValidatorProcessor extends AbstractProcessor {
     Types types = processingEnv.getTypeUtils();
     TypeElement expectedReturnInterface = expectedReturnClass == null || expectedReturnClass.equals("") ? null :
         elementUtils.getTypeElement(expectedReturnClass);
+    TypeMirror expectedType = expectedReturnInterface == null
+        ? null : types.erasure(expectedReturnInterface.asType());
     return method.getSimpleName().toString().equals(expectedMethodName) && (expectedReturnType == null ||
         types.asElement(method.getReturnType()) != null &&
             types.asElement(method.getReturnType()).getKind() == expectedReturnType) &&
         (expectedReturnInterface == null ||
-            types.isAssignable(types.asElement(method.getReturnType()).asType(), expectedReturnInterface.asType()));
+            types.isAssignable(types.erasure(types.asElement(method.getReturnType()).asType()), expectedType));
   }
 
   private void processElements(Set<? extends Element> annotatedElements) {
