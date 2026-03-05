@@ -98,8 +98,7 @@ public class SCMUpgradeFinalizer extends
 
   /**
    * Run on each SCM (leader and follower) when a layout feature is being
-   * finalized to run its finalization actions, update the VERSION file, and
-   * move the state of its in memory datanodes to healthy readonly.
+   * finalized to run its finalization actions, update the VERSION file.
    *
    * @param lf The layout feature that is being finalized.
    * @param context Supplier of objects needed to run the steps.
