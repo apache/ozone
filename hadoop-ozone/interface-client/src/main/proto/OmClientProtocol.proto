@@ -1730,19 +1730,6 @@ message PartKeyInfo {
     required KeyInfo partKeyInfo = 3;
 }
 
-message MultipartPartInfo {
-  required string partName = 1;
-  required uint32 partNumber = 2;
-  repeated KeyLocationList keyLocationList = 6;
-  required uint64 dataSize = 7;
-  required uint64 modificationTime = 8;
-  required uint64 objectID = 9;
-  required uint64 updateID = 10;
-  repeated hadoop.hdds.KeyValue metadata = 11;
-  optional FileEncryptionInfoProto fileEncryptionInfo = 12;
-  optional FileChecksumProto fileChecksum = 13;
-}
-
 message MultipartCommitUploadPartRequest {
     required KeyArgs keyArgs = 1;
     required uint64 clientID = 2;
