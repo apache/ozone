@@ -60,7 +60,6 @@ public final class ScmCodecFactory {
         new ScmNonShadedGeneratedMessageCodec<>(DeletedBlocksTransaction.parser()));
     codecs.put(DeletedBlocksTransactionSummary.class,
         new ScmNonShadedGeneratedMessageCodec<>(DeletedBlocksTransactionSummary.parser()));
-    codecs.put(Message.class, new ScmGeneratedMessageCodec());
     codecs.put(List.class, new ScmListCodec());
     codecs.put(Integer.class, new ScmIntegerCodec());
     codecs.put(Long.class, new ScmLongCodec());
