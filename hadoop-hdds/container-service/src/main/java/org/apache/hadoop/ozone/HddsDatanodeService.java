@@ -63,7 +63,6 @@ import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.cli.GenericCli;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
-import org.apache.hadoop.hdds.conf.DatanodeReconfigurationHandler;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.ReconfigurationHandler;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
@@ -303,7 +302,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
       }
 
       reconfigurationHandler =
-          new DatanodeReconfigurationHandler("DN", conf, this::checkAdminPrivilege)
+          new ReconfigurationHandler("DN", conf, this::checkAdminPrivilege)
               .register(HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX,
                   this::reconfigBlockDeleteThreadMax)
               .register(OZONE_BLOCK_DELETING_SERVICE_WORKERS,
@@ -318,7 +317,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
       scmServiceId = HddsUtils.getScmServiceId(conf);
 
       if (scmServiceId != null) {
-        ((DatanodeReconfigurationHandler) reconfigurationHandler)
+        reconfigurationHandler
             .registerPrefix(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY, scmServiceId))
             .register(OZONE_SCM_NODES_KEY + "." + scmServiceId, this::reconfigScmNodes);
       }
