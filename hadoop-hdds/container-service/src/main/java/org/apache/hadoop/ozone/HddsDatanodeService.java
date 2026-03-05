@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone;
 
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTP;
 import static org.apache.hadoop.hdds.protocol.DatanodeDetails.Port.Name.HTTPS;
+import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_ADDRESS_KEY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_NODES_KEY;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getRemoteUser;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.getScmSecurityClientWithMaxRetry;
@@ -93,6 +94,7 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerProtocolServer;
+import org.apache.hadoop.ozone.ha.ConfUtils;
 import org.apache.hadoop.ozone.util.OzoneNetUtils;
 import org.apache.hadoop.ozone.util.ShutdownHookManager;
 import org.apache.hadoop.security.SecurityUtil;
@@ -313,9 +315,11 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
                   this::reconfigReplicationStreamsLimit);
 
       scmServiceId = HddsUtils.getScmServiceId(conf);
+
       if (scmServiceId != null) {
-        reconfigurationHandler.register(OZONE_SCM_NODES_KEY + "." + scmServiceId,
-            this::reconfigScmNodes);
+        reconfigurationHandler
+            .registerPrefix(ConfUtils.addKeySuffixes(OZONE_SCM_ADDRESS_KEY, scmServiceId))
+            .register(OZONE_SCM_NODES_KEY + "." + scmServiceId, this::reconfigScmNodes);
       }
 
       reconfigurationHandler.setReconfigurationCompleteCallback(reconfigurationHandler.defaultLoggingCallback());
