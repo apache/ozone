@@ -102,7 +102,7 @@ message MultipartPartInfo {
   required uint64 modificationTime = 8;
   required uint64 objectID = 9;
   required uint64 updateID = 10;
-  repeated hadoop.hdds.KeyValue metadata = 11;
+  required string eTag = 11;
   optional FileEncryptionInfoProto fileEncryptionInfo = 12;
   optional FileChecksumProto fileChecksum = 13;
 }
