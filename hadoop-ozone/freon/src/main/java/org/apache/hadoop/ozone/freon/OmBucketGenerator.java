@@ -40,7 +40,7 @@ import picocli.CommandLine.Option;
     showDefaultValues = true)
 @MetaInfServices(FreonSubcommand.class)
 public class OmBucketGenerator extends BaseFreonGenerator
-    implements Callable<Void> {
+    implements Callable<Void>, FreonSubcommand {
 
   @Option(names = {"-v", "--volume"},
       description = "Name of the volume which contains the test data. Will be"

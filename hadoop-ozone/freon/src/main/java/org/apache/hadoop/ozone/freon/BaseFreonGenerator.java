@@ -73,7 +73,7 @@ import picocli.CommandLine.ParentCommand;
  */
 @CommandLine.Command
 @SuppressWarnings("java:S2245") // no need for secure random
-public class BaseFreonGenerator implements FreonSubcommand {
+public class BaseFreonGenerator {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(BaseFreonGenerator.class);

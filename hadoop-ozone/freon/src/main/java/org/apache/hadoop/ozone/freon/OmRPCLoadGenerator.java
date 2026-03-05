@@ -42,7 +42,7 @@ import picocli.CommandLine.Option;
         showDefaultValues = true)
 @MetaInfServices(FreonSubcommand.class)
 public class OmRPCLoadGenerator extends BaseFreonGenerator
-        implements Callable<Void> {
+        implements Callable<Void>, FreonSubcommand {
 
   private Timer timer;
   private OzoneManagerProtocolClientSideTranslatorPB[] clients;

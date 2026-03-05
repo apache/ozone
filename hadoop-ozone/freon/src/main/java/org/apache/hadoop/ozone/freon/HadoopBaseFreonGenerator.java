@@ -28,7 +28,7 @@ import picocli.CommandLine.Option;
 /**
  * Base class for Freon generator tests that requires  {@link FileSystem} instance.
  */
-public abstract class HadoopBaseFreonGenerator extends BaseFreonGenerator {
+public abstract class HadoopBaseFreonGenerator extends BaseFreonGenerator implements FreonSubcommand {
 
   @Option(names = {"-r", "--rpath", "--path"},
       description = "Hadoop FS file system path. Use full path.",

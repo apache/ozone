@@ -88,7 +88,7 @@ import picocli.CommandLine.Option;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
-@MetaInfServices(FreonSubcommand.class)
+@MetaInfServices(VaporSubcommand.class)
 @SuppressWarnings("java:S2245") // no need for secure random
 public class FollowerAppendLogEntryGenerator extends BaseAppendLogGenerator
     implements Callable<Void>, StreamObserver<AppendEntriesReplyProto> {

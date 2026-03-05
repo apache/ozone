@@ -51,7 +51,7 @@ import picocli.CommandLine;
         showDefaultValues = true)
 @MetaInfServices(FreonSubcommand.class)
 public class OzoneClientKeyReadWriteListOps extends BaseFreonGenerator
-        implements Callable<Void> {
+        implements Callable<Void>, FreonSubcommand {
 
   @CommandLine.Option(names = {"-v", "--volume"},
           description = "Name of the volume which contains the test data. " +

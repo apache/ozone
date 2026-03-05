@@ -59,7 +59,7 @@ import picocli.CommandLine.Option;
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
 @MetaInfServices(FreonSubcommand.class)
-public class HsyncGenerator extends BaseFreonGenerator implements Callable<Void> {
+public class HsyncGenerator extends BaseFreonGenerator implements Callable<Void>, FreonSubcommand {
   private static final Logger LOG = LoggerFactory.getLogger(HsyncGenerator.class);
 
   @CommandLine.ParentCommand

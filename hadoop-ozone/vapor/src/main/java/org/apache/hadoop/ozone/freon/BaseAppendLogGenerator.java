@@ -30,7 +30,7 @@ import picocli.CommandLine.Option;
 /**
  * Generic utility for leader/follower specific isolated tests.
  */
-public class BaseAppendLogGenerator extends BaseFreonGenerator {
+public class BaseAppendLogGenerator extends BaseFreonGenerator implements VaporSubcommand {
 
   @SuppressWarnings("checkstyle:VisibilityModifier")
   @Option(names = {"-r", "--raft-peer"},

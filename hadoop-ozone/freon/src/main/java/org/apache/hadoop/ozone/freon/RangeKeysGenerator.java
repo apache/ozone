@@ -45,7 +45,7 @@ import picocli.CommandLine;
         showDefaultValues = true)
 @MetaInfServices(FreonSubcommand.class)
 public class RangeKeysGenerator extends BaseFreonGenerator
-        implements Callable<Void> {
+        implements Callable<Void>, FreonSubcommand {
 
   private static final Logger LOG =
           LoggerFactory.getLogger(RangeKeysGenerator.class);

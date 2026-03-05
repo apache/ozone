@@ -44,7 +44,7 @@ import picocli.CommandLine.Option;
     showDefaultValues = true)
 @MetaInfServices(FreonSubcommand.class)
 public class OzoneClientKeyValidator extends BaseFreonGenerator
-    implements Callable<Void> {
+    implements Callable<Void>, FreonSubcommand {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(OzoneClientKeyValidator.class);
