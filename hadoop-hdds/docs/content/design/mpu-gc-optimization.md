@@ -95,17 +95,21 @@ Split MPU metadata into:
 **New MultipartPartInfo Structure:**
 ```protobuf
 message MultipartPartInfo {
-  required string partName = 1;
-  required uint32 partNumber = 2;
-  repeated KeyLocationList keyLocationList = 6;
-  required uint64 dataSize = 7;
-  required uint64 modificationTime = 8;
-  required uint64 objectID = 9;
-  required uint64 updateID = 10;
-  required string eTag = 11;
-  optional FileEncryptionInfoProto fileEncryptionInfo = 12;
-  optional FileChecksumProto fileChecksum = 13;
+  optional string partName = 1;
+  optional uint32 partNumber = 2;
+  optional string eTag = 3;
+  optional KeyLocationList keyLocationList = 4; 
+  optional uint64 dataSize = 5;
+  optional uint64 modificationTime = 6;
+  optional uint64 objectID = 7;
+  optional uint64 updateID = 8;
+  optional FileEncryptionInfoProto fileEncryptionInfo = 9;
+  optional FileChecksumProto fileChecksum = 10;
 }
+```
+
+```
+Note: Here we are setting all fields to optional because Protobuf states that required field should be enforced in the application level. Also proto3 doesn't support required fields.
 ```
 
 ### Comparison: V1 (legacy) vs V2
