@@ -30,7 +30,6 @@ option java_generate_equals_and_hash = true;
 package hadoop.ozone;
 
 import "hdds.proto";
-import "OmClientProtocol.proto";
 
 message OzoneAclInfo {
   enum OzoneAclType {
@@ -79,17 +78,4 @@ message FileSizeCountKeyProto {
 message SnapDiffObjectInfo {
   optional uint64 objectID = 1;
   optional string keyName = 2;
-}
-
-message MultipartPartInfo {
-  required string partName = 1;
-  required uint32 partNumber = 2;
-  repeated KeyLocationList keyLocationList = 6;
-  required uint64 dataSize = 7;
-  required uint64 modificationTime = 8;
-  required uint64 objectID = 9;
-  required uint64 updateID = 10;
-  required string eTag = 11;
-  optional FileEncryptionInfoProto fileEncryptionInfo = 12;
-  optional FileChecksumProto fileChecksum = 13;
 }
