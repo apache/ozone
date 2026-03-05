@@ -1731,16 +1731,16 @@ message PartKeyInfo {
 }
 
 message MultipartPartInfo {
-  required string partName = 1;
-  required uint32 partNumber = 2;
-  repeated KeyLocationList keyLocationList = 6; 
-  required string eTag = 7;
-  optional uint64 dataSize = 8;
-  optional uint64 modificationTime = 9;
-  optional uint64 objectID = 10;
-  optional uint64 updateID = 11;
-  optional FileEncryptionInfoProto fileEncryptionInfo = 12;
-  optional FileChecksumProto fileChecksum = 13;
+  optional string partName = 1;
+  optional uint32 partNumber = 2;
+  optional string eTag = 3;
+  optional KeyLocationList keyLocationList = 4; 
+  optional uint64 dataSize = 5;
+  optional uint64 modificationTime = 6;
+  optional uint64 objectID = 7;
+  optional uint64 updateID = 8;
+  optional FileEncryptionInfoProto fileEncryptionInfo = 9;
+  optional FileChecksumProto fileChecksum = 10;
 }
 
 message MultipartCommitUploadPartRequest {
