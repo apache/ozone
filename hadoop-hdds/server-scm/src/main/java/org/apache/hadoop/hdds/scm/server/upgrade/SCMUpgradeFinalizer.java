@@ -78,18 +78,16 @@ public class SCMUpgradeFinalizer extends
   @Override
   public void finalizeLayoutFeatures(Iterable<LayoutFeature> features, SCMUpgradeFinalizationContext context)
       throws UpgradeException {
-    int firstLv = -1;
     int lastLv = -1;
     for (LayoutFeature lf : features) {
-      if (firstLv == -1) {
-        firstLv = lf.layoutVersion();
-      }
       lastLv = lf.layoutVersion();
     }
     try {
-      if (firstLv > -1) {
+      if (lastLv > -1) {
         // If there are no feature to finalize we just skip this and the finalize operation is a noop.
-        context.getFinalizationStateManager().finalizeLayoutFeatures(firstLv, lastLv);
+        context.getFinalizationStateManager().finalizeLayoutFeatures(lastLv);
+      } else {
+        LOG.info("No layout features to finalize.");
       }
     } catch (IOException ex) {
       throw new UpgradeException(ex, UpgradeException.ResultCodes.LAYOUT_FEATURE_FINALIZATION_FAILED);

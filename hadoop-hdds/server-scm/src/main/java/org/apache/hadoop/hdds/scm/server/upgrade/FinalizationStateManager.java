@@ -33,7 +33,7 @@ public interface FinalizationStateManager {
   void removeFinalizingMark() throws IOException;
 
   @Replicate
-  void finalizeLayoutFeatures(Integer startLayoutVersion, Integer endLayoutVersion)
+  void finalizeLayoutFeatures(Integer toLayoutVersion)
       throws IOException;
 
   /**

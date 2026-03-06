@@ -121,8 +121,7 @@ public class TestScmFinalization {
     HDDSLayoutFeature[] finalizationFeatures = HDDSLayoutFeature.values();
     HDDSLayoutFeature finalVersion = finalizationFeatures[finalizationFeatures.length - 1];
     assertCurrentCheckpoint(scmContext, stateManager, FinalizationCheckpoint.FINALIZATION_STARTED);
-    stateManager.finalizeLayoutFeatures(
-        HDDSLayoutFeature.INITIAL_VERSION.layoutVersion(), finalVersion.layoutVersion());
+    stateManager.finalizeLayoutFeatures(finalVersion.layoutVersion());
     assertCurrentCheckpoint(scmContext, stateManager, FinalizationCheckpoint.MLV_EQUALS_SLV);
     stateManager.removeFinalizingMark();
     assertCurrentCheckpoint(scmContext, stateManager, FinalizationCheckpoint.FINALIZATION_COMPLETE);

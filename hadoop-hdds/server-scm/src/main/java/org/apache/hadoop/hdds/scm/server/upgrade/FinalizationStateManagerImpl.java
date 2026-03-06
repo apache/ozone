@@ -99,8 +99,9 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
   }
 
   @Override
-  public void finalizeLayoutFeatures(Integer startLayoutVersion, Integer endLayoutVersion) throws IOException {
-    for (int version = startLayoutVersion; version <= endLayoutVersion; version++) {
+  public void finalizeLayoutFeatures(Integer toVersion) throws IOException {
+    int startLayoutVersion = versionManager.getMetadataLayoutVersion() + 1;
+    for (int version = startLayoutVersion; version <= toVersion; version++) {
       finalizeLayoutFeatureLocal(version);
     }
   }
