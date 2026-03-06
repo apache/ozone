@@ -34,7 +34,7 @@ import picocli.CommandLine;
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
 @MetaInfServices(FreonSubcommand.class)
-public class OzoneClientCreator extends BaseFreonGenerator implements Callable<Void>, FreonSubcommand {
+public class OzoneClientCreator extends BaseFreonGenerator implements Callable<Void> {
 
   @CommandLine.Option(names = "--om-service-id",
       description = "OM Service ID"

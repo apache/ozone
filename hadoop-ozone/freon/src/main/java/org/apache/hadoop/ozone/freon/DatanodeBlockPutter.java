@@ -58,7 +58,7 @@ import picocli.CommandLine.Option;
 @MetaInfServices(FreonSubcommand.class)
 @SuppressWarnings("java:S2245") // no need for secure random
 public class DatanodeBlockPutter extends BaseFreonGenerator implements
-    Callable<Void>, FreonSubcommand {
+    Callable<Void> {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(DatanodeBlockPutter.class);

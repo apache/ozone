@@ -41,7 +41,7 @@ import picocli.CommandLine.Option;
  * implementations.
  */
 public abstract class AbstractOmBucketReadWriteOps extends BaseFreonGenerator
-    implements Callable<Void>, FreonSubcommand {
+    implements Callable<Void> {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(AbstractOmBucketReadWriteOps.class);

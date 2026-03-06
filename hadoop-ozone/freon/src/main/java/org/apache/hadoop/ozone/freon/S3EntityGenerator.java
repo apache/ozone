@@ -27,7 +27,7 @@ import picocli.CommandLine;
 /**
  * Initiliazing common aspects of S3BucketGenerator and S3KeyGenerator.
  */
-public class S3EntityGenerator extends BaseFreonGenerator implements FreonSubcommand {
+public class S3EntityGenerator extends BaseFreonGenerator {
   @CommandLine.Option(names = {"-e", "--endpoint"},
           description = "S3 HTTP endpoint",
           defaultValue = "http://localhost:9878")

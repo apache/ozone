@@ -58,7 +58,7 @@ import picocli.CommandLine.Option;
         showDefaultValues = true)
 @MetaInfServices(FreonSubcommand.class)
 public class DNRPCLoadGenerator extends BaseFreonGenerator
-        implements Callable<Void>, FreonSubcommand {
+        implements Callable<Void> {
   private static final Logger LOG =
       LoggerFactory.getLogger(DNRPCLoadGenerator.class);
   private static final int RPC_PAYLOAD_MULTIPLICATION_FACTOR = 1024;

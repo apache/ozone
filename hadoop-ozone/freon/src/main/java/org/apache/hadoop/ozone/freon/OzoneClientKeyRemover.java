@@ -38,7 +38,7 @@ import picocli.CommandLine.Option;
     showDefaultValues = true)
 @MetaInfServices(FreonSubcommand.class)
 public class OzoneClientKeyRemover extends BaseFreonGenerator
-    implements Callable<Void>, FreonSubcommand {
+    implements Callable<Void> {
 
   @Option(names = {"-v", "--volume"},
       description = "Name of the volume which contains the test data. Will be"

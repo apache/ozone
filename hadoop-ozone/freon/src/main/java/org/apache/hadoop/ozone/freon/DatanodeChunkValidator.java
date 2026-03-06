@@ -51,7 +51,7 @@ import picocli.CommandLine.Option;
     showDefaultValues = true)
 @MetaInfServices(FreonSubcommand.class)
 public class DatanodeChunkValidator extends BaseFreonGenerator
-    implements Callable<Void>, FreonSubcommand {
+    implements Callable<Void> {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(DatanodeChunkValidator.class);

@@ -41,7 +41,7 @@ import picocli.CommandLine.Command;
     showDefaultValues = true)
 @MetaInfServices(FreonSubcommand.class)
 public class FollowerReader extends BaseFreonGenerator
-    implements Callable<Void>, FreonSubcommand {
+    implements Callable<Void> {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(FollowerReader.class);
