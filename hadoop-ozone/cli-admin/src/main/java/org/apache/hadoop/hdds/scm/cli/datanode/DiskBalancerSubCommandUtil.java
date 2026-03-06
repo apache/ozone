@@ -22,8 +22,9 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
@@ -86,20 +87,20 @@ final class DiskBalancerSubCommandUtil {
   }
 
   /**
-   * Retrieves all IN_SERVICE datanode addresses from SCM.
+   * Retrieves all IN_SERVICE datanode addresses with their hostnames from SCM.
    * Used for batch operations with --in-service-datanodes flag.
-   * 
+   *
    * @param scmClient the SCM client
-   * @return list of datanode addresses in "ip:port" format
+   * @return map of address (ip:port) to display string (hostname (ip:port) or ip:port)
    * @throws IOException if SCM query fails
    */
-  public static List<String> getAllOperableNodesClientRpcAddress(
+  public static Map<String, String> getAllOperableNodesClientRpcAddress(
       ScmClient scmClient) throws IOException {
     List<HddsProtos.Node> nodes = scmClient.queryNode(
         NodeOperationalState.IN_SERVICE, HddsProtos.NodeState.HEALTHY,
         HddsProtos.QueryScope.CLUSTER, "");
 
-    List<String> addresses = new ArrayList<>();
+    Map<String, String> addressToDisplay = new LinkedHashMap<>();
     for (HddsProtos.Node node : nodes) {
       DatanodeDetails details =
           DatanodeDetails.getFromProtoBuf(node.getNodeID());
@@ -108,8 +109,10 @@ final class DiskBalancerSubCommandUtil {
       }
       Port port = details.getPort(Port.Name.CLIENT_RPC);
       if (port != null) {
-        // Use IP address for reliable connection (hostnames with underscores may not be valid)
-        addresses.add(details.getIpAddress() + ":" + port.getValue());
+        String address = details.getIpAddress() + ":" + port.getValue();
+        String display = getDatanodeHostAndIp(
+            details.getHostName(), details.getIpAddress(), port.getValue());
+        addressToDisplay.put(address, display);
       } else {
         System.out.printf("host: %s(%s) %s port not found%n",
             details.getHostName(), details.getIpAddress(),
@@ -117,7 +120,44 @@ final class DiskBalancerSubCommandUtil {
       }
     }
 
-    return addresses;
+    return addressToDisplay;
   }
+
+  /**
+   * Extracts hostname, IP address, and port from a DatanodeDetailsProto of status and report.
+   *
+   * @param nodeProto the DatanodeDetailsProto from the diskbalancer info
+   * @return array with [hostname, ipAddress, port] where port is the CLIENT_RPC port
+   */
+  public static String[] extractHostIpAndPort(HddsProtos.DatanodeDetailsProto nodeProto) {
+    String hostname = nodeProto.getHostName();
+    String ipAddress = nodeProto.getIpAddress();
+    int port = nodeProto.getPortsList().stream()
+        .filter(p -> p.getName().equals(
+            DatanodeDetails.Port.Name.CLIENT_RPC.name()))
+        .mapToInt(HddsProtos.Port::getValue)
+        .findFirst()
+        .orElse(19864); // Default port if not found
+    return new String[]{hostname, ipAddress, String.valueOf(port)};
+  }
+
+  /**
+   * Returns a formatted string combining hostname and IP address.
+   * If hostname is null or empty, returns just "ip:port".
+   * 
+   * @param hostname the hostname of the datanode
+   * @param ipAddress the IP address of the datanode
+   * @param port the port of the datanode
+   * @return formatted string "hostname (ip:port)" or "ip:port" if hostname is not available
+   */
+  public static String getDatanodeHostAndIp(String hostname,
+      String ipAddress, int port) {
+    String addressPort = ipAddress + ":" + port;
+    if (hostname != null && !hostname.isEmpty() && !hostname.equals(ipAddress)) {
+      return hostname + " (" + addressPort + ")";
+    }
+    return addressPort;
+  }
+
 }
 

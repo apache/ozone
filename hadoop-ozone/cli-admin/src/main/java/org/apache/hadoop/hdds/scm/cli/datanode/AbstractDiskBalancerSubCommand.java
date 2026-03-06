@@ -23,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
@@ -41,6 +42,9 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
 
   // Track if we're in batch mode to run commands on all in-service datanodes
   private boolean isBatchMode = false;
+
+  // Pre-fetched datanode address names for batch mode (address -> "hostname (ip:port)"); null in non-batch
+  private Map<String, String> datanodeDisplayNames = null;
 
   @Override
   public Void call() throws Exception {
@@ -74,6 +78,11 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
       return null;
     }
 
+    // Remove duplicates while preserving order
+    List<String> deduplicatedDatanodes = targetDatanodes.stream()
+        .distinct()
+        .collect(Collectors.toList());
+
     // Track if we're using batch mode for display
     isBatchMode = options.isInServiceDatanodes();
 
@@ -83,7 +92,7 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
     List<Object> jsonResults = new ArrayList<>();
     
     // Execute commands and collect results
-    for (String dn : targetDatanodes) {
+    for (String dn : deduplicatedDatanodes) {
       try {
         Object result = executeCommand(dn);
         successNodes.add(dn);
@@ -145,6 +154,7 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
     if (options.isInServiceDatanodes()) {
       return getAllInServiceDatanodes();
     } else {
+      datanodeDisplayNames = null;  // Non-batch: use user input as-is, no SCM for formatting
       return options.getDatanodes();
     }
   }
@@ -154,9 +164,10 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
    */
   private List<String> getAllInServiceDatanodes() {
     try (ScmClient scmClient = new ContainerOperationClient(new OzoneConfiguration())) {
-      return DiskBalancerSubCommandUtil.getAllOperableNodesClientRpcAddress(scmClient);
+      datanodeDisplayNames = DiskBalancerSubCommandUtil.getAllOperableNodesClientRpcAddress(scmClient);
+      return new ArrayList<>(datanodeDisplayNames.keySet());
     } catch (IOException e) {
-      System.err.println("Error querying SCM for in-service datanodes: %n" + e.getMessage());
+      System.err.printf("Error querying SCM for in-service datanodes. %n%s%n", e.getMessage());
       return null;
     }
   }
@@ -220,7 +231,9 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
    */
   private Map<String, Object> createErrorResult(String datanode, String errorMsg) {
     Map<String, Object> errorResult = new LinkedHashMap<>();
-    errorResult.put("datanode", datanode);
+    // Format datanode string with hostname if available
+    String formattedDatanode = formatDatanodeDisplayName(datanode);
+    errorResult.put("datanode", formattedDatanode);
     errorResult.put("action", getActionName());
     errorResult.put("status", "failure");
     errorResult.put("errorMsg", errorMsg);
@@ -232,6 +245,21 @@ public abstract class AbstractDiskBalancerSubCommand implements Callable<Void> {
     }
     
     return errorResult;
+  }
+
+  /**
+   * Format a datanode address for display.
+   * In batch mode, uses pre-fetched display names from the SCM query.
+   * In non-batch mode, returns the user's input as-is (no SCM call).
+   *
+   * @param address the datanode address in "ip:port" format
+   * @return formatted string "hostname (ip:port)" in batch mode, or address as-is in non-batch
+   */
+  protected String formatDatanodeDisplayName(String address) {
+    if (datanodeDisplayNames != null) {
+      return datanodeDisplayNames.getOrDefault(address, address);
+    }
+    return address;
   }
 }
 
