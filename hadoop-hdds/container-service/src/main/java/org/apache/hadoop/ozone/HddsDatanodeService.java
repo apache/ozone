@@ -81,6 +81,7 @@ import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
 import org.apache.hadoop.hdds.utils.HddsVersionInfo;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.helpers.ContainerUtils;
@@ -579,6 +580,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
           }
         }
       }
+      IOUtils.close(LOG, reconfigurationHandler);
       if (datanodeStateMachine != null) {
         datanodeStateMachine.stopDaemon();
       }
