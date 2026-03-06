@@ -52,6 +52,10 @@ tags:
     externalDocs:
       description: Prometheus API docs
       url: https://prometheus.io/docs/prometheus/latest/querying/api/
+  - name: Storage Distribution
+    description: APIs to fetch data about storage distribution across datanodes. **Admin Only**
+  - name: Pending Deletion
+    description: APIs to fetch data about pending deletions by component (SCM, OM, or Datanodes). **Admin Only**
 paths:
   /containers:
     get:
@@ -833,6 +837,116 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MetricsQuery'
+  /storageDistribution:
+    get:
+      tags:
+        - Storage Distribution
+      summary: Retrieves storage capacity distribution across datanodes including global storage, namespace, and used space breakdown
+      operationId: getStorageDistribution
+      responses:
+        '200':
+          description: Successful Operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StorageCapacityDistributionResponse'
+        '500':
+          description: Internal server error while retrieving storage distribution
+          content:
+            text/plain:
+              schema:
+                type: string
+  /storageDistribution/download:
+    get:
+      tags:
+        - Storage Distribution
+      summary: Downloads per-datanode storage and pending deletion statistics as a CSV file
+      operationId: downloadDataNodeStorageDistribution
+      description: |
+        Triggers or polls a background metrics collection task across all datanodes.
+        - If collection is **not yet finished**, returns **HTTP 202** with a JSON status response.
+        - If collection is **finished**, returns **HTTP 200** with a downloadable CSV file containing
+          per-datanode stats: HostName, Datanode UUID, Filesystem Capacity, Filesystem Used Space,
+          Filesystem Remaining Space, Ozone Capacity, Ozone Used Space, Ozone Remaining Space,
+          PreAllocated Container Space, Reserved Space, Minimum Free Space, Pending Block Size.
+      responses:
+        '200':
+          description: CSV file with storage and pending deletion statistics per datanode
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        '202':
+          description: Metrics collection is still in progress or has not started; returns current collection status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataNodeMetricsServiceResponse'
+        '500':
+          description: Internal server error - metrics data missing despite FINISHED collection status
+          content:
+            text/plain:
+              schema:
+                type: string
+  /pendingDeletion:
+    get:
+      tags:
+        - Pending Deletion
+      summary: Returns pending deletion information for the specified component (scm, om, or dn)
+      operationId: getPendingDeletionByComponent
+      description: |
+        Returns pending deletion data for a specific component:
+        - **scm**: Returns block-level pending deletion stats from the Storage Container Manager.
+        - **om**: Returns a map of pending deletion sizes (pendingDirectorySize, pendingKeySize) from the Object Manager.
+        - **dn**: Triggers or polls a background metrics collection task across all datanodes. Returns **HTTP 202** if collection is in progress, or **HTTP 200** with per-datanode pending block sizes if finished.
+      parameters:
+        - name: component
+          in: query
+          description: Component to query — one of `scm`, `om`, or `dn`
+          example: scm
+          required: true
+          schema:
+            type: string
+            enum:
+              - scm
+              - om
+              - dn
+        - name: limit
+          in: query
+          description: Maximum number of datanode results to return (only applicable when component=dn)
+          example: 10
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: |
+            Successful Operation. Response schema depends on the `component` parameter:
+            - **scm** → `ScmPendingDeletion`
+            - **om** → `OmPendingDeletion`
+            - **dn** → `DataNodeMetricsServiceResponse` (only when collection is FINISHED)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/ScmPendingDeletion'
+                  - $ref: '#/components/schemas/OmPendingDeletion'
+                  - $ref: '#/components/schemas/DataNodeMetricsServiceResponse'
+        '202':
+          description: Datanode metrics collection is still in progress or not yet started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataNodeMetricsServiceResponse'
+        '400':
+          description: Bad request — `component` parameter is missing, empty, or not one of `scm`, `om`, `dn`; or `limit` is less than 1
+          content:
+            text/plain:
+              schema:
+                type: string
+
 components:
   schemas:
     Volumes:
@@ -2212,3 +2326,188 @@ components:
                     example:
                       - 1599159384.455
                       - "5"
+    StorageCapacityDistributionResponse:
+      type: object
+      description: Aggregated storage capacity distribution report for the cluster
+      properties:
+        globalStorage:
+          $ref: '#/components/schemas/GlobalStorageReport'
+        globalNamespace:
+          $ref: '#/components/schemas/GlobalNamespaceReport'
+        usedSpaceBreakdown:
+          $ref: '#/components/schemas/UsedSpaceBreakDown'
+        dataNodeUsage:
+          type: array
+          description: Per-datanode storage usage reports
+          items:
+            $ref: '#/components/schemas/DataNodeStorageReport'
+    GlobalStorageReport:
+      type: object
+      description: |
+        Aggregated storage metrics across all datanodes in the cluster.
+
+        **Storage Hierarchy:**
+        - `totalFileSystemCapacity` = `totalOzoneCapacity` + `totalReservedSpace`
+        - `totalOzoneCapacity` = `totalOzoneUsedSpace` + `totalOzoneFreeSpace`
+      properties:
+        totalFileSystemCapacity:
+          type: integer
+          format: int64
+          description: Total OS-reported filesystem capacity across all datanodes (bytes)
+          example: 270461374464
+        totalReservedSpace:
+          type: integer
+          format: int64
+          description: Space reserved and not available for Ozone allocation (bytes)
+          example: 31457280
+        totalOzoneCapacity:
+          type: integer
+          format: int64
+          description: Portion of filesystem capacity available for Ozone — equals filesystem capacity minus reserved space (bytes)
+          example: 270429917184
+        totalOzoneUsedSpace:
+          type: integer
+          format: int64
+          description: Space currently consumed by Ozone data (bytes)
+          example: 358805504
+        totalOzoneFreeSpace:
+          type: integer
+          format: int64
+          description: Remaining allocatable space within Ozone capacity (bytes)
+          example: 270071111680
+        totalOzoneCommittedSpace:
+          type: integer
+          format: int64
+          description: Space pre-allocated for containers but not yet fully utilized (bytes)
+          example: 27007111
+        totalMinimumFreeSpace:
+          type: integer
+          format: int64
+          description: Minimum free space that must be maintained as per configuration (bytes)
+          example: 20480
+    GlobalNamespaceReport:
+      type: object
+      description: High-level metadata summary of the global namespace
+      properties:
+        totalUsedSpace:
+          type: integer
+          format: int64
+          description: |
+            Total space utilized in the namespace (bytes). Includes committed data,
+            open keys, and data pending deletion.
+          example: 500000000
+        totalKeys:
+          type: integer
+          format: int64
+          description: Total number of keys (files) in the namespace across all volumes and buckets
+          example: 10000
+    UsedSpaceBreakDown:
+      type: object
+      description: Breakdown of used storage space by lifecycle category
+      properties:
+        openKeyBytes:
+          $ref: '#/components/schemas/OpenKeyBytesInfo'
+        finalizedKeyBytes:
+          type: integer
+          format: int64
+          description: Space occupied by written (closed) keys with replica overhead (bytes)
+          example: 450000000
+    OpenKeyBytesInfo:
+      type: object
+      description: Breakdown of storage space occupied by open (uncommitted) keys
+      properties:
+        openKeyAndFileBytes:
+          type: integer
+          format: int64
+          description: Total replicated bytes for open non-multipart keys and files
+          example: 13824
+        multipartOpenKeyBytes:
+          type: integer
+          format: int64
+          description: Total replicated bytes for in-progress multipart upload keys
+          example: 4096
+        totalOpenKeyBytes:
+          type: integer
+          format: int64
+          description: Sum of openKeyAndFileBytes and multipartOpenKeyBytes
+          example: 17920
+    DataNodeMetricsServiceResponse:
+      type: object
+      description: Response from a background per-datanode metrics collection task
+      properties:
+        status:
+          type: string
+          enum:
+            - NOT_STARTED
+            - IN_PROGRESS
+            - FINISHED
+            - FAILED
+          description: Current status of the metric collection task
+          example: FINISHED
+        totalPendingDeletionSize:
+          type: integer
+          format: int64
+          description: Total size of blocks pending deletion across all queried datanodes (bytes)
+          example: 1048576
+        pendingDeletionPerDataNode:
+          type: array
+          nullable: true
+          description: Per-datanode pending deletion metrics; null if collection is not finished
+          items:
+            $ref: '#/components/schemas/DatanodePendingDeletionMetrics'
+        totalNodesQueried:
+          type: integer
+          description: Total number of datanodes queried during the collection task
+          example: 4
+        totalNodeQueriesFailed:
+          type: integer
+          format: int64
+          description: Number of datanode queries that failed during collection
+          example: 0
+    DatanodePendingDeletionMetrics:
+      type: object
+      description: Pending deletion block metrics for a single datanode
+      properties:
+        hostName:
+          type: string
+          description: Hostname of the datanode
+          example: ozone-datanode-1
+        datanodeUuid:
+          type: string
+          description: UUID of the datanode
+          example: 841be80f-0454-47df-b676-a1234567890a
+        pendingBlockSize:
+          type: integer
+          format: int64
+          description: Total size of blocks pending deletion on this datanode (bytes)
+          example: 262144
+    ScmPendingDeletion:
+      type: object
+      description: Block-level pending deletion statistics from the Storage Container Manager
+      properties:
+        totalBlocksize:
+          type: integer
+          format: int64
+          description: Total unreplicated size of all blocks pending deletion in SCM (bytes)
+          example: 10485760
+        totalReplicatedBlockSize:
+          type: integer
+          format: int64
+          description: Total replicated size of all blocks pending deletion in SCM (bytes)
+          example: 31457280
+        totalBlocksCount:
+          type: integer
+          format: int64
+          description: Total number of blocks pending deletion in SCM
+          example: 500
+    OmPendingDeletion:
+      type: object
+      description: |
+        Map of pending deletion sizes by category at the OM level (values in bytes).
+        Common keys: `pendingDirectorySize`, `pendingKeySize`.
+      additionalProperties:
+        type: integer
+        format: int64
+      example:
+        pendingDirectorySize: 204800
+        pendingKeySize: 1048576
