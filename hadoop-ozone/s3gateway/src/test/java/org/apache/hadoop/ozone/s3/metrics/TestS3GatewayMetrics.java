@@ -117,6 +117,14 @@ public class TestS3GatewayMetrics {
     metrics = bucketEndpoint.getMetrics();
   }
 
+  @Test
+  public void testMetricsCreateIsIdempotent() {
+    S3GatewayMetrics m1 = S3GatewayMetrics.create(new OzoneConfiguration());
+    S3GatewayMetrics m2 = S3GatewayMetrics.create(new OzoneConfiguration());
+    assertThat(m2).isSameAs(m1);
+    S3GatewayMetrics.unRegister();
+  }
+
   /**
    * Bucket Level Endpoints.
    */
