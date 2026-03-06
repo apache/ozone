@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.OmUtils.normalizeKey;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.KEY_NOT_FOUND;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.RENAME_OPEN_FILE;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
+import static org.apache.hadoop.ozone.om.request.OMClientRequestUtils.validateKeyName;
 
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
@@ -70,6 +71,14 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
   }
 
   @Override
+  public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
+    final OMRequest omRequest = commonKeyRenamePreExecute(ozoneManager);
+    final KeyArgs keyArgs = omRequest.getRenameKeyRequest().getKeyArgs();
+    validateKeyName(keyArgs.getKeyName());
+    return omRequest;
+  }
+
+  @Override
   @SuppressWarnings("methodlength")
   public OMClientResponse validateAndUpdateCache(OzoneManager ozoneManager, ExecutionContext context) {
     final long trxnLogIndex = context.getIndex();
@@ -98,11 +107,6 @@ public class OMKeyRenameRequestWithFSO extends OMKeyRenameRequest {
     OmKeyInfo fromKeyValue;
     Result result;
     try {
-      if (fromKeyName.isEmpty()) {
-        throw new OMException("Source key name is empty",
-                OMException.ResultCodes.INVALID_KEY_NAME);
-      }
-
       mergeOmLockDetails(omMetadataManager.getLock()
           .acquireWriteLock(BUCKET_LOCK, volumeName, bucketName));
       acquiredLock = getOmLockDetails().isLockAcquired();
