@@ -4502,17 +4502,6 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   }
 
   /**
-   * Return true, if the current OM node is leader regardless of ready state.
-   * If ratis is not enabled, then it always returns true.
-   */
-  public boolean isLeader() {
-    final OzoneManagerRatisServer ratisServer = omRatisServer;
-    return ratisServer != null &&
-        (ratisServer.getLeaderStatus() == LEADER_AND_READY ||
-            ratisServer.getLeaderStatus() == LEADER_AND_NOT_READY);
-  }
-
-  /**
    * Checks the leader status.  Does nothing if this OM is leader and is ready.
    * @throws OMLeaderNotReadyException  if leader, but not ready
    * @throws OMNotLeaderException       if not leader
