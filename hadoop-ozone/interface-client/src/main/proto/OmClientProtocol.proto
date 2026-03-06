@@ -1303,6 +1303,9 @@ message ListStatusRequest {
     required string startKey = 3;
     required uint64 numEntries = 4;
     optional bool allowPartialPrefix = 5;
+    // When keyArgs.keyName is empty (root listing), this is the original S3/list
+    // prefix for STS auth. Enables LIST check on this prefix instead of "*".
+    optional string listPrefix = 6;
 }
 
 message ListStatusResponse {
