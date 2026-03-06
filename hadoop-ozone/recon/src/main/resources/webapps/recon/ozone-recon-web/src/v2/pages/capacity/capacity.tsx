@@ -340,7 +340,7 @@ const Capacity: React.FC<object> = () => {
             color: '#11073a'
           }, {
             title: 'CONTAINER PRE-ALLOCATED',
-            value: storageDistribution.data.globalStorage.totalOzonePreAllocatedContainerSpace,
+            value: storageDistribution.data.globalStorage.totalOzoneCommittedSpace,
             color: '#f47b2d'
           }, {
             title: 'REMAINING SPACE',
@@ -366,7 +366,7 @@ const Capacity: React.FC<object> = () => {
             color: '#f47c2d'
           }, {
             title: 'COMMITTED KEYS',
-            value: storageDistribution.data.usedSpaceBreakdown.committedKeyBytes,
+            value: storageDistribution.data.usedSpaceBreakdown.finalizedKeyBytes,
             color: '#f4a233'
           }, {
             title: (
