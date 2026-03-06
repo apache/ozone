@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.io.retry.FailoverProxyProvider;
 import org.apache.hadoop.io.retry.RetryPolicies;
 import org.apache.hadoop.io.retry.RetryPolicy;
+import org.apache.hadoop.io.retry.RetryPolicy.RetryAction.RetryDecision;
 import org.apache.hadoop.ipc_.ProtobufRpcEngine;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.net.NetUtils;
@@ -333,18 +334,60 @@ public abstract class SCMFailoverProxyProviderBase<T> implements FailoverProxyPr
           }
         }
 
+        RetryPolicy.RetryAction retryAction = SCMHAUtils.getRetryAction(
+            failover, retry, e, maxRetryCount, getRetryInterval());
+
+        if (retryAction.action == RetryDecision.RETRY
+            || retryAction.action == RetryDecision.FAILOVER_AND_RETRY) {
+          printRetryMessage(e, failover, retryAction.delayMillis);
+        }
+
         if (SCMHAUtils.checkRetriableWithNoFailoverException(e)) {
           setUpdatedLeaderNodeID();
         } else {
           performFailoverToAssignedLeader(null, e);
         }
-        return SCMHAUtils.getRetryAction(failover, retry, e, maxRetryCount,
-            getRetryInterval());
+        return retryAction;
       }
     };
   }
 
   public synchronized void setUpdatedLeaderNodeID() {
     this.updatedLeaderNodeID = getCurrentProxySCMNodeId();
+  }
+
+  /**
+   * Print user-facing retry message to stderr.
+   * Shows connection attempts and failover progress.
+   * Only called when a retry will actually occur.
+   *
+   * @param exception the exception that triggered the retry
+   * @param failoverCount the number of failover attempts made so far
+   * @param delayMillis the delay before the next retry attempt
+   */
+  private void printRetryMessage(Exception exception, int failoverCount,
+      long delayMillis) {
+    Throwable cause = exception.getCause();
+    String exceptionType = (cause != null ? cause : exception).getClass().getSimpleName();
+
+    // Extract concise error message
+    String errorMsg;
+    if (cause != null && cause.getMessage() != null) {
+      String fullMsg = cause.getMessage();
+      int colonIndex = fullMsg.indexOf(':');
+      errorMsg = colonIndex > 0 && colonIndex < 100 ?
+          fullMsg.substring(0, colonIndex) : fullMsg;
+    } else {
+      errorMsg = exception.getMessage();
+    }
+
+    System.err.printf("%s: %s, while invoking %s over %s. " +
+        "Retrying in %dms after %d failover attempt(s).%n",
+        exceptionType,
+        errorMsg,
+        protocolClass.getSimpleName(),
+        getCurrentProxySCMNodeId(),
+        delayMillis,
+        failoverCount);
   }
 }

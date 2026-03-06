@@ -343,6 +343,30 @@ public class TestOMNodeDetails {
   }
 
   /**
+   * Test getOMDBCheckpointEndpointUrl with useV2 parameter.
+   */
+  @Test
+  public void testGetOMDBCheckpointEndpointUrlUseV2() throws IOException {
+    OMNodeDetails nodeDetails = new OMNodeDetails.Builder()
+        .setOMServiceId(OM_SERVICE_ID)
+        .setOMNodeId(OM_NODE_ID)
+        .setHostAddress(HOST_ADDRESS)
+        .setRpcPort(RPC_PORT)
+        .setRatisPort(RATIS_PORT)
+        .setHttpAddress(HOST_ADDRESS + ":9874")
+        .setHttpsAddress(HOST_ADDRESS + ":9875")
+        .build();
+
+    URL urlV2 = nodeDetails.getOMDBCheckpointEndpointUrl(true, true, false);
+    assertNotNull(urlV2);
+    assertTrue(urlV2.getPath().endsWith("/v2/dbCheckpoint"));
+
+    URL urlV1 = nodeDetails.getOMDBCheckpointEndpointUrl(false, true, false);
+    assertNotNull(urlV1);
+    assertTrue(urlV1.getPath().endsWith("/dbCheckpoint"));
+  }
+
+  /**
    * Test getOMNodeAddressFromConf.
    */
   @Test

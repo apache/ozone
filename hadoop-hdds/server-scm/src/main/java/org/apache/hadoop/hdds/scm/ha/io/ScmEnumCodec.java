@@ -19,35 +19,52 @@ package org.apache.hadoop.hdds.scm.ha.io;
 
 import com.google.common.primitives.Ints;
 import com.google.protobuf.ProtocolMessageEnum;
-import java.lang.reflect.InvocationTargetException;
-import org.apache.hadoop.hdds.scm.ha.ReflectionUtil;
+import java.util.function.IntFunction;
+import org.apache.hadoop.hdds.StringUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
+import org.apache.ratis.util.Preconditions;
 
 /**
- * {@link ScmCodec} for {@link ProtocolMessageEnum} objects.
+ * {@link ScmCodec} for protobuf {@link ProtocolMessageEnum} objects.
+ * Stores protobuf enum number (wire value) and restores via number lookup.
  */
-public class ScmEnumCodec implements ScmCodec<Object>  {
+class ScmEnumCodec<T extends Enum<T> & ProtocolMessageEnum> implements ScmCodec<T> {
+  private final Class<T> enumClass;
+  private final IntFunction<T> forNumber;
 
-  @Override
-  public ByteString serialize(Object object)
-      throws InvalidProtocolBufferException {
-    // toByteArray returns a new array
-    return UnsafeByteOperations.unsafeWrap(Ints.toByteArray(((ProtocolMessageEnum) object).getNumber()));
+  ScmEnumCodec(Class<T> enumClass, IntFunction<T> forNumber) {
+    Preconditions.assertTrue(enumClass.isEnum());
+    for (T constant : enumClass.getEnumConstants()) {
+      Preconditions.assertSame(constant, forNumber.apply(constant.getNumber()), "constant");
+    }
+
+    this.enumClass = enumClass;
+    this.forNumber = forNumber;
   }
 
   @Override
-  public Object deserialize(Class<?> type, ByteString value)
-      throws InvalidProtocolBufferException {
+  public ByteString serialize(T object) {
+    return UnsafeByteOperations.unsafeWrap(Ints.toByteArray(object.getNumber()));
+  }
+
+  @Override
+  public T deserialize(Class<?> type, ByteString value) throws InvalidProtocolBufferException {
+    final int n;
     try {
-      return ReflectionUtil.getMethod(type, "valueOf", int.class)
-          .invoke(null, Ints.fromByteArray(
-              value.toByteArray()));
-    } catch (NoSuchMethodException | IllegalAccessException
-        | InvocationTargetException ex) {
+      n = Ints.fromByteArray(value.toByteArray());
+    } catch (Exception e) {
       throw new InvalidProtocolBufferException(
-          "Message cannot be decoded!" + ex.getMessage());
+          "Failed to deserialize enum " + enumClass + ": "
+              + StringUtils.bytes2String(value.asReadOnlyByteBuffer()), e);
     }
+
+    final T decoded = forNumber.apply(n);
+    if (decoded == null) {
+      throw new InvalidProtocolBufferException(
+          "Unknown enum number for " + enumClass.getName() + ": " + n);
+    }
+    return decoded;
   }
 }

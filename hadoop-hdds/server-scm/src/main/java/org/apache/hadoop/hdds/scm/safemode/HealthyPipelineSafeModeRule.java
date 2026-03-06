@@ -123,13 +123,18 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
       LOG.info("All SCM pipelines are closed due to ongoing upgrade " +
           "finalization. Bypassing healthy pipeline safemode rule.");
       return true;
-    } else {
-      return currentHealthyPipelineCount >= healthyPipelineThresholdCount;
     }
+    if (!validateBasedOnReportProcessing()) {
+      return validateHealthyPipelineSafeModeRuleUsingPipelineManager();
+    }
+    return currentHealthyPipelineCount >= healthyPipelineThresholdCount;
   }
 
   @Override
   protected synchronized void process(Pipeline pipeline) {
+    if (!validateBasedOnReportProcessing()) {
+      return;
+    }
     Objects.requireNonNull(pipeline, "pipeline == null");
 
     // When SCM is in safe mode for long time, already registered
@@ -237,6 +242,61 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
         healthyPipelineThresholdCount);
   }
 
+  private boolean validateHealthyPipelineSafeModeRuleUsingPipelineManager() {
+    // Query PipelineManager directly for healthy pipeline count
+    List<Pipeline> openPipelines = pipelineManager.getPipelines(
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
+        Pipeline.PipelineState.OPEN);
+    
+    LOG.debug("Found {} open RATIS/THREE pipelines", openPipelines.size());
+
+    int pipelineCount = openPipelines.size();
+    healthyPipelineThresholdCount = Math.max(minHealthyPipelines,
+        (int) Math.ceil(healthyPipelinesPercent * pipelineCount));
+
+    currentHealthyPipelineCount = (int) openPipelines.stream()
+        .filter(this::isPipelineHealthy)
+        .count();
+
+    getSafeModeMetrics().setNumCurrentHealthyPipelines(currentHealthyPipelineCount);
+    boolean isValid = currentHealthyPipelineCount >= healthyPipelineThresholdCount;
+    if (scmInSafeMode()) {
+      LOG.info("SCM in safe mode. Healthy pipelines: {}, threshold: {}, rule satisfied: {}",
+          currentHealthyPipelineCount, healthyPipelineThresholdCount, isValid);
+    } else {
+      LOG.debug("SCM not in safe mode. Healthy pipelines: {}, threshold: {}",
+          currentHealthyPipelineCount, healthyPipelineThresholdCount);
+    }
+    return isValid;
+  }
+
+  boolean isPipelineHealthy(Pipeline pipeline) {
+    // Verify pipeline has all 3 nodes
+    List<DatanodeDetails> nodes = pipeline.getNodes();
+    if (nodes.size() != 3) {
+      LOG.debug("Pipeline {} is not healthy: has {} nodes instead of 3",
+          pipeline.getId(), nodes.size());
+      return false;
+    }
+
+    // Verify all nodes are healthy
+    for (DatanodeDetails dn : nodes) {
+      try {
+        NodeStatus status = nodeManager.getNodeStatus(dn);
+        if (!status.equals(NodeStatus.inServiceHealthy())) {
+          LOG.debug("Pipeline {} is not healthy: DN {} has status - Health: {}, Operational State: {}",
+              pipeline.getId(), dn.getUuidString(), status.getHealth(), status.getOperationalState());
+          return false;
+        }
+      } catch (NodeNotFoundException e) {
+        LOG.warn("Pipeline {} is not healthy: DN {} not found in node manager",
+            pipeline.getId(), dn.getUuidString());
+        return false;
+      }
+    }
+    return true;
+  }
+
   @Override
   protected synchronized void cleanup() {
     processedPipelineIDs.clear();
@@ -265,6 +325,24 @@ public class HealthyPipelineSafeModeRule extends SafeModeExitRule<Pipeline> {
 
   private synchronized String updateStatusTextWithSamplePipelines(
       String status) {
+    if (validateBasedOnReportProcessing()) {
+      List<Pipeline> openPipelines = pipelineManager.getPipelines(
+          RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.THREE),
+          Pipeline.PipelineState.OPEN);
+
+      Set<PipelineID> unhealthyPipelines = openPipelines.stream()
+          .filter(p -> !isPipelineHealthy(p))
+          .map(Pipeline::getId)
+          .limit(SAMPLE_PIPELINE_DISPLAY_LIMIT)
+          .collect(Collectors.toSet());
+
+      if (!unhealthyPipelines.isEmpty()) {
+        String samplePipelineText =
+            "Sample pipelines not satisfying the criteria : " + unhealthyPipelines;
+        status = status.concat("\n").concat(samplePipelineText);
+      }
+      return status;
+    }
     Set<PipelineID> samplePipelines =
         unProcessedPipelineSet.stream().limit(SAMPLE_PIPELINE_DISPLAY_LIMIT)
             .collect(Collectors.toSet());
