@@ -1644,6 +1644,7 @@ public final class StorageContainerManager extends ServiceRuntimeInfoImpl
   public void stop() {
     if (isStopped.getAndSet(true)) {
       LOG.info("Storage Container Manager is not running.");
+      IOUtils.close(LOG, reconfigurationHandler);
       IOUtils.close(LOG, scmHAManager);
       stopReplicationManager(); // started eagerly
       return;
