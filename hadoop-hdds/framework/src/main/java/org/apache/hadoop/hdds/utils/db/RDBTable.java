@@ -208,20 +208,25 @@ class RDBTable implements Table<byte[], byte[]> {
     } else {
       throw new IllegalArgumentException("batch should be RDBBatchOperation");
     }
-
   }
 
   @Override
   public KeyValueIterator<byte[], byte[]> iterator(byte[] prefix, IteratorType type)
       throws RocksDatabaseException {
-    return new RDBStoreByteArrayIterator(db.newIterator(family, false), this,
-        prefix, type);
+    return new RDBStoreByteArrayIterator(readOptions -> db.newIterator(family, readOptions),
+        this, prefix, type);
   }
 
-  KeyValueIterator<CodecBuffer, CodecBuffer> iterator(
-      CodecBuffer prefix, IteratorType type) throws RocksDatabaseException {
-    return new RDBStoreCodecBufferIterator(db.newIterator(family, false),
+  KeyValueIterator<CodecBuffer, CodecBuffer> newCodecBufferIterator(
+      byte[] prefix, IteratorType type) throws RocksDatabaseException {
+    return new RDBStoreCodecBufferIterator(readOptions -> db.newIterator(family, readOptions),
         this, prefix, type);
+  }
+
+  CloseableKeyValueIterator<CodecBuffer, CodecBuffer> newCloseableCodecBufferIterator(
+      byte[] prefix, IteratorType type, int numberOfObjectsNeededConcurrently) throws RocksDatabaseException {
+    return new RDBStorePoolBackedCodecBufferIterator(readOptions -> db.newIterator(family, readOptions),
+        this, prefix, type, numberOfObjectsNeededConcurrently);
   }
 
   @Override
@@ -245,26 +250,13 @@ class RDBTable implements Table<byte[], byte[]> {
   }
 
   @Override
-  public void dumpToFileWithPrefix(File externalFile, byte[] prefix)
-      throws RocksDatabaseException, CodecException {
-    CodecBuffer prefixBuffer = prefix == null || prefix.length == 0 ? null :
-        CodecBufferCodec.get(true).fromPersistedFormat(prefix);
-    KeyValueIterator<CodecBuffer, CodecBuffer> iter;
-    try {
-      iter = iterator(prefixBuffer, IteratorType.KEY_AND_VALUE);
-    } catch (RocksDatabaseException e) {
-      if (prefixBuffer != null) {
-        prefixBuffer.close();
-      }
-      throw e;
-    }
-    try (RDBSstFileWriter fileWriter = new RDBSstFileWriter(externalFile)) {
+  public void dumpToFileWithPrefix(File externalFile, byte[] prefix) throws RocksDatabaseException {
+    try (KeyValueIterator<CodecBuffer, CodecBuffer> iter = newCodecBufferIterator(prefix, IteratorType.KEY_AND_VALUE);
+         RDBSstFileWriter fileWriter = new RDBSstFileWriter(externalFile)) {
       while (iter.hasNext()) {
         final KeyValue<CodecBuffer, CodecBuffer> entry = iter.next();
         fileWriter.put(entry.getKey(), entry.getValue());
       }
-    } finally {
-      iter.close();
     }
   }
 
