@@ -164,8 +164,21 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
           INVALID_BLOCK_SIZE);
     }
 
-    ContainerInfo containerInfo = writableContainerFactory.getContainer(
-        size, replicationConfig, owner, excludeList, storageType);
+    ContainerInfo containerInfo;
+    try {
+      containerInfo = writableContainerFactory.getContainer(
+          size, replicationConfig, owner, excludeList, storageType);
+    } catch (IOException e) {
+      StorageType fallback = getFallbackStorageType(storageType);
+      if (fallback != null) {
+        LOG.warn("No pipeline with StorageType={} found for owner={},"
+            + " falling back to {}", storageType, owner, fallback, e);
+        containerInfo = writableContainerFactory.getContainer(
+            size, replicationConfig, owner, excludeList, fallback);
+      } else {
+        throw e;
+      }
+    }
 
     if (containerInfo != null) {
       return newBlock(containerInfo);
@@ -258,6 +271,13 @@ public class BlockManagerImpl implements BlockManager, BlockmanagerMXBean {
   @Override
   public DeletedBlockLog getDeletedBlockLog() {
     return this.deletedBlockLog;
+  }
+
+  private static StorageType getFallbackStorageType(StorageType primaryType) {
+    if (primaryType == StorageType.SSD) {
+      return StorageType.DISK;
+    }
+    return null;
   }
 
   /**

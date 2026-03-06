@@ -578,13 +578,12 @@ public class TestBlockManager {
   /**
    * Integration test: verifies the full BlockManagerImpl → WritableContainerFactory
    * → WritableRatisContainerProvider → PipelineStorageTypeFilter chain.
-   * MockNodeManager reports only DISK volumes. Requesting SSD should fail
-   * because the filter removes all existing pipelines, and newly created
-   * pipelines also contain DISK-only nodes so they too get filtered on
-   * the second attempt.
+   * MockNodeManager reports only DISK volumes. Requesting SSD triggers the
+   * fallback path (SSD → DISK) and succeeds because DISK pipelines are
+   * available.
    */
   @Test
-  public void testAllocateBlockWithNonMatchingStorageTypeFails()
+  public void testAllocateBlockFallsBackOnNonMatchingStorageType()
       throws Exception {
     pipelineManager.createPipeline(replicationConfig);
     HddsTestUtils.openAllRatisPipelines(pipelineManager);
@@ -595,14 +594,13 @@ public class TestBlockManager {
         new ExcludeList(), StorageType.DISK);
     assertNotNull(diskBlock);
 
-    // SSD allocation should fail: MockNodeManager nodes only have DISK
-    // volumes, so the PipelineStorageTypeFilter removes all pipelines,
-    // pipeline creation adds another DISK-only pipeline which also gets
-    // filtered, resulting in IOException.
-    assertThrows(IOException.class,
-        () -> blockManager.allocateBlock(DEFAULT_BLOCK_SIZE,
-            replicationConfig, OzoneConsts.OZONE,
-            new ExcludeList(), StorageType.SSD));
+    // SSD allocation should fall back to DISK and succeed: MockNodeManager
+    // nodes only have DISK volumes, so the PipelineStorageTypeFilter
+    // removes all pipelines for SSD, but the fallback retries with DISK.
+    AllocatedBlock ssdBlock = blockManager.allocateBlock(
+        DEFAULT_BLOCK_SIZE, replicationConfig, OzoneConsts.OZONE,
+        new ExcludeList(), StorageType.SSD);
+    assertNotNull(ssdBlock);
   }
 
   private class DatanodeCommandHandler implements
