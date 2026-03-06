@@ -13,9 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Configuration for .github/workflows/label-pr.yml
+# This workflow periodically applies labels for PRs.
 
-# This rule can be deleted once the zero downtime upgrade feature branch is merged.
-zdu:
-- base-branch: HDDS-14496-zdu
+name: scheduled-label-pull-requests
 
+on:
+  # every 5 minutes
+  schedule:
+    - cron: '*/5 * * * *'
+
+jobs:
+  label:
+    uses: ./.github/workflows/label-pr.yml
+    secrets: inherit

@@ -199,6 +199,7 @@ import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -2379,6 +2380,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     try {
       omState = State.STOPPED;
+      IOUtils.close(LOG, reconfigurationHandler);
       // Cancel the metrics timer and set to null.
       if (metricsTimer != null) {
         metricsTimer.cancel();
@@ -4010,20 +4012,22 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @param leaderId peerNodeID of the leader OM
    * @return If checkpoint is installed successfully, return the
    *         corresponding termIndex. Otherwise, return null.
+   * @throws IOException if download or cleanup fails
    */
-  public synchronized TermIndex installSnapshotFromLeader(String leaderId) {
+  public synchronized TermIndex installSnapshotFromLeader(String leaderId) throws IOException {
     if (omRatisSnapshotProvider == null) {
       LOG.error("OM Snapshot Provider is not configured as there are no peer " +
           "nodes.");
       return null;
     }
 
-    DBCheckpoint omDBCheckpoint;
+    DBCheckpoint omDBCheckpoint = null;
     try {
       omDBCheckpoint = omRatisSnapshotProvider.
           downloadDBSnapshotFromLeader(leaderId);
     } catch (IOException ex) {
       LOG.error("Failed to download snapshot from Leader {}.", leaderId,  ex);
+      cleanupCheckpoint(omDBCheckpoint);
       return null;
     }
 
@@ -4037,13 +4041,31 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } catch (Exception ex) {
       LOG.error("Failed to install snapshot from Leader OM.", ex);
     } finally {
+      cleanupCheckpoint(omDBCheckpoint);
+    }
+    return termIndex;
+  }
+
+  private void cleanupCheckpoint(DBCheckpoint omDBCheckpoint) throws IOException {
+    if (omDBCheckpoint != null) {
       try {
         omDBCheckpoint.cleanupCheckpoint();
       } catch (IOException e) {
-        LOG.error("Failed to cleanup checkpoint at {}", omDBCheckpoint.getCheckpointLocation(), e);
+        LOG.error("Failed to cleanup checkpoint at {}",
+            omDBCheckpoint.getCheckpointLocation(), e);
+      }
+    } else {
+      // Download failed; clean up any partial content in candidate dir
+      File candidateDir = omRatisSnapshotProvider.getCandidateDir();
+      if (candidateDir.exists()) {
+        try {
+          org.apache.commons.io.FileUtils.deleteDirectory(candidateDir);
+        } catch (IOException ioe) {
+          LOG.error("Failed to delete candidate dir: {}", candidateDir, ioe);
+          throw new IOException("Failed to cleanup candidate dir after download failure", ioe);
+        }
       }
     }
-    return termIndex;
   }
 
   /**

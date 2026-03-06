@@ -46,6 +46,7 @@ import org.apache.hadoop.ozone.recon.api.types.DatanodePendingDeletionMetrics;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeStorageReport;
 import org.apache.hadoop.ozone.recon.api.types.GlobalNamespaceReport;
 import org.apache.hadoop.ozone.recon.api.types.GlobalStorageReport;
+import org.apache.hadoop.ozone.recon.api.types.OpenKeyBytesInfo;
 import org.apache.hadoop.ozone.recon.api.types.StorageCapacityDistributionResponse;
 import org.apache.hadoop.ozone.recon.api.types.UsedSpaceBreakDown;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
@@ -97,15 +98,21 @@ public class StorageDistributionEndpoint {
     try {
       List<DatanodeStorageReport> nodeStorageReports = collectDatanodeReports();
       GlobalStorageReport globalStorageReport = calculateGlobalStorageReport();
+      OpenKeyBytesInfo totalOpenKeySize;
+      try {
+        totalOpenKeySize = calculateOpenKeySizes();
+      } catch (Exception e) {
+        LOG.error("Error calculating open key sizes", e);
+        totalOpenKeySize = new OpenKeyBytesInfo(0L, 0L);
+      }
 
       Map<String, Long> namespaceMetrics = new HashMap<>();
       try {
-        namespaceMetrics = calculateNamespaceMetrics();
+        namespaceMetrics = calculateNamespaceMetrics(totalOpenKeySize);
       } catch (Exception e) {
         LOG.error("Error calculating namespace metrics", e);
         // Initialize with default values
         namespaceMetrics.put("totalUsedNamespace", 0L);
-        namespaceMetrics.put("totalOpenKeySize", 0L);
         namespaceMetrics.put("totalCommittedSize", 0L);
         namespaceMetrics.put("pendingDirectorySize", 0L);
         namespaceMetrics.put("pendingKeySize", 0L);
@@ -113,7 +120,7 @@ public class StorageDistributionEndpoint {
       }
 
       StorageCapacityDistributionResponse response = buildStorageDistributionResponse(
-              nodeStorageReports, globalStorageReport, namespaceMetrics);
+              nodeStorageReports, globalStorageReport, namespaceMetrics, totalOpenKeySize);
       return Response.ok(response).build();
     } catch (Exception e) {
       LOG.error("Error getting storage distribution", e);
@@ -215,32 +222,37 @@ public class StorageDistributionEndpoint {
   }
 
   private GlobalStorageReport calculateGlobalStorageReport() {
+    GlobalStorageReport.Builder globalStorageBuilder = GlobalStorageReport.newBuilder();
     try {
       SCMNodeStat stats = nodeManager.getStats();
       if (stats == null) {
         LOG.warn("Node manager stats are null, returning default values");
-        return new GlobalStorageReport(0L, 0L, 0L);
+        return globalStorageBuilder.build();
       }
 
-      long scmUsed = stats.getScmUsed() != null ? stats.getScmUsed().get() : 0L;
-      long remaining = stats.getRemaining() != null ? stats.getRemaining().get() : 0L;
-      long capacity = stats.getCapacity() != null ? stats.getCapacity().get() : 0L;
+      return globalStorageBuilder
+          .setTotalOzoneCapacity(stats.getCapacity() != null ? stats.getCapacity().get() : 0L)
+          .setTotalReservedSpace(stats.getReserved() != null ? stats.getReserved().get() : 0L)
+          .setTotalOzoneFreeSpace(stats.getRemaining() != null ? stats.getRemaining().get() : 0L)
+          .setTotalOzoneUsedSpace(stats.getScmUsed() != null ? stats.getScmUsed().get() : 0L)
+          .setTotalOzonePreAllocatedContainerSpace(stats.getCommitted() != null ? stats.getCommitted().get() : 0L)
+          .setTotalMinimumFreeSpace(stats.getFreeSpaceToSpare() != null ? stats.getFreeSpaceToSpare().get() : 0L)
+          .build();
 
-      return new GlobalStorageReport(scmUsed, remaining, capacity);
     } catch (Exception e) {
       LOG.error("Error calculating global storage report", e);
-      return new GlobalStorageReport(0L, 0L, 0L);
+      return globalStorageBuilder.build();
     }
   }
 
-  private Map<String, Long> calculateNamespaceMetrics() throws IOException {
+  private Map<String, Long> calculateNamespaceMetrics(OpenKeyBytesInfo totalOpenKeySize) throws IOException {
     Map<String, Long> metrics = new HashMap<>();
     Map<String, Long> totalPendingAtOmSide = reconGlobalMetricsService.calculatePendingSizes();
-    long totalOpenKeySize = calculateOpenKeySizes();
     long totalCommittedSize = calculateCommittedSize();
     long pendingDirectorySize = totalPendingAtOmSide.getOrDefault("pendingDirectorySize", 0L);
     long pendingKeySize = totalPendingAtOmSide.getOrDefault("pendingKeySize", 0L);
-    long totalUsedNamespace = pendingDirectorySize + pendingKeySize + totalOpenKeySize + totalCommittedSize;
+    long totalUsedNamespace = pendingDirectorySize + pendingKeySize +
+        totalOpenKeySize.getTotalOpenKeyBytes() + totalCommittedSize;
 
     long totalKeys = 0L;
     // Keys from OBJECT_STORE buckets.
@@ -255,8 +267,6 @@ public class StorageDistributionEndpoint {
     if (fileRecord != null) {
       totalKeys += fileRecord.getValue();
     }
-
-    metrics.put("totalOpenKeySize", totalOpenKeySize);
     metrics.put("totalCommittedSize", totalCommittedSize);
     metrics.put("totalUsedNamespace", totalUsedNamespace);
     metrics.put("totalKeys", totalKeys);
@@ -266,16 +276,13 @@ public class StorageDistributionEndpoint {
   private StorageCapacityDistributionResponse buildStorageDistributionResponse(
           List<DatanodeStorageReport> nodeStorageReports,
           GlobalStorageReport storageMetrics,
-          Map<String, Long> namespaceMetrics) {
+          Map<String, Long> namespaceMetrics,
+          OpenKeyBytesInfo totalOpenKeySize) {
 
     // Safely get values from namespaceMetrics with null checks
     Long totalUsedNamespace = namespaceMetrics.get("totalUsedNamespace");
-    Long totalOpenKeySize = namespaceMetrics.get("totalOpenKeySize");
     Long totalCommittedSize = namespaceMetrics.get("totalCommittedSize");
     Long totalKeys = namespaceMetrics.get("totalKeys");
-    Long totalContainerPreAllocated = nodeStorageReports.stream()
-        .map(DatanodeStorageReport::getCommitted)
-        .reduce(0L, Long::sum);
 
     return StorageCapacityDistributionResponse.newBuilder()
             .setDataNodeUsage(nodeStorageReports)
@@ -284,8 +291,7 @@ public class StorageDistributionEndpoint {
                     totalUsedNamespace != null ? totalUsedNamespace : 0L,
                     totalKeys != null ? totalKeys : 0L))
             .setUsedSpaceBreakDown(new UsedSpaceBreakDown(
-                    totalOpenKeySize != null ? totalOpenKeySize : 0L,
-                    totalCommittedSize != null ? totalCommittedSize : 0L, totalContainerPreAllocated))
+                    totalOpenKeySize, totalCommittedSize != null ? totalCommittedSize : 0L))
             .build();
   }
 
@@ -296,12 +302,12 @@ public class StorageDistributionEndpoint {
         .collect(Collectors.toList());
   }
 
-  private long calculateOpenKeySizes() {
+  private OpenKeyBytesInfo calculateOpenKeySizes() {
     Map<String, Long> openKeySummary = reconGlobalMetricsService.getOpenKeySummary();
     Map<String, Long> openKeyMPUSummary = reconGlobalMetricsService.getMPUKeySummary();
     long openKeyDataSize = openKeySummary.getOrDefault("totalReplicatedDataSize", 0L);
     long totalMPUKeySize = openKeyMPUSummary.getOrDefault("totalReplicatedDataSize", 0L);
-    return openKeyDataSize + totalMPUKeySize;
+    return new OpenKeyBytesInfo(openKeyDataSize, totalMPUKeySize);
   }
 
   private long calculateCommittedSize() {

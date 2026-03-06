@@ -31,10 +31,14 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
 import java.util.Properties;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.StorageType;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -56,6 +60,9 @@ import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 /**
  * Unit tests for {@link HddsVolume}.
@@ -604,5 +611,37 @@ public class TestHddsVolume {
     dbVolumeSet.getVolumesList().get(0).format(CLUSTER_ID);
     dbVolumeSet.getVolumesList().get(0).createWorkingDir(CLUSTER_ID, null);
     return dbVolumeSet;
+  }
+
+  private static Stream<Arguments> dataDirectoryPermissionsProvider() {
+    return Stream.of(
+        Arguments.of("700", "rwx------"),
+        Arguments.of("750", "rwxr-x---"),
+        Arguments.of("755", "rwxr-xr-x")
+    );
+  }
+
+  @ParameterizedTest
+  @MethodSource("dataDirectoryPermissionsProvider")
+  public void testDataDirectoryPermissions(String permissionValue,
+      String expectedPermissionString) throws Exception {
+    // Set permission configuration
+    CONF.set(ScmConfigKeys.HDDS_DATANODE_DATA_DIR_PERMISSIONS, permissionValue);
+
+    // Create a new volume
+    StorageVolume volume = volumeBuilder.build();
+    volume.format(CLUSTER_ID);
+
+    // Verify storage directory (hdds subdirectory) has correct permissions
+    File storageDir = volume.getStorageDir();
+    assertTrue(storageDir.exists());
+    Path storageDirPath = storageDir.toPath();
+    Set<PosixFilePermission> expectedPermissions =
+        PosixFilePermissions.fromString(expectedPermissionString);
+    Set<PosixFilePermission> actualPermissions =
+        Files.getPosixFilePermissions(storageDirPath);
+
+    assertEquals(expectedPermissions, actualPermissions,
+        "Storage directory should have " + permissionValue + " permissions");
   }
 }

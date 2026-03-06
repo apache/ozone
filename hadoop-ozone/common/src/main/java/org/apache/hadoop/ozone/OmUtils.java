@@ -38,6 +38,7 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_LISTENER_NODES_KE
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_NODES_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_PORT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
+import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyProto.READ_CONSISTENCY_UNSPECIFIED;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -1126,5 +1127,11 @@ public final class OmUtils {
       LOG.error("Failure in resolving OM host address", e);
       throw e;
     }
+  }
+
+  public static boolean specifiedReadConsistency(OMRequest request) {
+    return request.hasReadConsistencyHint()
+        && request.getReadConsistencyHint().hasReadConsistency()
+        && request.getReadConsistencyHint().getReadConsistency() != READ_CONSISTENCY_UNSPECIFIED;
   }
 }

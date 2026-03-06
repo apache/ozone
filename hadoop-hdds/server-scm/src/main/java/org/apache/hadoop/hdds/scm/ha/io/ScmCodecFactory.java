@@ -24,7 +24,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.IntFunction;
 import org.apache.commons.lang3.ClassUtils;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineState;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
@@ -35,12 +39,11 @@ import org.apache.ratis.thirdparty.com.google.protobuf.Message;
  */
 public final class ScmCodecFactory {
 
-  private static Map<Class<?>, ScmCodec> codecs = new HashMap<>();
+  private static Map<Class<?>, ScmCodec<?>> codecs = new HashMap<>();
 
   static {
     codecs.put(com.google.protobuf.Message.class, new ScmNonShadedGeneratedMessageCodec());
     codecs.put(Message.class, new ScmGeneratedMessageCodec());
-    codecs.put(ProtocolMessageEnum.class, new ScmEnumCodec());
     codecs.put(List.class, new ScmListCodec());
     codecs.put(Integer.class, new ScmIntegerCodec());
     codecs.put(Long.class, new ScmLongCodec());
@@ -51,6 +54,15 @@ public final class ScmCodecFactory {
     codecs.put(com.google.protobuf.ByteString.class, new ScmNonShadedByteStringCodec());
     codecs.put(ByteString.class, new ScmByteStringCodec());
     codecs.put(ManagedSecretKey.class, new ScmManagedSecretKeyCodec());
+
+    putEnum(LifeCycleEvent.class, LifeCycleEvent::forNumber);
+    putEnum(PipelineState.class, PipelineState::forNumber);
+    putEnum(NodeType.class, NodeType::forNumber);
+  }
+
+  static <T extends Enum<T> & ProtocolMessageEnum> void putEnum(
+      Class<T> enumClass, IntFunction<T> forNumber) {
+    codecs.put(enumClass, new ScmEnumCodec<>(enumClass, forNumber));
   }
 
   private ScmCodecFactory() { }
