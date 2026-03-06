@@ -42,6 +42,9 @@ run_test ha     non-rolling-upgrade 2.1.0 "$OZONE_CURRENT_VERSION"
 # run_test ha non-rolling-upgrade 1.2.1 "$OZONE_CURRENT_VERSION"
 # run_test om-ha non-rolling-upgrade 1.1.0 "$OZONE_CURRENT_VERSION"
 
+# Rolling upgrade test, commented out for now
+run_test ha     rolling-upgrade "$OZONE_CURRENT_VERSION" "$OZONE_CURRENT_VERSION"
+
 generate_report "upgrade" "$ALL_RESULT_DIR"
 
 exit "$RESULT"
