@@ -375,11 +375,17 @@ public final class RocksDatabase implements Closeable {
 
   @Override
   public void close() {
-    close(true);
+    close(true, null);
   }
 
-  private void close(boolean isSync) {
+  private void close(boolean isSync, RocksDBException closeCause) {
     if (isClosed.compareAndSet(false, true)) {
+      if (closeCause != null) {
+        String statusCode = closeCause.getStatus() == null ? "unknown" : closeCause.getStatus().getCodeString();
+        String statusState = closeCause.getStatus() == null ? "unknown" : closeCause.getStatus().getState();
+        LOG.error("Closing {} due to RocksDB error. Status={}, state={}", this, statusCode, statusState, closeCause);
+      }
+
       // Wait for all background work to be cancelled first. e.g. RDB compaction
       db.get().cancelAllBackgroundWork(true);
 
@@ -413,7 +419,7 @@ public final class RocksDatabase implements Closeable {
 
   private void closeOnError(RocksDBException e) {
     if (shouldClose(e)) {
-      close(false);
+      close(false, e);
     }
   }
 
