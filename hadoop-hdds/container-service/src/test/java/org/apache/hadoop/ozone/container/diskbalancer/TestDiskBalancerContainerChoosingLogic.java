@@ -35,6 +35,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.locks.ReentrantLock;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
@@ -45,14 +46,13 @@ import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.impl.ContainerLayoutVersion;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
-import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultVolumeContainerChoosingPolicy;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.DiskBalancerVolumeContainerCandidate;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
@@ -64,7 +64,7 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * Unit tests for the DefaultContainerChoosingPolicy.
  */
-public class TestDefaultContainerChoosingPolicy {
+public class TestDiskBalancerContainerChoosingLogic {
 
   @TempDir
   private Path baseDir;
@@ -74,19 +74,18 @@ public class TestDefaultContainerChoosingPolicy {
   private static final long VOLUME_CAPACITY = 2500L * MB; // 2500MB
   private static final double THRESHOLD = 10.0;
 
-  private ContainerChoosingPolicy policy;
+  private DefaultVolumeContainerChoosingPolicy policy;
   private OzoneContainer ozoneContainer;
   private MutableVolumeSet volumeSet;
   private ContainerSet containerSet;
   private HddsVolume sourceVolume;
   private HddsVolume destVolume1;
-  private HddsVolume destVolume2;
   private Set<ContainerID> inProgressContainerIDs;
   private Map<HddsVolume, Long> deltaMap;
 
   @BeforeEach
   public void setup() throws Exception {
-    policy = new DefaultContainerChoosingPolicy();
+    policy = new DefaultVolumeContainerChoosingPolicy(new ReentrantLock());
     setupVolumesAndContainer();
     inProgressContainerIDs = new HashSet<>();
     deltaMap = new HashMap<>();
@@ -105,7 +104,7 @@ public class TestDefaultContainerChoosingPolicy {
     // Create volumes with specific utilization
     sourceVolume = createVolume("source-volume", 0.80);
     destVolume1 = createVolume("dest-volume1", 0.10);
-    destVolume2 = createVolume("dest-volume2", 0.50);
+    HddsVolume destVolume2 = createVolume("dest-volume2", 0.50);
 
     CONF.set(HDDS_DATANODE_DIR_KEY, baseDir.resolve("defaultVolume").toString());
 
@@ -133,6 +132,7 @@ public class TestDefaultContainerChoosingPolicy {
     ozoneContainer = mock(OzoneContainer.class);
     ContainerController controller = new ContainerController(containerSet, null);
     when(ozoneContainer.getController()).thenReturn(controller);
+    when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
   }
 
   /**
@@ -174,29 +174,35 @@ public class TestDefaultContainerChoosingPolicy {
     // - C1 (500MB) is productive: (250+500)/2500 = 30% <= 56.67%
     // The policy iterates by container ID, so it will find and return C1.
 
-    ContainerData chosenContainer = policy.chooseContainer(ozoneContainer,
-        sourceVolume, destVolume1, inProgressContainerIDs, THRESHOLD, volumeSet, deltaMap);
+    DiskBalancerVolumeContainerCandidate candidate = policy.chooseVolumesAndContainer(ozoneContainer,
+        volumeSet, deltaMap, inProgressContainerIDs, THRESHOLD);
 
-    // first container should be chosen
-    assertNotNull(chosenContainer);
-    assertEquals(1L, chosenContainer.getContainerID());
+    // first contianer should be chosen
+    assertNotNull(candidate);
+    assertEquals(1L, candidate.getContainerData().getContainerID());
   }
 
   @Test
-  public void testContainerNotChosen() {
-    // For destVolume2, no container move should be productive.
-    // Max Allowed Utilization is ~56.67%.
-    //
-    // Evaluation for destVolume2 (50% used / 1250MB):
-    // Max productive size = (0.5667 * 2500) - 1250 = 166.75MB
-    // All containers on the source volume (smallest is 200MB) are larger
-    // than 166.75MB. Therefore, no container should be chosen.
+  public void testContainerNotChosen() throws IOException {
+    // Test scenario where no container fits the destination volume.
+    // Block dest1 (lowest utilization) and mark small containers as in-progress.
+    // Only large containers remain (500MB, 450MB), but dest2 can accept max 166.75MB.
+    
+    // Block dest1 by marking all available space as committed
+    destVolume1.incCommittedBytes(destVolume1.getCurrentUsage().getAvailable());
+    
+    // Mark small containers as in-progress (unavailable)
+    inProgressContainerIDs.add(ContainerID.valueOf(3L)); // 200MB
+    inProgressContainerIDs.add(ContainerID.valueOf(4L)); // 350MB
+    
+    DiskBalancerVolumeContainerCandidate candidate = policy.chooseVolumesAndContainer(ozoneContainer,
+        volumeSet, deltaMap, inProgressContainerIDs, THRESHOLD);
 
-    ContainerData chosenContainer = policy.chooseContainer(ozoneContainer,
-        sourceVolume, destVolume2, inProgressContainerIDs, THRESHOLD, volumeSet, deltaMap);
-
-    // No containers should not be chosen
-    assertNull(chosenContainer);
+    assertNull(candidate);
+    
+    // Cleanup
+    destVolume1.incCommittedBytes(-destVolume1.getCurrentUsage().getAvailable());
+    inProgressContainerIDs.clear();
   }
 
   @Test
@@ -215,15 +221,16 @@ public class TestDefaultContainerChoosingPolicy {
     OzoneContainer testOzoneContainer = mock(OzoneContainer.class);
     ContainerController testController = new ContainerController(testContainerSet, null);
     when(testOzoneContainer.getController()).thenReturn(testController);
+    when(testOzoneContainer.getContainerSet()).thenReturn(testContainerSet);
     
     // The policy should skip containers 10 and 11 (size 0) and choose container 12
-    ContainerData chosenContainer = policy.chooseContainer(testOzoneContainer,
-        sourceVolume, destVolume1, inProgressContainerIDs, THRESHOLD, volumeSet, deltaMap);
-    
+    DiskBalancerVolumeContainerCandidate candidate = policy.chooseVolumesAndContainer(testOzoneContainer,
+        volumeSet, deltaMap, inProgressContainerIDs, THRESHOLD);
+
     // Container 12 (non-zero size) should be chosen, skipping containers 10 and 11 (size 0)
-    assertNotNull(chosenContainer);
-    assertEquals(12L, chosenContainer.getContainerID());
-    assertEquals(200L * MB, chosenContainer.getBytesUsed());
+    assertNotNull(candidate);
+    assertEquals(12L, candidate.getContainerData().getContainerID());
+    assertEquals(200L * MB, candidate.getContainerData().getBytesUsed());
   }
 
   /**

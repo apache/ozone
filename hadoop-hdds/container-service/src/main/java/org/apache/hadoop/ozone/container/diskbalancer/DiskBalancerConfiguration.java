@@ -94,20 +94,13 @@ public final class DiskBalancerConfiguration {
   )
   private long diskBalancerTimeout = Duration.ofSeconds(300).toMillis();
 
-  @Config(key = "hdds.datanode.disk.balancer.volume.choosing.policy", type = ConfigType.CLASS,
+  @Config(key = "hdds.datanode.disk.balancer.volume.container.choosing.policy", type = ConfigType.CLASS,
       defaultValue = "org.apache.hadoop.ozone.container.diskbalancer.policy" +
-          ".DefaultVolumeChoosingPolicy",
+          ".DefaultVolumeContainerChoosingPolicy",
       tags = {ConfigTag.DISKBALANCER},
-      description = "The volume choosing policy of the disk balancer service.")
-  private Class<?> volumeChoosingPolicyClass;
-
-  @Config(key = "hdds.datanode.disk.balancer.container.choosing.policy", type = ConfigType.CLASS,
-      defaultValue = "org.apache.hadoop.ozone.container.diskbalancer.policy" +
-          ".DefaultContainerChoosingPolicy",
-      tags = {ConfigTag.DISKBALANCER},
-      description = "The container choosing policy of the disk balancer " +
-          "service.")
-  private Class<?> containerChoosingPolicyClass;
+      description = "The policy for selecting source/destination volumes and " +
+          "containers to move for disk balancing.")
+  private Class<?> volumeContainerChoosingPolicyClass;
 
   @Config(key = "hdds.datanode.disk.balancer.stop.after.disk.even",
       type = ConfigType.BOOLEAN,
@@ -174,12 +167,8 @@ public final class DiskBalancerConfiguration {
     this.diskBalancerTimeout = duration.toMillis();
   }
 
-  public Class<?> getVolumeChoosingPolicyClass() {
-    return volumeChoosingPolicyClass;
-  }
-
-  public Class<?> getContainerChoosingPolicyClass() {
-    return containerChoosingPolicyClass;
+  public Class<?> getVolumeContainerChoosingPolicyClass() {
+    return volumeContainerChoosingPolicyClass;
   }
 
   public boolean isStopAfterDiskEven() {

@@ -20,30 +20,33 @@ package org.apache.hadoop.ozone.container.diskbalancer.policy;
 import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
-import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 
 /**
- * This interface specifies the policy for choosing containers to balance.
+ * This interface specifies the policy for choosing volumes and containers to balance.
+ * It provides consolidated volume selection (source/destination pair) and container selection
+ * into a single operation to avoid recalculating ideal utilization and disk usage.
  */
-public interface ContainerChoosingPolicy {
+public interface VolumeContainerChoosingPolicy {
   /**
-   * Choose a container for balancing.
-   * @param ozoneContainer the OzoneContainer instance to get all containers of a particular volume.
-   * @param srcVolume the HddsVolume instance to choose containers from.
-   * @param destVolume the destination volume to which container is being moved.
-   * @param inProgressContainerIDs containerIDs present in this set should be
-   - avoided as these containers are already under move by diskBalancer.
-   * @param thresholdPercentage the threshold percentage in range (0, 100)
+   * Choose a container and its source/destination volumes for balancing.
+   * Performs both volume pair selection and container selection in one call,
+   * computing ideal usage and volume utilizations only once.
+   * Space is reserved on the destination only when a container is chosen,
+   * using the actual container size.
+   *
+   * @param ozoneContainer the OzoneContainer instance to get all containers
    * @param volumeSet the volumeSet instance
-   * @param deltaMap the deltaMap instance of source volume
-   * @return a Container
+   * @param deltaMap the deltaMap for in-progress balancing jobs (negative = space to be freed)
+   * @param inProgressContainerIDs containerIDs to avoid (already under move)
+   * @param thresholdPercentage the threshold percentage in range (0, 100)
+   * @return a DiskBalancerVolumeContainerCandidate with container and volumes, or null if none found
    */
-  ContainerData chooseContainer(OzoneContainer ozoneContainer,
-      HddsVolume srcVolume, HddsVolume destVolume,
+  DiskBalancerVolumeContainerCandidate chooseVolumesAndContainer(OzoneContainer ozoneContainer,
+      MutableVolumeSet volumeSet,
+      Map<HddsVolume, Long> deltaMap,
       Set<ContainerID> inProgressContainerIDs,
-      double thresholdPercentage, MutableVolumeSet volumeSet,
-      Map<HddsVolume, Long> deltaMap);
+      double thresholdPercentage);
 }

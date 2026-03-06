@@ -51,7 +51,6 @@ import java.util.concurrent.TimeoutException;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -72,7 +71,7 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
-import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultVolumeContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -267,7 +266,7 @@ public class TestDiskBalancerTask {
     kvFaultInjector.reset();
     KeyValueContainer.setInjector(null);
     DiskBalancerService.setInjector(null);
-    DefaultContainerChoosingPolicy.setTest(false);
+    DefaultVolumeContainerChoosingPolicy.setTest(false);
   }
 
   @ParameterizedTest
@@ -291,7 +290,7 @@ public class TestDiskBalancerTask {
 
     String oldContainerPath = container.getContainerData().getContainerPath();
     if (containerState == State.QUASI_CLOSED) {
-      DefaultContainerChoosingPolicy.setTest(true);
+      DefaultVolumeContainerChoosingPolicy.setTest(true);
     }
     DiskBalancerService.DiskBalancerTask task = getTask();
     task.call();
@@ -460,7 +459,7 @@ public class TestDiskBalancerTask {
         .when(spyContainerSet).updateContainer(any(Container.class));
     when(ozoneContainer.getContainerSet()).thenReturn(spyContainerSet);
 
-    DefaultContainerChoosingPolicy.setTest(true);
+    DefaultVolumeContainerChoosingPolicy.setTest(true);
     DiskBalancerService.DiskBalancerTask task = getTask();
     CompletableFuture completableFuture = CompletableFuture.runAsync(() -> task.call());
 
@@ -564,11 +563,8 @@ public class TestDiskBalancerTask {
 
     GenericTestUtils.LogCapturer serviceLog = GenericTestUtils.LogCapturer.captureLogs(DiskBalancerService.class);
     DiskBalancerService.DiskBalancerTask task = getTask();
-    long defaultContainerSize = (long) conf.getStorageSize(
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
-    // verify committed space is reserved for destination volume
-    assertEquals(defaultContainerSize, destVolume.getCommittedBytes() - initialDestCommitted);
+    // verify committed space is reserved for destination volume (uses actual container size)
+    assertEquals(CONTAINER_SIZE, destVolume.getCommittedBytes() - initialDestCommitted);
 
     // delete the container from containerSet to simulate a failure
     containerSet.removeContainer(CONTAINER_ID);
@@ -626,7 +622,7 @@ public class TestDiskBalancerTask {
       throws IOException, InterruptedException, TimeoutException {
     LogCapturer serviceLog = LogCapturer.captureLogs(DiskBalancerService.class);
 
-    // Create a CLOSED container which will be selected by DefaultContainerChoosingPolicy
+    // Create a CLOSED container which will be selected by DefaultVolumeContainerChoosingPolicy
     Container container = createContainer(CONTAINER_ID, sourceVolume, State.CLOSED);
     long initialSourceUsed = sourceVolume.getCurrentUsage().getUsedSpace();
     long initialDestUsed = destVolume.getCurrentUsage().getUsedSpace();

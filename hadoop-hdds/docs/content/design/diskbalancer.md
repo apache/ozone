@@ -120,16 +120,11 @@ and balanced state will be visible only after the configured delay, when the sou
 By default, the DiskBalancer uses specific policies to decide which disks to balance and which containers to move. These
 are configurable, but the default implementations provide robust and safe behavior.
 
-*   **`DefaultVolumeChoosingPolicy`**: This is the default policy for selecting the source and destination volumes. It 
-identifies the most over-utilized volume as the source and the most under-utilized volume as the destination by comparing
-each volume's utilization against the Datanode's average. The calculation is smart enough to account for data that is 
-already in the process of being moved, ensuring it makes accurate decisions based on the future state of the volumes.
-
-*   **`DefaultContainerChoosingPolicy`**: This is the default policy for selecting which container to move from a source
-volume. It iterates through the containers on the source disk and picks the first one that is in a **CLOSED** state 
-and is not already being moved by another balancing operation. To optimize performance and avoid re-scanning the same 
-containers repeatedly, it caches the list of containers for each volume which auto expires after one hour of its last 
-used time or if the container iterator for that is invalidated on full utilisation.
+*   **`DefaultVolumeContainerChoosingPolicy`**: This is the default policy that consolidates both volume selection and container
+selection into a single operation. It identifies the most over-utilized volume as the source and the most under-utilized
+volume with sufficient space as the destination, then iterates through containers on the source to pick the first one
+that is in a **CLOSED** state and is not already being moved. Consolidating both steps avoids recalculating ideal
+utilization and disk usage. It caches the list of containers for each volume which auto expires after one hour.
 
 ## Security Design
 DiskBalancer follows the same security model as other services:
