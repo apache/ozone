@@ -94,6 +94,7 @@ import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.PERM
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_ERROR_OTHER;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
+import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_NOT_READY;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.RaftServerStatus.LEADER_AND_READY;
 import static org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer.getRaftGroupIdFromOmServiceId;
 import static org.apache.hadoop.ozone.om.s3.S3SecretStoreConfigurationKeys.DEFAULT_SECRET_STORAGE_TYPE;
@@ -4498,6 +4499,17 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
   public boolean isLeaderReady() {
     final OzoneManagerRatisServer ratisServer = omRatisServer;
     return ratisServer != null && ratisServer.getLeaderStatus() == LEADER_AND_READY;
+  }
+
+  /**
+   * Return true, if the current OM node is leader regardless of ready state.
+   * If ratis is not enabled, then it always returns true.
+   */
+  public boolean isLeader() {
+    final OzoneManagerRatisServer ratisServer = omRatisServer;
+    return ratisServer != null &&
+        (ratisServer.getLeaderStatus() == LEADER_AND_READY ||
+            ratisServer.getLeaderStatus() == LEADER_AND_NOT_READY);
   }
 
   /**
