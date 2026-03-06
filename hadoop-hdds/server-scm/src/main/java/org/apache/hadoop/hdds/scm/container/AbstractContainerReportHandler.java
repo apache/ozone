@@ -316,6 +316,7 @@ abstract class AbstractContainerReportHandler {
       if (container.getReplicationType().equals(HddsProtos.ReplicationType.EC)) {
         // In case of EC container, delete its replica to avoid orphan replica
         deleteReplica(containerId, datanode, publisher, "DELETED", true, detailsForLogging);
+        return false;
       }
       // HDDS-12421: fall-through to case DELETING
     case DELETING:
