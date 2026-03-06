@@ -172,6 +172,8 @@ message MultipartKeyInfo {
     optional string volumeName = 11;
     optional string bucketName = 12;
     optional string keyName = 13;
+    optional string ownerName = 14;
+    repeated OzoneAclInfo acls = 15;
 }
 ```
 
