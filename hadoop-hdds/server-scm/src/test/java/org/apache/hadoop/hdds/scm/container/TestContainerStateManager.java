@@ -17,7 +17,9 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
 import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
+import static org.apache.hadoop.hdds.scm.HddsTestUtils.getECContainer;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -37,6 +39,7 @@ import java.util.ArrayList;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -295,6 +298,31 @@ public class TestContainerStateManager {
         container, datanode, 9000L, false, 0, true);
     verifyForceDeleteCommand(deleteCmd, container.containerID(), true,
         "Delete command should have force=true for stale RATIS replica with lower BCSID");
+  }
+
+  /**
+   * DELETED EC container in SCM.
+   * Expected: Should send force delete to DN
+   */
+  @Test
+  public void testDeletedECContainerWithStaleClosedReplicaShouldNotForceDelete()
+      throws IOException {
+    final DatanodeDetails datanode = randomDatanodeDetails();
+    nodeManager.register(datanode, null, null);
+    // Create a DELETED EC container
+    ECReplicationConfig repConfig = new ECReplicationConfig(3, 2);
+    final ContainerInfo ecContainer = getECContainer(
+        HddsProtos.LifeCycleState.DELETED,
+        PipelineID.randomId(),
+        repConfig);
+    containerStateManager.addContainer(ecContainer.getProtobuf());
+    assertEquals(HddsProtos.ReplicationType.EC, ecContainer.getReplicationType());
+
+    // Verify delete command sent
+    sendReportAndCaptureDeleteCommand(ecContainer, datanode,
+        ecContainer.getSequenceId(), false, 1, true);
+    // Container should remain as DELETED
+    verifyContainerState(ecContainer.containerID(), HddsProtos.LifeCycleState.DELETED);
   }
 
   private DeleteContainerCommand sendReportAndCaptureDeleteCommand(
