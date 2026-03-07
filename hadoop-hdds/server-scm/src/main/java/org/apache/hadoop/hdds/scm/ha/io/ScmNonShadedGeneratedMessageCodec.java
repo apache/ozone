@@ -18,8 +18,7 @@
 package org.apache.hadoop.hdds.scm.ha.io;
 
 import com.google.protobuf.Message;
-import java.lang.reflect.InvocationTargetException;
-import org.apache.hadoop.hdds.scm.ha.ReflectionUtil;
+import com.google.protobuf.Parser;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
@@ -28,25 +27,25 @@ import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
  * {@link ScmCodec} implementation for non-shaded
  * {@link com.google.protobuf.Message} objects.
  */
-public class ScmNonShadedGeneratedMessageCodec implements ScmCodec<Object> {
+public class ScmNonShadedGeneratedMessageCodec<T extends Message> implements ScmCodec<T> {
 
-  @Override
-  public ByteString serialize(Object object)
-      throws InvalidProtocolBufferException {
-    return UnsafeByteOperations.unsafeWrap(
-        ((Message) object).toByteString().asReadOnlyByteBuffer());
+  private final Parser<T> parser;
+
+  public ScmNonShadedGeneratedMessageCodec(Parser<T> parser) {
+    this.parser = parser;
   }
 
   @Override
-  public Object deserialize(Class<?> type, ByteString value)
-      throws InvalidProtocolBufferException {
+  public ByteString serialize(T object) throws InvalidProtocolBufferException {
+    return UnsafeByteOperations.unsafeWrap(object.toByteString().asReadOnlyByteBuffer());
+  }
+
+  @Override
+  public T deserialize(Class<?> type, ByteString value) throws InvalidProtocolBufferException {
     try {
-      return ReflectionUtil.getMethod(type, "parseFrom", byte[].class)
-          .invoke(null, (Object) value.toByteArray());
-    } catch (NoSuchMethodException | IllegalAccessException
-             | InvocationTargetException ex) {
-      ex.printStackTrace();
-      throw new InvalidProtocolBufferException("Message cannot be decoded: " + ex.getMessage());
+      return parser.parseFrom(value.toByteArray());
+    } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+      throw new InvalidProtocolBufferException("Message cannot be decoded", e);
     }
   }
 }
