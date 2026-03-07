@@ -74,7 +74,7 @@ import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffReportOzone;
 import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse;
 import org.apache.ozone.compaction.log.CompactionLogEntry;
-import org.apache.ozone.rocksdiff.CompactionNode;
+import org.apache.ozone.rocksdiff.FlushNode;
 import org.apache.ozone.test.GenericTestUtils;
 import org.apache.ozone.test.LambdaTestUtils;
 import org.apache.ozone.test.tag.Flaky;
@@ -429,23 +429,13 @@ public class TestSnapshotBackgroundServices {
     assertEquals(compactionLogEntriesOnPreviousLeader,
         compactionLogEntriesOnNewLeader);
 
+    // Compare flush nodes between leader and new leader
     assertEquals(leaderOM.getMetadataManager().getStore()
-            .getRocksDBCheckpointDiffer().getForwardCompactionDAG().nodes()
-            .stream().map(CompactionNode::getFileName).collect(toSet()),
+            .getRocksDBCheckpointDiffer().getFlushLinkedList().getFlushNodes()
+            .stream().map(FlushNode::getFileName).collect(toSet()),
         newLeaderOM.getMetadataManager().getStore()
-            .getRocksDBCheckpointDiffer().getForwardCompactionDAG().nodes()
-            .stream().map(CompactionNode::getFileName).collect(toSet()));
-
-    assertEquals(leaderOM.getMetadataManager().getStore()
-            .getRocksDBCheckpointDiffer().getForwardCompactionDAG().edges()
-            .stream().map(edge ->
-                edge.source().getFileName() + "-" + edge.target().getFileName())
-            .collect(toSet()),
-        newLeaderOM.getMetadataManager().getStore()
-            .getRocksDBCheckpointDiffer().getForwardCompactionDAG().edges()
-            .stream().map(edge ->
-                edge.source().getFileName() + "-" + edge.target().getFileName())
-            .collect(toSet()));
+            .getRocksDBCheckpointDiffer().getFlushLinkedList().getFlushNodes()
+            .stream().map(FlushNode::getFileName).collect(toSet()));
 
     confirmSnapDiffForTwoSnapshotsDifferingBySingleKey(newLeaderOM);
   }

@@ -112,7 +112,7 @@ class TestSnapshotCache {
       Table<?, ?> keyTable = mock(Table.class);
       when(table1.getName()).thenReturn("table1");
       when(table2.getName()).thenReturn("table2");
-      when(keyTable.getName()).thenReturn("keyTable"); // This is in COLUMN_FAMILIES_TO_TRACK_IN_DAG
+      when(keyTable.getName()).thenReturn("keyTable"); // This is in COLUMN_FAMILIES_TO_TRACK
       final List<Table<?, ?>> tables = new ArrayList<>();
       tables.add(table1);
       tables.add(table2);
