@@ -87,6 +87,9 @@ public final class OmMultipartPartInfo {
     this.fileChecksum = b.fileChecksum;
   }
 
+  /**
+   * Builder of OmMultipartPartInfo.
+   */
   public static class Builder {
     private String partName;
     private int partNumber;
@@ -146,11 +149,11 @@ public final class OmMultipartPartInfo {
       return this;
     }
 
-    public Builder setETag(String eTag) {
-      if (StringUtils.isBlank(eTag)) {
+    public Builder setETag(String eTagValue) {
+      if (StringUtils.isBlank(eTagValue)) {
         throw new IllegalArgumentException("eTag is required");
       }
-      this.eTag = eTag;
+      this.eTag = eTagValue;
       return this;
     }
 

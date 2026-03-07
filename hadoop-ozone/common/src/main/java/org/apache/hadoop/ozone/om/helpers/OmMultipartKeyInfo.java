@@ -258,6 +258,10 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
   }
 
   public void addPartKeyInfo(PartKeyInfo partKeyInfo) {
+    if (schemaVersion == 1) {
+      throw new IllegalStateException(
+          "PartKeyInfoMap is not supported for schemaVersion 1");
+    }
     this.partKeyInfoMap = PartKeyInfoMap.put(partKeyInfo, partKeyInfoMap);
   }
 
@@ -309,12 +313,11 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
       this.replicationConfig = multipartKeyInfo.replicationConfig;
       this.acls = AclListBuilder.of(multipartKeyInfo.acls);
       this.partKeyInfoList = new TreeMap<>();
+
       if (multipartKeyInfo.getSchemaVersion() == 0) {
         for (PartKeyInfo partKeyInfo : multipartKeyInfo.partKeyInfoMap) {
           this.partKeyInfoList.put(partKeyInfo.getPartNumber(), partKeyInfo);
         }
-      } else  {
-        // TODO: Build parts information from MultipartPartInfo table
       }
 
       this.parentID = multipartKeyInfo.parentID;
@@ -470,6 +473,11 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
    * @return MultipartKeyInfo
    */
   public MultipartKeyInfo getProto() {
+    if (schemaVersion == 1 && partKeyInfoMap != null && partKeyInfoMap.size() > 0) {
+      throw new IllegalStateException(
+          "PartKeyInfoMap must be empty for schemaVersion 1");
+    }
+
     MultipartKeyInfo.Builder builder = MultipartKeyInfo.newBuilder()
         .setUploadID(uploadID)
         .setCreationTime(creationTime)
@@ -499,7 +507,9 @@ public final class OmMultipartKeyInfo extends WithObjectID implements CopyObject
     }
 
     builder.addAllAcls(OzoneAclUtil.toProtobuf(acls));
-    builder.addAllPartKeyInfoList(partKeyInfoMap);
+    if (schemaVersion == 0) {
+      builder.addAllPartKeyInfoList(partKeyInfoMap);
+    }
     return builder.build();
   }
 

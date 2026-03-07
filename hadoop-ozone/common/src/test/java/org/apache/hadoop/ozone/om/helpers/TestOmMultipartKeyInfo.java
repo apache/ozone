@@ -20,8 +20,10 @@ package org.apache.hadoop.ozone.om.helpers;
 import static java.util.stream.Collectors.toList;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.Collections;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -113,6 +115,34 @@ public class TestOmMultipartKeyInfo {
     // THEN
     assertEquals(0, copy.getPartKeyInfoMap().size());
     assertEquals(1, subject.getPartKeyInfoMap().size());
+  }
+
+  @Test
+  public void addPartKeyInfoRejectsSchemaVersionOne() {
+    OmMultipartKeyInfo subject = createSubject()
+        .setSchemaVersion((byte) 1)
+        .build();
+
+    assertThrows(IllegalStateException.class,
+        () -> subject.addPartKeyInfo(createPart(createKeyInfo()).build()));
+  }
+
+  @Test
+  public void getProtoRejectsLegacyPartListForSchemaVersionOne() {
+    PartKeyInfo part = createPart(createKeyInfo()).build();
+    TreeMap<Integer, PartKeyInfo> legacyMap = new TreeMap<>();
+    legacyMap.put(part.getPartNumber(), part);
+
+    OmMultipartKeyInfo subject = new OmMultipartKeyInfo.Builder()
+        .setUploadID(UUID.randomUUID().toString())
+        .setCreationTime(Time.now())
+        .setSchemaVersion((byte) 1)
+        .setReplicationConfig(StandaloneReplicationConfig.getInstance(
+            HddsProtos.ReplicationFactor.ONE))
+        .setPartKeyInfoList(legacyMap)
+        .build();
+
+    assertThrows(IllegalStateException.class, subject::getProto);
   }
 
   private static OmMultipartKeyInfo.Builder createSubject() {
