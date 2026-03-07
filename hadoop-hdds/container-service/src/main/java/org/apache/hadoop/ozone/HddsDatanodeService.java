@@ -675,6 +675,11 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
    */
   private void checkAdminPrivilege(String operation)
       throws IOException {
+    // Skip check if authorization is disabled
+    if (secConf == null || !secConf.isAuthorizationEnabled()) {
+      return;
+    }
+
     final UserGroupInformation ugi = getRemoteUser();
     admins.checkAdminUserPrivilege(ugi);
   }
