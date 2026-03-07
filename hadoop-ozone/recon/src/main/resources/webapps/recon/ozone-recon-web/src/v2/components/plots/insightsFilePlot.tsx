@@ -227,6 +227,8 @@ const FileSizeDistribution: React.FC<FileSizeDistributionProps> = ({
         onTagClose={() => { }}
         fixedColumn=''
         columnLength={volumeOptions.length}
+        showSearch={true}
+        showSelectAll={true}
         style={{
           control: (baseStyles, state) => ({
             ...baseStyles,
@@ -243,6 +245,8 @@ const FileSizeDistribution: React.FC<FileSizeDistributionProps> = ({
         fixedColumn=''
         columnLength={bucketOptions.length}
         isDisabled={!isBucketSelectionEnabled}
+        showSearch={true}
+        showSelectAll={true}
         style={{
           control: (baseStyles, state) => ({
             ...baseStyles,
