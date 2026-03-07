@@ -276,7 +276,7 @@ public abstract class TestRawCoderBase extends TestCoderBase {
     ECReplicationConfig replicationConfig =
         new ECReplicationConfig(numDataUnits, numParityUnits);
     try {
-      RawErasureCoderFactory factory = encoderFactoryClass.newInstance();
+      RawErasureCoderFactory factory = decoderFactoryClass.newInstance();
       return factory.createDecoder(replicationConfig);
     } catch (Exception e) {
       throw new RuntimeException("Failed to create decoder", e);
