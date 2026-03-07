@@ -21,6 +21,7 @@ import static java.util.stream.Collectors.toList;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 
+import java.util.Collections;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
@@ -28,9 +29,11 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.KeyInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.PartKeyInfo;
+import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer;
 import org.apache.hadoop.util.Time;
 import org.junit.jupiter.api.Test;
 
@@ -85,6 +88,8 @@ public class TestOmMultipartKeyInfo {
     // THEN
     assertEquals(subject, fromProto);
     assertEquals(replicationConfig, fromProto.getReplicationConfig());
+    assertEquals(subject.getOwnerName(), fromProto.getOwnerName());
+    assertEquals(subject.getAcls(), fromProto.getAcls());
   }
 
   private static Stream<ReplicationConfig> replicationConfigs() {
@@ -113,6 +118,12 @@ public class TestOmMultipartKeyInfo {
   private static OmMultipartKeyInfo.Builder createSubject() {
     return new OmMultipartKeyInfo.Builder()
         .setUploadID(UUID.randomUUID().toString())
+        .setOwnerName("mpu-owner")
+        .setAcls(Collections.singletonList(OzoneAcl.of(
+            IAccessAuthorizer.ACLIdentityType.USER,
+            "mpu-owner",
+            OzoneAcl.AclScope.ACCESS,
+            IAccessAuthorizer.ACLType.WRITE)))
         .setCreationTime(Time.now());
   }
 
