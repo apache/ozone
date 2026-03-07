@@ -36,7 +36,7 @@ env:
 
 jobs:
   build-info:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-slim
     env:
       GITHUB_CONTEXT: ${{ toJson(github) }}
     outputs:
