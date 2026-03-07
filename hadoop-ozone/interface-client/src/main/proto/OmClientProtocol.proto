@@ -1713,17 +1713,36 @@ message MultipartKeyInfo {
     required uint64 creationTime = 2;
     required hadoop.hdds.ReplicationType type = 3;
     optional hadoop.hdds.ReplicationFactor factor = 4;
-    repeated PartKeyInfo partKeyInfoList = 5;
+    repeated PartKeyInfo partKeyInfoList = 5 [deprecated = true];
     optional uint64 objectID = 6;
     optional uint64 updateID = 7;
     optional uint64 parentID = 8;
     optional hadoop.hdds.ECReplicationConfig ecReplicationConfig = 9;
+    optional uint32 schemaVersion = 10;
+    optional string volumeName = 11;
+    optional string bucketName = 12;
+    optional string keyName = 13;
+    optional string ownerName = 14;
+    repeated OzoneAclInfo acls = 15;
 }
 
 message PartKeyInfo {
     required string partName = 1;
     required uint32 partNumber = 2;
     required KeyInfo partKeyInfo = 3;
+}
+
+message MultipartPartInfo {
+  optional string partName = 1;
+  optional uint32 partNumber = 2;
+  optional string eTag = 3;
+  optional KeyLocationList keyLocationList = 4; 
+  optional uint64 dataSize = 5;
+  optional uint64 modificationTime = 6;
+  optional uint64 objectID = 7;
+  optional uint64 updateID = 8;
+  optional FileEncryptionInfoProto fileEncryptionInfo = 9;
+  optional FileChecksumProto fileChecksum = 10;
 }
 
 message MultipartCommitUploadPartRequest {
