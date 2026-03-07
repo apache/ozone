@@ -45,7 +45,7 @@ public class ScmNonShadedGeneratedMessageCodec<T extends Message> implements Scm
     try {
       return parser.parseFrom(value.toByteArray());
     } catch (com.google.protobuf.InvalidProtocolBufferException e) {
-      throw new IllegalArgumentException("Message cannot be decoded", e);
+      throw new InvalidProtocolBufferException("Message cannot be decoded", e);
     }
   }
 }
