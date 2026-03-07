@@ -1161,7 +1161,8 @@ public class SCMClientProtocolServer implements
       Optional<Boolean> networkTopologyEnable,
       Optional<String> includeNodes,
       Optional<String> excludeNodes,
-      Optional<String> excludeContainers) throws IOException {
+      Optional<String> excludeContainers,
+      Optional<String> includeContainers) throws IOException {
     Map<String, String> auditMap = Maps.newHashMap();
     try {
       getScm().checkAdminAccess(getRemoteUser(), false);
@@ -1275,6 +1276,12 @@ public class SCMClientProtocolServer implements
         String ec = excludeContainers.get();
         auditMap.put("excludeContainers", (ec));
         cbc.setExcludeContainers(ec);
+      }
+
+      if (includeContainers.isPresent()) {
+        String ic = includeContainers.get();
+        auditMap.put("includeContainers", (ic));
+        cbc.setIncludeContainers(ic);
       }
 
       ContainerBalancer containerBalancer = scm.getContainerBalancer();
