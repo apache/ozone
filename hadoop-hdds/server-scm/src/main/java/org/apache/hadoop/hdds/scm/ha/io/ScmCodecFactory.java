@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.ha.io;
 
 import com.google.protobuf.ProtocolMessageEnum;
+import com.google.protobuf.Message;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
@@ -47,18 +48,13 @@ public final class ScmCodecFactory {
   private static Map<Class<?>, ScmCodec<?>> codecs = new HashMap<>();
 
   static {
-    codecs.put(ContainerID.class,
-        new ScmNonShadedGeneratedMessageCodec<>(ContainerID.parser()));
-    codecs.put(PipelineID.class,
-        new ScmNonShadedGeneratedMessageCodec<>(PipelineID.parser()));
-    codecs.put(Pipeline.class,
-        new ScmNonShadedGeneratedMessageCodec<>(Pipeline.parser()));
-    codecs.put(ContainerInfoProto.class,
-        new ScmNonShadedGeneratedMessageCodec<>(ContainerInfoProto.parser()));
-    codecs.put(DeletedBlocksTransaction.class,
-        new ScmNonShadedGeneratedMessageCodec<>(DeletedBlocksTransaction.parser()));
-    codecs.put(DeletedBlocksTransactionSummary.class,
-        new ScmNonShadedGeneratedMessageCodec<>(DeletedBlocksTransactionSummary.parser()));
+    putProto(ContainerID.getDefaultInstance());
+    putProto(PipelineID.getDefaultInstance());
+    putProto(Pipeline.getDefaultInstance());
+    putProto(ContainerInfoProto.getDefaultInstance());
+    putProto(DeletedBlocksTransaction.getDefaultInstance());
+    putProto(DeletedBlocksTransactionSummary.getDefaultInstance());
+
     codecs.put(List.class, new ScmListCodec());
     codecs.put(Integer.class, new ScmIntegerCodec());
     codecs.put(Long.class, new ScmLongCodec());
@@ -73,6 +69,11 @@ public final class ScmCodecFactory {
     putEnum(LifeCycleEvent.class, LifeCycleEvent::forNumber);
     putEnum(PipelineState.class, PipelineState::forNumber);
     putEnum(NodeType.class, NodeType::forNumber);
+  }
+
+  static <T extends Message> void putProto(T proto) {
+    codecs.put(proto.getClass(),
+        new ScmNonShadedGeneratedMessageCodec<>(proto.getParserForType()));
   }
 
   static <T extends Enum<T> & ProtocolMessageEnum> void putEnum(
