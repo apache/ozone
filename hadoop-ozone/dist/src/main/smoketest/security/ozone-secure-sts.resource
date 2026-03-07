@@ -18,6 +18,7 @@ Library             OperatingSystem
 Library             String
 Library             BuiltIn
 Library             DateTime
+Library             Collections
 Resource            ../commonlib.robot
 Resource            ../s3/commonawslib.robot
 
@@ -63,16 +64,16 @@ Create Ranger Policy
     Create Ranger Artifact        ${policy_json}                '${RANGER_ENDPOINT_URL}/service/public/v2/api/policy'
 
 Assume Role And Get Temporary Credentials
-    [Arguments]                   ${perm_access_key_id}  ${perm_secret_key}  ${policy_json}=${EMPTY}  ${role_arn}=${ROLE_ARN}
+    [Arguments]                   ${perm_access_key_id}  ${perm_secret_key}  ${policy_json}=${EMPTY}  ${role_arn}=${ROLE_ARN_OBS}
     Configure AWS Profile         permanent  ${perm_access_key_id}  ${perm_secret_key}
 
     ${now} =                      Get Current Date              time_zone=UTC
 
-    ${cmd} =                      Set Variable                  aws sts assume-role --endpoint-url ${STS_ENDPOINT_URL} --role-arn ${ROLE_ARN} --role-session-name ${ROLE_SESSION_NAME} --duration-seconds 900 --output json --profile permanent
+    ${cmd} =                      Set Variable                  aws sts assume-role --endpoint-url ${STS_ENDPOINT_URL} --role-arn ${role_arn} --role-session-name ${ROLE_SESSION_NAME} --duration-seconds 900 --output json --profile permanent
     ${cmd} =                      Set Variable If               '${policy_json}' != '${EMPTY}'    ${cmd} --policy '${policy_json}'    ${cmd}
 
     ${json} =                     Execute                       ${cmd}
-    Should contain                ${json}                       Credentials
+    Should Contain                ${json}                       Credentials
 
     ${stsAccessKeyId} =           Execute                       echo '${json}' | jq -r '.Credentials.AccessKeyId'
     ${stsSecretKey} =             Execute                       echo '${json}' | jq -r '.Credentials.SecretAccessKey'
@@ -89,14 +90,30 @@ Assume Role And Get Temporary Credentials
     Should Be True                ${time_diff} <= 902           Expected expiration to be at most 902s in the future, but was ${time_diff}s
 
 Assume Role Should Fail
-    [Arguments]                   ${perm_access_key_id}  ${perm_secret_key}  ${policy_json}=${EMPTY}  ${expected_error}=AccessDenied
+    [Arguments]                   ${perm_access_key_id}  ${perm_secret_key}  ${policy_json}=${EMPTY}  ${expected_error}=AccessDenied  ${expected_http_code}=${EMPTY}  ${role_arn}=${ROLE_ARN_OBS}
     Configure AWS Profile         permanent  ${perm_access_key_id}  ${perm_secret_key}
 
-    ${cmd} =                      Set Variable                  aws sts assume-role --endpoint-url ${STS_ENDPOINT_URL} --role-arn ${ROLE_ARN} --role-session-name ${ROLE_SESSION_NAME} --duration-seconds 900 --output json --profile permanent
-    ${cmd} =                      Set Variable If               '${policy_json}' != '${EMPTY}'    ${cmd} --policy '${policy_json}'    ${cmd}
+    IF                            '${expected_http_code}' != '${EMPTY}'
+        # Note: curl in the s3g container doesn't reliably support --aws-sigv4,
+        # so use awscli debug output to capture the HTTP response code.
+        ${cmd} =                  Set Variable                  aws sts assume-role --endpoint-url ${STS_ENDPOINT_URL} --role-arn ${role_arn} --role-session-name ${ROLE_SESSION_NAME} --duration-seconds 900 --profile permanent --debug 2>&1
+        ${cmd} =                  Set Variable If               '${policy_json}' != '${EMPTY}'    ${cmd} --policy '${policy_json}'    ${cmd}
 
-    ${output} =                   Execute And Ignore Error      ${cmd}
-    Should Contain                ${output}                     ${expected_error}
+        ${output} =               Execute And Ignore Error      ${cmd}
+        Should Contain            ${output}                     ${expected_error}
+
+        @{http_codes} =           Get Regexp Matches            ${output}    (?m)^.*"POST .*" ([0-9]{3}) .*    1
+        ${code_count} =           Get Length                    ${http_codes}
+        Should Be True            ${code_count} > 0             Expected to find an HTTP status code in awscli --debug output, but none was found.
+        ${http_code} =            Get From List                 ${http_codes}    -1
+        Should Be Equal As Strings  ${http_code}                ${expected_http_code}
+    ELSE
+        ${cmd} =                  Set Variable                  aws sts assume-role --endpoint-url ${STS_ENDPOINT_URL} --role-arn ${role_arn} --role-session-name ${ROLE_SESSION_NAME} --duration-seconds 900 --output json --profile permanent
+        ${cmd} =                  Set Variable If               '${policy_json}' != '${EMPTY}'    ${cmd} --policy '${policy_json}'    ${cmd}
+
+        ${output} =               Execute And Ignore Error      ${cmd}
+        Should Contain            ${output}                     ${expected_error}
+    END
 
 Get Object Should Succeed
     [Arguments]                   ${bucket}  ${key}  ${destination}=./${key}  ${profile}=sts
@@ -122,3 +139,34 @@ Create Bucket Should Fail
     [Arguments]                   ${bucket}  ${expectedFailureMessage}=AccessDenied  ${profile}=sts
     ${output} =                   Execute And Ignore Error      aws s3api --endpoint-url ${S3G_ENDPOINT_URL} create-bucket --bucket ${bucket} --profile ${profile}
     Should Contain                ${output}                     ${expectedFailureMessage}
+
+List Object Keys Should Succeed
+    [Arguments]                   ${bucket}  ${api}=list-objects  ${request_prefix}=${EMPTY}  ${profile}=sts  ${delimiter}=${EMPTY}
+    ${cmd} =                      Set Variable                  aws s3api --endpoint-url ${S3G_ENDPOINT_URL} ${api} --bucket ${bucket} --output json --profile ${profile}
+    ${cmd} =                      Set Variable If               '${request_prefix}' != '${EMPTY}'    ${cmd} --prefix ${request_prefix}    ${cmd}
+    ${cmd} =                      Set Variable If               '${delimiter}' != '${EMPTY}'    ${cmd} --delimiter '${delimiter}'    ${cmd}
+    ${output} =                   Execute And Ignore Error      ${cmd}
+    Should Not Contain            ${output}                     AccessDenied
+    ${keys_json} =                Execute                       echo '${output}' | jq -c '[(.Contents // [])[] | .Key] | sort'
+    [Return]                      ${keys_json}
+
+List Object Keys Should Fail
+    [Arguments]                   ${bucket}  ${api}=list-objects  ${expected_failure}=AccessDenied  ${request_prefix}=${EMPTY}  ${profile}=sts  ${delimiter}=${EMPTY}
+    ${cmd} =                      Set Variable                  aws s3api --endpoint-url ${S3G_ENDPOINT_URL} ${api} --bucket ${bucket} --output json --profile ${profile}
+    ${cmd} =                      Set Variable If               '${request_prefix}' != '${EMPTY}'    ${cmd} --prefix ${request_prefix}    ${cmd}
+    ${cmd} =                      Set Variable If               '${delimiter}' != '${EMPTY}'    ${cmd} --delimiter '${delimiter}'    ${cmd}
+    ${output} =                   Execute And Ignore Error      ${cmd}
+    Should Contain                ${output}                     ${expected_failure}
+
+Assert Listed Keys Json Should Equal
+    [Arguments]                   ${actual_keys_json}  ${expected_keys_json}
+    ${actual_list} =              Evaluate                      json.loads($actual_keys_json)    modules=json
+    ${expected_list} =            Evaluate                      json.loads($expected_keys_json)  modules=json
+    Lists Should Be Equal         ${actual_list}                ${expected_list}
+
+Assert Listed Keys Should Equal
+    [Arguments]                   ${actual_keys_json}  @{expected_keys}
+    ${expected_sorted} =          Copy List                     ${expected_keys}
+    Sort List                     ${expected_sorted}
+    ${actual_list} =              Evaluate                      json.loads($actual_keys_json)    modules=json
+    Lists Should Be Equal         ${actual_list}                ${expected_sorted}
