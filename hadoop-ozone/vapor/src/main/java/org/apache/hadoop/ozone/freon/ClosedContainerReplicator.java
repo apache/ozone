@@ -80,9 +80,9 @@ import picocli.CommandLine.Option;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
-@MetaInfServices(FreonSubcommand.class)
+@MetaInfServices(VaporSubcommand.class)
 public class ClosedContainerReplicator extends BaseFreonGenerator implements
-    Callable<Void> {
+    Callable<Void>, VaporSubcommand {
 
   @Option(names = {"--datanode"},
       description = "Replicate only containers on this specific datanode.",

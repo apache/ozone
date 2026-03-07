@@ -32,7 +32,7 @@ import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.ozone.freon.FreonSubcommand;
+import org.apache.hadoop.ozone.freon.VaporSubcommand;
 import org.kohsuke.MetaInfServices;
 import picocli.CommandLine.Command;
 
@@ -45,7 +45,7 @@ import picocli.CommandLine.Command;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
-@MetaInfServices(FreonSubcommand.class)
+@MetaInfServices(VaporSubcommand.class)
 public class GeneratorScm extends BaseGenerator {
 
   private Table<ContainerID, ContainerInfo> containerStore;
