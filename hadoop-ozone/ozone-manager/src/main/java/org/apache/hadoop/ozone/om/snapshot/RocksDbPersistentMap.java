@@ -127,12 +127,12 @@ public class RocksDbPersistentMap<K, V> implements PersistentMap<K, V> {
           throw new NoSuchElementException("No more elements in the map.");
         }
         K key = SnapshotStorageException.wrap(
-            "Failed to deserialize map entry", () -> {
+            "Failed to deserialize map key", () -> {
               K k = codecRegistry.asObject(iterator.get().key(), keyType);
               return k;
             });
         V value = SnapshotStorageException.wrap(
-            "Failed to deserialize map entry",
+            "Failed to deserialize map value",
             () -> codecRegistry.asObject(iterator.get().value(), valueType));
 
         // Move iterator to the next.
