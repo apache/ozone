@@ -54,8 +54,11 @@ import org.apache.hadoop.hdds.scm.container.MockNodeManager;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
+import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
+import org.apache.hadoop.hdds.scm.ha.SCMRatisServer;
 import org.apache.hadoop.hdds.scm.ha.SCMServiceManager;
+import org.apache.hadoop.hdds.scm.ha.SCMStateMachine;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStore;
 import org.apache.hadoop.hdds.scm.metadata.SCMMetadataStoreImpl;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -67,6 +70,7 @@ import org.apache.hadoop.hdds.scm.pipeline.PipelineManagerImpl;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineProvider;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeProtocolServer;
+import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -177,6 +181,16 @@ public class TestSCMSafeModeManager {
     }
     ContainerManager containerManager = mock(ContainerManager.class);
     when(containerManager.getContainers(ReplicationType.RATIS)).thenReturn(containers);
+
+    StorageContainerManager mockScmManager = mock(StorageContainerManager.class);
+    SCMHAManager mockScmhaManager = mock(SCMHAManager.class);
+    when(mockScmManager.getScmHAManager()).thenReturn(mockScmhaManager);
+    SCMRatisServer mockScmRatisServer = mock(SCMRatisServer.class);
+    when(mockScmhaManager.getRatisServer()).thenReturn(mockScmRatisServer);
+    SCMStateMachine mockScmStateMachine = mock(SCMStateMachine.class);
+    when(mockScmRatisServer.getSCMStateMachine()).thenReturn(mockScmStateMachine);
+    when((mockScmStateMachine.getIsStateMachineReady())).thenReturn(true);
+    scmContext = new SCMContext.Builder().setSCM(mockScmManager).build();
     scmSafeModeManager = new SCMSafeModeManager(config, null, null, containerManager,
         serviceManager, queue, scmContext);
     scmSafeModeManager.start();
@@ -207,6 +221,7 @@ public class TestSCMSafeModeManager {
     testContainerThreshold(containers.subList(75, 100), 1.0);
     assertEquals(100, scmSafeModeManager.getSafeModeMetrics()
         .getCurrentContainersWithOneReplicaReportedCount().value());
+    scmSafeModeManager.validateSafeModeExitRules(StateMachineReadyRule.class.getSimpleName());
 
     GenericTestUtils.waitFor(() -> !scmSafeModeManager.getInSafeMode(),
         100, 1000 * 5);

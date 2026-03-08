@@ -276,15 +276,21 @@ export class Insights extends React.Component<Record<string, object>, IInsightsS
       this.setState({
         fileCountData: {
           title: {
-            text: 'File Size Distribution',
+            text: 'File Size Frequency Distribution',
             left: 'center'
           },
           xAxis: {
             type: 'category',
-            data: xFileCountValues
+            data: xFileCountValues,
+            name: 'File Size Range',
+            nameLocation: 'middle',
+            nameGap: 40
           },
           yAxis: {
-            type: 'value'
+            type: 'value',
+            name: 'Number of Files',
+            nameLocation: 'middle',
+            nameGap: 50
           },
           tooltip: {
             trigger: 'item',

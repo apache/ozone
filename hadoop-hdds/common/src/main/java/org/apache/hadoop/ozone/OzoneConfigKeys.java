@@ -493,6 +493,15 @@ public final class OzoneConfigKeys {
       "ozone.client.follower.read.enabled";
   public static final boolean OZONE_CLIENT_FOLLOWER_READ_ENABLED_DEFAULT = false;
 
+  public static final String OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_KEY =
+      "ozone.client.follower.read.default.consistency";
+  public static final String OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_DEFAULT =
+      "LINEARIZABLE_ALLOW_FOLLOWER";
+  public static final String OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_KEY =
+      "ozone.client.leader.read.default.consistency";
+  public static final String OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_DEFAULT =
+      "DEFAULT";
+
   public static final String OZONE_FREON_HTTP_ENABLED_KEY =
       "ozone.freon.http.enabled";
   public static final String OZONE_FREON_HTTP_BIND_HOST_KEY =

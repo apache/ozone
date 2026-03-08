@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
@@ -204,7 +205,7 @@ public final class DatanodeAdminMonitorTestUtil {
         .then(invocation -> {
           ReplicationManagerReport report = invocation.getArgument(1);
           if (underReplicated) {
-            report.increment(ReplicationManagerReport.HealthState.UNDER_REPLICATED);
+            report.increment(ContainerHealthState.UNDER_REPLICATED);
             return true;
           }
           return false;
