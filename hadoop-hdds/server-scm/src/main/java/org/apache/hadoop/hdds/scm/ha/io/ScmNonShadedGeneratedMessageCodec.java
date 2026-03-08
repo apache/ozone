@@ -43,7 +43,7 @@ public class ScmNonShadedGeneratedMessageCodec<T extends Message> implements Scm
   @Override
   public T deserialize(Class<?> type, ByteString value) throws InvalidProtocolBufferException {
     try {
-      return parser.parseFrom(value.toByteArray());
+      return parser.parseFrom(value.asReadOnlyByteBuffer());
     } catch (com.google.protobuf.InvalidProtocolBufferException e) {
       throw new InvalidProtocolBufferException("Message cannot be decoded", e);
     }
