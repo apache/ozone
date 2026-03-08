@@ -130,6 +130,11 @@ function ozonecmd_case
       OZONE_CLASSNAME=org.apache.hadoop.ozone.freon.Freon
       OZONE_FREON_OPTS="${OZONE_FREON_OPTS} ${RATIS_OPTS} ${OZONE_MODULE_ACCESS_ARGS}"
       OZONE_RUN_ARTIFACT_NAME="ozone-freon"
+      if ozone_is_freon_command_moved_to_vapor; then
+        # backward compatibility
+        OZONE_CLASSNAME=org.apache.hadoop.ozone.freon.Vapor
+        OZONE_RUN_ARTIFACT_NAME="ozone-vapor"
+      fi
     ;;
     getconf)
       OZONE_CLASSNAME=org.apache.hadoop.ozone.conf.OzoneGetConf;
