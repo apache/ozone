@@ -2070,6 +2070,15 @@
     </description>
   </property>
   <property>
+    <name>ozone.s3g.metrics.enabled</name>
+    <value>true</value>
+    <tag>OZONE, S3GATEWAY</tag>
+    <description>
+      Controls whether S3 Gateway metrics are registered with the metrics
+      system and exposed to JMX and other metrics sinks.
+    </description>
+  </property>
+  <property>
     <name>ozone.xceiver.client.metrics.percentiles.intervals.seconds</name>
     <value>60</value>
     <tag>XCEIVER, PERFORMANCE</tag>
