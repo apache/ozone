@@ -2960,6 +2960,9 @@ function ozone_is_freon_command_moved_to_vapor
         strmg streaming-generator
     do
       if [[ "$opt" == "$subcommand" ]]; then
+        echo "WARN: 'ozone freon $subcommand' is changed to 'ozone vapor $subcommand'." >&2
+        echo "      Please update your scripts since 'ozone freon $subcommand' may no longer" >&2
+        echo "      work in future releases." >&2
         return 0
       fi
     done
