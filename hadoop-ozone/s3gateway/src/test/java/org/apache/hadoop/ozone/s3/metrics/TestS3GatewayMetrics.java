@@ -52,6 +52,7 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
+import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
@@ -139,7 +140,12 @@ public class TestS3GatewayMetrics {
     OzoneConfiguration disabledConf = new OzoneConfiguration();
     disabledConf.setBoolean(S3GatewayConfigKeys.OZONE_S3G_METRICS_ENABLED,
         false);
-    assertThat(S3GatewayMetrics.create(disabledConf)).isNull();
+    S3GatewayMetrics disabledMetrics = S3GatewayMetrics.create(disabledConf);
+    assertThat(disabledMetrics).isNotNull();
+    assertThat(DefaultMetricsSystem.instance().getSource(
+        S3GatewayMetrics.SOURCE_NAME)).isNull();
+    assertDoesNotThrow(
+        () -> disabledMetrics.getMetrics(new MetricsCollectorImpl(), true));
 
     S3GatewayMetrics.unRegister();
 
@@ -147,6 +153,8 @@ public class TestS3GatewayMetrics {
     enabledConf.setBoolean(S3GatewayConfigKeys.OZONE_S3G_METRICS_ENABLED,
         true);
     assertThat(S3GatewayMetrics.create(enabledConf)).isNotNull();
+    assertThat(DefaultMetricsSystem.instance().getSource(
+        S3GatewayMetrics.SOURCE_NAME)).isNotNull();
   }
 
   /**
