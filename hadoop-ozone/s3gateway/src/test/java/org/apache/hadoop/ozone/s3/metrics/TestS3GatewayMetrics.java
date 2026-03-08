@@ -50,11 +50,13 @@ import java.io.InputStream;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.StreamingOutput;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.metrics2.impl.MetricsCollectorImpl;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
+import org.apache.hadoop.ozone.s3.S3GatewayConfigKeys;
 import org.apache.hadoop.ozone.s3.endpoint.BucketEndpoint;
 import org.apache.hadoop.ozone.s3.endpoint.EndpointBuilder;
 import org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils;
@@ -66,6 +68,7 @@ import org.apache.hadoop.ozone.s3.exception.S3ErrorTable;
 import org.apache.hadoop.ozone.s3.util.S3Consts;
 import org.apache.hadoop.ozone.s3.util.S3Consts.QueryParams;
 import org.apache.http.HttpStatus;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -117,12 +120,33 @@ public class TestS3GatewayMetrics {
     metrics = bucketEndpoint.getMetrics();
   }
 
+  @AfterEach
+  public void tearDown() {
+    S3GatewayMetrics.unRegister();
+  }
+
   @Test
   public void testMetricsCreateIsIdempotent() {
     S3GatewayMetrics m1 = S3GatewayMetrics.create(new OzoneConfiguration());
     S3GatewayMetrics m2 = S3GatewayMetrics.create(new OzoneConfiguration());
     assertThat(m2).isSameAs(m1);
+  }
+
+  @Test
+  public void testMetricsCreateRespectsConfig() {
     S3GatewayMetrics.unRegister();
+
+    OzoneConfiguration disabledConf = new OzoneConfiguration();
+    disabledConf.setBoolean(S3GatewayConfigKeys.OZONE_S3G_METRICS_ENABLED,
+        false);
+    assertThat(S3GatewayMetrics.create(disabledConf)).isNull();
+
+    S3GatewayMetrics.unRegister();
+
+    OzoneConfiguration enabledConf = new OzoneConfiguration();
+    enabledConf.setBoolean(S3GatewayConfigKeys.OZONE_S3G_METRICS_ENABLED,
+        true);
+    assertThat(S3GatewayMetrics.create(enabledConf)).isNotNull();
   }
 
   /**

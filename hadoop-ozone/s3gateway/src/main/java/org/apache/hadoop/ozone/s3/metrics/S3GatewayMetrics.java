@@ -50,6 +50,7 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
   @SuppressWarnings("PMD.SingularField")
   private MetricsRegistry registry;
   private static S3GatewayMetrics instance;
+  private static Boolean metricsEnabled;
 
   // BucketEndpoint
   private @Metric MutableCounterLong getBucketSuccess;
@@ -304,8 +305,12 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
    * @return S3GatewayMetrics
    */
   public static synchronized S3GatewayMetrics create(OzoneConfiguration conf) {
-    if (!conf.getBoolean(S3GatewayConfigKeys.OZONE_S3G_METRICS_ENABLED,
-        S3GatewayConfigKeys.OZONE_S3G_METRICS_ENABLED_DEFAULT)) {
+    if (metricsEnabled == null) {
+      metricsEnabled = conf.getBoolean(
+          S3GatewayConfigKeys.OZONE_S3G_METRICS_ENABLED,
+          S3GatewayConfigKeys.OZONE_S3G_METRICS_ENABLED_DEFAULT);
+    }
+    if (!metricsEnabled) {
       return null;
     }
     if (instance != null) {
@@ -314,16 +319,16 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     instance = ms.register(SOURCE_NAME, "S3 Gateway Metrics",
         new S3GatewayMetrics(conf));
-    Runtime.getRuntime().addShutdownHook(new Thread(S3GatewayMetrics::unRegister));
     return instance;
   }
 
   /**
    * Unregister the metrics instance.
    */
-  public static void unRegister() {
+  public static synchronized void unRegister() {
     IOUtils.closeQuietly(instance);
     instance = null;
+    metricsEnabled = null;
     MetricsSystem ms = DefaultMetricsSystem.instance();
     ms.unregisterSource(SOURCE_NAME);
   }
