@@ -4668,6 +4668,15 @@
   </property>
 
   <property>
+    <name>ozone.om.snapshot.diff.iterator.metrics.enabled</name>
+    <value>false</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Enable counters for snapshot diff iterators (opened/closed) and keys scanned.
+    </description>
+  </property>
+
+  <property>
     <name>ozone.om.snapshot.diff.job.default.wait.time</name>
     <value>1m</value>
     <tag>OZONE, OM</tag>

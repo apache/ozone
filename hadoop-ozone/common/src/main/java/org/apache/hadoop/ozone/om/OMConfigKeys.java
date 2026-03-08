@@ -585,6 +585,10 @@ public final class OMConfigKeys {
       = "ozone.om.snapshot.diff.thread.pool.size";
   public static final int OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE_DEFAULT
       = 10;
+  public static final String OZONE_OM_SNAPSHOT_DIFF_ITERATOR_METRICS_ENABLED =
+      "ozone.om.snapshot.diff.iterator.metrics.enabled";
+  public static final boolean
+      OZONE_OM_SNAPSHOT_DIFF_ITERATOR_METRICS_ENABLED_DEFAULT = false;
 
   public static final String OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME
       = "ozone.om.snapshot.diff.job.default.wait.time";

@@ -21,6 +21,8 @@ import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.DEFAULT_COLUMN_FAMI
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_ITERATOR_METRICS_ENABLED;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_ITERATOR_METRICS_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB;
@@ -356,6 +358,16 @@ public class TestSnapshotDiffManager {
     when(omSnapshotManager.getDiffCleanupServiceInterval()).thenReturn(0L);
   }
 
+  private void recreateSnapshotDiffManager(boolean iteratorMetricsEnabled) {
+    when(configuration.getBoolean(
+        OZONE_OM_SNAPSHOT_DIFF_ITERATOR_METRICS_ENABLED,
+        OZONE_OM_SNAPSHOT_DIFF_ITERATOR_METRICS_ENABLED_DEFAULT))
+        .thenReturn(iteratorMetricsEnabled);
+    snapshotDiffManager = new SnapshotDiffManager(db, ozoneManager,
+        snapDiffJobTable, snapDiffReportTable, columnFamilyOptions,
+        codecRegistry);
+  }
+
   private CacheLoader<UUID, OmSnapshot> mockCacheLoader() {
     return new CacheLoader<UUID, OmSnapshot>() {
       @Nonnull
@@ -526,6 +538,73 @@ public class TestSnapshotDiffManager {
         }
         assertEquals(nativeLibraryLoaded ? 37 : 12, objectIdCnt);
       }
+
+      assertEquals(0, omMetrics.getNumSnapshotDiffIteratorsOpened());
+      assertEquals(0, omMetrics.getNumSnapshotDiffIteratorsClosed());
+      assertEquals(0, omMetrics.getNumSnapshotDiffKeysScanned());
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource({"false,3", "true,5"})
+  public void testObjectIdMapIteratorMetrics(boolean nativeLibraryLoaded,
+                                             long expectedKeysScanned)
+      throws IOException, RocksDBException {
+    recreateSnapshotDiffManager(true);
+
+    List<String> keysIncludingTombstones = IntStream.range(0, 5)
+        .boxed().map(i -> "key" + i).collect(Collectors.toList());
+    List<String> keysExcludingTombstones = IntStream.range(0, 3)
+        .boxed().map(i -> "key" + i).collect(Collectors.toList());
+
+    try (MockedConstruction<SstFileSetReader> mockedSSTFileReader =
+             mockConstruction(SstFileSetReader.class,
+                 (mock, context) -> {
+                   when(mock.getKeyStreamWithTombstone(any(), any()))
+                       .thenReturn(
+                           getNewIterator(keysIncludingTombstones.iterator()));
+                   when(mock.getKeyStream(any(), any()))
+                       .thenReturn(
+                           getNewIterator(keysExcludingTombstones.iterator()));
+                 })) {
+      Map<String, WithParentObjectId> fromSnapshotTableMap =
+          IntStream.range(0, 3).boxed().collect(Collectors.toMap(
+              i -> "key" + i,
+              i -> getKeyInfo(i, i, i + 100, KEY_TABLE)));
+      Map<String, WithParentObjectId> toSnapshotTableMap =
+          IntStream.range(2, 5).boxed().collect(Collectors.toMap(
+              i -> "key" + i,
+              i -> getKeyInfo(i, i, i + 100, KEY_TABLE)));
+
+      Table<String, WithParentObjectId> fromSnapshotTable =
+          new StringInMemoryTestTable<>(fromSnapshotTableMap, KEY_TABLE);
+      Table<String, WithParentObjectId> toSnapshotTable =
+          new StringInMemoryTestTable<>(toSnapshotTableMap, KEY_TABLE);
+
+      PersistentMap<byte[], byte[]> oldObjectIdKeyMap =
+          new StubbedPersistentMap<>();
+      PersistentMap<byte[], byte[]> newObjectIdKeyMap =
+          new SnapshotTestUtils.StubbedPersistentMap<>();
+      PersistentMap<byte[], Boolean> objectIdsToCheck =
+          new SnapshotTestUtils.StubbedPersistentMap<>();
+
+      snapshotDiffManager.addToObjectIdMap(
+          fromSnapshotTable,
+          toSnapshotTable,
+          Sets.newHashSet(Paths.get("dummy.sst")),
+          nativeLibraryLoaded,
+          oldObjectIdKeyMap,
+          newObjectIdKeyMap,
+          objectIdsToCheck,
+          Optional.empty(),
+          Optional.empty(),
+          new TablePrefixInfo(ImmutableMap.of(KEY_TABLE, "")),
+          "");
+
+      assertEquals(1, omMetrics.getNumSnapshotDiffIteratorsOpened());
+      assertEquals(1, omMetrics.getNumSnapshotDiffIteratorsClosed());
+      assertEquals(expectedKeysScanned,
+          omMetrics.getNumSnapshotDiffKeysScanned());
     }
   }
 

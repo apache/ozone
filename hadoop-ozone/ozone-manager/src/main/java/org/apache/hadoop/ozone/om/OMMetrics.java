@@ -76,6 +76,9 @@ public class OMMetrics implements OmMetadataReaderMetrics {
   private @Metric MutableCounterLong numSnapshotInfos;
   private @Metric MutableCounterLong numCancelSnapshotDiffs;
   private @Metric MutableCounterLong numListSnapshotDiffJobs;
+  private @Metric MutableCounterLong numSnapshotDiffIteratorsOpened;
+  private @Metric MutableCounterLong numSnapshotDiffIteratorsClosed;
+  private @Metric MutableCounterLong numSnapshotDiffKeysScanned;
 
   private @Metric MutableGaugeInt numSnapshotCacheSize;
   private @Metric MutableCounterLong numGetFileStatus;
@@ -536,6 +539,18 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public void incNumSnapshotDiffJobFails() {
     numSnapshotDiffJobFails.incr();
+  }
+
+  public void incNumSnapshotDiffIteratorsOpened() {
+    numSnapshotDiffIteratorsOpened.incr();
+  }
+
+  public void incNumSnapshotDiffIteratorsClosed() {
+    numSnapshotDiffIteratorsClosed.incr();
+  }
+
+  public void incNumSnapshotDiffKeysScanned(long delta) {
+    numSnapshotDiffKeysScanned.incr(delta);
   }
 
   public void incNumSnapshotInfoFails() {
@@ -1425,6 +1440,18 @@ public class OMMetrics implements OmMetadataReaderMetrics {
 
   public long getNumSnapshotDiffJobFails() {
     return numSnapshotDiffJobFails.value();
+  }
+
+  public long getNumSnapshotDiffIteratorsOpened() {
+    return numSnapshotDiffIteratorsOpened.value();
+  }
+
+  public long getNumSnapshotDiffIteratorsClosed() {
+    return numSnapshotDiffIteratorsClosed.value();
+  }
+
+  public long getNumSnapshotDiffKeysScanned() {
+    return numSnapshotDiffKeysScanned.value();
   }
 
   public long getNumSnapshotActive() {

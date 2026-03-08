@@ -31,6 +31,8 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DIS
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_JOB_DEFAULT_WAIT_TIME_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_ITERATOR_METRICS_ENABLED;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_ITERATOR_METRICS_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_MAX_ALLOWED_KEYS_CHANGED_PER_DIFF_JOB_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_THREAD_POOL_SIZE;
@@ -185,6 +187,8 @@ public class SnapshotDiffManager implements AutoCloseable {
 
   private final boolean diffDisableNativeLibs;
 
+  private final boolean snapDiffIteratorMetricsEnabled;
+
   private final boolean isNativeLibsLoaded;
 
   private final BiFunction<SnapshotInfo, SnapshotInfo, String>
@@ -218,6 +222,11 @@ public class SnapshotDiffManager implements AutoCloseable {
     this.diffDisableNativeLibs = ozoneManager.getConfiguration().getBoolean(
         OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS,
         OZONE_OM_SNAPSHOT_DIFF_DISABLE_NATIVE_LIBS_DEFAULT);
+
+    this.snapDiffIteratorMetricsEnabled =
+        ozoneManager.getConfiguration().getBoolean(
+            OZONE_OM_SNAPSHOT_DIFF_ITERATOR_METRICS_ENABLED,
+            OZONE_OM_SNAPSHOT_DIFF_ITERATOR_METRICS_ENABLED_DEFAULT);
 
     this.maxAllowedKeyChangesForASnapDiff = ozoneManager.getConfiguration()
         .getLong(
@@ -1031,14 +1040,21 @@ public class SnapshotDiffManager implements AutoCloseable {
     if (Strings.isNotEmpty(tablePrefix)) {
       sstFileReaderUpperBound = getLexicographicallyHigherString(tablePrefix);
     }
+    long keysScanned = 0;
+    boolean iteratorOpened = false;
     try (ClosableIterator<String> keysToCheck = nativeRocksToolsLoaded ?
         sstFileReader.getKeyStreamWithTombstone(sstFileReaderLowerBound, sstFileReaderUpperBound)
         : sstFileReader.getKeyStream(sstFileReaderLowerBound, sstFileReaderUpperBound);
          TableMergeIterator<String, WithParentObjectId> tableMergeIterator = new TableMergeIterator<>(keysToCheck,
              tablePrefix, (Table<String, WithParentObjectId>) fsTable, (Table<String, WithParentObjectId>) tsTable)) {
+      iteratorOpened = true;
+      if (snapDiffIteratorMetricsEnabled) {
+        ozoneManager.getMetrics().incNumSnapshotDiffIteratorsOpened();
+      }
       AtomicLong keysProcessed = new AtomicLong(0);
       while (tableMergeIterator.hasNext()) {
         Table.KeyValue<String, List<WithParentObjectId>> kvs = tableMergeIterator.next();
+        keysScanned++;
         String key = kvs.getKey();
         if (totalEstimatedKeysToProcess > 0) {
           double progressPct = (double) keysProcessed.get() / totalEstimatedKeysToProcess;
@@ -1080,6 +1096,11 @@ public class SnapshotDiffManager implements AutoCloseable {
         } catch (IOException e) {
           throw new RuntimeException(e);
         }
+      }
+    } finally {
+      if (snapDiffIteratorMetricsEnabled && iteratorOpened) {
+        ozoneManager.getMetrics().incNumSnapshotDiffIteratorsClosed();
+        ozoneManager.getMetrics().incNumSnapshotDiffKeysScanned(keysScanned);
       }
     }
   }
