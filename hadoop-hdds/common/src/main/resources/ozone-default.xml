@@ -2074,8 +2074,10 @@
     <value>true</value>
     <tag>OZONE, S3GATEWAY</tag>
     <description>
-      Controls whether S3 Gateway metrics are registered with the metrics
-      system and exposed to JMX and other metrics sinks.
+      When true (default), the S3 Gateway metrics source is registered with
+      the metrics system and exposed to JMX and other sinks. When false, the
+      source is not registered; counters are still updated in memory but are
+      not published.
     </description>
   </property>
   <property>

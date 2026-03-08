@@ -72,6 +72,11 @@ public final class S3GatewayConfigKeys {
   public static final String OZONE_S3G_CLIENT_BUFFER_SIZE_DEFAULT =
       "4MB";
 
+  /**
+   * When true (default), the S3 Gateway metrics source is registered with the
+   * Hadoop metrics system (JMX, etc.). When false, the source is not
+   * registered; counters are still updated in memory but not published.
+   */
   public static final String OZONE_S3G_METRICS_ENABLED =
       "ozone.s3g.metrics.enabled";
   public static final boolean OZONE_S3G_METRICS_ENABLED_DEFAULT = true;
