@@ -30,6 +30,7 @@ import static org.mockito.Mockito.mock;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
 import java.util.Collections;
@@ -92,12 +93,23 @@ public class TestDatanodeUpgradeToSchemaV3 {
   }
 
   private void setup() throws Exception {
-    address = SCMTestUtils.getReuseableAddress();
-    conf.setSocketAddr(ScmConfigKeys.OZONE_SCM_NAMES, address);
     conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
         tempFolder.resolve("data").toString());
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         tempFolder.resolve("meta").toString());
+  }
+
+  /**
+   * Starts the mock SCM RPC server on an OS-assigned port (port 0) to avoid
+   * the TOCTOU race that causes intermittent BindException when a pre-reserved
+   * port is grabbed by another process between reservation and bind.
+   */
+  private void startScm() throws IOException {
+    scmRpcServer = SCMTestUtils.startScmRpcServer(conf,
+        new ScmTestMock(CLUSTER_ID),
+        new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 10);
+    address = scmRpcServer.getListenerAddress();
+    conf.setSocketAddr(ScmConfigKeys.OZONE_SCM_NAMES, address);
   }
 
   @AfterEach
@@ -121,8 +133,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
   public void testDBOnHddsVolume(boolean schemaV3Enabled) throws Exception {
     initTests(schemaV3Enabled);
     // start DN and SCM
-    scmRpcServer = SCMTestUtils.startScmRpcServer(conf,
-        new ScmTestMock(CLUSTER_ID), address, 10);
+    startScm();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
 
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
@@ -158,8 +169,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
   public void testDBOnDbVolume(boolean schemaV3Enabled) throws Exception {
     initTests(schemaV3Enabled);
     // start DN and SCM
-    scmRpcServer = SCMTestUtils.startScmRpcServer(conf,
-        new ScmTestMock(CLUSTER_ID), address, 10);
+    startScm();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     UpgradeTestHelper.addDbVolume(conf, tempFolder);
 
@@ -199,8 +209,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
       throws Exception {
     initTests(schemaV3Enabled);
     // start DN and SCM
-    scmRpcServer = SCMTestUtils.startScmRpcServer(conf,
-        new ScmTestMock(CLUSTER_ID), address, 10);
+    startScm();
     // add one HddsVolume
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
 
@@ -246,8 +255,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
   public void testFinalizeTwice(boolean schemaV3Enabled) throws Exception {
     initTests(schemaV3Enabled);
     // start DN and SCM
-    scmRpcServer = SCMTestUtils.startScmRpcServer(conf,
-        new ScmTestMock(CLUSTER_ID), address, 10);
+    startScm();
     // add one HddsVolume and two DbVolume
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     UpgradeTestHelper.addDbVolume(conf, tempFolder);
@@ -276,8 +284,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
       throws Exception {
     initTests(schemaV3Enabled);
     // start DN and SCM
-    scmRpcServer = SCMTestUtils.startScmRpcServer(conf,
-        new ScmTestMock(CLUSTER_ID), address, 10);
+    startScm();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
 
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
@@ -310,8 +317,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
   public void testAddDbVolumeAfterFinalize(boolean schemaV3Enabled)
       throws Exception {
     initTests(schemaV3Enabled);
-    scmRpcServer = SCMTestUtils.startScmRpcServer(conf,
-        new ScmTestMock(CLUSTER_ID), address, 10);
+    startScm();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
 
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
@@ -353,8 +359,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
       throws Exception {
     initTests(schemaV3Enabled);
     // start DN and SCM
-    scmRpcServer = SCMTestUtils.startScmRpcServer(conf,
-        new ScmTestMock(CLUSTER_ID), address, 10);
+    startScm();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
 
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
@@ -421,8 +426,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
   public void testWrite(boolean enable, String expectedVersion)
       throws Exception {
     // start DN and SCM
-    scmRpcServer = SCMTestUtils.startScmRpcServer(conf,
-        new ScmTestMock(CLUSTER_ID), address, 10);
+    startScm();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     // Disable Schema V3
     conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED, false);
@@ -472,8 +476,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
       throws Exception {
     initTests(schemaV3Enabled);
     // start DN and SCM
-    scmRpcServer = SCMTestUtils.startScmRpcServer(conf,
-        new ScmTestMock(CLUSTER_ID), address, 10);
+    startScm();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
         HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
@@ -514,8 +517,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
   public void testFinalizeFailure(boolean schemaV3Enabled) throws Exception {
     initTests(schemaV3Enabled);
     // start DN and SCM
-    scmRpcServer = SCMTestUtils.startScmRpcServer(conf,
-        new ScmTestMock(CLUSTER_ID), address, 10);
+    startScm();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     // Let HddsVolume be formatted to mimic the real cluster upgrade
     // Set layout version.

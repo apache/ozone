@@ -21,6 +21,8 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
 import java.util.Collections;
@@ -66,10 +68,21 @@ public class TestDatanodeUpgradeToContainerIdsTable {
   }
 
   private void setup() throws Exception {
-    address = SCMTestUtils.getReuseableAddress();
-    conf.setSocketAddr(ScmConfigKeys.OZONE_SCM_NAMES, address);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         tempFolder.toString());
+  }
+
+  /**
+   * Starts the mock SCM RPC server on an OS-assigned port (port 0) to avoid
+   * the TOCTOU race that causes intermittent BindException when a pre-reserved
+   * port is grabbed by another process between reservation and bind.
+   */
+  private void startScm() throws IOException {
+    scmRpcServer = SCMTestUtils.startScmRpcServer(conf,
+        new ScmTestMock(CLUSTER_ID),
+        new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 10);
+    address = scmRpcServer.getListenerAddress();
+    conf.setSocketAddr(ScmConfigKeys.OZONE_SCM_NAMES, address);
   }
 
   @AfterEach
@@ -87,7 +100,7 @@ public class TestDatanodeUpgradeToContainerIdsTable {
   public void testContainerTableAccessBeforeAndAfterUpgrade() throws Exception {
     initTests();
     // start DN and SCM
-    scmRpcServer = SCMTestUtils.startScmRpcServer(conf, new ScmTestMock(CLUSTER_ID), address, 10);
+    startScm();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
         HDDSLayoutFeature.HBASE_SUPPORT.layoutVersion());
@@ -123,7 +136,7 @@ public class TestDatanodeUpgradeToContainerIdsTable {
   public void testContainerTableFinalizeRetry() throws Exception {
     initTests();
     // start DN and SCM
-    scmRpcServer = SCMTestUtils.startScmRpcServer(conf, new ScmTestMock(CLUSTER_ID), address, 10);
+    startScm();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
         HDDSLayoutFeature.HBASE_SUPPORT.layoutVersion());
