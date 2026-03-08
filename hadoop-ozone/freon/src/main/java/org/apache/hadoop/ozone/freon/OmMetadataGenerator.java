@@ -61,6 +61,8 @@ import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolClientSideTrans
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRoleInfo;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.kohsuke.MetaInfServices;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
@@ -77,6 +79,8 @@ import picocli.CommandLine.Option;
 @MetaInfServices(FreonSubcommand.class)
 public class OmMetadataGenerator extends BaseFreonGenerator
     implements Callable<Void> {
+
+  private static final Logger LOG = LoggerFactory.getLogger(OmMetadataGenerator.class);
 
   @Option(names = {"-v", "--volume"},
       description = "Name of the volume which contains the test data. Will be"
@@ -201,9 +205,10 @@ public class OmMetadataGenerator extends BaseFreonGenerator
         if (enableFollowerAffinity) {
           // Point the client proxy to the followers in a round-robin fashion
           // This balances the read loads on the OM followers
-          changeInitialProxyForFollowerRead(ozoneClient,
-              followerOMNodeIds.get(currentFollowerAffinityIndex));
+          String followerNodeId = followerOMNodeIds.get(currentFollowerAffinityIndex);
+          changeInitialProxyForFollowerRead(ozoneClient, followerNodeId);
           currentFollowerAffinityIndex = (currentFollowerAffinityIndex + 1) % followerOMNodeIds.size();
+          LOG.debug("Connected OzoneClient-{} to OM follower {}", i + 1, followerNodeId);
         }
         ozoneClients[i] = ozoneClient;
       }
@@ -560,6 +565,9 @@ public class OmMetadataGenerator extends BaseFreonGenerator
       if (followerReadFailoverProxyProvider != null) {
         followerReadFailoverProxyProvider.changeInitialProxyForTest(omNodeId);
       }
+    } else {
+      throw new IllegalStateException("The current transport " + transport.getClass().getName() +
+          " does not support follower read, only Hadoop3OmTransport is supported");
     }
   }
 }
