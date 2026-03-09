@@ -49,6 +49,10 @@ import org.apache.hadoop.ozone.protocolPB.StorageContainerDatanodeProtocolServer
  * Test Endpoint class.
  */
 public final class SCMTestUtils {
+
+  /** Cluster ID shared by all tests that need a fixed, predictable value. */
+  public static final String CLUSTER_ID = "clusterID";
+
   /**
    * Never constructed.
    */
@@ -110,6 +114,36 @@ public final class SCMTestUtils {
 
     scmServer.start();
     return scmServer;
+  }
+
+  /**
+   * Starts a mock SCM RPC server bound to an OS-assigned port (port 0),
+   * updates {@code OZONE_SCM_NAMES} in {@code conf} with the actual address,
+   * and returns the running server. Eliminates the TOCTOU race of pre-reserving
+   * a port with {@link #getReuseableAddress()} and binding later.
+   *
+   * @param conf configuration to update with the actual bound address
+   * @param server protocol implementation to serve
+   * @return started RPC server; caller can retrieve the address via
+   *         {@code server.getListenerAddress()}
+   */
+  public static RPC.Server startScmRpcServer(OzoneConfiguration conf,
+      StorageContainerDatanodeProtocol server) throws IOException {
+    RPC.Server rpcServer = startScmRpcServer(conf, server,
+        new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 10);
+    conf.setSocketAddr(ScmConfigKeys.OZONE_SCM_NAMES,
+        rpcServer.getListenerAddress());
+    return rpcServer;
+  }
+
+  /**
+   * Convenience overload of {@link #startScmRpcServer(OzoneConfiguration,
+   * StorageContainerDatanodeProtocol)} using a {@link ScmTestMock} initialised
+   * with {@link #CLUSTER_ID}.
+   */
+  public static RPC.Server startScmRpcServer(OzoneConfiguration conf)
+      throws IOException {
+    return startScmRpcServer(conf, new ScmTestMock(CLUSTER_ID));
   }
 
   public static InetSocketAddress getReuseableAddress() throws IOException {
