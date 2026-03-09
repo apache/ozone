@@ -75,7 +75,6 @@ public class TestDatanodeUpgradeToSchemaV3 {
   private OzoneConfiguration conf;
 
   private RPC.Server scmRpcServer;
-  private InetSocketAddress address;
 
   private void initTests(Boolean enable) throws Exception {
     boolean schemaV3Enabled = enable;
@@ -118,7 +117,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     initTests(schemaV3Enabled);
     // start DN and SCM
     scmRpcServer = SCMTestUtils.startScmRpcServer(conf);
-    address = scmRpcServer.getListenerAddress();
+    InetSocketAddress address = scmRpcServer.getListenerAddress();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
 
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
@@ -155,7 +154,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     initTests(schemaV3Enabled);
     // start DN and SCM
     scmRpcServer = SCMTestUtils.startScmRpcServer(conf);
-    address = scmRpcServer.getListenerAddress();
+    InetSocketAddress address = scmRpcServer.getListenerAddress();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     UpgradeTestHelper.addDbVolume(conf, tempFolder);
 
@@ -196,7 +195,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     initTests(schemaV3Enabled);
     // start DN and SCM
     scmRpcServer = SCMTestUtils.startScmRpcServer(conf);
-    address = scmRpcServer.getListenerAddress();
+    InetSocketAddress address = scmRpcServer.getListenerAddress();
     // add one HddsVolume
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
 
@@ -243,7 +242,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     initTests(schemaV3Enabled);
     // start DN and SCM
     scmRpcServer = SCMTestUtils.startScmRpcServer(conf);
-    address = scmRpcServer.getListenerAddress();
+    InetSocketAddress address = scmRpcServer.getListenerAddress();
     // add one HddsVolume and two DbVolume
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     UpgradeTestHelper.addDbVolume(conf, tempFolder);
@@ -273,7 +272,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     initTests(schemaV3Enabled);
     // start DN and SCM
     scmRpcServer = SCMTestUtils.startScmRpcServer(conf);
-    address = scmRpcServer.getListenerAddress();
+    InetSocketAddress address = scmRpcServer.getListenerAddress();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
 
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
@@ -307,7 +306,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
       throws Exception {
     initTests(schemaV3Enabled);
     scmRpcServer = SCMTestUtils.startScmRpcServer(conf);
-    address = scmRpcServer.getListenerAddress();
+    InetSocketAddress address = scmRpcServer.getListenerAddress();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
 
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
@@ -350,7 +349,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     initTests(schemaV3Enabled);
     // start DN and SCM
     scmRpcServer = SCMTestUtils.startScmRpcServer(conf);
-    address = scmRpcServer.getListenerAddress();
+    InetSocketAddress address = scmRpcServer.getListenerAddress();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
 
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
@@ -418,7 +417,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
       throws Exception {
     // start DN and SCM
     scmRpcServer = SCMTestUtils.startScmRpcServer(conf);
-    address = scmRpcServer.getListenerAddress();
+    InetSocketAddress address = scmRpcServer.getListenerAddress();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     // Disable Schema V3
     conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED, false);
@@ -469,7 +468,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     initTests(schemaV3Enabled);
     // start DN and SCM
     scmRpcServer = SCMTestUtils.startScmRpcServer(conf);
-    address = scmRpcServer.getListenerAddress();
+    InetSocketAddress address = scmRpcServer.getListenerAddress();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
         HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
@@ -511,7 +510,7 @@ public class TestDatanodeUpgradeToSchemaV3 {
     initTests(schemaV3Enabled);
     // start DN and SCM
     scmRpcServer = SCMTestUtils.startScmRpcServer(conf);
-    address = scmRpcServer.getListenerAddress();
+    InetSocketAddress address = scmRpcServer.getListenerAddress();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     // Let HddsVolume be formatted to mimic the real cluster upgrade
     // Set layout version.

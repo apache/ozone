@@ -50,7 +50,6 @@ public class TestDatanodeUpgradeToHBaseSupport {
   private OzoneConfiguration conf;
 
   private RPC.Server scmRpcServer;
-  private InetSocketAddress address;
 
   private void initTests() throws Exception {
     conf = new OzoneConfiguration();
@@ -81,7 +80,7 @@ public class TestDatanodeUpgradeToHBaseSupport {
     initTests();
     // start DN and SCM
     scmRpcServer = SCMTestUtils.startScmRpcServer(conf);
-    address = scmRpcServer.getListenerAddress();
+    InetSocketAddress address = scmRpcServer.getListenerAddress();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
         HDDSLayoutFeature.HADOOP_PRC_PORTS_IN_DATANODEDETAILS.layoutVersion());
@@ -116,7 +115,7 @@ public class TestDatanodeUpgradeToHBaseSupport {
     initTests();
     // start DN and SCM
     scmRpcServer = SCMTestUtils.startScmRpcServer(conf);
-    address = scmRpcServer.getListenerAddress();
+    InetSocketAddress address = scmRpcServer.getListenerAddress();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
         HDDSLayoutFeature.HADOOP_PRC_PORTS_IN_DATANODEDETAILS.layoutVersion());
