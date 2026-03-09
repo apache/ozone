@@ -88,21 +88,13 @@ public class TestDatanodeStateMachine {
         true);
     conf.setBoolean(
         OzoneConfigKeys.HDDS_CONTAINER_RATIS_DATASTREAM_RANDOM_PORT, true);
-    List<String> serverAddresses = new ArrayList<>();
     scmServers = new ArrayList<>();
     mockServers = new ArrayList<>();
     for (int x = 0; x < SCM_SERVER_COUNT; x++) {
-      int port = SCMTestUtils.getReuseableAddress().getPort();
-      String address = "127.0.0.1";
-      serverAddresses.add(address + ":" + port);
       ScmTestMock mock = new ScmTestMock();
-      scmServers.add(SCMTestUtils.startScmRpcServer(conf, mock,
-          new InetSocketAddress(address, port), 10));
+      scmServers.add(SCMTestUtils.startScmRpcServer(conf, mock));
       mockServers.add(mock);
     }
-
-    conf.setStrings(ScmConfigKeys.OZONE_SCM_NAMES,
-        serverAddresses.toArray(new String[0]));
 
     executorService = HadoopExecutors.newCachedThreadPool(
         new ThreadFactoryBuilder().setDaemon(true)

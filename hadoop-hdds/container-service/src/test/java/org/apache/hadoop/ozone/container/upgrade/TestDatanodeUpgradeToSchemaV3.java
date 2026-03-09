@@ -30,7 +30,6 @@ import static org.mockito.Mockito.mock;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
 import java.util.Collections;
@@ -53,7 +52,6 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.ContainerTestUtils;
 import org.apache.hadoop.ozone.container.common.DatanodeLayoutStorage;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.apache.hadoop.ozone.container.common.ScmTestMock;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
@@ -75,7 +73,6 @@ public class TestDatanodeUpgradeToSchemaV3 {
 
   private DatanodeStateMachine dsm;
   private OzoneConfiguration conf;
-  private static final String CLUSTER_ID = "clusterID";
 
   private RPC.Server scmRpcServer;
   private InetSocketAddress address;
@@ -99,19 +96,6 @@ public class TestDatanodeUpgradeToSchemaV3 {
         tempFolder.resolve("meta").toString());
   }
 
-  /**
-   * Starts the mock SCM RPC server on an OS-assigned port (port 0) to avoid
-   * the TOCTOU race that causes intermittent BindException when a pre-reserved
-   * port is grabbed by another process between reservation and bind.
-   */
-  private void startScm() throws IOException {
-    scmRpcServer = SCMTestUtils.startScmRpcServer(conf,
-        new ScmTestMock(CLUSTER_ID),
-        new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 10);
-    address = scmRpcServer.getListenerAddress();
-    conf.setSocketAddr(ScmConfigKeys.OZONE_SCM_NAMES, address);
-  }
-
   @AfterEach
   public void teardown() throws Exception {
     if (scmRpcServer != null) {
@@ -133,7 +117,8 @@ public class TestDatanodeUpgradeToSchemaV3 {
   public void testDBOnHddsVolume(boolean schemaV3Enabled) throws Exception {
     initTests(schemaV3Enabled);
     // start DN and SCM
-    startScm();
+    scmRpcServer = SCMTestUtils.startScmRpcServer(conf);
+    address = scmRpcServer.getListenerAddress();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
 
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
@@ -169,7 +154,8 @@ public class TestDatanodeUpgradeToSchemaV3 {
   public void testDBOnDbVolume(boolean schemaV3Enabled) throws Exception {
     initTests(schemaV3Enabled);
     // start DN and SCM
-    startScm();
+    scmRpcServer = SCMTestUtils.startScmRpcServer(conf);
+    address = scmRpcServer.getListenerAddress();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     UpgradeTestHelper.addDbVolume(conf, tempFolder);
 
@@ -209,7 +195,8 @@ public class TestDatanodeUpgradeToSchemaV3 {
       throws Exception {
     initTests(schemaV3Enabled);
     // start DN and SCM
-    startScm();
+    scmRpcServer = SCMTestUtils.startScmRpcServer(conf);
+    address = scmRpcServer.getListenerAddress();
     // add one HddsVolume
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
 
@@ -223,8 +210,8 @@ public class TestDatanodeUpgradeToSchemaV3 {
     HddsVolume dataVolume = (
         HddsVolume) dsm.getContainer().getVolumeSet().getVolumesList().get(0);
     // Format HddsVolume to mimic the real cluster upgrade situation
-    dataVolume.format(CLUSTER_ID);
-    File idDir = new File(dataVolume.getStorageDir(), CLUSTER_ID);
+    dataVolume.format(SCMTestUtils.CLUSTER_ID);
+    File idDir = new File(dataVolume.getStorageDir(), SCMTestUtils.CLUSTER_ID);
     if (!idDir.mkdir()) {
       fail("Failed to create id directory");
     }
@@ -255,7 +242,8 @@ public class TestDatanodeUpgradeToSchemaV3 {
   public void testFinalizeTwice(boolean schemaV3Enabled) throws Exception {
     initTests(schemaV3Enabled);
     // start DN and SCM
-    startScm();
+    scmRpcServer = SCMTestUtils.startScmRpcServer(conf);
+    address = scmRpcServer.getListenerAddress();
     // add one HddsVolume and two DbVolume
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     UpgradeTestHelper.addDbVolume(conf, tempFolder);
@@ -284,7 +272,8 @@ public class TestDatanodeUpgradeToSchemaV3 {
       throws Exception {
     initTests(schemaV3Enabled);
     // start DN and SCM
-    startScm();
+    scmRpcServer = SCMTestUtils.startScmRpcServer(conf);
+    address = scmRpcServer.getListenerAddress();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
 
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
@@ -317,7 +306,8 @@ public class TestDatanodeUpgradeToSchemaV3 {
   public void testAddDbVolumeAfterFinalize(boolean schemaV3Enabled)
       throws Exception {
     initTests(schemaV3Enabled);
-    startScm();
+    scmRpcServer = SCMTestUtils.startScmRpcServer(conf);
+    address = scmRpcServer.getListenerAddress();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
 
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
@@ -359,7 +349,8 @@ public class TestDatanodeUpgradeToSchemaV3 {
       throws Exception {
     initTests(schemaV3Enabled);
     // start DN and SCM
-    startScm();
+    scmRpcServer = SCMTestUtils.startScmRpcServer(conf);
+    address = scmRpcServer.getListenerAddress();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
 
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
@@ -426,7 +417,8 @@ public class TestDatanodeUpgradeToSchemaV3 {
   public void testWrite(boolean enable, String expectedVersion)
       throws Exception {
     // start DN and SCM
-    startScm();
+    scmRpcServer = SCMTestUtils.startScmRpcServer(conf);
+    address = scmRpcServer.getListenerAddress();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     // Disable Schema V3
     conf.setBoolean(DatanodeConfiguration.CONTAINER_SCHEMA_V3_ENABLED, false);
@@ -476,7 +468,8 @@ public class TestDatanodeUpgradeToSchemaV3 {
       throws Exception {
     initTests(schemaV3Enabled);
     // start DN and SCM
-    startScm();
+    scmRpcServer = SCMTestUtils.startScmRpcServer(conf);
+    address = scmRpcServer.getListenerAddress();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
         HDDSLayoutFeature.ERASURE_CODED_STORAGE_SUPPORT.layoutVersion());
@@ -517,7 +510,8 @@ public class TestDatanodeUpgradeToSchemaV3 {
   public void testFinalizeFailure(boolean schemaV3Enabled) throws Exception {
     initTests(schemaV3Enabled);
     // start DN and SCM
-    startScm();
+    scmRpcServer = SCMTestUtils.startScmRpcServer(conf);
+    address = scmRpcServer.getListenerAddress();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     // Let HddsVolume be formatted to mimic the real cluster upgrade
     // Set layout version.
@@ -530,8 +524,8 @@ public class TestDatanodeUpgradeToSchemaV3 {
     HddsVolume dataVolume = (
         HddsVolume) dsm.getContainer().getVolumeSet().getVolumesList().get(0);
     // Format HddsVolume to mimic the real cluster upgrade situation
-    dataVolume.format(CLUSTER_ID);
-    File idDir = new File(dataVolume.getStorageDir(), CLUSTER_ID);
+    dataVolume.format(SCMTestUtils.CLUSTER_ID);
+    File idDir = new File(dataVolume.getStorageDir(), SCMTestUtils.CLUSTER_ID);
     if (!idDir.mkdir()) {
       fail("Failed to create id directory");
     }

@@ -21,8 +21,6 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.IOException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.file.Path;
 import java.util.Collections;
@@ -35,7 +33,6 @@ import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.apache.hadoop.ozone.container.common.ScmTestMock;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
@@ -52,7 +49,6 @@ public class TestDatanodeUpgradeToHBaseSupport {
 
   private DatanodeStateMachine dsm;
   private OzoneConfiguration conf;
-  private static final String CLUSTER_ID = "clusterID";
 
   private RPC.Server scmRpcServer;
   private InetSocketAddress address;
@@ -65,19 +61,6 @@ public class TestDatanodeUpgradeToHBaseSupport {
   private void setup() throws Exception {
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         tempFolder.toString());
-  }
-
-  /**
-   * Starts the mock SCM RPC server on an OS-assigned port (port 0) to avoid
-   * the TOCTOU race that causes intermittent BindException when a pre-reserved
-   * port is grabbed by another process between reservation and bind.
-   */
-  private void startScm() throws IOException {
-    scmRpcServer = SCMTestUtils.startScmRpcServer(conf,
-        new ScmTestMock(CLUSTER_ID),
-        new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 10);
-    address = scmRpcServer.getListenerAddress();
-    conf.setSocketAddr(ScmConfigKeys.OZONE_SCM_NAMES, address);
   }
 
   @AfterEach
@@ -98,7 +81,8 @@ public class TestDatanodeUpgradeToHBaseSupport {
   public void testIncrementalChunkListBeforeAndAfterUpgrade() throws Exception {
     initTests();
     // start DN and SCM
-    startScm();
+    scmRpcServer = SCMTestUtils.startScmRpcServer(conf);
+    address = scmRpcServer.getListenerAddress();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
         HDDSLayoutFeature.HADOOP_PRC_PORTS_IN_DATANODEDETAILS.layoutVersion());
@@ -132,7 +116,8 @@ public class TestDatanodeUpgradeToHBaseSupport {
   public void testBlockFinalizationBeforeAndAfterUpgrade() throws Exception {
     initTests();
     // start DN and SCM
-    startScm();
+    scmRpcServer = SCMTestUtils.startScmRpcServer(conf);
+    address = scmRpcServer.getListenerAddress();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
         HDDSLayoutFeature.HADOOP_PRC_PORTS_IN_DATANODEDETAILS.layoutVersion());
