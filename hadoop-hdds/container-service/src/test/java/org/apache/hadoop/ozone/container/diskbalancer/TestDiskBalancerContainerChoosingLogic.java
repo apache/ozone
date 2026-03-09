@@ -51,8 +51,8 @@ import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultVolumeContainerChoosingPolicy;
-import org.apache.hadoop.ozone.container.diskbalancer.policy.DiskBalancerVolumeContainerCandidate;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerCandidate;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
@@ -74,7 +74,7 @@ public class TestDiskBalancerContainerChoosingLogic {
   private static final long VOLUME_CAPACITY = 2500L * MB; // 2500MB
   private static final double THRESHOLD = 10.0;
 
-  private DefaultVolumeContainerChoosingPolicy policy;
+  private DefaultContainerChoosingPolicy policy;
   private OzoneContainer ozoneContainer;
   private MutableVolumeSet volumeSet;
   private ContainerSet containerSet;
@@ -85,7 +85,7 @@ public class TestDiskBalancerContainerChoosingLogic {
 
   @BeforeEach
   public void setup() throws Exception {
-    policy = new DefaultVolumeContainerChoosingPolicy(new ReentrantLock());
+    policy = new DefaultContainerChoosingPolicy(new ReentrantLock());
     setupVolumesAndContainer();
     inProgressContainerIDs = new HashSet<>();
     deltaMap = new HashMap<>();
@@ -174,7 +174,7 @@ public class TestDiskBalancerContainerChoosingLogic {
     // - C1 (500MB) is productive: (250+500)/2500 = 30% <= 56.67%
     // The policy iterates by container ID, so it will find and return C1.
 
-    DiskBalancerVolumeContainerCandidate candidate = policy.chooseVolumesAndContainer(ozoneContainer,
+    ContainerCandidate candidate = policy.chooseVolumesAndContainer(ozoneContainer,
         volumeSet, deltaMap, inProgressContainerIDs, THRESHOLD);
 
     // first contianer should be chosen
@@ -195,7 +195,7 @@ public class TestDiskBalancerContainerChoosingLogic {
     inProgressContainerIDs.add(ContainerID.valueOf(3L)); // 200MB
     inProgressContainerIDs.add(ContainerID.valueOf(4L)); // 350MB
     
-    DiskBalancerVolumeContainerCandidate candidate = policy.chooseVolumesAndContainer(ozoneContainer,
+    ContainerCandidate candidate = policy.chooseVolumesAndContainer(ozoneContainer,
         volumeSet, deltaMap, inProgressContainerIDs, THRESHOLD);
 
     assertNull(candidate);
@@ -224,7 +224,7 @@ public class TestDiskBalancerContainerChoosingLogic {
     when(testOzoneContainer.getContainerSet()).thenReturn(testContainerSet);
     
     // The policy should skip containers 10 and 11 (size 0) and choose container 12
-    DiskBalancerVolumeContainerCandidate candidate = policy.chooseVolumesAndContainer(testOzoneContainer,
+    ContainerCandidate candidate = policy.chooseVolumesAndContainer(testOzoneContainer,
         volumeSet, deltaMap, inProgressContainerIDs, THRESHOLD);
 
     // Container 12 (non-zero size) should be chosen, skipping containers 10 and 11 (size 0)

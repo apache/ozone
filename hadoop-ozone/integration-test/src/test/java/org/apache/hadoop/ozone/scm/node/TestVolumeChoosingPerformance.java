@@ -58,9 +58,9 @@ import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
-import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultVolumeContainerChoosingPolicy;
-import org.apache.hadoop.ozone.container.diskbalancer.policy.DiskBalancerVolumeContainerCandidate;
-import org.apache.hadoop.ozone.container.diskbalancer.policy.VolumeContainerChoosingPolicy;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerCandidate;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
@@ -88,7 +88,7 @@ public class TestVolumeChoosingPerformance {
 
   private MutableVolumeSet volumeSet;
   private List<HddsVolume> hddsVolumes;
-  private VolumeContainerChoosingPolicy volumeContainerChoosingPolicy;
+  private ContainerChoosingPolicy volumeContainerChoosingPolicy;
   private OzoneContainer ozoneContainer;
   private ExecutorService executor;
 
@@ -102,7 +102,7 @@ public class TestVolumeChoosingPerformance {
     hddsVolumes = new ArrayList<>();
     createVolumes();
     createContainers();
-    volumeContainerChoosingPolicy = new DefaultVolumeContainerChoosingPolicy(new ReentrantLock());
+    volumeContainerChoosingPolicy = new DefaultContainerChoosingPolicy(new ReentrantLock());
     executor = Executors.newFixedThreadPool(NUM_THREADS);
   }
 
@@ -152,7 +152,7 @@ public class TestVolumeChoosingPerformance {
    * pairChosenCount: Number of successful container/volume choices from the policy.
    * FailureCount: Failures due to any exceptions thrown during choice or null return.
    */
-  private void testPolicyPerformance(String policyName, VolumeContainerChoosingPolicy policy) throws Exception {
+  private void testPolicyPerformance(String policyName, ContainerChoosingPolicy policy) throws Exception {
     CountDownLatch latch = new CountDownLatch(NUM_THREADS);
     AtomicInteger pairChosenCount = new AtomicInteger(0);
     AtomicInteger pairNotChosenCount = new AtomicInteger(0);
@@ -193,7 +193,7 @@ public class TestVolumeChoosingPerformance {
 
             long threadStart = System.nanoTime();
             try {
-              DiskBalancerVolumeContainerCandidate candidate = policy.chooseVolumesAndContainer(ozoneContainer,
+              ContainerCandidate candidate = policy.chooseVolumesAndContainer(ozoneContainer,
                   volumeSet, deltaSizes, inProgressContainerIDs, THRESHOLD);
 
               if (candidate == null) {

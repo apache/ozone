@@ -65,7 +65,7 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.VolumeFixedUsage;
-import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultVolumeContainerChoosingPolicy;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
@@ -97,7 +97,7 @@ public class TestContainerChoosingPerformance {
   private List<HddsVolume> volumes;
   private ContainerSet containerSet;
   private OzoneContainer ozoneContainer;
-  private DefaultVolumeContainerChoosingPolicy volumeContainerChoosingPolicy;
+  private DefaultContainerChoosingPolicy volumeContainerChoosingPolicy;
   private ExecutorService executor;
   private MutableVolumeSet volumeSet;
 
@@ -115,7 +115,7 @@ public class TestContainerChoosingPerformance {
     ContainerController containerController = new ContainerController(containerSet, null);
     when(ozoneContainer.getController()).thenReturn(containerController);
     when(ozoneContainer.getContainerSet()).thenReturn(containerSet);
-    volumeContainerChoosingPolicy = new DefaultVolumeContainerChoosingPolicy(new ReentrantLock());
+    volumeContainerChoosingPolicy = new DefaultContainerChoosingPolicy(new ReentrantLock());
     executor = Executors.newFixedThreadPool(NUM_THREADS);
 
     // Create a spied MutableVolumeSet and inject the test volumes

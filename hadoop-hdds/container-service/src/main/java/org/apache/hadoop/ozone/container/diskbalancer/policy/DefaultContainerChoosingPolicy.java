@@ -51,9 +51,9 @@ import org.slf4j.LoggerFactory;
  * exceeding the upper threshold. Space is reserved on the destination only when a container is
  * chosen, using the actual container size.
  */
-public class DefaultVolumeContainerChoosingPolicy implements VolumeContainerChoosingPolicy {
+public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
   public static final Logger LOG = LoggerFactory.getLogger(
-      DefaultVolumeContainerChoosingPolicy.class);
+      DefaultContainerChoosingPolicy.class);
 
   private static final ThreadLocal<Cache<HddsVolume, Iterator<Container<?>>>> CACHE =
       ThreadLocal.withInitial(
@@ -64,12 +64,12 @@ public class DefaultVolumeContainerChoosingPolicy implements VolumeContainerChoo
 
   private final ReentrantLock lock;
 
-  public DefaultVolumeContainerChoosingPolicy(ReentrantLock globalLock) {
+  public DefaultContainerChoosingPolicy(ReentrantLock globalLock) {
     this.lock = globalLock;
   }
 
   @Override
-  public DiskBalancerVolumeContainerCandidate chooseVolumesAndContainer(OzoneContainer ozoneContainer,
+  public ContainerCandidate chooseVolumesAndContainer(OzoneContainer ozoneContainer,
       MutableVolumeSet volumeSet, Map<HddsVolume, Long> deltaMap, Set<ContainerID> inProgressContainerIDs,
       double thresholdPercentage) {
     lock.lock();
@@ -130,7 +130,7 @@ public class DefaultVolumeContainerChoosingPolicy implements VolumeContainerChoo
                     + "destination={} (utilization={})",
                 src.getStorageID(), srcUsage.getUtilization(),
                 dst.getStorageID(), dstUsage.getUtilization());
-            return new DiskBalancerVolumeContainerCandidate(containerData, src, dst);
+            return new ContainerCandidate(containerData, src, dst);
           }
           LOG.debug("No suitable container found for destination {}, trying next volume.",
               dst.getStorageID());

@@ -71,7 +71,7 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
-import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultVolumeContainerChoosingPolicy;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
@@ -266,7 +266,7 @@ public class TestDiskBalancerTask {
     kvFaultInjector.reset();
     KeyValueContainer.setInjector(null);
     DiskBalancerService.setInjector(null);
-    DefaultVolumeContainerChoosingPolicy.setTest(false);
+    DefaultContainerChoosingPolicy.setTest(false);
   }
 
   @ParameterizedTest
@@ -290,7 +290,7 @@ public class TestDiskBalancerTask {
 
     String oldContainerPath = container.getContainerData().getContainerPath();
     if (containerState == State.QUASI_CLOSED) {
-      DefaultVolumeContainerChoosingPolicy.setTest(true);
+      DefaultContainerChoosingPolicy.setTest(true);
     }
     DiskBalancerService.DiskBalancerTask task = getTask();
     task.call();
@@ -459,7 +459,7 @@ public class TestDiskBalancerTask {
         .when(spyContainerSet).updateContainer(any(Container.class));
     when(ozoneContainer.getContainerSet()).thenReturn(spyContainerSet);
 
-    DefaultVolumeContainerChoosingPolicy.setTest(true);
+    DefaultContainerChoosingPolicy.setTest(true);
     DiskBalancerService.DiskBalancerTask task = getTask();
     CompletableFuture completableFuture = CompletableFuture.runAsync(() -> task.call());
 

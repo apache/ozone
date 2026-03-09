@@ -29,7 +29,7 @@ import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
  * It provides consolidated volume selection (source/destination pair) and container selection
  * into a single operation to avoid recalculating ideal utilization and disk usage.
  */
-public interface VolumeContainerChoosingPolicy {
+public interface ContainerChoosingPolicy {
   /**
    * Choose a container and its source/destination volumes for balancing.
    * Performs both volume pair selection and container selection in one call,
@@ -44,7 +44,7 @@ public interface VolumeContainerChoosingPolicy {
    * @param thresholdPercentage the threshold percentage in range (0, 100)
    * @return a DiskBalancerVolumeContainerCandidate with container and volumes, or null if none found
    */
-  DiskBalancerVolumeContainerCandidate chooseVolumesAndContainer(OzoneContainer ozoneContainer,
+  ContainerCandidate chooseVolumesAndContainer(OzoneContainer ozoneContainer,
       MutableVolumeSet volumeSet,
       Map<HddsVolume, Long> deltaMap,
       Set<ContainerID> inProgressContainerIDs,

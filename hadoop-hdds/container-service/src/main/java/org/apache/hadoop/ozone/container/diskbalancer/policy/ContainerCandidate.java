@@ -24,12 +24,12 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
  * Result of consolidated volume and container selection for disk balancing.
  * Contains the container to move and its source and destination volumes.
  */
-public final class DiskBalancerVolumeContainerCandidate {
+public final class ContainerCandidate {
   private final ContainerData containerData;
   private final HddsVolume sourceVolume;
   private final HddsVolume destVolume;
 
-  public DiskBalancerVolumeContainerCandidate(ContainerData containerData,
+  public ContainerCandidate(ContainerData containerData,
       HddsVolume sourceVolume, HddsVolume destVolume) {
     this.containerData = containerData;
     this.sourceVolume = sourceVolume;

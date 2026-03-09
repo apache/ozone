@@ -54,9 +54,9 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeSet;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.VolumeFixedUsage;
-import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultVolumeContainerChoosingPolicy;
-import org.apache.hadoop.ozone.container.diskbalancer.policy.DiskBalancerVolumeContainerCandidate;
-import org.apache.hadoop.ozone.container.diskbalancer.policy.VolumeContainerChoosingPolicy;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerCandidate;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
@@ -208,7 +208,7 @@ public class TestDiskBalancerService {
         getDiskBalancerService(containerSet, conf, keyValueHandler, null, 1);
 
     assertTrue(svc.getVolumeContainerChoosingPolicy()
-        instanceof DefaultVolumeContainerChoosingPolicy);
+        instanceof DefaultContainerChoosingPolicy);
   }
 
   private String generateVolumeLocation(String base, int volumeCount) {
@@ -316,7 +316,7 @@ public class TestDiskBalancerService {
         false, DiskBalancerVersion.DEFAULT_VERSION);
     svc.refresh(info);
 
-    VolumeContainerChoosingPolicy containerPolicy = mock(VolumeContainerChoosingPolicy.class);
+    ContainerChoosingPolicy containerPolicy = mock(ContainerChoosingPolicy.class);
     svc.setVolumeContainerChoosingPolicy(containerPolicy);
 
     List<StorageVolume> volumes = volumeSet.getVolumesList();
@@ -329,7 +329,7 @@ public class TestDiskBalancerService {
     when(containerData.getBytesUsed()).thenReturn(100L);
 
     when(containerPolicy.chooseVolumesAndContainer(any(), any(), any(), any(), anyDouble()))
-        .thenReturn(new DiskBalancerVolumeContainerCandidate(containerData, source, dest));
+        .thenReturn(new ContainerCandidate(containerData, source, dest));
 
     // Test when no tasks are in progress, it should schedule up to the limit
     BackgroundTaskQueue queue = svc.getTasks();

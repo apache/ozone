@@ -57,9 +57,9 @@ import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.VolumeFixedUsage;
-import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultVolumeContainerChoosingPolicy;
-import org.apache.hadoop.ozone.container.diskbalancer.policy.DiskBalancerVolumeContainerCandidate;
-import org.apache.hadoop.ozone.container.diskbalancer.policy.VolumeContainerChoosingPolicy;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerCandidate;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
@@ -82,7 +82,7 @@ public class TestDiskBalancerVolumeChoosingLogic {
   private static final long MB = 1024L * 1024L;
   private static final long VOLUME_CAPACITY = 2500L * MB; // 2500MB - same for all volumes
   private static final long DEFAULT_CONTAINER_SIZE = 100L * MB; // 100MB
-  private VolumeContainerChoosingPolicy policy;
+  private ContainerChoosingPolicy policy;
   private MutableVolumeSet volumeSet;
   private String datanodeUuid;
   private Map<HddsVolume, Long> deltaMap;
@@ -93,7 +93,7 @@ public class TestDiskBalancerVolumeChoosingLogic {
   @BeforeEach
   public void setup() {
     datanodeUuid = UUID.randomUUID().toString();
-    policy = new DefaultVolumeContainerChoosingPolicy(new ReentrantLock());
+    policy = new DefaultContainerChoosingPolicy(new ReentrantLock());
     deltaMap = new HashMap<>();
     inProgressContainerIDs = new HashSet<>();
   }
@@ -327,7 +327,7 @@ public class TestDiskBalancerVolumeChoosingLogic {
     // Get volume usages for verification
     List<VolumeFixedUsage> volumeUsages = getVolumeUsages(volumeSet, deltaMap);
 
-    DiskBalancerVolumeContainerCandidate result = policy.chooseVolumesAndContainer(ozoneContainer,
+    ContainerCandidate result = policy.chooseVolumesAndContainer(ozoneContainer,
         volumeSet, deltaMap, inProgressContainerIDs, scenario.getThresholdPercentage());
 
     if (scenario.shouldFindPair()) {
