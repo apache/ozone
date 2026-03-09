@@ -357,6 +357,17 @@ public class OzoneBucket extends WithMetadata {
   }
 
   /**
+   * Sets/Changes the storage policy of the bucket.
+   * @param newStoragePolicy Storage policy to be set
+   * @throws IOException
+   */
+  public void setStoragePolicy(OzoneStoragePolicy newStoragePolicy)
+      throws IOException {
+    proxy.setBucketStoragePolicy(volumeName, name, newStoragePolicy);
+    storagePolicy = newStoragePolicy;
+  }
+
+  /**
    * Enable/Disable versioning of the bucket.
    * @param newVersioning
    * @throws IOException

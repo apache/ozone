@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.shell.bucket;
 
 import java.io.IOException;
+import org.apache.hadoop.hdds.protocol.OzoneStoragePolicy;
 import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.shell.OzoneAddress;
@@ -35,6 +36,10 @@ public class UpdateBucketHandler extends BucketHandler {
       description = "Owner of the bucket to set")
   private String ownerName;
 
+  @Option(names = {"--storage-policy"},
+      description = "Storage policy (HOT, WARM)")
+  private String storagePolicy;
+
   @Override
   protected void execute(OzoneClient client, OzoneAddress address)
       throws IOException {
@@ -50,6 +55,10 @@ public class UpdateBucketHandler extends BucketHandler {
         out().format("Bucket '%s' owner is already '%s'. Unchanged.%n",
             volumeName + "/" + bucketName, ownerName);
       }
+    }
+
+    if (storagePolicy != null && !storagePolicy.isEmpty()) {
+      bucket.setStoragePolicy(OzoneStoragePolicy.fromString(storagePolicy));
     }
 
     OzoneBucket updatedBucket = client.getObjectStore().getVolume(volumeName)

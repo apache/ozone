@@ -27,6 +27,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -275,6 +276,16 @@ public interface ClientProtocol {
   void setBucketStorageType(String volumeName, String bucketName,
                             StorageType storageType)
       throws IOException;
+
+  /**
+   * Sets the Storage Policy of a Bucket.
+   * @param volumeName Name of the Volume
+   * @param bucketName Name of the Bucket
+   * @param storagePolicy OzoneStoragePolicy to be set
+   * @throws IOException
+   */
+  void setBucketStoragePolicy(String volumeName, String bucketName,
+      OzoneStoragePolicy storagePolicy) throws IOException;
 
   /**
    * Deletes a bucket if it is empty.

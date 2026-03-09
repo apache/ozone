@@ -21,6 +21,7 @@ import com.google.common.base.Strings;
 import java.io.IOException;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.client.OzoneQuota;
+import org.apache.hadoop.hdds.protocol.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.client.BucketArgs;
@@ -67,6 +68,10 @@ public class CreateBucketHandler extends BucketHandler {
 
   @CommandLine.Mixin
   private SetSpaceQuotaOptions quotaOptions;
+
+  @Option(names = {"--storage-policy"},
+      description = "Storage policy (HOT, WARM)")
+  private String storagePolicy;
 
   /**
    * Executes create bucket.
@@ -116,6 +121,11 @@ public class CreateBucketHandler extends BucketHandler {
       bb.setQuotaInNamespace(OzoneQuota.parseNameSpaceQuota(
           quotaOptions.getQuotaInNamespace()).getQuotaInNamespace());
     }
+
+    if (storagePolicy != null) {
+      bb.setStoragePolicy(OzoneStoragePolicy.fromString(storagePolicy));
+    }
+
     String volumeName = address.getVolumeName();
     String bucketName = address.getBucketName();
 

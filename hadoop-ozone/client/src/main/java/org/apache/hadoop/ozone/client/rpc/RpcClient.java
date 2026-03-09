@@ -76,6 +76,7 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
@@ -1199,6 +1200,19 @@ public class RpcClient implements ClientProtocol {
     builder.setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setStorageType(storageType);
+    ozoneManagerClient.setBucketProperty(builder.build());
+  }
+
+  @Override
+  public void setBucketStoragePolicy(String volumeName, String bucketName,
+      OzoneStoragePolicy storagePolicy) throws IOException {
+    verifyVolumeName(volumeName);
+    verifyBucketName(bucketName);
+    Objects.requireNonNull(storagePolicy, "storagePolicy == null");
+    OmBucketArgs.Builder builder = OmBucketArgs.newBuilder();
+    builder.setVolumeName(volumeName)
+        .setBucketName(bucketName)
+        .setStoragePolicy(storagePolicy);
     ozoneManagerClient.setBucketProperty(builder.build());
   }
 

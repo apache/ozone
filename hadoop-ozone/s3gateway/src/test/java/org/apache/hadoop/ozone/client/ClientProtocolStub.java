@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.OzoneStoragePolicy;
 import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.OzoneAcl;
@@ -182,6 +183,12 @@ public class ClientProtocolStub implements ClientProtocol {
   @Override
   public void setBucketStorageType(String volumeName, String bucketName,
                                    StorageType storageType) throws IOException {
+
+  }
+
+  @Override
+  public void setBucketStoragePolicy(String volumeName, String bucketName,
+      OzoneStoragePolicy storagePolicy) throws IOException {
 
   }
 
