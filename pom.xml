@@ -1308,6 +1308,11 @@
       </dependency>
       <dependency>
         <groupId>org.apache.ozone</groupId>
+        <artifactId>ozone-vapor</artifactId>
+        <version>${ozone.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.ozone</groupId>
         <artifactId>rocksdb-checkpoint-differ</artifactId>
         <version>${hdds.version}</version>
       </dependency>

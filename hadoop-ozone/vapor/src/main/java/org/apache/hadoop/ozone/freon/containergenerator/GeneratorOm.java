@@ -37,7 +37,7 @@ import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneAcl;
-import org.apache.hadoop.ozone.freon.FreonSubcommand;
+import org.apache.hadoop.ozone.freon.VaporSubcommand;
 import org.apache.hadoop.ozone.om.OMStorage;
 import org.apache.hadoop.ozone.om.codec.OMDBDefinition;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
@@ -61,7 +61,7 @@ import picocli.CommandLine.Option;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
-@MetaInfServices(FreonSubcommand.class)
+@MetaInfServices(VaporSubcommand.class)
 public class GeneratorOm extends BaseGenerator implements
     Callable<Void> {
 

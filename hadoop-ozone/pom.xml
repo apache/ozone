@@ -53,6 +53,7 @@
     <module>s3-secret-store</module>
     <module>s3gateway</module>
     <module>tools</module>
+    <module>vapor</module>
   </modules>
 
   <properties>

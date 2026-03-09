@@ -60,10 +60,10 @@ import picocli.CommandLine.Option;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
-@MetaInfServices(FreonSubcommand.class)
+@MetaInfServices(VaporSubcommand.class)
 @SuppressWarnings("java:S2245") // no need for secure random
 public class ChunkManagerDiskWrite extends BaseFreonGenerator implements
-    Callable<Void> {
+    Callable<Void>, VaporSubcommand {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ChunkManagerDiskWrite.class);

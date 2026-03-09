@@ -45,9 +45,9 @@ import picocli.CommandLine;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
-@MetaInfServices(FreonSubcommand.class)
+@MetaInfServices(VaporSubcommand.class)
 public class StreamingGenerator extends BaseFreonGenerator
-    implements Callable<Void> {
+    implements Callable<Void>, VaporSubcommand {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(StreamingGenerator.class);
