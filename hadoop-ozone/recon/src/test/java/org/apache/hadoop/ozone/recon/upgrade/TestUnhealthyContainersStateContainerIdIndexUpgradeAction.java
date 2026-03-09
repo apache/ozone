@@ -19,10 +19,10 @@ package org.apache.hadoop.ozone.recon.upgrade;
 
 import static org.apache.ozone.recon.schema.ContainerSchemaDefinition.UNHEALTHY_CONTAINERS_TABLE_NAME;
 import static org.apache.ozone.recon.schema.SqlDbUtils.TABLE_EXISTS_CHECK;
+import static org.jooq.impl.DSL.name;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.jooq.impl.DSL.name;
 
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
