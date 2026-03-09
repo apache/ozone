@@ -144,7 +144,7 @@ public class DiskBalancerService extends BackgroundService {
     volumeSet = ozoneContainer.getVolumeSet();
 
     try {
-      volumeContainerChoosingPolicy = ContainerChoosingPolicyFactory.getPolicy(conf);
+      volumeContainerChoosingPolicy = ContainerChoosingPolicyFactory.getDiskBalancerPolicy(conf);
     } catch (Exception e) {
       LOG.error("Got exception when initializing DiskBalancerService", e);
       throw new IOException(e);

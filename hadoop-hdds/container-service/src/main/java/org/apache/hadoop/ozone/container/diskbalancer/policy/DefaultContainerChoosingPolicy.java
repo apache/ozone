@@ -147,13 +147,9 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
   }
 
   /**
-   * Choose a container from source volume that can be moved to destination
-   * without exceeding the upper threshold. Checks both space and utilization.
-   * <p>
-   * This method is public to allow direct testing of container selection logic
-   * in integration tests without requiring full volume selection setup.
+   * Choose a container from source volume that can be moved to destination volume.
    */
-  public ContainerData chooseContainer(OzoneContainer ozoneContainer,
+  private ContainerData chooseContainer(OzoneContainer ozoneContainer,
       HddsVolume src, HddsVolume dst, VolumeFixedUsage dstUsage,
       Set<ContainerID> inProgressContainerIDs, double upperThreshold) {
     final Iterator<Container<?>> itr;

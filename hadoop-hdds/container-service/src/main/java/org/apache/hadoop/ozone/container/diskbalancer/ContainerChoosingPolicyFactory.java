@@ -47,7 +47,7 @@ public final class ContainerChoosingPolicyFactory {
    * @param conf the configuration source
    * @return a configured ContainerChoosingPolicy instance
    */
-  public static ContainerChoosingPolicy getPolicy(ConfigurationSource conf) {
+  public static ContainerChoosingPolicy getDiskBalancerPolicy(ConfigurationSource conf) {
     Class<? extends ContainerChoosingPolicy> policyClass = conf.getClass(
         HDDS_DATANODE_DISKBALANCER_CONTAINER_CHOOSING_POLICY,
         DEFAULT_CONTAINER_CHOOSING_POLICY, ContainerChoosingPolicy.class);
