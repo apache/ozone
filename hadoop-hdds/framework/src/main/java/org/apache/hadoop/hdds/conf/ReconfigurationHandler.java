@@ -186,9 +186,7 @@ public class ReconfigurationHandler extends ReconfigurableBase
   @Override
   public List<String> listReconfigureProperties() throws IOException {
     requireAdminPrivilege.accept("listReconfigurableProperties");
-    Set<String> reconfigureProperties = new TreeSet<>(getReconfigurableProperties());
-    reconfigureProperties.addAll(prefixProperties);
-    return new ArrayList<>(reconfigureProperties);
+    return new ArrayList<>(new TreeSet<>(getReconfigurableProperties()));
   }
 
   @Override
