@@ -248,14 +248,14 @@ public final class SCMRatisRequest {
       StringBuilder sb = new StringBuilder();
       sb.append(((Class<?>) rawType).getName());
       if (actualTypeArguments.length > 0) {
-        sb.append("<");
+        sb.append('<');
         for (int i = 0; i < actualTypeArguments.length; i++) {
           if (i > 0) {
-            sb.append(",");
+            sb.append(',');
           }
           sb.append(actualTypeArguments[i].getTypeName());
         }
-        sb.append(">");
+        sb.append('>');
       }
       return sb.toString();
     }

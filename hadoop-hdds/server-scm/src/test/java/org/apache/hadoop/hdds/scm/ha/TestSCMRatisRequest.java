@@ -99,6 +99,7 @@ public class TestSCMRatisRequest {
     assertEquals(value, SCMRatisRequest.decode(request.encode()).getArguments()[0]);
   }
 
+  @SuppressWarnings("unused")
   private void pipelineIdListMethod(List<HddsProtos.PipelineID> pids) {
   }
 
