@@ -2152,6 +2152,10 @@
                 <!-- disabled test -->
                 <excludedClass>org.apache.hadoop.ozone.om.service.TestRangerBGSyncService</excludedClass>
               </excludedClasses>
+              <ignoredDependencies>
+                <!-- analyzer gets confused by duplicate classes across rocksdbjni classified artifacts -->
+                <ignoredDependency>org.rocksdb:rocksdbjni</ignoredDependency>
+              </ignoredDependencies>
               <ignoredNonTestScopedDependencies>
                 <!--
                   Ignore false positive "Non-test scoped test only dependencies": these are test-only in some module, compile scope transitively.
