@@ -301,9 +301,8 @@ public class TestContainerStateManager {
   }
 
   /**
-   * DELETED EC container + CLOSED replica with BCSID <= container seqId.
-   * Expected: Should NOT send force delete
-   * Should transition to CLOSED instead
+   * DELETED EC container in SCM.
+   * Expected: Should send force delete to DN
    */
   @Test
   public void testDeletedECContainerWithStaleClosedReplicaShouldNotForceDelete()
@@ -318,11 +317,12 @@ public class TestContainerStateManager {
         repConfig);
     containerStateManager.addContainer(ecContainer.getProtobuf());
     assertEquals(HddsProtos.ReplicationType.EC, ecContainer.getReplicationType());
-    // Report CLOSED replica with BCSID = container's seqId
+
+    // Verify delete command sent
     sendReportAndCaptureDeleteCommand(ecContainer, datanode,
-        ecContainer.getSequenceId(), false, 1, false);
-    // Container should transition to CLOSED
-    verifyContainerState(ecContainer.containerID(), HddsProtos.LifeCycleState.CLOSED);
+        ecContainer.getSequenceId(), false, 1, true);
+    // Container should remain as DELETED
+    verifyContainerState(ecContainer.containerID(), HddsProtos.LifeCycleState.DELETED);
   }
 
   private DeleteContainerCommand sendReportAndCaptureDeleteCommand(

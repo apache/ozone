@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
+import com.google.protobuf.Message;
 import com.google.protobuf.ProtocolMessageEnum;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
@@ -24,23 +25,36 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.IntFunction;
 import org.apache.commons.lang3.ClassUtils;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerID;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.Pipeline;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineID;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineState;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
-import org.apache.ratis.thirdparty.com.google.protobuf.Message;
 
 /**
  * Maps types to the corresponding {@link ScmCodec} implementation.
  */
 public final class ScmCodecFactory {
 
-  private static Map<Class<?>, ScmCodec> codecs = new HashMap<>();
+  private static Map<Class<?>, ScmCodec<?>> codecs = new HashMap<>();
 
   static {
-    codecs.put(com.google.protobuf.Message.class, new ScmNonShadedGeneratedMessageCodec());
-    codecs.put(Message.class, new ScmGeneratedMessageCodec());
-    codecs.put(ProtocolMessageEnum.class, new ScmEnumCodec());
+    putProto(ContainerID.getDefaultInstance());
+    putProto(PipelineID.getDefaultInstance());
+    putProto(Pipeline.getDefaultInstance());
+    putProto(ContainerInfoProto.getDefaultInstance());
+    putProto(DeletedBlocksTransaction.getDefaultInstance());
+    putProto(DeletedBlocksTransactionSummary.getDefaultInstance());
+
     codecs.put(List.class, new ScmListCodec());
     codecs.put(Integer.class, new ScmIntegerCodec());
     codecs.put(Long.class, new ScmLongCodec());
@@ -51,6 +65,20 @@ public final class ScmCodecFactory {
     codecs.put(com.google.protobuf.ByteString.class, new ScmNonShadedByteStringCodec());
     codecs.put(ByteString.class, new ScmByteStringCodec());
     codecs.put(ManagedSecretKey.class, new ScmManagedSecretKeyCodec());
+
+    putEnum(LifeCycleEvent.class, LifeCycleEvent::forNumber);
+    putEnum(PipelineState.class, PipelineState::forNumber);
+    putEnum(NodeType.class, NodeType::forNumber);
+  }
+
+  static <T extends Message> void putProto(T proto) {
+    codecs.put(proto.getClass(),
+        new ScmNonShadedGeneratedMessageCodec<>(proto.getParserForType()));
+  }
+
+  static <T extends Enum<T> & ProtocolMessageEnum> void putEnum(
+      Class<T> enumClass, IntFunction<T> forNumber) {
+    codecs.put(enumClass, new ScmEnumCodec<>(enumClass, forNumber));
   }
 
   private ScmCodecFactory() { }

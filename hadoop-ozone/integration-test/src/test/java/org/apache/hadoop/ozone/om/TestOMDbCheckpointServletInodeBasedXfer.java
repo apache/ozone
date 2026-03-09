@@ -33,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.anyCollection;
@@ -57,6 +58,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -236,6 +238,8 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
         .writeDbDataToStream(any(), any(), any(), any(), any());
     doCallRealMethod().when(omDbCheckpointServletMock)
         .collectFilesFromDir(any(), any(), any(), anyBoolean(), any());
+    doCallRealMethod().when(omDbCheckpointServletMock)
+        .collectFilesFromDir(any(), any(), any(), anyBoolean(), any(), anyBoolean());
     doCallRealMethod().when(omDbCheckpointServletMock).collectDbDataToTransfer(any(), any(), any());
 
     when(omDbCheckpointServletMock.getBootstrapStateLock())
@@ -850,6 +854,50 @@ public class TestOMDbCheckpointServletInodeBasedXfer {
     if (capturedCheckpoint.get() != null) {
       capturedCheckpoint.get().cleanupCheckpoint();
     }
+  }
+
+
+  /**
+   * Verifies that when a file is deleted before/during transfer, the servlet
+   * gracefully skips it without failing (handles NoSuchFileException).
+   */
+  @Test
+  public void testCollectFilesFromDirSkipsDeletedFile() throws Exception {
+    OMDBCheckpointServletInodeBasedXfer servlet = new OMDBCheckpointServletInodeBasedXfer();
+    Path dbDir = Files.createTempDirectory(folder, "dbdir-");
+    Path sstFile1 = dbDir.resolve("file1.sst");
+    Path sstFile2 = dbDir.resolve("file2.sst");
+    Path sstFile3 = dbDir.resolve("file3.sst");
+    Files.write(sstFile1, "content1".getBytes(StandardCharsets.UTF_8));
+    Files.write(sstFile2, "content2".getBytes(StandardCharsets.UTF_8));
+    Files.write(sstFile3, "content3".getBytes(StandardCharsets.UTF_8));
+    List<Path> filesUnderDir = new ArrayList<>();
+    filesUnderDir.add(sstFile1);
+    filesUnderDir.add(sstFile2);
+    filesUnderDir.add(sstFile3);
+    // Delete file2 before transfer , same as pruner
+    Files.delete(sstFile2);
+    OMDBArchiver archiver = new OMDBArchiver();
+    Path tmpDir = folder.resolve("tmp-deleted-file-test");
+    Files.createDirectories(tmpDir);
+    archiver.setTmpDir(tmpDir);
+    OMDBArchiver archiverSpy = spy(archiver);
+
+    Set<String> sstFilesToExclude = new HashSet<>();
+    AtomicLong maxTotalSstSize = new AtomicLong(Long.MAX_VALUE);
+
+    doAnswer(invocation -> archiver.recordFileEntry(
+        invocation.getArgument(0), invocation.getArgument(1)))
+        .when(archiverSpy).recordFileEntry(any(), anyString());
+    boolean result = servlet.collectFilesFromDir(sstFilesToExclude, filesUnderDir.stream(),
+        maxTotalSstSize, true, archiverSpy, true);
+    assertTrue(result);
+    verify(archiverSpy, times(2)).recordFileEntry(any(), anyString());
+    // should throw exception when flag is set to false.
+    assertThrows(NoSuchFileException.class, () -> {
+      servlet.collectFilesFromDir(sstFilesToExclude, filesUnderDir.stream(),
+          maxTotalSstSize, true, archiverSpy, false);
+    });
   }
 
   private void writeDummyKeyToDeleteTableOfSnapshotDB(OzoneSnapshot snapshotToModify, String bucketName,

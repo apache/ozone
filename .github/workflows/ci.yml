@@ -135,6 +135,16 @@ jobs:
     with:
       sha: ${{ needs.build-info.outputs.sha }}
 
+  update-ozone-site-config-doc:
+    needs:
+      - generate-config-doc
+    if: |
+      github.event_name == 'push' &&
+      github.repository == 'apache/ozone' &&
+      github.ref_name == 'master'
+    uses: ./.github/workflows/update-ozone-site-config-doc.yml
+    secrets: inherit
+
   compile:
     needs:
       - build-info
@@ -214,6 +224,7 @@ jobs:
     needs:
       - build-info
       - build
+      - basic
     if: needs.build-info.outputs.needs-compile == 'true'
     uses: ./.github/workflows/check.yml
     secrets: inherit

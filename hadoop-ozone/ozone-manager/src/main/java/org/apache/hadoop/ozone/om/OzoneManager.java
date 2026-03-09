@@ -143,6 +143,8 @@ import java.util.StringTokenizer;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -199,6 +201,7 @@ import org.apache.hadoop.hdds.server.ServiceRuntimeInfoImpl;
 import org.apache.hadoop.hdds.server.http.RatisDropwizardExports;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
 import org.apache.hadoop.hdds.utils.TransactionInfo;
@@ -281,7 +284,7 @@ import org.apache.hadoop.ozone.om.ratis_snapshot.OmRatisSnapshotProvider;
 import org.apache.hadoop.ozone.om.request.OMClientRequest;
 import org.apache.hadoop.ozone.om.s3.S3SecretCacheProvider;
 import org.apache.hadoop.ozone.om.s3.S3SecretStoreProvider;
-import org.apache.hadoop.ozone.om.service.CompactDBService;
+import org.apache.hadoop.ozone.om.service.CompactDBUtil;
 import org.apache.hadoop.ozone.om.service.DirectoryDeletingService;
 import org.apache.hadoop.ozone.om.service.OMRangerBGSyncService;
 import org.apache.hadoop.ozone.om.service.QuotaRepairTask;
@@ -2379,6 +2382,7 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     }
     try {
       omState = State.STOPPED;
+      IOUtils.close(LOG, reconfigurationHandler);
       // Cancel the metrics timer and set to null.
       if (metricsTimer != null) {
         metricsTimer.cancel();
@@ -4010,20 +4014,22 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
    * @param leaderId peerNodeID of the leader OM
    * @return If checkpoint is installed successfully, return the
    *         corresponding termIndex. Otherwise, return null.
+   * @throws IOException if download or cleanup fails
    */
-  public synchronized TermIndex installSnapshotFromLeader(String leaderId) {
+  public synchronized TermIndex installSnapshotFromLeader(String leaderId) throws IOException {
     if (omRatisSnapshotProvider == null) {
       LOG.error("OM Snapshot Provider is not configured as there are no peer " +
           "nodes.");
       return null;
     }
 
-    DBCheckpoint omDBCheckpoint;
+    DBCheckpoint omDBCheckpoint = null;
     try {
       omDBCheckpoint = omRatisSnapshotProvider.
           downloadDBSnapshotFromLeader(leaderId);
     } catch (IOException ex) {
       LOG.error("Failed to download snapshot from Leader {}.", leaderId,  ex);
+      cleanupCheckpoint(omDBCheckpoint);
       return null;
     }
 
@@ -4037,13 +4043,31 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
     } catch (Exception ex) {
       LOG.error("Failed to install snapshot from Leader OM.", ex);
     } finally {
+      cleanupCheckpoint(omDBCheckpoint);
+    }
+    return termIndex;
+  }
+
+  private void cleanupCheckpoint(DBCheckpoint omDBCheckpoint) throws IOException {
+    if (omDBCheckpoint != null) {
       try {
         omDBCheckpoint.cleanupCheckpoint();
       } catch (IOException e) {
-        LOG.error("Failed to cleanup checkpoint at {}", omDBCheckpoint.getCheckpointLocation(), e);
+        LOG.error("Failed to cleanup checkpoint at {}",
+            omDBCheckpoint.getCheckpointLocation(), e);
+      }
+    } else {
+      // Download failed; clean up any partial content in candidate dir
+      File candidateDir = omRatisSnapshotProvider.getCandidateDir();
+      if (candidateDir.exists()) {
+        try {
+          org.apache.commons.io.FileUtils.deleteDirectory(candidateDir);
+        } catch (IOException ioe) {
+          LOG.error("Failed to delete candidate dir: {}", candidateDir, ioe);
+          throw new IOException("Failed to cleanup candidate dir after download failure", ioe);
+        }
       }
     }
-    return termIndex;
   }
 
   /**
@@ -5380,7 +5404,19 @@ public final class OzoneManager extends ServiceRuntimeInfoImpl
 
   public void compactOMDB(String columnFamily) throws IOException {
     checkAdminUserPrivilege("compact column family " + columnFamily);
-    new CompactDBService(this).compact(columnFamily);
+    CompletableFuture<Void> compactFuture =
+        CompactDBUtil.compactTableAsync(metadataManager, columnFamily);
+    compactFuture.whenComplete((result, throwable) -> {
+      if (throwable == null) {
+        LOG.info("Compaction request for column family \"{}\" completed successfully.",
+            columnFamily);
+      } else {
+        Throwable cause = throwable instanceof CompletionException
+            && throwable.getCause() != null ? throwable.getCause() : throwable;
+        LOG.error("Compaction request for column family \"{}\" failed.",
+            columnFamily, cause);
+      }
+    });
   }
 
   public OMExecutionFlow getOmExecutionFlow() {

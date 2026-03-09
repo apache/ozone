@@ -286,27 +286,13 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   void testCreateDoesNotAddParentDirKeys() throws Exception {
     Path grandparent = new Path(bucketPath,
         "testCreateDoesNotAddParentDirKeys");
-    Path parent = new Path(grandparent, "parent");
-    Path child = new Path(parent, "child");
-    ContractTestUtils.touch(fs, child);
+    createDoesNotAddParentDirKeys(grandparent);
+  }
 
-    OzoneKeyDetails key = getKey(child, false);
+  @Override
+  String getChildKeyName(Path child) {
     OFSPath childOFSPath = new OFSPath(child, conf);
-    assertEquals(key.getName(), childOFSPath.getKeyName());
-
-    // Creating a child should not add parent keys to the bucket
-    try {
-      getKey(parent, true);
-    } catch (OMException ome) {
-      assertEquals(KEY_NOT_FOUND, ome.getResult());
-    }
-
-    // List status on the parent should show the child file
-    assertEquals(1L, fs.listStatus(parent).length, "List status of parent should include the 1 child file");
-    assertTrue(fs.getFileStatus(parent).isDirectory(), "Parent directory does not appear to be a directory");
-
-    // Cleanup
-    fs.delete(grandparent, true);
+    return childOFSPath.getKeyName();
   }
 
   @Test
@@ -446,33 +432,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
   @Test
   void testListStatusIteratorInBucket() throws Exception {
     Path root = new Path("/" + volumeName + "/" + bucketName);
-    Path dir1 = new Path(root, "dir1");
-    Path dir12 = new Path(dir1, "dir12");
-    Path dir2 = new Path(root, "dir2");
-    try {
-      fs.mkdirs(dir12);
-      fs.mkdirs(dir2);
-
-      // ListStatus on root should return dir1 (even though /dir1 key does not
-      // exist) and dir2 only. dir12 is not an immediate child of root and
-      // hence should not be listed.
-      RemoteIterator<FileStatus> it = fs.listStatusIterator(root);
-      // Verify that dir12 is not included in the result of the listStatus on
-      // root
-      int iCount = 0;
-      while (it.hasNext()) {
-        iCount++;
-        FileStatus fileStatus = it.next();
-        assertNotNull(fileStatus);
-        assertNotEquals(fileStatus, dir12.toString());
-      }
-      assertEquals(2, iCount, "FileStatus should return only the immediate children");
-
-    } finally {
-      // cleanup
-      fs.delete(dir1, true);
-      fs.delete(dir2, true);
-    }
+    listStatusIteratorOnRoot(root);
   }
 
   @Test
