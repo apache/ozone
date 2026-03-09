@@ -152,9 +152,4 @@ public class TestNSSummaryAggregatedTotalsUpgrade {
       verify(mockInjector).getInstance(ReconTaskController.class);
     }
   }
-
-  @Test
-  public void testGetType() {
-    assert upgradeAction.getType() == ReconUpgradeAction.UpgradeActionType.FINALIZE;
-  }
 }

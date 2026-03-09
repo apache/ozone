@@ -13,10 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This workflow reads its configuration from the .github/labeler.yml file.
-name: pull-request-labeler
+# This workflow applies labels for PRs targeted at feature branches.
+
+name: label-pull-requests
+
 on:
-- pull_request_target
+  workflow_call:
+  # allow running the workflow manually from GitHub UI
+  workflow_dispatch:
 
 jobs:
   labeler:
@@ -24,6 +28,26 @@ jobs:
       contents: read
       pull-requests: write
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          # branch -> label rules
+          - branch: HDDS-14496-zdu
+            label: zdu
+      fail-fast: false
     steps:
-    - uses: actions/labeler@v5
-
+      - name: "Checkout project" # required for `gh` CLI
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            .github
+      - name: "Add label ${{ matrix.label }} to PRs for ${{ matrix.branch }}"
+        run: |
+          gh pr list --base "$BRANCH" --search "-label:$LABEL" --json number --jq '.[].number' \
+              | xargs --max-args 1 --no-run-if-empty gh pr edit --add-label "$LABEL"
+        env:
+          # use variables to sanitize input
+          BRANCH: ${{ matrix.branch }}
+          LABEL: ${{ matrix.label }}
+          GH_TOKEN: ${{ github.token }}

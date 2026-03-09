@@ -21,7 +21,6 @@ import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import java.io.IOException;
 import java.security.Principal;
-import java.util.Collection;
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
 import javax.servlet.FilterConfig;
@@ -30,10 +29,7 @@ import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.recon.ReconConfigKeys;
-import org.apache.hadoop.hdds.server.OzoneAdmins;
-import org.apache.hadoop.ozone.OzoneConfigKeys;
+import org.apache.hadoop.ozone.recon.ReconServer;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,15 +44,17 @@ public class ReconAdminFilter implements Filter {
   private static final Logger LOG =
       LoggerFactory.getLogger(ReconAdminFilter.class);
 
-  private final OzoneConfiguration conf;
+  private final ReconServer reconServer;
 
   @Inject
-  ReconAdminFilter(OzoneConfiguration conf) {
-    this.conf = conf;
+  ReconAdminFilter(ReconServer reconServer) {
+    this.reconServer = reconServer;
   }
 
   @Override
-  public void init(FilterConfig filterConfig) throws ServletException { }
+  public void init(FilterConfig filterConfig) throws ServletException {
+    LOG.info("ReconAdminFilter initialized");
+  }
 
   @Override
   public void doFilter(ServletRequest servletRequest,
@@ -100,15 +98,6 @@ public class ReconAdminFilter implements Filter {
   public void destroy() { }
 
   private boolean hasPermission(UserGroupInformation user) {
-    Collection<String> admins =
-        conf.getStringCollection(OzoneConfigKeys.OZONE_ADMINISTRATORS);
-    admins.addAll(
-        conf.getStringCollection(ReconConfigKeys.OZONE_RECON_ADMINISTRATORS));
-    Collection<String> adminGroups =
-        conf.getStringCollection(OzoneConfigKeys.OZONE_ADMINISTRATORS_GROUPS);
-    adminGroups.addAll(
-        conf.getStringCollection(
-            ReconConfigKeys.OZONE_RECON_ADMINISTRATORS_GROUPS));
-    return new OzoneAdmins(admins, adminGroups).isAdmin(user);
+    return reconServer.isAdmin(user);
   }
 }

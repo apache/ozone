@@ -66,6 +66,7 @@ share/ozone/lib/hadoop-hdfs-client.jar
 share/ozone/lib/hadoop-hdfs.jar
 share/ozone/lib/hadoop-shaded-guava.jar
 share/ozone/lib/hadoop-shaded-protobuf_3_25.jar
+share/ozone/lib/hdds-cli-common.jar
 share/ozone/lib/hdds-client.jar
 share/ozone/lib/hdds-common.jar
 share/ozone/lib/hdds-config.jar
@@ -232,6 +233,7 @@ share/ozone/lib/ozone-recon.jar
 share/ozone/lib/ozone-s3-secret-store.jar
 share/ozone/lib/ozone-s3gateway.jar
 share/ozone/lib/ozone-tools.jar
+share/ozone/lib/ozone-vapor.jar
 share/ozone/lib/perfmark-api.jar
 share/ozone/lib/picocli.jar
 share/ozone/lib/picocli-shell-jline3.jar

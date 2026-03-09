@@ -839,6 +839,9 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       Container container = getContainer(containerID);
       long startTime = Time.monotonicNow();
 
+      // Increment operation count metrics
+      metrics.incContainerOpsMetrics(cmdType);
+
       if (DispatcherContext.op(dispatcherContext).validateToken()) {
         validateToken(msg);
       }
