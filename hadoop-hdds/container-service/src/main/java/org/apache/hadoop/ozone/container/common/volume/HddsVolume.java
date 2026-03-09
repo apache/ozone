@@ -312,7 +312,7 @@ public class HddsVolume extends StorageVolume {
     }
 
     try (ManagedOptions managedOptions = new ManagedOptions();
-         ManagedRocksDB readOnlyDb = ManagedRocksDB.openReadOnly(managedOptions, dbFile.toString())) {
+         ManagedRocksDB ignored = ManagedRocksDB.openReadOnly(managedOptions, dbFile.toString())) {
       // Do nothing. Only check if rocksdb is accessible.
       LOG.debug("Successfully opened the database at \"{}\" for HDDS volume {}.", dbFile, getStorageDir());
     } catch (Exception e) {
