@@ -32,7 +32,7 @@ import org.apache.hadoop.ozone.recon.tasks.updater.ReconTaskStatusUpdaterManager
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit tests for ContainerHealthTaskV2 execution flow.
+ * Unit tests for ContainerHealthTask execution flow.
  */
 public class TestContainerHealthTask {
 
@@ -45,8 +45,8 @@ public class TestContainerHealthTask {
         mock(ReconStorageContainerManagerFacade.class);
     when(reconScm.getReplicationManager()).thenReturn(reconReplicationManager);
 
-    ContainerHealthTaskV2 task =
-        new ContainerHealthTaskV2(
+    ContainerHealthTask task =
+        new ContainerHealthTask(
             createTaskConfig(),
             createTaskStatusUpdaterManagerMock(),
             reconScm);
@@ -66,8 +66,8 @@ public class TestContainerHealthTask {
     org.mockito.Mockito.doThrow(expected).when(reconReplicationManager)
         .processAll();
 
-    ContainerHealthTaskV2 task =
-        new ContainerHealthTaskV2(
+    ContainerHealthTask task =
+        new ContainerHealthTask(
             createTaskConfig(),
             createTaskStatusUpdaterManagerMock(),
             reconScm);
@@ -87,7 +87,7 @@ public class TestContainerHealthTask {
     ReconTaskStatusUpdaterManager manager =
         mock(ReconTaskStatusUpdaterManager.class);
     ReconTaskStatusUpdater updater = mock(ReconTaskStatusUpdater.class);
-    when(manager.getTaskStatusUpdater("ContainerHealthTaskV2")).thenReturn(updater);
+    when(manager.getTaskStatusUpdater("ContainerHealthTask")).thenReturn(updater);
     return manager;
   }
 }

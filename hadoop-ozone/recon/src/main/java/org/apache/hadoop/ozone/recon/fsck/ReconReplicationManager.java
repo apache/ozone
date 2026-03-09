@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon.fsck;
 import java.io.IOException;
 import java.time.Clock;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -34,14 +35,15 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.replication.MonitoringReplicationQueue;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationQueue;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
-import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManagerV2;
-import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManagerV2.ContainerStateKey;
-import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManagerV2.UnhealthyContainerRecordV2;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager.ContainerStateKey;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager.UnhealthyContainerRecord;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.slf4j.Logger;
@@ -79,7 +81,7 @@ public class ReconReplicationManager extends ReplicationManager {
       LoggerFactory.getLogger(ReconReplicationManager.class);
   private static final int PERSIST_CHUNK_SIZE = 50_000;
 
-  private final ContainerHealthSchemaManagerV2 healthSchemaManager;
+  private final ContainerHealthSchemaManager healthSchemaManager;
   private final ContainerManager containerManager;
 
   /**
@@ -182,7 +184,7 @@ public class ReconReplicationManager extends ReplicationManager {
 
   public ReconReplicationManager(
       InitContext initContext,
-      ContainerHealthSchemaManagerV2 healthSchemaManager) throws IOException {
+      ContainerHealthSchemaManager healthSchemaManager) throws IOException {
 
     // Call parent with stub PendingOps (proven to not cause false positives)
     super(
@@ -208,7 +210,7 @@ public class ReconReplicationManager extends ReplicationManager {
    * <p>In Recon, we don't want the ReplicationManager's background threads
    * (replicationMonitor, underReplicatedProcessor, overReplicatedProcessor)
    * to run continuously. Instead, we call processAll() manually from
-   * ContainerHealthTaskV2 on a schedule.</p>
+   * ContainerHealthTask on a schedule.</p>
    *
    * <p>This prevents:
    * <ul>
@@ -221,7 +223,7 @@ public class ReconReplicationManager extends ReplicationManager {
   @Override
   public synchronized void start() {
     LOG.info("ReconReplicationManager.start() called - no-op (manual invocation via processAll())");
-    // Do nothing - we call processAll() manually from ContainerHealthTaskV2
+    // Do nothing - we call processAll() manually from ContainerHealthTask
   }
 
   /**
@@ -303,13 +305,14 @@ public class ReconReplicationManager extends ReplicationManager {
       report.increment(container.getState());
       try {
         ContainerID cid = container.containerID();
+        Set<ContainerReplica> replicas = containerManager.getContainerReplicas(cid);
+        List<ContainerReplicaOp> pendingOps = getPendingReplicationOps(cid);
 
         // Call inherited processContainer - this runs SCM's health check chain
         // readOnly=true ensures no commands are generated
-        processContainer(container, nullQueue, report, true);
+        processContainer(container, replicas, pendingOps, nullQueue, report, true);
 
         // ADDITIONAL CHECK: Detect REPLICA_MISMATCH (Recon-specific, not in SCM)
-        Set<ContainerReplica> replicas = containerManager.getContainerReplicas(cid);
         if (hasDataChecksumMismatch(replicas)) {
           report.addReplicaMismatchContainer(cid);
           LOG.debug("Container {} has data checksum mismatch across replicas", cid);
@@ -348,36 +351,78 @@ public class ReconReplicationManager extends ReplicationManager {
     long currentTime = System.currentTimeMillis();
     ProcessingStats totalStats = new ProcessingStats();
     int totalReplicaMismatchCount = 0;
+    Set<ContainerID> missingContainers = unionAsIdSet(report,
+        ContainerHealthState.MISSING,
+        ContainerHealthState.QUASI_CLOSED_STUCK_MISSING,
+        ContainerHealthState.MISSING_UNDER_REPLICATED);
+    Set<ContainerID> underReplicatedContainers = unionAsIdSet(report,
+        ContainerHealthState.UNDER_REPLICATED,
+        ContainerHealthState.UNHEALTHY_UNDER_REPLICATED,
+        ContainerHealthState.QUASI_CLOSED_STUCK_UNDER_REPLICATED,
+        ContainerHealthState.MISSING_UNDER_REPLICATED);
+    Set<ContainerID> overReplicatedContainers = unionAsIdSet(report,
+        ContainerHealthState.OVER_REPLICATED,
+        ContainerHealthState.UNHEALTHY_OVER_REPLICATED,
+        ContainerHealthState.QUASI_CLOSED_STUCK_OVER_REPLICATED);
+    Set<ContainerID> misReplicatedContainers =
+        asIdSet(report, ContainerHealthState.MIS_REPLICATED);
+    logUnmappedScmStates(report);
+    Set<ContainerID> replicaMismatchContainers =
+        new HashSet<>(report.getReplicaMismatchContainers());
 
     for (int from = 0; from < allContainers.size(); from += PERSIST_CHUNK_SIZE) {
       int to = Math.min(from + PERSIST_CHUNK_SIZE, allContainers.size());
       List<Long> chunkContainerIds = collectContainerIds(allContainers, from, to);
-      Set<Long> chunkContainerIdSet = new HashSet<>(chunkContainerIds);
       Map<ContainerStateKey, Long> existingInStateSinceByContainerAndState =
           healthSchemaManager.getExistingInStateSinceByContainerIds(chunkContainerIds);
-      List<UnhealthyContainerRecordV2> recordsToInsert = new ArrayList<>();
+      List<ContainerHealthSchemaManager.UnhealthyContainerRecord> recordsToInsert = new ArrayList<>();
+      List<Long> existingContainerIdsToDelete =
+          collectExistingContainerIds(existingInStateSinceByContainerAndState);
       ProcessingStats chunkStats = new ProcessingStats();
       Set<Long> negativeSizeRecorded = new HashSet<>();
 
-      report.forEachContainerByState((state, cid) -> {
-        if (!chunkContainerIdSet.contains(cid.getId())) {
-          return;
-        }
+      for (int i = from; i < to; i++) {
+        ContainerInfo container = allContainers.get(i);
+        ContainerID containerId = container.containerID();
         try {
-          handleScmStateContainer(state, cid, currentTime,
-              existingInStateSinceByContainerAndState, recordsToInsert,
-              negativeSizeRecorded, chunkStats);
+          if (missingContainers.contains(containerId)) {
+            handleMissingContainer(containerId, currentTime,
+                existingInStateSinceByContainerAndState, recordsToInsert, chunkStats);
+          }
+          if (underReplicatedContainers.contains(containerId)) {
+            chunkStats.incrementUnderRepCount();
+            handleReplicaStateContainer(containerId, currentTime,
+                UnHealthyContainerStates.UNDER_REPLICATED,
+                existingInStateSinceByContainerAndState, recordsToInsert,
+                negativeSizeRecorded, chunkStats);
+          }
+          if (overReplicatedContainers.contains(containerId)) {
+            chunkStats.incrementOverRepCount();
+            handleReplicaStateContainer(containerId, currentTime,
+                UnHealthyContainerStates.OVER_REPLICATED,
+                existingInStateSinceByContainerAndState, recordsToInsert,
+                negativeSizeRecorded, chunkStats);
+          }
+          if (misReplicatedContainers.contains(containerId)) {
+            chunkStats.incrementMisRepCount();
+            handleReplicaStateContainer(containerId, currentTime,
+                UnHealthyContainerStates.MIS_REPLICATED,
+                existingInStateSinceByContainerAndState, recordsToInsert,
+                negativeSizeRecorded, chunkStats);
+          }
+          if (replicaMismatchContainers.contains(containerId)) {
+            processReplicaMismatchContainer(containerId, currentTime,
+                existingInStateSinceByContainerAndState, recordsToInsert);
+            totalReplicaMismatchCount++;
+          }
         } catch (ContainerNotFoundException e) {
-          LOG.warn("Container {} not found when processing {} state", cid, state, e);
+          LOG.warn("Container {} not found when processing unhealthy states",
+              containerId, e);
         }
-      });
+      }
 
-      int chunkReplicaMismatchCount = processReplicaMismatchContainersForChunk(
-          report, currentTime, existingInStateSinceByContainerAndState,
-          recordsToInsert, chunkContainerIdSet);
-      totalReplicaMismatchCount += chunkReplicaMismatchCount;
       totalStats.add(chunkStats);
-      persistUnhealthyRecords(chunkContainerIds, recordsToInsert);
+      persistUnhealthyRecords(existingContainerIdsToDelete, recordsToInsert);
     }
 
     LOG.info("Stored {} MISSING, {} EMPTY_MISSING, {} UNDER_REPLICATED, " +
@@ -388,47 +433,11 @@ public class ReconReplicationManager extends ReplicationManager {
         totalReplicaMismatchCount);
   }
 
-  private void handleScmStateContainer(
-      ContainerHealthState state,
-      ContainerID containerId,
-      long currentTime,
-      Map<ContainerStateKey, Long> existingInStateSinceByContainerAndState,
-      List<UnhealthyContainerRecordV2> recordsToInsert,
-      Set<Long> negativeSizeRecorded,
-      ProcessingStats stats) throws ContainerNotFoundException {
-    switch (state) {
-    case MISSING:
-      handleMissingContainer(containerId, currentTime,
-          existingInStateSinceByContainerAndState, recordsToInsert, stats);
-      break;
-    case UNDER_REPLICATED:
-      stats.incrementUnderRepCount();
-      handleReplicaStateContainer(containerId, currentTime,
-          UnHealthyContainerStates.UNDER_REPLICATED,
-          existingInStateSinceByContainerAndState, recordsToInsert, negativeSizeRecorded, stats);
-      break;
-    case OVER_REPLICATED:
-      stats.incrementOverRepCount();
-      handleReplicaStateContainer(containerId, currentTime,
-          UnHealthyContainerStates.OVER_REPLICATED,
-          existingInStateSinceByContainerAndState, recordsToInsert, negativeSizeRecorded, stats);
-      break;
-    case MIS_REPLICATED:
-      stats.incrementMisRepCount();
-      handleReplicaStateContainer(containerId, currentTime,
-          UnHealthyContainerStates.MIS_REPLICATED,
-          existingInStateSinceByContainerAndState, recordsToInsert, negativeSizeRecorded, stats);
-      break;
-    default:
-      break;
-    }
-  }
-
   private void handleMissingContainer(
       ContainerID containerId,
       long currentTime,
       Map<ContainerStateKey, Long> existingInStateSinceByContainerAndState,
-      List<UnhealthyContainerRecordV2> recordsToInsert,
+      List<ContainerHealthSchemaManager.UnhealthyContainerRecord> recordsToInsert,
       ProcessingStats stats) throws ContainerNotFoundException {
     ContainerInfo container = containerManager.getContainer(containerId);
     int expected = container.getReplicationConfig().getRequiredNodes();
@@ -459,7 +468,7 @@ public class ReconReplicationManager extends ReplicationManager {
       long currentTime,
       UnHealthyContainerStates targetState,
       Map<ContainerStateKey, Long> existingInStateSinceByContainerAndState,
-      List<UnhealthyContainerRecordV2> recordsToInsert,
+      List<ContainerHealthSchemaManager.UnhealthyContainerRecord> recordsToInsert,
       Set<Long> negativeSizeRecorded,
       ProcessingStats stats) throws ContainerNotFoundException {
     ContainerInfo container = containerManager.getContainer(containerId);
@@ -474,36 +483,22 @@ public class ReconReplicationManager extends ReplicationManager {
         existingInStateSinceByContainerAndState, negativeSizeRecorded, stats);
   }
 
-  private int processReplicaMismatchContainersForChunk(
-      ReconReplicationManagerReport report,
+  private void processReplicaMismatchContainer(
+      ContainerID containerId,
       long currentTime,
       Map<ContainerStateKey, Long> existingInStateSinceByContainerAndState,
-      List<UnhealthyContainerRecordV2> recordsToInsert,
-      Set<Long> chunkContainerIdSet) {
-    List<ContainerID> replicaMismatchContainers = report.getReplicaMismatchContainers();
-    int chunkReplicaMismatchCount = 0;
-    for (ContainerID cid : replicaMismatchContainers) {
-      if (!chunkContainerIdSet.contains(cid.getId())) {
-        continue;
-      }
-      try {
-        ContainerInfo container = containerManager.getContainer(cid);
-        Set<ContainerReplica> replicas = containerManager.getContainerReplicas(cid);
-        int expected = container.getReplicationConfig().getRequiredNodes();
-        int actual = replicas.size();
-        recordsToInsert.add(createRecord(container,
-            UnHealthyContainerStates.REPLICA_MISMATCH,
-            resolveInStateSince(container.getContainerID(),
-                UnHealthyContainerStates.REPLICA_MISMATCH, currentTime,
-                existingInStateSinceByContainerAndState),
-            expected, actual,
-            "Data checksum mismatch across replicas"));
-        chunkReplicaMismatchCount++;
-      } catch (ContainerNotFoundException e) {
-        LOG.warn("Container {} not found when processing REPLICA_MISMATCH state", cid, e);
-      }
-    }
-    return chunkReplicaMismatchCount;
+      List<ContainerHealthSchemaManager.UnhealthyContainerRecord> recordsToInsert) throws ContainerNotFoundException {
+    ContainerInfo container = containerManager.getContainer(containerId);
+    Set<ContainerReplica> replicas = containerManager.getContainerReplicas(containerId);
+    int expected = container.getReplicationConfig().getRequiredNodes();
+    int actual = replicas.size();
+    recordsToInsert.add(createRecord(container,
+        UnHealthyContainerStates.REPLICA_MISMATCH,
+        resolveInStateSince(container.getContainerID(),
+            UnHealthyContainerStates.REPLICA_MISMATCH, currentTime,
+            existingInStateSinceByContainerAndState),
+        expected, actual,
+        "Data checksum mismatch across replicas"));
   }
 
   private List<Long> collectContainerIds(List<ContainerInfo> allContainers,
@@ -517,12 +512,11 @@ public class ReconReplicationManager extends ReplicationManager {
 
   private void persistUnhealthyRecords(
       List<Long> containerIdsToDelete,
-      List<UnhealthyContainerRecordV2> recordsToInsert) {
-    LOG.info("Deleting SCM states for {} containers", containerIdsToDelete.size());
-    healthSchemaManager.batchDeleteSCMStatesForContainers(containerIdsToDelete);
-
-    LOG.info("Inserting {} unhealthy container records", recordsToInsert.size());
-    healthSchemaManager.insertUnhealthyContainerRecords(recordsToInsert);
+      List<ContainerHealthSchemaManager.UnhealthyContainerRecord> recordsToInsert) {
+    LOG.info("Replacing unhealthy container records atomically: deleteRowsFor={} containers, insert={}",
+        containerIdsToDelete.size(), recordsToInsert.size());
+    healthSchemaManager.replaceUnhealthyContainerRecordsAtomically(
+        containerIdsToDelete, recordsToInsert);
   }
 
   private boolean isEmptyMissing(ContainerInfo container) {
@@ -537,7 +531,7 @@ public class ReconReplicationManager extends ReplicationManager {
       ContainerInfo container,
       long currentTime,
       int actualReplicaCount,
-      List<UnhealthyContainerRecordV2> recordsToInsert,
+      List<ContainerHealthSchemaManager.UnhealthyContainerRecord> recordsToInsert,
       Map<ContainerStateKey, Long> existingInStateSinceByContainerAndState,
       Set<Long> negativeSizeRecorded,
       ProcessingStats stats) {
@@ -573,6 +567,77 @@ public class ReconReplicationManager extends ReplicationManager {
     default:
       return null;
     }
+  }
+
+  private Set<ContainerID> asIdSet(ReconReplicationManagerReport report,
+      ContainerHealthState state) {
+    List<ContainerID> containers = report.getAllContainers(state);
+    if (containers.isEmpty()) {
+      return Collections.emptySet();
+    }
+    return new HashSet<>(containers);
+  }
+
+  private Set<ContainerID> unionAsIdSet(ReconReplicationManagerReport report,
+      ContainerHealthState... states) {
+    Set<ContainerID> result = null;
+    for (ContainerHealthState state : states) {
+      List<ContainerID> containers = report.getAllContainers(state);
+      if (containers.isEmpty()) {
+        continue;
+      }
+      if (result == null) {
+        result = new HashSet<>();
+      }
+      result.addAll(containers);
+    }
+    return result == null ? Collections.emptySet() : result;
+  }
+
+  private void logUnmappedScmStates(ReconReplicationManagerReport report) {
+    for (Map.Entry<ContainerHealthState, List<ContainerID>> entry :
+        report.getAllContainersByState().entrySet()) {
+      ContainerHealthState state = entry.getKey();
+      if (isMappedScmState(state)) {
+        continue;
+      }
+      int count = entry.getValue().size();
+      if (count > 0) {
+        LOG.warn("SCM state {} has {} containers but is not mapped to "
+                + "UNHEALTHY_CONTAINERS allowed states; skipping persistence "
+                + "for this state in this run",
+            state, count);
+      }
+    }
+  }
+
+  private boolean isMappedScmState(ContainerHealthState state) {
+    switch (state) {
+    case MISSING:
+    case UNDER_REPLICATED:
+    case OVER_REPLICATED:
+    case MIS_REPLICATED:
+    case UNHEALTHY_UNDER_REPLICATED:
+    case UNHEALTHY_OVER_REPLICATED:
+    case MISSING_UNDER_REPLICATED:
+    case QUASI_CLOSED_STUCK_MISSING:
+    case QUASI_CLOSED_STUCK_UNDER_REPLICATED:
+    case QUASI_CLOSED_STUCK_OVER_REPLICATED:
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  private List<Long> collectExistingContainerIds(
+      Map<ContainerStateKey, Long> existingInStateSinceByContainerAndState) {
+    if (existingInStateSinceByContainerAndState.isEmpty()) {
+      return Collections.emptyList();
+    }
+    Set<Long> existingContainerIds = new HashSet<>();
+    existingInStateSinceByContainerAndState.keySet()
+        .forEach(key -> existingContainerIds.add(key.getContainerId()));
+    return new ArrayList<>(existingContainerIds);
   }
 
   private static final class ProcessingStats {
@@ -626,16 +691,16 @@ public class ReconReplicationManager extends ReplicationManager {
    * @param expectedReplicaCount Expected number of replicas
    * @param actualReplicaCount Actual number of replicas
    * @param reason Human-readable reason for the health state
-   * @return UnhealthyContainerRecordV2 ready for insertion
+   * @return UnhealthyContainerRecord ready for insertion
    */
-  private UnhealthyContainerRecordV2 createRecord(
+  private ContainerHealthSchemaManager.UnhealthyContainerRecord createRecord(
       ContainerInfo container,
       UnHealthyContainerStates state,
       long timestamp,
       int expectedReplicaCount,
       int actualReplicaCount,
       String reason) {
-    return new UnhealthyContainerRecordV2(
+    return new UnhealthyContainerRecord(
         container.getContainerID(),
         state.toString(),
         timestamp,

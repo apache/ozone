@@ -219,7 +219,7 @@ public class TestReconContainerEndpoint {
                 .getOMMetadataManagerInstance();
     ContainerEndpoint containerEndpoint =
         new ContainerEndpoint(reconSCM,
-            null, // ContainerHealthSchemaManagerV2 - not needed for this test
+            null, // ContainerHealthSchemaManager - not needed for this test
             recon.getReconServer().getReconNamespaceSummaryManager(),
             recon.getReconServer().getReconContainerMetadataManager(),
             omMetadataManagerInstance);

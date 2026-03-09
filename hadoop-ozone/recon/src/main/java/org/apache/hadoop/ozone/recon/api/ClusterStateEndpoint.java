@@ -44,7 +44,7 @@ import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.ozone.recon.api.types.ClusterStateResponse;
 import org.apache.hadoop.ozone.recon.api.types.ClusterStorageReport;
 import org.apache.hadoop.ozone.recon.api.types.ContainerStateCounts;
-import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManagerV2;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
@@ -71,13 +71,13 @@ public class ClusterStateEndpoint {
   private final ReconContainerManager containerManager;
   private final ReconGlobalStatsManager reconGlobalStatsManager;
   private final OzoneConfiguration ozoneConfiguration;
-  private final ContainerHealthSchemaManagerV2 containerHealthSchemaManagerV2;
+  private final ContainerHealthSchemaManager containerHealthSchemaManager;
 
   @Inject
   ClusterStateEndpoint(OzoneStorageContainerManager reconSCM,
                        ReconGlobalStatsManager reconGlobalStatsManager,
-                       ContainerHealthSchemaManagerV2
-                           containerHealthSchemaManagerV2,
+                       ContainerHealthSchemaManager
+                           containerHealthSchemaManager,
                        OzoneConfiguration ozoneConfiguration) {
     this.nodeManager =
         (ReconNodeManager) reconSCM.getScmNodeManager();
@@ -85,7 +85,7 @@ public class ClusterStateEndpoint {
     this.containerManager =
         (ReconContainerManager) reconSCM.getContainerManager();
     this.reconGlobalStatsManager = reconGlobalStatsManager;
-    this.containerHealthSchemaManagerV2 = containerHealthSchemaManagerV2;
+    this.containerHealthSchemaManager = containerHealthSchemaManager;
     this.ozoneConfiguration = ozoneConfiguration;
   }
 
@@ -98,8 +98,8 @@ public class ClusterStateEndpoint {
     ContainerStateCounts containerStateCounts = new ContainerStateCounts();
     int pipelines = this.pipelineManager.getPipelines().size();
 
-    List<ContainerHealthSchemaManagerV2.UnhealthyContainerRecordV2> missingContainers =
-        containerHealthSchemaManagerV2
+    List<ContainerHealthSchemaManager.UnhealthyContainerRecord> missingContainers =
+        containerHealthSchemaManager
         .getUnhealthyContainers(
             ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
             0L, 0L, MISSING_CONTAINER_COUNT_LIMIT);

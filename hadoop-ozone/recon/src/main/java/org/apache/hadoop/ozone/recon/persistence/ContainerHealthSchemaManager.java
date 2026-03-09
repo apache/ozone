@@ -30,6 +30,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
@@ -47,12 +48,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Manager for UNHEALTHY_CONTAINERS table used by ContainerHealthTaskV2.
+ * Manager for UNHEALTHY_CONTAINERS table used by ContainerHealthTask.
  */
 @Singleton
-public class ContainerHealthSchemaManagerV2 {
+public class ContainerHealthSchemaManager {
   private static final Logger LOG =
-      LoggerFactory.getLogger(ContainerHealthSchemaManagerV2.class);
+      LoggerFactory.getLogger(ContainerHealthSchemaManager.class);
   private static final int BATCH_INSERT_CHUNK_SIZE = 1000;
 
   /**
@@ -69,15 +70,15 @@ public class ContainerHealthSchemaManagerV2 {
    */
   static final int MAX_DELETE_CHUNK_SIZE = 1_000;
 
-  private final UnhealthyContainersDao unhealthyContainersV2Dao;
-  private final ContainerSchemaDefinition containerSchemaDefinitionV2;
+  private final UnhealthyContainersDao unhealthyContainersDao;
+  private final ContainerSchemaDefinition containerSchemaDefinition;
 
   @Inject
-  public ContainerHealthSchemaManagerV2(
-      ContainerSchemaDefinition containerSchemaDefinitionV2,
-      UnhealthyContainersDao unhealthyContainersV2Dao) {
-    this.unhealthyContainersV2Dao = unhealthyContainersV2Dao;
-    this.containerSchemaDefinitionV2 = containerSchemaDefinitionV2;
+  public ContainerHealthSchemaManager(
+      ContainerSchemaDefinition containerSchemaDefinition,
+      UnhealthyContainersDao unhealthyContainersDao) {
+    this.unhealthyContainersDao = unhealthyContainersDao;
+    this.containerSchemaDefinition = containerSchemaDefinition;
   }
 
   /**
@@ -85,7 +86,7 @@ public class ContainerHealthSchemaManagerV2 {
    * Uses JOOQ's batch API for optimal performance (single SQL statement for all records).
    * Falls back to individual insert-or-update if batch insert fails (e.g., duplicate keys).
    */
-  public void insertUnhealthyContainerRecords(List<UnhealthyContainerRecordV2> recs) {
+  public void insertUnhealthyContainerRecords(List<UnhealthyContainerRecord> recs) {
     if (recs == null || recs.isEmpty()) {
       return;
     }
@@ -95,10 +96,11 @@ public class ContainerHealthSchemaManagerV2 {
           rec.getContainerId(), rec.getContainerState()));
     }
 
-    DSLContext dslContext = containerSchemaDefinitionV2.getDSLContext();
+    DSLContext dslContext = containerSchemaDefinition.getDSLContext();
 
     try {
-      batchInsertInChunks(dslContext, recs);
+      dslContext.transaction(configuration ->
+          batchInsertInChunks(configuration.dsl(), recs));
 
       LOG.debug("Batch inserted {} unhealthy container records", recs.size());
 
@@ -115,34 +117,31 @@ public class ContainerHealthSchemaManagerV2 {
   }
 
   private void batchInsertInChunks(DSLContext dslContext,
-      List<UnhealthyContainerRecordV2> recs) {
-    dslContext.transaction(configuration -> {
-      DSLContext txContext = configuration.dsl();
-      List<UnhealthyContainersRecord> records =
-          new ArrayList<>(BATCH_INSERT_CHUNK_SIZE);
+      List<UnhealthyContainerRecord> recs) {
+    List<UnhealthyContainersRecord> records =
+        new ArrayList<>(BATCH_INSERT_CHUNK_SIZE);
 
-      for (int from = 0; from < recs.size(); from += BATCH_INSERT_CHUNK_SIZE) {
-        int to = Math.min(from + BATCH_INSERT_CHUNK_SIZE, recs.size());
-        records.clear();
-        for (int i = from; i < to; i++) {
-          records.add(toJooqRecord(txContext, recs.get(i)));
-        }
-        txContext.batchInsert(records).execute();
+    for (int from = 0; from < recs.size(); from += BATCH_INSERT_CHUNK_SIZE) {
+      int to = Math.min(from + BATCH_INSERT_CHUNK_SIZE, recs.size());
+      records.clear();
+      for (int i = from; i < to; i++) {
+        records.add(toJooqRecord(dslContext, recs.get(i)));
       }
-    });
+      dslContext.batchInsert(records).execute();
+    }
   }
 
-  private void fallbackInsertOrUpdate(List<UnhealthyContainerRecordV2> recs) {
-    try (Connection connection = containerSchemaDefinitionV2.getDataSource().getConnection()) {
+  private void fallbackInsertOrUpdate(List<UnhealthyContainerRecord> recs) {
+    try (Connection connection = containerSchemaDefinition.getDataSource().getConnection()) {
       connection.setAutoCommit(false);
       try {
-        for (UnhealthyContainerRecordV2 rec : recs) {
+        for (UnhealthyContainerRecord rec : recs) {
           UnhealthyContainers jooqRec = toJooqPojo(rec);
           try {
-            unhealthyContainersV2Dao.insert(jooqRec);
+            unhealthyContainersDao.insert(jooqRec);
           } catch (DataAccessException insertEx) {
             // Duplicate key - update existing record
-            unhealthyContainersV2Dao.update(jooqRec);
+            unhealthyContainersDao.update(jooqRec);
           }
         }
         connection.commit();
@@ -161,7 +160,7 @@ public class ContainerHealthSchemaManagerV2 {
   }
 
   private UnhealthyContainersRecord toJooqRecord(DSLContext txContext,
-      UnhealthyContainerRecordV2 rec) {
+      UnhealthyContainerRecord rec) {
     UnhealthyContainersRecord record = txContext.newRecord(UNHEALTHY_CONTAINERS);
     record.setContainerId(rec.getContainerId());
     record.setContainerState(rec.getContainerState());
@@ -173,7 +172,7 @@ public class ContainerHealthSchemaManagerV2 {
     return record;
   }
 
-  private UnhealthyContainers toJooqPojo(UnhealthyContainerRecordV2 rec) {
+  private UnhealthyContainers toJooqPojo(UnhealthyContainerRecord rec) {
     return new UnhealthyContainers(
         rec.getContainerId(),
         rec.getContainerState(),
@@ -211,37 +210,58 @@ public class ContainerHealthSchemaManagerV2 {
       return;
     }
 
-    DSLContext dslContext = containerSchemaDefinitionV2.getDSLContext();
+    DSLContext dslContext = containerSchemaDefinition.getDSLContext();
+    int totalDeleted = deleteScmStatesForContainers(dslContext, containerIds);
+    LOG.debug("Batch deleted {} health state records for {} containers",
+        totalDeleted, containerIds.size());
+  }
+
+  /**
+   * Atomically replaces unhealthy rows for a given set of containers.
+   * Delete and insert happen in the same DB transaction.
+   */
+  public void replaceUnhealthyContainerRecordsAtomically(
+      List<Long> containerIdsToDelete,
+      List<UnhealthyContainerRecord> recordsToInsert) {
+    if ((containerIdsToDelete == null || containerIdsToDelete.isEmpty())
+        && (recordsToInsert == null || recordsToInsert.isEmpty())) {
+      return;
+    }
+
+    DSLContext dslContext = containerSchemaDefinition.getDSLContext();
+    dslContext.transaction(configuration -> {
+      DSLContext txContext = configuration.dsl();
+      if (containerIdsToDelete != null && !containerIdsToDelete.isEmpty()) {
+        deleteScmStatesForContainers(txContext, containerIdsToDelete);
+      }
+      if (recordsToInsert != null && !recordsToInsert.isEmpty()) {
+        batchInsertInChunks(txContext, recordsToInsert);
+      }
+    });
+  }
+
+  private int deleteScmStatesForContainers(DSLContext dslContext,
+      List<Long> containerIds) {
     int totalDeleted = 0;
 
-    // Chunk the container IDs so each DELETE statement stays within Derby's
-    // generated-bytecode limit (MAX_DELETE_CHUNK_SIZE IDs per statement).
     for (int from = 0; from < containerIds.size(); from += MAX_DELETE_CHUNK_SIZE) {
       int to = Math.min(from + MAX_DELETE_CHUNK_SIZE, containerIds.size());
       List<Long> chunk = containerIds.subList(from, to);
 
-      try {
-        int deleted = dslContext.deleteFrom(UNHEALTHY_CONTAINERS)
-            .where(UNHEALTHY_CONTAINERS.CONTAINER_ID.in(chunk))
-            .and(UNHEALTHY_CONTAINERS.CONTAINER_STATE.in(
-                UnHealthyContainerStates.MISSING.toString(),
-                UnHealthyContainerStates.EMPTY_MISSING.toString(),
-                UnHealthyContainerStates.UNDER_REPLICATED.toString(),
-                UnHealthyContainerStates.OVER_REPLICATED.toString(),
-                UnHealthyContainerStates.MIS_REPLICATED.toString(),
-                UnHealthyContainerStates.NEGATIVE_SIZE.toString(),
-                UnHealthyContainerStates.REPLICA_MISMATCH.toString()))
-            .execute();
-        totalDeleted += deleted;
-      } catch (Exception e) {
-        LOG.error("Failed to batch delete health states for {} containers (chunk {}-{})",
-            chunk.size(), from, to, e);
-        throw new RuntimeException("Failed to batch delete health states", e);
-      }
+      int deleted = dslContext.deleteFrom(UNHEALTHY_CONTAINERS)
+          .where(UNHEALTHY_CONTAINERS.CONTAINER_ID.in(chunk))
+          .and(UNHEALTHY_CONTAINERS.CONTAINER_STATE.in(
+              UnHealthyContainerStates.MISSING.toString(),
+              UnHealthyContainerStates.EMPTY_MISSING.toString(),
+              UnHealthyContainerStates.UNDER_REPLICATED.toString(),
+              UnHealthyContainerStates.OVER_REPLICATED.toString(),
+              UnHealthyContainerStates.MIS_REPLICATED.toString(),
+              UnHealthyContainerStates.NEGATIVE_SIZE.toString(),
+              UnHealthyContainerStates.REPLICA_MISMATCH.toString()))
+          .execute();
+      totalDeleted += deleted;
     }
-
-    LOG.debug("Batch deleted {} health state records for {} containers",
-        totalDeleted, containerIds.size());
+    return totalDeleted;
   }
 
   /**
@@ -254,7 +274,7 @@ public class ContainerHealthSchemaManagerV2 {
       return new HashMap<>();
     }
 
-    DSLContext dslContext = containerSchemaDefinitionV2.getDSLContext();
+    DSLContext dslContext = containerSchemaDefinition.getDSLContext();
     Map<ContainerStateKey, Long> existing = new HashMap<>();
     try {
       dslContext.select(
@@ -284,9 +304,9 @@ public class ContainerHealthSchemaManagerV2 {
   /**
    * Get summary of unhealthy containers grouped by state from V2 table.
    */
-  public List<UnhealthyContainersSummaryV2> getUnhealthyContainersSummary() {
-    DSLContext dslContext = containerSchemaDefinitionV2.getDSLContext();
-    List<UnhealthyContainersSummaryV2> result = new ArrayList<>();
+  public List<UnhealthyContainersSummary> getUnhealthyContainersSummary() {
+    DSLContext dslContext = containerSchemaDefinition.getDSLContext();
+    List<UnhealthyContainersSummary> result = new ArrayList<>();
 
     try {
       return dslContext
@@ -294,7 +314,7 @@ public class ContainerHealthSchemaManagerV2 {
               count().as("cnt"))
           .from(UNHEALTHY_CONTAINERS)
           .groupBy(UNHEALTHY_CONTAINERS.CONTAINER_STATE)
-          .fetchInto(UnhealthyContainersSummaryV2.class);
+          .fetchInto(UnhealthyContainersSummary.class);
     } catch (Exception e) {
       LOG.error("Failed to get summary from V2 table", e);
       return result;
@@ -304,9 +324,9 @@ public class ContainerHealthSchemaManagerV2 {
   /**
    * Get unhealthy containers from V2 table.
    */
-  public List<UnhealthyContainerRecordV2> getUnhealthyContainers(
+  public List<UnhealthyContainerRecord> getUnhealthyContainers(
       UnHealthyContainerStates state, long minContainerId, long maxContainerId, int limit) {
-    DSLContext dslContext = containerSchemaDefinitionV2.getDSLContext();
+    DSLContext dslContext = containerSchemaDefinition.getDSLContext();
 
     SelectQuery<Record> query = dslContext.selectQuery();
     query.addFrom(UNHEALTHY_CONTAINERS);
@@ -352,7 +372,7 @@ public class ContainerHealthSchemaManagerV2 {
       }
       // Forward-pagination path: SQL already orders ASC — no Java re-sort needed.
 
-      return stream.map(record -> new UnhealthyContainerRecordV2(
+      return stream.map(record -> new UnhealthyContainerRecord(
               record.getContainerId(),
               record.getContainerState(),
               record.getInStateSince(),
@@ -372,7 +392,7 @@ public class ContainerHealthSchemaManagerV2 {
    */
   @VisibleForTesting
   public void clearAllUnhealthyContainerRecords() {
-    DSLContext dslContext = containerSchemaDefinitionV2.getDSLContext();
+    DSLContext dslContext = containerSchemaDefinition.getDSLContext();
     try {
       dslContext.deleteFrom(UNHEALTHY_CONTAINERS).execute();
       LOG.info("Cleared all V2 unhealthy container records");
@@ -384,7 +404,7 @@ public class ContainerHealthSchemaManagerV2 {
   /**
    * POJO representing a record in UNHEALTHY_CONTAINERS table.
    */
-  public static class UnhealthyContainerRecordV2 {
+  public static class UnhealthyContainerRecord {
     private final long containerId;
     private final String containerState;
     private final long inStateSince;
@@ -393,9 +413,9 @@ public class ContainerHealthSchemaManagerV2 {
     private final int replicaDelta;
     private final String reason;
 
-    public UnhealthyContainerRecordV2(long containerId, String containerState,
-        long inStateSince, int expectedReplicaCount, int actualReplicaCount,
-        int replicaDelta, String reason) {
+    public UnhealthyContainerRecord(long containerId, String containerState,
+                                    long inStateSince, int expectedReplicaCount, int actualReplicaCount,
+                                    int replicaDelta, String reason) {
       this.containerId = containerId;
       this.containerState = containerState;
       this.inStateSince = inStateSince;
@@ -446,6 +466,10 @@ public class ContainerHealthSchemaManagerV2 {
       this.state = state;
     }
 
+    public long getContainerId() {
+      return containerId;
+    }
+
     @Override
     public boolean equals(Object other) {
       if (this == other) {
@@ -460,18 +484,18 @@ public class ContainerHealthSchemaManagerV2 {
 
     @Override
     public int hashCode() {
-      return Long.hashCode(containerId) * 31 + state.hashCode();
+      return Objects.hash(containerId, state);
     }
   }
 
   /**
    * POJO representing a summary record for unhealthy containers.
    */
-  public static class UnhealthyContainersSummaryV2 {
+  public static class UnhealthyContainersSummary {
     private final String containerState;
     private final int count;
 
-    public UnhealthyContainersSummaryV2(String containerState, int count) {
+    public UnhealthyContainersSummary(String containerState, int count) {
       this.containerState = containerState;
       this.count = count;
     }

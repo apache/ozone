@@ -54,7 +54,7 @@ import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.ClusterStateResponse;
 import org.apache.hadoop.ozone.recon.api.types.ClusterStorageReport;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
-import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManagerV2;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconNodeManager;
@@ -110,7 +110,7 @@ public class TestClusterStateEndpoint extends AbstractReconSqlDBTest {
             .addBinding(StorageContainerServiceProvider.class,
                 mock(StorageContainerServiceProviderImpl.class))
             .addBinding(ClusterStateEndpoint.class)
-            .addBinding(ContainerHealthSchemaManagerV2.class)
+            .addBinding(ContainerHealthSchemaManager.class)
             .build();
     OzoneStorageContainerManager ozoneStorageContainerManager =
         reconTestInjector.getInstance(OzoneStorageContainerManager.class);
@@ -118,14 +118,14 @@ public class TestClusterStateEndpoint extends AbstractReconSqlDBTest {
         ozoneStorageContainerManager.getContainerManager();
     ReconPipelineManager reconPipelineManager = (ReconPipelineManager)
                                                     ozoneStorageContainerManager.getPipelineManager();
-    ContainerHealthSchemaManagerV2 containerHealthSchemaManagerV2 =
-        reconTestInjector.getInstance(ContainerHealthSchemaManagerV2.class);
+    ContainerHealthSchemaManager containerHealthSchemaManager =
+        reconTestInjector.getInstance(ContainerHealthSchemaManager.class);
     ReconGlobalStatsManager reconGlobalStatsManager = 
         reconTestInjector.getInstance(ReconGlobalStatsManager.class);
     conf = mock(OzoneConfiguration.class);
     clusterStateEndpoint =
         new ClusterStateEndpoint(ozoneStorageContainerManager,
-            reconGlobalStatsManager, containerHealthSchemaManagerV2, conf);
+            reconGlobalStatsManager, containerHealthSchemaManager, conf);
     pipeline = getRandomPipeline();
     pipelineID = pipeline.getId();
     reconPipelineManager.addPipeline(pipeline);
@@ -177,8 +177,8 @@ public class TestClusterStateEndpoint extends AbstractReconSqlDBTest {
     ReconNodeManager mockNodeManager = mock(ReconNodeManager.class);
     ReconPipelineManager mockPipelineManager = mock(ReconPipelineManager.class);
     ReconContainerManager mockContainerManager = mock(ReconContainerManager.class);
-    ContainerHealthSchemaManagerV2 mockContainerHealthSchemaManagerV2 =
-        mock(ContainerHealthSchemaManagerV2.class);
+    ContainerHealthSchemaManager mockContainerHealthSchemaManager =
+        mock(ContainerHealthSchemaManager.class);
     ReconGlobalStatsManager mockGlobalStatsManager =
         mock(ReconGlobalStatsManager.class);
     OzoneConfiguration mockConf = mock(OzoneConfiguration.class);
@@ -194,7 +194,7 @@ public class TestClusterStateEndpoint extends AbstractReconSqlDBTest {
         .thenReturn(0);
     when(mockContainerManager.getContainerStateCount(HddsProtos.LifeCycleState.DELETED))
         .thenReturn(0);
-    when(mockContainerHealthSchemaManagerV2.getUnhealthyContainers(
+    when(mockContainerHealthSchemaManager.getUnhealthyContainers(
         any(), anyLong(), anyLong(), anyInt())).thenReturn(Collections.emptyList());
 
     SCMNodeStat scmNodeStat = new SCMNodeStat(
@@ -209,7 +209,7 @@ public class TestClusterStateEndpoint extends AbstractReconSqlDBTest {
         .thenReturn(new SpaceUsageSource.Fixed(2000L, 1500L, 500L));
 
     ClusterStateEndpoint endpoint = new ClusterStateEndpoint(
-        mockScm, mockGlobalStatsManager, mockContainerHealthSchemaManagerV2, mockConf);
+        mockScm, mockGlobalStatsManager, mockContainerHealthSchemaManager, mockConf);
 
     ClusterStateResponse response =
         (ClusterStateResponse) endpoint.getClusterState().getEntity();

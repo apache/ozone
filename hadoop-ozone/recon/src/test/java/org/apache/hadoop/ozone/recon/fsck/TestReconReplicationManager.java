@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.recon.fsck;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -42,13 +43,14 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationQueue;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest;
-import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManagerV2;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.apache.ozone.recon.schema.generated.tables.daos.UnhealthyContainersDao;
@@ -71,7 +73,7 @@ import org.junit.jupiter.api.Test;
  */
 public class TestReconReplicationManager extends AbstractReconSqlDBTest {
 
-  private ContainerHealthSchemaManagerV2 schemaManagerV2;
+  private ContainerHealthSchemaManager schemaManagerV2;
   private UnhealthyContainersDao dao;
   private ContainerManager containerManager;
   private ReconReplicationManager reconRM;
@@ -83,7 +85,7 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
   @BeforeEach
   public void setUp() throws Exception {
     dao = getDao(UnhealthyContainersDao.class);
-    schemaManagerV2 = new ContainerHealthSchemaManagerV2(
+    schemaManagerV2 = new ContainerHealthSchemaManager(
         getSchemaDefinition(ContainerSchemaDefinition.class), dao);
 
     containerManager = mock(ContainerManager.class);
@@ -146,13 +148,13 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
         emptyMissingContainerId, negativeSizeContainerId);
     reconRM.processAll();
 
-    List<ContainerHealthSchemaManagerV2.UnhealthyContainerRecordV2> emptyMissing =
+    List<ContainerHealthSchemaManager.UnhealthyContainerRecord> emptyMissing =
         schemaManagerV2.getUnhealthyContainers(
             UnHealthyContainerStates.EMPTY_MISSING, 0, 0, 100);
     assertEquals(1, emptyMissing.size());
     assertEquals(emptyMissingContainerId, emptyMissing.get(0).getContainerId());
 
-    List<ContainerHealthSchemaManagerV2.UnhealthyContainerRecordV2> negativeSize =
+    List<ContainerHealthSchemaManager.UnhealthyContainerRecord> negativeSize =
         schemaManagerV2.getUnhealthyContainers(
             UnHealthyContainerStates.NEGATIVE_SIZE, 0, 0, 100);
     assertEquals(1, negativeSize.size());
@@ -216,6 +218,114 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
         UnHealthyContainerStates.MIS_REPLICATED, 0, 0, 10).size());
     assertEquals(1, schemaManagerV2.getUnhealthyContainers(
         UnHealthyContainerStates.REPLICA_MISMATCH, 0, 0, 10).size());
+  }
+
+  @Test
+  public void testProcessAllMapsCompositeScmStatesToBaseStates() throws Exception {
+    final long unhealthyUnderContainerId = 401L;
+    final long unhealthyOverContainerId = 402L;
+    final long qcStuckMissingContainerId = 403L;
+    final long qcStuckUnderContainerId = 404L;
+    final long qcStuckOverContainerId = 405L;
+    final long missingUnderContainerId = 406L;
+
+    List<ContainerInfo> containers = Arrays.asList(
+        mockContainerInfo(unhealthyUnderContainerId, 5, 1024L, 3),
+        mockContainerInfo(unhealthyOverContainerId, 5, 1024L, 3),
+        mockContainerInfo(qcStuckMissingContainerId, 5, 1024L, 3),
+        mockContainerInfo(qcStuckUnderContainerId, 5, 1024L, 3),
+        mockContainerInfo(qcStuckOverContainerId, 5, 1024L, 3),
+        mockContainerInfo(missingUnderContainerId, 5, 1024L, 3));
+    when(containerManager.getContainers()).thenReturn(containers);
+
+    Map<Long, Set<ContainerReplica>> replicasByContainer = new HashMap<>();
+    replicasByContainer.put(unhealthyUnderContainerId,
+        setOfMockReplicasWithChecksums(1000L, 1000L));
+    replicasByContainer.put(unhealthyOverContainerId,
+        setOfMockReplicasWithChecksums(1000L, 1000L, 1000L, 1000L));
+    replicasByContainer.put(qcStuckMissingContainerId, Collections.emptySet());
+    replicasByContainer.put(qcStuckUnderContainerId,
+        setOfMockReplicasWithChecksums(1000L, 1000L));
+    replicasByContainer.put(qcStuckOverContainerId,
+        setOfMockReplicasWithChecksums(1000L, 1000L, 1000L, 1000L));
+    replicasByContainer.put(missingUnderContainerId, Collections.emptySet());
+
+    Map<Long, ContainerHealthState> stateByContainer = new HashMap<>();
+    stateByContainer.put(unhealthyUnderContainerId,
+        ContainerHealthState.UNHEALTHY_UNDER_REPLICATED);
+    stateByContainer.put(unhealthyOverContainerId,
+        ContainerHealthState.UNHEALTHY_OVER_REPLICATED);
+    stateByContainer.put(qcStuckMissingContainerId,
+        ContainerHealthState.QUASI_CLOSED_STUCK_MISSING);
+    stateByContainer.put(qcStuckUnderContainerId,
+        ContainerHealthState.QUASI_CLOSED_STUCK_UNDER_REPLICATED);
+    stateByContainer.put(qcStuckOverContainerId,
+        ContainerHealthState.QUASI_CLOSED_STUCK_OVER_REPLICATED);
+    stateByContainer.put(missingUnderContainerId,
+        ContainerHealthState.MISSING_UNDER_REPLICATED);
+
+    for (ContainerInfo container : containers) {
+      long containerId = container.getContainerID();
+      when(containerManager.getContainer(ContainerID.valueOf(containerId)))
+          .thenReturn(container);
+      when(containerManager.getContainerReplicas(ContainerID.valueOf(containerId)))
+          .thenReturn(replicasByContainer.get(containerId));
+    }
+
+    reconRM = createStateInjectingReconRM(stateByContainer);
+    reconRM.processAll();
+
+    List<ContainerHealthSchemaManager.UnhealthyContainerRecord> missing =
+        schemaManagerV2.getUnhealthyContainers(
+            UnHealthyContainerStates.MISSING, 0, 0, 20);
+    List<ContainerHealthSchemaManager.UnhealthyContainerRecord> underReplicated =
+        schemaManagerV2.getUnhealthyContainers(
+            UnHealthyContainerStates.UNDER_REPLICATED, 0, 0, 20);
+    List<ContainerHealthSchemaManager.UnhealthyContainerRecord> overReplicated =
+        schemaManagerV2.getUnhealthyContainers(
+            UnHealthyContainerStates.OVER_REPLICATED, 0, 0, 20);
+
+    assertEquals(2, missing.size());
+    assertEquals(3, underReplicated.size());
+    assertEquals(2, overReplicated.size());
+    assertEquals(0, schemaManagerV2.getUnhealthyContainers(
+        UnHealthyContainerStates.EMPTY_MISSING, 0, 0, 20).size());
+
+    assertTrue(containsContainerId(missing, missingUnderContainerId));
+    assertTrue(containsContainerId(underReplicated, missingUnderContainerId));
+  }
+
+  @Test
+  public void testProcessAllSkipsUnsupportedScmStateWithoutDbViolation()
+      throws Exception {
+    final long unsupportedStateContainerId = 407L;
+
+    ContainerInfo container = mockContainerInfo(
+        unsupportedStateContainerId, 5, 1024L, 3);
+    when(containerManager.getContainers()).thenReturn(Collections.singletonList(container));
+    when(containerManager.getContainer(ContainerID.valueOf(unsupportedStateContainerId)))
+        .thenReturn(container);
+    Set<ContainerReplica> replicas =
+        setOfMockReplicasWithChecksums(1000L, 1000L, 1000L);
+    when(containerManager.getContainerReplicas(ContainerID.valueOf(unsupportedStateContainerId)))
+        .thenReturn(replicas);
+
+    Map<Long, ContainerHealthState> stateByContainer = new HashMap<>();
+    // This SCM state has no matching value in Recon's allowed DB enum.
+    stateByContainer.put(unsupportedStateContainerId, ContainerHealthState.UNHEALTHY);
+
+    reconRM = createStateInjectingReconRM(stateByContainer);
+    reconRM.processAll();
+
+    assertEquals(0, dao.count());
+    assertEquals(0, schemaManagerV2.getUnhealthyContainers(
+        UnHealthyContainerStates.MISSING, 0, 0, 10).size());
+    assertEquals(0, schemaManagerV2.getUnhealthyContainers(
+        UnHealthyContainerStates.UNDER_REPLICATED, 0, 0, 10).size());
+    assertEquals(0, schemaManagerV2.getUnhealthyContainers(
+        UnHealthyContainerStates.OVER_REPLICATED, 0, 0, 10).size());
+    assertEquals(0, schemaManagerV2.getUnhealthyContainers(
+        UnHealthyContainerStates.MIS_REPLICATED, 0, 0, 10).size());
   }
 
   @Test
@@ -344,6 +454,22 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
     return new ReconReplicationManager(initContext, schemaManagerV2) {
       @Override
       protected boolean processContainer(ContainerInfo containerInfo,
+          Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps,
+          ReplicationQueue repQueue, ReplicationManagerReport report,
+          boolean readOnly) {
+        ReconReplicationManagerReport reconReport =
+            (ReconReplicationManagerReport) report;
+        ContainerHealthState state =
+            stateByContainer.get(containerInfo.getContainerID());
+        if (state != null) {
+          reconReport.incrementAndSample(state, containerInfo);
+          return true;
+        }
+        return false;
+      }
+
+      @Override
+      protected boolean processContainer(ContainerInfo containerInfo,
           ReplicationQueue repQueue, ReplicationManagerReport report,
           boolean readOnly) {
         ReconReplicationManagerReport reconReport =
@@ -367,5 +493,11 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
       replicas.add(replica);
     }
     return replicas;
+  }
+
+  private boolean containsContainerId(
+      List<ContainerHealthSchemaManager.UnhealthyContainerRecord> records,
+      long containerId) {
+    return records.stream().anyMatch(r -> r.getContainerId() == containerId);
   }
 }

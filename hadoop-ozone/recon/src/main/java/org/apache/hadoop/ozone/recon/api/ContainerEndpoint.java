@@ -75,7 +75,7 @@ import org.apache.hadoop.ozone.recon.api.types.MissingContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersSummary;
-import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManagerV2;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
@@ -101,7 +101,7 @@ public class ContainerEndpoint {
 
   private final ReconContainerManager containerManager;
   private final PipelineManager pipelineManager;
-  private final ContainerHealthSchemaManagerV2 containerHealthSchemaManagerV2;
+  private final ContainerHealthSchemaManager containerHealthSchemaManager;
   private final ReconNamespaceSummaryManager reconNamespaceSummaryManager;
   private final OzoneStorageContainerManager reconSCM;
   private static final Logger LOG =
@@ -142,14 +142,14 @@ public class ContainerEndpoint {
 
   @Inject
   public ContainerEndpoint(OzoneStorageContainerManager reconSCM,
-                           ContainerHealthSchemaManagerV2 containerHealthSchemaManagerV2,
+                           ContainerHealthSchemaManager containerHealthSchemaManager,
                            ReconNamespaceSummaryManager reconNamespaceSummaryManager,
                            ReconContainerMetadataManager reconContainerMetadataManager,
                            ReconOMMetadataManager omMetadataManager) {
     this.containerManager =
         (ReconContainerManager) reconSCM.getContainerManager();
     this.pipelineManager = reconSCM.getPipelineManager();
-    this.containerHealthSchemaManagerV2 = containerHealthSchemaManagerV2;
+    this.containerHealthSchemaManager = containerHealthSchemaManager;
     this.reconNamespaceSummaryManager = reconNamespaceSummaryManager;
     this.reconSCM = reconSCM;
     this.reconContainerMetadataManager = reconContainerMetadataManager;
@@ -339,7 +339,7 @@ public class ContainerEndpoint {
       int limit
   ) {
     List<MissingContainerMetadata> missingContainers = new ArrayList<>();
-    containerHealthSchemaManagerV2.getUnhealthyContainers(
+    containerHealthSchemaManager.getUnhealthyContainers(
             ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
             0L, 0L, limit)
         .forEach(container -> {
@@ -417,15 +417,15 @@ public class ContainerEndpoint {
       }
 
       // Get summary from V2 table and convert to V1 format
-      List<ContainerHealthSchemaManagerV2.UnhealthyContainersSummaryV2> v2Summary =
-          containerHealthSchemaManagerV2.getUnhealthyContainersSummary();
-      for (ContainerHealthSchemaManagerV2.UnhealthyContainersSummaryV2 s : v2Summary) {
+      List<ContainerHealthSchemaManager.UnhealthyContainersSummary> v2Summary =
+          containerHealthSchemaManager.getUnhealthyContainersSummary();
+      for (ContainerHealthSchemaManager.UnhealthyContainersSummary s : v2Summary) {
         summary.add(new UnhealthyContainersSummary(s.getContainerState(), s.getCount()));
       }
 
       // Get containers from V2 table
-      List<ContainerHealthSchemaManagerV2.UnhealthyContainerRecordV2> v2Containers =
-          containerHealthSchemaManagerV2.getUnhealthyContainers(v2State, minContainerId, maxContainerId, limit);
+      List<ContainerHealthSchemaManager.UnhealthyContainerRecord> v2Containers =
+          containerHealthSchemaManager.getUnhealthyContainers(v2State, minContainerId, maxContainerId, limit);
 
       unhealthyMeta = v2Containers.stream()
           .map(this::toUnhealthyMetadata)
@@ -452,7 +452,7 @@ public class ContainerEndpoint {
   }
 
   private UnhealthyContainerMetadata toUnhealthyMetadata(
-      ContainerHealthSchemaManagerV2.UnhealthyContainerRecordV2 record) {
+      ContainerHealthSchemaManager.UnhealthyContainerRecord record) {
     try {
       long containerID = record.getContainerId();
       ContainerInfo containerInfo =

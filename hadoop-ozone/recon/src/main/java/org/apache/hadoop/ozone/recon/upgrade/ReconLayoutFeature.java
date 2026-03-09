@@ -34,7 +34,9 @@ public enum ReconLayoutFeature {
 
   // HDDS-13432: Materialize NSSummary totals and rebuild tree on upgrade
   NSSUMMARY_AGGREGATED_TOTALS(3, "Aggregated totals for NSSummary and auto-rebuild on upgrade"),
-  REPLICATED_SIZE_OF_FILES(4, "Adds replicatedSizeOfFiles to NSSummary");
+  REPLICATED_SIZE_OF_FILES(4, "Adds replicatedSizeOfFiles to NSSummary"),
+  UNHEALTHY_CONTAINERS_STATE_CONTAINER_ID_INDEX(5,
+      "Adds idx_state_container_id index on UNHEALTHY_CONTAINERS for upgrades");
 
   private final int version;
   private final String description;

@@ -38,8 +38,8 @@ import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.ozone.recon.ReconControllerModule.ReconDaoBindingModule;
 import org.apache.hadoop.ozone.recon.ReconSchemaManager;
 import org.apache.hadoop.ozone.recon.persistence.AbstractReconSqlDBTest.DerbyDataSourceConfigurationProvider;
-import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManagerV2.UnhealthyContainerRecordV2;
-import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManagerV2.UnhealthyContainersSummaryV2;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager.UnhealthyContainerRecord;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager.UnhealthyContainersSummary;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.apache.ozone.recon.schema.ReconSchemaGenerationModule;
@@ -158,12 +158,12 @@ public class TestUnhealthyContainersDerbyPerformance {
 
   /**
    * Number of container IDs to pass per
-   * {@link ContainerHealthSchemaManagerV2#batchDeleteSCMStatesForContainers}
+   * {@link ContainerHealthSchemaManager#batchDeleteSCMStatesForContainers}
    * call in the delete test.
    *
    * <p>{@code batchDeleteSCMStatesForContainers} now handles internal
-   * chunking at {@link ContainerHealthSchemaManagerV2#MAX_DELETE_CHUNK_SIZE}
-   * ({@value ContainerHealthSchemaManagerV2#MAX_DELETE_CHUNK_SIZE} IDs per
+   * chunking at {@link ContainerHealthSchemaManager#MAX_DELETE_CHUNK_SIZE}
+   * ({@value ContainerHealthSchemaManager#MAX_DELETE_CHUNK_SIZE} IDs per
    * SQL statement) to stay within Derby's 64 KB generated-bytecode limit
    * (ERROR XBCM4).  This test-level constant controls how many IDs are
    * accumulated before each call and should match that limit so the test
@@ -209,7 +209,7 @@ public class TestUnhealthyContainersDerbyPerformance {
   // Infrastructure (shared for the life of this test class)
   // -----------------------------------------------------------------------
 
-  private ContainerHealthSchemaManagerV2 schemaManager;
+  private ContainerHealthSchemaManager schemaManager;
   private UnhealthyContainersDao dao;
   private ContainerSchemaDefinition schemaDefinition;
 
@@ -272,7 +272,7 @@ public class TestUnhealthyContainersDerbyPerformance {
 
     dao = injector.getInstance(UnhealthyContainersDao.class);
     schemaDefinition = injector.getInstance(ContainerSchemaDefinition.class);
-    schemaManager = new ContainerHealthSchemaManagerV2(schemaDefinition, dao);
+    schemaManager = new ContainerHealthSchemaManager(schemaDefinition, dao);
 
     // ----- Insert 1 M records in small per-transaction chunks -----
     //
@@ -290,7 +290,7 @@ public class TestUnhealthyContainersDerbyPerformance {
 
     for (int startId = 1; startId <= CONTAINER_ID_RANGE; startId += CONTAINERS_PER_TX) {
       int endId = Math.min(startId + CONTAINERS_PER_TX - 1, CONTAINER_ID_RANGE);
-      List<UnhealthyContainerRecordV2> chunk = generateRecordsForRange(startId, endId, now);
+      List<UnhealthyContainerRecord> chunk = generateRecordsForRange(startId, endId, now);
       schemaManager.insertUnhealthyContainerRecords(chunk);
     }
 
@@ -372,7 +372,7 @@ public class TestUnhealthyContainersDerbyPerformance {
   // -----------------------------------------------------------------------
 
   /**
-   * Runs the {@link ContainerHealthSchemaManagerV2#getUnhealthyContainersSummary()}
+   * Runs the {@link ContainerHealthSchemaManager#getUnhealthyContainersSummary()}
    * GROUP-BY query over all 1 M rows, which represents a typical API request
    * to populate the Recon UI dashboard.
    *
@@ -385,7 +385,7 @@ public class TestUnhealthyContainersDerbyPerformance {
     LOG.info("--- Test 3: GROUP BY summary over {} rows ---", TOTAL_RECORDS);
 
     long start = System.nanoTime();
-    List<UnhealthyContainersSummaryV2> summary =
+    List<UnhealthyContainersSummary> summary =
         schemaManager.getUnhealthyContainersSummary();
     long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
 
@@ -397,7 +397,7 @@ public class TestUnhealthyContainersDerbyPerformance {
     assertEquals(STATE_COUNT, summary.size(),
         "Summary must contain one entry per tested state");
 
-    for (UnhealthyContainersSummaryV2 entry : summary) {
+    for (UnhealthyContainersSummary entry : summary) {
       assertEquals(CONTAINER_ID_RANGE, entry.getCount(),
           "Each state must have " + CONTAINER_ID_RANGE + " records in the summary");
     }
@@ -440,7 +440,7 @@ public class TestUnhealthyContainersDerbyPerformance {
     long start = System.nanoTime();
 
     while (true) {
-      List<UnhealthyContainerRecordV2> page =
+      List<ContainerHealthSchemaManager.UnhealthyContainerRecord> page =
           schemaManager.getUnhealthyContainers(
               targetState, minContainerId, 0, READ_PAGE_SIZE);
 
@@ -448,7 +448,7 @@ public class TestUnhealthyContainersDerbyPerformance {
         break;
       }
 
-      for (UnhealthyContainerRecordV2 rec : page) {
+      for (ContainerHealthSchemaManager.UnhealthyContainerRecord rec : page) {
         if (rec.getContainerId() <= lastContainerId) {
           orderedCorrectly = false;
         }
@@ -506,7 +506,7 @@ public class TestUnhealthyContainersDerbyPerformance {
       long minId = 0;
 
       while (true) {
-        List<UnhealthyContainerRecordV2> page =
+        List<ContainerHealthSchemaManager.UnhealthyContainerRecord> page =
             schemaManager.getUnhealthyContainers(state, minId, 0, READ_PAGE_SIZE);
         if (page.isEmpty()) {
           break;
@@ -547,10 +547,10 @@ public class TestUnhealthyContainersDerbyPerformance {
   /**
    * Deletes records for the first half of container IDs (1 – 100,000) across
    * all five states by passing the complete 100 K ID list in one call to
-   * {@link ContainerHealthSchemaManagerV2#batchDeleteSCMStatesForContainers}.
+   * {@link ContainerHealthSchemaManager#batchDeleteSCMStatesForContainers}.
    *
    * <p>{@code batchDeleteSCMStatesForContainers} now handles internal
-   * chunking at {@link ContainerHealthSchemaManagerV2#MAX_DELETE_CHUNK_SIZE}
+   * chunking at {@link ContainerHealthSchemaManager#MAX_DELETE_CHUNK_SIZE}
    * IDs per SQL statement to stay within Derby's 64 KB generated-bytecode
    * limit (JVM ERROR XBCM4).  Passing 100 K IDs in a single call is safe
    * because the method partitions them internally into 100 statements of
@@ -569,12 +569,12 @@ public class TestUnhealthyContainersDerbyPerformance {
     int expectedDeleted = deleteCount * STATE_COUNT;    // 500 000 rows
     int expectedRemaining = TOTAL_RECORDS - expectedDeleted;
     int internalChunks = (int) Math.ceil(
-        (double) deleteCount / ContainerHealthSchemaManagerV2.MAX_DELETE_CHUNK_SIZE);
+        (double) deleteCount / ContainerHealthSchemaManager.MAX_DELETE_CHUNK_SIZE);
 
     LOG.info("--- Test 6: Batch DELETE — {} IDs × {} states = {} rows  "
             + "({} internal SQL statements of {} IDs) ---",
         deleteCount, STATE_COUNT, expectedDeleted,
-        internalChunks, ContainerHealthSchemaManagerV2.MAX_DELETE_CHUNK_SIZE);
+        internalChunks, ContainerHealthSchemaManager.MAX_DELETE_CHUNK_SIZE);
 
     long start = System.nanoTime();
 
@@ -656,10 +656,10 @@ public class TestUnhealthyContainersDerbyPerformance {
    * @param timestamp epoch millis to use as {@code in_state_since}
    * @return list of {@code (endId - startId + 1) × STATE_COUNT} records
    */
-  private List<UnhealthyContainerRecordV2> generateRecordsForRange(
+  private List<ContainerHealthSchemaManager.UnhealthyContainerRecord> generateRecordsForRange(
       int startId, int endId, long timestamp) {
     int size = (endId - startId + 1) * STATE_COUNT;
-    List<UnhealthyContainerRecordV2> records = new ArrayList<>(size);
+    List<UnhealthyContainerRecord> records = new ArrayList<>(size);
 
     for (int containerId = startId; containerId <= endId; containerId++) {
       for (UnHealthyContainerStates state : TESTED_STATES) {
@@ -699,7 +699,7 @@ public class TestUnhealthyContainersDerbyPerformance {
           reason = "Unknown state";
         }
 
-        records.add(new UnhealthyContainerRecordV2(
+        records.add(new ContainerHealthSchemaManager.UnhealthyContainerRecord(
             containerId,
             state.toString(),
             timestamp,

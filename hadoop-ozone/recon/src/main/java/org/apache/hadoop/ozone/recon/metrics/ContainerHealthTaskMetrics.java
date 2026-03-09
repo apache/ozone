@@ -27,33 +27,33 @@ import org.apache.hadoop.metrics2.lib.MutableRate;
 import org.apache.hadoop.ozone.OzoneConsts;
 
 /**
- * Runtime metrics for ContainerHealthTaskV2 execution.
+ * Runtime metrics for ContainerHealthTask execution.
  */
 @InterfaceAudience.Private
-@Metrics(about = "ContainerHealthTaskV2 Metrics", context = OzoneConsts.OZONE)
-public final class ContainerHealthTaskV2Metrics {
+@Metrics(about = "ContainerHealthTask Metrics", context = OzoneConsts.OZONE)
+public final class ContainerHealthTaskMetrics {
 
   private static final String SOURCE_NAME =
-      ContainerHealthTaskV2Metrics.class.getSimpleName();
+      ContainerHealthTaskMetrics.class.getSimpleName();
 
-  @Metric(about = "ContainerHealthTaskV2 runtime in milliseconds")
+  @Metric(about = "ContainerHealthTask runtime in milliseconds")
   private MutableRate runTimeMs;
 
-  @Metric(about = "ContainerHealthTaskV2 successful runs")
+  @Metric(about = "ContainerHealthTask successful runs")
   private MutableCounterLong runSuccessCount;
 
-  @Metric(about = "ContainerHealthTaskV2 failed runs")
+  @Metric(about = "ContainerHealthTask failed runs")
   private MutableCounterLong runFailureCount;
 
-  private ContainerHealthTaskV2Metrics() {
+  private ContainerHealthTaskMetrics() {
   }
 
-  public static ContainerHealthTaskV2Metrics create() {
+  public static ContainerHealthTaskMetrics create() {
     MetricsSystem ms = DefaultMetricsSystem.instance();
     return ms.register(
         SOURCE_NAME,
-        "ContainerHealthTaskV2 Metrics",
-        new ContainerHealthTaskV2Metrics());
+        "ContainerHealthTask Metrics",
+        new ContainerHealthTaskMetrics());
   }
 
   public void unRegister() {

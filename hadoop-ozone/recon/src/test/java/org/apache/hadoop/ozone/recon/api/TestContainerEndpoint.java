@@ -97,7 +97,7 @@ import org.apache.hadoop.ozone.recon.api.types.MissingContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.MissingContainersResponse;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainerMetadata;
 import org.apache.hadoop.ozone.recon.api.types.UnhealthyContainersResponse;
-import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManagerV2;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.persistence.ContainerHistory;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
@@ -140,7 +140,7 @@ public class TestContainerEndpoint {
   private ReconContainerMetadataManager reconContainerMetadataManager;
   private ContainerEndpoint containerEndpoint;
   private boolean isSetupDone = false;
-  private ContainerHealthSchemaManagerV2 containerHealthSchemaManager;
+  private ContainerHealthSchemaManager containerHealthSchemaManager;
   private ReconOMMetadataManager reconOMMetadataManager;
   private OzoneConfiguration omConfiguration;
 
@@ -197,7 +197,7 @@ public class TestContainerEndpoint {
             .addBinding(StorageContainerServiceProvider.class,
                 mock(StorageContainerServiceProviderImpl.class))
             .addBinding(ContainerEndpoint.class)
-            .addBinding(ContainerHealthSchemaManagerV2.class)
+            .addBinding(ContainerHealthSchemaManager.class)
             .build();
 
     OzoneStorageContainerManager ozoneStorageContainerManager =
@@ -210,7 +210,7 @@ public class TestContainerEndpoint {
         reconTestInjector.getInstance(ReconContainerMetadataManager.class);
     containerEndpoint = reconTestInjector.getInstance(ContainerEndpoint.class);
     containerHealthSchemaManager =
-        reconTestInjector.getInstance(ContainerHealthSchemaManagerV2.class);
+        reconTestInjector.getInstance(ContainerHealthSchemaManager.class);
     this.reconNamespaceSummaryManager =
         reconTestInjector.getInstance(ReconNamespaceSummaryManager.class);
 
@@ -1157,9 +1157,9 @@ public class TestContainerEndpoint {
   private void createUnhealthyRecord(int id, String state, int expected,
                                      int actual, int delta, String reason, boolean dataChecksumMismatch) {
     long cID = Integer.toUnsignedLong(id);
-    ArrayList<ContainerHealthSchemaManagerV2.UnhealthyContainerRecordV2> records =
+    ArrayList<ContainerHealthSchemaManager.UnhealthyContainerRecord> records =
         new ArrayList<>();
-    records.add(new ContainerHealthSchemaManagerV2.UnhealthyContainerRecordV2(
+    records.add(new ContainerHealthSchemaManager.UnhealthyContainerRecord(
         cID, state, 12345L, expected, actual, delta, reason));
     containerHealthSchemaManager.insertUnhealthyContainerRecords(records);
 

@@ -27,7 +27,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
-import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManagerV2.UnhealthyContainerRecordV2;
+import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager.UnhealthyContainerRecord;
 import org.apache.hadoop.ozone.recon.scm.ReconContainerManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
@@ -39,7 +39,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Integration tests for ContainerHealthTaskV2 with multi-node clusters.
+ * Integration tests for ContainerHealthTask with multi-node clusters.
  *
  * These tests are separate from TestReconTasks because they require
  * different cluster configurations (3 datanodes) and would conflict
@@ -95,7 +95,7 @@ public class TestReconTasksV2MultiNode {
   }
 
   /**
-   * Test that ContainerHealthTaskV2 can query UNDER_REPLICATED containers.
+   * Test that ContainerHealthTask can query UNDER_REPLICATED containers.
    * Steps:
    * 1. Create a cluster with 3 datanodes
    * 2. Verify the query mechanism for UNDER_REPLICATED state works
@@ -119,7 +119,7 @@ public class TestReconTasksV2MultiNode {
    * 2. Write actual data to container (creates physical replicas)
    * 3. Shut down 1 datanode
    * 4. Wait for SCM to mark datanode as dead (stale/dead intervals)
-   * 5. Wait for ContainerHealthTaskV2 to run (task interval)
+   * 5. Wait for ContainerHealthTask to run (task interval)
    * 6. Verify UNDER_REPLICATED state in V2 table with correct replica counts
    * 7. Restart datanode and verify container becomes healthy
    */
@@ -128,7 +128,7 @@ public class TestReconTasksV2MultiNode {
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE, 60000);
 
     // Verify the query mechanism for UNDER_REPLICATED state works
-    List<UnhealthyContainerRecordV2> underReplicatedContainers =
+    List<UnhealthyContainerRecord> underReplicatedContainers =
         reconContainerManager.getContainerSchemaManagerV2()
             .getUnhealthyContainers(
                 ContainerSchemaDefinition.UnHealthyContainerStates.UNDER_REPLICATED,
@@ -139,13 +139,13 @@ public class TestReconTasksV2MultiNode {
   }
 
   /**
-   * Test that ContainerHealthTaskV2 detects OVER_REPLICATED containers.
+   * Test that ContainerHealthTask detects OVER_REPLICATED containers.
    * Steps:
    * 1. Create a cluster with 3 datanodes
    * 2. Allocate a container with replication factor 1
    * 3. Write data to the container
    * 4. Manually add the container to additional datanodes to create over-replication
-   * 5. Verify ContainerHealthTaskV2 detects OVER_REPLICATED state in V2 table
+   * 5. Verify ContainerHealthTask detects OVER_REPLICATED state in V2 table
    *
    * Note: Creating over-replication scenarios is complex in integration tests
    * as it requires manipulating the container replica state artificially.
@@ -167,7 +167,7 @@ public class TestReconTasksV2MultiNode {
     // should contain the record with proper replica counts.
 
     // For now, just verify that the query mechanism works
-    List<UnhealthyContainerRecordV2> overReplicatedContainers =
+    List<UnhealthyContainerRecord> overReplicatedContainers =
         reconContainerManager.getContainerSchemaManagerV2()
             .getUnhealthyContainers(
                 ContainerSchemaDefinition.UnHealthyContainerStates.OVER_REPLICATED,

@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.recon.fsck;
 
 import javax.inject.Inject;
-import org.apache.hadoop.ozone.recon.metrics.ContainerHealthTaskV2Metrics;
+import org.apache.hadoop.ozone.recon.metrics.ContainerHealthTaskMetrics;
 import org.apache.hadoop.ozone.recon.scm.ReconScmTask;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
 import org.apache.hadoop.ozone.recon.tasks.ReconTaskConfig;
@@ -51,25 +51,26 @@ import org.slf4j.LoggerFactory;
  * @see ReconReplicationManager
  * @see NoOpsContainerReplicaPendingOps
  */
-public class ContainerHealthTaskV2 extends ReconScmTask {
+public class ContainerHealthTask extends ReconScmTask {
 
   private static final Logger LOG =
-      LoggerFactory.getLogger(ContainerHealthTaskV2.class);
+      LoggerFactory.getLogger(ContainerHealthTask.class);
+  private static final long MIN_NEXT_RUN_INTERVAL_MS = 60_000L;
 
   private final ReconStorageContainerManagerFacade reconScm;
   private final long interval;
-  private final ContainerHealthTaskV2Metrics metrics;
+  private final ContainerHealthTaskMetrics taskMetrics;
 
   @Inject
-  public ContainerHealthTaskV2(
+  public ContainerHealthTask(
       ReconTaskConfig reconTaskConfig,
       ReconTaskStatusUpdaterManager taskStatusUpdaterManager,
       ReconStorageContainerManagerFacade reconScm) {
     super(taskStatusUpdaterManager);
     this.reconScm = reconScm;
     this.interval = reconTaskConfig.getMissingContainerTaskInterval().toMillis();
-    this.metrics = ContainerHealthTaskV2Metrics.create();
-    LOG.info("Initialized ContainerHealthTaskV2 with Local ReplicationManager, interval={}ms",
+    this.taskMetrics = ContainerHealthTaskMetrics.create();
+    LOG.info("Initialized ContainerHealthTask with Local ReplicationManager, interval={}ms",
         interval);
   }
 
@@ -80,16 +81,16 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
       try {
         initializeAndRunTask();
         long elapsed = Time.monotonicNow() - cycleStart;
-        long sleepMs = Math.max(0, interval - elapsed);
+        long sleepMs = Math.max(MIN_NEXT_RUN_INTERVAL_MS, interval - elapsed);
         if (sleepMs > 0) {
           Thread.sleep(sleepMs);
         }
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
-        LOG.info("ContainerHealthTaskV2 interrupted");
+        LOG.info("ContainerHealthTask interrupted");
         break;
       } catch (Exception e) {
-        LOG.error("Error in ContainerHealthTaskV2", e);
+        LOG.error("Error in ContainerHealthTask", e);
       }
     }
   }
@@ -107,7 +108,7 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
   @Override
   protected void runTask() throws Exception {
     long start = Time.monotonicNow();
-    LOG.info("ContainerHealthTaskV2 starting - using local ReplicationManager");
+    LOG.info("ContainerHealthTask starting - using local ReplicationManager");
 
     // Get Recon's ReplicationManager (actually a ReconReplicationManager instance)
     ReconReplicationManager reconRM =
@@ -121,15 +122,15 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
     boolean succeeded = false;
     try {
       reconRM.processAll();
-      metrics.incrSuccess();
+      taskMetrics.incrSuccess();
       succeeded = true;
     } catch (Exception e) {
-      metrics.incrFailure();
+      taskMetrics.incrFailure();
       throw e;
     } finally {
       long durationMs = Time.monotonicNow() - start;
-      metrics.addRunTime(durationMs);
-      LOG.info("ContainerHealthTaskV2 completed with status={} in {} ms",
+      taskMetrics.addRunTime(durationMs);
+      LOG.info("ContainerHealthTask completed with status={} in {} ms",
           succeeded ? "success" : "failure", durationMs);
     }
   }
@@ -137,6 +138,6 @@ public class ContainerHealthTaskV2 extends ReconScmTask {
   @Override
   public synchronized void stop() {
     super.stop();
-    metrics.unRegister();
+    taskMetrics.unRegister();
   }
 }

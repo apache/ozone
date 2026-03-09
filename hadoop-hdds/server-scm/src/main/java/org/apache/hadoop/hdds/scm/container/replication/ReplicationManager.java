@@ -853,17 +853,23 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   protected boolean processContainer(ContainerInfo containerInfo,
       ReplicationQueue repQueue, ReplicationManagerReport report,
       boolean readOnly) throws ContainerNotFoundException {
+    ContainerID containerID = containerInfo.containerID();
+    Set<ContainerReplica> replicas = containerManager.getContainerReplicas(
+        containerID);
+    List<ContainerReplicaOp> pendingOps =
+        containerReplicaPendingOps.getPendingOps(containerID);
+    return processContainer(containerInfo, replicas, pendingOps, repQueue, report,
+        readOnly);
+  }
+
+  protected boolean processContainer(ContainerInfo containerInfo,
+      Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps,
+      ReplicationQueue repQueue, ReplicationManagerReport report,
+      boolean readOnly) throws ContainerNotFoundException {
     synchronized (containerInfo) {
       // Reset health state to HEALTHY before processing this container
       report.resetContainerHealthState();
-      
-      ContainerID containerID = containerInfo.containerID();
       final boolean isEC = isEC(containerInfo.getReplicationConfig());
-
-      Set<ContainerReplica> replicas = containerManager.getContainerReplicas(
-          containerID);
-      List<ContainerReplicaOp> pendingOps =
-          containerReplicaPendingOps.getPendingOps(containerID);
 
       ContainerCheckRequest checkRequest = new ContainerCheckRequest.Builder()
           .setContainerInfo(containerInfo)
