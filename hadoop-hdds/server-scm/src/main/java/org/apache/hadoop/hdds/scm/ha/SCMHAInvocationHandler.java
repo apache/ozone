@@ -117,7 +117,7 @@ public class SCMHAInvocationHandler implements InvocationHandler {
   private Object invokeRatisServer(Method method, Object[] args)
       throws Exception {
     SCMRatisRequest scmRatisRequest = SCMRatisRequest.of(requestType,
-        method.getName(), method.getParameterTypes(), args);
+        method.getName(), method.getParameterTypes(), method.getGenericParameterTypes(), args);
     final SCMRatisResponse response = ratisHandler.submitRequest(
         scmRatisRequest);
     if (response.isSuccess()) {
@@ -129,7 +129,7 @@ public class SCMHAInvocationHandler implements InvocationHandler {
   private Object invokeRatisClient(Method method, Object[] args)
       throws Exception {
     final SCMRatisRequest scmRatisRequest = SCMRatisRequest.of(requestType,
-        method.getName(), method.getParameterTypes(), args);
+        method.getName(), method.getParameterTypes(), method.getGenericParameterTypes(), args);
     final SCMRatisResponse response = HASecurityUtils.submitScmRequestToRatis(
         ratisHandler.getDivision().getGroup(),
         ratisHandler.getGrpcTlsConfig(),
