@@ -152,13 +152,16 @@ It provides:
 | `addFlush(fileName, snapshotGeneration, flushTime, startKey, endKey, columnFamily)` | O(1) | Append a new flush (always newest) |
 | `getFlushNode(fileName)` | O(1) | Look up a flush by SST file name |
 | `getFlushNodesBetween(fromGen, toGen)` | O(N) | Get all flushes in a generation range |
-| `pruneOlderThan(generation)` | O(K) | Remove all flushes before a generation (K = removed count, stops early) |
-| `pruneOlderThanTime(cutoffTime)` | O(K) | Remove all flushes before a timestamp |
+| `pruneOlderThan(snapshotGeneration)` | O(K) | Remove all flush nodes with `snapshotGeneration` strictly less than the given value; stops at the first newer node (K = removed count) |
+| `pruneOlderThanTime(cutoffTime)` | O(K) | Remove all flush nodes with `flushTime` strictly less than the given cutoff timestamp (milliseconds); stops at the first newer node (K = removed count) |
 | `getOldest()` / `getNewest()` | O(1) | Peek at the head or tail of the list |
 
-Because the list is time-ordered, `pruneOlderThan()` stops as soon as it
-encounters a node newer than the cutoff — giving O(K) time where K is the
-number of removed entries, not O(N) over the full list.
+Because the list is ordered by `snapshotGeneration`, both `pruneOlderThan()` and
+`pruneOlderThanTime()` stop as soon as they encounter a node that is not older
+than the cutoff — giving O(K) time where K is the number of removed entries,
+not O(N) over the full list. In practice the background pruning task calls
+`pruneOlderThanTime()` (wall-clock based), while `pruneOlderThan()` is
+available for generation-based pruning (e.g. in tests or future callers).
 
 # 5. Data Flow
 
@@ -244,7 +247,7 @@ Note that `FlushLogEntryProto.fileInfo` is a **singular** field (not repeated), 
 | Tracked event | Compaction (multi-input → multi-output) | Flush (memtable → one L0 file) |
 | Listener callbacks | `onCompactionBegin()` + `onCompactionCompleted()` | `onFlushCompleted()` only |
 | Data structure | Guava `MutableGraph` (DAG) | `LinkedList` + `ConcurrentMap` |
-| Diff query | DAG traversal (recursive successor search) | Linear range scan |
+| Diff query | DAG traversal (recursive successor search) | SST file set intersection / set difference |
 | Pruning | Graph node removal (complex) | Head-truncation of ordered list (O(K)) |
 | Race conditions | In-flight compaction map required | None (flush is a single atomic event) |
 | Memory growth | Unbounded without careful pruning | Bounded by active snapshot range |
