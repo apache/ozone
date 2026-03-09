@@ -85,8 +85,8 @@ between any two snapshots.
 All flushes happen in **strict chronological order**, indexed by the RocksDB DB sequence number (snapshot generation).
 This means:
 
-- All files flushed in generation range `(fromGen, toGen]` are "changed" files for the snapshot diff.
-- A simple **time-ordered linked list** replaces the complex DAG.
+- The diff between two snapshots reduces to a **set difference** of their SST file sets: files in src-but-not-dest (and vice versa) are "changed"; files in both are "unchanged".
+- A simple **time-ordered linked list** replaces the complex DAG for tracking flush history (used for startup recovery, pruning, and observability).
 - A single `onFlushCompleted()` listener replaces the two-phase compaction listeners.
 
 ## 3.2. Component Overview
@@ -149,7 +149,7 @@ It provides:
 
 | Method | Complexity | Description |
 |--------|-----------|-------------|
-| `addFlush(FlushNode)` | O(1) | Append a new flush (always newest) |
+| `addFlush(fileName, snapshotGeneration, flushTime, startKey, endKey, columnFamily)` | O(1) | Append a new flush (always newest) |
 | `getFlushNode(fileName)` | O(1) | Look up a flush by SST file name |
 | `getFlushNodesBetween(fromGen, toGen)` | O(N) | Get all flushes in a generation range |
 | `pruneOlderThan(generation)` | O(K) | Remove all flushes before a generation (K = removed count, stops early) |
@@ -170,19 +170,21 @@ When RocksDB flushes a memtable to an L0 SST file, the `onFlushCompleted()` list
 
 ## 5.2. Snapshot Diff Calculation
 
-When a user requests the diff between snapshot A (generation `fromGen`) and snapshot B (generation `toGen`):
+When a user requests the diff between snapshot A (generation `fromGen`) and snapshot B (generation `toGen`), `internalGetSSTDiffListUsingFlush` is called:
 
-![flush-tracking-computeSnapshotDiff.png](flush-tracking-computeSnapshotDiff.png)
+1. **Query flush history (observability):** `FlushLinkedList.getFlushNodesBetween(dest.gen, src.gen)` is called to collect the set of file names flushed in that generation range. This is logged for debugging but does **not** drive the classification below.
+2. **Set intersection → sameFiles:** Iterate over `srcSnapFiles`; any file also present in `destSnapFiles` goes to `sameFiles`.
+3. **Set difference → differentFiles:** Any file only in `srcSnapFiles` (not in `destSnapFiles`) goes to `differentFiles`. Then iterate `destSnapFiles`; any file not already classified goes to `differentFiles`.
+
+In other words, the diff is a straightforward **SST file set difference** between the two snapshots. The `FlushLinkedList` range query serves as an observability hook (debug log) rather than the branching logic itself.
 
 **Contrast with the old DAG approach:**
 
-Old (Compaction DAG):
-
-![flush-tracking-old.png](flush-tracking-old.png)
-
-New (Flush list):
-
-![flush-tracking-new.png](flush-tracking-new.png)
+| Step | Compaction DAG (old) | Flush list (new) |
+|------|---------------------|------------------|
+| Core question | Which compaction successors of src-SSTs appear in dest? | Which SST files are in src but not dest (and vice versa)? |
+| Mechanism | Recursive graph traversal | Set intersection / set difference |
+| FlushLinkedList role | N/A | Startup recovery, pruning, observability |
 
 ## 5.3. OM Startup: Loading Flush History
 
@@ -205,9 +207,12 @@ Each row stores a serialized `FlushLogEntryProto`.
 
 **Schema:**
 
-| Key                   | Value                      |
-|-----------------------|----------------------------|
-| `<dbSequenceNumber>_<fileName>` | `FlushLogEntryProto` (serialized protobuf) |
+| Key                              | Value                                      |
+|----------------------------------|--------------------------------------------|
+| `<paddedSequenceNumber>-<flushTime>` | `FlushLogEntryProto` (serialized protobuf) |
+
+- `<paddedSequenceNumber>` — the DB sequence number **left-padded with zeros** to `LONG_MAX_STR_LEN` (19) characters, ensuring correct **lexicographic ordering** when iterating the column family.
+- `<flushTime>` — the wall-clock flush timestamp in milliseconds, appended to avoid key collisions when two flushes share the same sequence number.
 
 The column family handle is set on `RocksDBCheckpointDiffer` during `RDBStore` initialization and is used for both writes (on flush events) and reads (on startup).
 
@@ -247,10 +252,12 @@ Note that `FlushLogEntryProto.fileInfo` is a **singular** field (not repeated), 
 
 # 8. Backward Compatibility
 
-The `CompactionLogTable` and associated log-file loading path (`addEntriesFromLogFilesToDagAndCompactionLogTable`) are retained for backward compatibility with existing deployments.
-On startup, Ozone loads legacy compaction log data if present, alongside the new flush log data.
+The in-memory `CompactionDag` (and `CompactionNode`) have been **removed**. The `CompactionLogTable` and legacy text log-file loading path (`addEntriesFromLogFilesToDagAndCompactionLogTable`) are retained for the following limited purpose:
 
-New deployments will only write to `FlushLogTable` and rely on `FlushLinkedList` for all snapshot diff operations.
+- On startup, if legacy compaction log **text files** are present, they are read and their entries are written into `CompactionLogTable`, then the files are deleted. This is a one-time migration step.
+- The `CompactionLogTable` data itself is **not** used to reconstruct any in-memory DAG; it is kept on disk for audit/recovery purposes only.
+
+Snapshot diff for **all** deployments (old and new) is now served exclusively by `FlushLinkedList` populated from `FlushLogTable`. An existing cluster that upgrades will start accumulating flush log entries from the moment of upgrade; snapshots created before the upgrade may fall back to full diff if no flush history is available.
 
 ### References
 - [HDDS-13874](https://issues.apache.org/jira/browse/HDDS-13874)
