@@ -179,11 +179,17 @@ public class TypedTable<KEY, VALUE> implements Table<KEY, VALUE> {
     } else if (keyCodec.supportCodecBuffer()) {
       // keyCodec.supportCodecBuffer() is enough since value is not needed.
       try (CodecBuffer inKey = keyCodec.toDirectCodecBuffer(key)) {
-        // Use zero capacity buffer since value is not needed.
+        // Try the lightweight "existence only" check first.
         try (CodecBuffer outValue = CodecBuffer.getEmptyBuffer()) {
-          return getFromTableIfExist(inKey, outValue) != null;
+          if (getFromTableIfExist(inKey, outValue) != null) {
+            return true;
+          }
         }
       }
+      // keyMayExist/getIfExist can still be false-negative in some RocksDB
+      // configurations (observed with snapshot/checkpoint DBs), so confirm with
+      // a regular point lookup before returning false.
+      return getFromTable(key) != null;
     } else {
       return rawTable.isExist(encodeKey(key));
     }
