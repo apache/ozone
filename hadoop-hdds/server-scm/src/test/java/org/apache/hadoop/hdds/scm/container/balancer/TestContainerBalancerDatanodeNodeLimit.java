@@ -461,6 +461,23 @@ public class TestContainerBalancerDatanodeNodeLimit {
 
   @ParameterizedTest(name = "MockedSCM #{index}: {0}")
   @MethodSource("createMockedSCMs")
+  public void balancerShouldOnlySelectConfiguredIncludeContainers(@Nonnull MockedSCM mockedSCM) {
+    ContainerBalancerConfiguration config = new ContainerBalancerConfigBuilder(mockedSCM.getNodeCount()).build();
+    config.setIncludeContainers("1, 4, 5");
+
+    ContainerBalancerTask task = mockedSCM.startBalancerTask(config);
+
+    Set<ContainerID> includeContainers = config.getIncludeContainers();
+    assertThat(task.getContainerToSourceMap()).isNotEmpty();
+    for (ContainerID container : task.getContainerToSourceMap().keySet()) {
+      assertThat(includeContainers)
+          .as("Container %s should be in the include list", container)
+          .contains(container);
+    }
+  }
+
+  @ParameterizedTest(name = "MockedSCM #{index}: {0}")
+  @MethodSource("createMockedSCMs")
   public void checkIterationResult(@Nonnull MockedSCM mockedSCM) {
     ContainerBalancerConfiguration config = new ContainerBalancerConfigBuilder(mockedSCM.getNodeCount()).build();
     config.setMaxSizeEnteringTarget(10 * STORAGE_UNIT);

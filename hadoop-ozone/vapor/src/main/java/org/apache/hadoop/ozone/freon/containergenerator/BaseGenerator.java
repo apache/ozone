@@ -22,13 +22,14 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.freon.BaseFreonGenerator;
+import org.apache.hadoop.ozone.freon.VaporSubcommand;
 import picocli.CommandLine.Option;
 
 /**
  * Common options of data generators for fast scale test.
  */
 public abstract class BaseGenerator extends BaseFreonGenerator implements
-    Callable<Void> {
+    Callable<Void>, VaporSubcommand {
 
   @Option(names = {"-u", "--user"},
       description = "Owner of the files",

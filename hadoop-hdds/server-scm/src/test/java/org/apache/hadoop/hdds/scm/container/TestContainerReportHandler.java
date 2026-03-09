@@ -209,6 +209,10 @@ public class TestContainerReportHandler {
               containerState.equals(HddsProtos.LifeCycleState.DELETING))) {
             continue;
           }
+          if (replicationType == HddsProtos.ReplicationType.EC &&
+              containerState.equals(HddsProtos.LifeCycleState.DELETED)) {
+            continue;
+          }
           for (ContainerReplicaProto.State invalidState : invalidReplicaStates) {
             combinations.add(Arguments.of(replicationType, containerState, replicaState, invalidState));
           }
