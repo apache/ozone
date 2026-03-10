@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.utils.db;
 import java.util.NoSuchElementException;
 import java.util.function.Consumer;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,6 +37,13 @@ abstract class RDBStoreAbstractIterator<RAW>
 
   private final ManagedRocksIterator rocksDBIterator;
   private final RDBTable rocksDBTable;
+  /**
+   * Holds a reference count on the underlying RocksDatabase for the lifetime
+   * of this iterator. This prevents the DB from being physically closed while
+   * the iterator is still in use, eliminating the TOCTOU race between
+   * isClosed() and native iterator calls.
+   */
+  private final UncheckedAutoCloseable dbRef;
   private Table.KeyValue<RAW, RAW> currentEntry;
   // This is for schemas that use a fixed-length
   // prefix for each key.
@@ -48,6 +56,20 @@ abstract class RDBStoreAbstractIterator<RAW>
     this.rocksDBTable = table;
     this.prefix = prefix;
     this.type = type;
+    this.dbRef = acquireDbRef(table);
+  }
+
+  private static UncheckedAutoCloseable acquireDbRef(RDBTable table) {
+    if (table == null) {
+      return null;
+    }
+    try {
+      return table.acquireIterator();
+    } catch (RocksDatabaseException e) {
+      LOG.warn("Failed to acquire DB reference for iterator on table {}: {}",
+          table.getName(), e.getMessage());
+      return null;
+    }
   }
 
   IteratorType getType() {
@@ -89,7 +111,17 @@ abstract class RDBStoreAbstractIterator<RAW>
     }
   }
 
+  private boolean isDbClosed() {
+    return rocksDBTable != null && rocksDBTable.isClosed();
+  }
+
   private void setCurrentEntry() {
+    if (isDbClosed()) {
+      LOG.warn("Stopping iterator for table {}: underlying RocksDB is closed",
+          rocksDBTable.getName());
+      currentEntry = null;
+      return;
+    }
     if (rocksDBIterator.get().isValid()) {
       currentEntry = getKeyValue();
     } else {
@@ -99,6 +131,9 @@ abstract class RDBStoreAbstractIterator<RAW>
 
   @Override
   public final boolean hasNext() {
+    if (isDbClosed()) {
+      return false;
+    }
     return rocksDBIterator.get().isValid() &&
         (prefix == null || startsWithPrefix(key()));
   }
@@ -155,5 +190,8 @@ abstract class RDBStoreAbstractIterator<RAW>
   @Override
   public void close() {
     rocksDBIterator.close();
+    if (dbRef != null) {
+      dbRef.close();
+    }
   }
 }
