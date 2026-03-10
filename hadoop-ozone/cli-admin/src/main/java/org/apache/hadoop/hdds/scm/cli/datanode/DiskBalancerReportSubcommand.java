@@ -104,10 +104,8 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
     for (DatanodeDiskBalancerInfoProto proto : sortedProtos) {
       formatBuilder.append("%-60s %s%n");
       // Format datanode string with hostname and IP address
-      String[] hostnameIpPort = DiskBalancerSubCommandUtil.extractHostIpAndPort(
-          proto.getNode());
       String formattedDatanode = DiskBalancerSubCommandUtil.getDatanodeHostAndIp(
-          hostnameIpPort[0], hostnameIpPort[1], Integer.parseInt(hostnameIpPort[2]));
+          proto.getNode());
       contentList.add(formattedDatanode);
       contentList.add(String.valueOf(proto.getCurrentVolumeDensitySum()));
     }
@@ -131,10 +129,8 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
       HddsProtos.DatanodeDiskBalancerInfoProto report) {
     Map<String, Object> result = new LinkedHashMap<>();
     // Format datanode string with hostname and IP address
-    String[] hostnameIpPort = DiskBalancerSubCommandUtil.extractHostIpAndPort(
-        report.getNode());
     String formattedDatanode = DiskBalancerSubCommandUtil.getDatanodeHostAndIp(
-        hostnameIpPort[0], hostnameIpPort[1], Integer.parseInt(hostnameIpPort[2]));
+        report.getNode());
     result.put("datanode", formattedDatanode);
     result.put("action", "report");
     result.put("status", "success");

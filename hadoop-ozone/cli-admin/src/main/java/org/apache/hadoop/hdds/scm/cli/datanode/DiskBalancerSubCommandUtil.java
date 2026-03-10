@@ -49,7 +49,7 @@ final class DiskBalancerSubCommandUtil {
    * <p>The address can be provided in two formats:
    * <ul>
    *   <li>"hostname:port" - Uses the specified port</li>
-   *   <li>"hostname" - Uses the default CLIENT_RPC port (19864)</li>
+   *   <li>"hostname" - Uses the default CLIENT_RPC port (HDDS_DATANODE_CLIENT_PORT_DEFAULT)</li>
    * </ul>
    * 
    * @param address the datanode address in "host:port" or "host" format
@@ -62,28 +62,16 @@ final class DiskBalancerSubCommandUtil {
     UserGroupInformation user = UserGroupInformation.getCurrentUser();
     
     // Parse address and add default port if not specified
-    InetSocketAddress nodeAddr = parseAddress(address, HDDS_DATANODE_CLIENT_PORT_DEFAULT);
-    
-    return new DiskBalancerProtocolClientSideTranslatorPB(
-        nodeAddr, user, ozoneConf);
-  }
-
-  /**
-   * Parses a datanode address string and returns an InetSocketAddress.
-   * If the address doesn't contain a port, uses the provided default port.
-   * 
-   * @param address the address string (e.g., "host:port" or "host")
-   * @param defaultPort the default port to use if not specified
-   * @return InetSocketAddress with the parsed or default port
-   */
-  private static InetSocketAddress parseAddress(String address, int defaultPort) {
+    InetSocketAddress nodeAddr;
     if (address.contains(":")) {
       // Port is specified, use NetUtils to parse
-      return NetUtils.createSocketAddr(address);
+      nodeAddr = NetUtils.createSocketAddr(address);
     } else {
       // Port not specified, use default
-      return NetUtils.createSocketAddr(address, defaultPort);
+      nodeAddr = NetUtils.createSocketAddr(address, HDDS_DATANODE_CLIENT_PORT_DEFAULT);
     }
+    return new DiskBalancerProtocolClientSideTranslatorPB(
+        nodeAddr, user, ozoneConf);
   }
 
   /**
@@ -110,8 +98,11 @@ final class DiskBalancerSubCommandUtil {
       Port port = details.getPort(Port.Name.CLIENT_RPC);
       if (port != null) {
         String address = details.getIpAddress() + ":" + port.getValue();
-        String display = getDatanodeHostAndIp(
-            details.getHostName(), details.getIpAddress(), port.getValue());
+        // Format the display string: "hostname (ip:port)" or "ip:port"
+        String hostname = details.getHostName();
+        String display = (hostname != null && !hostname.isEmpty()
+            && !hostname.equals(details.getIpAddress())) ? hostname + " (" + address + ")"
+            : address;
         addressToDisplay.put(address, display);
       } else {
         System.out.printf("host: %s(%s) %s port not found%n",
@@ -124,12 +115,13 @@ final class DiskBalancerSubCommandUtil {
   }
 
   /**
-   * Extracts hostname, IP address, and port from a DatanodeDetailsProto of status and report.
-   *
+   * Returns a formatted string combining hostname and IP address from DatanodeDetailsProto.
+   * If hostname is null or empty, returns just "ip:port".
+   * 
    * @param nodeProto the DatanodeDetailsProto from the diskbalancer info
-   * @return array with [hostname, ipAddress, port] where port is the CLIENT_RPC port
+   * @return formatted string "hostname (ip:port)" or "ip:port" if hostname is not available
    */
-  public static String[] extractHostIpAndPort(HddsProtos.DatanodeDetailsProto nodeProto) {
+  public static String getDatanodeHostAndIp(HddsProtos.DatanodeDetailsProto nodeProto) {
     String hostname = nodeProto.getHostName();
     String ipAddress = nodeProto.getIpAddress();
     int port = nodeProto.getPortsList().stream()
@@ -137,27 +129,13 @@ final class DiskBalancerSubCommandUtil {
             DatanodeDetails.Port.Name.CLIENT_RPC.name()))
         .mapToInt(HddsProtos.Port::getValue)
         .findFirst()
-        .orElse(19864); // Default port if not found
-    return new String[]{hostname, ipAddress, String.valueOf(port)};
-  }
+        .orElse(HDDS_DATANODE_CLIENT_PORT_DEFAULT); // Default port if not found
 
-  /**
-   * Returns a formatted string combining hostname and IP address.
-   * If hostname is null or empty, returns just "ip:port".
-   * 
-   * @param hostname the hostname of the datanode
-   * @param ipAddress the IP address of the datanode
-   * @param port the port of the datanode
-   * @return formatted string "hostname (ip:port)" or "ip:port" if hostname is not available
-   */
-  public static String getDatanodeHostAndIp(String hostname,
-      String ipAddress, int port) {
+    // Format the output string
     String addressPort = ipAddress + ":" + port;
     if (hostname != null && !hostname.isEmpty() && !hostname.equals(ipAddress)) {
       return hostname + " (" + addressPort + ")";
     }
     return addressPort;
   }
-
 }
-

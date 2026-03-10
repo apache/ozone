@@ -112,10 +112,8 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
       long bytesToMoveMB = (long) Math.ceil(proto.getBytesToMove() / (1024.0 * 1024.0));
 
       // Format datanode string with hostname and IP address
-      String[] hostnameIpPort = DiskBalancerSubCommandUtil.extractHostIpAndPort(
-          proto.getNode());
       String formattedDatanode = DiskBalancerSubCommandUtil.getDatanodeHostAndIp(
-          hostnameIpPort[0], hostnameIpPort[1], Integer.parseInt(hostnameIpPort[2]));
+          proto.getNode());
       contentList.add(formattedDatanode);
       contentList.add(proto.getRunningStatus().name());
       contentList.add(
@@ -159,10 +157,8 @@ public class DiskBalancerStatusSubcommand extends AbstractDiskBalancerSubCommand
   private Map<String, Object> createStatusResult(DatanodeDiskBalancerInfoProto status) {
     Map<String, Object> result = new LinkedHashMap<>();
     // Format datanode string with hostname and IP address
-    String[] hostnameIpPort = DiskBalancerSubCommandUtil.extractHostIpAndPort(
-        status.getNode());
     String formattedDatanode = DiskBalancerSubCommandUtil.getDatanodeHostAndIp(
-        hostnameIpPort[0], hostnameIpPort[1], Integer.parseInt(hostnameIpPort[2]));
+        status.getNode());
     result.put("datanode", formattedDatanode);
     result.put("action", "status");
     result.put("status", "success");
