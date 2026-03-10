@@ -374,7 +374,8 @@ public final class IamSessionPolicyResolver {
       return mappedS3Actions;
     }
 
-    if (mappedS3Actions.contains(S3Action.LIST_BUCKET)) {
+    if (mappedS3Actions.contains(S3Action.LIST_BUCKET) ||
+        mappedS3Actions.contains(S3Action.ALL_S3)) {
       final Set<S3Action> filteredActions = new HashSet<>();
       filteredActions.add(S3Action.LIST_BUCKET);
       return filteredActions;
@@ -498,7 +499,7 @@ public final class IamSessionPolicyResolver {
       Preconditions.checkArgument(
           authorizerType != AuthorizerType.NATIVE,
           "ResourceSpec type ANY not supported for OzoneNativeAuthorizer");
-      processResourceTypeAny(volumeName, mappedS3Actions, objToAclsMap);
+      processResourceTypeAny(volumeName, authorizerType, mappedS3Actions, condition, objToAclsMap);
       break;
     case BUCKET:
       processBucketResource(volumeName, mappedS3Actions, resourceSpec, condition, authorizerType, objToAclsMap);
@@ -533,12 +534,25 @@ public final class IamSessionPolicyResolver {
    * Handles ResourceType.ANY (*).
    * Example: "Resource": "*"
    */
-  private static void processResourceTypeAny(String volumeName, Set<S3Action> mappedS3Actions,
+  private static void processResourceTypeAny(String volumeName, AuthorizerType authorizerType,
+      Set<S3Action> mappedS3Actions, Condition condition,
       Map<IOzoneObj, Set<ACLType>> objToAclsMap) {
     for (S3Action action : mappedS3Actions) {
       addAclsForObj(objToAclsMap, volumeObj(volumeName), action.volumePerms);
       addAclsForObj(objToAclsMap, bucketObj(volumeName, "*"), action.bucketPerms);
-      addAclsForObj(objToAclsMap, keyObj(volumeName, "*", "*"), action.objectPerms);
+      if (condition != null && (action == S3Action.LIST_BUCKET || action == S3Action.ALL_S3) &&
+          condition.prefixes != null && !condition.prefixes.isEmpty()) {
+        for (String prefix : condition.prefixes) {
+          // If operator is StringEquals, ignore wildcard prefixes.
+          if ("StringEquals".equals(condition.operator) && (prefix.contains("*") || prefix.contains("?"))) {
+            continue;
+          }
+          createObjectResourcesFromConditionPrefix(
+              volumeName, authorizerType, ResourceSpec.any(), prefix, objToAclsMap, EnumSet.of(LIST));
+        }
+      } else {
+        addAclsForObj(objToAclsMap, keyObj(volumeName, "*", "*"), action.objectPerms);
+      }
     }
   }
 
