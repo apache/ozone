@@ -154,11 +154,20 @@ public final class IamSessionPolicyResolver {
         continue;
       }
 
+      // s3:prefix is only applicable to the ListBucket action because we don't support ListBucketVersions
+      // (see https://docs.aws.amazon.com/service-authorization/latest/reference/list_amazons3.html and search for
+      // s3:prefix).  If a statement carries a Condition, non-ListBucket actions (ex GetObject, PutObject,
+      // ListBucketMultipartUploads, etc.) in that statement do not apply.
+      final Set<S3Action> filteredS3Actions = filterActionsWhenConditionPresent(mappedS3Actions, condition);
+      if (filteredS3Actions.isEmpty()) {
+        continue;
+      }
+
       // Categorize resources according to bucket resource, object resource, etc
       final Set<ResourceSpec> resourceSpecs = validateAndCategorizeResources(authorizerType, resources);
 
       // For each action, map to Ozone objects (paths) and acls based on resource specs and prefixes
-      createPathsAndPermissions(volumeName, authorizerType, mappedS3Actions, resourceSpecs, condition, objToAclsMap);
+      createPathsAndPermissions(volumeName, authorizerType, filteredS3Actions, resourceSpecs, condition, objToAclsMap);
     }
 
     // Group accumulated objects by their ACL sets to create final result
@@ -360,6 +369,23 @@ public final class IamSessionPolicyResolver {
   }
 
   /**
+   * Filters out actions when a Condition is present if the action is not ListBucket.
+   */
+  private static Set<S3Action> filterActionsWhenConditionPresent(Set<S3Action> mappedS3Actions, Condition condition) {
+    if (condition == null) {
+      return mappedS3Actions;
+    }
+
+    if (mappedS3Actions.contains(S3Action.LIST_BUCKET) || mappedS3Actions.contains(S3Action.ALL_S3)) {
+      final Set<S3Action> filteredActions = new HashSet<>();
+      filteredActions.add(S3Action.LIST_BUCKET);
+      return filteredActions;
+    }
+
+    return Collections.emptySet();
+  }
+
+  /**
    * Validates that wildcard bucket patterns are not used with native authorizer.
    */
   private static void validateNativeAuthorizerBucketPattern(AuthorizerType authorizerType, String bucket)
@@ -474,7 +500,7 @@ public final class IamSessionPolicyResolver {
       Preconditions.checkArgument(
           authorizerType != AuthorizerType.NATIVE,
           "ResourceSpec type ANY not supported for OzoneNativeAuthorizer");
-      processResourceTypeAny(volumeName, mappedS3Actions, objToAclsMap);
+      processResourceTypeAny(volumeName, authorizerType, mappedS3Actions, condition, objToAclsMap);
       break;
     case BUCKET:
       processBucketResource(volumeName, mappedS3Actions, resourceSpec, condition, authorizerType, objToAclsMap);
@@ -509,12 +535,24 @@ public final class IamSessionPolicyResolver {
    * Handles ResourceType.ANY (*).
    * Example: "Resource": "*"
    */
-  private static void processResourceTypeAny(String volumeName, Set<S3Action> mappedS3Actions,
-      Map<IOzoneObj, Set<ACLType>> objToAclsMap) {
+  private static void processResourceTypeAny(String volumeName, AuthorizerType authorizerType,
+      Set<S3Action> mappedS3Actions, Condition condition, Map<IOzoneObj, Set<ACLType>> objToAclsMap) {
     for (S3Action action : mappedS3Actions) {
       addAclsForObj(objToAclsMap, volumeObj(volumeName), action.volumePerms);
       addAclsForObj(objToAclsMap, bucketObj(volumeName, "*"), action.bucketPerms);
-      addAclsForObj(objToAclsMap, keyObj(volumeName, "*", "*"), action.objectPerms);
+      if (condition != null && condition.prefixes != null && !condition.prefixes.isEmpty() &&
+          (action == S3Action.LIST_BUCKET || action == S3Action.ALL_S3)) {
+        for (String prefix : condition.prefixes) {
+          // If operator is StringEquals, ignore wildcard prefixes.
+          if (STRING_EQUALS.equals(condition.operator) && hasWildcard(prefix)) {
+            continue;
+          }
+          createObjectResourcesFromConditionPrefix(
+              volumeName, authorizerType, ResourceSpec.any(), prefix, objToAclsMap, EnumSet.of(LIST));
+        }
+      } else {
+        addAclsForObj(objToAclsMap, keyObj(volumeName, "*", "*"), action.objectPerms);
+      }
     }
   }
 
