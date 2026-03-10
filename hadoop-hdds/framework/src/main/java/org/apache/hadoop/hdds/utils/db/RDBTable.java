@@ -160,8 +160,10 @@ class RDBTable implements Table<byte[], byte[]> {
 
   Integer getIfExist(ByteBuffer key, ByteBuffer outValue) throws RocksDatabaseException {
     rdbMetrics.incNumDBKeyGetIfExistChecks();
+    // keyMayExist may change key buffer position; never reuse the same
+    // ByteBuffer instance for fallback point-get.
     final Supplier<Integer> value = db.keyMayExist(
-        family, key, outValue.duplicate());
+        family, key.duplicate(), outValue.duplicate());
     if (value != null) {
       final Integer length = value.get();
       if (length != null) {
@@ -172,7 +174,7 @@ class RDBTable implements Table<byte[], byte[]> {
 
     // keyMayExist is treated as a hint only; confirm via point-get.
     rdbMetrics.incNumDBKeyGetIfExistGets();
-    final Integer val = get(key, outValue);
+    final Integer val = get(key.duplicate(), outValue);
     if (val == null) {
       rdbMetrics.incNumDBKeyGetIfExistMisses();
     }

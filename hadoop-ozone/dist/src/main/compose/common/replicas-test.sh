@@ -47,9 +47,19 @@ docker exec "${container}" sed -i -e '1s/^/a/' "${datafile}"
 execute_robot_test ${SCM} -v "PREFIX:${prefix}" -v "CORRUPT_DATANODE:${host}" debug/corrupt-block-checksum.robot
 
 echo "Overwriting container.db with the backup db"
-target_container_dir=$(docker exec "${container}" find "${container_db_path}" -name "container.db" | xargs dirname)
-docker cp "${local_db_backup_path}/container.db" "${container}:${target_container_dir}/"
-docker exec "${container}" sudo chown -R hadoop:hadoop "${target_container_dir}"
+target_container_db=$(docker exec "${container}" find "${container_db_path}" -name "container.db" | head -n 1)
+if [ -z "${target_container_db}" ]; then
+  echo "Failed to locate container.db on ${container}" >&2
+  exit 1
+fi
+# Replace the whole RocksDB directory so stale files (eg. old WAL/MANIFEST)
+# are not left behind when restoring the backup.
+echo "Restoring backup at ${target_container_db} on ${container}"
+docker exec "${container}" mv "${target_container_db}" "${target_container_db}.orig" \
+  && docker cp "${local_db_backup_path}/container.db" "${container}:${target_container_db}" \
+  && docker exec "${container}" sudo chown -R hadoop:hadoop "${target_container_db}" \
+  && docker exec "${container}" rm -rf "${target_container_db}.orig" \
+  || exit 1
 
 docker stop "${container}"
 
