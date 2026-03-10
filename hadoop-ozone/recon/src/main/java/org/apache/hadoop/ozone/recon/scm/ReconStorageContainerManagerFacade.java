@@ -155,7 +155,7 @@ public class ReconStorageContainerManagerFacade
   private final SCMNodeDetails reconNodeDetails;
   private final SCMHAManager scmhaManager;
   private final SequenceIdGenerator sequenceIdGen;
-  private final ReconScmTask containerHealthTaskV2;
+  private final ReconScmTask containerHealthTask;
   private final DataSource dataSource;
   private final ContainerHealthSchemaManager containerHealthSchemaManager;
 
@@ -272,7 +272,7 @@ public class ReconStorageContainerManagerFacade
 
     // Create ContainerHealthTask (always runs, writes to UNHEALTHY_CONTAINERS)
     LOG.info("Creating ContainerHealthTask");
-    containerHealthTaskV2 = new ContainerHealthTask(
+    containerHealthTask = new ContainerHealthTask(
         reconTaskConfig,
         taskStatusUpdaterManager,
         this  // ReconStorageContainerManagerFacade - provides access to ReconReplicationManager
@@ -312,7 +312,7 @@ public class ReconStorageContainerManagerFacade
         new ReconStaleNodeHandler(nodeManager, pipelineManager, pipelineSyncTask);
     DeadNodeHandler deadNodeHandler = new ReconDeadNodeHandler(nodeManager,
         pipelineManager, containerManager, scmServiceProvider,
-        containerHealthTaskV2, pipelineSyncTask);
+        containerHealthTask, pipelineSyncTask);
 
     ContainerReportHandler containerReportHandler =
         new ReconContainerReportHandler(nodeManager, containerManager);
@@ -380,7 +380,7 @@ public class ReconStorageContainerManagerFacade
     eventQueue.addHandler(SCMEvents.CLOSE_CONTAINER, closeContainerHandler);
     eventQueue.addHandler(SCMEvents.NEW_NODE, newNodeHandler);
     reconScmTasks.add(pipelineSyncTask);
-    reconScmTasks.add(containerHealthTaskV2);
+    reconScmTasks.add(containerHealthTask);
     reconScmTasks.add(containerSizeCountTask);
     reconSafeModeMgrTask = new ReconSafeModeMgrTask(
         containerManager, nodeManager, safeModeManager,
@@ -761,7 +761,7 @@ public class ReconStorageContainerManagerFacade
 
   @VisibleForTesting
   public ReconScmTask getContainerHealthTask() {
-    return containerHealthTaskV2;
+    return containerHealthTask;
   }
 
   @VisibleForTesting

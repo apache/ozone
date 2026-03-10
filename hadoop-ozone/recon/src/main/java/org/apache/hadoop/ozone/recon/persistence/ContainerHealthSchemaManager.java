@@ -82,7 +82,7 @@ public class ContainerHealthSchemaManager {
   }
 
   /**
-   * Insert or update unhealthy container records in V2 table using TRUE batch insert.
+   * Insert or update unhealthy container records in UNHEALTHY_CONTAINERS table using TRUE batch insert.
    * Uses JOOQ's batch API for optimal performance (single SQL statement for all records).
    * Falls back to individual insert-or-update if batch insert fails (e.g., duplicate keys).
    */
@@ -302,7 +302,7 @@ public class ContainerHealthSchemaManager {
   }
 
   /**
-   * Get summary of unhealthy containers grouped by state from V2 table.
+   * Get summary of unhealthy containers grouped by state from UNHEALTHY_CONTAINERS table.
    */
   public List<UnhealthyContainersSummary> getUnhealthyContainersSummary() {
     DSLContext dslContext = containerSchemaDefinition.getDSLContext();
@@ -316,13 +316,13 @@ public class ContainerHealthSchemaManager {
           .groupBy(UNHEALTHY_CONTAINERS.CONTAINER_STATE)
           .fetchInto(UnhealthyContainersSummary.class);
     } catch (Exception e) {
-      LOG.error("Failed to get summary from V2 table", e);
+      LOG.error("Failed to get summary from UNHEALTHY_CONTAINERS table", e);
       return result;
     }
   }
 
   /**
-   * Get unhealthy containers from V2 table.
+   * Get unhealthy containers from UNHEALTHY_CONTAINERS table.
    */
   public List<UnhealthyContainerRecord> getUnhealthyContainers(
       UnHealthyContainerStates state, long minContainerId, long maxContainerId, int limit) {
@@ -382,22 +382,22 @@ public class ContainerHealthSchemaManager {
               record.getReason()))
           .collect(Collectors.toList());
     } catch (Exception e) {
-      LOG.error("Failed to query V2 table", e);
+      LOG.error("Failed to query UNHEALTHY_CONTAINERS table", e);
       return new ArrayList<>();
     }
   }
 
   /**
-   * Clear all records from V2 table (for testing).
+   * Clear all records from UNHEALTHY_CONTAINERS table (for testing).
    */
   @VisibleForTesting
   public void clearAllUnhealthyContainerRecords() {
     DSLContext dslContext = containerSchemaDefinition.getDSLContext();
     try {
       dslContext.deleteFrom(UNHEALTHY_CONTAINERS).execute();
-      LOG.info("Cleared all V2 unhealthy container records");
+      LOG.info("Cleared all UNHEALTHY_CONTAINERS table's unhealthy container records");
     } catch (Exception e) {
-      LOG.error("Failed to clear V2 unhealthy container records", e);
+      LOG.error("Failed to clear UNHEALTHY_CONTAINERS table's unhealthy container records", e);
     }
   }
 

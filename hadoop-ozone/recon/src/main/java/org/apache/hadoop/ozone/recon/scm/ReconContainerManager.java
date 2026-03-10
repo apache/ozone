@@ -341,7 +341,7 @@ public class ReconContainerManager extends ContainerManagerImpl {
   }
 
   @VisibleForTesting
-  public ContainerHealthSchemaManager getContainerSchemaManagerV2() {
+  public ContainerHealthSchemaManager getContainerSchemaManager() {
     return containerHealthSchemaManager;
   }
 

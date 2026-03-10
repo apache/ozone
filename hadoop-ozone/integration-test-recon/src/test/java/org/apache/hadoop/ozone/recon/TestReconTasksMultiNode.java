@@ -45,7 +45,7 @@ import org.junit.jupiter.api.Test;
  * different cluster configurations (3 datanodes) and would conflict
  * with the @BeforeEach/@AfterEach setup in that class.
  */
-public class TestReconTasksV2MultiNode {
+public class TestReconTasksMultiNode {
 
   private static MiniOzoneCluster cluster;
   private static ReconContainerManager reconContainerManager;
@@ -81,7 +81,7 @@ public class TestReconTasksV2MultiNode {
   @BeforeEach
   public void cleanupBeforeEach() throws Exception {
     // Ensure each test starts from a clean unhealthy-container table.
-    reconContainerManager.getContainerSchemaManagerV2().clearAllUnhealthyContainerRecords();
+    reconContainerManager.getContainerSchemaManager().clearAllUnhealthyContainerRecords();
     // Ensure Recon has initialized pipeline state before assertions.
     LambdaTestUtils.await(60000, 300,
         () -> (!reconPipelineManager.getPipelines().isEmpty()));
@@ -111,7 +111,7 @@ public class TestReconTasksV2MultiNode {
    * 4. Datanodes are decommissioned
    *
    * The detection logic is tested end-to-end in:
-   * - TestReconTasks.testContainerHealthTaskV2WithSCMSync() - which proves
+   * - TestReconTasks.testContainerHealthTaskWithSCMSync() - which proves
    *   Recon's RM logic works for MISSING containers (similar detection logic)
    *
    * Full end-to-end test for UNDER_REPLICATED would require:
@@ -120,16 +120,16 @@ public class TestReconTasksV2MultiNode {
    * 3. Shut down 1 datanode
    * 4. Wait for SCM to mark datanode as dead (stale/dead intervals)
    * 5. Wait for ContainerHealthTask to run (task interval)
-   * 6. Verify UNDER_REPLICATED state in V2 table with correct replica counts
+   * 6. Verify UNDER_REPLICATED state in table with correct replica counts
    * 7. Restart datanode and verify container becomes healthy
    */
   @Test
-  public void testContainerHealthTaskV2UnderReplicated() throws Exception {
+  public void testContainerHealthTaskUnderReplicated() throws Exception {
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.THREE, 60000);
 
     // Verify the query mechanism for UNDER_REPLICATED state works
     List<UnhealthyContainerRecord> underReplicatedContainers =
-        reconContainerManager.getContainerSchemaManagerV2()
+        reconContainerManager.getContainerSchemaManager()
             .getUnhealthyContainers(
                 ContainerSchemaDefinition.UnHealthyContainerStates.UNDER_REPLICATED,
                 0L, 0L, 1000);
@@ -145,14 +145,14 @@ public class TestReconTasksV2MultiNode {
    * 2. Allocate a container with replication factor 1
    * 3. Write data to the container
    * 4. Manually add the container to additional datanodes to create over-replication
-   * 5. Verify ContainerHealthTask detects OVER_REPLICATED state in V2 table
+   * 5. Verify ContainerHealthTask detects OVER_REPLICATED state in UNHEALTHY_CONTAINERS table
    *
    * Note: Creating over-replication scenarios is complex in integration tests
    * as it requires manipulating the container replica state artificially.
    * This test demonstrates the detection capability when over-replication occurs.
    */
   @Test
-  public void testContainerHealthTaskV2OverReplicated() throws Exception {
+  public void testContainerHealthTaskOverReplicated() throws Exception {
     cluster.waitForPipelineTobeReady(HddsProtos.ReplicationFactor.ONE, 60000);
 
     // Note: Creating over-replication in integration tests is challenging
@@ -163,12 +163,12 @@ public class TestReconTasksV2MultiNode {
     // 3. Manual intervention or bugs cause duplicate replicas
     //
     // For now, this test verifies the detection mechanism exists.
-    // If over-replication is detected in the future, the V2 table
+    // If over-replication is detected in the future, the UNHEALTHY_CONTAINERS table
     // should contain the record with proper replica counts.
 
     // For now, just verify that the query mechanism works
     List<UnhealthyContainerRecord> overReplicatedContainers =
-        reconContainerManager.getContainerSchemaManagerV2()
+        reconContainerManager.getContainerSchemaManager()
             .getUnhealthyContainers(
                 ContainerSchemaDefinition.UnHealthyContainerStates.OVER_REPLICATED,
                 0L, 0L, 1000);

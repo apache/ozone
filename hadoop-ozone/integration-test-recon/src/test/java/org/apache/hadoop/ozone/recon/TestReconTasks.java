@@ -70,22 +70,22 @@ import org.slf4j.event.Level;
  * table except the dead {@code ALL_REPLICAS_BAD} state):</p>
  * <ul>
  *   <li>{@code UNDER_REPLICATED}: RF3 CLOSED container loses one replica (node down)
- *       → {@link #testContainerHealthTaskV2DetectsUnderReplicatedAfterNodeFailure}</li>
+ *       → {@link #testContainerHealthTaskDetectsUnderReplicatedAfterNodeFailure}</li>
  *   <li>{@code EMPTY_MISSING}: RF1 OPEN container's only replica lost (node down,
  *       container has no OM-tracked keys) →
- *       {@link #testContainerHealthTaskV2DetectsEmptyMissingWhenAllReplicasLost}</li>
+ *       {@link #testContainerHealthTaskDetectsEmptyMissingWhenAllReplicasLost}</li>
  *   <li>{@code MISSING}: RF1 CLOSED container with OM-tracked keys loses its only
  *       replica (metadata manipulation) →
- *       {@link #testContainerHealthTaskV2DetectsMissingForContainerWithKeys}</li>
+ *       {@link #testContainerHealthTaskDetectsMissingForContainerWithKeys}</li>
  *   <li>{@code OVER_REPLICATED}: RF1 CLOSED container gains a phantom extra replica
  *       (metadata injection) →
- *       {@link #testContainerHealthTaskV2DetectsOverReplicatedAndNegativeSize}</li>
+ *       {@link #testContainerHealthTaskDetectsOverReplicatedAndNegativeSize}</li>
  *   <li>{@code NEGATIVE_SIZE}: Co-detected alongside {@code OVER_REPLICATED} when
  *       the container's {@code usedBytes} is negative →
- *       {@link #testContainerHealthTaskV2DetectsOverReplicatedAndNegativeSize}</li>
+ *       {@link #testContainerHealthTaskDetectsOverReplicatedAndNegativeSize}</li>
  *   <li>{@code REPLICA_MISMATCH}: RF3 CLOSED container where one replica reports a
  *       different data checksum (metadata injection) →
- *       {@link #testContainerHealthTaskV2DetectsReplicaMismatch}</li>
+ *       {@link #testContainerHealthTaskDetectsReplicaMismatch}</li>
  * </ul>
  *
  * <p>States NOT covered:</p>
@@ -209,7 +209,7 @@ public class TestReconTasks {
    * MISSING/EMPTY_MISSING, regardless of key count.</p>
    */
   @Test
-  public void testContainerHealthTaskV2DetectsUnderReplicatedAfterNodeFailure()
+  public void testContainerHealthTaskDetectsUnderReplicatedAfterNodeFailure()
       throws Exception {
     ReconStorageContainerManagerFacade reconScm =
         (ReconStorageContainerManagerFacade)
@@ -285,15 +285,15 @@ public class TestReconTasks {
     LambdaTestUtils.await(STATE_TRANSITION_TIMEOUT_MS, POLL_INTERVAL_MS, () -> {
       forceContainerHealthScan(reconScm);
       List<ContainerHealthSchemaManager.UnhealthyContainerRecord> underReplicated =
-          reconCm.getContainerSchemaManagerV2().getUnhealthyContainers(
+          reconCm.getContainerSchemaManager().getUnhealthyContainers(
               ContainerSchemaDefinition.UnHealthyContainerStates.UNDER_REPLICATED,
               0L, 0L, 1000);
       List<UnhealthyContainerRecord> missing =
-          reconCm.getContainerSchemaManagerV2().getUnhealthyContainers(
+          reconCm.getContainerSchemaManager().getUnhealthyContainers(
               ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
               0L, 0L, 1000);
       List<UnhealthyContainerRecord> emptyMissing =
-          reconCm.getContainerSchemaManagerV2().getUnhealthyContainers(
+          reconCm.getContainerSchemaManager().getUnhealthyContainers(
               ContainerSchemaDefinition.UnHealthyContainerStates.EMPTY_MISSING,
               0L, 0L, 1000);
       return containsContainerId(underReplicated, containerID)
@@ -307,7 +307,7 @@ public class TestReconTasks {
     LambdaTestUtils.await(STATE_TRANSITION_TIMEOUT_MS, POLL_INTERVAL_MS, () -> {
       forceContainerHealthScan(reconScm);
       List<UnhealthyContainerRecord> underReplicated =
-          reconCm.getContainerSchemaManagerV2().getUnhealthyContainers(
+          reconCm.getContainerSchemaManager().getUnhealthyContainers(
               ContainerSchemaDefinition.UnHealthyContainerStates.UNDER_REPLICATED,
               0L, 0L, 1000);
       return !containsContainerId(underReplicated, containerID);
@@ -315,14 +315,14 @@ public class TestReconTasks {
 
     // After recovery: our container must not appear in any unhealthy state.
     List<ContainerHealthSchemaManager.UnhealthyContainerRecord> missingAfterRecovery =
-        reconCm.getContainerSchemaManagerV2().getUnhealthyContainers(
+        reconCm.getContainerSchemaManager().getUnhealthyContainers(
             ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
             0L, 0L, 1000);
     assertFalse(containsContainerId(missingAfterRecovery, containerID),
         "Container should not be MISSING after node recovery");
 
     List<ContainerHealthSchemaManager.UnhealthyContainerRecord> emptyMissingAfterRecovery =
-        reconCm.getContainerSchemaManagerV2().getUnhealthyContainers(
+        reconCm.getContainerSchemaManager().getUnhealthyContainers(
             ContainerSchemaDefinition.UnHealthyContainerStates.EMPTY_MISSING,
             0L, 0L, 1000);
     assertFalse(containsContainerId(emptyMissingAfterRecovery, containerID),
@@ -351,7 +351,7 @@ public class TestReconTasks {
    * replicas for the health scan to classify as EMPTY_MISSING.</p>
    */
   @Test
-  public void testContainerHealthTaskV2DetectsEmptyMissingWhenAllReplicasLost()
+  public void testContainerHealthTaskDetectsEmptyMissingWhenAllReplicasLost()
       throws Exception {
     ReconStorageContainerManagerFacade reconScm =
         (ReconStorageContainerManagerFacade)
@@ -387,15 +387,15 @@ public class TestReconTasks {
     LambdaTestUtils.await(STATE_TRANSITION_TIMEOUT_MS, POLL_INTERVAL_MS, () -> {
       forceContainerHealthScan(reconScm);
       List<ContainerHealthSchemaManager.UnhealthyContainerRecord> emptyMissing =
-          reconCm.getContainerSchemaManagerV2().getUnhealthyContainers(
+          reconCm.getContainerSchemaManager().getUnhealthyContainers(
               ContainerSchemaDefinition.UnHealthyContainerStates.EMPTY_MISSING,
               0L, 0L, 1000);
       List<ContainerHealthSchemaManager.UnhealthyContainerRecord> missing =
-          reconCm.getContainerSchemaManagerV2().getUnhealthyContainers(
+          reconCm.getContainerSchemaManager().getUnhealthyContainers(
               ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
               0L, 0L, 1000);
       List<ContainerHealthSchemaManager.UnhealthyContainerRecord> underReplicated =
-          reconCm.getContainerSchemaManagerV2().getUnhealthyContainers(
+          reconCm.getContainerSchemaManager().getUnhealthyContainers(
               ContainerSchemaDefinition.UnHealthyContainerStates.UNDER_REPLICATED,
               0L, 0L, 1000);
       // EMPTY_MISSING must be set; MISSING and UNDER_REPLICATED must NOT be set
@@ -412,7 +412,7 @@ public class TestReconTasks {
     LambdaTestUtils.await(STATE_TRANSITION_TIMEOUT_MS, POLL_INTERVAL_MS, () -> {
       forceContainerHealthScan(reconScm);
       List<ContainerHealthSchemaManager.UnhealthyContainerRecord> emptyMissing =
-          reconCm.getContainerSchemaManagerV2().getUnhealthyContainers(
+          reconCm.getContainerSchemaManager().getUnhealthyContainers(
               ContainerSchemaDefinition.UnHealthyContainerStates.EMPTY_MISSING,
               0L, 0L, 1000);
       return !containsContainerId(emptyMissing, containerID);
@@ -420,14 +420,14 @@ public class TestReconTasks {
 
     // After recovery: our container must not appear in any unhealthy state.
     List<UnhealthyContainerRecord> missingAfterRecovery =
-        reconCm.getContainerSchemaManagerV2().getUnhealthyContainers(
+        reconCm.getContainerSchemaManager().getUnhealthyContainers(
             ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
             0L, 0L, 1000);
     assertFalse(containsContainerId(missingAfterRecovery, containerID),
         "Container should not be MISSING after node recovery");
 
     List<ContainerHealthSchemaManager.UnhealthyContainerRecord> underReplicatedAfterRecovery =
-        reconCm.getContainerSchemaManagerV2().getUnhealthyContainers(
+        reconCm.getContainerSchemaManager().getUnhealthyContainers(
             ContainerSchemaDefinition.UnHealthyContainerStates.UNDER_REPLICATED,
             0L, 0L, 1000);
     assertFalse(containsContainerId(underReplicatedAfterRecovery, containerID),
@@ -453,7 +453,7 @@ public class TestReconTasks {
    * by re-adding the replica and running another health scan.</p>
    */
   @Test
-  public void testContainerHealthTaskV2DetectsMissingForContainerWithKeys()
+  public void testContainerHealthTaskDetectsMissingForContainerWithKeys()
       throws Exception {
     ReconStorageContainerManagerFacade reconScm =
         (ReconStorageContainerManagerFacade)
@@ -513,11 +513,11 @@ public class TestReconTasks {
     forceContainerHealthScan(reconScm);
 
     List<ContainerHealthSchemaManager.UnhealthyContainerRecord> missing =
-        reconCm.getContainerSchemaManagerV2().getUnhealthyContainers(
+        reconCm.getContainerSchemaManager().getUnhealthyContainers(
             ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
             0L, 0L, 1000);
     List<UnhealthyContainerRecord> emptyMissing =
-        reconCm.getContainerSchemaManagerV2().getUnhealthyContainers(
+        reconCm.getContainerSchemaManager().getUnhealthyContainers(
             ContainerSchemaDefinition.UnHealthyContainerStates.EMPTY_MISSING,
             0L, 0L, 1000);
 
@@ -531,7 +531,7 @@ public class TestReconTasks {
     forceContainerHealthScan(reconScm);
 
     List<ContainerHealthSchemaManager.UnhealthyContainerRecord> missingAfterRecovery =
-        reconCm.getContainerSchemaManagerV2().getUnhealthyContainers(
+        reconCm.getContainerSchemaManager().getUnhealthyContainers(
             ContainerSchemaDefinition.UnHealthyContainerStates.MISSING,
             0L, 0L, 1000);
     assertFalse(containsContainerId(missingAfterRecovery, containerID),
@@ -558,7 +558,7 @@ public class TestReconTasks {
    * {@code usedBytes} to a non-negative value.</p>
    */
   @Test
-  public void testContainerHealthTaskV2DetectsOverReplicatedAndNegativeSize()
+  public void testContainerHealthTaskDetectsOverReplicatedAndNegativeSize()
       throws Exception {
     ReconStorageContainerManagerFacade reconScm =
         (ReconStorageContainerManagerFacade)
@@ -628,11 +628,11 @@ public class TestReconTasks {
     forceContainerHealthScan(reconScm);
 
     List<ContainerHealthSchemaManager.UnhealthyContainerRecord> overReplicated =
-        reconCm.getContainerSchemaManagerV2().getUnhealthyContainers(
+        reconCm.getContainerSchemaManager().getUnhealthyContainers(
             ContainerSchemaDefinition.UnHealthyContainerStates.OVER_REPLICATED,
             0L, 0L, 1000);
     List<ContainerHealthSchemaManager.UnhealthyContainerRecord> negativeSize =
-        reconCm.getContainerSchemaManagerV2().getUnhealthyContainers(
+        reconCm.getContainerSchemaManager().getUnhealthyContainers(
             ContainerSchemaDefinition.UnHealthyContainerStates.NEGATIVE_SIZE,
             0L, 0L, 1000);
 
@@ -647,11 +647,11 @@ public class TestReconTasks {
     forceContainerHealthScan(reconScm);
 
     List<ContainerHealthSchemaManager.UnhealthyContainerRecord> overReplicatedAfterRecovery =
-        reconCm.getContainerSchemaManagerV2().getUnhealthyContainers(
+        reconCm.getContainerSchemaManager().getUnhealthyContainers(
             ContainerSchemaDefinition.UnHealthyContainerStates.OVER_REPLICATED,
             0L, 0L, 1000);
     List<ContainerHealthSchemaManager.UnhealthyContainerRecord> negativeSizeAfterRecovery =
-        reconCm.getContainerSchemaManagerV2().getUnhealthyContainers(
+        reconCm.getContainerSchemaManager().getUnhealthyContainers(
             ContainerSchemaDefinition.UnHealthyContainerStates.NEGATIVE_SIZE,
             0L, 0L, 1000);
 
@@ -681,7 +681,7 @@ public class TestReconTasks {
    * were excluded and could linger indefinitely after a mismatch was resolved).</p>
    */
   @Test
-  public void testContainerHealthTaskV2DetectsReplicaMismatch() throws Exception {
+  public void testContainerHealthTaskDetectsReplicaMismatch() throws Exception {
     ReconStorageContainerManagerFacade reconScm =
         (ReconStorageContainerManagerFacade)
             recon.getReconServer().getReconStorageContainerManager();
@@ -741,7 +741,7 @@ public class TestReconTasks {
     forceContainerHealthScan(reconScm);
 
     List<ContainerHealthSchemaManager.UnhealthyContainerRecord> replicaMismatch =
-        reconCm.getContainerSchemaManagerV2().getUnhealthyContainers(
+        reconCm.getContainerSchemaManager().getUnhealthyContainers(
             ContainerSchemaDefinition.UnHealthyContainerStates.REPLICA_MISMATCH,
             0L, 0L, 1000);
     assertTrue(containsContainerId(replicaMismatch, containerID),
@@ -752,7 +752,7 @@ public class TestReconTasks {
     forceContainerHealthScan(reconScm);
 
     List<ContainerHealthSchemaManager.UnhealthyContainerRecord> replicaMismatchAfterRecovery =
-        reconCm.getContainerSchemaManagerV2().getUnhealthyContainers(
+        reconCm.getContainerSchemaManager().getUnhealthyContainers(
             ContainerSchemaDefinition.UnHealthyContainerStates.REPLICA_MISMATCH,
             0L, 0L, 1000);
     assertFalse(containsContainerId(replicaMismatchAfterRecovery, containerID),

@@ -398,7 +398,7 @@ public class ContainerEndpoint {
   }
 
   /**
-   * V2 implementation - reads from UNHEALTHY_CONTAINERS table.
+   * New implementation - reads from UNHEALTHY_CONTAINERS table.
    */
   private Response getUnhealthyContainersFromSchema(
       String state,
@@ -416,14 +416,14 @@ public class ContainerEndpoint {
         v2State = ContainerSchemaDefinition.UnHealthyContainerStates.valueOf(state);
       }
 
-      // Get summary from V2 table and convert to V1 format
+      // Get summary from UNHEALTHY_CONTAINERS table and convert to V1 format
       List<ContainerHealthSchemaManager.UnhealthyContainersSummary> v2Summary =
           containerHealthSchemaManager.getUnhealthyContainersSummary();
       for (ContainerHealthSchemaManager.UnhealthyContainersSummary s : v2Summary) {
         summary.add(new UnhealthyContainersSummary(s.getContainerState(), s.getCount()));
       }
 
-      // Get containers from V2 table
+      // Get containers from UNHEALTHY_CONTAINERS table
       List<ContainerHealthSchemaManager.UnhealthyContainerRecord> v2Containers =
           containerHealthSchemaManager.getUnhealthyContainers(v2State, minContainerId, maxContainerId, limit);
 

@@ -28,7 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * V2 implementation of Container Health Task using Local ReplicationManager.
+ * New implementation of Container Health Task using Local ReplicationManager.
  *
  * <p><b>Solution:</b></p>
  * <ul>
