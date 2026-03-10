@@ -54,13 +54,4 @@ public class KerberosConfigProbe implements DiagnosticProbe {
     }
     return file.exists();
   }
-
-  /**
-   * Prints a JVM system property.
-   */
-  private void printSysprop(String property) {
-    String value = System.getProperty(property);
-    System.out.println(property + " = " +
-        (value == null ? "(unset)" : value));
-  }
 }
