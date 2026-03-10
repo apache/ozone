@@ -89,7 +89,7 @@ import org.apache.ozone.compaction.log.CompactionLogEntry;
  * |         deletedTable | /volume/bucket/key                     :- RepeatedKeyInfo |
  * |         openKeyTable | /volume/bucket/key/id                  :- KeyInfo         |
  * |   multipartInfoTable | /volume/bucket/key/uploadId            :- parts           |
- * |  multipartPartsTable | /volume/bucket/key/uploadId/partNumber :- PartKeyInfo     |
+ * |  multipartPartsTable | uploadId/partNumber                    :- PartKeyInfo     |
  * |----------------------------------------------------------------------------------|
  * }
  * </pre>
