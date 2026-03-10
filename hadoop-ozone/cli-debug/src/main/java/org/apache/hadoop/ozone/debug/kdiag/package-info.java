@@ -16,6 +16,6 @@
  */
 
 /**
- * Kerberos related command line utilities for Ozone.
+ * Kerberos diagnostic debug related commands.
  */
-package org.apache.hadoop.ozone.kerberos;
+package org.apache.hadoop.ozone.debug.kdiag;

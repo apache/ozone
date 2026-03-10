@@ -15,39 +15,49 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.kerberos;
+package org.apache.hadoop.ozone.debug.authtolocal;
 
+import java.util.List;
+import java.util.concurrent.Callable;
+import org.apache.hadoop.hdds.cli.DebugSubcommand;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.security.authentication.util.KerberosName;
+import org.kohsuke.MetaInfServices;
+import picocli.CommandLine;
 
 /**
- * Command line utility to translate Kerberos principals to local user names
- * using the configured {@code hadoop.security.auth_to_local} rules.
- * Example usage:
- *   ozone kerbname <principal>
+ * Debug command to translate Kerberos principals into local user names
+ * using the configured auth_to_local rules.
  *
+ * Example:
+ *   ozone debug kerbname om/om1@EXAMPLE.COM
  */
-public final class KerbName {
+@CommandLine.Command(
+    name = "kerbname",
+    description = "Translate Kerberos principal(s) using auth_to_local rules."
+)
+@MetaInfServices(DebugSubcommand.class)
+public class KerbNameDebug implements Callable<Void>, DebugSubcommand {
 
-  private KerbName() {
-  }
+  @CommandLine.Parameters(arity = "1..*",
+      description = "Kerberos principal(s) to translate"
+  )
+  private List<String> principals;
 
-  public static void main(String[] args) throws Exception {
-
-    if (args.length == 0) {
-      System.err.println("Usage: ozone kerbname <principal>");
-      return;
-    }
-
+  @Override
+  public Void call() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
     String rules = conf.get("hadoop.security.auth_to_local");
     if (rules != null) {
       KerberosName.setRules(rules);
     }
-
-    for (String principal : args) {
+    System.out.println("-- Kerberos Principal Translation --");
+    for (String principal : principals) {
       KerberosName name = new KerberosName(principal);
-      System.out.println("Name: " + name + " to " + name.getShortName());
+      System.out.println(
+          principal + " -> " + name.getShortName()
+      );
     }
+    return null;
   }
 }
