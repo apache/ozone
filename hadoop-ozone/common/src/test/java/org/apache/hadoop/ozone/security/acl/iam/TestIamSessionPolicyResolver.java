@@ -1542,11 +1542,11 @@ public class TestIamSessionPolicyResolver {
         "      \"Effect\": \"Allow\",\n" +
         "      \"Action\": [\n" +
         "        \"s3:GetAccelerateConfiguration\",\n" +    // unsupported action
-        "        \"s3:GetBucketAcl\",\n" +
+        "        \"s3:GetBucketAcl\",\n" +                  // ignored because it doesn't support s3:prefix condition
         "        \"s3:GetObject\",\n" +                     // object-level action not applied for bucket
         "        \"s3:GetObjectAcl\",\n" +                  // unsupported action
         "        \"s3:ListBucket\",\n" +
-        "        \"s3:ListBucketMultipartUploads\"\n" +
+        "        \"s3:ListBucketMultipartUploads\"\n" +     // ignored because it doesn't support s3:prefix condition
         "      ],\n" +
         "      \"Resource\": \"arn:aws:s3:::bucket1\",\n" +
         "      \"Condition\": {\n" +
@@ -1564,10 +1564,10 @@ public class TestIamSessionPolicyResolver {
     // Ensure what we got is what we expected
     final Set<OzoneGrant> expectedResolvedNative = new LinkedHashSet<>();
 
-    // Expected for native: READ, LIST, READ_ACL bucket acls; volume READ;
+    // Expected for native: READ, LIST bucket acls; volume READ;
     // prefixes "team/folder", "team/folder/" LIST
     final Set<IOzoneObj> bucketSet = objSet(bucket("bucket1"));
-    final Set<ACLType> bucketAcls = acls(READ, LIST, READ_ACL);
+    final Set<ACLType> bucketAcls = acls(READ, LIST);
     expectedResolvedNative.add(new OzoneGrant(bucketSet, bucketAcls));
     expectedResolvedNative.add(new OzoneGrant(
         objSet(prefix("bucket1", "team/folder"), prefix("bucket1", "team/folder/")), acls(LIST)));
@@ -1575,7 +1575,7 @@ public class TestIamSessionPolicyResolver {
     assertThat(resolvedFromNativeAuthorizer).isEqualTo(expectedResolvedNative);
 
     final Set<OzoneGrant> expectedResolvedRanger = new LinkedHashSet<>();
-    // Expected for Ranger: READ, LIST, READ_ACL bucket acls; volume READ;
+    // Expected for Ranger: READ, LIST bucket acls; volume READ;
     // keys "team/folder" and "team/folder/*" LIST
     expectedResolvedRanger.add(new OzoneGrant(bucketSet, bucketAcls));
     expectedResolvedRanger.add(new OzoneGrant(

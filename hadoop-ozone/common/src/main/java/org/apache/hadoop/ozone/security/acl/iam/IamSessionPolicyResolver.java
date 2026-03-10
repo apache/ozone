@@ -152,9 +152,11 @@ public final class IamSessionPolicyResolver {
         continue;
       }
 
-      // s3:prefix is only applicable to the ListBucket action.  If a statement carries a Condition, object actions
-      // (ex GetObject, PutObject, etc.) in that statement do not apply.
-      final Set<S3Action> filteredS3Actions = filterObjectActionsWhenConditionPresent(mappedS3Actions, condition);
+      // s3:prefix is only applicable to the ListBucket action because we don't support ListBucketVersions
+      // (see https://docs.aws.amazon.com/service-authorization/latest/reference/list_amazons3.html and search for
+      // s3:prefix).  If a statement carries a Condition, non-ListBucket actions (ex GetObject, PutObject,
+      // ListBucketMultipartUploads, etc.) in that statement do not apply.
+      final Set<S3Action> filteredS3Actions = filterActionsWhenConditionPresent(mappedS3Actions, condition);
       if (filteredS3Actions.isEmpty()) {
         continue;
       }
@@ -365,19 +367,17 @@ public final class IamSessionPolicyResolver {
   }
 
   /**
-   * Filters out object actions when a Condition is present.
+   * Filters out actions when a Condition is present if the action is not ListBucket.
    */
-  private static Set<S3Action> filterObjectActionsWhenConditionPresent(Set<S3Action> mappedS3Actions,
-      Condition condition) {
+  private static Set<S3Action> filterActionsWhenConditionPresent(Set<S3Action> mappedS3Actions, Condition condition) {
     if (condition == null) {
       return mappedS3Actions;
     }
 
-    final Set<S3Action> filteredActions = new LinkedHashSet<>();
-    for (S3Action action : mappedS3Actions) {
-      if (action.kind != ActionKind.OBJECT) {
-        filteredActions.add(action);
-      }
+    final Set<S3Action> filteredActions = new HashSet<>();
+    if (mappedS3Actions.contains(S3Action.LIST_BUCKET)) {
+      filteredActions.add(S3Action.LIST_BUCKET);
+      return filteredActions;
     }
 
     return filteredActions;
