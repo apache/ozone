@@ -126,7 +126,7 @@ public final class SCMRatisRequest {
           argBuilder.setGenericType(((Class<?>) actualTypes[0]).getName());
         }
       }
-      argBuilder.setValue(ScmCodecFactory.getCodec(argument.getClass())
+      argBuilder.setValue(ScmCodecFactory.getCodec(genericParameterType)
           .serialize(argument));
       args.add(argBuilder.build());
       paramCounter++;
@@ -183,8 +183,22 @@ public final class SCMRatisRequest {
           genericType = new SimpleParameterizedType(clazz, genericClazz);
         }
         genericParameterTypes[paramCounter] = genericType;
-        args.add(ScmCodecFactory.getCodec(clazz)
-            .deserialize(clazz, argument.getValue()));
+        if (genericType instanceof Class<?>) {
+          args.add(ScmCodecFactory.getCodec((Class<?>) genericType)
+              .deserialize((Class<?>) genericType, argument.getValue()));
+        } else if (genericType instanceof ParameterizedType) {
+          ParameterizedType pt = (ParameterizedType) genericType;
+          Type rawType = pt.getRawType();
+          if (!(rawType instanceof Class<?>)) {
+            throw new InvalidProtocolBufferException(
+                "Unsupported raw type: " + rawType);
+          }
+          args.add(ScmCodecFactory.getCodec(genericType)
+              .deserialize((Class<?>) rawType, argument.getValue()));
+        } else {
+          throw new InvalidProtocolBufferException(
+              "Unsupported generic type: " + genericType);
+        }
         paramCounter++;
       } catch (ClassNotFoundException ex) {
         throw new InvalidProtocolBufferException(argument.getType() +

@@ -30,19 +30,23 @@ import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferExce
  */
 public class ScmListCodec implements ScmCodec<Object> {
 
+  private final Class<?> elementType;
+  private final ScmCodec<?> elementCodec;
+
+  public ScmListCodec(Class<?> elementType, ScmCodec<?> elementCodec) {
+    this.elementType = elementType;
+    this.elementCodec = elementCodec;
+  }
+
   @Override
   public ByteString serialize(Object object)
       throws InvalidProtocolBufferException {
     final ListArgument.Builder listArgs = ListArgument.newBuilder();
     final List<?> values = (List<?>) object;
-    if (!values.isEmpty()) {
-      Class<?> type = values.get(0).getClass();
-      listArgs.setType(type.getName());
-      for (Object value : values) {
-        listArgs.addValue(ScmCodecFactory.getCodec(type).serialize(value));
-      }
-    } else {
-      listArgs.setType(Object.class.getName());
+
+    listArgs.setType(elementType.getName());
+    for (Object value : values) {
+      listArgs.addValue(serializeElement(value));
     }
     return listArgs.build().toByteString();
   }
@@ -51,31 +55,42 @@ public class ScmListCodec implements ScmCodec<Object> {
   public Object deserialize(Class<?> type, ByteString value)
       throws InvalidProtocolBufferException {
     try {
-      // If argument type is the generic interface, then determine a
-      // concrete implementation.
       Class<?> concreteType = (type == List.class) ? ArrayList.class : type;
 
-      List<Object> result = (List<Object>) concreteType.newInstance();
+      @SuppressWarnings("unchecked")
+      List<Object> result =
+          (List<Object>) concreteType.getDeclaredConstructor().newInstance();
+
       final ListArgument listArgs = (ListArgument) ReflectionUtil
           .getMethod(ListArgument.class, "parseFrom", byte[].class)
           .invoke(null, (Object) value.toByteArray());
 
-      // proto2 required-equivalent check
       if (!listArgs.hasType()) {
         throw new InvalidProtocolBufferException("Missing ListArgument.type");
       }
 
-      final Class<?> dataType = ReflectionUtil.getClass(listArgs.getType());
       for (ByteString element : listArgs.getValueList()) {
-        result.add(ScmCodecFactory.getCodec(dataType)
-            .deserialize(dataType, element));
+        result.add(deserializeElement(element));
       }
       return result;
     } catch (InstantiationException | NoSuchMethodException |
-        IllegalAccessException | InvocationTargetException |
-        ClassNotFoundException ex) {
+             IllegalAccessException | InvocationTargetException ex) {
       throw new InvalidProtocolBufferException(
           "Message cannot be decoded: " + ex.getMessage());
     }
+  }
+
+  private ByteString serializeElement(Object value)
+      throws InvalidProtocolBufferException {
+    @SuppressWarnings("unchecked")
+    final ScmCodec<Object> codec = (ScmCodec<Object>) elementCodec;
+    return codec.serialize(value);
+  }
+
+  private Object deserializeElement(ByteString value)
+      throws InvalidProtocolBufferException {
+    @SuppressWarnings("unchecked")
+    final ScmCodec<Object> codec = (ScmCodec<Object>) elementCodec;
+    return codec.deserialize(elementType, value);
   }
 }
