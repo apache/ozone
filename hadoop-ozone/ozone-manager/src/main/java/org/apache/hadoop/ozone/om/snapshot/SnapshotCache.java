@@ -135,6 +135,11 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
     return dbMap;
   }
 
+  @VisibleForTesting
+  Set<UUID> getPendingEvictionQueue() {
+    return pendingEvictionQueue;
+  }
+
   /**
    * @return number of DB instances currently held in cache.
    */
@@ -327,6 +332,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
       try {
         if (!cleanupFunction.get()) {
           lockDetails.set(emptyUnlockFunction.get());
+          throw new IllegalStateException("Failed to acquire lock as cleanup did not drain the cache.");
         }
       } catch (Throwable t) {
         lockDetails.set(emptyUnlockFunction.get());
@@ -385,8 +391,8 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
     dbMap.compute(evictionKey, (k, v) -> {
       ReferenceCounted<OmSnapshot> result = null;
       if (v == null) {
-        LOG.warn("SnapshotId '" + k + "' does not exist in cache. The RocksDB " +
-            "instance of the Snapshot may not be closed properly.");
+        LOG.warn("SnapshotId '{}' does not exist in cache. The RocksDB " +
+            "instance of the Snapshot may not be closed properly.", k);
       } else if (v.getTotalRefCount() > 0) {
         LOG.debug("SnapshotId {} is still being referenced ({}), skipping its clean up.", k, v.getTotalRefCount());
         result = v;
@@ -396,8 +402,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
         try {
           v.get().close();
         } catch (IOException ex) {
-          LOG.error("Error while closing snapshot DB.", ex);
-          return v;
+          throw new IllegalStateException("Error while closing snapshot DB for snapshotId " + k, ex);
         }
         omMetrics.decNumSnapshotCacheSize();
       }

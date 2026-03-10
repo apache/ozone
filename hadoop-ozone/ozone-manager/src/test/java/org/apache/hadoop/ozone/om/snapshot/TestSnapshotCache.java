@@ -40,10 +40,8 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.cache.CacheLoader;
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeoutException;
@@ -516,31 +514,20 @@ class TestSnapshotCache {
     verify(store1, times(0)).compactTable("keyTable");
   }
 
-  @SuppressWarnings("unchecked")
-  private static Set<UUID> getPendingEvictionQueue(SnapshotCache cache) {
-    try {
-      Field f = SnapshotCache.class.getDeclaredField("pendingEvictionQueue");
-      f.setAccessible(true);
-      return (Set<UUID>) f.get(cache);
-    } catch (ReflectiveOperationException e) {
-      throw new IllegalStateException("Failed to access pendingEvictionQueue via reflection", e);
-    }
-  }
-
   private static IOzoneManagerLock newAcquiringLock() {
     IOzoneManagerLock acquiringLock = mock(IOzoneManagerLock.class);
     when(acquiringLock.acquireReadLock(eq(SNAPSHOT_DB_LOCK), any(String[].class)))
         .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED);
     when(acquiringLock.releaseReadLock(eq(SNAPSHOT_DB_LOCK), any(String[].class)))
-        .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED);
+        .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_NOT_ACQUIRED);
     when(acquiringLock.acquireResourceWriteLock(eq(SNAPSHOT_DB_LOCK)))
         .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED);
     when(acquiringLock.releaseResourceWriteLock(eq(SNAPSHOT_DB_LOCK)))
-        .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED);
+        .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_NOT_ACQUIRED);
     when(acquiringLock.acquireWriteLock(eq(SNAPSHOT_DB_LOCK), any(String[].class)))
         .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED);
     when(acquiringLock.releaseWriteLock(eq(SNAPSHOT_DB_LOCK), any(String[].class)))
-        .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_ACQUIRED);
+        .thenReturn(OMLockDetails.EMPTY_DETAILS_LOCK_NOT_ACQUIRED);
     return acquiringLock;
   }
 
@@ -568,7 +555,7 @@ class TestSnapshotCache {
 
     // Late close triggers ReferenceCounted callback which can re-add snapshotId to pendingEvictionQueue.
     handle.close();
-    assertTrue(getPendingEvictionQueue(snapshotCache).contains(snapshotId));
+    assertTrue(snapshotCache.getPendingEvictionQueue().contains(snapshotId));
 
     // cleanup(true) is invoked by lock(); it should remove the stale key and not throw.
     assertDoesNotThrow(() -> {
@@ -576,7 +563,7 @@ class TestSnapshotCache {
         assertTrue(lockDetails.get().isLockAcquired());
       }
     });
-    assertFalse(getPendingEvictionQueue(snapshotCache).contains(snapshotId));
+    assertFalse(snapshotCache.getPendingEvictionQueue().contains(snapshotId));
   }
 
   @Test
@@ -610,14 +597,12 @@ class TestSnapshotCache {
       assertEquals(1, omMetrics.getNumSnapshotCacheSize());
     }
     assertEquals(0L, snapshotCache.getDbMap().get(snapshotId).getTotalRefCount());
-    assertTrue(getPendingEvictionQueue(snapshotCache).contains(snapshotId));
+    assertTrue(snapshotCache.getPendingEvictionQueue().contains(snapshotId));
 
     // First cleanup attempt fails to close; entry should remain in dbMap and key should stay queued for retry.
-    try (UncheckedAutoCloseableSupplier<OMLockDetails> lockDetails = snapshotCache.lock()) {
-      assertTrue(lockDetails.get().isLockAcquired());
-    }
+    assertThrows(IllegalStateException.class, () -> snapshotCache.lock());
     assertTrue(snapshotCache.getDbMap().containsKey(snapshotId));
-    assertTrue(getPendingEvictionQueue(snapshotCache).contains(snapshotId));
+    assertTrue(snapshotCache.getPendingEvictionQueue().contains(snapshotId));
     assertEquals(1, omMetrics.getNumSnapshotCacheSize());
 
     // Second cleanup attempt should succeed (close no longer throws), removing entry and eviction key.
@@ -625,7 +610,7 @@ class TestSnapshotCache {
       assertTrue(lockDetails.get().isLockAcquired());
     }
     assertFalse(snapshotCache.getDbMap().containsKey(snapshotId));
-    assertFalse(getPendingEvictionQueue(snapshotCache).contains(snapshotId));
+    assertFalse(snapshotCache.getPendingEvictionQueue().contains(snapshotId));
     assertEquals(0, omMetrics.getNumSnapshotCacheSize());
   }
 
@@ -651,7 +636,7 @@ class TestSnapshotCache {
     try (UncheckedAutoCloseableSupplier<OmSnapshot> ignored = snapshotCache.get(snapshotId)) {
       assertEquals(1, snapshotCache.size());
     }
-    assertTrue(getPendingEvictionQueue(snapshotCache).contains(snapshotId));
+    assertTrue(snapshotCache.getPendingEvictionQueue().contains(snapshotId));
 
     // cleanup(true) will throw -> lock() should release the resource write lock before rethrowing.
     assertThrows(RuntimeException.class, () -> snapshotCache.lock());
