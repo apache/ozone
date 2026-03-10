@@ -45,4 +45,11 @@ public final class VolumeChoosingPolicyFactory {
         DEFAULT_VOLUME_CHOOSING_POLICY, VolumeChoosingPolicy.class);
     return ReflectionUtils.newInstance(policyClass, new Class<?>[] {ReentrantLock.class}, LOCK);
   }
+
+  /**
+   * Returns the shared lock used for volume space reservation.
+   */
+  public static ReentrantLock getVolumeSpaceReservationLock() {
+    return LOCK;
+  }
 }

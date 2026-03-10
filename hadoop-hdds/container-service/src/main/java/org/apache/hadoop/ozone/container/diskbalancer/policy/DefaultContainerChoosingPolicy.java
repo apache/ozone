@@ -178,7 +178,7 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
 
         long containerSize = containerData.getBytesUsed();
         // Check if dst has enough space and can accept the container without exceeding threshold
-        if (containerSize <= usableSpace &&
+        if (containerSize < usableSpace &&
             computeUtilization(dstSpaceUsage, dstCommittedBytes, containerSize) < upperThreshold) {
           return containerData;
         }

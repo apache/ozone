@@ -21,6 +21,7 @@ import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerConfigu
 
 import java.util.concurrent.locks.ReentrantLock;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
+import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
 import org.apache.ratis.util.ReflectionUtils;
@@ -35,9 +36,6 @@ public final class ContainerChoosingPolicyFactory {
   private static final Class<? extends ContainerChoosingPolicy>
       DEFAULT_CONTAINER_CHOOSING_POLICY = DefaultContainerChoosingPolicy.class;
 
-  // A lock to coordinate space reservation between multiple policy instances and threads
-  private static final ReentrantLock LOCK = new ReentrantLock();
-
   private ContainerChoosingPolicyFactory() {
   }
 
@@ -51,6 +49,7 @@ public final class ContainerChoosingPolicyFactory {
     Class<? extends ContainerChoosingPolicy> policyClass = conf.getClass(
         HDDS_DATANODE_DISKBALANCER_CONTAINER_CHOOSING_POLICY,
         DEFAULT_CONTAINER_CHOOSING_POLICY, ContainerChoosingPolicy.class);
-    return ReflectionUtils.newInstance(policyClass, new Class<?>[]{ReentrantLock.class}, LOCK);
+    return ReflectionUtils.newInstance(policyClass, new Class<?>[]{ReentrantLock.class},
+        VolumeChoosingPolicyFactory.getVolumeSpaceReservationLock());
   }
 }
