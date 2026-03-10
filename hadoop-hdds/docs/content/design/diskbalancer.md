@@ -103,6 +103,18 @@ D1     ----> C1-CLOSED  --- (5) ---> C1-DELETED
         |
 D2      ----> Temp C1-CLOSED  --- (2) ---> Temp C1-RECOVERING --- (3) ---> C1-RECOVERING --- (4) ---> C1-CLOSED
 ```
+
+### Lazy Deletion of Source Container Replica
+
+The source container on D1 is **not** deleted immediately after the move completes. Instead, it is scheduled for deletion after a configurable delay using config `hdds.datanode.disk.balancer.replica.deletion.delay`, **default: 5 minutes**.
+
+**Rationale:** When a container has only one replica and that replica has an in-flight read operation, the read thread may still hold a reference to the old container at the source path.
+If the DiskBalancer deletes the old container immediately after the move, the in-flight read would fail because the container data is now at the new path. The lazy deletion provides a
+grace period for in-flight reads to complete before the old container is removed, avoiding immediate read failures.
+
+**Note:** Because of this lazy deletion, the disk utilization of the source volume will not decrease immediately after a container move or after the DiskBalancer is stopped. The freed space
+and balanced state will be visible only after the configured delay, when the source container replicas are actually deleted.
+
 ## DiskBalancing Policies
 
 By default, the DiskBalancer uses specific policies to decide which disks to balance and which containers to move. These

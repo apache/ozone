@@ -22,7 +22,7 @@ env:
 
 jobs:
   update-ozone-site-config-doc:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-slim
     steps:
       - name: Download generated documentation
         uses: actions/download-artifact@v4

@@ -233,6 +233,7 @@ share/ozone/lib/ozone-recon.jar
 share/ozone/lib/ozone-s3-secret-store.jar
 share/ozone/lib/ozone-s3gateway.jar
 share/ozone/lib/ozone-tools.jar
+share/ozone/lib/ozone-vapor.jar
 share/ozone/lib/perfmark-api.jar
 share/ozone/lib/picocli.jar
 share/ozone/lib/picocli-shell-jline3.jar
