@@ -119,10 +119,11 @@ diff --git a/src.mk b/src.mk
 index b94bc43ca..c13e5cde6 100644
 --- a/src.mk
 +++ b/src.mk
-@@ -338,11 +338,8 @@ RANGE_TREE_SOURCES =\
+@@ -367,12 +367,8 @@
    utilities/transactions/lock/range/range_tree/range_tree_lock_tracker.cc
-
+ 
  TOOL_LIB_SOURCES =                                              \
+-  db_stress_tool/db_stress_compression_manager.cc               \
 -  tools/io_tracer_parser_tool.cc                                \
 -  tools/ldb_cmd.cc                                              \
 -  tools/ldb_tool.cc                                             \
@@ -130,7 +131,7 @@ index b94bc43ca..c13e5cde6 100644
 -  utilities/blob_db/blob_dump_tool.cc                           \
 +  tools/raw_sst_file_reader.cc                                  \
 +  tools/raw_sst_file_iterator.cc                                \
-
+ 
  ANALYZER_LIB_SOURCES =                                          \
    tools/block_cache_analyzer/block_cache_trace_analyzer.cc      \
 diff --git a/tools/raw_sst_file_iterator.cc b/tools/raw_sst_file_iterator.cc
