@@ -374,13 +374,13 @@ public final class IamSessionPolicyResolver {
       return mappedS3Actions;
     }
 
-    final Set<S3Action> filteredActions = new HashSet<>();
     if (mappedS3Actions.contains(S3Action.LIST_BUCKET)) {
+      final Set<S3Action> filteredActions = new HashSet<>();
       filteredActions.add(S3Action.LIST_BUCKET);
       return filteredActions;
     }
 
-    return filteredActions;
+    return Collections.emptySet();
   }
 
   /**
