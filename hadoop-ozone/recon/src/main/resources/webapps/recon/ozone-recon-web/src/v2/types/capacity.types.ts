@@ -17,9 +17,13 @@
  */
 
 type GlobalStorage = {
-  totalUsedSpace: number;
-  totalFreeSpace: number;
-  totalCapacity: number;
+  totalFileSystemCapacity: number;
+  totalReservedSpace: number;
+  totalOzoneCapacity: number;
+  totalOzoneUsedSpace: number;
+  totalOzoneFreeSpace: number;
+  totalOzonePreAllocatedContainerSpace: number;
+  totalMinimumFreeSpace: number;
 };
 
 type GlobalNamespace = {
@@ -30,7 +34,6 @@ type GlobalNamespace = {
 type UsedSpaceBreakdown = {
   openKeyBytes: OpenKeyBytesInfo;
   committedKeyBytes: number;
-  preAllocatedContainerBytes: number;
 };
 
 type OpenKeyBytesInfo = {

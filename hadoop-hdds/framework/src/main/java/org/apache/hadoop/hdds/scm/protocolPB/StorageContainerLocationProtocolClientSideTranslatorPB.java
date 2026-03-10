@@ -969,7 +969,8 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       Optional<Boolean> networkTopologyEnable,
       Optional<String> includeNodes,
       Optional<String> excludeNodes,
-      Optional<String> excludeContainers) throws IOException {
+      Optional<String> excludeContainers,
+      Optional<String> includeContainers) throws IOException {
     StartContainerBalancerRequestProto.Builder builder =
         StartContainerBalancerRequestProto.newBuilder();
     builder.setTraceID(TracingUtil.exportCurrentSpan());
@@ -1058,6 +1059,11 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     if (excludeContainers.isPresent()) {
       String ec = excludeContainers.get();
       builder.setExcludeContainers(ec);
+    }
+
+    if (includeContainers.isPresent()) {
+      String ic = includeContainers.get();
+      builder.setIncludeContainers(ic);
     }
 
     StartContainerBalancerRequestProto request = builder.build();

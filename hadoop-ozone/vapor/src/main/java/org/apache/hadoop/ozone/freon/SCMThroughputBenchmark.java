@@ -109,9 +109,9 @@ import picocli.CommandLine;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
-@MetaInfServices(FreonSubcommand.class)
+@MetaInfServices(VaporSubcommand.class)
 @SuppressWarnings("java:S2245") // no need for secure random
-public final class SCMThroughputBenchmark implements Callable<Void>, FreonSubcommand {
+public final class SCMThroughputBenchmark implements Callable<Void>, VaporSubcommand {
 
   private static final Logger LOG =
       LoggerFactory.getLogger(SCMThroughputBenchmark.class);

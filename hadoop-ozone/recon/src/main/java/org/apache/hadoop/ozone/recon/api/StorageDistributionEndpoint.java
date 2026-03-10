@@ -222,21 +222,26 @@ public class StorageDistributionEndpoint {
   }
 
   private GlobalStorageReport calculateGlobalStorageReport() {
+    GlobalStorageReport.Builder globalStorageBuilder = GlobalStorageReport.newBuilder();
     try {
       SCMNodeStat stats = nodeManager.getStats();
       if (stats == null) {
         LOG.warn("Node manager stats are null, returning default values");
-        return new GlobalStorageReport(0L, 0L, 0L);
+        return globalStorageBuilder.build();
       }
 
-      long scmUsed = stats.getScmUsed() != null ? stats.getScmUsed().get() : 0L;
-      long remaining = stats.getRemaining() != null ? stats.getRemaining().get() : 0L;
-      long capacity = stats.getCapacity() != null ? stats.getCapacity().get() : 0L;
+      return globalStorageBuilder
+          .setTotalOzoneCapacity(stats.getCapacity() != null ? stats.getCapacity().get() : 0L)
+          .setTotalReservedSpace(stats.getReserved() != null ? stats.getReserved().get() : 0L)
+          .setTotalOzoneFreeSpace(stats.getRemaining() != null ? stats.getRemaining().get() : 0L)
+          .setTotalOzoneUsedSpace(stats.getScmUsed() != null ? stats.getScmUsed().get() : 0L)
+          .setTotalOzonePreAllocatedContainerSpace(stats.getCommitted() != null ? stats.getCommitted().get() : 0L)
+          .setTotalMinimumFreeSpace(stats.getFreeSpaceToSpare() != null ? stats.getFreeSpaceToSpare().get() : 0L)
+          .build();
 
-      return new GlobalStorageReport(scmUsed, remaining, capacity);
     } catch (Exception e) {
       LOG.error("Error calculating global storage report", e);
-      return new GlobalStorageReport(0L, 0L, 0L);
+      return globalStorageBuilder.build();
     }
   }
 
@@ -278,9 +283,6 @@ public class StorageDistributionEndpoint {
     Long totalUsedNamespace = namespaceMetrics.get("totalUsedNamespace");
     Long totalCommittedSize = namespaceMetrics.get("totalCommittedSize");
     Long totalKeys = namespaceMetrics.get("totalKeys");
-    Long totalContainerPreAllocated = nodeStorageReports.stream()
-        .map(DatanodeStorageReport::getCommitted)
-        .reduce(0L, Long::sum);
 
     return StorageCapacityDistributionResponse.newBuilder()
             .setDataNodeUsage(nodeStorageReports)
@@ -289,7 +291,7 @@ public class StorageDistributionEndpoint {
                     totalUsedNamespace != null ? totalUsedNamespace : 0L,
                     totalKeys != null ? totalKeys : 0L))
             .setUsedSpaceBreakDown(new UsedSpaceBreakDown(
-                    totalOpenKeySize, totalCommittedSize != null ? totalCommittedSize : 0L, totalContainerPreAllocated))
+                    totalOpenKeySize, totalCommittedSize != null ? totalCommittedSize : 0L))
             .build();
   }
 

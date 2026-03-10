@@ -22,8 +22,8 @@ on:
         required: true
 
 jobs:
-  generate:
-    runs-on: ubuntu-24.04
+  generate-config-doc:
+    runs-on: ubuntu-slim
     steps:
       - name: Checkout project
         uses: actions/checkout@v4

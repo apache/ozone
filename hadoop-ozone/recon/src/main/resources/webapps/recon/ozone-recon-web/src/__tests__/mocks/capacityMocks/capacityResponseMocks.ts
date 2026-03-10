@@ -18,9 +18,12 @@
 
 export const StorageDistribution = {
   globalStorage: {
-    totalUsedSpace: 4096,
-    totalFreeSpace: 4096,
-    totalCapacity: 10240
+    totalFileSystemCapacity: 11264,
+    totalOzoneUsedSpace: 4096,
+    totalOzoneFreeSpace: 4096,
+    totalOzoneCapacity: 10240,
+    totalReservedSpace: 1024,
+    totalOzonePreAllocatedContainerSpace: 1024
   },
   globalNamespace: {
     totalUsedSpace: 4096,
@@ -32,8 +35,7 @@ export const StorageDistribution = {
       openKeyAndFileBytes: 512,
       multipartOpenKeyBytes: 512
     },
-    committedKeyBytes: 2048,
-    preAllocatedContainerBytes: 1024
+    committedKeyBytes: 2048
   },
   dataNodeUsage: [
     {

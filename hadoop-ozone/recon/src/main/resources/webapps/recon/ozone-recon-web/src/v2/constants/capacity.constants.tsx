@@ -20,9 +20,13 @@ import { UtilizationResponse, SCMPendingDeletion, OMPendingDeletion, DNPendingDe
 
 export const DEFAULT_CAPACITY_UTILIZATION: UtilizationResponse = {
   globalStorage: {
-    totalUsedSpace: 0,
-    totalFreeSpace: 0,
-    totalCapacity: 0
+    totalFileSystemCapacity: 0,
+    totalReservedSpace: 0,
+    totalOzoneCapacity: 0,
+    totalOzoneFreeSpace: 0,
+    totalOzoneUsedSpace: 0,
+    totalOzonePreAllocatedContainerSpace: 0,
+    totalMinimumFreeSpace: 0
   },
   globalNamespace: {
     totalUsedSpace: 0,
@@ -34,8 +38,7 @@ export const DEFAULT_CAPACITY_UTILIZATION: UtilizationResponse = {
       openKeyAndFileBytes: 0,
       multipartOpenKeyBytes: 0
     },
-    committedKeyBytes: 0,
-    preAllocatedContainerBytes: 0
+    committedKeyBytes: 0
   },
   dataNodeUsage: []
 };

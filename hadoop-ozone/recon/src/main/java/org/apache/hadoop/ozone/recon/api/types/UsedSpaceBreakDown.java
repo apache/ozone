@@ -50,16 +50,12 @@ public class UsedSpaceBreakDown {
   @JsonProperty("committedKeyBytes")
   private long committedKeyBytes;
 
-  @JsonProperty("preAllocatedContainerBytes")
-  private long preAllocatedContainerBytes;
-
   public UsedSpaceBreakDown() {
   }
 
-  public UsedSpaceBreakDown(OpenKeyBytesInfo openKeyBytes, long committedKeyBytes, long preAllocatedContainerBytes) {
+  public UsedSpaceBreakDown(OpenKeyBytesInfo openKeyBytes, long committedKeyBytes) {
     this.openKeyBytes = openKeyBytes;
     this.committedKeyBytes = committedKeyBytes;
-    this.preAllocatedContainerBytes = preAllocatedContainerBytes;
   }
 
   public OpenKeyBytesInfo getOpenKeyBytes() {
@@ -68,9 +64,5 @@ public class UsedSpaceBreakDown {
 
   public long getCommittedKeyBytes() {
     return committedKeyBytes;
-  }
-
-  public long getPreAllocatedContainerBytes() {
-    return preAllocatedContainerBytes;
   }
 }
