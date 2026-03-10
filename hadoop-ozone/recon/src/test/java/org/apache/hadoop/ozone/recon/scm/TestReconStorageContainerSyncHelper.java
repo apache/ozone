@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.recon.scm;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -86,9 +87,9 @@ class TestReconStorageContainerSyncHelper {
 
   @Test
   void testContainerMissingFromReconIsAddedWhenMultiplePages() throws Exception {
-    // Force containerCountPerCall = 2 by capping the RPC size to 2MB
+    // Force containerCountPerCall = 2 via the batch size config
     OzoneConfiguration pagedConf = new OzoneConfiguration();
-    pagedConf.setInt("ipc.maximum.data.length", 2 * 1024 * 1024);
+    pagedConf.setLong(OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE, 2L);
     ReconStorageContainerSyncHelper pagedHelper = new ReconStorageContainerSyncHelper(
         mockScmServiceProvider, pagedConf, mockContainerManager);
 

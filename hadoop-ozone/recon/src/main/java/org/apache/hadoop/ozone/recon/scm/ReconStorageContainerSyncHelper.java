@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.ozone.recon.scm;
 
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE;
+import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE_DEFAULT;
+
 import java.io.IOException;
 import java.util.List;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -29,9 +32,9 @@ import org.slf4j.LoggerFactory;
 
 class ReconStorageContainerSyncHelper {
 
-  public static final long CONTAINER_METADATA_SIZE = 1 * 1024 * 1024L;
   private static final String IPC_MAXIMUM_DATA_LENGTH = "ipc.maximum.data.length";
   private static final int IPC_MAXIMUM_DATA_LENGTH_DEFAULT = 128 * 1024 * 1024;
+  private static final long CONTAINER_ID_PROTO_SIZE_BYTES = 12;
 
   private static final Logger LOG = LoggerFactory
       .getLogger(ReconStorageContainerSyncHelper.class);
@@ -95,14 +98,17 @@ class ReconStorageContainerSyncHelper {
   }
 
   private long getContainerCountPerCall(long totalContainerCount) {
-    // Assumption of size of 1 container info object here is 1 MB
-    long containersMetaDataTotalRpcRespSizeMB =
-        CONTAINER_METADATA_SIZE * totalContainerCount;
+    // Assumption of size of 1 ContainerID proto here is 12 bytes
+    long totalIdsSizeBytes = CONTAINER_ID_PROTO_SIZE_BYTES * totalContainerCount;
     long hadoopRPCSize = ozoneConfiguration.getInt(IPC_MAXIMUM_DATA_LENGTH, IPC_MAXIMUM_DATA_LENGTH_DEFAULT);
-    long containerCountPerCall = containersMetaDataTotalRpcRespSizeMB <=
+    long countByRpc = totalIdsSizeBytes <=
         hadoopRPCSize ? totalContainerCount :
         Math.round(Math.floor(
-            hadoopRPCSize / (double) CONTAINER_METADATA_SIZE));
-    return containerCountPerCall;
+            hadoopRPCSize / (double) CONTAINER_ID_PROTO_SIZE_BYTES));
+
+    long containerIdMaxBatchSize = ozoneConfiguration.getLong(
+        OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE,
+        OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE_DEFAULT);
+    return Math.min(countByRpc, containerIdMaxBatchSize);
   }
 }
