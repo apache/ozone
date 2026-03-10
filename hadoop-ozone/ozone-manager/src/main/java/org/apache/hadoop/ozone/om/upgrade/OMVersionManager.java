@@ -15,18 +15,26 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.upgrade;
+package org.apache.hadoop.ozone.om.upgrade;
 
+import java.io.IOException;
 import org.apache.hadoop.hdds.ComponentVersion;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
+import org.apache.hadoop.ozone.upgrade.ComponentVersionManager;
 
 /**
- * Generic Layout feature interface for Ozone.
+ * Component version manager for Ozone Manager.
  */
-public interface LayoutFeature extends ComponentVersion {
-  int layoutVersion();
+public class OMVersionManager extends ComponentVersionManager {
+  public OMVersionManager(int serializedApparentVersion) throws IOException {
+    super(computeApparentVersion(serializedApparentVersion), OzoneManagerVersion.SOFTWARE_VERSION);
+  }
 
-  @Override
-  default int serialize() {
-    return this.layoutVersion();
+  private static ComponentVersion computeApparentVersion(int serializedApparentVersion) {
+    if (serializedApparentVersion < OzoneManagerVersion.ZDU.serialize()) {
+      return OMLayoutFeature.deserialize(serializedApparentVersion);
+    } else {
+      return OzoneManagerVersion.deserialize(serializedApparentVersion);
+    }
   }
 }

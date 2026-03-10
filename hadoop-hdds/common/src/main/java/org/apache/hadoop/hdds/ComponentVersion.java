@@ -17,23 +17,16 @@
 
 package org.apache.hadoop.hdds;
 
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.Map;
 import java.util.Optional;
-import java.util.SortedMap;
-import java.util.TreeMap;
-import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.upgrade.UpgradeAction;
 
-import static java.util.function.Function.identity;
-import static java.util.stream.Collectors.toMap;
-
 /**
- * Base type for component version enums.
+ * The logical versioning system used to track incompatible changes to a component, regardless whether they affect disk
+ * or network compatibility between the same or different types of components.
+ *
+ * This interface is the base type for component version enums.
  */
-public interface ComponentVersion<V extends ComponentVersion<V>> extends Comparable<V> {
+public interface ComponentVersion {
   /**
    * @return The serialized representation of this version. This is an opaque value which should not be checked or
    * compared directly.
@@ -48,19 +41,21 @@ public interface ComponentVersion<V extends ComponentVersion<V>> extends Compara
   /**
    * @return The next version immediately following this one, or null if there is no such version.
    */
-  V nextVersion();
-
-  /**
-   * @return All versions immediately following this one, in order, or an empty iterable if there are no more versions.
-   */
-  Iterable<V> nextVersions();
+  ComponentVersion nextVersion();
 
   /**
    * Deserializes a ComponentVersion and checks if its feature set is supported by the current ComponentVersion.
    *
-   * @return true if this version supports the features of otherVersion. False otherwise.
+   * @return true if this version supports the features of the provided version. False otherwise.
    */
   boolean isSupportedBy(int serializedVersion);
+
+  /**
+   * @return true if this version supports the features of the provided version. False otherwise.
+   */
+  default boolean isSupportedBy(ComponentVersion other) {
+    return isSupportedBy(other.serialize());
+  }
 
   default Optional<? extends UpgradeAction> action() {
     return Optional.empty();

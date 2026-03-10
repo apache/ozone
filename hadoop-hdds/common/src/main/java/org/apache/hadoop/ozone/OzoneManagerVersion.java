@@ -21,18 +21,17 @@ import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toMap;
 
 import java.util.Arrays;
-import java.util.Iterator;
-import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import org.apache.hadoop.hdds.ComponentVersion;
-import org.apache.hadoop.hdds.HDDSVersion;
-import org.jspecify.annotations.NonNull;
 
 /**
  * Versioning for Ozone Manager.
  */
-public enum OzoneManagerVersion implements ComponentVersion<OzoneManagerVersion> {
+public enum OzoneManagerVersion implements ComponentVersion {
+
+  //////////////////////////////  //////////////////////////////
+
   DEFAULT_VERSION(0, "Initial version"),
   S3G_PERSISTENT_CONNECTIONS(1,
       "New S3G persistent connection support is present in OM."),
@@ -65,6 +64,8 @@ public enum OzoneManagerVersion implements ComponentVersion<OzoneManagerVersion>
   FUTURE_VERSION(-1, "Used internally in the client when the server side is "
       + " newer and an unknown server version has arrived to the client.");
 
+  //////////////////////////////  //////////////////////////////
+
   private static final SortedMap<Integer, OzoneManagerVersion> BY_VALUE =
       Arrays.stream(values())
           .collect(toMap(OzoneManagerVersion::serialize, identity(), (v1, v2) -> v1, TreeMap::new));
@@ -89,6 +90,11 @@ public enum OzoneManagerVersion implements ComponentVersion<OzoneManagerVersion>
     return version;
   }
 
+  /**
+   * @param value The serialized version to convert.
+   * @return The version corresponding to this serialized value, or {@link #FUTURE_VERSION} if no matching version is
+   *    found.
+   */
   public static OzoneManagerVersion deserialize(int value) {
     return BY_VALUE.getOrDefault(value, FUTURE_VERSION);
   }
@@ -101,15 +107,6 @@ public enum OzoneManagerVersion implements ComponentVersion<OzoneManagerVersion>
   @Override
   public OzoneManagerVersion nextVersion() {
     return BY_VALUE.get(version + 1);
-  }
-
-  /**
-   * @return All versions immediately following this one in order but excluding FUTURE_VERSION,
-   *    or an empty iterable if there are no more versions.
-   */
-  @Override
-  public Iterable<OzoneManagerVersion> nextVersions() {
-    return BY_VALUE.tailMap(version + 1).values();
   }
 
   @Override

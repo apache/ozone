@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.upgrade;
 
-import org.apache.hadoop.hdds.ComponentVersion;
 import org.apache.hadoop.metrics2.MetricsCollector;
 import org.apache.hadoop.metrics2.MetricsInfo;
 import org.apache.hadoop.metrics2.MetricsRecordBuilder;
@@ -43,13 +42,13 @@ public final class ComponentVersionManagerMetrics implements MetricsSource {
       "ApparentVersion",
       "Current apparent version in serialized int form.");
 
-  private final VersionManager<?> versionManager;
+  private final ComponentVersionManager versionManager;
 
-  private ComponentVersionManagerMetrics(VersionManager<?> versionManager) {
+  private ComponentVersionManagerMetrics(ComponentVersionManager versionManager) {
     this.versionManager = versionManager;
   }
 
-  public static ComponentVersionManagerMetrics create(VersionManager<?> versionManager) {
+  public static ComponentVersionManagerMetrics create(ComponentVersionManager versionManager) {
     ComponentVersionManagerMetrics metrics = (ComponentVersionManagerMetrics) DefaultMetricsSystem.instance()
             .getSource(METRICS_SOURCE_NAME);
     if (metrics == null) {

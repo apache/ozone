@@ -21,16 +21,14 @@ import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toMap;
 
 import java.util.Arrays;
-import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import org.apache.hadoop.hdds.ComponentVersion;
-import org.apache.hadoop.hdds.HDDSVersion;
 
 /**
  * Versioning for protocol clients.
  */
-public enum ClientVersion implements ComponentVersion<ClientVersion> {
+public enum ClientVersion implements ComponentVersion {
 
   DEFAULT_VERSION(0, "Initial version"),
 
@@ -69,11 +67,6 @@ public enum ClientVersion implements ComponentVersion<ClientVersion> {
   @Override
   public ClientVersion nextVersion() {
     return BY_VALUE.get(version + 1);
-  }
-
-  @Override
-  public Iterable<ClientVersion> nextVersions() {
-    return BY_VALUE.tailMap(version + 1).values();
   }
 
   @Override
