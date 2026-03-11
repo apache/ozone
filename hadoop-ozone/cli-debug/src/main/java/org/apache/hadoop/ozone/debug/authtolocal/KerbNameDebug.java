@@ -30,7 +30,7 @@ import picocli.CommandLine;
  * using the configured auth_to_local rules.
  *
  * Example:
- *   ozone debug kerbname om/om1@EXAMPLE.COM
+ *   ozone debug kerbname testuser/host@EXAMPLE.COM
  */
 @CommandLine.Command(
     name = "kerbname",
@@ -46,17 +46,22 @@ public class KerbNameDebug implements Callable<Void>, DebugSubcommand {
 
   @Override
   public Void call() throws Exception {
-    OzoneConfiguration conf = new OzoneConfiguration();
-    String rules = conf.get("hadoop.security.auth_to_local");
-    if (rules != null) {
-      KerberosName.setRules(rules);
-    }
     System.out.println("-- Kerberos Principal Translation --");
+    OzoneConfiguration conf = new OzoneConfiguration();
+    // Initialize auth_to_local rules
+    String rules = conf.get("hadoop.security.auth_to_local", "DEFAULT");
+    KerberosName.setRules(rules);
+    System.out.println("auth_to_local rules = " + rules);
     for (String principal : principals) {
-      KerberosName name = new KerberosName(principal);
-      System.out.println(
-          principal + " -> " + name.getShortName()
-      );
+      System.out.println("Principal = " + principal);
+      try {
+        KerberosName kerbName = new KerberosName(principal);
+        String shortName = kerbName.getShortName();
+        System.out.println("Local user = " + shortName);
+      } catch (Exception e) {
+        System.out.println("Failed to translate principal: " + e.getMessage());
+      }
+      System.out.println();
     }
     return null;
   }
