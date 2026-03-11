@@ -105,6 +105,9 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 
   const finalStyles = {...selectStyles, ...style ?? {}}
 
+  const fixedOption = fixedColumn ? options.find((opt) => opt.value === fixedColumn) : undefined;
+  const selectableOptions = fixedColumn ? options.filter((opt) => opt.value !== fixedColumn) : options;
+
   return (
     <ReactSelect
       {...props}
@@ -115,17 +118,21 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
       isSearchable={false}
       controlShouldRenderValue={false}
       classNamePrefix='multi-select'
-      options={options.map((opt) => ({...opt, isDisabled: (opt.value === fixedColumn)}))}
+      options={selectableOptions}
       components={{
         ValueContainer,
         Option
       }}
+      menuPortalTarget={document.body}
+      menuPosition='fixed'
       placeholder={placeholder}
       value={selected}
       isDisabled={isDisabled}
       onChange={(selected: ValueType<Option, true>) => {
-        if (selected?.length === options.length) return onChange!(options);
-        return onChange!(selected);
+        const selectedOpts = (selected as Option[]) ?? [];
+        const withFixed = fixedOption ? [fixedOption, ...selectedOpts] : selectedOpts;
+        if (selectedOpts.length === selectableOptions.length) return onChange!(options);
+        return onChange!(withFixed);
       }}
       styles={finalStyles} />
   )
