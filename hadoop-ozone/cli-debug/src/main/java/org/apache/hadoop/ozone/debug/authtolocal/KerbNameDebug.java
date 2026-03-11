@@ -56,7 +56,8 @@ public class KerbNameDebug implements Callable<Void>, DebugSubcommand {
       try {
         KerberosName kerbName = new KerberosName(principal);
         String shortName = kerbName.getShortName();
-        System.out.println("Principal = " + principal +" to "+"Local user = " + shortName);
+        System.out.println(String.format(
+            "Principal = %s to Local user = %s", principal, shortName));
       } catch (Exception e) {
         System.out.println("Failed to translate principal: " + e.getMessage());
       }
