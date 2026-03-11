@@ -21,14 +21,23 @@ volume="cli-debug-volume${prefix}"
 bucket="cli-debug-bucket"
 key="testfile"
 
-dn_container="ozonesecure-ha-datanode1-1"
 container_db_path="/data/hdds/hdds/"
-local_db_backup_path="${COMPOSE_DIR}/container_db_backup"
+local_db_backup_path="${COMPOSE_DIR}/container_db_backup_${prefix}"
 mkdir -p "${local_db_backup_path}"
 
-echo "Taking a backup of container.db"
-docker exec "${dn_container}" find "${container_db_path}" -name "container.db" | while read -r db; do
-  docker cp "${dn_container}:${db}" "${local_db_backup_path}/container.db"
+echo "Taking backups of existing container.db directories"
+datanodes=$(docker ps --format '{{.Names}}' | grep '^ozonesecure-ha-datanode[0-9]\+-1$' | sort)
+if [ -z "${datanodes}" ]; then
+  echo "Failed to find datanode containers" >&2
+  exit 1
+fi
+
+for dn_container in ${datanodes}; do
+  docker exec "${dn_container}" find "${container_db_path}" -name "container.db" | while read -r db; do
+    backup_path="${local_db_backup_path}/${dn_container}${db}"
+    mkdir -p "$(dirname "${backup_path}")"
+    docker cp "${dn_container}:${db}" "${backup_path}"
+  done
 done
 
 execute_robot_test ${SCM} -v "PREFIX:${prefix}" debug/ozone-debug-tests.robot
@@ -40,23 +49,44 @@ host="$(jq -r '.keyLocations[0][0].datanode["hostname"]' ${chunkinfo})"
 container="${host%%.*}"
 dn_with_num="$(sed -E 's/^.*-(datanode[0-9]+)-[0-9]+$/\1/' <<< "$container")"
 
-# corrupt the first block of key on one of the datanodes
 datafile="$(jq -r '.keyLocations[0][0].file' ${chunkinfo})"
+
+# corrupt the first block of key on one of the datanodes
 docker exec "${container}" sed -i -e '1s/^/a/' "${datafile}"
 
 execute_robot_test ${SCM} -v "PREFIX:${prefix}" -v "CORRUPT_DATANODE:${host}" debug/corrupt-block-checksum.robot
 
 echo "Overwriting container.db with the backup db"
-target_container_db=$(docker exec "${container}" find "${container_db_path}" -name "container.db" | head -n 1)
+target_container_db=$(docker exec "${container}" bash -c "
+  datafile=\$1
+  dir=\$(dirname \"\$datafile\")
+  while [ \"\$dir\" != '/' ]; do
+    if [[ \$(basename \"\$dir\") == CID-* ]]; then
+      container_db=\$(find \"\$dir\" -path '*/container.db' | head -n 1)
+      if [ -n \"\$container_db\" ]; then
+        echo \"\$container_db\"
+        exit 0
+      fi
+      exit 1
+    fi
+    dir=\$(dirname \"\$dir\")
+  done
+  exit 1
+" _ "${datafile}")
 if [ -z "${target_container_db}" ]; then
-  echo "Failed to locate container.db on ${container}" >&2
+  echo "Failed to locate container.db for ${datafile} on ${container}" >&2
+  exit 1
+fi
+backup_container_db="${local_db_backup_path}/${container}${target_container_db}"
+if [ ! -e "${backup_container_db}" ]; then
+  echo "Failed to locate backup for ${target_container_db} on ${container}" >&2
   exit 1
 fi
 # Replace the whole RocksDB directory so stale files (eg. old WAL/MANIFEST)
 # are not left behind when restoring the backup.
 echo "Restoring backup at ${target_container_db} on ${container}"
 docker exec "${container}" mv "${target_container_db}" "${target_container_db}.orig" \
-  && docker cp "${local_db_backup_path}/container.db" "${container}:${target_container_db}" \
+  && docker cp "${backup_container_db}" "${container}:${target_container_db}" \
   && docker exec "${container}" sudo chown -R hadoop:hadoop "${target_container_db}" \
   && docker exec "${container}" rm -rf "${target_container_db}.orig" \
   || exit 1
