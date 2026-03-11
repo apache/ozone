@@ -179,10 +179,19 @@ public final class TracingUtil {
 
   /**
    * Execute {@code runnable} inside an activated new span.
+   * If a parent span exists in the current context, this becomes a child span.
    */
   public static <E extends Exception> void executeInNewSpan(String spanName,
       CheckedRunnable<E> runnable) throws E {
-    Span span = tracer.spanBuilder(spanName).setNoParent().startSpan();
+    Span span;
+    Context currentContext = Context.current();
+    Span parentSpan = Span.fromContext(currentContext);
+
+    if (parentSpan != null && parentSpan.getSpanContext().isValid()) {
+      span = tracer.spanBuilder(spanName).setParent(currentContext).startSpan();
+    } else {
+      span = tracer.spanBuilder(spanName).setNoParent().startSpan();
+    }
     executeInSpan(span, runnable);
   }
 
@@ -191,7 +200,15 @@ public final class TracingUtil {
    */
   public static <R, E extends Exception> R executeInNewSpan(String spanName,
       CheckedSupplier<R, E> supplier) throws E {
-    Span span = tracer.spanBuilder(spanName).setNoParent().startSpan();
+    Span span;
+    Context currentContext = Context.current();
+    Span parentSpan = Span.fromContext(currentContext);
+
+    if (parentSpan != null && parentSpan.getSpanContext().isValid()) {
+      span = tracer.spanBuilder(spanName).setParent(currentContext).startSpan();
+    } else {
+      span = tracer.spanBuilder(spanName).setNoParent().startSpan();
+    }
     return executeInSpan(span, supplier);
   }
 
@@ -244,7 +261,16 @@ public final class TracingUtil {
    * in case of Exceptions.
    */
   public static TraceCloseable createActivatedSpan(String spanName) {
-    Span span = tracer.spanBuilder(spanName).setNoParent().startSpan();
+    Span span;
+    Context currentContext = Context.current();
+    Span parentSpan = Span.fromContext(currentContext);
+
+    if (parentSpan != null && parentSpan.getSpanContext().isValid()) {
+      span = tracer.spanBuilder(spanName).setParent(currentContext).startSpan();
+    } else {
+      span = tracer.spanBuilder(spanName).setNoParent().startSpan();
+    }
+
     Scope scope = span.makeCurrent();
     return () -> {
       scope.close();
