@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -112,6 +113,28 @@ class TestRandomAccessFileChannel {
     assertEquals(0, zeroSizedBuffer.remaining());
     assertEquals(0, zeroSizedBuffer.position());
     assertEquals(0, zeroSizedBuffer.limit());
+  }
+
+  @Test
+  void tryWithResourcesClosesAutomatically() throws Exception {
+    final File f = tempDir.resolve("try-with-resources").toFile();
+    try (RandomAccessFile raf = new RandomAccessFile(f, "rw")) {
+      raf.write(new byte[]{10, 20, 30});
+    }
+
+    final RandomAccessFileChannel c = new RandomAccessFileChannel();
+    c.open(f);
+    assertTrue(c.isOpen());
+    // Closeable contract: close via try-with-resources helper
+    closeAndVerify(c);
+    assertFalse(c.isOpen(), "should be closed after try-with-resources");
+    assertDoesNotThrow(c::close, "double close should be safe");
+  }
+
+  private static void closeAndVerify(Closeable closeable) throws IOException {
+    try (Closeable ignored = closeable) {
+      // auto-closed on exit
+    }
   }
 
   private static void setField(Object target, String name, Object value)

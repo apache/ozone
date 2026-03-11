@@ -50,10 +50,19 @@ public class RandomAccessFileChannel implements Closeable {
     Preconditions.assertNull(blockFile, "blockFile");
     final File f = Objects.requireNonNull(file, "blockFile == null");
     final RandomAccessFile newRaf = new RandomAccessFile(f, "r");
-    final FileChannel newChannel = newRaf.getChannel();
-    blockFile = f;
-    raf = newRaf;
-    channel = newChannel;
+    try {
+      final FileChannel newChannel = newRaf.getChannel();
+      blockFile = f;
+      raf = newRaf;
+      channel = newChannel;
+    } catch (Exception e) {
+      try {
+        newRaf.close();
+      } catch (IOException closeEx) {
+        e.addSuppressed(closeEx);
+      }
+      throw e;
+    }
   }
 
   /** Similar to {@link FileChannel#position(long)}. */
