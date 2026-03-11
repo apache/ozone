@@ -50,13 +50,19 @@ container="${host%%.*}"
 dn_with_num="$(sed -E 's/^.*-(datanode[0-9]+)-[0-9]+$/\1/' <<< "$container")"
 
 datafile="$(jq -r '.keyLocations[0][0].file' ${chunkinfo})"
+container_id="$(jq -r '.keyLocations[0][0].blockData.blockID.containerID' ${chunkinfo})"
+pipeline_id="$(docker-compose exec -T ${SCM} bash -c \
+  "ozone admin container info ${container_id} --json | jq -r '.writePipelineID.id // .writePipelineId.id'")"
+if [ -z "${pipeline_id}" ] || [ "${pipeline_id}" = "null" ]; then
+  echo "Failed to determine write pipeline for container ${container_id}" >&2
+  exit 1
+fi
 
 # corrupt the first block of key on one of the datanodes
 docker exec "${container}" sed -i -e '1s/^/a/' "${datafile}"
 
 execute_robot_test ${SCM} -v "PREFIX:${prefix}" -v "CORRUPT_DATANODE:${host}" debug/corrupt-block-checksum.robot
 
-echo "Overwriting container.db with the backup db"
 target_container_db=$(docker exec "${container}" bash -c "
   datafile=\$1
   dir=\$(dirname \"\$datafile\")
@@ -82,12 +88,6 @@ if [ ! -e "${backup_container_db}" ]; then
   echo "Failed to locate backup for ${target_container_db} on ${container}" >&2
   exit 1
 fi
-target_container_dir=$(dirname "${target_container_db}")
-echo "Restoring backup at ${target_container_db} on ${container}"
-docker exec "${container}" rm -rf "${target_container_db}" \
-  && docker cp "${backup_container_db}" "${container}:${target_container_db}" \
-  && docker exec "${container}" sudo chown -R hadoop:hadoop "${target_container_db}" \
-  || exit 1
 
 docker stop "${container}"
 
@@ -99,9 +99,26 @@ docker start "${container}"
 
 wait_for_datanode "${container}" HEALTHY 60
 
-execute_robot_test ${SCM} -v "PREFIX:${prefix}" -v "DATANODE:${host}" debug/block-existence-check.robot
-
 execute_robot_test ${SCM} -v "PREFIX:${prefix}" -v "DATANODE:${host}" -v "FAULT_INJ_DATANODE:${dn_with_num}" debug/container-state-verifier.robot
 
 execute_robot_test ${OM} kinit.robot
 execute_robot_test ${OM} -v "PREFIX:${prefix}" debug/ozone-debug-tests-ec3-2.robot
+
+echo "Overwriting container.db with the backup db"
+echo "Restoring backup at ${target_container_db} on ${container}"
+docker exec "${container}" rm -rf "${target_container_db}" \
+  && docker cp "${backup_container_db}" "${container}:${target_container_db}" \
+  && docker exec "${container}" sudo chown -R hadoop:hadoop "${target_container_db}" \
+  || exit 1
+echo "Removing dn.ratis state for pipeline ${pipeline_id} on ${container}"
+docker exec "${container}" rm -rf "/data/metadata/dn.ratis/${pipeline_id}" || exit 1
+
+docker stop "${container}"
+
+wait_for_datanode "${container}" STALE 60
+
+docker start "${container}"
+
+wait_for_datanode "${container}" HEALTHY 60
+
+execute_robot_test ${SCM} -v "PREFIX:${prefix}" -v "DATANODE:${host}" debug/block-existence-check.robot
