@@ -31,7 +31,6 @@ share/ozone/lib/commons-daemon.jar
 share/ozone/lib/commons-digester.jar
 share/ozone/lib/commons-io.jar
 share/ozone/lib/commons-lang3.jar
-share/ozone/lib/commons-lang.jar
 share/ozone/lib/commons-net.jar
 share/ozone/lib/commons-pool2.jar
 share/ozone/lib/commons-text.jar
@@ -106,11 +105,15 @@ share/ozone/lib/jakarta.validation-api.jar
 share/ozone/lib/jakarta.ws.rs-api.jar
 share/ozone/lib/jakarta.xml.bind-api.jar
 share/ozone/lib/javassist-GA.jar
+share/ozone/lib/javax.activation-api.jar
 share/ozone/lib/javax.annotation-api.jar
 share/ozone/lib/javax.el-api.jar
 share/ozone/lib/javax.inject.jar
 share/ozone/lib/javax.interceptor-api.jar
 share/ozone/lib/javax.servlet-api.jar
+share/ozone/lib/jaxb-api.jar
+share/ozone/lib/jaxb-core.jar
+share/ozone/lib/jaxb-impl.jar
 share/ozone/lib/jaxb-runtime.jar
 share/ozone/lib/jcip-annotations.jar
 share/ozone/lib/jcl-over-slf4j.jar
@@ -158,6 +161,7 @@ share/ozone/lib/jsch.jar
 share/ozone/lib/json-simple.jar
 share/ozone/lib/jsp-api.jar
 share/ozone/lib/jspecify.jar
+share/ozone/lib/jsr305.jar
 share/ozone/lib/jsr311-api.jar
 share/ozone/lib/kerb-core.jar
 share/ozone/lib/kerb-crypto.jar
@@ -241,6 +245,7 @@ share/ozone/lib/protobuf-java.jar
 share/ozone/lib/protobuf-java.jar
 share/ozone/lib/proto-google-common-protos.jar
 share/ozone/lib/ranger-audit-core.jar
+share/ozone/lib/ranger-authz-api.jar
 share/ozone/lib/ranger-intg.jar
 share/ozone/lib/ranger-plugin-classloader.jar
 share/ozone/lib/ranger-plugins-common.jar
@@ -276,6 +281,7 @@ share/ozone/lib/spring-tx.jar
 share/ozone/lib/sqlite-jdbc.jar
 share/ozone/lib/stax2-api.jar
 share/ozone/lib/txw2.jar
+share/ozone/lib/ugsync-util.jar
 share/ozone/lib/vault-java-driver.jar
 share/ozone/lib/weld-servlet-shaded.Final.jar
 share/ozone/lib/woodstox-core.jar

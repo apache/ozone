@@ -246,15 +246,19 @@ EPL 2.0
 CDDL 1.1 + GPLv2 with classpath exception
 =====================
 
+   com.sun.xml.bind:jaxb-core
+   com.sun.xml.bind:jaxb-impl
    com.sun.istack:istack-commons-runtime
    com.sun.jersey:jersey-client
    com.sun.jersey:jersey-core
+   javax.activation:javax.activation-api
    javax.annotation:javax.annotation-api
    javax.el:javax.el-api
    javax.interceptor:javax.interceptor-api
    javax.servlet:javax.servlet-api
    javax.servlet.jsp:jsp-api
    javax.ws.rs:jsr311-api
+   javax.xml.bind:jaxb-api
    org.glassfish.jaxb:jaxb-runtime
    org.glassfish.jaxb:txw2
 
@@ -307,7 +311,6 @@ Apache License 2.0
    commons-digester:commons-digester
    commons-httpclient:commons-httpclient
    commons-io:commons-io
-   commons-lang:commons-lang
    commons-net:commons-net
    commons-validator:commons-validator
    commons-fileupload:commons-fileupload
@@ -402,10 +405,12 @@ Apache License 2.0
    org.apache.logging.log4j:log4j-api
    org.apache.logging.log4j:log4j-core
    org.apache.ranger:ranger-audit-core
+   org.apache.ranger:ranger-authz-api
    org.apache.ranger:ranger-intg
    org.apache.ranger:ranger-plugin-classloader
    org.apache.ranger:ranger-plugin-common
    org.apache.ranger:ranger-plugin-cred
+   org.apache.ranger:ugsync-util
    org.apache.ratis:ratis-client
    org.apache.ratis:ratis-common
    org.apache.ratis:ratis-grpc
@@ -471,6 +476,7 @@ BSD 3-Clause
 =====================
 
    com.github.vlsi.mxgraph:jgraphx
+   com.google.code.findbugs:jsr305
    com.google.protobuf:protobuf-java
    com.google.re2j:re2j
    com.jcraft:jsch
