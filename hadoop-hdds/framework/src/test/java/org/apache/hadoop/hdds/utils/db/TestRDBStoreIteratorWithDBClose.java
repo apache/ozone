@@ -26,6 +26,7 @@ import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -169,12 +170,11 @@ public class TestRDBStoreIteratorWithDBClose {
     RDBTable table = rdbStore.getTable(TABLE_NAME);
 
     CountDownLatch scanStarted = new CountDownLatch(1);
-    AtomicBoolean scanThrewException = new AtomicBoolean(false);
     AtomicBoolean scanCompleted = new AtomicBoolean(false);
 
     // Scanner thread — simulates BackgroundContainerDataScanner
     ExecutorService executor = Executors.newSingleThreadExecutor();
-    Future<?> scanFuture = executor.submit(() -> {
+    Future<?> scanFuture = executor.submit((Callable<Void>) () -> {
       try (Table.KeyValueIterator<byte[], byte[]> iter =
           table.iterator((byte[]) null, KEY_AND_VALUE)) {
         scanStarted.countDown();
@@ -182,19 +182,16 @@ public class TestRDBStoreIteratorWithDBClose {
           iter.next();
           Thread.sleep(1); // slow scan to maximise chance of DB close racing
         }
-        scanCompleted.set(true);
-      } catch (Exception e) {
-        scanThrewException.set(true);
       }
+      scanCompleted.set(true);
+      return null;
     });
 
     // Wait for scan to start, then trigger failVolume() concurrently
     assertTrue(scanStarted.await(5, TimeUnit.SECONDS));
     rdbStore.close(); // simulates failVolume() → closeDbStore()
 
-    scanFuture.get(10, TimeUnit.SECONDS);
-
-    assertFalse(scanThrewException.get(),
+    assertDoesNotThrow(() -> scanFuture.get(10, TimeUnit.SECONDS),
         "Scan should exit cleanly without throwing when DB is closed concurrently");
     assertTrue(scanCompleted.get(),
         "Scan loop should complete (via hasNext() returning false), not hang");
