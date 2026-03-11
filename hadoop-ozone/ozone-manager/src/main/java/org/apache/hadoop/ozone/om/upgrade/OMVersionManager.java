@@ -30,6 +30,12 @@ public class OMVersionManager extends ComponentVersionManager {
     super(computeApparentVersion(serializedApparentVersion), OzoneManagerVersion.SOFTWARE_VERSION);
   }
 
+  /**
+   * If the apparent version stored on the disk is >= 100, it indicates the component has been finalized for the
+   * ZDU feature, and the apparent version corresponds to a version in {@link OzoneManagerVersion}.
+   * If the apparent version stored on the disk is < 100, it indicates the component is not yet finalized for the
+   * ZDU feature, and the apparent version corresponds to a version in {@link OMLayoutFeature}.
+   */
   private static ComponentVersion computeApparentVersion(int serializedApparentVersion) {
     if (serializedApparentVersion < OzoneManagerVersion.ZDU.serialize()) {
       return OMLayoutFeature.deserialize(serializedApparentVersion);

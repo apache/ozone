@@ -23,13 +23,19 @@ import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.ozone.upgrade.ComponentVersionManager;
 
 /**
- * Component version manager for HDDS.
+ * Component version manager for HDDS (Datanodes and SCM).
  */
 public class HDDSVersionManager extends ComponentVersionManager {
   public HDDSVersionManager(int serializedApparentVersion) throws IOException {
     super(computeApparentVersion(serializedApparentVersion), HDDSVersion.SOFTWARE_VERSION);
   }
 
+  /**
+   * If the apparent version stored on the disk is >= 100, it indicates the component has been finalized for the
+   * ZDU feature, and the apparent version corresponds to a version in {@link HDDSVersion}.
+   * If the apparent version stored on the disk is < 100, it indicates the component is not yet finalized for the
+   * ZDU feature, and the apparent version corresponds to a version in {@link HDDSLayoutFeature}.
+   */
   private static ComponentVersion computeApparentVersion(int serializedApparentVersion) {
     if (serializedApparentVersion < HDDSVersion.ZDU.serialize()) {
       return HDDSLayoutFeature.deserialize(serializedApparentVersion);
