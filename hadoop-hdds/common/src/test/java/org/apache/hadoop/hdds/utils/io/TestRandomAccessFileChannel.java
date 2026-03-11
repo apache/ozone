@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.utils.io;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -133,7 +134,7 @@ class TestRandomAccessFileChannel {
 
   private static void closeAndVerify(Closeable closeable) throws IOException {
     try (Closeable c = closeable) {
-      assertTrue(c != null);
+      assertNotNull(c);
     }
   }
 
