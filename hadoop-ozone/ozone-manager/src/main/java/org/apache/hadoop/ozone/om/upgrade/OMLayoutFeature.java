@@ -82,7 +82,9 @@ public enum OMLayoutFeature implements LayoutFeature {
   public boolean isSupportedBy(int serializedVersion) {
     // In order for the other serialized version to support this version's features,
     // the other version must be equal or larger to this version.
-    return serializedVersion >= layoutVersion();
+    return serializedVersion >= layoutVersion() ||
+        // Future versions support all known features.
+        OzoneManagerVersion.deserialize(serializedVersion).equals(OzoneManagerVersion.FUTURE_VERSION);
   }
 
   /**
