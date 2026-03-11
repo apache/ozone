@@ -2392,21 +2392,7 @@
               <doctitle>Apache Ozone API - ${project.version}</doctitle>
               <windowtitle>Apache Ozone ${project.version} API</windowtitle>
 
-              <!-- Logical grouping and custom titles for packages -->
-              <groups>
-                <group>
-                  <title>Core</title>
-                  <packages>org.apache.ozone*</packages>
-                </group>
-                <group>
-                  <title>Hadoop Ozone Integration</title>
-                  <packages>org.apache.hadoop.ozone*</packages>
-                </group>
-              </groups>
-
-              <!-- Output settings and encoding -->
-              <reportOutputDirectory>${project.build.directory}/site</reportOutputDirectory>
-              <destDir>ozone-main/api</destDir>
+              <!-- Output report encoding -->
               <source>${maven.compiler.release}</source>
               <charset>${project.reporting.outputEncoding}</charset>
 
