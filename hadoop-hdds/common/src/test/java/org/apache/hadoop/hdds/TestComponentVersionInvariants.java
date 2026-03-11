@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds;
 
+import static org.apache.hadoop.hdds.ComponentVersionTestUtils.assertNotSupportedBy;
+import static org.apache.hadoop.hdds.ComponentVersionTestUtils.assertSupportedBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
@@ -93,15 +95,6 @@ public class TestComponentVersionInvariants {
 
   @ParameterizedTest
   @MethodSource("values")
-  public void testVersionIsSupportedByItself(ComponentVersion[] values, ComponentVersion defaultValue,
-      ComponentVersion futureValue) {
-    for (ComponentVersion value : values) {
-      assertTrue(value.isSupportedBy(value.serialize()));
-    }
-  }
-
-  @ParameterizedTest
-  @MethodSource("values")
   public void testOnlyEqualOrHigherVersionsCanSupportAFeature(ComponentVersion[] values, ComponentVersion defaultValue,
       ComponentVersion futureValue) {
     int knownVersionCount = values.length - 1;
@@ -109,8 +102,11 @@ public class TestComponentVersionInvariants {
       ComponentVersion requiredFeature = values[featureIndex];
       for (int providerIndex = 0; providerIndex < knownVersionCount; providerIndex++) {
         ComponentVersion provider = values[providerIndex];
-        boolean expected = providerIndex >= featureIndex;
-        assertEquals(expected, requiredFeature.isSupportedBy(provider.serialize()));
+        if (providerIndex >= featureIndex) {
+          assertSupportedBy(requiredFeature, provider);
+        } else {
+          assertNotSupportedBy(requiredFeature, provider);
+        }
       }
     }
   }

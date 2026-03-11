@@ -17,13 +17,13 @@
 
 package org.apache.hadoop.ozone.om.upgrade;
 
+import static org.apache.hadoop.hdds.ComponentVersionTestUtils.assertNotSupportedBy;
+import static org.apache.hadoop.hdds.ComponentVersionTestUtils.assertSupportedBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.apache.hadoop.ozone.OzoneManagerVersion;
-import org.apache.hadoop.ozone.om.OzoneManager;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -31,23 +31,16 @@ import org.junit.jupiter.api.Test;
  */
 public class TestOMLayoutFeature {
   @Test
-  public void testOMLayoutFeaturesHaveIncreasingLayoutVersion()
-      throws Exception {
+  public void testOMLayoutFeaturesHaveIncreasingLayoutVersion() {
     OMLayoutFeature[] values = OMLayoutFeature.values();
     int currVersion = -1;
-    OMLayoutFeature lastFeature = null;
     for (OMLayoutFeature lf : values) {
-      assertEquals(currVersion + 1, lf.layoutVersion());
+      // This will skip the jump from the last OMLayoutFeature to OzoneManagerVersion#ZDU,
+      // since that is expected to be a larger version increment.
+      assertEquals(currVersion + 1, lf.layoutVersion(),
+          "Expected monotonically increasing layout version for " + lf);
       currVersion = lf.layoutVersion();
-      lastFeature = lf;
     }
-    lastFeature.addAction(arg -> {
-      String v = arg.getVersion();
-    });
-
-    OzoneManager omMock = mock(OzoneManager.class);
-    lastFeature.action().get().execute(omMock);
-    verify(omMock, times(1)).getVersion();
   }
 
   /**
@@ -60,5 +53,57 @@ public class TestOMLayoutFeature {
     assertEquals(10, numOMLayoutFeatures);
     assertEquals(OMLayoutFeature.SNAPSHOT_DEFRAG, lastFeature);
     assertEquals(9, lastFeature.layoutVersion());
+  }
+
+  @Test
+  public void testNextVersion() {
+    OMLayoutFeature[] values = OMLayoutFeature.values();
+    for (int i = 1; i < values.length; i++) {
+      OMLayoutFeature previous = values[i - 1];
+      OMLayoutFeature current = values[i];
+      assertEquals(current, previous.nextVersion(),
+          "Expected " + previous + ".nextVersion() to be " + current);
+    }
+    // The last layout feature should point us to the ZDU version to switch to using OzoneManagerVersion.
+    assertEquals(OzoneManagerVersion.ZDU, values[values.length - 1].nextVersion());
+  }
+
+  @Test
+  public void testSerDes() {
+    for (OMLayoutFeature version : OMLayoutFeature.values()) {
+      assertEquals(version, OMLayoutFeature.deserialize(version.serialize()));
+    }
+  }
+
+  @Test
+  public void testDeserializeUnknownVersionReturnsNull() {
+    assertNull(OMLayoutFeature.deserialize(-1));
+    assertNull(OMLayoutFeature.deserialize(Integer.MAX_VALUE));
+    // OMLayoutFeature can only deserialize values from its own enum.
+    assertNull(OMLayoutFeature.deserialize(OzoneManagerVersion.ZDU.serialize()));
+  }
+
+  @Test
+  public void testIsSupportedByFeatureBoundary() {
+    for (OMLayoutFeature feature : OMLayoutFeature.values()) {
+      // A layout feature should support itself.
+      int layoutVersion = feature.layoutVersion();
+      assertSupportedBy(feature, feature);
+      if (layoutVersion > 0) {
+        // A layout feature should not be supported by older features.
+        OMLayoutFeature previousFeature = OMLayoutFeature.values()[layoutVersion - 1];
+        assertNotSupportedBy(feature, previousFeature);
+      }
+    }
+  }
+
+  @Test
+  public void testAllLayoutFeaturesAreSupportedByFutureVersions() {
+    for (OMLayoutFeature feature : OMLayoutFeature.values()) {
+      assertSupportedBy(feature, OzoneManagerVersion.ZDU);
+      assertSupportedBy(feature, OzoneManagerVersion.FUTURE_VERSION);
+      // No ComponentVersion instance represents an arbitrary unknown future version.
+      assertTrue(feature.isSupportedBy(Integer.MAX_VALUE));
+    }
   }
 }
