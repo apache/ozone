@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.upgrade;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.Optional;
 import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
 import org.apache.hadoop.hdds.upgrade.test.MockComponent;
@@ -65,7 +64,7 @@ public class TestUpgradeFinalizerActions {
   /**
    * Mock Layout Feature list.
    */
-  enum MockLayoutFeature implements LayoutFeature<MockLayoutFeature> {
+  enum MockLayoutFeature implements LayoutFeature {
     VERSION_1(1),
     VERSION_2(2),
     VERSION_3(3);
@@ -94,12 +93,9 @@ public class TestUpgradeFinalizerActions {
     }
 
     @Override
-    public Iterable<MockLayoutFeature> nextVersions() {
-      int nextOrdinal = ordinal() + 1;
-      if (nextOrdinal >= values().length) {
-        return java.util.Collections.emptyList();
-      }
-      return Arrays.asList(values()).subList(nextOrdinal, values().length);
+    public boolean isSupportedBy(int serializedVersion) {
+      // TODO HDDS-14826 will remove this test. No need to add handling for this new method.
+      return false;
     }
 
     @Override

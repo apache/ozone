@@ -29,6 +29,7 @@ import java.lang.management.ManagementFactory;
 import java.util.Iterator;
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
+import org.apache.hadoop.hdds.ComponentVersion;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -187,6 +188,18 @@ public class TestAbstractLayoutVersionManager {
         @Override
         public String description() {
           return null;
+        }
+
+        @Override
+        public ComponentVersion nextVersion() {
+          // TODO HDDS-14826 will remove this test. No need to add handling for this new method.
+          return null;
+        }
+
+        @Override
+        public boolean isSupportedBy(int serializedVersion) {
+          // TODO HDDS-14826 will remove this test. No need to add handling for this new method.
+          return false;
         }
       };
     }
