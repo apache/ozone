@@ -44,7 +44,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Test OM layout version management.
  */
-public class TestOMVersionManager {
+public class TestOMLayoutVersionManager {
 
   @Test
   public void testOMLayoutVersionManager() throws IOException {
@@ -63,26 +63,6 @@ public class TestOMVersionManager {
         .layoutVersion() + 1;
     OMException ome = assertThrows(OMException.class, () -> new OMLayoutVersionManager(lV));
     assertEquals(NOT_SUPPORTED_OPERATION, ome.getResult());
-  }
-
-  @Test
-  public void testOMLayoutFeaturesHaveIncreasingLayoutVersion()
-      throws Exception {
-    OMLayoutFeature[] values = OMLayoutFeature.values();
-    int currVersion = -1;
-    OMLayoutFeature lastFeature = null;
-    for (OMLayoutFeature lf : values) {
-      assertEquals(currVersion + 1, lf.layoutVersion());
-      currVersion = lf.layoutVersion();
-      lastFeature = lf;
-    }
-    lastFeature.addAction(arg -> {
-      String v = arg.getVersion();
-    });
-
-    OzoneManager omMock = mock(OzoneManager.class);
-    lastFeature.action().get().execute(omMock);
-    verify(omMock, times(1)).getVersion();
   }
 
   @Test

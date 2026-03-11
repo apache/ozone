@@ -43,4 +43,6 @@ public class HDDSVersionManager extends ComponentVersionManager {
       return HDDSVersion.deserialize(serializedApparentVersion);
     }
   }
+
+  // TODO HDDS-14826: Register upgrade actions based on annotations
 }

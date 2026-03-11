@@ -43,4 +43,6 @@ public class OMVersionManager extends ComponentVersionManager {
       return OzoneManagerVersion.deserialize(serializedApparentVersion);
     }
   }
+
+  // TODO HDDS-14826: Register upgrade actions based on annotations
 }
