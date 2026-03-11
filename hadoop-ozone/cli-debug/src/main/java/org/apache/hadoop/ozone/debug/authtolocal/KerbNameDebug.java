@@ -30,7 +30,7 @@ import picocli.CommandLine;
  * using the configured auth_to_local rules.
  *
  * Example:
- *   ozone debug kerbname testuser/host@EXAMPLE.COM
+ *   ozone debug kerbname testuser/om@EXAMPLE.COM
  */
 @CommandLine.Command(
     name = "kerbname",
@@ -53,15 +53,13 @@ public class KerbNameDebug implements Callable<Void>, DebugSubcommand {
     KerberosName.setRules(rules);
     System.out.println("auth_to_local rules = " + rules);
     for (String principal : principals) {
-      System.out.println("Principal = " + principal);
       try {
         KerberosName kerbName = new KerberosName(principal);
         String shortName = kerbName.getShortName();
-        System.out.println("Local user = " + shortName);
+        System.out.println("Principal = " + principal +" to "+"Local user = " + shortName);
       } catch (Exception e) {
         System.out.println("Failed to translate principal: " + e.getMessage());
       }
-      System.out.println();
     }
     return null;
   }
