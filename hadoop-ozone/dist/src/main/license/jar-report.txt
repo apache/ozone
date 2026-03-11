@@ -105,13 +105,11 @@ share/ozone/lib/jakarta.validation-api.jar
 share/ozone/lib/jakarta.ws.rs-api.jar
 share/ozone/lib/jakarta.xml.bind-api.jar
 share/ozone/lib/javassist-GA.jar
-share/ozone/lib/javax.activation-api.jar
 share/ozone/lib/javax.annotation-api.jar
 share/ozone/lib/javax.el-api.jar
 share/ozone/lib/javax.inject.jar
 share/ozone/lib/javax.interceptor-api.jar
 share/ozone/lib/javax.servlet-api.jar
-share/ozone/lib/jaxb-api.jar
 share/ozone/lib/jaxb-core.jar
 share/ozone/lib/jaxb-impl.jar
 share/ozone/lib/jaxb-runtime.jar
@@ -161,7 +159,6 @@ share/ozone/lib/jsch.jar
 share/ozone/lib/json-simple.jar
 share/ozone/lib/jsp-api.jar
 share/ozone/lib/jspecify.jar
-share/ozone/lib/jsr305.jar
 share/ozone/lib/jsr311-api.jar
 share/ozone/lib/kerb-core.jar
 share/ozone/lib/kerb-crypto.jar

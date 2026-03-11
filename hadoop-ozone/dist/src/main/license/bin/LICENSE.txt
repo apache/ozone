@@ -251,14 +251,12 @@ CDDL 1.1 + GPLv2 with classpath exception
    com.sun.istack:istack-commons-runtime
    com.sun.jersey:jersey-client
    com.sun.jersey:jersey-core
-   javax.activation:javax.activation-api
    javax.annotation:javax.annotation-api
    javax.el:javax.el-api
    javax.interceptor:javax.interceptor-api
    javax.servlet:javax.servlet-api
    javax.servlet.jsp:jsp-api
    javax.ws.rs:jsr311-api
-   javax.xml.bind:jaxb-api
    org.glassfish.jaxb:jaxb-runtime
    org.glassfish.jaxb:txw2
 
@@ -476,7 +474,6 @@ BSD 3-Clause
 =====================
 
    com.github.vlsi.mxgraph:jgraphx
-   com.google.code.findbugs:jsr305
    com.google.protobuf:protobuf-java
    com.google.re2j:re2j
    com.jcraft:jsch
