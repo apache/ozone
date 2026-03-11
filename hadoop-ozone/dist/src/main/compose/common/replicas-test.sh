@@ -84,8 +84,9 @@ if [ ! -e "${backup_container_db}" ]; then
 fi
 target_container_dir=$(dirname "${target_container_db}")
 echo "Restoring backup at ${target_container_db} on ${container}"
-docker cp "${backup_container_db}" "${container}:${target_container_dir}/" \
-  && docker exec "${container}" sudo chown -R hadoop:hadoop "${target_container_dir}" \
+docker exec "${container}" rm -rf "${target_container_db}" \
+  && docker cp "${backup_container_db}" "${container}:${target_container_db}" \
+  && docker exec "${container}" sudo chown -R hadoop:hadoop "${target_container_db}" \
   || exit 1
 
 docker stop "${container}"
