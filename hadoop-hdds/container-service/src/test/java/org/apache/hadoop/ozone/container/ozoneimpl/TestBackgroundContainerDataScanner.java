@@ -312,7 +312,7 @@ public class TestBackgroundContainerDataScanner extends
       Thread.sleep(100);
     }
 
-    verify(vol, atLeastOnce()).isFailed();
+    assertFalse(verify(vol, atLeastOnce()).isFailed());
     assertFalse(scanner.isAlive(),
         "Scanner thread should have terminated after detecting volume failure");
     assertEquals(0, metrics.getNumScanIterations(),
@@ -351,7 +351,8 @@ public class TestBackgroundContainerDataScanner extends
             try (Table.KeyValueIterator<String, Long> iter =
                 iterableMetaTable.iterator()) {
               iteratorOpen.countDown();
-              resumeIteration.await(5, TimeUnit.SECONDS);
+              assertTrue(resumeIteration.await(5, TimeUnit.SECONDS),
+                  "resumeIteration latch should have been released");
               while (iter.hasNext()) {
                 iter.next();
               }
