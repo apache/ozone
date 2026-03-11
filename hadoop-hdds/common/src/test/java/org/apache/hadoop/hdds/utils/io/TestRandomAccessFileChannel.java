@@ -132,8 +132,8 @@ class TestRandomAccessFileChannel {
   }
 
   private static void closeAndVerify(Closeable closeable) throws IOException {
-    try (Closeable ignored = closeable) {
-      // auto-closed on exit
+    try (Closeable c = closeable) {
+      assertTrue(c != null);
     }
   }
 
