@@ -23,6 +23,7 @@ key="testfile"
 
 container_db_path="/data/hdds/hdds/"
 local_db_backup_path="${COMPOSE_DIR}/container_db_backup_${prefix}"
+backup_manifest="${local_db_backup_path}/container_db_paths.tsv"
 mkdir -p "${local_db_backup_path}"
 
 echo "Taking backups of existing container.db directories"
@@ -32,12 +33,31 @@ if [ -z "${datanodes}" ]; then
   exit 1
 fi
 
+>"${backup_manifest}"
 for dn_container in ${datanodes}; do
-  docker exec "${dn_container}" find "${container_db_path}" -name "container.db" | while read -r db; do
-    backup_path="${local_db_backup_path}/${dn_container}${db}"
-    mkdir -p "$(dirname "${backup_path}")"
-    docker cp "${dn_container}:${db}" "${backup_path}"
-  done
+  while read -r db; do
+    printf '%s\t%s\n' "${dn_container}" "${db}" >> "${backup_manifest}"
+  done < <(docker exec "${dn_container}" find "${container_db_path}" -name "container.db")
+done
+
+echo "Stopping datanodes for a consistent container.db backup"
+for dn_container in ${datanodes}; do
+  docker stop "${dn_container}" >/dev/null
+done
+
+while IFS=$'\t' read -r dn_container db; do
+  backup_path="${local_db_backup_path}/${dn_container}${db}"
+  mkdir -p "$(dirname "${backup_path}")"
+  docker cp "${dn_container}:${db}" "${backup_path}"
+done < "${backup_manifest}"
+
+echo "Restarting datanodes after backup"
+for dn_container in ${datanodes}; do
+  docker start "${dn_container}" >/dev/null
+done
+
+for dn_container in ${datanodes}; do
+  wait_for_datanode "${dn_container}" HEALTHY 60
 done
 
 execute_robot_test ${SCM} -v "PREFIX:${prefix}" debug/ozone-debug-tests.robot
