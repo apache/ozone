@@ -54,6 +54,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.io.FileUtils;
@@ -131,6 +132,25 @@ public class OMDBCheckpointServlet extends DBCheckpointServlet {
         om.isSpnegoEnabled());
 
     lock = new Lock(om);
+  }
+
+  @Override
+  public void processMetadataSnapshotRequest(HttpServletRequest request, HttpServletResponse response,
+      boolean isFormData, boolean flush) {
+    OzoneManager om = (OzoneManager) getServletContext().getAttribute(OzoneConsts.OM_CONTEXT_ATTRIBUTE);
+    boolean isOmLeader = om.isLeaderReady();
+    if (!isOmLeader) {
+      String msg = "Unable to process metadata snapshot request as this OM is not the leader";
+      LOG.warn(msg);
+      try {
+        response.sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE, msg);
+      } catch (IOException e) {
+        LOG.warn("Failed to send error response, falling back to status only", e);
+        response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
+      }
+      return;
+    }
+    super.processMetadataSnapshotRequest(request, response, isFormData, flush);
   }
 
   @Override
