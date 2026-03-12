@@ -378,6 +378,84 @@ public abstract class AbstractS3SDKV1Tests extends OzoneTestBase implements NonH
   }
 
   @Test
+  public void testPutObjectIfNoneMatch() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(bucketName);
+
+    InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+    ObjectMetadata metadata = new ObjectMetadata();
+    metadata.setHeader("If-None-Match", "*");
+
+    PutObjectResult putObjectResult = s3Client.putObject(bucketName, keyName, is, metadata);
+    assertEquals("37b51d194a7513e45b56f6524f2d51f2", putObjectResult.getETag());
+  }
+
+  @Test
+  public void testPutObjectIfNoneMatchFail() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(bucketName);
+
+    InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+    s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
+
+    InputStream is2 = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+    ObjectMetadata metadata = new ObjectMetadata();
+    metadata.setHeader("If-None-Match", "*");
+
+    AmazonServiceException ase = assertThrows(AmazonServiceException.class,
+        () -> s3Client.putObject(bucketName, keyName, is2, metadata));
+
+    assertEquals(ErrorType.Client, ase.getErrorType());
+    assertEquals(412, ase.getStatusCode());
+    assertEquals("PreconditionFailed", ase.getErrorCode());
+  }
+
+  @Test
+  public void testPutObjectIfMatch() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(bucketName);
+
+    InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+    PutObjectResult putObjectResult = s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
+    String etag = putObjectResult.getETag();
+
+    InputStream is2 = new ByteArrayInputStream("bar2".getBytes(StandardCharsets.UTF_8));
+    ObjectMetadata metadata = new ObjectMetadata();
+    metadata.setHeader("If-Match", etag);
+
+    PutObjectResult putObjectResult2 = s3Client.putObject(bucketName, keyName, is2, metadata);
+    assertNotNull(putObjectResult2.getETag());
+  }
+
+  @Test
+  public void testPutObjectIfMatchFail() {
+    final String bucketName = getBucketName();
+    final String keyName = getKeyName();
+    final String content = "bar";
+    s3Client.createBucket(bucketName);
+
+    InputStream is = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+    s3Client.putObject(bucketName, keyName, is, new ObjectMetadata());
+
+    InputStream is2 = new ByteArrayInputStream("bar2".getBytes(StandardCharsets.UTF_8));
+    ObjectMetadata metadata = new ObjectMetadata();
+    metadata.setHeader("If-Match", "wrong-etag");
+
+    AmazonServiceException ase = assertThrows(AmazonServiceException.class,
+        () -> s3Client.putObject(bucketName, keyName, is2, metadata));
+
+    assertEquals(ErrorType.Client, ase.getErrorType());
+    assertEquals(412, ase.getStatusCode());
+    assertEquals("PreconditionFailed", ase.getErrorCode());
+  }
+
+  @Test
   public void testPutObjectWithMD5Header() throws Exception {
     final String bucketName = getBucketName();
     final String keyName = getKeyName();
