@@ -106,7 +106,11 @@ public enum OzoneManagerVersion implements ComponentVersion {
    */
   @Override
   public OzoneManagerVersion nextVersion() {
-    return BY_VALUE.get(version + 1);
+    int nextOrdinal = ordinal() + 1;
+    if (nextOrdinal >= values().length - 1) {
+      return null;
+    }
+    return values()[nextOrdinal];
   }
 
   @Override

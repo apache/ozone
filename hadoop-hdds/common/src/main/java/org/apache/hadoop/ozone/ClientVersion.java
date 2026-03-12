@@ -66,7 +66,11 @@ public enum ClientVersion implements ComponentVersion {
 
   @Override
   public ClientVersion nextVersion() {
-    return BY_VALUE.get(version + 1);
+    int nextOrdinal = ordinal() + 1;
+    if (nextOrdinal >= values().length - 1) {
+      return null;
+    }
+    return values()[nextOrdinal];
   }
 
   @Override
