@@ -183,15 +183,7 @@ public final class TracingUtil {
    */
   public static <E extends Exception> void executeInNewSpan(String spanName,
       CheckedRunnable<E> runnable) throws E {
-    Span span;
-    Context currentContext = Context.current();
-    Span parentSpan = Span.fromContext(currentContext);
-
-    if (parentSpan != null && parentSpan.getSpanContext().isValid()) {
-      span = tracer.spanBuilder(spanName).setParent(currentContext).startSpan();
-    } else {
-      span = tracer.spanBuilder(spanName).setNoParent().startSpan();
-    }
+    Span span = buildSpan(spanName);
     executeInSpan(span, runnable);
   }
 
@@ -200,15 +192,7 @@ public final class TracingUtil {
    */
   public static <R, E extends Exception> R executeInNewSpan(String spanName,
       CheckedSupplier<R, E> supplier) throws E {
-    Span span;
-    Context currentContext = Context.current();
-    Span parentSpan = Span.fromContext(currentContext);
-
-    if (parentSpan != null && parentSpan.getSpanContext().isValid()) {
-      span = tracer.spanBuilder(spanName).setParent(currentContext).startSpan();
-    } else {
-      span = tracer.spanBuilder(spanName).setNoParent().startSpan();
-    }
+    Span span = buildSpan(spanName);
     return executeInSpan(span, supplier);
   }
 
@@ -261,16 +245,7 @@ public final class TracingUtil {
    * in case of Exceptions.
    */
   public static TraceCloseable createActivatedSpan(String spanName) {
-    Span span;
-    Context currentContext = Context.current();
-    Span parentSpan = Span.fromContext(currentContext);
-
-    if (parentSpan != null && parentSpan.getSpanContext().isValid()) {
-      span = tracer.spanBuilder(spanName).setParent(currentContext).startSpan();
-    } else {
-      span = tracer.spanBuilder(spanName).setNoParent().startSpan();
-    }
-
+    Span span = buildSpan(spanName);
     Scope scope = span.makeCurrent();
     return () -> {
       scope.close();
@@ -323,6 +298,21 @@ public final class TracingUtil {
           map.put(kv[0].trim(), kv[1].trim());
         }
       }
+    }
+  }
+
+  /**
+   * Creates a new span, using the current context as a parent if valid;
+   * otherwise, creates a root span.
+   */
+  private static Span buildSpan(String spanName) {
+    Context currentContext = Context.current();
+    Span parentSpan = Span.fromContext(currentContext);
+
+    if (parentSpan.getSpanContext().isValid()) {
+      return tracer.spanBuilder(spanName).setParent(currentContext).startSpan();
+    } else {
+      return tracer.spanBuilder(spanName).setNoParent().startSpan();
     }
   }
 }

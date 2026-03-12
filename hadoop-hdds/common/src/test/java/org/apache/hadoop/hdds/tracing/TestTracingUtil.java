@@ -20,8 +20,10 @@ package org.apache.hadoop.hdds.tracing;
 import static org.apache.hadoop.hdds.tracing.TracingUtil.createProxy;
 import static org.apache.hadoop.hdds.tracing.TracingUtil.exportCurrentSpan;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import io.opentelemetry.api.trace.Span;
 import org.apache.hadoop.hdds.conf.InMemoryConfigurationForTesting;
 import org.apache.hadoop.hdds.conf.MutableConfigurationSource;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
@@ -56,6 +58,92 @@ public class TestTracingUtil {
     MutableConfigurationSource config = new InMemoryConfigurationForTesting();
     config.setBoolean(ScmConfigKeys.HDDS_TRACING_ENABLED, true);
     return config;
+  }
+
+  @Test
+  public void testSkipTracingAnnotation() {
+    TracingUtil.initTracing("testSkipTracing", tracingEnabled());
+    ServiceWithSkipTracing subject = createProxy(
+        new ServiceWithSkipTracingImpl(),
+        ServiceWithSkipTracing.class,
+        tracingEnabled());
+
+    String result = subject.skipTracedMethod();
+    assertEquals("skipped", result);
+
+    //assert that no span was created
+    Span currentSpan = TracingUtil.getActiveSpan();
+    assertEquals(false, currentSpan.getSpanContext().isValid());
+  }
+
+  @Test
+  public void testSkipTracingWithException() {
+    TracingUtil.initTracing("testSkipTracingException", tracingEnabled());
+    ServiceWithSkipTracing subject = createProxy(
+        new ServiceWithSkipTracingImpl(),
+        ServiceWithSkipTracing.class,
+        tracingEnabled());
+
+    //assert the exception is propagated unwrapped
+    RuntimeException exception = assertThrows(RuntimeException.class,
+        () -> subject.skipTracedMethodThatThrows());
+    assertEquals("Test exception", exception.getMessage());
+
+    //assert no span was created
+    Span currentSpan = TracingUtil.getActiveSpan();
+    assertEquals(false, currentSpan.getSpanContext().isValid());
+  }
+
+  @Test
+  public void testNormalMethodCreatesSpan() {
+    TracingUtil.initTracing("testNormalMethod", tracingEnabled());
+    ServiceWithSkipTracing subject = createProxy(
+        new ServiceWithSkipTracingImpl(),
+        ServiceWithSkipTracing.class,
+        tracingEnabled());
+
+    //create a parent span and call method without skiptracing annotation.
+    try (TracingUtil.TraceCloseable parent = TracingUtil.createActivatedSpan("parent")) {
+      String result = subject.normalMethod();
+      assertEquals("normal", result);
+
+      //verify a span was created
+      Span currentSpan = TracingUtil.getActiveSpan();
+      assertEquals(true, currentSpan.getSpanContext().isValid());
+    }
+  }
+
+  /**
+   * Test interface for {@link SkipTracing} annotation logic.
+   */
+  public interface ServiceWithSkipTracing {
+    @SkipTracing
+    String skipTracedMethod();
+
+    @SkipTracing
+    String skipTracedMethodThatThrows();
+
+    String normalMethod();
+  }
+
+  /**
+   * Implementation for the skip tracing test service.
+   */
+  public static class ServiceWithSkipTracingImpl implements ServiceWithSkipTracing {
+    @Override
+    public String skipTracedMethod() {
+      return "skipped";
+    }
+
+    @Override
+    public String skipTracedMethodThatThrows() {
+      throw new RuntimeException("Test exception");
+    }
+
+    @Override
+    public String normalMethod() {
+      return "normal";
+    }
   }
 
 }
