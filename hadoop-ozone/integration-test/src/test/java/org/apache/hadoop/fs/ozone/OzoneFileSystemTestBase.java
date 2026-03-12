@@ -259,7 +259,7 @@ public abstract class OzoneFileSystemTestBase {
         assertNotNull(fileStatus);
         // Verify that dir12 is not included in the result
         // of the listStatusIterator on root.
-        assertNotEquals(fileStatus, dir12.toString());
+        assertNotEquals(fileStatus.getPath().toUri().getPath(), dir12.toString());
       }
       assertEquals(2, iCount, "FileStatus should return only the immediate children");
     } finally {
@@ -332,7 +332,7 @@ public abstract class OzoneFileSystemTestBase {
     fs.delete(parent, true);
   }
 
-  void listStatusIteratorOnSubDirs(Path root, boolean isOFS) throws Exception {
+  void listStatusIteratorOnSubDirs(Path root) throws Exception {
     // Create the following key structure
     //      /dir1/dir11/dir111
     //      /dir1/dir12
@@ -361,9 +361,6 @@ public abstract class OzoneFileSystemTestBase {
         iCount++;
         FileStatus fileStatus = it.next();
         assertNotNull(fileStatus);
-        if (isOFS) {
-          assertNotEquals(fileStatus, dir12.toString());
-        }
         // Verify that the two children of /dir1
         // returned by listStatusIterator operation
         // are /dir1/dir11 and /dir1/dir12.

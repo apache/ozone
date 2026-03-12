@@ -411,7 +411,7 @@ abstract class AbstractRootedOzoneFileSystemTest extends OzoneFileSystemTestBase
    */
   @Test
   void testListStatusIteratorOnSubDirs() throws Exception {
-    listStatusIteratorOnSubDirs(bucketPath, true);
+    listStatusIteratorOnSubDirs(bucketPath);
   }
 
   /**

@@ -884,7 +884,7 @@ abstract class AbstractOzoneFileSystemTest extends OzoneFileSystemTestBase {
    */
   @Test
   public void testListStatusIteratorOnSubDirs() throws Exception {
-    listStatusIteratorOnSubDirs(ROOT, false);
+    listStatusIteratorOnSubDirs(ROOT);
   }
 
   @Test
