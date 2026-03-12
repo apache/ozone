@@ -20,8 +20,8 @@ package org.apache.hadoop.ozone.om.upgrade;
 import static org.apache.hadoop.hdds.ComponentVersionTestUtils.assertNotSupportedBy;
 import static org.apache.hadoop.hdds.ComponentVersionTestUtils.assertSupportedBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.junit.jupiter.api.Test;

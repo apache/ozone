@@ -16,6 +16,7 @@
  */
 
 package org.apache.hadoop.hdds;
+
 import org.apache.hadoop.ozone.ClientVersion;
 
 /**
