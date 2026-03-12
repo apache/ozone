@@ -61,6 +61,8 @@ import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.VolumeFixedUsage;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerCandidate;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.ContainerChoosingPolicy;
 import org.apache.hadoop.ozone.container.diskbalancer.policy.DefaultContainerChoosingPolicy;
@@ -182,20 +184,6 @@ public class TestDiskBalancerPolicyPerformance {
           int failures = 0;
 
           for (int j = 0; j < NUM_ITERATIONS; j++) {
-            // Block all volumes except the highest-util (source) - no destination has space
-            if (rand.nextDouble() < 0.05 && volumes.size() >= 2) {
-              List<HddsVolume> sorted = new ArrayList<>(volumes);
-              sorted.sort(Comparator.comparingDouble(v ->
-                  v.getCurrentUsage().getUsedSpace() / (double) Math.max(1, v.getCurrentUsage().getCapacity())));
-              for (int k = 0; k < sorted.size() - 1; k++) {
-                HddsVolume v = sorted.get(k);
-                long avail = v.getCurrentUsage().getAvailable();
-                if (avail > 0) {
-                  v.incCommittedBytes(avail);
-                }
-              }
-            }
-
             long threadStart = System.nanoTime();
             try {
               ContainerCandidate candidate = pol.chooseVolumesAndContainer(ozoneContainer,
@@ -279,9 +267,11 @@ public class TestDiskBalancerPolicyPerformance {
 
   private List<Long> getSourceContainerIdsInPolicyOrder() {
     List<Long> ids = new ArrayList<>();
-    volumes.stream()
-        .max(Comparator.comparingDouble(v -> v.getCurrentUsage().getUsedSpace()
-            / (double) Math.max(1, v.getCurrentUsage().getCapacity())))
+    List<VolumeFixedUsage> usages = DiskBalancerVolumeCalculation.getVolumeUsages(volumeSet, deltaMap);
+    usages.stream()
+        .max(Comparator.comparingDouble(VolumeFixedUsage::getUtilization)
+            .thenComparing(v -> v.getVolume().getStorageID()))
+        .map(VolumeFixedUsage::getVolume)
         .ifPresent(src -> ozoneContainer.getController().getContainers(src)
             .forEachRemaining(c -> {
               if (c.getContainerData().isClosed() && c.getContainerData().getBytesUsed() > 0) {
@@ -308,7 +298,9 @@ public class TestDiskBalancerPolicyPerformance {
       String volumePath = baseDir.resolve("disk" + i).toString();
       long capacity = 1L * 1024 * 1024 * 1024 * 1024; // 1TB
 
-      long usedBytes = (long) (capacity * (0.05 + random.nextDouble() * 0.5));
+      // Vary utilization from 5% to 55% so we have imbalance to balance
+      double utilFraction = 0.05 + (i / (double) NUM_VOLUMES) * 0.5 + random.nextDouble() * 0.05;
+      long usedBytes = (long) (capacity * Math.min(utilFraction, 0.55));
       long available = capacity - usedBytes;
 
       SpaceUsageSource source = MockSpaceUsageSource.fixed(capacity, available);
@@ -334,8 +326,11 @@ public class TestDiskBalancerPolicyPerformance {
     long startTime = System.currentTimeMillis();
 
     for (int i = 0; i < NUM_CONTAINERS; i++) {
-      boolean isOpen = i < 10;
-      int volumeIndex = i % NUM_VOLUMES;
+      // ~50 OPEN containers (policy skips) - keep few so most are eligible
+      boolean isOpen = i < 50;
+      // High-util volumes (index 15-19) get more containers - more source candidates
+      int volumeIndex = (i % 2 == 0) ? (i % NUM_VOLUMES) : (15 + (i % 5));
+      volumeIndex = Math.min(volumeIndex, NUM_VOLUMES - 1);
       HddsVolume volume = volumes.get(volumeIndex);
 
       KeyValueContainerData containerData = new KeyValueContainerData(
@@ -344,9 +339,23 @@ public class TestDiskBalancerPolicyPerformance {
 
       containerData.setState(isOpen ? ContainerDataProto.State.OPEN : ContainerDataProto.State.CLOSED);
       containerData.setVolume(volume);
-      // Set some bytes used for containers so they can be chosen for disk balancing
-      // Use a small non-zero value to ensure containers are not skipped
-      long bytesUsed = isOpen ? 0 : (i % 1000 + 1) * 1024L; // 1KB to 1MB for closed containers
+
+      // Varied sizes: small (1-10MB), medium (20-80MB), large (100-400MB)
+      long bytesUsed;
+      if (isOpen) {
+        bytesUsed = 0;
+      } else {
+        int sizeIdx = i % 100;
+        if (sizeIdx < 2) {
+          bytesUsed = 0;  // Policy skips size 0 (~2% of closed)
+        } else if (sizeIdx < 60) {
+          bytesUsed = (1 + (i % 10)) * 1024 * 1024L;  // 1-10 MB
+        } else if (sizeIdx < 90) {
+          bytesUsed = (20 + (i % 60)) * 1024 * 1024L;  // 20-80 MB
+        } else {
+          bytesUsed = (100 + (i % 300)) * 1024 * 1024L;  // 100-400 MB
+        }
+      }
       containerData.getStatistics().setBlockBytesForTesting(bytesUsed);
       KeyValueContainer container = new KeyValueContainer(containerData, conf);
 
@@ -356,8 +365,7 @@ public class TestDiskBalancerPolicyPerformance {
         Assertions.fail(e.getMessage());
       }
 
-      // Collect IDs of closed containers
-      if (!isOpen) {
+      if (!isOpen && bytesUsed > 0) {
         closedContainerIDs.add(ContainerID.valueOf((long) i));
       }
     }
