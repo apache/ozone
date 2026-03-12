@@ -32,6 +32,8 @@ import org.apache.hadoop.ozone.upgrade.UpgradeException;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 
+import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.FINALIZATION_DONE;
+
 /**
  * UpgradeFinalizer for the Storage Container Manager service.
  *
@@ -43,29 +45,9 @@ public class SCMUpgradeFinalizer extends
     BasicUpgradeFinalizer<SCMUpgradeFinalizationContext,
         HDDSLayoutVersionManager> {
 
-  public SCMUpgradeFinalizer(HDDSLayoutVersionManager versionManager) {
-    super(versionManager);
-  }
-
   public SCMUpgradeFinalizer(HDDSLayoutVersionManager versionManager,
       UpgradeFinalizationExecutor<SCMUpgradeFinalizationContext> executor) {
     super(versionManager, executor);
-  }
-
-  private void logCheckpointCrossed(FinalizationCheckpoint checkpoint) {
-    LOG.info("SCM Finalization has crossed checkpoint {}", checkpoint);
-  }
-
-  @Override
-  public void preFinalizeUpgrade(SCMUpgradeFinalizationContext context)
-      throws IOException {
-    FinalizationStateManager stateManager =
-        context.getFinalizationStateManager();
-    if (!stateManager.crossedCheckpoint(
-        FinalizationCheckpoint.FINALIZATION_STARTED)) {
-      context.getFinalizationStateManager().addFinalizingMark();
-    }
-    logCheckpointCrossed(FinalizationCheckpoint.FINALIZATION_STARTED);
   }
 
   @Override
@@ -111,18 +93,9 @@ public class SCMUpgradeFinalizer extends
   }
 
   @Override
-  public void postFinalizeUpgrade(SCMUpgradeFinalizationContext context)
-      throws IOException {
-    // If we reached this phase of finalization, all layout features should
-    // be finalized.
-    logCheckpointCrossed(FinalizationCheckpoint.MLV_EQUALS_SLV);
-    FinalizationStateManager stateManager =
-        context.getFinalizationStateManager();
-    if (!stateManager.crossedCheckpoint(
-        FinalizationCheckpoint.FINALIZATION_COMPLETE)) {
-      waitForDatanodesToFinalize(context);
-      stateManager.removeFinalizingMark();
-    }
+  public void postFinalizeUpgrade(SCMUpgradeFinalizationContext context) throws IOException {
+    waitForDatanodesToFinalize(context);
+    getVersionManager().setUpgradeState(FINALIZATION_DONE);
   }
 
   /**

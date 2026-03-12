@@ -49,8 +49,6 @@ public interface FinalizationManager {
 
   void reinitialize(Table<String, String> finalizationStore) throws IOException;
 
-  void onLeaderReady();
-
   static boolean shouldTellDatanodesToFinalize(
       FinalizationCheckpoint checkpoint) {
     return checkpoint.hasCrossed(FinalizationCheckpoint.MLV_EQUALS_SLV);

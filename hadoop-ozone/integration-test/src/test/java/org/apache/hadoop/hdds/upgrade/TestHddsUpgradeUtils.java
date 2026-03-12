@@ -35,7 +35,6 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationCheckpoint;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
@@ -95,10 +94,6 @@ public final class TestHddsUpgradeUtils {
 
   public static void testPostUpgradeConditionsSCM(StorageContainerManager scm,
                                                   int numContainers, int numDatanodes) {
-
-    assertTrue(scm.getScmContext().getFinalizationCheckpoint()
-        .hasCrossed(FinalizationCheckpoint.FINALIZATION_COMPLETE));
-
     HDDSLayoutVersionManager scmVersionManager = scm.getLayoutVersionManager();
     assertEquals(scmVersionManager.getSoftwareLayoutVersion(),
         scmVersionManager.getMetadataLayoutVersion());
