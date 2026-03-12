@@ -29,6 +29,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalSt
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_MAINTENANCE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.DEAD;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.QUASI_CLOSED;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DATANODE_ADMIN_MONITOR_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_DEADNODE_INTERVAL;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
@@ -361,5 +362,70 @@ class TestReplicationManagerIntegration {
     assertEquals(0, report.getStat(ContainerHealthState.UNDER_REPLICATED));
     assertEquals(0, report.getStat(ContainerHealthState.MIS_REPLICATED));
     assertEquals(0, report.getStat(ContainerHealthState.OVER_REPLICATED));
+  }
+
+  /**
+   * Test for empty QUASI_CLOSED container deletion.
+   */
+  @Test
+  public void testEmptyQuasiClosedContainerDeletion() throws Exception {
+    ContainerInfo containerInfo = containerManager.allocateContainer(RATIS_REPLICATION_CONFIG, "TestOwner");
+    ContainerID cid = containerInfo.containerID();
+    containerManager.updateContainerState(cid, HddsProtos.LifeCycleEvent.FINALIZE);
+    containerManager.updateContainerState(cid, HddsProtos.LifeCycleEvent.QUASI_CLOSE);
+    
+    // Wait for container to be QUASI_CLOSED
+    GenericTestUtils.waitFor(() -> {
+      try {
+        ContainerInfo info = containerManager.getContainer(cid);
+        return info.getState() == HddsProtos.LifeCycleState.QUASI_CLOSED;
+      } catch (ContainerNotFoundException e) {
+        return false;
+      }
+    }, 100, 5000);
+    
+    containerInfo = containerManager.getContainer(cid);
+    assertEquals(HddsProtos.LifeCycleState.QUASI_CLOSED, containerInfo.getState());
+    assertEquals(0L, containerInfo.getNumberOfKeys());
+
+    // Add empty QUASI_CLOSED replicas
+    List<DatanodeDetails> datanodes = nodeManager.getAllNodes().stream()
+        .limit(3).collect(Collectors.toList());
+    
+    for (int i = 0; i < 3; i++) {
+      ContainerReplica replica = ContainerReplica.newBuilder()
+          .setContainerID(cid)
+          .setContainerState(QUASI_CLOSED)
+          .setDatanodeDetails(datanodes.get(i))
+          .setOriginNodeId(datanodes.get(i).getID())
+          .setSequenceId(0L)
+          .setKeyCount(0L)
+          .setBytesUsed(0L)
+          .setEmpty(true)
+          .setReplicaIndex(i)
+          .build();
+      containerManager.updateContainerReplica(cid, replica);
+    }
+    
+    Set<ContainerReplica> replicas = containerManager.getContainerReplicas(cid);
+    assertEquals(3, replicas.size());
+    assertTrue(replicas.stream().allMatch(ContainerReplica::isEmpty));
+
+    replicationManager.getConfig().setInterval(Duration.ofSeconds(1));
+    replicationManager.notifyStatusChanged();
+
+    // QUASI_CLOSED -> CLOSED -> DELETING
+    GenericTestUtils.waitFor(() -> {
+      try {
+        ContainerInfo info = containerManager.getContainer(cid);
+        HddsProtos.LifeCycleState state = info.getState();
+        return state == HddsProtos.LifeCycleState.DELETING;
+      } catch (ContainerNotFoundException e) {
+        return false;
+      }
+    }, 1000, 30000);
+    
+    containerInfo = containerManager.getContainer(cid);
+    assertEquals(HddsProtos.LifeCycleState.DELETING, containerInfo.getState());
   }
 }
