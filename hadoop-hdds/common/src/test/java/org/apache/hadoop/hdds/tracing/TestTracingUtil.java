@@ -20,7 +20,9 @@ package org.apache.hadoop.hdds.tracing;
 import static org.apache.hadoop.hdds.tracing.TracingUtil.createProxy;
 import static org.apache.hadoop.hdds.tracing.TracingUtil.exportCurrentSpan;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import io.opentelemetry.api.trace.Span;
@@ -73,7 +75,7 @@ public class TestTracingUtil {
 
     //assert that no span was created
     Span currentSpan = TracingUtil.getActiveSpan();
-    assertEquals(false, currentSpan.getSpanContext().isValid());
+    assertFalse(currentSpan.getSpanContext().isValid());
   }
 
   @Test
@@ -91,7 +93,7 @@ public class TestTracingUtil {
 
     //assert no span was created
     Span currentSpan = TracingUtil.getActiveSpan();
-    assertEquals(false, currentSpan.getSpanContext().isValid());
+    assertFalse(currentSpan.getSpanContext().isValid());
   }
 
   @Test
@@ -109,7 +111,7 @@ public class TestTracingUtil {
 
       //verify a span was created
       Span currentSpan = TracingUtil.getActiveSpan();
-      assertEquals(true, currentSpan.getSpanContext().isValid());
+      assertTrue(currentSpan.getSpanContext().isValid());
     }
   }
 
