@@ -205,8 +205,8 @@
     <reload4j.version>1.2.26</reload4j.version>
     <restrict-imports.enforcer.version>3.0.0</restrict-imports.enforcer.version>
     <rocksdb.source.version>10.10.1</rocksdb.source.version>
-    <rocksdb.version>10.10.1-SNAPSHOT</rocksdb.version>
-    <rocksdbjni.groupId>io.github.smengcl</rocksdbjni.groupId>
+    <rocksdb.version>10.5.1</rocksdb.version>
+    <rocksdbjni.groupId>org.rocksdb</rocksdbjni.groupId>
     <servlet-api.version>3.1.0</servlet-api.version>
     <shell-executable>bash</shell-executable>
     <slf4j.version>2.0.17</slf4j.version>
@@ -2148,7 +2148,7 @@
                 <ignoredNonTestScopedDependency>org.apache.ozone:hdds-client:jar</ignoredNonTestScopedDependency>
                 <ignoredNonTestScopedDependency>org.apache.ozone:ozone-interface-client:jar</ignoredNonTestScopedDependency>
                 <ignoredNonTestScopedDependency>org.glassfish.jersey.core:jersey-common:jar</ignoredNonTestScopedDependency>
-                <ignoredNonTestScopedDependency>io.github.smengcl:rocksdbjni:jar</ignoredNonTestScopedDependency>
+                <ignoredNonTestScopedDependency>org.rocksdb:rocksdbjni:jar</ignoredNonTestScopedDependency>
                 <ignoredNonTestScopedDependency>org.springframework:spring-core:jar</ignoredNonTestScopedDependency>
               </ignoredNonTestScopedDependencies>
             </configuration>
