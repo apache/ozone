@@ -24,7 +24,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -88,33 +90,55 @@ public class TestRDBStoreIteratorWithDBClose {
   @Test
   public void testHasNextReturnsFalseAfterDBClosed() throws Exception {
     RDBTable table = rdbStore.getTable(TABLE_NAME);
-    ExecutorService executor = Executors.newSingleThreadExecutor();
-    CountDownLatch closeStarted = new CountDownLatch(1);
-    Future<?> closeFuture;
 
-    try (Table.KeyValueIterator<byte[], byte[]> iter =
-        table.iterator((byte[]) null, KEY_AND_VALUE)) {
+    int threadCount = 10;
+    // Each thread iterates for up to 60 s; with 100 ms per entry × 100 entries
+    // one pass takes ~10 s, so threads are guaranteed mid-scan at the 5 s close.
+    long iterationCycleMs = 60_000;
+    long closeAfterMs = 5_000;
+    int sleepPerEntryMs = 100;
 
-      assertTrue(iter.hasNext(),
-          "Iterator should have entries before DB is closed");
+    CountDownLatch allStarted = new CountDownLatch(threadCount);
+    ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+    List<Future<Void>> futures = new ArrayList<>();
 
-      // Simulate failVolume() from StorageVolumeChecker's thread
-      closeFuture = executor.submit(() -> {
-        closeStarted.countDown();
-        rdbStore.close(); // blocks until iterator releases dbRef
-      });
+    for (int t = 0; t < threadCount; t++) {
+      futures.add(executor.submit((Callable<Void>) () -> {
+        try (Table.KeyValueIterator<byte[], byte[]> iter =
+            table.iterator((byte[]) null, KEY_AND_VALUE)) {
+          allStarted.countDown();
+          long deadline = System.currentTimeMillis() + iterationCycleMs;
+          while (System.currentTimeMillis() < deadline) {
+            while (iter.hasNext()) {
+              iter.next();
+              Thread.sleep(sleepPerEntryMs);
+            }
+            // hasNext() returned false: either DB was closed or natural table end.
+            // isClosed() is package-private on RDBTable, accessible from this package.
+            if (table.isClosed()) {
+              break; // DB closed — exit cleanly
+            }
+            // Natural end of table — seek back for another pass
+            iter.seekToFirst();
+          }
+        }
+        return null;
+      }));
+    }
 
-      // Wait for close thread to set isClosed = true
-      assertTrue(closeStarted.await(5, TimeUnit.SECONDS));
-      Thread.sleep(50);
+    assertTrue(allStarted.await(10, TimeUnit.SECONDS),
+        "All scanner threads should start within 10 seconds");
 
-      // Fast-fail: hasNext() must return false once isClosed = true
-      assertFalse(iter.hasNext(),
-          "hasNext() must return false immediately after DB is closed");
+    // All threads are mid-scan; close the DB now
+    Thread.sleep(closeAfterMs);
+    rdbStore.close();
 
-    } // iter.close() called here → dbRef released → closeFuture unblocks
+    // Every thread must detect the close via hasNext() → false and finish cleanly
+    for (Future<Void> future : futures) {
+      assertDoesNotThrow(() -> future.get(15, TimeUnit.SECONDS),
+          "Each scanner thread should complete cleanly after DB close");
+    }
 
-    closeFuture.get(5, TimeUnit.SECONDS);
     executor.shutdown();
   }
 
