@@ -56,10 +56,10 @@ import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.ScmUtils;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.apache.hadoop.hdds.scm.client.ScmClient;
+import org.apache.hadoop.hdds.scm.container.ContainerHealthState;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
-import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport.HealthState;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.TestNodeUtil;
@@ -202,7 +202,7 @@ class TestReconAndAdminContainerCLI {
     GenericTestUtils.waitFor(() -> {
       try {
         return scmClient.getReplicationManagerReport()
-                   .getStat(ReplicationManagerReport.HealthState.MISSING) == 1;
+                   .getStat(ContainerHealthState.MISSING) == 1;
       } catch (IOException e) {
         throw new RuntimeException(e);
       }
@@ -333,10 +333,10 @@ class TestReconAndAdminContainerCLI {
       reconResponse = TestReconEndpointUtil
           .getUnhealthyContainersFromRecon(CONF, state);
 
-      assertEquals(rmReport.getStat(HealthState.MISSING), reconResponse.getMissingCount());
-      assertEquals(rmReport.getStat(HealthState.UNDER_REPLICATED), reconResponse.getUnderReplicatedCount());
-      assertEquals(rmReport.getStat(HealthState.OVER_REPLICATED), reconResponse.getOverReplicatedCount());
-      assertEquals(rmReport.getStat(HealthState.MIS_REPLICATED), reconResponse.getMisReplicatedCount());
+      assertEquals(rmReport.getStat(ContainerHealthState.MISSING), reconResponse.getMissingCount());
+      assertEquals(rmReport.getStat(ContainerHealthState.UNDER_REPLICATED), reconResponse.getUnderReplicatedCount());
+      assertEquals(rmReport.getStat(ContainerHealthState.OVER_REPLICATED), reconResponse.getOverReplicatedCount());
+      assertEquals(rmReport.getStat(ContainerHealthState.MIS_REPLICATED), reconResponse.getMisReplicatedCount());
     } catch (IOException e) {
       LOG.info("Error getting report", e);
       return false;
@@ -348,20 +348,20 @@ class TestReconAndAdminContainerCLI {
     // Recon's UnhealthyContainerResponse contains a list of containers
     // for a particular state. Check if RMs sample of containers can be
     // found in Recon's list of containers for a particular state.
-    HealthState rmState = HealthState.UNHEALTHY;
+    ContainerHealthState rmState = ContainerHealthState.UNHEALTHY;
 
     if (state.equals(UnHealthyContainerStates.MISSING) &&
         reconResponse.getMissingCount() > 0) {
-      rmState = HealthState.MISSING;
+      rmState = ContainerHealthState.MISSING;
     } else if (state.equals(UnHealthyContainerStates.UNDER_REPLICATED) &&
                reconResponse.getUnderReplicatedCount() > 0) {
-      rmState = HealthState.UNDER_REPLICATED;
+      rmState = ContainerHealthState.UNDER_REPLICATED;
     } else if (state.equals(UnHealthyContainerStates.OVER_REPLICATED) &&
                reconResponse.getOverReplicatedCount() > 0) {
-      rmState = HealthState.OVER_REPLICATED;
+      rmState = ContainerHealthState.OVER_REPLICATED;
     } else if (state.equals(UnHealthyContainerStates.MIS_REPLICATED) &&
                reconResponse.getMisReplicatedCount() > 0) {
-      rmState = HealthState.MIS_REPLICATED;
+      rmState = ContainerHealthState.MIS_REPLICATED;
     }
 
     List<ContainerID> rmContainerIDs = rmReport.getSample(rmState);
@@ -457,6 +457,8 @@ class TestReconAndAdminContainerCLI {
         1, SECONDS);
     CONF.setTimeDuration(HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT,
         0, SECONDS);
+    // Configure multiple task threads for concurrent task execution
+    CONF.setInt("ozone.recon.task.thread.count", 6);
     CONF.set(OzoneConfigKeys.OZONE_SCM_CLOSE_CONTAINER_WAIT_DURATION, "2s");
     CONF.set(ScmConfigKeys.OZONE_SCM_PIPELINE_SCRUB_INTERVAL, "2s");
     CONF.set(ScmConfigKeys.OZONE_SCM_PIPELINE_DESTROY_TIMEOUT, "5s");

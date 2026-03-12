@@ -48,6 +48,7 @@ import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.utils.db.InMemoryTestTable;
@@ -77,7 +78,9 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueHandler;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.container.metadata.ContainerCreateInfo;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaOneImpl;
 import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaThreeImpl;
+import org.apache.hadoop.ozone.container.metadata.DatanodeStoreSchemaTwoImpl;
 import org.apache.hadoop.ozone.container.metadata.WitnessedContainerMetadataStore;
 import org.apache.hadoop.util.Time;
 import org.apache.ozone.test.GenericTestUtils.LogCapturer;
@@ -167,28 +170,72 @@ public class TestContainerReader {
     KeyValueContainerData cData = keyValueContainer.getContainerData();
     try (DBHandle metadataStore = BlockUtils.getDB(cData, conf)) {
 
-      for (int i = 0; i < count; i++) {
-        Table<String, BlockData> blockDataTable =
-                metadataStore.getStore().getBlockDataTable();
+      if (metadataStore.getStore() instanceof DatanodeStoreSchemaThreeImpl) {
+        DatanodeStoreSchemaThreeImpl schemaThree = (DatanodeStoreSchemaThreeImpl) metadataStore.getStore();
+        Table<String, StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction> delTxTable =
+            schemaThree.getDeleteTransactionTable();
 
-        Long localID = blockNames.get(i);
-        String blk = cData.getBlockKey(localID);
-        BlockData blkInfo = blockDataTable.get(blk);
+        // Fix: Use the correct container prefix format for the delete transaction key
+        String containerPrefix = cData.containerPrefix();
+        long txId = System.currentTimeMillis();
+        String txKey = containerPrefix + txId; // This ensures the key matches the container prefix
 
-        blockDataTable.delete(blk);
-        blockDataTable.put(cData.getDeletingBlockKey(localID), blkInfo);
+        StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction.Builder deleteTxBuilder =
+            StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction.newBuilder()
+                .setTxID(txId)
+                .setContainerID(cData.getContainerID())
+                .setCount(count);
+
+        for (int i = 0; i < count; i++) {
+          Long localID = blockNames.get(i);
+          deleteTxBuilder.addLocalID(localID);
+        }
+
+        StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction deleteTx = deleteTxBuilder.build();
+        delTxTable.put(txKey, deleteTx); // Use the properly formatted key
+
+      } else if (metadataStore.getStore() instanceof DatanodeStoreSchemaTwoImpl) {
+        DatanodeStoreSchemaTwoImpl schemaTwoStore = (DatanodeStoreSchemaTwoImpl) metadataStore.getStore();
+        Table<Long, StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction> delTxTable =
+            schemaTwoStore.getDeleteTransactionTable();
+
+        long txId = System.currentTimeMillis();
+        StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction.Builder deleteTxBuilder =
+            StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction.newBuilder()
+                .setTxID(txId)
+                .setContainerID(cData.getContainerID())
+                .setCount(count);
+
+        for (int i = 0; i < count; i++) {
+          Long localID = blockNames.get(i);
+          deleteTxBuilder.addLocalID(localID);
+        }
+
+        StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction deleteTx = deleteTxBuilder.build();
+        delTxTable.put(txId, deleteTx);
+
+      } else if (metadataStore.getStore() instanceof DatanodeStoreSchemaOneImpl) {
+        // Schema 1: Move blocks to deleting prefix (this part looks correct)
+        Table<String, BlockData> blockDataTable = metadataStore.getStore().getBlockDataTable();
+        for (int i = 0; i < count; i++) {
+          Long localID = blockNames.get(i);
+          String blk = cData.getBlockKey(localID);
+          BlockData blkInfo = blockDataTable.get(blk);
+          blockDataTable.delete(blk);
+          blockDataTable.put(cData.getDeletingBlockKey(localID), blkInfo);
+        }
       }
 
       if (setMetaData) {
-        // Pending delete blocks are still counted towards the block count
-        // and bytes used metadata values, so those do not change.
-        Table<String, Long> metadataTable =
-                metadataStore.getStore().getMetadataTable();
-        metadataTable.put(cData.getPendingDeleteBlockCountKey(),
-            (long)count);
+        Table<String, Long> metadataTable = metadataStore.getStore().getMetadataTable();
+        metadataTable.put(cData.getPendingDeleteBlockCountKey(), (long)count);
+        // Also set the pending deletion size
+        long deletionSize = count * blockLen;
+        metadataTable.put(cData.getPendingDeleteBlockBytesKey(), deletionSize);
       }
-    }
 
+      metadataStore.getStore().flushDB();
+    }
   }
 
   private List<Long> addBlocks(KeyValueContainer keyValueContainer,
@@ -774,13 +821,13 @@ public class TestContainerReader {
     keyValueHandler.updateContainerChecksum(container, treeWriter);
     // Create an empty checksum file that exists but has no valid merkle tree
     assertTrue(ContainerChecksumTreeManager.getContainerChecksumFile(containerData).exists());
-    
+
     // Verify no checksum in RocksDB initially
     try (DBHandle dbHandle = BlockUtils.getDB(containerData, conf)) {
       Long dbDataChecksum = dbHandle.getStore().getMetadataTable().get(containerData.getContainerDataChecksumKey());
       assertNull(dbDataChecksum);
     }
-    
+
     ContainerCache.getInstance(conf).shutdownCache();
 
     // Test container loading - should handle when checksum file is present without the container merkle tree and

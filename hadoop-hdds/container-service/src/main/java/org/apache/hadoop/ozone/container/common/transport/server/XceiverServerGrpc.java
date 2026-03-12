@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.container.common.transport.server;
 
-import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.opentelemetry.api.trace.Span;
 import io.opentelemetry.context.Scope;
@@ -25,6 +24,7 @@ import java.io.IOException;
 import java.net.BindException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -85,7 +85,7 @@ public final class XceiverServerGrpc implements XceiverServerSpi {
   public XceiverServerGrpc(DatanodeDetails datanodeDetails,
       ConfigurationSource conf,
       ContainerDispatcher dispatcher, CertificateClient caClient) {
-    Preconditions.checkNotNull(conf);
+    Objects.requireNonNull(conf, "conf == null");
 
     this.id = datanodeDetails.getID();
     this.datanodeDetails = datanodeDetails;

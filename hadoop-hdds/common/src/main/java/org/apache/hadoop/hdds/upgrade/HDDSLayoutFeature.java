@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.upgrade;
 
-import java.util.EnumMap;
 import java.util.Optional;
 import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 
@@ -42,29 +41,43 @@ public enum HDDSLayoutFeature implements LayoutFeature {
                                      "to DatanodeDetails."),
   HBASE_SUPPORT(8, "Datanode RocksDB Schema Version 3 has an extra table " +
           "for the last chunk of blocks to support HBase.)"),
-  WITNESSED_CONTAINER_DB_PROTO_VALUE(9, "ContainerID table schema to use value type as proto");
+  WITNESSED_CONTAINER_DB_PROTO_VALUE(9, "ContainerID table schema to use value type as proto"),
+  STORAGE_SPACE_DISTRIBUTION(10, "Enhanced block deletion function for storage space distribution feature.");
 
   //////////////////////////////  //////////////////////////////
 
   private int layoutVersion;
   private String description;
-  private EnumMap<UpgradeActionType, HDDSUpgradeAction> scmActions =
-      new EnumMap<>(UpgradeActionType.class);
-  private EnumMap<UpgradeActionType, HDDSUpgradeAction> datanodeActions =
-      new EnumMap<>(UpgradeActionType.class);
+  private HDDSUpgradeAction scmAction;
+  private HDDSUpgradeAction datanodeAction;
 
   HDDSLayoutFeature(final int layoutVersion, String description) {
     this.layoutVersion = layoutVersion;
     this.description = description;
   }
 
-  public void addScmAction(UpgradeActionType type, HDDSUpgradeAction action) {
-    this.scmActions.put(type, action);
+  /**
+   * Associates an SCM upgrade action with this feature. Only the first upgrade action registered will be used.
+   *
+   * @param action The upgrade action to associate with this feature.
+   */
+  public void addScmAction(HDDSUpgradeAction action) {
+    // Required by SpotBugs since this setter exists in an enum.
+    if (this.scmAction == null) {
+      this.scmAction = action;
+    }
   }
 
-  public void addDatanodeAction(UpgradeActionType type,
-                                HDDSUpgradeAction action) {
-    this.datanodeActions.put(type, action);
+  /**
+   * Associates a Datanode upgrade action with this feature. Only the first upgrade action registered will be used.
+   *
+   * @param action The upgrade action to associate with this feature.
+   */
+  public void addDatanodeAction(HDDSUpgradeAction action) {
+    // Required by SpotBugs since this setter exists in an enum.
+    if (this.datanodeAction == null) {
+      this.datanodeAction = action;
+    }
   }
 
   @Override
@@ -77,11 +90,11 @@ public enum HDDSLayoutFeature implements LayoutFeature {
     return description;
   }
 
-  public Optional<HDDSUpgradeAction> scmAction(UpgradeActionType type) {
-    return Optional.ofNullable(scmActions.get(type));
+  public Optional<HDDSUpgradeAction> scmAction() {
+    return Optional.ofNullable(scmAction);
   }
 
-  public Optional<HDDSUpgradeAction> datanodeAction(UpgradeActionType type) {
-    return Optional.ofNullable(datanodeActions.get(type));
+  public Optional<HDDSUpgradeAction> datanodeAction() {
+    return Optional.ofNullable(datanodeAction);
   }
 }

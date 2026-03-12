@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.client;
 
-import com.google.common.base.Preconditions;
+import java.util.Objects;
 
 /**
  * This class encapsulates the arguments for creating a tenant.
@@ -91,7 +91,7 @@ public final class TenantArgs {
      * @return TenantArgs.
      */
     public TenantArgs build() {
-      Preconditions.checkNotNull(volumeName);
+      Objects.requireNonNull(volumeName, "volumeName == null");
       return new TenantArgs(volumeName, forceCreationWhenVolumeExists);
     }
   }

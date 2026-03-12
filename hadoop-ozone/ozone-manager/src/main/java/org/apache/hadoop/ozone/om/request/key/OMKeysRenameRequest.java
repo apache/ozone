@@ -192,7 +192,9 @@ public class OMKeysRenameRequest extends OMKeyRequest {
           continue;
         }
 
-        fromKeyValue.setUpdateID(trxnLogIndex);
+        fromKeyValue = fromKeyValue.toBuilder()
+            .setUpdateID(trxnLogIndex)
+            .build();
 
         fromKeyValue.setKeyName(toKeyName);
 

@@ -33,10 +33,12 @@ OZONE-SITE.XML_ozone.scm.primordial.node.id=scm1
 
 OZONE-SITE.XML_ozone.scm.pipeline.creation.interval=30s
 OZONE-SITE.XML_ozone.scm.pipeline.owner.container.count=1
+OZONE-SITE.XML_ozone.scm.ec.pipeline.minimum=1
 OZONE-SITE.XML_ozone.scm.datanode.id.dir=/data/metadata
 OZONE-SITE.XML_ozone.scm.container.size=1GB
 OZONE-SITE.XML_hdds.datanode.dir=/data/hdds
 OZONE-SITE.XML_hdds.datanode.volume.min.free.space=100MB
+OZONE-SITE.XML_hdds.datanode.volume.min.free.space.percent=0
 OZONE-SITE.XML_ozone.http.basedir=/tmp/ozone_http
 OZONE-SITE.XML_ozone.client.hbase.enhancements.allowed=true
 OZONE-SITE.XML_ozone.fs.hsync.enabled=true

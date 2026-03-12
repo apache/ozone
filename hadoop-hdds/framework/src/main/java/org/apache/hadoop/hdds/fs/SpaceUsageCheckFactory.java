@@ -131,7 +131,7 @@ public interface SpaceUsageCheckFactory {
     private static final String CLASSNAME_KEY = "classname";
 
     @Config(
-        key = CLASSNAME_KEY,
+        key = "hdds.datanode.du.factory.classname",
         defaultValue = "",
         tags = { ConfigTag.DATANODE },
         description = "The fully qualified name of the factory class that "

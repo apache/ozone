@@ -56,10 +56,6 @@ public class DefaultReplicationConfig {
     return ReplicationType.fromProto(replicationConfig.getReplicationType());
   }
 
-  public DefaultReplicationConfig copy() {
-    return new DefaultReplicationConfig(replicationConfig);
-  }
-
   public ReplicationConfig getReplicationConfig() {
     return replicationConfig;
   }

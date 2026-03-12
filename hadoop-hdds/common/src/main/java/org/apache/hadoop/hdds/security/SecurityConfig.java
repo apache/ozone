@@ -71,10 +71,11 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_ROOTCA_PUBLIC_KEY_
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_SIGNATURE_ALGO;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_X509_SIGNATURE_ALGO_DEFAULT;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_AUTHORIZATION_ENABLED;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_AUTHORIZATION_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SECURITY_ENABLED_KEY;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -82,6 +83,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.Provider;
 import java.security.Security;
 import java.time.Duration;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -104,6 +106,15 @@ public class SecurityConfig {
   private static final Logger LOG =
       LoggerFactory.getLogger(SecurityConfig.class);
   private static volatile Provider provider;
+
+  /**
+   * Test-only configuration property to enable authorization checks without
+   * requiring full security (Kerberos) setup. This is for testing purposes
+   * only.
+   */
+  public static final String OZONE_TEST_AUTHORIZATION_ENABLED = "ozone.test.authorization.enabled";
+  public static final boolean OZONE_TEST_AUTHORIZATION_ENABLED_DEFAULT = false;
+
   private final int size;
   private final String keyAlgo;
   private final String providerString;
@@ -136,6 +147,7 @@ public class SecurityConfig {
   private final Duration rootCaCertificatePollingInterval;
   private final boolean autoCARotationEnabled;
   private final Duration expiredCertificateCheckInterval;
+  private final boolean authorizationEnabled;
 
   /**
    * Constructs a SecurityConfig.
@@ -143,7 +155,7 @@ public class SecurityConfig {
    * @param configuration - HDDS Configuration
    */
   public SecurityConfig(ConfigurationSource configuration) {
-    Preconditions.checkNotNull(configuration, "Configuration cannot be null");
+    Objects.requireNonNull(configuration, "Configuration cannot be null");
     this.size = configuration.getInt(HDDS_KEY_LEN, HDDS_DEFAULT_KEY_LEN);
     this.keyAlgo = configuration.get(HDDS_KEY_ALGORITHM,
         HDDS_DEFAULT_KEY_ALGORITHM);
@@ -199,6 +211,14 @@ public class SecurityConfig {
     this.isSecurityEnabled = configuration.getBoolean(
         OZONE_SECURITY_ENABLED_KEY,
         OZONE_SECURITY_ENABLED_DEFAULT);
+
+    // Authorization is only effective when security is enabled, unless test mode is enabled
+    boolean testAuthorizationEnabled = configuration.getBoolean(
+        OZONE_TEST_AUTHORIZATION_ENABLED,
+        OZONE_TEST_AUTHORIZATION_ENABLED_DEFAULT);
+    this.authorizationEnabled = (isSecurityEnabled || testAuthorizationEnabled) &&
+        configuration.getBoolean(OZONE_AUTHORIZATION_ENABLED,
+            OZONE_AUTHORIZATION_ENABLED_DEFAULT);
 
     String certDurationString =
         configuration.get(HDDS_X509_DEFAULT_DURATION,
@@ -425,8 +445,7 @@ public class SecurityConfig {
    * @return Path Key location.
    */
   public Path getKeyLocation(String component) {
-    Preconditions.checkNotNull(this.metadataDir, "Metadata directory can't be"
-        + " null. Please check configs.");
+    Objects.requireNonNull(this.metadataDir, "Metadata directory can't be null. Please check configs.");
     return Paths.get(metadataDir, component, keyDir);
   }
 
@@ -438,8 +457,7 @@ public class SecurityConfig {
    * @return Path location.
    */
   public Path getCertificateLocation(String component) {
-    Preconditions.checkNotNull(this.metadataDir, "Metadata directory can't be"
-        + " null. Please check configs.");
+    Objects.requireNonNull(this.metadataDir, "Metadata directory can't be null. Please check configs.");
     return Paths.get(metadataDir, component, certificateDir);
   }
 
@@ -450,8 +468,7 @@ public class SecurityConfig {
    * @return Path location.
    */
   public Path getLocation(String component) {
-    Preconditions.checkNotNull(this.metadataDir, "Metadata directory can't be"
-        + " null. Please check configs.");
+    Objects.requireNonNull(this.metadataDir, "Metadata directory can't be null. Please check configs.");
     return Paths.get(metadataDir, component);
   }
 
@@ -610,5 +627,16 @@ public class SecurityConfig {
 
   public boolean isTokenEnabled() {
     return blockTokenEnabled || containerTokenEnabled;
+  }
+
+  /**
+   * Check if authorization checks should be performed in Ozone.
+   * Authorization is only effective when security is enabled, unless test mode is enabled.
+   * This controls both admin privilege checks and ACL checks.
+   *
+   * @return true if authorization checks should be performed
+   */
+  public boolean isAuthorizationEnabled() {
+    return authorizationEnabled;
   }
 }

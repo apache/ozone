@@ -28,7 +28,7 @@ import org.apache.hadoop.hdds.conf.ConfigType;
 @ConfigGroup(prefix = "hdds.scm.http.auth")
 public class SCMHTTPServerConfig {
 
-  @Config(key = "kerberos.principal",
+  @Config(key = "hdds.scm.http.auth.kerberos.principal",
       type = ConfigType.STRING,
       defaultValue = "",
       tags = {ConfigTag.SECURITY},
@@ -37,7 +37,7 @@ public class SCMHTTPServerConfig {
   )
   private String principal = "";
 
-  @Config(key = "kerberos.keytab",
+  @Config(key = "hdds.scm.http.auth.kerberos.keytab",
       type = ConfigType.STRING,
       defaultValue = "",
       tags = {ConfigTag.SECURITY},

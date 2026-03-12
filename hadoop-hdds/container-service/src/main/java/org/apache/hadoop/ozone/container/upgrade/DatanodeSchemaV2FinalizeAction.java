@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.container.upgrade;
 
 import static org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature.DATANODE_SCHEMA_V2;
-import static org.apache.hadoop.ozone.upgrade.LayoutFeature.UpgradeActionType.ON_FINALIZE;
 import static org.apache.hadoop.ozone.upgrade.UpgradeActionHdds.Component.DATANODE;
 
 import org.apache.hadoop.hdds.upgrade.HDDSUpgradeAction;
@@ -30,8 +29,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Upgrade Action for DataNode for the very first first Upgrade Version.
  */
-@UpgradeActionHdds(feature = DATANODE_SCHEMA_V2, component = DATANODE,
-    type = ON_FINALIZE)
+@UpgradeActionHdds(feature = DATANODE_SCHEMA_V2, component = DATANODE)
 public class DatanodeSchemaV2FinalizeAction
     implements HDDSUpgradeAction<DatanodeStateMachine> {
 

@@ -47,8 +47,8 @@ import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdfs.LogVerificationAppender;
-import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
 import org.apache.hadoop.ozone.OzoneConfigKeys;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -65,12 +65,12 @@ import org.apache.hadoop.ozone.om.ha.OMHAMetrics;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUploadCompleteInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
+import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.om.service.KeyDeletingService;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.log4j.Logger;
 import org.apache.ozone.test.GenericTestUtils;
-import org.apache.ozone.test.tag.Flaky;
 import org.apache.ratis.client.RaftClient;
 import org.apache.ratis.conf.RaftProperties;
 import org.apache.ratis.protocol.ClientId;
@@ -166,9 +166,8 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     // Stop leader OM, to see when the OM leader changes
     // multipart upload is happening successfully or not.
 
-    HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider =
-        OmFailoverProxyUtil
-            .getFailoverProxyProvider(getObjectStore().getClientProxy());
+    final HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> omFailoverProxyProvider
+        = OmTestUtil.getFailoverProxyProvider(getObjectStore());
 
     // The omFailoverProxyProvider will point to the current leader OM node.
     String leaderOMNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
@@ -234,9 +233,8 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
   public void testOMProxyProviderFailoverOnConnectionFailure()
       throws Exception {
     ObjectStore objectStore = getObjectStore();
-    HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider =
-        OmFailoverProxyUtil
-            .getFailoverProxyProvider(objectStore.getClientProxy());
+    final HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> omFailoverProxyProvider
+        = OmTestUtil.getFailoverProxyProvider(objectStore);
     String firstProxyNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
 
     createVolumeTest(true);
@@ -267,10 +265,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
 
     ObjectStore objectStore = getObjectStore();
     // Get the leader OM
-    String leaderOMNodeId = OmFailoverProxyUtil
-        .getFailoverProxyProvider(objectStore.getClientProxy())
-        .getCurrentProxyOMNodeId();
-
+    final String leaderOMNodeId = OmTestUtil.getCurrentOmProxyNodeId(objectStore);
     OzoneManager leaderOM = getCluster().getOzoneManager(leaderOMNodeId);
 
     // Get follower OM
@@ -439,8 +434,7 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
 
     OzoneManager ozoneManager = getCluster().getOMLeader();
 
-    KeyDeletingService keyDeletingService =
-        (KeyDeletingService) ozoneManager.getKeyManager().getDeletingService();
+    final KeyDeletingService keyDeletingService = ozoneManager.getKeyManager().getDeletingService();
 
     // Check on leader OM Count.
     GenericTestUtils.waitFor(() ->
@@ -482,9 +476,8 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     long waitBetweenRetries = getConf().getLong(
         OzoneConfigKeys.OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_KEY,
         OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT);
-    HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider =
-        OmFailoverProxyUtil
-            .getFailoverProxyProvider(getObjectStore().getClientProxy());
+    final HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> omFailoverProxyProvider
+        = OmTestUtil.getFailoverProxyProvider(getObjectStore());
 
     // The omFailoverProxyProvider will point to the current leader OM node.
     String leaderOMNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
@@ -501,7 +494,6 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
         omFailoverProxyProvider.getWaitTime());
   }
 
-  @Flaky("HDDS-11353")
   @Test
   void testOMHAMetrics() throws Exception {
     // Get leader OM
@@ -518,6 +510,11 @@ public class TestOzoneManagerHAWithStoppedNodes extends TestOzoneManagerHA {
     getCluster().shutdownOzoneManager(leaderOM);
     getCluster().restartOzoneManager(leaderOM, true);
     waitForLeaderToBeReady();
+
+    // Do some writes so that the old leader can receive AppendEntries
+    // which will trigger notifyLeaderChanged, instead of relying on
+    // AppendEntries
+    setupBucket();
 
     // Get the new leader
     OzoneManager newLeaderOM = getCluster().getOMLeader();

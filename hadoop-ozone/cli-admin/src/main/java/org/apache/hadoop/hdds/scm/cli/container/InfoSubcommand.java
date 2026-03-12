@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.cli.container;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -25,6 +24,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
@@ -110,7 +110,7 @@ public class InfoSubcommand extends ScmSubcommand {
     final ContainerWithPipeline container;
     try {
       container = scmClient.getContainerWithPipeline(containerID);
-      Preconditions.checkNotNull(container, "Container cannot be null");
+      Objects.requireNonNull(container, "Container cannot be null");
     } catch (IOException e) {
       printError("Unable to retrieve the container details for " + containerID);
       return;
@@ -161,7 +161,8 @@ public class InfoSubcommand extends ScmSubcommand {
         }
       }
       System.out.printf("Container State: %s%n", container.getContainerInfo().getState());
-
+      System.out.printf("SequenceId: %s%n", container.getContainerInfo().getSequenceId());
+      
       // Print pipeline of an existing container.
       String machinesStr = container.getPipeline().getNodes().stream().map(
               InfoSubcommand::buildDatanodeDetails)
@@ -189,7 +190,8 @@ public class InfoSubcommand extends ScmSubcommand {
     if (replica.getReplicaIndex() != -1) {
       sb.append(" ReplicaIndex: ").append(replica.getReplicaIndex()).append(';');
     }
-    sb.append(" Origin: ").append(replica.getPlaceOfBirth().toString()).append(';')
+    sb.append(" SequenceId: ").append(replica.getSequenceId()).append(';')
+        .append(" Origin: ").append(replica.getPlaceOfBirth().toString()).append(';')
         .append(" Location: ").append(buildDatanodeDetails(replica.getDatanodeDetails()));
     return sb.toString();
   }

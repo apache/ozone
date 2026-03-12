@@ -155,7 +155,8 @@ public class TestKeyManagerImpl {
       assertThrows(expectedException, () -> km.getDeletedKeyEntries(volumeName, bucketName, startKey, filter,
           numberOfEntries));
     } else {
-      assertEquals(expectedEntries, km.getDeletedKeyEntries(volumeName, bucketName, startKey, filter, numberOfEntries));
+      assertEquals(expectedEntries,
+          km.getDeletedKeyEntries(volumeName, bucketName, startKey, filter, numberOfEntries));
     }
   }
 
@@ -193,7 +194,8 @@ public class TestKeyManagerImpl {
       assertThrows(expectedException, () -> km.getRenamesKeyEntries(volumeName, bucketName, startKey,
           filter, numberOfEntries));
     } else {
-      assertEquals(expectedEntries, km.getRenamesKeyEntries(volumeName, bucketName, startKey, filter, numberOfEntries));
+      assertEquals(expectedEntries,
+          km.getRenamesKeyEntries(volumeName, bucketName, startKey, filter, numberOfEntries));
     }
   }
 

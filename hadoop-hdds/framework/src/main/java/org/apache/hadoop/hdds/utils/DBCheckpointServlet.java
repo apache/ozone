@@ -73,14 +73,14 @@ public class DBCheckpointServlet extends HttpServlet
   private transient DBStore dbStore;
   private transient DBCheckpointMetrics dbMetrics;
 
-  private boolean aclEnabled;
+  private boolean authorizationEnabled;
   private boolean isSpnegoEnabled;
   private transient OzoneAdmins admins;
   private transient BootstrapStateHandler.Lock lock;
   private transient File bootstrapTempData;
 
   public void initialize(DBStore store, DBCheckpointMetrics metrics,
-                         boolean omAclEnabled,
+                         boolean isAuthorizationEnabled,
                          Collection<String> allowedAdminUsers,
                          Collection<String> allowedAdminGroups,
                          boolean isSpnegoAuthEnabled)
@@ -94,7 +94,7 @@ public class DBCheckpointServlet extends HttpServlet
       throw new ServletException("DB Store is null");
     }
 
-    this.aclEnabled = omAclEnabled;
+    this.authorizationEnabled = isAuthorizationEnabled;
     this.admins = new OzoneAdmins(allowedAdminUsers, allowedAdminGroups);
     this.isSpnegoEnabled = isSpnegoAuthEnabled;
     lock = new NoOpLock();
@@ -129,9 +129,9 @@ public class DBCheckpointServlet extends HttpServlet
   }
 
   private boolean hasPermission(UserGroupInformation user) {
-    // Check ACL for dbCheckpoint only when global Ozone ACL and SPNEGO is
+    // Check admin access for dbCheckpoint only when authorization and SPNEGO is
     // enabled
-    if (aclEnabled && isSpnegoEnabled) {
+    if (authorizationEnabled && isSpnegoEnabled) {
       return admins.isAdmin(user);
     } else {
       return true;
@@ -165,8 +165,8 @@ public class DBCheckpointServlet extends HttpServlet
       return;
     }
 
-    // Check ACL for dbCheckpoint only when global Ozone ACL is enabled
-    if (aclEnabled) {
+    // Check authorization for dbCheckpoint only when authorization is enabled
+    if (authorizationEnabled) {
       final java.security.Principal userPrincipal = request.getUserPrincipal();
       if (userPrincipal == null) {
         final String remoteUser = request.getRemoteUser();
@@ -395,21 +395,21 @@ public class DBCheckpointServlet extends HttpServlet
    * This lock is a no-op but can overridden by child classes.
    */
   public static class NoOpLock extends BootstrapStateHandler.Lock {
-
-    private final UncheckedAutoCloseable noopLock = () -> {
+    private static final UncheckedAutoCloseable NOOP_LOCK = () -> {
     };
 
     public NoOpLock() {
+      super((readLock) -> NOOP_LOCK);
     }
 
     @Override
     public UncheckedAutoCloseable acquireReadLock() {
-      return noopLock;
+      return NOOP_LOCK;
     }
 
     @Override
     public UncheckedAutoCloseable acquireWriteLock() {
-      return noopLock;
+      return NOOP_LOCK;
     }
   }
 }

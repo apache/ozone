@@ -16,7 +16,7 @@
     "ag-charts-community": "^7.3.0",
     "ag-charts-react": "^7.3.0",
     "antd": "~4.10.3",
-    "axios": "~1.9.0",
+    "axios": "~1.13.5",
     "classnames": "^2.3.2",
     "echarts": "^5.5.0",
     "filesize": "^6.4.0",

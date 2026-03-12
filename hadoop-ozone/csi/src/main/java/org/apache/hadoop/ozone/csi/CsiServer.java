@@ -96,28 +96,28 @@ public class CsiServer extends GenericCli implements Callable<Void> {
   @ConfigGroup(prefix = "ozone.csi")
   public static class CsiConfig {
 
-    @Config(key = "socket",
+    @Config(key = "ozone.csi.socket",
         defaultValue = "/var/lib/csi.sock",
         description =
             "The socket where all the CSI services will listen (file name).",
         tags = ConfigTag.STORAGE)
     private String socketPath;
 
-    @Config(key = "default-volume-size",
+    @Config(key = "ozone.csi.default-volume-size",
         defaultValue = "1000000000",
         description =
             "The default size of the create volumes (if not specified).",
         tags = ConfigTag.STORAGE)
     private long defaultVolumeSize;
 
-    @Config(key = "s3g.address",
+    @Config(key = "ozone.csi.s3g.address",
         defaultValue = "http://localhost:9878",
         description =
             "The address of S3 Gateway endpoint.",
         tags = ConfigTag.STORAGE)
     private String s3gAddress;
 
-    @Config(key = "owner",
+    @Config(key = "ozone.csi.owner",
         defaultValue = "",
         description =
             "This is the username which is used to create the requested "
@@ -129,7 +129,7 @@ public class CsiServer extends GenericCli implements Callable<Void> {
         tags = ConfigTag.STORAGE)
     private String volumeOwner;
 
-    @Config(key = "mount.command",
+    @Config(key = "ozone.csi.mount.command",
         defaultValue = "goofys --endpoint %s %s %s",
         description =
             "This is the mount command which is used to publish volume."

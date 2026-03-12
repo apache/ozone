@@ -369,7 +369,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy extends NSSummaryTests {
     populateOMDB();
     NSSummaryTaskWithOBS nsSummaryTaskWithOBS =
         new NSSummaryTaskWithOBS(reconNamespaceSummaryManager,
-            reconOMMetadataManager, 10);
+            reconOMMetadataManager, 10, 5, 20, 2000);
     nsSummaryTaskWithOBS.reprocessWithOBS(reconOMMetadataManager);
     NSSummaryTaskWithLegacy nsSummaryTaskWithLegacy =
         new NSSummaryTaskWithLegacy(reconNamespaceSummaryManager,
@@ -1446,7 +1446,7 @@ public class TestNSSummaryEndpointWithOBSAndLegacy extends NSSummaryTests {
 
   private static SCMNodeStat getMockSCMRootStat() {
     return new SCMNodeStat(ROOT_QUOTA, ROOT_DATA_SIZE,
-        ROOT_QUOTA - ROOT_DATA_SIZE, 0L, 0L);
+        ROOT_QUOTA - ROOT_DATA_SIZE, 0L, 0L, 0);
   }
 
 }

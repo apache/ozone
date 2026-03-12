@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.util.List;
+import java.util.Objects;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -80,7 +81,7 @@ public class ECBlockChecksumComputer extends AbstractBlockChecksumComputer {
       int parityBytes = getParityBytes(chunkSize, bytesPerCrc);
       ByteString stripeChecksum = chunkInfo.getStripeChecksum();
 
-      Preconditions.checkNotNull(stripeChecksum);
+      Objects.requireNonNull(stripeChecksum, "stripeChecksum == null");
       final int checksumSize = stripeChecksum.size();
       Preconditions.checkArgument(checksumSize % 4 == 0,
           "Checksum Bytes size does not match");
@@ -130,7 +131,7 @@ public class ECBlockChecksumComputer extends AbstractBlockChecksumComputer {
       // Total parity checksum bytes per stripe to remove
       int parityBytes = getParityBytes(chunkSize, bytesPerCrc);
 
-      Preconditions.checkNotNull(stripeChecksum);
+      Objects.requireNonNull(stripeChecksum, "stripeChecksum == null");
       final int checksumSize = stripeChecksum.size();
       Preconditions.checkArgument(checksumSize % 4 == 0,
           "Checksum Bytes size does not match");

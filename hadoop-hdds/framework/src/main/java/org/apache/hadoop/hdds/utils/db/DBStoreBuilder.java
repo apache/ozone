@@ -28,7 +28,6 @@ import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_DELTA_UPDATE_DATA
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_DELTA_UPDATE_DATA_SIZE_MAX_LIMIT_DEFAULT;
 import static org.rocksdb.RocksDB.DEFAULT_COLUMN_FAMILY;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -38,6 +37,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -48,6 +48,7 @@ import org.apache.hadoop.hdds.utils.db.managed.ManagedLogger;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedStatistics;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedWriteOptions;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.rocksdb.InfoLogLevel;
 import org.rocksdb.RocksDBException;
 import org.rocksdb.StatsLevel;
@@ -101,6 +102,7 @@ public final class DBStoreBuilder {
   // number in request to avoid increase in heap memory.
   private long maxDbUpdatesSizeThreshold;
   private Integer maxNumberOfOpenFiles = null;
+  private Function<Boolean, UncheckedAutoCloseable> differLockSupplier;
 
   /**
    * Create DBStoreBuilder from a generic DBDefinition.
@@ -146,6 +148,7 @@ public final class DBStoreBuilder {
     this.maxDbUpdatesSizeThreshold = (long) configuration.getStorageSize(
         OZONE_OM_DELTA_UPDATE_DATA_SIZE_MAX_LIMIT,
         OZONE_OM_DELTA_UPDATE_DATA_SIZE_MAX_LIMIT_DEFAULT, StorageUnit.BYTES);
+    this.differLockSupplier = null;
   }
 
   public static File getDBDirPath(DBDefinition definition,
@@ -225,7 +228,7 @@ public final class DBStoreBuilder {
       writeOptions.setSync(rocksDBConfiguration.getSyncOption());
 
       return new RDBStore(dbFile, rocksDBOption, statistics, writeOptions, tableConfigs,
-          openReadOnly, dbJmxBeanNameName, enableCompactionDag,
+          openReadOnly, dbJmxBeanNameName, enableCompactionDag, differLockSupplier,
           maxDbUpdatesSizeThreshold, createCheckpointDirs, configuration,
           enableRocksDbMetrics);
     } catch (Exception ex) {
@@ -274,13 +277,13 @@ public final class DBStoreBuilder {
   }
 
   public DBStoreBuilder setPath(Path path) {
-    Preconditions.checkNotNull(path);
+    Objects.requireNonNull(path, "path == null");
     dbPath = path;
     return this;
   }
 
   public DBStoreBuilder setOptionsPath(Path optionsPath) {
-    Preconditions.checkNotNull(optionsPath);
+    Objects.requireNonNull(optionsPath, "optionsPath == null");
     this.optionsPath = optionsPath;
     return this;
   }
@@ -290,8 +293,10 @@ public final class DBStoreBuilder {
     return this;
   }
 
-  public DBStoreBuilder setEnableCompactionDag(boolean enableCompactionDag) {
-    this.enableCompactionDag = enableCompactionDag;
+  public DBStoreBuilder setEnableCompactionDag(boolean compactionDagEnable,
+      Function<Boolean, UncheckedAutoCloseable> lockSupplier) {
+    this.enableCompactionDag = compactionDagEnable;
+    this.differLockSupplier = lockSupplier;
     return this;
   }
 

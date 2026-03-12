@@ -56,20 +56,8 @@ import picocli.CommandLine;
 )
 public class FinalizeUpgradeSubCommand implements Callable<Void> {
 
-  @CommandLine.ParentCommand
-  private OMAdmin parent;
-
-  @CommandLine.Option(
-      names = {"-id", "--service-id"},
-      description = "Ozone Manager Service ID"
-  )
-  private String omServiceId;
-
-  @CommandLine.Option(
-      names = {"-host", "--service-host"},
-      description = "Ozone Manager Host"
-  )
-  private String omHost;
+  @CommandLine.Mixin
+  private OmAddressOptions.OptionalServiceIdOrHostMixin omAddressOptions;
 
   @CommandLine.Option(
       names = {"--takeover"},
@@ -80,11 +68,8 @@ public class FinalizeUpgradeSubCommand implements Callable<Void> {
 
   @Override
   public Void call() throws Exception {
-    boolean forceHA = false;
-    OzoneManagerProtocol client =
-        parent.createOmClient(omServiceId, omHost, forceHA);
-    String upgradeClientID = "Upgrade-Client-" + UUID.randomUUID().toString();
-    try {
+    String upgradeClientID = "Upgrade-Client-" + UUID.randomUUID();
+    try (OzoneManagerProtocol client = omAddressOptions.newClient()) {
       UpgradeFinalization.StatusAndMessages finalizationResponse =
           client.finalizeUpgrade(upgradeClientID);
       if (isFinalized(finalizationResponse.status())) {
@@ -98,10 +83,10 @@ public class FinalizeUpgradeSubCommand implements Callable<Void> {
         );
         throw new IOException("Exiting...");
       }
+      monitorAndWaitFinalization(client, upgradeClientID);
     } catch (UpgradeException e) {
       handleInvalidRequestAfterInitiatingFinalization(force, e);
     }
-    monitorAndWaitFinalization(client, upgradeClientID);
     return null;
   }
 

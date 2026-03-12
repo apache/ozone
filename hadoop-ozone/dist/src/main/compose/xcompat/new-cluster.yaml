@@ -56,6 +56,7 @@ services:
       - 9882
     environment:
       OZONE_OPTS:
+      OZONE-SITE.XML_hdds.datanode.volume.min.free.space.percent: 0
     command: ["ozone","datanode"]
   om:
     <<: *new-config

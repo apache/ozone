@@ -20,7 +20,7 @@ package org.apache.hadoop.ozone.protocolPB;
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
 
 import org.apache.hadoop.hdds.HddsConfigKeys;
-import org.apache.hadoop.ipc.ProtocolInfo;
+import org.apache.hadoop.ipc_.ProtocolInfo;
 import org.apache.hadoop.security.KerberosInfo;
 
 /**

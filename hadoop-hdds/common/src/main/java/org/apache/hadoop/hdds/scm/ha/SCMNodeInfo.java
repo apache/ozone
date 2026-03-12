@@ -127,22 +127,18 @@ public class SCMNodeInfo {
       // Following current approach of fall back to
       // OZONE_SCM_CLIENT_ADDRESS_KEY to figure out hostname.
 
-      String scmBlockClientAddress = getHostNameFromConfigKeys(conf,
-          OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
-          OZONE_SCM_CLIENT_ADDRESS_KEY).orElse(null);
-
       String scmClientAddress = getHostNameFromConfigKeys(conf,
-          OZONE_SCM_CLIENT_ADDRESS_KEY).orElse(null);
+          OZONE_SCM_CLIENT_ADDRESS_KEY,
+          OZONE_SCM_NAMES).orElse(null);
+      
+      String scmBlockClientAddress = getHostNameFromConfigKeys(conf,
+          OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY).orElse(scmClientAddress);
 
-      String scmSecurityClientAddress =
-          getHostNameFromConfigKeys(conf,
-              OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY,
-              OZONE_SCM_CLIENT_ADDRESS_KEY).orElse(null);
+      String scmSecurityClientAddress = getHostNameFromConfigKeys(conf,
+          OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY).orElse(scmClientAddress);
 
-      String scmDatanodeAddress =
-          getHostNameFromConfigKeys(conf,
-              OZONE_SCM_DATANODE_ADDRESS_KEY,
-              OZONE_SCM_CLIENT_ADDRESS_KEY, OZONE_SCM_NAMES).orElse(null);
+      String scmDatanodeAddress = getHostNameFromConfigKeys(conf,
+          OZONE_SCM_DATANODE_ADDRESS_KEY).orElse(scmClientAddress);
 
       int scmBlockClientPort = getPortNumberFromConfigKeys(conf,
           OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY)
@@ -181,12 +177,11 @@ public class SCMNodeInfo {
 
   }
 
-  private static String buildAddress(String address, int port) {
-    return new StringBuilder().append(address).append(':')
-        .append(port).toString();
+  public static String buildAddress(String address, int port) {
+    return address + ':' + port;
   }
 
-  private static int getPort(ConfigurationSource conf,
+  public static int getPort(ConfigurationSource conf,
       String scmServiceId, String scmNodeId, String configKey,
       String portKey, int defaultPort) {
     String suffixKey = ConfUtils.addKeySuffixes(configKey, scmServiceId,

@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om.response;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.Objects;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -35,7 +36,7 @@ public abstract class OMClientResponse {
   private OMLockDetails omLockDetails;
 
   public OMClientResponse(OMResponse omResponse) {
-    Preconditions.checkNotNull(omResponse);
+    Objects.requireNonNull(omResponse, "omResponse == null");
     this.omResponse = omResponse;
   }
 

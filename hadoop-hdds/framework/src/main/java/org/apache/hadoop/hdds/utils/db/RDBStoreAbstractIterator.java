@@ -41,16 +41,16 @@ abstract class RDBStoreAbstractIterator<RAW>
   // prefix for each key.
   private final RAW prefix;
 
-  private final Type type;
+  private final IteratorType type;
 
-  RDBStoreAbstractIterator(ManagedRocksIterator iterator, RDBTable table, RAW prefix, Type type) {
+  RDBStoreAbstractIterator(ManagedRocksIterator iterator, RDBTable table, RAW prefix, IteratorType type) {
     this.rocksDBIterator = iterator;
     this.rocksDBTable = table;
     this.prefix = prefix;
     this.type = type;
   }
 
-  Type getType() {
+  IteratorType getType() {
     return type;
   }
 

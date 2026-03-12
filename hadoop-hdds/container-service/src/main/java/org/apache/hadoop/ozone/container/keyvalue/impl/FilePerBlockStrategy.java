@@ -38,6 +38,7 @@ import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.time.Duration;
+import java.util.Objects;
 import java.util.concurrent.ExecutionException;
 import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.hdds.client.BlockID;
@@ -125,7 +126,7 @@ public class FilePerBlockStrategy implements ChunkManager {
 
     checkLayoutVersion(container);
 
-    Preconditions.checkNotNull(dispatcherContext);
+    Objects.requireNonNull(dispatcherContext, "dispatcherContext == null");
     DispatcherContext.WriteChunkStage stage = dispatcherContext.getStage();
 
     if (info.getLen() <= 0) {
@@ -274,7 +275,7 @@ public class FilePerBlockStrategy implements ChunkManager {
       throws StorageContainerException {
     checkLayoutVersion(container);
 
-    Preconditions.checkNotNull(blockID, "Block ID cannot be null.");
+    Objects.requireNonNull(blockID, "blockID == null");
 
     final File file = getChunkFile(container, blockID);
 
@@ -287,8 +288,6 @@ public class FilePerBlockStrategy implements ChunkManager {
     }
 
     if (verifyLength) {
-      Preconditions.checkNotNull(info, "Chunk info cannot be null for single " +
-          "chunk delete");
       checkFullDelete(info, file);
     }
 
@@ -302,6 +301,7 @@ public class FilePerBlockStrategy implements ChunkManager {
 
   private static void checkFullDelete(ChunkInfo info, File chunkFile)
       throws StorageContainerException {
+    Objects.requireNonNull(info, "info == null");
     long fileLength = chunkFile.length();
     if ((info.getOffset() > 0) || (info.getLen() != fileLength)) {
       String msg = String.format(

@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.om.service;
 
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.BOOTSTRAP_LOCK;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
@@ -25,6 +27,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
 import org.apache.hadoop.hdds.utils.BackgroundService;
 import org.apache.hadoop.hdds.utils.BackgroundTask;
 import org.apache.hadoop.hdds.utils.BackgroundTaskQueue;
@@ -34,6 +37,7 @@ import org.apache.hadoop.ozone.lock.BootstrapStateHandler;
 import org.apache.hadoop.ozone.om.DeletingServiceMetrics;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
+import org.apache.hadoop.ozone.om.lock.IOzoneManagerLock;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -55,8 +59,7 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
   private final AtomicLong runCount;
   private final AtomicLong callId;
   private final AtomicBoolean suspended;
-  private final BootstrapStateHandler.Lock lock =
-      new BootstrapStateHandler.Lock();
+  private final BootstrapStateHandler.Lock lock;
 
   public AbstractKeyDeletingService(String serviceName, long interval,
       TimeUnit unit, int threadPoolSize, long serviceTimeout,
@@ -69,6 +72,10 @@ public abstract class AbstractKeyDeletingService extends BackgroundService
     this.perfMetrics = ozoneManager.getPerfMetrics();
     this.callId = new AtomicLong(0);
     this.suspended = new AtomicBoolean(false);
+    IOzoneManagerLock ozoneManagerLock = ozoneManager.getMetadataManager().getLock();
+    Function<Boolean, UncheckedAutoCloseable> lockSupplier = (readLock) ->
+        ozoneManagerLock.acquireLock(BOOTSTRAP_LOCK, getServiceName(), readLock);
+    this.lock = new BootstrapStateHandler.Lock(lockSupplier);
   }
 
   @Override

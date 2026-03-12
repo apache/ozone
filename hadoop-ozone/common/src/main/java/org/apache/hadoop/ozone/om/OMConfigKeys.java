@@ -102,10 +102,6 @@ public final class OMConfigKeys {
   public static final int OZONE_OM_HTTP_BIND_PORT_DEFAULT = 9874;
   public static final int OZONE_OM_HTTPS_BIND_PORT_DEFAULT = 9875;
 
-  public static final String OZONE_OM_VOLUME_LISTALL_ALLOWED =
-      "ozone.om.volume.listall.allowed";
-  public static final boolean OZONE_OM_VOLUME_LISTALL_ALLOWED_DEFAULT = true;
-
   public static final String OZONE_KEY_DELETING_LIMIT_PER_TASK =
       "ozone.key.deleting.limit.per.task";
   public static final int OZONE_KEY_DELETING_LIMIT_PER_TASK_DEFAULT = 50000;
@@ -228,7 +224,11 @@ public final class OMConfigKeys {
   public static final String OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_KEY
       = "ozone.om.ratis.snapshot.max.total.sst.size";
   public static final long
-      OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT = 100_000_000;
+      OZONE_OM_RATIS_SNAPSHOT_MAX_TOTAL_SST_SIZE_DEFAULT = 10737418240L;
+
+  public static final String OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_KEY
+      = "ozone.om.db.checkpoint.use.inode.based.transfer";
+  public static final boolean OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_DEFAULT = true;
 
   // OM Ratis server configurations
   public static final String OZONE_OM_RATIS_SERVER_REQUEST_TIMEOUT_KEY
@@ -384,6 +384,11 @@ public final class OMConfigKeys {
       "ozone.directory.deleting.service.interval";
   public static final String OZONE_DIR_DELETING_SERVICE_INTERVAL_DEFAULT
       = "60s";
+
+  public static final String OZONE_PATH_DELETING_LIMIT_PER_TASK =
+      "ozone.path.deleting.limit.per.task";
+  // default is 20000 taking account of 32MB buffer size
+  public static final int OZONE_PATH_DELETING_LIMIT_PER_TASK_DEFAULT = 20000;
 
   /**
    * Configuration properties for Snapshot Directory Service.

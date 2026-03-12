@@ -19,9 +19,12 @@ package org.apache.hadoop.ozone.container.common.volume;
 
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_VOLUME_CHOOSING_POLICY;
 
+import java.util.concurrent.locks.ReentrantLock;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
+import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerConfiguration;
+import org.apache.hadoop.ozone.container.diskbalancer.policy.DiskBalancerVolumeChoosingPolicy;
 import org.apache.ratis.util.ReflectionUtils;
 
 /**
@@ -32,6 +35,8 @@ public final class VolumeChoosingPolicyFactory {
 
   private static final Class<? extends VolumeChoosingPolicy>
       DEFAULT_VOLUME_CHOOSING_POLICY = CapacityVolumeChoosingPolicy.class;
+  // a lock to coordinate space reservation between multiple policies and threads
+  private static final ReentrantLock LOCK = new ReentrantLock();
 
   private VolumeChoosingPolicyFactory() {
   }
@@ -40,6 +45,12 @@ public final class VolumeChoosingPolicyFactory {
     Class<? extends VolumeChoosingPolicy> policyClass = conf.getClass(
         HDDS_DATANODE_VOLUME_CHOOSING_POLICY,
         DEFAULT_VOLUME_CHOOSING_POLICY, VolumeChoosingPolicy.class);
-    return ReflectionUtils.newInstance(policyClass);
+    return ReflectionUtils.newInstance(policyClass, new Class<?>[] {ReentrantLock.class}, LOCK);
+  }
+
+  public static DiskBalancerVolumeChoosingPolicy getDiskBalancerPolicy(ConfigurationSource conf) {
+    Class<?> policyClass = conf.getObject(DiskBalancerConfiguration.class).getVolumeChoosingPolicyClass();
+    return (DiskBalancerVolumeChoosingPolicy) ReflectionUtils.newInstance(
+        policyClass, new Class<?>[]{ReentrantLock.class}, LOCK);
   }
 }

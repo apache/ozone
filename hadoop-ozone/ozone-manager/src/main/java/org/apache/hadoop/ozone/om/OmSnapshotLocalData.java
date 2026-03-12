@@ -67,6 +67,9 @@ public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
   // Stores the transactionInfo corresponding to OM when the snaphot is purged.
   private TransactionInfo transactionInfo;
 
+  // Stores the rocksDB's transaction sequence number at the time of snapshot creation.
+  private long dbTxSequenceNumber;
+
   // Map of version to VersionMeta, using linkedHashMap since the order of the map needs to be deterministic for
   // checksum computation.
   private final LinkedHashMap<Integer, VersionMeta> versionSstFileInfos;
@@ -78,7 +81,7 @@ public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
    * Creates a OmSnapshotLocalData object with default values.
    */
   public OmSnapshotLocalData(UUID snapshotId, List<LiveFileMetaData> notDefraggedSSTFileList, UUID previousSnapshotId,
-      TransactionInfo transactionInfo) {
+      TransactionInfo transactionInfo, long dbTxSequenceNumber) {
     this.snapshotId = snapshotId;
     this.isSSTFiltered = false;
     this.lastDefragTime = 0L;
@@ -89,7 +92,12 @@ public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
     this.version = 0;
     this.previousSnapshotId = previousSnapshotId;
     this.transactionInfo = transactionInfo;
+    this.dbTxSequenceNumber = dbTxSequenceNumber;
     setChecksumTo0ByteArray();
+  }
+
+  public long getDbTxSequenceNumber() {
+    return dbTxSequenceNumber;
   }
 
   /**
@@ -108,6 +116,7 @@ public class OmSnapshotLocalData implements WithChecksum<OmSnapshotLocalData> {
     this.versionSstFileInfos = new LinkedHashMap<>();
     setVersionSstFileInfos(source.versionSstFileInfos);
     this.transactionInfo = source.transactionInfo;
+    this.dbTxSequenceNumber = source.dbTxSequenceNumber;
   }
 
   public TransactionInfo getTransactionInfo() {

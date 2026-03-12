@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
 import java.io.IOException;
+import java.util.Objects;
 import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
@@ -71,7 +72,7 @@ public class OMTenantDeleteResponse extends OMClientResponse {
         batchOperation, tenantId);
 
     if (!volumeName.isEmpty()) {
-      Preconditions.checkNotNull(omVolumeArgs);
+      Objects.requireNonNull(omVolumeArgs, "omVolumeArgs == null");
       Preconditions.checkState(omVolumeArgs.getVolume().equals(volumeName));
 
       final String dbVolumeKey = omMetadataManager.getVolumeKey(volumeName);

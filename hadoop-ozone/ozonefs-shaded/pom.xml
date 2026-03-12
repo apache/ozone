@@ -28,10 +28,8 @@
     <!-- no tests in this module so far -->
     <maven.test.skip>true</maven.test.skip>
     <mdep.analyze.skip>true</mdep.analyze.skip>
-    <ozone.shaded.native.prefix>org_apache_ozone_shaded</ozone.shaded.native.prefix>
     <!-- refer to ratis thirdparty ratis.thirdparty.shaded.native.prefix -->
     <ratis.thirdparty.shaded.native.prefix>org_apache_ratis_thirdparty_</ratis.thirdparty.shaded.native.prefix>
-    <shaded.prefix>org.apache.ozone.shaded</shaded.prefix>
   </properties>
 
   <dependencies>
@@ -133,7 +131,6 @@
             </goals>
             <phase>package</phase>
             <configuration>
-              <skip>${maven.shade.skip}</skip>
               <artifactSet>
                 <excludes>
                   <exclude>com.sun.javadoc:*</exclude>
@@ -194,7 +191,7 @@
               <relocations>
                 <relocation>
                   <pattern>org</pattern>
-                  <shadedPattern>${shaded.prefix}.org</shadedPattern>
+                  <shadedPattern>${ozone.shaded.prefix}.org</shadedPattern>
                   <excludes>
                     <exclude>org.apache.hadoop.**</exclude>
                     <exclude>org.apache.log4j.**</exclude>
@@ -214,13 +211,12 @@
                 </relocation>
                 <relocation>
                   <pattern>org.apache.ratis</pattern>
-                  <shadedPattern>${shaded.prefix}.org.apache.ratis</shadedPattern>
+                  <shadedPattern>${ozone.shaded.prefix}.org.apache.ratis</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>com</pattern>
-                  <shadedPattern>${shaded.prefix}.com</shadedPattern>
+                  <shadedPattern>${ozone.shaded.prefix}.com</shadedPattern>
                   <excludes>
-                    <exclude>com.google.protobuf.**</exclude>
                     <!-- These packages are the ones that are not shaded in the hadoop release package.
                     To prevent conflicts, we do not include these packages in the ozone client release package.
                     Ozone will use hadoop / JVM to provide these dependencies. -->
@@ -234,43 +230,43 @@
                 </relocation>
                 <relocation>
                   <pattern>google</pattern>
-                  <shadedPattern>${shaded.prefix}.google</shadedPattern>
+                  <shadedPattern>${ozone.shaded.prefix}.google</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>net.jcip</pattern>
-                  <shadedPattern>${shaded.prefix}.net.jcip</shadedPattern>
+                  <shadedPattern>${ozone.shaded.prefix}.net.jcip</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>javassist</pattern>
-                  <shadedPattern>${shaded.prefix}.javassist</shadedPattern>
+                  <shadedPattern>${ozone.shaded.prefix}.javassist</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>javax.xml.bind</pattern>
-                  <shadedPattern>${shaded.prefix}.javax.xml.bind</shadedPattern>
+                  <shadedPattern>${ozone.shaded.prefix}.javax.xml.bind</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>javax.activation</pattern>
-                  <shadedPattern>${shaded.prefix}.javax.activation</shadedPattern>
+                  <shadedPattern>${ozone.shaded.prefix}.javax.activation</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>jakarta.annotation</pattern>
-                  <shadedPattern>${shaded.prefix}.jakarta.annotation</shadedPattern>
+                  <shadedPattern>${ozone.shaded.prefix}.jakarta.annotation</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>kotlin</pattern>
-                  <shadedPattern>${shaded.prefix}.kotlin</shadedPattern>
+                  <shadedPattern>${ozone.shaded.prefix}.kotlin</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>picocli</pattern>
-                  <shadedPattern>${shaded.prefix}.picocli</shadedPattern>
+                  <shadedPattern>${ozone.shaded.prefix}.picocli</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>info</pattern>
-                  <shadedPattern>${shaded.prefix}.info</shadedPattern>
+                  <shadedPattern>${ozone.shaded.prefix}.info</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>io</pattern>
-                  <shadedPattern>${shaded.prefix}.io</shadedPattern>
+                  <shadedPattern>${ozone.shaded.prefix}.io</shadedPattern>
                   <excludes>
                     <exclude>io!netty!*</exclude>
                     <!-- Exclude config keys for Hadoop that look like package names -->
@@ -291,11 +287,11 @@
                 <!-- handling some special packages with special names -->
                 <relocation>
                   <pattern>okio</pattern>
-                  <shadedPattern>${shaded.prefix}.okio</shadedPattern>
+                  <shadedPattern>${ozone.shaded.prefix}.okio</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>okhttp3</pattern>
-                  <shadedPattern>${shaded.prefix}.okhttp3</shadedPattern>
+                  <shadedPattern>${ozone.shaded.prefix}.okhttp3</shadedPattern>
                 </relocation>
               </relocations>
             </configuration>

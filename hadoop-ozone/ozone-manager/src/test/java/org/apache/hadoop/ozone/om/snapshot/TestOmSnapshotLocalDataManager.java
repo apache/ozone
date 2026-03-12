@@ -82,8 +82,9 @@ import org.apache.hadoop.ozone.om.OmMetadataManagerImpl;
 import org.apache.hadoop.ozone.om.OmSnapshotLocalData;
 import org.apache.hadoop.ozone.om.OmSnapshotLocalDataYaml;
 import org.apache.hadoop.ozone.om.OmSnapshotManager;
+import org.apache.hadoop.ozone.om.SnapshotChainManager;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
-import org.apache.hadoop.ozone.om.lock.FlatResource;
+import org.apache.hadoop.ozone.om.lock.DAGLeveledResource;
 import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager;
 import org.apache.hadoop.ozone.om.lock.HierarchicalResourceLockManager.HierarchicalResourceLock;
 import org.apache.hadoop.ozone.om.snapshot.OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataProvider;
@@ -211,22 +212,23 @@ public class TestOmSnapshotLocalDataManager {
   }
 
   private String getReadLockMessageAcquire(UUID snapshotId) {
-    return READ_LOCK_MESSAGE_ACQUIRE + " " + FlatResource.SNAPSHOT_LOCAL_DATA_LOCK + " " + snapshotId;
+    return READ_LOCK_MESSAGE_ACQUIRE + " " + DAGLeveledResource.SNAPSHOT_LOCAL_DATA_LOCK + " " + snapshotId;
   }
 
   private String getReadLockMessageRelease(UUID snapshotId) {
-    return READ_LOCK_MESSAGE_UNLOCK + " " + FlatResource.SNAPSHOT_LOCAL_DATA_LOCK + " " + snapshotId;
+    return READ_LOCK_MESSAGE_UNLOCK + " " + DAGLeveledResource.SNAPSHOT_LOCAL_DATA_LOCK + " " + snapshotId;
   }
 
   private String getWriteLockMessageAcquire(UUID snapshotId) {
-    return WRITE_LOCK_MESSAGE_ACQUIRE + " " + FlatResource.SNAPSHOT_LOCAL_DATA_LOCK + " " + snapshotId;
+    return WRITE_LOCK_MESSAGE_ACQUIRE + " " + DAGLeveledResource.SNAPSHOT_LOCAL_DATA_LOCK + " " + snapshotId;
   }
 
   private String getWriteLockMessageRelease(UUID snapshotId) {
-    return WRITE_LOCK_MESSAGE_UNLOCK + " " + FlatResource.SNAPSHOT_LOCAL_DATA_LOCK + " " + snapshotId;
+    return WRITE_LOCK_MESSAGE_UNLOCK + " " + DAGLeveledResource.SNAPSHOT_LOCAL_DATA_LOCK + " " + snapshotId;
   }
 
-  private HierarchicalResourceLock getHierarchicalResourceLock(FlatResource resource, String key, boolean isWriteLock) {
+  private HierarchicalResourceLock getHierarchicalResourceLock(DAGLeveledResource resource, String key,
+      boolean isWriteLock) {
     return new HierarchicalResourceLock() {
       @Override
       public boolean isLockAcquired() {
@@ -247,12 +249,12 @@ public class TestOmSnapshotLocalDataManager {
   private void mockLockManager() throws IOException {
     lockCapturor.clear();
     reset(lockManager);
-    when(lockManager.acquireReadLock(any(FlatResource.class), anyString()))
+    when(lockManager.acquireReadLock(any(DAGLeveledResource.class), anyString()))
         .thenAnswer(i -> {
           lockCapturor.add(READ_LOCK_MESSAGE_ACQUIRE + " " + i.getArgument(0) + " " + i.getArgument(1));
           return getHierarchicalResourceLock(i.getArgument(0), i.getArgument(1), false);
         });
-    when(lockManager.acquireWriteLock(any(FlatResource.class), anyString()))
+    when(lockManager.acquireWriteLock(any(DAGLeveledResource.class), anyString()))
         .thenAnswer(i -> {
           lockCapturor.add(WRITE_LOCK_MESSAGE_ACQUIRE + " " + i.getArgument(0) + " " + i.getArgument(1));
           return getHierarchicalResourceLock(i.getArgument(0), i.getArgument(1), true);
@@ -338,7 +340,8 @@ public class TestOmSnapshotLocalDataManager {
                  read ? localDataManager.getOmSnapshotLocalData(endSnapshotId, startSnapshotId) :
                      localDataManager.getWritableOmSnapshotLocalData(endSnapshotId, startSnapshotId)) {
           OmSnapshotLocalData snapshotLocalData = omSnapshotLocalDataProvider.getSnapshotLocalData();
-          OmSnapshotLocalData previousSnapshot = omSnapshotLocalDataProvider.getPreviousSnapshotLocalData();
+          OmSnapshotLocalData previousSnapshot = omSnapshotLocalDataProvider.getPreviousSnapshotLocalData()
+              .orElse(null);
           assertEquals(endSnapshotId, snapshotLocalData.getSnapshotId());
           if (startSnapshotId == null) {
             assertNull(previousSnapshot);
@@ -387,7 +390,7 @@ public class TestOmSnapshotLocalDataManager {
                read ? localDataManager.getOmSnapshotLocalData(snapId) :
                    localDataManager.getWritableOmSnapshotLocalData(snapId)) {
         OmSnapshotLocalData snapshotLocalData = omSnapshotLocalDataProvider.getSnapshotLocalData();
-        OmSnapshotLocalData previousSnapshot = omSnapshotLocalDataProvider.getPreviousSnapshotLocalData();
+        OmSnapshotLocalData previousSnapshot = omSnapshotLocalDataProvider.getPreviousSnapshotLocalData().orElse(null);
         assertEquals(snapId, snapshotLocalData.getSnapshotId());
         assertEquals(expectedPreviousSnapId, previousSnapshot == null ? null :
             previousSnapshot.getSnapshotId());
@@ -543,7 +546,7 @@ public class TestOmSnapshotLocalDataManager {
     if (purgeSnapshot) {
       assertThrows(NoSuchFileException.class,
           () -> localDataManager.getOmSnapshotLocalData(secondSnapId));
-      assertFalse(localDataManager.getVersionNodeMap().containsKey(secondSnapId));
+      assertFalse(localDataManager.getVersionNodeMapUnmodifiable().containsKey(secondSnapId));
     } else {
       try (ReadableOmSnapshotLocalDataProvider snap = localDataManager.getOmSnapshotLocalData(secondSnapId)) {
         OmSnapshotLocalData snapshotLocalData = snap.getSnapshotLocalData();
@@ -694,7 +697,7 @@ public class TestOmSnapshotLocalDataManager {
     }
     addVersionsToLocalData(localDataManager, snapshotIds.get(1), ImmutableMap.of(1, 3, 2, previousVersion));
     try (ReadableOmSnapshotLocalDataProvider snap = localDataManager.getOmSnapshotLocalData(snapshotIds.get(1))) {
-      assertEquals(previousVersion < snap.getPreviousSnapshotLocalData().getVersion(), snap.needsDefrag());
+      assertEquals(previousVersion < snap.getPreviousSnapshotLocalData().orElse(null).getVersion(), snap.needsDefrag());
     }
   }
 
@@ -737,7 +740,7 @@ public class TestOmSnapshotLocalDataManager {
               localDataManager.getOmSnapshotLocalData(snapId, prevSnapId) :
               localDataManager.getWritableOmSnapshotLocalData(snapId, prevSnapId)) {
             OmSnapshotLocalData snapshotLocalData = snap.getSnapshotLocalData();
-            OmSnapshotLocalData prevSnapshotLocalData = snap.getPreviousSnapshotLocalData();
+            OmSnapshotLocalData prevSnapshotLocalData = snap.getPreviousSnapshotLocalData().orElse(null);
             assertEquals(prevSnapshotLocalData.getSnapshotId(), snapshotLocalData.getPreviousSnapshotId());
             assertEquals(prevSnapId, snapshotLocalData.getPreviousSnapshotId());
             assertEquals(snapId, snapshotLocalData.getSnapshotId());
@@ -790,15 +793,17 @@ public class TestOmSnapshotLocalDataManager {
     expNotDefraggedSSTFileList.put(DIRECTORY_TABLE, Stream.of("dt1", "dt2").collect(Collectors.toList()));
 
     List<LiveFileMetaData> mockedLiveFiles = new ArrayList<>();
+    int seqNumber = 0;
     for (Map.Entry<String, List<String>> entry : expNotDefraggedSSTFileList.entrySet()) {
       String cfname = entry.getKey();
       for (String fname : entry.getValue()) {
-        mockedLiveFiles.add(createMockLiveFileMetaData("/" + fname + ".sst", cfname, "k1", "k2"));
+        mockedLiveFiles.add(createMockLiveFileMetaData("/" + fname + ".sst", cfname, "k1", "k2", seqNumber++));
       }
     }
+    int expectedDbTxSequenceNumber = seqNumber - 1;
     // Add some other column families and files that should be ignored
-    mockedLiveFiles.add(createMockLiveFileMetaData("ot1.sst", "otherTable", "k1", "k2"));
-    mockedLiveFiles.add(createMockLiveFileMetaData("ot2.sst", "otherTable", "k1", "k2"));
+    mockedLiveFiles.add(createMockLiveFileMetaData("ot1.sst", "otherTable", "k1", "k2", seqNumber++));
+    mockedLiveFiles.add(createMockLiveFileMetaData("ot2.sst", "otherTable", "k1", "k2", seqNumber));
 
     mockSnapshotStore(snapshotId, mockedLiveFiles);
     localDataManager = getNewOmSnapshotLocalDataManager();
@@ -820,6 +825,7 @@ public class TestOmSnapshotLocalDataManager {
     assertEquals(0L, localData.getLastDefragTime());
     assertTrue(localData.getNeedsDefrag());
     assertEquals(1, localData.getVersionSstFileInfos().size());
+    assertEquals(expectedDbTxSequenceNumber, localData.getDbTxSequenceNumber());
   }
 
   @Test
@@ -829,12 +835,12 @@ public class TestOmSnapshotLocalDataManager {
     // Setup snapshot store mock
 
     List<LiveFileMetaData> sstFiles = new ArrayList<>();
-    sstFiles.add(createMockLiveFileMetaData("file1.sst", KEY_TABLE, "key1", "key7"));
-    sstFiles.add(createMockLiveFileMetaData("file2.sst", KEY_TABLE, "key3", "key9"));
-    sstFiles.add(createMockLiveFileMetaData("file3.sst", FILE_TABLE, "key1", "key7"));
-    sstFiles.add(createMockLiveFileMetaData("file4.sst", FILE_TABLE, "key1", "key7"));
-    sstFiles.add(createMockLiveFileMetaData("file5.sst", DIRECTORY_TABLE, "key1", "key7"));
-    sstFiles.add(createMockLiveFileMetaData("file6.sst", "colFamily1", "key1", "key7"));
+    sstFiles.add(createMockLiveFileMetaData("file1.sst", KEY_TABLE, "key1", "key7", 10));
+    sstFiles.add(createMockLiveFileMetaData("file2.sst", KEY_TABLE, "key3", "key9", 20));
+    sstFiles.add(createMockLiveFileMetaData("file3.sst", FILE_TABLE, "key1", "key7", 30));
+    sstFiles.add(createMockLiveFileMetaData("file4.sst", FILE_TABLE, "key1", "key7", 100));
+    sstFiles.add(createMockLiveFileMetaData("file5.sst", DIRECTORY_TABLE, "key1", "key7", 5000));
+    sstFiles.add(createMockLiveFileMetaData("file6.sst", "colFamily1", "key1", "key7", 6000));
     List<SstFileInfo> sstFileInfos = IntStream.range(0, sstFiles.size() - 1)
         .mapToObj(sstFiles::get).map(lfm ->
             new SstFileInfo(lfm.fileName().replace(".sst", ""),
@@ -856,6 +862,7 @@ public class TestOmSnapshotLocalDataManager {
       assertEquals(expectedVersionMeta, versionMeta);
       // New Snapshot create needs to be defragged always.
       assertTrue(snapshotLocalData.needsDefrag());
+      assertEquals(5000, snapshotLocalData.getSnapshotLocalData().getDbTxSequenceNumber());
     }
   }
 
@@ -964,7 +971,7 @@ public class TestOmSnapshotLocalDataManager {
 
     assertNotNull(localDataManager);
     Map<UUID, OmSnapshotLocalDataManager.SnapshotVersionsMeta> versionMap =
-        localDataManager.getVersionNodeMap();
+        localDataManager.getVersionNodeMapUnmodifiable();
     assertEquals(2, versionMap.size());
     assertEquals(versionMap.keySet(), new HashSet<>(versionIds));
   }
@@ -994,7 +1001,7 @@ public class TestOmSnapshotLocalDataManager {
     when(layoutVersionManager.isAllowed(eq(OMLayoutFeature.SNAPSHOT_DEFRAG))).thenReturn(!needsUpgrade);
     localDataManager = getNewOmSnapshotLocalDataManager(mockedProvider);
     if (needsUpgrade) {
-      assertEquals(ImmutableSet.of(snap1, snap2, snap3), localDataManager.getVersionNodeMap().keySet());
+      assertEquals(ImmutableSet.of(snap1, snap2, snap3), localDataManager.getVersionNodeMapUnmodifiable().keySet());
       Map<UUID, UUID> previousMap = ImmutableMap.of(snap2, snap3, snap1, snap2);
       Map<UUID, Map<Integer, OmSnapshotLocalData.VersionMeta>> expectedSstFile = ImmutableMap.of(
           snap3, ImmutableMap.of(0,
@@ -1005,17 +1012,61 @@ public class TestOmSnapshotLocalDataManager {
                   new SstFileInfo(snap1.toString(), snap1 + "k1", snap1 + "k2", KEY_TABLE)))),
           snap2, ImmutableMap.of(0,
               new OmSnapshotLocalData.VersionMeta(0, ImmutableList.of())));
-      for (UUID snapshotId : localDataManager.getVersionNodeMap().keySet()) {
+      for (UUID snapshotId : localDataManager.getVersionNodeMapUnmodifiable().keySet()) {
         try (ReadableOmSnapshotLocalDataProvider readableOmSnapshotLocalDataProvider =
                  localDataManager.getOmSnapshotLocalData(snapshotId)) {
           OmSnapshotLocalData snapshotLocalData = readableOmSnapshotLocalDataProvider.getSnapshotLocalData();
           assertEquals(snapshotId, snapshotLocalData.getSnapshotId());
           assertEquals(previousMap.get(snapshotId), snapshotLocalData.getPreviousSnapshotId());
           assertEquals(expectedSstFile.get(snapshotId), snapshotLocalData.getVersionSstFileInfos());
+          assertTrue(readableOmSnapshotLocalDataProvider.needsDefrag());
+          assertTrue(snapshotLocalData.getNeedsDefrag());
         }
       }
     } else {
-      assertEquals(ImmutableSet.of(), localDataManager.getVersionNodeMap().keySet());
+      assertEquals(ImmutableSet.of(), localDataManager.getVersionNodeMapUnmodifiable().keySet());
+    }
+  }
+
+  /**
+   * Regression test for NullPointerException in OmSnapshotManager#createCacheLoader.
+   * <p>
+   * isSnapshotPurged() now falls back to transactionInfo when getTableKey() returns null.
+   * A null transactionInfo means no purge was ever recorded for this snapshot in its YAML,
+   * so the snapshot is treated as active and the orphan check should correctly skip it.
+   */
+  @Test
+  public void testCheckOrphanSnapshotVersionsWithStaleSnapshotChain() throws IOException {
+    localDataManager = getNewOmSnapshotLocalDataManager();
+    UUID snapshotId = createSnapshotLocalData(localDataManager, 1).get(0);
+
+    // Snapshot must be in versionNodeMap before the orphan check.
+    assertNotNull(localDataManager.getVersionNodeMapUnmodifiable().get(snapshotId));
+
+    // Use the real isSnapshotPurged
+    snapshotUtilMock.when(() -> OmSnapshotManager.isSnapshotPurged(any(), any(), any(), any()))
+        .thenCallRealMethod();
+
+    // Simulate a stale SnapshotChainManager: getTableKey returns null for the
+    // snapshot because the snapshot chain has not been correctly updated
+    SnapshotChainManager staleChain = mock(SnapshotChainManager.class);
+    when(staleChain.getTableKey(snapshotId)).thenReturn(null);
+
+    localDataManager.checkOrphanSnapshotVersions(omMetadataManager, staleChain, snapshotId);
+
+    // Before the fix: isSnapshotPurged returned true for any null tableKey, so the snapshot
+    // was removed from versionNodeMap. getMeta() then returned null, causing NullPointerException
+
+    // After the fix: null transactionInfo means no purge has been recorded, assuming active snapshot.
+    // versionNodeMap entry will survive the orphan check. getMeta() will be non-null.
+
+    assertNotNull(localDataManager.getVersionNodeMapUnmodifiable().get(snapshotId),
+        "Active snapshot was removed erroneously from versionNodeMap due to stale SnapshotChainManager");
+
+    try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataMetaProvider provider =
+             localDataManager.getOmSnapshotLocalDataMeta(snapshotId)) {
+      assertNotNull(provider.getMeta(),
+          "getMeta() returned null. Calling getVersion() on it throws NullPointerException");
     }
   }
 
@@ -1060,11 +1111,17 @@ public class TestOmSnapshotLocalDataManager {
 
   private LiveFileMetaData createMockLiveFileMetaData(String fileName, String columnFamilyName, String smallestKey,
       String largestKey) {
+    return createMockLiveFileMetaData(fileName, columnFamilyName, smallestKey, largestKey, 0);
+  }
+
+  private LiveFileMetaData createMockLiveFileMetaData(String fileName, String columnFamilyName, String smallestKey,
+      String largestKey, long largestSeqNumber) {
     LiveFileMetaData liveFileMetaData = mock(LiveFileMetaData.class);
     when(liveFileMetaData.columnFamilyName()).thenReturn(StringUtils.string2Bytes(columnFamilyName));
     when(liveFileMetaData.fileName()).thenReturn(fileName);
     when(liveFileMetaData.smallestKey()).thenReturn(StringUtils.string2Bytes(smallestKey));
     when(liveFileMetaData.largestKey()).thenReturn(StringUtils.string2Bytes(largestKey));
+    when(liveFileMetaData.largestSeqno()).thenReturn(largestSeqNumber);
     return liveFileMetaData;
   }
 
@@ -1074,7 +1131,7 @@ public class TestOmSnapshotLocalDataManager {
     sstFiles.add(createMockLiveFileMetaData("file2.sst", "columnFamily1", "key3", "key10"));
     sstFiles.add(createMockLiveFileMetaData("file3.sst", "columnFamily2", "key1", "key8"));
     sstFiles.add(createMockLiveFileMetaData("file4.sst", "columnFamily2", "key0", "key10"));
-    return new OmSnapshotLocalData(snapshotId, sstFiles, previousSnapshotId, null);
+    return new OmSnapshotLocalData(snapshotId, sstFiles, previousSnapshotId, null, 10);
   }
 
   private void createSnapshotLocalDataFile(UUID snapshotId, UUID previousSnapshotId)
@@ -1092,5 +1149,39 @@ public class TestOmSnapshotLocalDataManager {
     // This is a simplified version - in real implementation, 
     // you would use the YamlSerializer
     snapshotLocalDataYamlSerializer.save(filePath.toFile(), localData);
+  }
+
+  /**
+   * Tests the fix for the NoSuchFileException : when a purged snapshot (last in chain)
+   * has all its versions removed and YAML deleted by orphan check, it must NOT be
+   * re-added to snapshotToBeCheckedForOrphans. Otherwise the next orphan check run
+   * would try to load the deleted YAML and throw NoSuchFileException.
+   *
+   */
+  @Test
+  public void testPurgedSnapshotNotReAddedAfterYamlDeleted() throws Exception {
+    localDataManager = getNewOmSnapshotLocalDataManager();
+    List<UUID> snapshotIds = createSnapshotLocalData(localDataManager, 2);
+    UUID secondSnapId = snapshotIds.get(1);
+    // Simulate purge: set transactionInfo on S2's YAML (purge does this before orphan check runs)
+    try (WritableOmSnapshotLocalDataProvider writableProvider =
+             localDataManager.getWritableOmSnapshotLocalData(secondSnapId)) {
+      writableProvider.setTransactionInfo(TransactionInfo.valueOf(1, 1));
+      writableProvider.commit();
+    }
+    // S2 is last in chain - mark as purged so all versions get removed
+    purgedSnapshotIdMap.put(secondSnapId, true);
+    // Simulate purge adding S2 to orphan check list
+    localDataManager.getSnapshotToBeCheckedForOrphans().clear();
+    localDataManager.getSnapshotToBeCheckedForOrphans().put(secondSnapId, 1);
+    // Run full orphan check
+    java.lang.reflect.Method method = OmSnapshotLocalDataManager.class.getDeclaredMethod(
+        "checkOrphanSnapshotVersions", OMMetadataManager.class,
+        org.apache.hadoop.ozone.om.SnapshotChainManager.class);
+    method.setAccessible(true);
+    method.invoke(localDataManager, omMetadataManager, null);
+    // S2 should NOT be in the map
+    assertFalse(localDataManager.getSnapshotToBeCheckedForOrphans().containsKey(secondSnapId),
+        "Purged snapshot should not be re-added after YAML deleted");
   }
 }

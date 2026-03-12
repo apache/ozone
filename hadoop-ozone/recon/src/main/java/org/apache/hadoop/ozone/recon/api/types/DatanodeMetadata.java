@@ -18,8 +18,8 @@
 package org.apache.hadoop.ozone.recon.api.types;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.google.common.base.Preconditions;
 import java.util.List;
+import java.util.Objects;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
@@ -272,8 +272,8 @@ public final class DatanodeMetadata {
      * @return instance of DatanodeMetadata.
      */
     public DatanodeMetadata build() {
-      Preconditions.checkNotNull(hostname);
-      Preconditions.checkNotNull(state);
+      Objects.requireNonNull(hostname, "hostname == null");
+      Objects.requireNonNull(state, "state == null");
 
       return new DatanodeMetadata(this);
     }

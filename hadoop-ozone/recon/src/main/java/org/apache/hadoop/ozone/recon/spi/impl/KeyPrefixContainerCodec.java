@@ -19,10 +19,10 @@ package org.apache.hadoop.ozone.recon.spi.impl;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-import com.google.common.base.Preconditions;
 import com.google.common.primitives.Longs;
 import jakarta.annotation.Nonnull;
 import java.nio.ByteBuffer;
+import java.util.Objects;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop.hdds.utils.db.Codec;
 import org.apache.hadoop.hdds.utils.db.CodecBuffer;
@@ -63,7 +63,7 @@ public final class KeyPrefixContainerCodec
 
   @Override
   public CodecBuffer toCodecBuffer(@Nonnull KeyPrefixContainer object, CodecBuffer.Allocator allocator) {
-    Preconditions.checkNotNull(object, "Null object can't be converted to CodecBuffer.");
+    Objects.requireNonNull(object, "Null object can't be converted to CodecBuffer.");
 
     final byte[] keyPrefixBytes = object.getKeyPrefix().getBytes(UTF_8);
     int totalSize = keyPrefixBytes.length;
@@ -141,7 +141,7 @@ public final class KeyPrefixContainerCodec
 
   @Override
   public byte[] toPersistedFormat(KeyPrefixContainer keyPrefixContainer) {
-    Preconditions.checkNotNull(keyPrefixContainer,
+    Objects.requireNonNull(keyPrefixContainer,
             "Null object can't be converted to byte array.");
     byte[] keyPrefixBytes = keyPrefixContainer.getKeyPrefix().getBytes(UTF_8);
 

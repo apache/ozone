@@ -68,7 +68,6 @@ import org.apache.hadoop.ozone.om.helpers.OmMultipartKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmMultipartUpload;
 import org.apache.hadoop.ozone.om.helpers.OmPrefixInfo;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
-import org.apache.hadoop.ozone.om.helpers.OzoneFSUtils;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.SnapshotInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
@@ -591,7 +590,6 @@ public final class OMRequestTestUtils {
         .setVolumeName(volumeName)
         .setBucketName(bucketName)
         .setKeyName(keyName)
-        .setFileName(OzoneFSUtils.getFileName(keyName))
         .setReplicationConfig(replicationConfig)
         .setObjectID(0L)
         .setUpdateID(0L)
@@ -613,7 +611,7 @@ public final class OMRequestTestUtils {
   public static OmDirectoryInfo createOmDirectoryInfo(String keyName,
       long objectID,
       long parentObjID) {
-    return new OmDirectoryInfo.Builder()
+    return OmDirectoryInfo.newBuilder()
         .setName(keyName)
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())

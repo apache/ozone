@@ -24,6 +24,7 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProt
 import com.google.common.base.Preconditions;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
+import jakarta.annotation.Nullable;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -31,6 +32,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -42,6 +44,7 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionInfo;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.GetScmInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.TransferLeadershipRequestProto;
@@ -78,6 +81,8 @@ import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolPro
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainerWithPipelineRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainersOnDecomNodeRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetContainersOnDecomNodeResponseProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetDeletedBlocksTxnSummaryRequestProto;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetDeletedBlocksTxnSummaryResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetExistContainerWithPipelinesInBatchRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetMetricsRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.GetMetricsResponseProto;
@@ -132,14 +137,16 @@ import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
 import org.apache.hadoop.io.retry.RetryProxy;
-import org.apache.hadoop.ipc.ProtobufHelper;
-import org.apache.hadoop.ipc.ProtocolTranslator;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc_.ProtobufHelper;
+import org.apache.hadoop.ipc_.ProtocolTranslator;
+import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ozone.ClientVersion;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization.StatusAndMessages;
 import org.apache.hadoop.ozone.util.ProtobufUtils;
 import org.apache.hadoop.security.token.Token;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class is the client-side translator to translate the requests made on
@@ -157,6 +164,9 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   private final StorageContainerLocationProtocolPB rpcProxy;
   private final SCMContainerLocationFailoverProxyProvider fpp;
+  private final ScmNodeTarget targetScmNode;
+  private static final Logger LOG =
+      LoggerFactory.getLogger(StorageContainerLocationProtocolClientSideTranslatorPB.class);
 
   /**
    * Creates a new StorageContainerLocationProtocolClientSideTranslatorPB.
@@ -165,8 +175,20 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
    */
   public StorageContainerLocationProtocolClientSideTranslatorPB(
       SCMContainerLocationFailoverProxyProvider proxyProvider) {
-    Preconditions.checkNotNull(proxyProvider);
+    this(proxyProvider, null);
+  }
+
+  /**
+   * Creates a new StorageContainerLocationProtocolClientSideTranslatorPB with a ScmNodeTarget.
+   *
+   * @param proxyProvider {@link SCMContainerLocationFailoverProxyProvider}
+   * @param targetScmNode {@link ScmNodeTarget} to route requests to specific SCM nodes
+   */
+  public StorageContainerLocationProtocolClientSideTranslatorPB(
+      SCMContainerLocationFailoverProxyProvider proxyProvider, ScmNodeTarget targetScmNode) {
+    Objects.requireNonNull(proxyProvider, "proxyProvider == null");
     this.fpp = proxyProvider;
+    this.targetScmNode = targetScmNode;
     this.rpcProxy = (StorageContainerLocationProtocolPB) RetryProxy.create(
         StorageContainerLocationProtocolPB.class,
         fpp,
@@ -197,6 +219,17 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
 
   private ScmContainerLocationResponse submitRpcRequest(
       ScmContainerLocationRequest wrapper) throws ServiceException {
+    // If targetScmNode has a specific node ID, route follower-readable requests to that node
+    if (targetScmNode != null && targetScmNode.hasNodeId() && 
+        FOLLOWER_READABLE_COMMAND_TYPES.contains(wrapper.getCmdType())) {
+      try {
+        StorageContainerLocationProtocolPB proxy = fpp.getProxyForNode(targetScmNode.getNodeId());
+        return proxy.submitRequest(NULL_RPC_CONTROLLER, wrapper);
+      } catch (IOException e) {
+        throw new ServiceException("Failed to get proxy for node: " + targetScmNode.getNodeId(), e);
+      }
+    }
+
     if (!ADMIN_COMMAND_TYPE.contains(wrapper.getCmdType())) {
       return rpcProxy.submitRequest(NULL_RPC_CONTROLLER, wrapper);
     }
@@ -551,7 +584,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   @Override
   public List<DatanodeAdminError> decommissionNodes(List<String> nodes, boolean force)
       throws IOException {
-    Preconditions.checkNotNull(nodes);
+    Objects.requireNonNull(nodes, "nodes == null");
     DecommissionNodesRequestProto request =
         DecommissionNodesRequestProto.newBuilder()
         .addAllHosts(nodes).setForce(force)
@@ -575,7 +608,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   @Override
   public List<DatanodeAdminError> recommissionNodes(List<String> nodes)
       throws IOException {
-    Preconditions.checkNotNull(nodes);
+    Objects.requireNonNull(nodes, "nodes == null");
     RecommissionNodesRequestProto request =
         RecommissionNodesRequestProto.newBuilder()
             .addAllHosts(nodes)
@@ -604,7 +637,7 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
   @Override
   public List<DatanodeAdminError> startMaintenanceNodes(
       List<String> nodes, int endInHours, boolean force) throws IOException {
-    Preconditions.checkNotNull(nodes);
+    Objects.requireNonNull(nodes, "nodes == null");
     StartMaintenanceNodesRequestProto request =
         StartMaintenanceNodesRequestProto.newBuilder()
             .addAllHosts(nodes)
@@ -801,6 +834,18 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     return 0;
   }
 
+  @Nullable
+  @Override
+  public DeletedBlocksTransactionSummary getDeletedBlockSummary() throws IOException {
+    GetDeletedBlocksTxnSummaryRequestProto request =
+        GetDeletedBlocksTxnSummaryRequestProto.newBuilder().build();
+    ScmContainerLocationResponse scmContainerLocationResponse = submitRequest(Type.GetDeletedBlocksTransactionSummary,
+        builder -> builder.setGetDeletedBlocksTxnSummaryRequest(request));
+    GetDeletedBlocksTxnSummaryResponseProto response =
+        scmContainerLocationResponse.getGetDeletedBlocksTxnSummaryResponse();
+    return response.hasSummary() ? response.getSummary() : null;
+  }
+
   /**
    * Check if SCM is in safe mode.
    *
@@ -826,13 +871,21 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         submitRequest(Type.GetSafeModeRuleStatuses,
             builder -> builder.setGetSafeModeRuleStatusesRequest(request))
             .getGetSafeModeRuleStatusesResponse();
-    Map<String, Pair<Boolean, String>> map = new HashMap();
-    for (SafeModeRuleStatusProto statusProto :
-        response.getSafeModeRuleStatusesProtoList()) {
-      map.put(statusProto.getRuleName(),
+    return buildSafeModeRuleStatusesMap(response);
+  }
+
+  /**
+   * Helper method to build a map from GetSafeModeRuleStatusesResponseProto.
+   * Extracts rule names and their status information.
+   */
+  private Map<String, Pair<Boolean, String>> buildSafeModeRuleStatusesMap(
+      GetSafeModeRuleStatusesResponseProto response) {
+    Map<String, Pair<Boolean, String>> ruleStatuses = new HashMap<>();
+    for (SafeModeRuleStatusProto statusProto : response.getSafeModeRuleStatusesProtoList()) {
+      ruleStatuses.put(statusProto.getRuleName(),
           Pair.of(statusProto.getValidate(), statusProto.getStatusText()));
     }
-    return map;
+    return ruleStatuses;
   }
 
   /**
@@ -912,7 +965,9 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
       Optional<Integer> moveReplicationTimeout,
       Optional<Boolean> networkTopologyEnable,
       Optional<String> includeNodes,
-      Optional<String> excludeNodes) throws IOException {
+      Optional<String> excludeNodes,
+      Optional<String> excludeContainers,
+      Optional<String> includeContainers) throws IOException {
     StartContainerBalancerRequestProto.Builder builder =
         StartContainerBalancerRequestProto.newBuilder();
     builder.setTraceID(TracingUtil.exportCurrentSpan());
@@ -996,6 +1051,16 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
     if (excludeNodes.isPresent()) {
       String ex = excludeNodes.get();
       builder.setExcludeNodes(ex);
+    }
+
+    if (excludeContainers.isPresent()) {
+      String ec = excludeContainers.get();
+      builder.setExcludeContainers(ec);
+    }
+
+    if (includeContainers.isPresent()) {
+      String ic = includeContainers.get();
+      builder.setIncludeContainers(ic);
     }
 
     StartContainerBalancerRequestProto request = builder.build();
@@ -1222,5 +1287,25 @@ public final class StorageContainerLocationProtocolClientSideTranslatorPB
         .build();
     // TODO check error handling.
     submitRequest(Type.ReconcileContainer, builder -> builder.setReconcileContainerRequest(request));
+  }
+
+  /**
+   * Holder class to store the target SCM node ID for routing requests.
+   * This allows requests to be directed to specific SCM nodes in an HA cluster.
+   */
+  public static class ScmNodeTarget {
+    private String nodeId;
+
+    public String getNodeId() {
+      return nodeId;
+    }
+
+    public void setNodeId(String nodeId) {
+      this.nodeId = nodeId;
+    }
+
+    public boolean hasNodeId() {
+      return nodeId != null && !nodeId.isEmpty();
+    }
   }
 }

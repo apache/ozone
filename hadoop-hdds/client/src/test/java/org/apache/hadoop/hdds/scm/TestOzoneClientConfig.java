@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.time.Duration;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.junit.jupiter.api.Test;
 
@@ -75,5 +76,19 @@ class TestOzoneClientConfig {
     assertFalse(subject.getIncrementalChunkList());
     assertFalse(subject.getEnablePutblockPiggybacking());
     assertEquals(1, subject.getMaxConcurrentWritePerKey());
+  }
+
+  @Test
+  public void testStreamReadConfigParsing() {
+    OzoneConfiguration conf = new OzoneConfiguration();
+    conf.set("ozone.client.stream.read.pre-read-size", "67108864");
+    conf.set("ozone.client.stream.read.response-data-size", "2097152");
+    conf.set("ozone.client.stream.read.timeout", "5s");
+
+    OzoneClientConfig clientConfig = conf.getObject(OzoneClientConfig.class);
+
+    assertEquals(64L << 20, clientConfig.getStreamReadPreReadSize());
+    assertEquals(2 << 20, clientConfig.getStreamReadResponseDataSize());
+    assertEquals(Duration.ofSeconds(5), clientConfig.getStreamReadTimeout());
   }
 }

@@ -422,7 +422,9 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
     deleteObjectTaggingFailure.snapshot(recordBuilder, true);
     deleteObjectTaggingFailureLatencyNs.snapshot(recordBuilder, true);
     putObjectAclSuccess.snapshot(recordBuilder, true);
+    putObjectAclSuccessLatencyNs.snapshot(recordBuilder, true);
     putObjectAclFailure.snapshot(recordBuilder, true);
+    putObjectAclFailureLatencyNs.snapshot(recordBuilder, true);
   }
 
   // INC and UPDATE

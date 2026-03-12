@@ -91,7 +91,6 @@
     <dependency>
       <groupId>org.apache.ozone</groupId>
       <artifactId>hdds-test-utils</artifactId>
-      <type>test-jar</type>
     </dependency>
     <dependency>
       <groupId>org.apache.ozone</groupId>
@@ -108,6 +107,10 @@
     <dependency>
       <groupId>org.apache.ratis</groupId>
       <artifactId>ratis-common</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.ratis</groupId>
+      <artifactId>ratis-server-api</artifactId>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>

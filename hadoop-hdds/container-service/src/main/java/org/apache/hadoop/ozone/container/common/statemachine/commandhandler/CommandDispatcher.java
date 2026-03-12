@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto.Type;
 import org.apache.hadoop.hdfs.util.EnumCounters;
 import org.apache.hadoop.ozone.container.common.helpers.CommandHandlerMetrics;
@@ -91,7 +92,7 @@ public final class CommandDispatcher {
    * @param command - SCM Command.
    */
   public void handle(SCMCommand<?> command) {
-    Preconditions.checkNotNull(command);
+    Objects.requireNonNull(command, "command == null");
     CommandHandler handler = handlerMap.get(command.getType());
     if (handler != null) {
       commandHandlerMetrics.increaseCommandCount(command.getType());
@@ -153,7 +154,7 @@ public final class CommandDispatcher {
      * @return Builder
      */
     public Builder addHandler(CommandHandler handler) {
-      Preconditions.checkNotNull(handler);
+      Objects.requireNonNull(handler, "handler == null");
       handlerList.add(handler);
       return this;
     }
@@ -165,7 +166,7 @@ public final class CommandDispatcher {
      * @return Builder
      */
     public Builder setContainer(OzoneContainer ozoneContainer) {
-      Preconditions.checkNotNull(ozoneContainer);
+      Objects.requireNonNull(ozoneContainer,  "ozoneContainer == null");
       this.container = ozoneContainer;
       return this;
     }
@@ -178,7 +179,7 @@ public final class CommandDispatcher {
      */
     public Builder setConnectionManager(SCMConnectionManager
         scmConnectionManager) {
-      Preconditions.checkNotNull(scmConnectionManager);
+      Objects.requireNonNull(scmConnectionManager, "scmConnectionManager == null");
       this.connectionManager = scmConnectionManager;
       return this;
     }
@@ -190,7 +191,7 @@ public final class CommandDispatcher {
      * @return this
      */
     public Builder setContext(StateContext stateContext) {
-      Preconditions.checkNotNull(stateContext);
+      Objects.requireNonNull(stateContext, "stateContext == null");
       this.context = stateContext;
       return this;
     }
@@ -200,10 +201,9 @@ public final class CommandDispatcher {
      * @return Command Dispatcher.
      */
     public CommandDispatcher build() {
-      Preconditions.checkNotNull(this.connectionManager,
-          "Missing scm connection manager.");
-      Preconditions.checkNotNull(this.container, "Missing ozone container.");
-      Preconditions.checkNotNull(this.context, "Missing state context.");
+      Objects.requireNonNull(connectionManager, "connectionManager == null");
+      Objects.requireNonNull(container, "container == null");
+      Objects.requireNonNull(context, "context == null");
       Preconditions.checkArgument(!this.handlerList.isEmpty(),
           "The number of command handlers must be greater than 0.");
       return new CommandDispatcher(this.container, this.connectionManager,

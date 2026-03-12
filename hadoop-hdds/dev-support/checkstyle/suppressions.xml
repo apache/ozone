@@ -22,4 +22,5 @@
   <suppress checks="IllegalImport" files="src/test/java/org/apache/hadoop/fs/contract/.*java"/>
   <suppress checks="MissingJavadocType" files="src/test/java/org/apache/hadoop/fs/contract/.*java"/>
   <suppress checks="IllegalImport" files="src/test/java/org/apache/hadoop/tools/contract/.*java"/>
+  <suppress checks=".*" files="src/main/java/org/apache/hadoop/.*_/.*java"/>
 </suppressions>

@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.om;
 
 import static org.apache.commons.io.file.PathUtils.copyDirectory;
 import static org.apache.hadoop.hdds.utils.HAUtils.getExistingFiles;
+import static org.apache.hadoop.hdds.utils.IOUtils.getINode;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_CHECKPOINT_DIR;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
@@ -29,7 +30,6 @@ import static org.apache.hadoop.ozone.om.OMDBCheckpointServlet.processFile;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.OM_HARDLINK_FILE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.BUCKET_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.VOLUME_TABLE;
-import static org.apache.hadoop.ozone.om.snapshot.OmSnapshotUtils.getINode;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -65,6 +65,7 @@ import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.scm.HddsWhiteboxTestUtils;
 import org.apache.hadoop.hdds.utils.db.DBStore;
+import org.apache.hadoop.hdds.utils.db.InodeMetadataRocksDBCheckpoint;
 import org.apache.hadoop.hdds.utils.db.RDBBatchOperation;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.Table;
@@ -222,7 +223,7 @@ class TestOmSnapshotManager {
 
     snapshotChainManager.addSnapshot(first);
     snapshotChainManager.addSnapshot(second);
-    RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
+    RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation();
     // create the first snapshot checkpoint
     OmSnapshotManager.createOmSnapshotCheckpoint(om.getMetadataManager(),
         first, rdbBatchOperation);
@@ -237,7 +238,7 @@ class TestOmSnapshotManager {
         firstSnapshot.getMetadataManager(), "store", firstSnapshotStore);
 
     // create second snapshot checkpoint (which will be used for eviction)
-    rdbBatchOperation = new RDBBatchOperation();
+    rdbBatchOperation = RDBBatchOperation.newAtomicOperation();
     OmSnapshotManager.createOmSnapshotCheckpoint(om.getMetadataManager(),
         second, rdbBatchOperation);
     om.getMetadataManager().getStore().commitBatchOperation(rdbBatchOperation);
@@ -378,20 +379,26 @@ class TestOmSnapshotManager {
     Files.move(hardLinkList, Paths.get(candidateDir.toString(),
         OM_HARDLINK_FILE));
 
-    // Pointers to follower links to be created.
-    File f1FileLink = new File(followerSnapDir2, "f1.sst");
-    File s1FileLink = new File(followerSnapDir2, "s1.sst");
+    Path snapshot2Path = Paths.get(candidateDir.getPath(),
+        OM_SNAPSHOT_CHECKPOINT_DIR, followerSnapDir2.getName());
 
+    // Pointers to follower links to be created.
+    File f1FileLink = new File(snapshot2Path.toFile(), "f1.sst");
+    File s1FileLink = new File(snapshot2Path.toFile(), "s1.sst");
+    Object s1FileInode = getINode(s1File.toPath());
+    Object f1FileInode = getINode(f1File.toPath());
     // Create links on the follower from list.
-    OmSnapshotUtils.createHardLinks(candidateDir.toPath(), false);
+    InodeMetadataRocksDBCheckpoint obtainedCheckpoint =
+        new InodeMetadataRocksDBCheckpoint(candidateDir.toPath());
+    assertNotNull(obtainedCheckpoint);
 
     // Confirm expected follower links.
     assertTrue(s1FileLink.exists());
-    assertEquals(getINode(s1File.toPath()),
+    assertEquals(s1FileInode,
         getINode(s1FileLink.toPath()), "link matches original file");
 
     assertTrue(f1FileLink.exists());
-    assertEquals(getINode(f1File.toPath()),
+    assertEquals(f1FileInode,
         getINode(f1FileLink.toPath()), "link matches original file");
   }
 
@@ -742,7 +749,7 @@ class TestOmSnapshotManager {
     when(snapshotInfoTable.get(first.getTableKey())).thenReturn(first);
 
     // Create first checkpoint for the snapshot checkpoint
-    RDBBatchOperation rdbBatchOperation = new RDBBatchOperation();
+    RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation();
     OmSnapshotManager.createOmSnapshotCheckpoint(om.getMetadataManager(),
         first, rdbBatchOperation);
     om.getMetadataManager().getStore().commitBatchOperation(rdbBatchOperation);
@@ -751,7 +758,7 @@ class TestOmSnapshotManager {
     logCapturer.clearOutput();
 
     // Create checkpoint again for the same snapshot.
-    rdbBatchOperation = new RDBBatchOperation();
+    rdbBatchOperation = RDBBatchOperation.newAtomicOperation();
     OmSnapshotManager.createOmSnapshotCheckpoint(om.getMetadataManager(),
         first, rdbBatchOperation);
     om.getMetadataManager().getStore().commitBatchOperation(rdbBatchOperation);

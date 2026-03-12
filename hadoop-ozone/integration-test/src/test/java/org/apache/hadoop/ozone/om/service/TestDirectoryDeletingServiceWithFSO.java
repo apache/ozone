@@ -41,6 +41,7 @@ import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongSupplier;
 import org.apache.commons.lang3.RandomStringUtils;
@@ -623,9 +624,9 @@ public class TestDirectoryDeletingServiceWithFSO {
       }
       return null;
     }).when(service).optimizeDirDeletesAndSubmitRequest(anyLong(), anyLong(),
-        anyLong(), anyList(), anyList(), eq(null), anyLong(), anyLong(), any(),
+        anyLong(), anyList(), anyList(), eq(null), anyLong(), any(),
         any(ReclaimableDirFilter.class), any(ReclaimableKeyFilter.class), anyMap(), any(),
-        anyLong());
+        anyLong(), any(AtomicInteger.class));
 
     Mockito.doAnswer(i -> {
       store.createSnapshot(testVolumeName, testBucketName, snap2);
@@ -657,7 +658,23 @@ public class TestDirectoryDeletingServiceWithFSO {
     store.deleteSnapshot(testVolumeName, testBucketName, snap2);
     service.runPeriodicalTaskNow();
     store.deleteSnapshot(testVolumeName, testBucketName, snap1);
+    cluster.getOzoneManager().awaitDoubleBufferFlush();
     cluster.restartOzoneManager();
+    cluster.waitForClusterToBeReady();
+    cluster.getOzoneManager().awaitDoubleBufferFlush();
+    SnapshotDeletingService snapshotDeletingService =
+        cluster.getOzoneManager().getKeyManager().getSnapshotDeletingService();
+    GenericTestUtils.waitFor(() -> {
+      try {
+        snapshotDeletingService.runPeriodicalTaskNow();
+        cluster.getOzoneManager().awaitDoubleBufferFlush();
+        long currentSnapshotCount = cluster.getOzoneManager().getMetadataManager()
+            .countRowsInTable(cluster.getOzoneManager().getMetadataManager().getSnapshotInfoTable());
+        return currentSnapshotCount <= initialSnapshotCount;
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }, 100, 10000);
     assertTableRowCount(cluster.getOzoneManager().getMetadataManager().getSnapshotInfoTable(), initialSnapshotCount);
     dirDeletingService.resume();
   }

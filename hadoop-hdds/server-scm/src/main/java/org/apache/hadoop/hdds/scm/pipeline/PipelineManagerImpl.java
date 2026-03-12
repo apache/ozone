@@ -58,6 +58,8 @@ import org.apache.hadoop.hdds.scm.node.DatanodeInfo;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationManager;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
+import org.apache.hadoop.hdds.utils.db.CodecException;
+import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.metrics2.util.MBeans;
 import org.apache.hadoop.ozone.ClientVersion;
@@ -385,34 +387,32 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   @Override
-  public void addContainerToPipeline(
-      PipelineID pipelineID, ContainerID containerID) throws IOException {
+  public void addContainerToPipeline(PipelineID pipelineID, ContainerID containerID)
+      throws PipelineNotFoundException, InvalidPipelineStateException {
     // should not lock here, since no ratis operation happens.
     stateManager.addContainerToPipeline(pipelineID, containerID);
   }
 
   @Override
-  public void addContainerToPipelineSCMStart(
-      PipelineID pipelineID, ContainerID containerID) throws IOException {
+  public void addContainerToPipelineSCMStart(PipelineID pipelineID, ContainerID containerID)
+      throws PipelineNotFoundException {
     // should not lock here, since no ratis operation happens.
     stateManager.addContainerToPipelineForce(pipelineID, containerID);
   }
 
   @Override
-  public void removeContainerFromPipeline(
-      PipelineID pipelineID, ContainerID containerID) throws IOException {
+  public void removeContainerFromPipeline(PipelineID pipelineID, ContainerID containerID) {
     // should not lock here, since no ratis operation happens.
     stateManager.removeContainerFromPipeline(pipelineID, containerID);
   }
 
   @Override
-  public NavigableSet<ContainerID> getContainersInPipeline(
-      PipelineID pipelineID) throws IOException {
+  public NavigableSet<ContainerID> getContainersInPipeline(PipelineID pipelineID) throws PipelineNotFoundException {
     return stateManager.getContainers(pipelineID);
   }
 
   @Override
-  public int getNumberOfContainers(PipelineID pipelineID) throws IOException {
+  public int getNumberOfContainers(PipelineID pipelineID) throws PipelineNotFoundException {
     return stateManager.getNumberOfContainers(pipelineID);
   }
 
@@ -641,7 +641,7 @@ public class PipelineManagerImpl implements PipelineManager {
       if (!(node instanceof DatanodeInfo)) {
         node = nodeManager.getDatanodeInfo(node);
       }
-      if (!SCMCommonPlacementPolicy.hasEnoughSpace(node, 0, containerSize, null)) {
+      if (!SCMCommonPlacementPolicy.hasEnoughSpace(node, 0, containerSize)) {
         return false;
       }
     }
@@ -671,13 +671,8 @@ public class PipelineManagerImpl implements PipelineManager {
   }
 
   @Override
-  public int minHealthyVolumeNum(Pipeline pipeline) {
-    return nodeManager.minHealthyVolumeNum(pipeline.getNodes());
-  }
-
-  @Override
-  public int minPipelineLimit(Pipeline pipeline) {
-    return nodeManager.minPipelineLimit(pipeline.getNodes());
+  public int openContainerLimit(List<DatanodeDetails> datanodes) {
+    return nodeManager.openContainerLimit(datanodes);
   }
 
   /**
@@ -804,7 +799,7 @@ public class PipelineManagerImpl implements PipelineManager {
 
   @Override
   public void reinitialize(Table<PipelineID, Pipeline> pipelineStore)
-      throws IOException {
+      throws RocksDatabaseException, DuplicatedPipelineIdException, CodecException {
     stateManager.reinitialize(pipelineStore);
   }
 
@@ -842,8 +837,6 @@ public class PipelineManagerImpl implements PipelineManager {
 
     SCMPipelineMetrics.unRegister();
 
-    // shutdown pipeline provider.
-    pipelineFactory.shutdown();
     try {
       stateManager.close();
     } catch (Exception ex) {
@@ -950,5 +943,10 @@ public class PipelineManagerImpl implements PipelineManager {
   @Override
   public void releaseWriteLock() {
     lock.writeLock().unlock();
+  }
+
+  @Override
+  public SCMPipelineMetrics getMetrics() {
+    return metrics;
   }
 }

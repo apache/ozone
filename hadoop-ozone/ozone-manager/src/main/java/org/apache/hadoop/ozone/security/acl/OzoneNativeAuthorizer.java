@@ -194,7 +194,7 @@ public class OzoneNativeAuthorizer implements OzoneManagerAuthorizer {
     Objects.requireNonNull(om, "om == null");
     volumeManager = om.getVolumeManager();
     bucketManager = om.getBucketManager();
-    allowListAllVolumes = om::getAllowListAllVolumes;
+    allowListAllVolumes = () -> om.getConfig().isListAllVolumesAllowed();
     setAdminCheck(om::isAdmin);
     setReadOnlyAdminCheck(om::isReadOnlyAdmin);
 

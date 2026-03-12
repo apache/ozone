@@ -35,6 +35,7 @@ execute_command_in_container kms hadoop key create ${OZONE_BUCKET_KEY_NAME}
 
 execute_robot_test scm kinit.robot
 
+execute_robot_test scm cli/ozone-insight.robot
 execute_robot_test scm basic
 
 execute_robot_test scm security

@@ -29,6 +29,7 @@ import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContain
 import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import java.util.Objects;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -119,18 +120,17 @@ public final class BlockUtils {
    */
   public static DBHandle getDB(KeyValueContainerData containerData,
       ConfigurationSource conf) throws StorageContainerException {
-    Preconditions.checkNotNull(containerData);
-    Preconditions.checkNotNull(containerData.getDbFile());
-
-    String containerDBPath = containerData.getDbFile().getAbsolutePath();
+    Objects.requireNonNull(containerData, "containerData == null");
+    final File dbFile = Objects.requireNonNull(containerData.getDbFile(), "dbFile == null");
+    final String containerDBPath = dbFile.getAbsolutePath();
     try {
       if (containerData.hasSchema(OzoneConsts.SCHEMA_V3)) {
         DatanodeStoreCache cache = DatanodeStoreCache.getInstance();
-        Preconditions.checkNotNull(cache);
+        Objects.requireNonNull(cache, "cache == null");
         return cache.getDB(containerDBPath, conf);
       } else {
         ContainerCache cache = ContainerCache.getInstance(conf);
-        Preconditions.checkNotNull(cache);
+        Objects.requireNonNull(cache, "cache == null");
         return cache.getDB(containerData.getContainerID(), containerData
                 .getContainerDBType(), containerDBPath,
             containerData.getSchemaVersion(), conf);
@@ -152,12 +152,12 @@ public final class BlockUtils {
    */
   public static void removeDB(KeyValueContainerData container,
       ConfigurationSource conf) {
-    Preconditions.checkNotNull(container);
-    Preconditions.checkNotNull(container.getDbFile());
+    Objects.requireNonNull(container, "container == null");
+    Objects.requireNonNull(container.getDbFile(), "dbFile == null");
     Preconditions.checkState(!container.hasSchema(OzoneConsts.SCHEMA_V3));
 
     ContainerCache cache = ContainerCache.getInstance(conf);
-    Preconditions.checkNotNull(cache);
+    Objects.requireNonNull(cache, "cache == null");
     cache.removeDB(container.getDbFile().getAbsolutePath());
   }
 
@@ -183,11 +183,11 @@ public final class BlockUtils {
       ConfigurationSource conf, String schemaVersion) {
     if (isSameSchemaVersion(schemaVersion, OzoneConsts.SCHEMA_V3)) {
       DatanodeStoreCache cache = DatanodeStoreCache.getInstance();
-      Preconditions.checkNotNull(cache);
+      Objects.requireNonNull(cache, "cache == null");
       cache.addDB(containerDBPath, new RawDB(store, containerDBPath));
     } else {
       ContainerCache cache = ContainerCache.getInstance(conf);
-      Preconditions.checkNotNull(cache);
+      Objects.requireNonNull(cache, "cache == null");
       cache.addDB(containerDBPath,
           new ReferenceCountedDB(store, containerDBPath));
     }
@@ -221,10 +221,8 @@ public final class BlockUtils {
   public static void verifyBCSId(Container container, BlockID blockID)
       throws IOException {
     long bcsId = blockID.getBlockCommitSequenceId();
-    Preconditions.checkNotNull(blockID,
-        "BlockID cannot be null");
-    Preconditions.checkNotNull(container,
-        "Container cannot be null");
+    Objects.requireNonNull(blockID, "blockID == null");
+    Objects.requireNonNull(container, "container == null");
 
     long containerBCSId = container.getBlockCommitSequenceId();
     if (containerBCSId < bcsId) {

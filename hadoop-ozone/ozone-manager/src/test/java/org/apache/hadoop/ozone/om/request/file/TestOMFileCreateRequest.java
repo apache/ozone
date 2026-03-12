@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.request.file;
 
+import static org.apache.hadoop.ozone.om.request.OMRequestTestUtils.addVolumeAndBucketToDB;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.BUCKET_NOT_FOUND;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.DIRECTORY_NOT_FOUND;
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.FILE_ALREADY_EXISTS;
@@ -24,6 +25,7 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Status.VOLUME_NOT_FOUND;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -31,7 +33,12 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import jakarta.annotation.Nonnull;
@@ -43,8 +50,14 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.crypto.CipherSuite;
 import org.apache.hadoop.crypto.CryptoProtocolVersion;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
+import org.apache.hadoop.hdds.client.ContainerBlockID;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.scm.container.common.helpers.AllocatedBlock;
+import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
+import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
+import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BucketEncryptionKeyInfo;
@@ -52,6 +65,7 @@ import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
 import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
+import org.apache.hadoop.ozone.om.lock.OzoneLockProvider;
 import org.apache.hadoop.ozone.om.request.OMRequestTestUtils;
 import org.apache.hadoop.ozone.om.request.key.TestOMKeyRequest;
 import org.apache.hadoop.ozone.om.response.OMClientResponse;
@@ -63,6 +77,7 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Tests OMFileCreateRequest.
@@ -521,6 +536,40 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
   }
 
   @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testIgnoreClientACL(boolean ignoreClientACLs) throws Exception {
+    ozoneManager.getConfig().setIgnoreClientACLs(ignoreClientACLs);
+    when(ozoneManager.getOzoneLockProvider()).thenReturn(new OzoneLockProvider(true, true));
+    addVolumeAndBucketToDB(volumeName, bucketName, omMetadataManager, getBucketLayout());
+    // create file
+    String ozoneAll = "user:ozone:a";
+    List<OzoneAcl> aclList = new ArrayList<>();
+    aclList.add(OzoneAcl.parseAcl(ozoneAll));
+
+    // Recursive create file with acls inherited from bucket DEFAULT acls
+    OMRequest omRequest = createFileRequest(volumeName, bucketName,
+        keyName, HddsProtos.ReplicationFactor.ONE,
+        HddsProtos.ReplicationType.RATIS, false, true, aclList);
+
+    OMFileCreateRequest omFileCreateRequest = getOMFileCreateRequest(omRequest);
+    OMRequest modifiedOmRequest = omFileCreateRequest.preExecute(ozoneManager);
+    long id = modifiedOmRequest.getCreateFileRequest().getClientID();
+
+    omFileCreateRequest = getOMFileCreateRequest(modifiedOmRequest);
+    OMClientResponse omFileCreateResponse =
+        omFileCreateRequest.validateAndUpdateCache(ozoneManager, 100L);
+    assertEquals(OzoneManagerProtocolProtos.Status.OK,
+        omFileCreateResponse.getOMResponse().getStatus());
+
+    OmKeyInfo omKeyInfo = verifyPathInOpenKeyTable(keyName, id, true);
+    if (ignoreClientACLs) {
+      assertFalse(omKeyInfo.getAcls().contains(OzoneAcl.parseAcl(ozoneAll)));
+    } else {
+      assertTrue(omKeyInfo.getAcls().contains(OzoneAcl.parseAcl(ozoneAll)));
+    }
+  }
+
+  @ParameterizedTest
   @CsvSource(value = {
       ".snapshot/keyName,Cannot create key under path reserved for snapshot: .snapshot/",
       ".snapshot/a/keyName,Cannot create key under path reserved for snapshot: .snapshot/",
@@ -617,11 +666,27 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
       HddsProtos.ReplicationFactor replicationFactor,
       HddsProtos.ReplicationType replicationType, boolean overWrite,
       boolean recursive) {
+    return createFileRequest(volumeName, bucketName, keyName, replicationFactor,
+        replicationType, overWrite, recursive, null);
+  }
+
+  @SuppressWarnings("checkstyle:ParameterNumber")
+  @Nonnull
+  protected OMRequest createFileRequest(
+      String volumeName, String bucketName, String keyName,
+      HddsProtos.ReplicationFactor replicationFactor,
+      HddsProtos.ReplicationType replicationType, boolean overWrite,
+      boolean recursive, List<OzoneAcl> acls) {
 
     KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
             .setVolumeName(volumeName).setBucketName(bucketName)
             .setKeyName(keyName).setFactor(replicationFactor)
             .setType(replicationType).setDataSize(dataSize);
+    if (acls != null) {
+      for (OzoneAcl acl : acls) {
+        keyArgs.addAcls(OzoneAcl.toProtobuf(acl));
+      }
+    }
 
     CreateFileRequest createFileRequest = CreateFileRequest.newBuilder()
         .setKeyArgs(keyArgs)
@@ -633,6 +698,119 @@ public class TestOMFileCreateRequest extends TestOMKeyRequest {
         .setClientId(UUID.randomUUID().toString())
         .setCreateFileRequest(createFileRequest).build();
 
+  }
+
+  /**
+   * Test that SCM's allocateBlock is still called when creating an empty file.
+   */
+  @Test
+  public void testZeroSizedFileShouldCallAllocateBlock() throws Exception {
+    KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
+        .setVolumeName(volumeName).setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setFactor(HddsProtos.ReplicationFactor.ONE)
+        .setType(HddsProtos.ReplicationType.RATIS)
+        .setDataSize(0);  // Set data size to 0 for empty file
+
+    CreateFileRequest createFileRequest = CreateFileRequest.newBuilder()
+        .setKeyArgs(keyArgs)
+        .setIsOverwrite(false)
+        .setIsRecursive(true).build();
+
+    OMRequest omRequest = OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.CreateFile)
+        .setClientId(UUID.randomUUID().toString())
+        .setCreateFileRequest(createFileRequest).build();
+
+    OMFileCreateRequest omFileCreateRequest = getOMFileCreateRequest(omRequest);
+
+    OMRequest modifiedOmRequest = omFileCreateRequest.preExecute(ozoneManager);
+
+    // Verify that SCM's allocateBlock is always called
+    verify(scmBlockLocationProtocol, atLeastOnce())
+        .allocateBlock(anyLong(), anyInt(),
+            any(ReplicationConfig.class), anyString(),
+            any(ExcludeList.class), anyString());
+
+    // Verify key locations are present in the response
+    assertTrue(modifiedOmRequest.hasCreateFileRequest());
+    CreateFileRequest responseCreateFileRequest =
+        modifiedOmRequest.getCreateFileRequest();
+    assertTrue(
+        responseCreateFileRequest.getKeyArgs().getKeyLocationsCount() > 0,
+        "File with zero dataSize should still have key locations allocated");
+  }
+
+  /**
+   * Test that SCM's allocateBlock is still called when creating a file
+   * without explicitly setting dataSize (should use default scmBlockSize).
+   */
+  @Test
+  public void testFileWithoutDataSizeShouldAllocateBlock() throws Exception {
+    // Setup mock to return valid blocks
+    Pipeline pipeline = Pipeline.newBuilder()
+        .setState(Pipeline.PipelineState.OPEN)
+        .setId(PipelineID.randomId())
+        .setReplicationConfig(
+            StandaloneReplicationConfig.getInstance(
+                HddsProtos.ReplicationFactor.ONE))
+        .setNodes(new ArrayList<>())
+        .build();
+
+    AllocatedBlock.Builder blockBuilder = new AllocatedBlock.Builder()
+        .setPipeline(pipeline)
+        .setContainerBlockID(new ContainerBlockID(CONTAINER_ID, LOCAL_ID));
+
+    when(scmBlockLocationProtocol.allocateBlock(
+            anyLong(), anyInt(),
+            any(ReplicationConfig.class), anyString(),
+            any(ExcludeList.class), anyString()))
+        .thenAnswer(invocation -> {
+          int num = invocation.getArgument(1);
+          List<AllocatedBlock> allocatedBlocks = new ArrayList<>(num);
+          for (int i = 0; i < num; i++) {
+            blockBuilder.setContainerBlockID(
+                new ContainerBlockID(CONTAINER_ID + i, LOCAL_ID + i));
+            allocatedBlocks.add(blockBuilder.build());
+          }
+          return allocatedBlocks;
+        });
+
+    // Create a file request WITHOUT setting dataSize (should default to scmBlockSize)
+    KeyArgs.Builder keyArgs = KeyArgs.newBuilder()
+        .setVolumeName(volumeName).setBucketName(bucketName)
+        .setKeyName(keyName)
+        .setFactor(HddsProtos.ReplicationFactor.ONE)
+        .setType(HddsProtos.ReplicationType.RATIS);
+    // Note: dataSize is not set
+
+    CreateFileRequest createFileRequest = CreateFileRequest.newBuilder()
+        .setKeyArgs(keyArgs)
+        .setIsOverwrite(false)
+        .setIsRecursive(true).build();
+
+    OMRequest omRequest = OMRequest.newBuilder()
+        .setCmdType(OzoneManagerProtocolProtos.Type.CreateFile)
+        .setClientId(UUID.randomUUID().toString())
+        .setCreateFileRequest(createFileRequest).build();
+
+    OMFileCreateRequest omFileCreateRequest = getOMFileCreateRequest(omRequest);
+
+    OMRequest modifiedOmRequest = omFileCreateRequest.preExecute(ozoneManager);
+
+    // Verify that SCM's allocateBlock was called
+    verify(scmBlockLocationProtocol, atLeastOnce())
+        .allocateBlock(anyLong(), anyInt(),
+            any(ReplicationConfig.class), anyString(),
+            any(ExcludeList.class), anyString());
+
+    // Verify key locations are present in the response
+    assertTrue(modifiedOmRequest.hasCreateFileRequest());
+    CreateFileRequest responseCreateFileRequest =
+        modifiedOmRequest.getCreateFileRequest();
+    assertTrue(
+        responseCreateFileRequest.getKeyArgs().getKeyLocationsCount() > 0,
+        "File without explicit dataSize should have key locations allocated");
   }
 
   /**

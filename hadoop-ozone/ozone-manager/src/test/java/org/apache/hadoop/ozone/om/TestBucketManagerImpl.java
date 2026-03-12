@@ -86,7 +86,7 @@ class TestBucketManagerImpl extends OzoneTestBase {
   }
 
   public String volumeName() {
-    return getTestName().toLowerCase();
+    return uniqueObjectName();
   }
 
   private void createSampleVol(String volume) throws IOException {

@@ -33,7 +33,7 @@ public class ContainerReplicaNotFoundException extends ContainerException {
     this(null, null);
   }
 
-  /** Required by {@link org.apache.hadoop.ipc.RemoteException#unwrapRemoteException()}. */
+  /** Required by {@link org.apache.hadoop.ipc_.RemoteException#unwrapRemoteException()}. */
   public ContainerReplicaNotFoundException(String message) {
     super(message, ResultCodes.CONTAINER_REPLICA_NOT_FOUND);
   }

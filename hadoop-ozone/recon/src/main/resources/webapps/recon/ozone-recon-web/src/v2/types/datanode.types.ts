@@ -17,7 +17,7 @@
  */
 
 import { Pipeline } from "@/v2/types/pipelines.types";
-import { StorageReport } from "@/v2/types/overview.types";
+import { DatanodeStorageReport } from "@/v2/types/datanodeStorageReport.types";
 import { Option as MultiOption } from "@/v2/components/select/multiSelect";
 
 // Corresponds to HddsProtos.NodeState
@@ -40,7 +40,7 @@ export type DatanodeResponse = {
   state: DatanodeState;
   opState: DatanodeOpState;
   lastHeartbeat: string;
-  storageReport: StorageReport;
+  storageReport: DatanodeStorageReport;
   pipelines: Pipeline[];
   containers: number;
   openContainers: number;
@@ -63,6 +63,7 @@ export type Datanode = {
   state: DatanodeState;
   opState: DatanodeOpState;
   lastHeartbeat: string;
+  storageReport: DatanodeStorageReport;
   storageUsed: number;
   storageTotal: number;
   storageRemaining: number;

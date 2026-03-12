@@ -105,13 +105,13 @@ public class TestSCMContainerPlacementCapacity {
         .thenReturn(new ArrayList<>(datanodes));
 
     when(mockNodeManager.getNodeStat(any()))
-        .thenReturn(new SCMNodeMetric(100L, 0L, 100L, 0, 90));
+        .thenReturn(new SCMNodeMetric(100L, 0L, 100L, 0, 90, 0));
     when(mockNodeManager.getNodeStat(datanodes.get(2)))
-        .thenReturn(new SCMNodeMetric(100L, 90L, 10L, 0, 9));
+        .thenReturn(new SCMNodeMetric(100L, 90L, 10L, 0, 9, 0));
     when(mockNodeManager.getNodeStat(datanodes.get(3)))
-        .thenReturn(new SCMNodeMetric(100L, 80L, 20L, 0, 19));
+        .thenReturn(new SCMNodeMetric(100L, 80L, 20L, 0, 19, 0));
     when(mockNodeManager.getNodeStat(datanodes.get(4)))
-        .thenReturn(new SCMNodeMetric(100L, 70L, 30L, 0, 20));
+        .thenReturn(new SCMNodeMetric(100L, 70L, 30L, 0, 20, 0));
     when(mockNodeManager.getNode(any(DatanodeID.class))).thenAnswer(
             invocation -> datanodes.stream()
                 .filter(dn -> dn.getID().equals(invocation.getArgument(0)))

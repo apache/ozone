@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.s3.endpoint;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_FS_DATASTREAM_AUTO_THRESHOLD;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertSucceeds;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.put;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.COPY_SOURCE_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.STORAGE_CLASS_HEADER;
 import static org.apache.hadoop.ozone.s3.util.S3Consts.X_AMZ_CONTENT_SHA256;
@@ -27,15 +29,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import java.io.ByteArrayInputStream;
 import java.io.OutputStream;
 import java.util.HashMap;
 import java.util.Map;
-import javax.ws.rs.container.ContainerRequestContext;
 import javax.ws.rs.core.HttpHeaders;
-import javax.ws.rs.core.MultivaluedHashMap;
-import javax.ws.rs.core.Response;
-import javax.ws.rs.core.UriInfo;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationFactor;
 import org.apache.hadoop.hdds.client.ReplicationType;
@@ -69,7 +66,7 @@ public class TestUploadWithStream {
     client.getObjectStore().createS3Bucket(S3BUCKET);
 
     HttpHeaders headers = mock(HttpHeaders.class);
-    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("mockSignature");
+    when(headers.getHeaderString(X_AMZ_CONTENT_SHA256)).thenReturn("UNSIGNED-PAYLOAD");
     when(headers.getHeaderString(STORAGE_CLASS_HEADER)).thenReturn("STANDARD");
 
     OzoneConfiguration conf = new OzoneConfiguration();
@@ -78,19 +75,11 @@ public class TestUploadWithStream {
     conf.setStorageSize(OZONE_FS_DATASTREAM_AUTO_THRESHOLD, 1,
         StorageUnit.BYTES);
 
-    ContainerRequestContext context = mock(ContainerRequestContext.class);
-    when(context.getUriInfo()).thenReturn(mock(UriInfo.class));
-    when(context.getUriInfo().getQueryParameters())
-        .thenReturn(new MultivaluedHashMap<>());
-
     rest = EndpointBuilder.newObjectEndpointBuilder()
         .setClient(client)
         .setHeaders(headers)
         .setConfig(conf)
-        .setContext(context)
         .build();
-
-    rest.init();
   }
 
   @Test
@@ -100,12 +89,7 @@ public class TestUploadWithStream {
 
   @Test
   public void testUpload() throws Exception {
-    byte[] keyContent = S3_COPY_EXISTING_KEY_CONTENT.getBytes(UTF_8);
-    ByteArrayInputStream body =
-        new ByteArrayInputStream(keyContent);
-    Response response = rest.put(S3BUCKET, S3KEY, 0, 0, null, null, null, body);
-
-    assertEquals(200, response.getStatus());
+    assertSucceeds(() -> put(rest, S3BUCKET, S3KEY, S3_COPY_EXISTING_KEY_CONTENT));
   }
 
   @Test
@@ -137,9 +121,7 @@ public class TestUploadWithStream {
         .forEach((k, v) -> when(headers.getHeaderString(k)).thenReturn(v));
     rest.setHeaders(headers);
 
-    Response response = rest.put(S3BUCKET, S3KEY, 0, 0, null, null, null, null);
-
-    assertEquals(200, response.getStatus());
+    assertSucceeds(() -> put(rest, S3BUCKET, S3KEY, null));
 
     final long newDataSize = bucket.getKey(S3KEY).getDataSize();
     assertEquals(dataSize, newDataSize);

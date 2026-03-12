@@ -21,6 +21,12 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_CONTAINER_REPORT_INTERV
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.hdds.HddsConfigKeys.OZONE_METADATA_DIRS;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_KEY_PREFIX;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_GRPC_PORT_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTPS_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_ADDRESS_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_PORT_KEY;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.ozone.test.LambdaTestUtils.await;
@@ -507,5 +513,49 @@ public class TestSstFilteringService {
   private void deleteSnapshot(String volumeName, String bucketName, String snapshotName) throws IOException {
     writeClient.deleteSnapshot(volumeName, bucketName, snapshotName);
     countTotalSnapshots--;
+  }
+
+  /**
+   * Test to verify that SSTFilteringService is disabled when defrag service is enabled.
+   * This test creates a new OzoneManager instance with defrag service enabled and verifies
+   * that the SST filtering service is not started.
+   */
+  @Test
+  public void testSstFilteringDisabledWhenDefragEnabled(@TempDir Path folder) throws Exception {
+    OzoneConfiguration testConf = new OzoneConfiguration();
+    testConf.set(OZONE_METADATA_DIRS, folder.toString());
+    testConf.setTimeDuration(HDDS_CONTAINER_REPORT_INTERVAL, 200, TimeUnit.MILLISECONDS);
+    // Enable SST filtering service
+    testConf.setTimeDuration(OZONE_SNAPSHOT_SST_FILTERING_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
+    // Enable defrag service
+    testConf.setTimeDuration(OZONE_SNAPSHOT_DEFRAG_SERVICE_INTERVAL, 100, TimeUnit.MILLISECONDS);
+    testConf.setEnum(HDDS_DB_PROFILE, DBProfile.TEST);
+    testConf.setQuietMode(false);
+    // Configure dynamic ports to avoid conflicts with the OzoneManager instance from @BeforeAll
+    testConf.set(OZONE_OM_ADDRESS_KEY, "127.0.0.1:0");
+    testConf.set(OZONE_OM_HTTP_ADDRESS_KEY, "127.0.0.1:0");
+    testConf.set(OZONE_OM_HTTPS_ADDRESS_KEY, "127.0.0.1:0");
+    testConf.setInt(OZONE_OM_RATIS_PORT_KEY, 0);
+    testConf.setInt(OZONE_OM_GRPC_PORT_KEY, 0);
+
+    OmTestManagers testManagers = new OmTestManagers(testConf);
+    KeyManager testKeyManager = testManagers.getKeyManager();
+    OzoneManager testOm = testManagers.getOzoneManager();
+
+    try {
+      // Verify that SST filtering service is not started when defrag is enabled
+      SstFilteringService sstFilteringService = testKeyManager.getSnapshotSstFilteringService();
+      assertThat(sstFilteringService).as("SstFilteringService should be null when defrag is enabled").isNull();
+    } finally {
+      if (testKeyManager != null) {
+        testKeyManager.stop();
+      }
+      if (testManagers.getWriteClient() != null) {
+        testManagers.getWriteClient().close();
+      }
+      if (testOm != null) {
+        testOm.stop();
+      }
+    }
   }
 }

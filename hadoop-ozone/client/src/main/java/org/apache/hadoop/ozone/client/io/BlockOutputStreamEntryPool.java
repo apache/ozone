@@ -23,9 +23,11 @@ import java.io.IOException;
 import java.time.Clock;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
@@ -71,7 +73,8 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
    */
   private int currentStreamIndex;
   private final OzoneManagerProtocol omClient;
-  private final OmKeyArgs keyArgs;
+  private final OmKeyArgs.Builder keyArgs;
+  private final Map<String, String> metadata = new HashMap<>();
   private final XceiverClientFactory xceiverClientFactory;
   /**
    * A {@link BufferPool} shared between all
@@ -100,8 +103,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
         .setDataSize(info.getDataSize())
         .setIsMultipartKey(b.isMultipartKey())
         .setMultipartUploadID(b.getMultipartUploadID())
-        .setMultipartUploadPartNumber(b.getMultipartNumber())
-        .build();
+        .setMultipartUploadPartNumber(b.getMultipartNumber());
     this.openID = b.getOpenHandler().getId();
     this.excludeList = createExcludeList();
 
@@ -155,7 +157,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
     return
         new BlockOutputStreamEntry.Builder()
             .setBlockID(subKeyInfo.getBlockID())
-            .setKey(keyArgs.getKeyName())
+            .setKey(getKeyName())
             .setXceiverClientManager(xceiverClientFactory)
             .setPipeline(subKeyInfo.getPipeline())
             .setConfig(config)
@@ -170,7 +172,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
   }
 
   private synchronized void addKeyLocationInfo(OmKeyLocationInfo subKeyInfo, boolean forRetry) {
-    Preconditions.checkNotNull(subKeyInfo.getPipeline());
+    Objects.requireNonNull(subKeyInfo.getPipeline(), "subKeyInfo.getPipeline() == null");
     streamEntries.add(createStreamEntry(subKeyInfo, forRetry));
   }
 
@@ -299,7 +301,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
       LOG.debug("Allocating block with {}", excludeList);
     }
     OmKeyLocationInfo subKeyInfo =
-        omClient.allocateBlock(keyArgs, openID, excludeList);
+        omClient.allocateBlock(buildKeyArgs(), openID, excludeList);
     addKeyLocationInfo(subKeyInfo, forRetry);
   }
 
@@ -326,9 +328,9 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
       // partial key of a large file.
       if (keyArgs.getIsMultipartKey()) {
         commitUploadPartInfo =
-            omClient.commitMultipartUploadPart(keyArgs, openID);
+            omClient.commitMultipartUploadPart(buildKeyArgs(), openID);
       } else {
-        omClient.commitKey(keyArgs, openID);
+        omClient.commitKey(buildKeyArgs(), openID);
       }
     } else {
       LOG.warn("Closing KeyOutputStream, but key args is null");
@@ -348,13 +350,13 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
       } else {
         if (keyArgs.getLocationInfoList().isEmpty()) {
           MetricUtil.captureLatencyNs(clientMetrics::addOMHsyncLatency,
-              () -> omClient.hsyncKey(keyArgs, openID));
+              () -> omClient.hsyncKey(buildKeyArgs(), openID));
         } else {
           ContainerBlockID lastBLockId = keyArgs.getLocationInfoList().get(keyArgs.getLocationInfoList().size() - 1)
               .getBlockID().getContainerBlockID();
           if (!lastUpdatedBlockId.equals(lastBLockId)) {
             MetricUtil.captureLatencyNs(clientMetrics::addOMHsyncLatency,
-                () -> omClient.hsyncKey(keyArgs, openID));
+                () -> omClient.hsyncKey(buildKeyArgs(), openID));
             lastUpdatedBlockId = lastBLockId;
           }
         }
@@ -387,7 +389,7 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
       currentStreamIndex++;
     }
     if (streamEntries.size() <= currentStreamIndex) {
-      Preconditions.checkNotNull(omClient);
+      Objects.requireNonNull(omClient, "omClient == null");
       // allocate a new block, if a exception happens, log an error and
       // throw exception to the caller directly, and the write fails.
       allocateNewBlock(forRetry);
@@ -430,13 +432,15 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
 
   @Override
   public Map<String, String> getMetadata() {
-    if (keyArgs != null) {
-      return this.keyArgs.getMetadata();
-    }
-    return null;
+    return metadata;
   }
 
   long getDataSize() {
     return keyArgs.getDataSize();
+  }
+
+  private OmKeyArgs buildKeyArgs() {
+    keyArgs.addAllMetadata(metadata);
+    return keyArgs.build();
   }
 }

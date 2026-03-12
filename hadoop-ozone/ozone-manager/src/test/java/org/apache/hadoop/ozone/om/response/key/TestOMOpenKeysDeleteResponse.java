@@ -207,8 +207,11 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
       long clientID = random.nextLong();
       long parentID = random.nextLong();
 
-      OmKeyInfo omKeyInfo = OMRequestTestUtils.createOmKeyInfo(volume,
-          bucket, key, replicationConfig).build();
+      OmKeyInfo.Builder keyInfoBuilder = OMRequestTestUtils.createOmKeyInfo(volume, bucket, key, replicationConfig);
+      if (getBucketLayout().isFileSystemOptimized()) {
+        keyInfoBuilder.setParentObjectID(parentID);
+      }
+      OmKeyInfo omKeyInfo = keyInfoBuilder.build();
 
       if (keyLength > 0) {
         OMRequestTestUtils.addKeyLocationInfo(omKeyInfo, 0, keyLength);
@@ -223,8 +226,6 @@ public class TestOMOpenKeysDeleteResponse extends TestOMKeyResponse {
         String file = OzoneFSUtils.getFileName(key);
         final long volumeId = omMetadataManager.getVolumeId(volume);
         final long bucketId = omMetadataManager.getBucketId(volume, bucket);
-        omKeyInfo.setFileName(file);
-        omKeyInfo.setParentObjectID(parentID);
         OMRequestTestUtils.addFileToKeyTable(true, false, file, omKeyInfo,
             clientID, 0L, omMetadataManager);
         openKey = omMetadataManager.getOpenFileName(

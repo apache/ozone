@@ -39,6 +39,7 @@ import org.apache.hadoop.hdds.protocol.SecretKeyProtocolScm;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ReadContainerResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.ContainerBalancerStatusInfoResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.DecommissionScmResponseProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerLocationProtocolProtos.StartContainerBalancerResponseProto;
@@ -56,6 +57,7 @@ import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ContainerWithPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
+import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB.ScmNodeTarget;
 import org.apache.hadoop.hdds.scm.storage.ContainerProtocolCalls;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CACertificateProvider;
 import org.apache.hadoop.hdds.utils.HAUtils;
@@ -93,8 +95,16 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   public ContainerOperationClient(OzoneConfiguration conf) throws IOException {
+    this(conf, null);
+  }
+
+  public ContainerOperationClient(OzoneConfiguration conf, ScmNodeTarget targetScmNode) throws IOException {
     this.configuration = conf;
-    storageContainerLocationClient = newContainerRpcClient(conf);
+    if (targetScmNode != null) {
+      storageContainerLocationClient = newContainerRpcClientForNode(conf, targetScmNode);
+    } else {
+      storageContainerLocationClient = newContainerRpcClient(conf);
+    }
     secretKeyClient = newSecretKeyClient(conf);
     containerSizeB = (int) conf.getStorageSize(OZONE_SCM_CONTAINER_SIZE,
         OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
@@ -132,6 +142,11 @@ public class ContainerOperationClient implements ScmClient {
   public static StorageContainerLocationProtocol newContainerRpcClient(
       ConfigurationSource configSource) {
     return HAUtils.getScmContainerClient(configSource);
+  }
+
+  public static StorageContainerLocationProtocol newContainerRpcClientForNode(
+      ConfigurationSource configSource, ScmNodeTarget targetScmNode) {
+    return HAUtils.getScmContainerClientForNode(configSource, targetScmNode);
   }
 
   public static SecretKeyProtocolScm newSecretKeyClient(
@@ -184,7 +199,7 @@ public class ContainerOperationClient implements ScmClient {
     // creation state.
     if (LOG.isDebugEnabled()) {
       LOG.debug("Created container {} machines {}", containerId,
-              client.getPipeline().getNodes());
+          client.getPipeline().getNodes());
     }
   }
 
@@ -210,7 +225,7 @@ public class ContainerOperationClient implements ScmClient {
     XceiverClientSpi client = null;
     XceiverClientManager clientManager = getXceiverClientManager();
     try {
-      ContainerWithPipeline containerWithPipeline = 
+      ContainerWithPipeline containerWithPipeline =
           storageContainerLocationClient.allocateContainer(replicationConfig, owner);
       Pipeline pipeline = containerWithPipeline.getPipeline();
       // connect to pipeline leader and allocate container on leader datanode.
@@ -396,8 +411,7 @@ public class ContainerOperationClient implements ScmClient {
     }
   }
 
-  public Map<DatanodeDetails, ReadContainerResponseProto>
-      readContainerFromAllNodes(long containerID, Pipeline pipeline)
+  public Map<DatanodeDetails, ReadContainerResponseProto> readContainerFromAllNodes(long containerID, Pipeline pipeline)
       throws IOException, InterruptedException {
     XceiverClientManager clientManager = getXceiverClientManager();
     String encodedToken = getEncodedContainerToken(containerID);
@@ -434,8 +448,7 @@ public class ContainerOperationClient implements ScmClient {
   }
 
   @Override
-  public List<ContainerReplicaInfo>
-      getContainerReplicas(long containerId) throws IOException {
+  public List<ContainerReplicaInfo> getContainerReplicas(long containerId) throws IOException {
     List<HddsProtos.SCMContainerReplicaProto> protos =
         storageContainerLocationClient.getContainerReplicas(containerId,
             ClientVersion.CURRENT_VERSION);
@@ -511,13 +524,15 @@ public class ContainerOperationClient implements ScmClient {
       Optional<Integer> moveReplicationTimeout,
       Optional<Boolean> networkTopologyEnable,
       Optional<String> includeNodes,
-      Optional<String> excludeNodes) throws IOException {
+      Optional<String> excludeNodes,
+      Optional<String> excludeContainers,
+      Optional<String> includeContainers) throws IOException {
     return storageContainerLocationClient.startContainerBalancer(threshold,
         iterations, maxDatanodesPercentageToInvolvePerIteration,
         maxSizeToMovePerIterationInGB, maxSizeEnteringTargetInGB,
         maxSizeLeavingSourceInGB, balancingInterval, moveTimeout,
         moveReplicationTimeout, networkTopologyEnable, includeNodes,
-        excludeNodes);
+        excludeNodes, excludeContainers, includeContainers);
   }
 
   @Override
@@ -548,6 +563,11 @@ public class ContainerOperationClient implements ScmClient {
   @Override
   public void transferLeadership(String newLeaderId) throws IOException {
     storageContainerLocationClient.transferLeadership(newLeaderId);
+  }
+
+  @Override
+  public DeletedBlocksTransactionSummary getDeletedBlockSummary() throws IOException {
+    return storageContainerLocationClient.getDeletedBlockSummary();
   }
 
   @Override

@@ -61,9 +61,8 @@ public abstract class TestDatanodeReconfiguration extends ReconfigurationTestBas
 
   @Test
   void blockDeletingLimitPerInterval() throws ReconfigurationException {
-    getFirstDatanode().getReconfigurationHandler().reconfigurePropertyImpl(
+    getFirstDatanode().getReconfigurationHandler().reconfigureProperty(
         "hdds.datanode.block.deleting.limit.per.interval", "1");
-
     assertEquals(1, getFirstDatanode().getDatanodeStateMachine().getContainer()
         .getBlockDeletingService().getBlockLimitPerInterval());
   }
@@ -76,8 +75,9 @@ public abstract class TestDatanodeReconfiguration extends ReconfigurationTestBas
             .getDeleteBlocksCommandHandler()).getExecutor();
     int newValue = executor.getMaximumPoolSize() + delta;
 
-    getFirstDatanode().getReconfigurationHandler().reconfigurePropertyImpl(
+    getFirstDatanode().getReconfigurationHandler().reconfigureProperty(
         HDDS_DATANODE_BLOCK_DELETE_THREAD_MAX, String.valueOf(newValue));
+
     assertEquals(newValue, executor.getMaximumPoolSize());
     assertEquals(newValue, executor.getCorePoolSize());
   }
@@ -90,7 +90,7 @@ public abstract class TestDatanodeReconfiguration extends ReconfigurationTestBas
             .getReplicationServer().getExecutor();
     int newValue = executor.getCorePoolSize() + delta;
 
-    getFirstDatanode().getReconfigurationHandler().reconfigurePropertyImpl(
+    getFirstDatanode().getReconfigurationHandler().reconfigureProperty(
         REPLICATION_STREAMS_LIMIT_KEY, String.valueOf(newValue));
     assertEquals(newValue, executor.getMaximumPoolSize());
     assertEquals(newValue, executor.getCorePoolSize());

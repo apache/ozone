@@ -31,10 +31,13 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.inject.Singleton;
 import jakarta.annotation.Nonnull;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.sql.Timestamp;
 import java.text.ParseException;
@@ -49,8 +52,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.BlockingQueue;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.StreamingOutput;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -100,7 +107,7 @@ public class ReconUtils {
   /**
    * Get the current rebuild state of NSSummary tree.
    * Delegates to NSSummaryTask's unified control mechanism.
-   * 
+   *
    * @return current RebuildState from NSSummaryTask
    */
   public static org.apache.hadoop.ozone.recon.tasks.NSSummaryTask.RebuildState getNSSummaryRebuildState() {
@@ -846,5 +853,69 @@ public class ReconUtils {
       pathBuilder.append(OM_KEY_PREFIX).append(id);
     }
     return pathBuilder.toString();
+  }
+
+  public static Map<String, Object> getMetricsData(List<Map<String, Object>> metrics, String beanName) {
+    if (metrics == null || StringUtils.isEmpty(beanName)) {
+      return null;
+    }
+    for (Map<String, Object> item :metrics) {
+      if (beanName.equals(item.get("name"))) {
+        return item;
+      }
+    }
+    return null;
+  }
+
+  public static long extractLongMetricValue(Map<String, Object> metrics, String keyName) {
+    if (metrics == null || StringUtils.isEmpty(keyName)) {
+      return  -1;
+    }
+    Object value = metrics.get(keyName);
+    if (value instanceof Number) {
+      return ((Number) value).longValue();
+    }
+    if (value instanceof String) {
+      try {
+        return Long.parseLong((String) value);
+      } catch (NumberFormatException e) {
+        log.error("Failed to parse long value for key: {} with value: {}", keyName, value, e);
+      }
+    }
+    return -1;
+  }
+
+  public static  <T> Response downloadCsv(
+      String fileName,
+      List<String> headers,
+      List<T> data,
+      List<Function<T, Object>> columnExtractors) {
+
+    StreamingOutput stream = output -> {
+      CSVFormat format = CSVFormat.DEFAULT.builder()
+          .setHeader(headers.toArray(new String[0]))
+          .build();
+
+      try (CSVPrinter printer = new CSVPrinter(
+          new BufferedWriter(new OutputStreamWriter(output, StandardCharsets.UTF_8)),
+          format)) {
+
+        for (T item : data) {
+          List<Object> row = new ArrayList<>();
+          for (Function<T, Object> extractor : columnExtractors) {
+            row.add(extractor.apply(item));
+          }
+          printer.printRecord(row);
+        }
+
+        printer.flush();
+      }
+    };
+
+    return Response.ok(stream)
+        .type("text/csv")
+        .header("Content-Disposition",
+            "attachment; filename=\"" + fileName + "\"")
+        .build();
   }
 }

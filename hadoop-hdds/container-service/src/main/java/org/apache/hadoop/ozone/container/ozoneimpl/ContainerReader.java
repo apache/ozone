@@ -21,9 +21,9 @@ import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.Con
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.DELETED;
 import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.RECOVERING;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
+import java.util.Objects;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
@@ -82,7 +82,7 @@ public class ContainerReader implements Runnable {
   public ContainerReader(
       MutableVolumeSet volSet, HddsVolume volume, ContainerSet cset,
       ConfigurationSource conf, boolean shouldDelete) {
-    Preconditions.checkNotNull(volume);
+    Objects.requireNonNull(volume,  "volume == null");
     this.hddsVolume = volume;
     this.hddsVolumeDir = hddsVolume.getHddsRootDir();
     this.containerSet = cset;
@@ -103,8 +103,7 @@ public class ContainerReader implements Runnable {
   }
 
   public void readVolume(File hddsVolumeRootDir) {
-    Preconditions.checkNotNull(hddsVolumeRootDir, "hddsVolumeRootDir" +
-        "cannot be null");
+    Objects.requireNonNull(hddsVolumeRootDir, "hddsVolumeRootDir == null");
 
     //filtering storage directory
     File[] storageDirs = hddsVolumeRootDir.listFiles(File::isDirectory);

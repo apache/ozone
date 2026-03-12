@@ -33,6 +33,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -60,6 +61,7 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
@@ -189,7 +191,7 @@ public class TestFSORepairTool {
   void testConnectedTreeOneBucket(boolean dryRun) {
     String expectedOutput = serializeReport(vol1Report);
 
-    int exitCode = execute(dryRun, "-v", "/vol1", "-b", "bucket1");
+    int exitCode = execute(dbPath, dryRun, "-v", "/vol1", "-b", "bucket1");
     assertEquals(0, exitCode, err.getOutput());
 
     String cliOutput = out.getOutput();
@@ -311,6 +313,25 @@ public class TestFSORepairTool {
     assertEquals(expectedOutput, reportOutput);
   }
 
+  @Order(ORDER_DRY_RUN)
+  @Test
+  public void testAlternateOmDbDirName(@TempDir java.nio.file.Path tempDir) throws Exception {
+    File original = new File(dbPath);
+    File backup = tempDir.resolve("om-db-backup").toFile();
+
+    FileUtils.copyDirectory(original, backup);
+
+    out.reset();
+    String expectedOutput = serializeReport(fullReport);
+    int exitCode = execute(backup.getPath(), true);
+
+    assertEquals(0, exitCode, err.getOutput());
+
+    String cliOutput = out.getOutput();
+    String reportOutput = extractRelevantSection(cliOutput);
+    assertEquals(expectedOutput, reportOutput);
+  }
+
   /**
    * Test in repair mode. This test ensures that:
    * - The initial repair correctly resolves unreferenced objects.
@@ -360,15 +381,15 @@ public class TestFSORepairTool {
   }
 
   private int repair(String... args) {
-    return execute(false, args);
+    return execute(dbPath, false, args);
   }
 
   private int dryRun(String... args) {
-    return execute(true, args);
+    return execute(dbPath, true, args);
   }
 
-  private int execute(boolean dryRun, String... args) {
-    List<String> argList = new ArrayList<>(Arrays.asList("om", "fso-tree", "--db", dbPath));
+  private int execute(String effectiveDbPath, boolean dryRun, String... args) {
+    List<String> argList = new ArrayList<>(Arrays.asList("om", "fso-tree", "--db", effectiveDbPath));
     if (dryRun) {
       argList.add("--dry-run");
     }
@@ -405,12 +426,12 @@ public class TestFSORepairTool {
         report.getReachable().getDirs(),
         report.getReachable().getFiles(),
         report.getReachable().getBytes(),
-        report.getUnreachable().getDirs(),
-        report.getUnreachable().getFiles(),
-        report.getUnreachable().getBytes(),
-        report.getUnreferenced().getDirs(),
-        report.getUnreferenced().getFiles(),
-        report.getUnreferenced().getBytes()
+        report.getPendingToDelete().getDirs(),
+        report.getPendingToDelete().getFiles(),
+        report.getPendingToDelete().getBytes(),
+        report.getOrphaned().getDirs(),
+        report.getOrphaned().getFiles(),
+        report.getOrphaned().getBytes()
     );
   }
 
@@ -462,14 +483,14 @@ public class TestFSORepairTool {
     fs.mkdirs(new Path("/vol-empty/bucket-empty"));
     FSORepairTool.ReportStatistics reachableCount =
             new FSORepairTool.ReportStatistics(0, 0, 0);
-    FSORepairTool.ReportStatistics unreachableCount =
+    FSORepairTool.ReportStatistics pendingToDeleteCount =
             new FSORepairTool.ReportStatistics(0, 0, 0);
-    FSORepairTool.ReportStatistics unreferencedCount =
+    FSORepairTool.ReportStatistics orphanedCount =
             new FSORepairTool.ReportStatistics(0, 0, 0);
     return new FSORepairTool.Report.Builder()
         .setReachable(reachableCount)
-        .setUnreachable(unreachableCount)
-        .setUnreferenced(unreferencedCount)
+        .setPendingToDelete(pendingToDeleteCount)
+        .setOrphaned(orphanedCount)
         .build();
   }
 
@@ -507,14 +528,14 @@ public class TestFSORepairTool {
 
     FSORepairTool.ReportStatistics reachableCount = 
         new FSORepairTool.ReportStatistics(1, 1, fileSize);
-    FSORepairTool.ReportStatistics unreachableCount =
+    FSORepairTool.ReportStatistics pendingToDeleteCount =
         new FSORepairTool.ReportStatistics(1, 2, fileSize * 2L);
-    FSORepairTool.ReportStatistics unreferencedCount =
+    FSORepairTool.ReportStatistics orphanedCount =
         new FSORepairTool.ReportStatistics(0, 0, 0);
     return new FSORepairTool.Report.Builder()
         .setReachable(reachableCount)
-        .setUnreachable(unreachableCount)
-        .setUnreferenced(unreferencedCount)
+        .setPendingToDelete(pendingToDeleteCount)
+        .setOrphaned(orphanedCount)
         .build();
   }
 
@@ -581,15 +602,15 @@ public class TestFSORepairTool {
 
     assertDisconnectedTreePartiallyReadable(volume, bucket);
 
-    // dir1 does not count towards the unreferenced directories the tool
+    // dir1 does not count towards the orphaned directories the tool
     // will see. It was deleted completely so the tool will never see it.
     FSORepairTool.ReportStatistics reachableCount =
             new FSORepairTool.ReportStatistics(1, 1, fileSize);
-    FSORepairTool.ReportStatistics unreferencedCount =
+    FSORepairTool.ReportStatistics orphanedCount =
             new FSORepairTool.ReportStatistics(1, 3, fileSize * 3L);
     return new FSORepairTool.Report.Builder()
         .setReachable(reachableCount)
-        .setUnreferenced(unreferencedCount)
+        .setOrphaned(orphanedCount)
         .build();
   }
 

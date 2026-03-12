@@ -160,7 +160,11 @@ public class TestSCMNodeMetrics {
   public void testNodeCountAndInfoMetricsReported() throws Exception {
 
     StorageReportProto storageReport = HddsTestUtils.createStorageReport(
-        registeredDatanode.getID(), "/tmp", 100, 10, 90, null);
+        registeredDatanode.getID(), "/tmp", 100, 10, 90, null)
+        .toBuilder()
+        .setFsCapacity(200)
+        .setFsAvailable(150)
+        .build();
     NodeReportProto nodeReport = NodeReportProto.newBuilder()
         .addStorageReport(storageReport).build();
 
@@ -226,9 +230,18 @@ public class TestSCMNodeMetrics {
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
     assertGauge("AllNodes", 1,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("TotalCapacity", 100L,
+    // The DN has no metadata volumes, so hasEnoughSpace() returns false indicating the DN is out of space.
+    assertGauge("NonWritableNodes", 1,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
-    assertGauge("TotalUsed", 10L,
+    assertGauge("TotalOzoneCapacity", 100L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("TotalOzoneUsed", 10L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("TotalFilesystemCapacity", 200L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("TotalFilesystemUsed", 50L,
+        getMetrics(SCMNodeMetrics.class.getSimpleName()));
+    assertGauge("TotalFilesystemAvailable", 150L,
         getMetrics(SCMNodeMetrics.class.getSimpleName()));
     nodeManager.processHeartbeat(registeredDatanode);
     sleep(4000);

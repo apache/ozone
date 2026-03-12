@@ -22,6 +22,8 @@ import static java.net.HttpURLConnection.HTTP_OK;
 import static org.apache.hadoop.ozone.OzoneConsts.MULTIPART_FORM_DATA_BOUNDARY;
 import static org.apache.hadoop.ozone.OzoneConsts.OM_DB_NAME;
 import static org.apache.hadoop.ozone.OzoneConsts.OZONE_DB_CHECKPOINT_REQUEST_TO_EXCLUDE_SST;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_DEFAULT;
+import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HTTP_AUTH_TYPE;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_PROVIDER_CONNECTION_TIMEOUT_DEFAULT;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_PROVIDER_CONNECTION_TIMEOUT_KEY;
@@ -36,6 +38,7 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -46,6 +49,8 @@ import org.apache.hadoop.hdds.server.http.HttpConfig;
 import org.apache.hadoop.hdds.utils.HAUtils;
 import org.apache.hadoop.hdds.utils.LegacyHadoopConfigurationSource;
 import org.apache.hadoop.hdds.utils.RDBSnapshotProvider;
+import org.apache.hadoop.hdds.utils.db.DBCheckpoint;
+import org.apache.hadoop.hdds.utils.db.InodeMetadataRocksDBCheckpoint;
 import org.apache.hadoop.hdfs.web.URLConnectionFactory;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.security.SecurityUtil;
@@ -80,6 +85,7 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
   private final HttpConfig.Policy httpPolicy;
   private final boolean spnegoEnabled;
   private final URLConnectionFactory connectionFactory;
+  private final boolean useV2CheckpointApi;
 
   public OmRatisSnapshotProvider(File snapshotDir,
       Map<String, OMNodeDetails> peerNodesMap, HttpConfig.Policy httpPolicy,
@@ -89,6 +95,7 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
     this.httpPolicy = httpPolicy;
     this.spnegoEnabled = spnegoEnabled;
     this.connectionFactory = connectionFactory;
+    this.useV2CheckpointApi = OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_DEFAULT;
   }
 
   public OmRatisSnapshotProvider(MutableConfigurationSource conf,
@@ -97,6 +104,8 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
     LOG.info("Initializing OM Snapshot Provider");
     this.peerNodesMap = new ConcurrentHashMap<>();
     peerNodesMap.putAll(peerNodeDetails);
+    this.useV2CheckpointApi = conf.getBoolean(OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_KEY,
+        OZONE_OM_DB_CHECKPOINT_USE_INODE_BASED_DEFAULT);
 
     this.httpPolicy = HttpConfig.getHttpPolicy(conf);
     this.spnegoEnabled = conf.get(OZONE_OM_HTTP_AUTH_TYPE, "simple")
@@ -140,7 +149,7 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
       throws IOException {
     OMNodeDetails leader = peerNodesMap.get(leaderNodeID);
     URL omCheckpointUrl = leader.getOMDBCheckpointEndpointUrl(
-        httpPolicy.isHttpEnabled(), true);
+        useV2CheckpointApi, httpPolicy.isHttpEnabled(), true);
     LOG.info("Downloading latest checkpoint from Leader OM {}. Checkpoint: {} URL: {}",
         leaderNodeID, targetFile.getName(), omCheckpointUrl);
     SecurityUtil.doAsCurrentUser(() -> {
@@ -152,8 +161,10 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
           MULTIPART_FORM_DATA_BOUNDARY;
       connection.setRequestProperty("Content-Type", contentTypeValue);
       connection.setDoOutput(true);
-      writeFormData(connection,
-          HAUtils.getExistingFiles(getCandidateDir()));
+
+      List<String> existingFiles = useV2CheckpointApi ? HAUtils.getExistingFiles(getCandidateDir())
+          : HAUtils.getExistingSstFilesRelativeToDbDir(getCandidateDir());
+      writeFormData(connection, existingFiles);
 
       connection.connect();
       int errorCode = connection.getResponseCode();
@@ -205,6 +216,11 @@ public class OmRatisSnapshotProvider extends RDBSnapshotProvider {
       LOG.info("Download completed for '{}'. Total size: {} KB",
           targetFile.getName(), totalBytesRead / (1024));
     }
+  }
+
+  @Override
+  public DBCheckpoint getCheckpointFromUntarredDb(Path untarredDbDir) throws IOException {
+    return new InodeMetadataRocksDBCheckpoint(untarredDbDir, useV2CheckpointApi);
   }
 
   /**

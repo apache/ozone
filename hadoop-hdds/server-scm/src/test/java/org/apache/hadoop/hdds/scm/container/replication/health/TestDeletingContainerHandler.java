@@ -62,6 +62,7 @@ public class TestDeletingContainerHandler {
   private DeletingContainerHandler deletingContainerHandler;
   private ECReplicationConfig ecReplicationConfig;
   private RatisReplicationConfig ratisReplicationConfig;
+  private ReplicationManager.ReplicationManagerConfiguration rmConf;
 
   @BeforeEach
   public void setup() throws IOException {
@@ -70,7 +71,7 @@ public class TestDeletingContainerHandler {
     ratisReplicationConfig = RatisReplicationConfig.getInstance(
         HddsProtos.ReplicationFactor.THREE);
     replicationManager = mock(ReplicationManager.class);
-
+    rmConf = mock(ReplicationManager.ReplicationManagerConfiguration.class);
     doNothing().when(replicationManager).updateContainerState(any(ContainerID.class),
         any(HddsProtos.LifeCycleEvent.class));
 
@@ -93,7 +94,7 @@ public class TestDeletingContainerHandler {
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
@@ -111,7 +112,7 @@ public class TestDeletingContainerHandler {
 
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();
@@ -142,7 +143,7 @@ public class TestDeletingContainerHandler {
     Set<ContainerReplica> containerReplicas = new HashSet<>();
     ContainerCheckRequest.Builder builder = new ContainerCheckRequest.Builder()
         .setPendingOps(Collections.emptyList())
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas);
 
@@ -252,7 +253,7 @@ public class TestDeletingContainerHandler {
                                    int times) throws NotLeaderException {
     ContainerCheckRequest request = new ContainerCheckRequest.Builder()
         .setPendingOps(pendingOps)
-        .setReport(new ReplicationManagerReport())
+        .setReport(new ReplicationManagerReport(rmConf.getContainerSampleLimit()))
         .setContainerInfo(containerInfo)
         .setContainerReplicas(containerReplicas)
         .build();

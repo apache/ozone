@@ -21,8 +21,8 @@ import com.google.protobuf.RpcController;
 import io.grpc.Status;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.hadoop.ipc.RPC;
-import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ipc_.RPC;
+import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerServiceGrpc.OzoneManagerServiceImplBase;
@@ -57,7 +57,7 @@ public class OzoneManagerServiceGrpc extends OzoneManagerServiceImplBase {
         request.getCmdType().name());
     AtomicInteger callCount = new AtomicInteger(0);
 
-    org.apache.hadoop.ipc.Server.getCurCall().set(new Server.Call(1,
+    org.apache.hadoop.ipc_.Server.getCurCall().set(new Server.Call(1,
         callCount.incrementAndGet(),
         null,
         null,

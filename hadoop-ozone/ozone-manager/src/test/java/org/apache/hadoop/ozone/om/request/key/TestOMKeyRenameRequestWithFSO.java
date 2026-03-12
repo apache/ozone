@@ -62,12 +62,15 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
     String toKeyParentName = UUID.randomUUID().toString();
     fromKeyName = new Path(fromKeyParentName, "fromKey").toString();
     toKeyName = new Path(toKeyParentName, "toKey").toString();
-    fromKeyParentInfo = getOmKeyInfo(fromKeyParentName);
-    fromKeyParentInfo.setParentObjectID(bucketId);
-    toKeyParentInfo = getOmKeyInfo(toKeyParentName);
-    toKeyParentInfo.setParentObjectID(bucketId);
-    fromKeyInfo = getOmKeyInfo(fromKeyName);
-    fromKeyInfo.setParentObjectID(fromKeyParentInfo.getObjectID());
+    fromKeyParentInfo = getOmKeyInfo(fromKeyParentName)
+        .setParentObjectID(bucketId)
+        .build();
+    toKeyParentInfo = getOmKeyInfo(toKeyParentName)
+        .setParentObjectID(bucketId)
+        .build();
+    fromKeyInfo = getOmKeyInfo(fromKeyName)
+        .setParentObjectID(fromKeyParentInfo.getObjectID())
+        .build();
     OMRequestTestUtils.addDirKeyToDirTable(false,
         OMFileRequest.getDirectoryInfo(fromKeyParentInfo), volumeName,
         bucketName, txnLogId, omMetadataManager);
@@ -80,8 +83,8 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
 
   @Test
   public void testRenameOpenFile() throws Exception {
-    fromKeyInfo.getMetadata().put(OzoneConsts.HSYNC_CLIENT_ID,
-        String.valueOf(1234));
+    fromKeyInfo = fromKeyInfo.withMetadataMutations(metadata ->
+        metadata.put(OzoneConsts.HSYNC_CLIENT_ID, String.valueOf(1234)));
     addKeyToTable(fromKeyInfo);
     OMRequest modifiedOmRequest =
         doPreExecute(createRenameKeyRequest(
@@ -177,12 +180,11 @@ public class TestOMKeyRenameRequestWithFSO extends TestOMKeyRenameRequest {
   }
 
   @Override
-  protected OmKeyInfo getOmKeyInfo(String keyName) {
+  protected OmKeyInfo.Builder getOmKeyInfo(String keyName) {
     long bucketId = random.nextLong();
     return OMRequestTestUtils.createOmKeyInfo(volumeName, bucketName, keyName, RatisReplicationConfig.getInstance(ONE))
         .setObjectID(bucketId + 100L)
-        .setParentObjectID(bucketId + 101L)
-        .build();
+        .setParentObjectID(bucketId + 101L);
   }
 
   @Override

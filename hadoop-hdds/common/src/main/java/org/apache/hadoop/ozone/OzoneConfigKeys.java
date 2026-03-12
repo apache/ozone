@@ -469,6 +469,8 @@ public final class OzoneConfigKeys {
       "ozone.acl.enabled";
   public static final boolean OZONE_ACL_ENABLED_DEFAULT =
       false;
+  public static final String OZONE_AUTHORIZATION_ENABLED = "ozone.authorization.enabled";
+  public static final boolean OZONE_AUTHORIZATION_ENABLED_DEFAULT = true;
   public static final String OZONE_S3_VOLUME_NAME =
           "ozone.s3g.volume.name";
   public static final String OZONE_S3_VOLUME_NAME_DEFAULT =
@@ -487,6 +489,20 @@ public final class OzoneConfigKeys {
       "ozone.client.wait.between.retries.millis";
   public static final long OZONE_CLIENT_WAIT_BETWEEN_RETRIES_MILLIS_DEFAULT =
       2000;
+
+  // Ozone Client Follower Read
+  public static final String OZONE_CLIENT_FOLLOWER_READ_ENABLED_KEY =
+      "ozone.client.follower.read.enabled";
+  public static final boolean OZONE_CLIENT_FOLLOWER_READ_ENABLED_DEFAULT = false;
+
+  public static final String OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_KEY =
+      "ozone.client.follower.read.default.consistency";
+  public static final String OZONE_CLIENT_FOLLOWER_READ_DEFAULT_CONSISTENCY_DEFAULT =
+      "LINEARIZABLE_ALLOW_FOLLOWER";
+  public static final String OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_KEY =
+      "ozone.client.leader.read.default.consistency";
+  public static final String OZONE_CLIENT_LEADER_READ_DEFAULT_CONSISTENCY_DEFAULT =
+      "DEFAULT";
 
   public static final String OZONE_FREON_HTTP_ENABLED_KEY =
       "ozone.freon.http.enabled";

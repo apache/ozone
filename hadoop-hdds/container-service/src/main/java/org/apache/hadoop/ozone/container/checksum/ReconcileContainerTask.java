@@ -32,6 +32,8 @@ public class ReconcileContainerTask extends AbstractReplicationTask {
   private final ReconcileContainerCommand command;
   private final DNContainerOperationClient dnClient;
   private final ContainerController controller;
+  public static final String METRIC_NAME = "ContainerReconciliations";
+  public static final String METRIC_DESCRIPTION_SEGMENT = "Container Reconciliations";
 
   private static final Logger LOG =
       LoggerFactory.getLogger(ReconcileContainerTask.class);
@@ -69,12 +71,12 @@ public class ReconcileContainerTask extends AbstractReplicationTask {
 
   @Override
   public String getMetricName() {
-    return "ContainerReconciliations";
+    return METRIC_NAME;
   }
 
   @Override
   public String getMetricDescriptionSegment() {
-    return "Container Reconciliations";
+    return METRIC_DESCRIPTION_SEGMENT;
   }
 
   @Override

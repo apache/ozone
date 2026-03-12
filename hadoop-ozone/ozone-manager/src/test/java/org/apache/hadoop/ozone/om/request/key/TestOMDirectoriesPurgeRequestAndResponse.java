@@ -18,7 +18,7 @@
 package org.apache.hadoop.ozone.om.request.key;
 
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.ONE;
-import static org.apache.hadoop.ozone.om.lock.FlatResource.SNAPSHOT_DB_CONTENT_LOCK;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_DB_CONTENT_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.request.file.OMFileRequest.getOmKeyInfo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -44,6 +44,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomUtils;
@@ -232,7 +233,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
   }
 
   private PurgePathRequest createBucketDataAndGetPurgePathRequest(OmBucketInfo bucketInfo) throws Exception {
-    OmDirectoryInfo dir1 = new OmDirectoryInfo.Builder()
+    OmDirectoryInfo dir1 = OmDirectoryInfo.newBuilder()
         .setName("dir1")
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
@@ -247,7 +248,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     List<String> subFileKeys = new ArrayList<>();
     List<String> subDirKeys = new ArrayList<>();
     for (int id = 1; id < 10; id++) {
-      OmDirectoryInfo subdir = new OmDirectoryInfo.Builder()
+      OmDirectoryInfo subdir = OmDirectoryInfo.newBuilder()
           .setName("subdir" + id)
           .setCreationTime(Time.now())
           .setModificationTime(Time.now())
@@ -371,7 +372,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     String bucketKey = omMetadataManager.getBucketKey(volumeName, bucket);
     OmBucketInfo bucketInfo = omMetadataManager.getBucketTable().get(bucketKey);
     long purgeUsedNamespaceCountBeforePurge = bucketInfo.getSnapshotUsedNamespace();
-    OmDirectoryInfo dir1 = new OmDirectoryInfo.Builder()
+    OmDirectoryInfo dir1 = OmDirectoryInfo.newBuilder()
         .setName("dir1")
         .setCreationTime(Time.now())
         .setModificationTime(Time.now())
@@ -388,7 +389,7 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     List<String> deletedSubDirKeys = new ArrayList<>();
     List<String> deletedSubFiles = new ArrayList<>();
     for (int id = 0; id < numberOfSubEntries; id++) {
-      OmDirectoryInfo subdir = new OmDirectoryInfo.Builder()
+      OmDirectoryInfo subdir = OmDirectoryInfo.newBuilder()
           .setName("subdir" + id)
           .setCreationTime(Time.now())
           .setModificationTime(Time.now())
@@ -617,13 +618,21 @@ public class TestOMDirectoriesPurgeRequestAndResponse extends TestOMKeyRequest {
     validateDeletedKeys(omMetadataManager, deletedKeyNames);
   }
 
-  private void performBatchOperationCommit(OMDirectoriesPurgeResponseWithFSO omClientResponse) throws IOException {
-    try (BatchOperation batchOperation =
-             omMetadataManager.getStore().initBatchOperation()) {
-      omClientResponse.addToDBBatch(omMetadataManager, batchOperation);
-      // Do manual commit and see whether addToBatch is successful or not.
-      omMetadataManager.getStore().commitBatchOperation(batchOperation);
-    }
+  private void performBatchOperationCommit(OMDirectoriesPurgeResponseWithFSO omClientResponse)
+      throws ExecutionException, InterruptedException {
+    CompletableFuture<Void> future = new CompletableFuture<>();
+    CompletableFuture.runAsync(() -> {
+      try (BatchOperation batchOperation = omMetadataManager.getStore().initBatchOperation()) {
+        omClientResponse.addToDBBatch(omMetadataManager, batchOperation);
+        // Do manual commit and see whether addToBatch is successful or not.
+        omMetadataManager.getStore().commitBatchOperation(batchOperation);
+      } catch (IOException e) {
+        future.completeExceptionally(e);
+        return;
+      }
+      future.complete(null);
+    });
+    future.get();
   }
 
   @Nonnull

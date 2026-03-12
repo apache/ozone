@@ -26,17 +26,14 @@ import java.nio.file.Path;
 import java.util.Collections;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.pipeline.MockPipeline;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.utils.db.StringCodec;
 import org.apache.hadoop.hdds.utils.db.Table;
-import org.apache.hadoop.hdds.utils.db.TypedTable;
-import org.apache.hadoop.ipc.RPC;
+import org.apache.hadoop.ipc_.RPC;
 import org.apache.hadoop.ozone.container.common.SCMTestUtils;
-import org.apache.hadoop.ozone.container.common.ScmTestMock;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.interfaces.ContainerDispatcher;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
@@ -56,10 +53,8 @@ public class TestDatanodeUpgradeToContainerIdsTable {
 
   private DatanodeStateMachine dsm;
   private OzoneConfiguration conf;
-  private static final String CLUSTER_ID = "clusterID";
 
   private RPC.Server scmRpcServer;
-  private InetSocketAddress address;
 
   private void initTests() throws Exception {
     conf = new OzoneConfiguration();
@@ -67,8 +62,6 @@ public class TestDatanodeUpgradeToContainerIdsTable {
   }
 
   private void setup() throws Exception {
-    address = SCMTestUtils.getReuseableAddress();
-    conf.setSocketAddr(ScmConfigKeys.OZONE_SCM_NAMES, address);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS,
         tempFolder.toString());
   }
@@ -88,7 +81,8 @@ public class TestDatanodeUpgradeToContainerIdsTable {
   public void testContainerTableAccessBeforeAndAfterUpgrade() throws Exception {
     initTests();
     // start DN and SCM
-    scmRpcServer = SCMTestUtils.startScmRpcServer(conf, new ScmTestMock(CLUSTER_ID), address, 10);
+    scmRpcServer = SCMTestUtils.startScmRpcServer(conf);
+    InetSocketAddress address = scmRpcServer.getListenerAddress();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
         HDDSLayoutFeature.HBASE_SUPPORT.layoutVersion());
@@ -102,7 +96,7 @@ public class TestDatanodeUpgradeToContainerIdsTable {
 
     // check if the containerIds table is in old format
     WitnessedContainerMetadataStore metadataStore = dsm.getContainer().getWitnessedContainerMetadataStore();
-    TypedTable<ContainerID, String> tableWithStringCodec = metadataStore.getStore().getTable(
+    Table<ContainerID, String> tableWithStringCodec = metadataStore.getStore().getTable(
         metadataStore.getContainerCreateInfoTable().getName(), ContainerID.getCodec(), StringCodec.get());
     assertEquals("containerIds", metadataStore.getContainerCreateInfoTable().getName());
     assertEquals(OPEN.name(), tableWithStringCodec.get(ContainerID.valueOf(containerID)));
@@ -124,7 +118,8 @@ public class TestDatanodeUpgradeToContainerIdsTable {
   public void testContainerTableFinalizeRetry() throws Exception {
     initTests();
     // start DN and SCM
-    scmRpcServer = SCMTestUtils.startScmRpcServer(conf, new ScmTestMock(CLUSTER_ID), address, 10);
+    scmRpcServer = SCMTestUtils.startScmRpcServer(conf);
+    InetSocketAddress address = scmRpcServer.getListenerAddress();
     UpgradeTestHelper.addHddsVolume(conf, tempFolder);
     dsm = UpgradeTestHelper.startPreFinalizedDatanode(conf, tempFolder, dsm, address,
         HDDSLayoutFeature.HBASE_SUPPORT.layoutVersion());
@@ -138,7 +133,7 @@ public class TestDatanodeUpgradeToContainerIdsTable {
 
     // check if the containerIds table is in old format
     WitnessedContainerMetadataStore metadataStore = dsm.getContainer().getWitnessedContainerMetadataStore();
-    TypedTable<ContainerID, String> tableWithStringCodec = metadataStore.getStore().getTable(
+    Table<ContainerID, String> tableWithStringCodec = metadataStore.getStore().getTable(
         metadataStore.getContainerCreateInfoTable().getName(), ContainerID.getCodec(), StringCodec.get());
     assertEquals("containerIds", metadataStore.getContainerCreateInfoTable().getName());
     assertEquals(OPEN.name(), tableWithStringCodec.get(ContainerID.valueOf(containerID)));

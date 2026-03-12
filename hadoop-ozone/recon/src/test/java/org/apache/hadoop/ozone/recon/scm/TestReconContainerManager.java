@@ -40,6 +40,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
+import org.apache.hadoop.hdds.scm.container.ContainerChecksums;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -209,7 +210,8 @@ public class TestReconContainerManager
         .setUuid(uuid1).setHostName("host1").setIpAddress("127.0.0.1").build();
     ContainerReplica containerReplica1 = ContainerReplica.newBuilder()
         .setContainerID(containerID1).setContainerState(State.OPEN)
-        .setDatanodeDetails(datanodeDetails1).setSequenceId(1001L).setDataChecksum(1234L).build();
+        .setDatanodeDetails(datanodeDetails1).setSequenceId(1001L)
+        .setChecksums(ContainerChecksums.of(1234L, 0L)).build();
 
     final ReconContainerManager containerManager = getContainerManager();
     final Map<Long, Map<UUID, ContainerReplicaHistory>> repHistMap =
@@ -256,7 +258,8 @@ public class TestReconContainerManager
         .setUuid(uuid2).setHostName("host2").setIpAddress("127.0.0.2").build();
     final ContainerReplica containerReplica2 = ContainerReplica.newBuilder()
         .setContainerID(containerID1).setContainerState(State.OPEN)
-        .setDatanodeDetails(datanodeDetails2).setSequenceId(1051L).setDataChecksum(1234L).build();
+        .setDatanodeDetails(datanodeDetails2).setSequenceId(1051L)
+        .setChecksums(ContainerChecksums.of(1234L, 0L)).build();
 
     // Add replica to DN02
     containerManager.updateContainerReplica(containerID1, containerReplica2);

@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.ozone.om.ratis;
 
-import static org.apache.hadoop.ipc.RpcConstants.DUMMY_CLIENT_ID;
-import static org.apache.hadoop.ipc.RpcConstants.INVALID_CALL_ID;
+import static org.apache.hadoop.ipc_.RpcConstants.DUMMY_CLIENT_ID;
+import static org.apache.hadoop.ipc_.RpcConstants.INVALID_CALL_ID;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_HA_PREFIX;
 import static org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils.createServerTlsConfig;
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
@@ -38,6 +38,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -54,7 +55,8 @@ import org.apache.hadoop.hdds.ratis.RatisHelper;
 import org.apache.hadoop.hdds.security.SecurityConfig;
 import org.apache.hadoop.hdds.security.x509.certificate.client.CertificateClient;
 import org.apache.hadoop.hdds.tracing.TracingUtil;
-import org.apache.hadoop.ipc.ProtobufRpcEngine.Server;
+import org.apache.hadoop.ipc_.ProtobufRpcEngine.Server;
+import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
@@ -63,6 +65,7 @@ import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.exceptions.OMNotLeaderException;
 import org.apache.hadoop.ozone.om.helpers.OMNodeDetails;
 import org.apache.hadoop.ozone.om.helpers.OMRatisHelper;
+import org.apache.hadoop.ozone.om.helpers.ReadConsistency;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
@@ -87,11 +90,14 @@ import org.apache.ratis.protocol.SetConfigurationRequest;
 import org.apache.ratis.protocol.exceptions.LeaderNotReadyException;
 import org.apache.ratis.protocol.exceptions.LeaderSteppingDownException;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
+import org.apache.ratis.protocol.exceptions.ReadException;
+import org.apache.ratis.protocol.exceptions.ReadIndexException;
 import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.apache.ratis.rpc.RpcType;
 import org.apache.ratis.rpc.SupportedRpcType;
 import org.apache.ratis.server.RaftServer;
 import org.apache.ratis.server.RaftServerConfigKeys;
+import org.apache.ratis.server.RaftServerConfigKeys.Read;
 import org.apache.ratis.server.RetryCache;
 import org.apache.ratis.server.protocol.TermIndex;
 import org.apache.ratis.server.storage.RaftStorage;
@@ -124,6 +130,7 @@ public final class OzoneManagerRatisServer {
 
   private final ClientId clientId = ClientId.randomId();
   private static final AtomicLong CALL_ID_COUNTER = new AtomicLong();
+  private final Read.Option readOption;
 
   private static long nextCallId() {
     return CALL_ID_COUNTER.getAndIncrement() & Long.MAX_VALUE;
@@ -170,6 +177,8 @@ public final class OzoneManagerRatisServer {
           raftGroupIdStr, raftPeersStr.substring(2));
     }
     this.omStateMachine = getStateMachine(conf);
+
+    this.readOption = RaftServerConfigKeys.Read.option(serverProperties);
 
     Parameters parameters = createServerTlsParameters(secConfig, certClient);
     this.server = RaftServer.newBuilder()
@@ -239,11 +248,11 @@ public final class OzoneManagerRatisServer {
    * @return OMResponse - response returned to the client.
    * @throws ServiceException
    */
-  public OMResponse submitRequest(OMRequest omRequest) throws ServiceException {
+  public OMResponse submitRequest(OMRequest omRequest, boolean isWrite) throws ServiceException {
     // In prepare mode, only prepare and cancel requests are allowed to go
     // through.
     if (ozoneManager.getPrepareState().requestAllowed(omRequest.getCmdType())) {
-      RaftClientRequest raftClientRequest = createRaftRequest(omRequest);
+      RaftClientRequest raftClientRequest = createRaftRequest(omRequest, isWrite);
       RaftClientReply raftClientReply = submitRequestToRatis(raftClientRequest);
       return createOmResponse(omRequest, raftClientReply);
     } else {
@@ -277,10 +286,10 @@ public final class OzoneManagerRatisServer {
         () -> submitRequestToRatisImpl(raftClientRequest));
   }
 
-  private RaftClientRequest createRaftRequest(OMRequest omRequest) {
+  private RaftClientRequest createRaftRequest(OMRequest omRequest, boolean isWrite) {
     return captureLatencyNs(
         perfMetrics.getCreateRatisRequestLatencyNs(),
-        () -> createRaftRequestImpl(omRequest));
+        () -> createRaftRequestImpl(omRequest, isWrite));
   }
 
   /**
@@ -323,7 +332,7 @@ public final class OzoneManagerRatisServer {
    * Add new OM to the Ratis ring.
    */
   public void addOMToRatisRing(OMNodeDetails newOMNode) throws IOException {
-    Preconditions.checkNotNull(newOMNode);
+    Objects.requireNonNull(newOMNode, "newOMNode == null");
 
     String newOMNodeId = newOMNode.getNodeId();
     RaftPeer newRaftPeer = OzoneManagerRatisServer.createRaftPeer(newOMNode);
@@ -349,7 +358,7 @@ public final class OzoneManagerRatisServer {
    */
   public void removeOMFromRatisRing(OMNodeDetails removeOMNode)
       throws IOException {
-    Preconditions.checkNotNull(removeOMNode);
+    Objects.requireNonNull(removeOMNode, "removeOMNode == null");
 
     String removeNodeId = removeOMNode.getNodeId();
     LOG.info("{}: Submitting SetConfiguration request to Ratis server to " +
@@ -496,11 +505,11 @@ public final class OzoneManagerRatisServer {
 
   /**
    * Create Write RaftClient request from OMRequest.
-   * @param omRequest
+   * @param omRequest OM request.
    * @return RaftClientRequest - Raft Client request which is submitted to
    * ratis server.
    */
-  private RaftClientRequest createRaftRequestImpl(OMRequest omRequest) {
+  private RaftClientRequest createRaftRequestImpl(OMRequest omRequest, boolean isWrite) {
     return RaftClientRequest.newBuilder()
         .setClientId(getClientId())
         .setServerId(server.getId())
@@ -509,8 +518,26 @@ public final class OzoneManagerRatisServer {
         .setMessage(
             Message.valueOf(
                 OMRatisHelper.convertRequestToByteString(omRequest)))
-        .setType(RaftClientRequest.writeRequestType())
+        .setType(isWrite ? RaftClientRequest.writeRequestType() : getRaftReadRequestType(omRequest))
         .build();
+  }
+
+  private static RaftClientRequest.Type getRaftReadRequestType(OMRequest omRequest) {
+    if (!OmUtils.specifiedReadConsistency(omRequest)) {
+      // If there is no consistency hint, we simply follow the Raft server read option
+      return RaftClientRequest.readRequestType();
+    }
+    // Allow client to decide which read consistency semantic can be used
+    ReadConsistency readConsistency =
+        ReadConsistency.fromProto(omRequest.getReadConsistencyHint().getReadConsistency());
+    if (readConsistency.isLinearizable()) {
+      // Note that the linearizable request type might not be respected
+      // if the Raft server does not set the read option to LINEARIZABLE
+      return RaftClientRequest.readRequestType(false);
+    } else {
+      // This will do a leader-only read even if the Raft server read option is LINEARIZABLE
+      return RaftClientRequest.readRequestType(true);
+    }
   }
 
   private ClientId getClientId() {
@@ -537,7 +564,11 @@ public final class OzoneManagerRatisServer {
     }
     //cache hit
     try {
-      return getOMResponse(cacheEntry.getReplyFuture().get());
+      RaftClientReply reply = cacheEntry.getReplyFuture().get();
+      if (!reply.isSuccess()) {
+        return null;
+      }
+      return getOMResponse(reply);
     } catch (ExecutionException ex) {
       throw new ServiceException(ex.getMessage(), ex);
     } catch (InterruptedException ex) {
@@ -579,6 +610,16 @@ public final class OzoneManagerRatisServer {
         throw new ServiceException(new OMNotLeaderException(leaderSteppingDownException.getMessage()));
       }
 
+      ReadIndexException readIndexException = reply.getReadIndexException();
+      if (readIndexException != null) {
+        throw new ServiceException(readIndexException);
+      }
+
+      ReadException readException = reply.getReadException();
+      if (readException != null) {
+        throw new ServiceException(readException);
+      }
+
       StateMachineException stateMachineException =
           reply.getStateMachineException();
       if (stateMachineException != null) {
@@ -612,7 +653,7 @@ public final class OzoneManagerRatisServer {
 
   private OMResponse getOMResponse(RaftClientReply reply) throws ServiceException {
     try {
-      return OMRatisHelper.getOMResponseFromRaftClientReply(reply);
+      return OMRatisHelper.getOMResponseFromRaftClientReply(reply, getLeaderId());
     } catch (IOException ex) {
       if (ex.getMessage() != null) {
         throw new ServiceException(ex.getMessage(), ex);
@@ -645,6 +686,15 @@ public final class OzoneManagerRatisServer {
   @VisibleForTesting
   public RaftServer.Division getServerDivision() {
     return serverDivision.get();
+  }
+
+  public boolean isLinearizableRead() {
+    // TODO: Currently we use LINEARIZABLE read option to imply
+    //  that we support follower reads although technically
+    //  linearizable leader-only read is also a valid configuration.
+    //  In the future, a separate configuration to check whether OM
+    //  supports follower read can be added.
+    return readOption == Read.Option.LINEARIZABLE;
   }
 
   /**

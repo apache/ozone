@@ -19,6 +19,7 @@ package org.apache.hadoop.ozone.container.common.statemachine;
 
 import static org.apache.hadoop.metrics2.lib.Interns.info;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.CaseFormat;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
@@ -169,6 +170,27 @@ public final class DatanodeQueueMetrics implements MetricsSource {
         k -> getMetricsInfo(PIPELINE_ACTION_QUEUE_PREFIX,
             CaseFormat.UPPER_UNDERSCORE
                 .to(CaseFormat.UPPER_CAMEL, k.getHostName())));
+  }
+
+  public void removeEndpoint(InetSocketAddress endpoint) {
+    incrementalReportsQueueMap.remove(endpoint);
+    containerActionQueueMap.remove(endpoint);
+    pipelineActionQueueMap.remove(endpoint);
+  }
+
+  @VisibleForTesting
+  public int getIncrementalReportsQueueMapSize() {
+    return incrementalReportsQueueMap.size();
+  }
+
+  @VisibleForTesting
+  public int getContainerActionQueueMapSize() {
+    return containerActionQueueMap.size();
+  }
+
+  @VisibleForTesting
+  public int getPipelineActionQueueMapSize() {
+    return pipelineActionQueueMap.size();
   }
 
   private MetricsInfo getMetricsInfo(String prefix, String metricName) {

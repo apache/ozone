@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
+import org.apache.hadoop.ozone.recon.ReconServerConfigKeys;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.spi.ReconFileMetadataManager;
 
@@ -53,11 +54,27 @@ public class FileSizeCountTaskFSO implements ReconOmTask {
 
   @Override
   public TaskResult reprocess(OMMetadataManager omMetadataManager) {
+    int maxKeysInMemory = ozoneConfiguration.getInt(
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_KEYS_IN_MEMORY,
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_KEYS_IN_MEMORY_DEFAULT);
+    int maxIterators = ozoneConfiguration.getInt(
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_ITERATORS,
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_ITERATORS_DEFAULT);
+    int maxWorkers = ozoneConfiguration.getInt(
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_WORKERS,
+        ReconServerConfigKeys.OZONE_RECON_TASK_REPROCESS_MAX_WORKERS_DEFAULT);
+    long fileSizeCountFlushThreshold = ozoneConfiguration.getLong(
+        ReconServerConfigKeys.OZONE_RECON_FILESIZECOUNT_FLUSH_TO_DB_MAX_THRESHOLD,
+        ReconServerConfigKeys.OZONE_RECON_FILESIZECOUNT_FLUSH_TO_DB_MAX_THRESHOLD_DEFAULT);
     return FileSizeCountTaskHelper.reprocess(
         omMetadataManager,
         reconFileMetadataManager,
         BucketLayout.FILE_SYSTEM_OPTIMIZED,
-        getTaskName()
+        getTaskName(),
+        maxIterators,
+        maxWorkers,
+        maxKeysInMemory,
+        fileSizeCountFlushThreshold
     );
   }
 

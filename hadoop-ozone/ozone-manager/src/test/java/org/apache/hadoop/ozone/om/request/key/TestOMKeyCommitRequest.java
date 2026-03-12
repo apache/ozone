@@ -237,15 +237,13 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
             .map(OmKeyLocationInfo::getFromProtobuf)
             .collect(Collectors.toList());
 
+    List<OzoneAcl> acls = Collections.singletonList(OzoneAcl.parseAcl("user:foo:rw"));
     OmKeyInfo.Builder omKeyInfoBuilder = OMRequestTestUtils.createOmKeyInfo(
         volumeName, bucketName, keyName, replicationConfig, new OmKeyLocationInfoGroup(version, new ArrayList<>()));
     omKeyInfoBuilder.setExpectedDataGeneration(1L);
-    OmKeyInfo omKeyInfo = omKeyInfoBuilder.build();
-    omKeyInfo.appendNewBlocks(allocatedLocationList, false);
-    List<OzoneAcl> acls = Collections.singletonList(OzoneAcl.parseAcl("user:foo:rw"));
-    omKeyInfo.addAcl(acls.get(0));
+    omKeyInfoBuilder.addAcl(acls.get(0));
 
-    String openKey = addKeyToOpenKeyTable(allocatedLocationList, omKeyInfo);
+    String openKey = addKeyToOpenKeyTable(allocatedLocationList, omKeyInfoBuilder);
     OmKeyInfo openKeyInfo = openKeyTable.get(openKey);
     assertNotNull(openKeyInfo);
     assertEquals(acls, openKeyInfo.getAcls());
@@ -816,6 +814,41 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
     assertThat(key).doesNotEndWith(String.valueOf(omKeyInfoList.get(0).getObjectID()));
   }
 
+  @Test
+  public void testPreAllocatedUncommittedBlockForEmptyFile() throws Exception {
+    dataSize = 0;
+    List<KeyLocation> emptyKeyLocations = new ArrayList<>();
+    List<KeyLocation> oneKeyLocations = getKeyLocation(1);
+    OMRequest omRequest = createCommitKeyRequest(emptyKeyLocations, false);
+    OMRequest modifiedOmRequest = doPreExecute(omRequest);
+    OMKeyCommitRequest omKeyCommitRequest = getOmKeyCommitRequest(modifiedOmRequest);
+
+    OMRequestTestUtils.addVolumeAndBucketToDB(volumeName, bucketName,
+        omMetadataManager, omKeyCommitRequest.getBucketLayout());
+
+    List<OmKeyLocationInfo> allocatedLocationList =
+        oneKeyLocations.stream().map(OmKeyLocationInfo::getFromProtobuf).collect(Collectors.toList());
+    String openKey = addKeyToOpenKeyTable(allocatedLocationList);
+    OmKeyInfo omKeyInfo = omMetadataManager.getOpenKeyTable(omKeyCommitRequest.getBucketLayout()).get(openKey);
+    assertNotNull(omKeyInfo);
+
+    String ozoneKey = getOzonePathKey();
+    omKeyInfo = omMetadataManager.getKeyTable(omKeyCommitRequest.getBucketLayout()).get(ozoneKey);
+    assertNull(omKeyInfo);
+
+    OMClientResponse omClientResponse = omKeyCommitRequest.validateAndUpdateCache(ozoneManager, 100L);
+    assertEquals(OK, omClientResponse.getOMResponse().getStatus());
+
+    Map<String, RepeatedOmKeyInfo> toDeleteKeyList = ((OMKeyCommitResponse) omClientResponse).getKeysToDelete();
+    assertNull(toDeleteKeyList);
+
+    omKeyInfo = omMetadataManager.getOpenKeyTable(omKeyCommitRequest.getBucketLayout()).get(openKey);
+    assertNull(omKeyInfo);
+
+    omKeyInfo = omMetadataManager.getKeyTable(omKeyCommitRequest.getBucketLayout()).get(ozoneKey);
+    assertNotNull(omKeyInfo);
+  }
+
   /**
    * This method calls preExecute and verify the modified request.
    * @param originalOMRequest
@@ -935,7 +968,10 @@ public class TestOMKeyCommitRequest extends TestOMKeyRequest {
   }
 
   @Nonnull
-  protected String addKeyToOpenKeyTable(List<OmKeyLocationInfo> locationList, OmKeyInfo keyInfo) throws Exception {
+  protected String addKeyToOpenKeyTable(List<OmKeyLocationInfo> locationList, OmKeyInfo.Builder keyInfoBuilder)
+      throws Exception {
+    OmKeyInfo keyInfo = keyInfoBuilder.build();
+    keyInfo.appendNewBlocks(locationList, false);
     OMRequestTestUtils.addKeyToTable(true, false, keyInfo, clientID, 0, omMetadataManager);
 
     return omMetadataManager.getOpenKey(volumeName, bucketName,

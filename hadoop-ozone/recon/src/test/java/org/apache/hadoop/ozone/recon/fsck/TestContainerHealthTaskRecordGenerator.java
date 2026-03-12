@@ -41,6 +41,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PlacementPolicy;
+import org.apache.hadoop.hdds.scm.container.ContainerChecksums;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
@@ -642,8 +643,8 @@ public class TestContainerHealthTaskRecordGenerator {
       replicas.add(new ContainerReplica.ContainerReplicaBuilder()
           .setContainerID(cont.containerID())
           .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
+          .setChecksums(ContainerChecksums.of(1234L, 0L))
           .setContainerState(s)
-          .setDataChecksum(1234L)
           .build());
     }
     return replicas;
@@ -658,7 +659,7 @@ public class TestContainerHealthTaskRecordGenerator {
           .setContainerID(cont.containerID())
           .setDatanodeDetails(MockDatanodeDetails.randomDatanodeDetails())
           .setContainerState(s)
-          .setDataChecksum(checksum)
+          .setChecksums(ContainerChecksums.of(checksum, 0L))
           .build());
       checksum++;
     }

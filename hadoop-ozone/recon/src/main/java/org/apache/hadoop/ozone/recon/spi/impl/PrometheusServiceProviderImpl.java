@@ -17,19 +17,14 @@
 
 package org.apache.hadoop.ozone.recon.spi.impl;
 
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT_DEFAULT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_METRICS_HTTP_CONNECTION_TIMEOUT;
-import static org.apache.hadoop.ozone.recon.ReconServerConfigKeys.OZONE_RECON_METRICS_HTTP_CONNECTION_TIMEOUT_DEFAULT;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.concurrent.TimeUnit;
 import javax.inject.Singleton;
 import javax.ws.rs.core.Response;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -49,7 +44,6 @@ public class PrometheusServiceProviderImpl
     implements MetricsServiceProvider {
 
   public static final String PROMETHEUS_INSTANT_QUERY_API = "query";
-  public static final String PROMETHEUS_RANGED_QUERY_API = "query_range";
 
   private static final Logger LOG =
       LoggerFactory.getLogger(PrometheusServiceProviderImpl.class);
@@ -58,21 +52,12 @@ public class PrometheusServiceProviderImpl
   private final String prometheusEndpoint;
   private ReconUtils reconUtils;
 
-  public PrometheusServiceProviderImpl(OzoneConfiguration configuration,
-                                       ReconUtils reconUtils) {
+  public PrometheusServiceProviderImpl(
+      OzoneConfiguration configuration,
+      ReconUtils reconUtils,
+      URLConnectionFactory connectionFactory) {
 
-    int connectionTimeout = (int) configuration.getTimeDuration(
-        OZONE_RECON_METRICS_HTTP_CONNECTION_TIMEOUT,
-        OZONE_RECON_METRICS_HTTP_CONNECTION_TIMEOUT_DEFAULT,
-        TimeUnit.MILLISECONDS);
-    int connectionRequestTimeout = (int) configuration.getTimeDuration(
-        OZONE_RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT,
-        OZONE_RECON_METRICS_HTTP_CONNECTION_REQUEST_TIMEOUT_DEFAULT,
-        TimeUnit.MILLISECONDS);
-
-    connectionFactory =
-        URLConnectionFactory.newDefaultURLConnectionFactory(connectionTimeout,
-            connectionRequestTimeout, configuration);
+    this.connectionFactory = connectionFactory;
 
     String endpoint = configuration.getTrimmed(getEndpointConfigKey());
     // Remove the trailing slash from endpoint url.
@@ -123,17 +108,9 @@ public class PrometheusServiceProviderImpl
     return getMetrics(PROMETHEUS_INSTANT_QUERY_API, queryString);
   }
 
-  /**
-   * Returns a list of {@link Metric} for the given ranged query.
-   *
-   * @param queryString query string with metric name, start time, end time,
-   *                    step and other filters.
-   * @return List of Json map of metrics response.
-   * @throws Exception exception
-   */
   @Override
-  public List<Metric> getMetricsRanged(String queryString) throws Exception {
-    return getMetrics(PROMETHEUS_RANGED_QUERY_API, queryString);
+  public List<Map<String, Object>> getMetrics(String queryString) throws Exception {
+    return Collections.emptyList();
   }
 
   /**

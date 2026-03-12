@@ -179,7 +179,7 @@ public class TestSnapshotDefragAdmin {
             "om",
             "snapshot",
             "defrag",
-            "-id", omServiceId,
+            "--service-id", omServiceId,
             "--node-id", nodeId,
             "--no-wait"
         };
@@ -188,7 +188,7 @@ public class TestSnapshotDefragAdmin {
             "om",
             "snapshot",
             "defrag",
-            "-id", omServiceId,
+            "--service-id", omServiceId,
             "--node-id", nodeId
         };
       }

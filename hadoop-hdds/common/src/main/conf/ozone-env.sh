@@ -17,8 +17,23 @@
 
 # Set Ozone-specific environment variables here.
 
-# Enable core dump when crash in C++
-ulimit -c unlimited
+# Enable core dump when crash in C++.
+# Ozone may invoke native components (e.g., RocksDB, JNI, or C++ libraries).
+# When a native crash occurs, enabling core dumps can help debugging.
+#
+# However, raising the core file size limit is not always allowed.
+# - 'ulimit -Hc' returns the hard limit for core size.
+#   If the hard limit is 0, core dumps are explicitly forbidden
+#   (common for non-root users or Docker containers started with
+#   '--ulimit core=0'). In such environments, attempting
+#   'ulimit -c unlimited' would always fail and print a warning.
+#
+# To avoid noisy warnings during CLI execution (e.g., ozone version),
+# we only attempt to raise the limit when the hard limit is non-zero,
+# and we silence any possible error for safety.
+if [ "$(ulimit -Hc 2>/dev/null || echo 0)" != 0 ]; then
+  ulimit -c unlimited 2>/dev/null || true
+fi
 
 # Many of the options here are built from the perspective that users
 # may want to provide OVERWRITING values on the command line.

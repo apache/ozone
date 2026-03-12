@@ -22,8 +22,10 @@ import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandRequestProto;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerCommandResponseProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.utils.io.RandomAccessFileChannel;
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.DispatcherContext;
 import org.apache.ratis.statemachine.StateMachine;
+import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 
 /**
  * Dispatcher acts as the bridge between the transport layer and
@@ -88,5 +90,16 @@ public interface ContainerDispatcher {
       ContainerCommandRequestProto msg) throws StorageContainerException {
     throw new UnsupportedOperationException(
         "getStreamDataChannel not supported.");
+  }
+
+  /**
+   * When reading data form client by streaming chunks.
+   */
+  default void streamDataReadOnly(
+       ContainerCommandRequestProto msg,
+       StreamObserver<ContainerCommandResponseProto> streamObserver,
+       RandomAccessFileChannel blockFile,
+       DispatcherContext dispatcherContext) {
+    throw new UnsupportedOperationException("streamDataReadOnly not supported.");
   }
 }

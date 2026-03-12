@@ -74,3 +74,8 @@ message FileSizeCountKeyProto {
     required string bucket = 2;
     required int64 fileSizeUpperBound = 3;
 }
+
+message SnapDiffObjectInfo {
+  optional uint64 objectID = 1;
+  optional string keyName = 2;
+}

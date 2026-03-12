@@ -23,7 +23,7 @@ import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretP
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.READ;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.BlockTokenSecretProto.AccessModeProto.WRITE;
 
-import com.google.common.base.Preconditions;
+import java.util.Objects;
 import org.apache.hadoop.hdds.HddsUtils;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ContainerBlockID;
@@ -71,8 +71,7 @@ public class BlockTokenVerifier extends
   @Override
   protected Object getService(ContainerCommandRequestProtoOrBuilder cmd) {
     BlockID blockID = HddsUtils.getBlockID(cmd);
-    Preconditions.checkNotNull(blockID,
-        "no blockID in %s command", cmd.getCmdType());
+    Objects.requireNonNull(blockID, () -> "blockID == null in command " + cmd.getCmdType());
     return getTokenService(blockID);
   }
 

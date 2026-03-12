@@ -60,6 +60,7 @@ import org.apache.hadoop.hdds.scm.server.SCMHTTPServerConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.hadoop.hdds.security.symmetric.SecretKeyManager;
+import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.minikdc.MiniKdc;
 import org.apache.hadoop.ozone.MiniOzoneCluster;
 import org.apache.hadoop.ozone.MiniOzoneHAClusterImpl;
@@ -133,9 +134,7 @@ public final class TestSecretKeySnapshot {
   @AfterEach
   public void stop() {
     miniKdc.stop();
-    if (cluster != null) {
-      cluster.stop();
-    }
+    IOUtils.closeQuietly(cluster);
   }
 
   private void createCredentialsInKDC() throws Exception {

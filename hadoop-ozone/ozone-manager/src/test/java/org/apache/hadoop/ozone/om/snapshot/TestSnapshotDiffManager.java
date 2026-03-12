@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.om.snapshot;
 
+import static org.apache.commons.lang3.StringUtils.leftPad;
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.DEFAULT_COLUMN_FAMILY_NAME;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_OM_SNAPSHOT_LOAD_NATIVE_LIB_DEFAULT;
@@ -30,13 +31,13 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_DIFF_THR
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SNAPSHOT_FORCE_FULL_DIFF_DEFAULT;
 import static org.apache.hadoop.ozone.om.OmSnapshotManager.DELIMITER;
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.SNAP_DIFF_JOB_TABLE_NAME;
-import static org.apache.hadoop.ozone.om.OmSnapshotManager.SNAP_DIFF_REPORT_TABLE_NAME;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.DIRECTORY_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.FILE_TABLE;
 import static org.apache.hadoop.ozone.om.codec.OMDBDefinition.KEY_TABLE;
 import static org.apache.hadoop.ozone.om.helpers.BucketLayout.LEGACY;
 import static org.apache.hadoop.ozone.om.helpers.SnapshotInfo.getTableKey;
+import static org.apache.hadoop.ozone.om.snapshot.db.SnapshotDiffDBDefinition.SNAP_DIFF_JOB_TABLE_NAME;
+import static org.apache.hadoop.ozone.om.snapshot.db.SnapshotDiffDBDefinition.SNAP_DIFF_REPORT_TABLE_NAME;
 import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage.CANCEL_ALREADY_CANCELLED_JOB;
 import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage.CANCEL_ALREADY_DONE_JOB;
 import static org.apache.hadoop.ozone.snapshot.CancelSnapshotDiffResponse.CancelMessage.CANCEL_ALREADY_FAILED_JOB;
@@ -52,23 +53,16 @@ import static org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus.RE
 import static org.apache.ratis.util.JavaUtils.attempt;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.anyBoolean;
-import static org.mockito.Mockito.anyDouble;
-import static org.mockito.Mockito.anyInt;
-import static org.mockito.Mockito.anyMap;
-import static org.mockito.Mockito.anySet;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockConstruction;
@@ -79,16 +73,16 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.cache.CacheLoader;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import jakarta.annotation.Nonnull;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -102,12 +96,14 @@ import java.util.concurrent.Future;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.RandomStringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -115,6 +111,8 @@ import org.apache.hadoop.hdds.utils.IOUtils;
 import org.apache.hadoop.hdds.utils.db.CodecRegistry;
 import org.apache.hadoop.hdds.utils.db.RDBStore;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase;
+import org.apache.hadoop.hdds.utils.db.SstFileSetReader;
+import org.apache.hadoop.hdds.utils.db.StringInMemoryTestTable;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
@@ -146,16 +144,9 @@ import org.apache.hadoop.ozone.snapshot.SnapshotDiffResponse.JobStatus;
 import org.apache.hadoop.ozone.util.ClosableIterator;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ExitUtil;
-import org.apache.ozone.rocksdb.util.RdbUtil;
-import org.apache.ozone.rocksdb.util.SstFileSetReader;
-import org.apache.ozone.rocksdiff.DifferSnapshotInfo;
-import org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer;
-import org.apache.ozone.rocksdiff.RocksDiffUtils;
 import org.apache.ratis.util.ExitUtils;
 import org.apache.ratis.util.TimeDuration;
-import org.apache.ratis.util.function.UncheckedAutoCloseableSupplier;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -165,19 +156,15 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
-import org.mockito.stubbing.Answer;
 import org.rocksdb.ColumnFamilyDescriptor;
 import org.rocksdb.ColumnFamilyHandle;
 import org.rocksdb.RocksDBException;
-import org.rocksdb.RocksIterator;
 
 /**
  * Tests for SnapshotDiffManager.
@@ -204,10 +191,6 @@ public class TestSnapshotDiffManager {
   private final OMMetrics omMetrics = OMMetrics.create();
   @TempDir
   private File dbDir;
-  @TempDir
-  private File snapDiffDir;
-  @Mock
-  private RocksDBCheckpointDiffer differ;
   @Mock
   private OMMetadataManager omMetadataManager;
   @Mock
@@ -224,12 +207,6 @@ public class TestSnapshotDiffManager {
   private OmBucketInfo omBucketInfo;
   @Mock
   private RDBStore dbStore;
-
-  @Mock
-  private RocksIterator jobTableIterator;
-
-  @Mock
-  private OmSnapshotManager omSnapshotManager;
 
   private static CodecRegistry codecRegistry;
 
@@ -280,7 +257,6 @@ public class TestSnapshotDiffManager {
 
     String snapshotNamePrefix = "snap-";
     String snapshotPath = "snapshotPath";
-    String snapshotCheckpointDir = "snapshotCheckpointDir";
     UUID baseSnapshotId = UUID.randomUUID();
     String baseSnapshotName = snapshotNamePrefix + baseSnapshotId;
     snapshotInfo = new SnapshotInfo.Builder()
@@ -306,7 +282,7 @@ public class TestSnapshotDiffManager {
       SnapshotDiffJob diffJob = new SnapshotDiffJob(System.currentTimeMillis(),
           UUID.randomUUID().toString(), jobStatus, VOLUME_NAME, BUCKET_NAME,
           baseSnapshotName, targetSnapshotName, false, false, 0,
-          null, 0.0);
+          null, 0.0, "");
 
       snapshotNames.add(targetSnapshotName);
       snapshotInfoList.add(targetSnapshot);
@@ -366,7 +342,7 @@ public class TestSnapshotDiffManager {
     when(ozoneManager.getConfiguration()).thenReturn(configuration);
     when(ozoneManager.getMetadataManager()).thenReturn(omMetadataManager);
 
-    omSnapshotManager = mock(OmSnapshotManager.class);
+    OmSnapshotManager omSnapshotManager = mock(OmSnapshotManager.class);
     when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
     SnapshotCache snapshotCache = new SnapshotCache(mockCacheLoader(), 10, omMetrics, 0, true,
         new OmReadOnlyLock());
@@ -378,7 +354,7 @@ public class TestSnapshotDiffManager {
           return snapshotCache.get(snapInfo.getSnapshotId());
         });
     when(ozoneManager.getOmSnapshotManager()).thenReturn(omSnapshotManager);
-    snapshotDiffManager = new SnapshotDiffManager(db, differ, ozoneManager,
+    snapshotDiffManager = new SnapshotDiffManager(db, ozoneManager,
         snapDiffJobTable, snapDiffReportTable, columnFamilyOptions, codecRegistry);
     when(omSnapshotManager.getDiffCleanupServiceInterval()).thenReturn(0L);
   }
@@ -409,229 +385,6 @@ public class TestSnapshotDiffManager {
     return omSnapshot;
   }
 
-  private SnapshotInfo getMockedSnapshotInfo(UUID snapshotId) {
-    SnapshotInfo snapInfo = mock(SnapshotInfo.class);
-    when(snapInfo.getSnapshotId()).thenReturn(snapshotId);
-    return snapInfo;
-  }
-
-  @ParameterizedTest
-  @ValueSource(ints = {0, 1, 2, 5, 10, 100, 1000, 10000})
-  public void testGetDeltaFilesWithDag(int numberOfFiles) throws IOException {
-    UUID snap1 = UUID.randomUUID();
-    UUID snap2 = UUID.randomUUID();
-    when(snapshotInfoTable.get(SnapshotInfo.getTableKey(VOLUME_NAME, BUCKET_NAME, snap1.toString())))
-        .thenReturn(getSnapshotInfoInstance(VOLUME_NAME, BUCKET_NAME, snap1.toString(), snap2));
-    when(snapshotInfoTable.get(SnapshotInfo.getTableKey(VOLUME_NAME, BUCKET_NAME, snap2.toString())))
-        .thenReturn(getSnapshotInfoInstance(VOLUME_NAME, BUCKET_NAME, snap2.toString(), snap2));
-
-    String diffDir = snapDiffDir.getAbsolutePath();
-    String diffJobKey = snap1 + DELIMITER + snap2;
-    Set<String> randomStrings = IntStream.range(0, numberOfFiles)
-        .mapToObj(i -> RandomStringUtils.secure().nextAlphabetic(10))
-        .collect(Collectors.toSet());
-
-    when(differ.getSSTDiffListWithFullPath(
-        any(DifferSnapshotInfo.class),
-        any(DifferSnapshotInfo.class),
-        anySet(),
-        eq(diffDir))
-    ).thenReturn(Optional.of(Lists.newArrayList(randomStrings)));
-
-    UncheckedAutoCloseableSupplier<OmSnapshot> rcFromSnapshot =
-        omSnapshotManager.getActiveSnapshot(VOLUME_NAME, BUCKET_NAME, snap1.toString());
-    UncheckedAutoCloseableSupplier<OmSnapshot> rcToSnapshot =
-        omSnapshotManager.getActiveSnapshot(VOLUME_NAME, BUCKET_NAME, snap2.toString());
-    OmSnapshot fromSnapshot = rcFromSnapshot.get();
-    OmSnapshot toSnapshot = rcToSnapshot.get();
-
-    SnapshotInfo fromSnapshotInfo = getMockedSnapshotInfo(snap1);
-    SnapshotInfo toSnapshotInfo = getMockedSnapshotInfo(snap2);
-    when(jobTableIterator.isValid()).thenReturn(false);
-    try (MockedStatic<RdbUtil> mockedRdbUtil = Mockito.mockStatic(RdbUtil.class, Mockito.CALLS_REAL_METHODS);
-         MockedStatic<RocksDiffUtils> mockedRocksDiffUtils = Mockito.mockStatic(RocksDiffUtils.class,
-             Mockito.CALLS_REAL_METHODS)) {
-      mockedRdbUtil.when(() -> RdbUtil.getSSTFilesForComparison(any(), any()))
-          .thenReturn(Collections.singleton(RandomStringUtils.secure().nextAlphabetic(10)));
-      mockedRocksDiffUtils.when(() -> RocksDiffUtils.filterRelevantSstFiles(any(), any(), anySet()))
-          .thenAnswer(i -> null);
-      SnapshotDiffManager spy = spy(snapshotDiffManager);
-      doNothing().when(spy).recordActivity(any(), any());
-      doNothing().when(spy).updateProgress(anyString(), anyDouble());
-      Set<String> deltaFiles = spy.getDeltaFiles(
-          fromSnapshot,
-          toSnapshot,
-          Sets.newHashSet("cf1", "cf2"), fromSnapshotInfo,
-          toSnapshotInfo, false,
-          new TablePrefixInfo(Collections.emptyMap()), diffDir, diffJobKey);
-      assertEquals(randomStrings, deltaFiles);
-    }
-    rcFromSnapshot.close();
-    rcToSnapshot.close();
-  }
-
-  @ParameterizedTest
-  @CsvSource({"0,true", "1,true", "2,true", "5,true", "10,true", "100,true",
-      "1000,true", "10000,true", "0,false", "1,false", "2,false", "5,false",
-      "10,false", "100,false", "1000,false", "10000,false"})
-  public void testGetDeltaFilesWithFullDiff(int numberOfFiles,
-                                            boolean useFullDiff)
-      throws IOException {
-    try (MockedStatic<RdbUtil> mockedRdbUtil = mockStatic(RdbUtil.class);
-         MockedStatic<RocksDiffUtils> mockedRocksDiffUtils =
-             mockStatic(RocksDiffUtils.class)) {
-      Set<String> deltaStrings = new HashSet<>();
-
-      mockedRdbUtil.when(
-              () -> RdbUtil.getSSTFilesForComparison(any(), anySet()))
-          .thenAnswer((Answer<Set<String>>) invocation -> {
-            Set<String> retVal = IntStream.range(0, numberOfFiles)
-                .mapToObj(i -> RandomStringUtils.secure().nextAlphabetic(10))
-                .collect(Collectors.toSet());
-            deltaStrings.addAll(retVal);
-            return retVal;
-          });
-
-      mockedRocksDiffUtils.when(() ->
-              RocksDiffUtils.filterRelevantSstFiles(anySet(), any(), anyMap(), anySet(), any(ManagedRocksDB.class),
-                  any(ManagedRocksDB.class)))
-          .thenAnswer((Answer<Void>) invocationOnMock -> {
-            invocationOnMock.getArgument(0, Set.class).stream()
-                .findAny().ifPresent(val -> {
-                  assertTrue(deltaStrings.contains(val));
-                  invocationOnMock.getArgument(0, Set.class).remove(val);
-                  deltaStrings.remove(val);
-                });
-            return null;
-          });
-      UUID snap1 = UUID.randomUUID();
-      UUID snap2 = UUID.randomUUID();
-      String diffJobKey = snap1 + DELIMITER + snap2;
-      when(snapshotInfoTable.get(SnapshotInfo.getTableKey(VOLUME_NAME, BUCKET_NAME, snap1.toString())))
-          .thenReturn(getSnapshotInfoInstance(VOLUME_NAME, BUCKET_NAME, snap1.toString(), snap2));
-      when(snapshotInfoTable.get(SnapshotInfo.getTableKey(VOLUME_NAME, BUCKET_NAME, snap2.toString())))
-          .thenReturn(getSnapshotInfoInstance(VOLUME_NAME, BUCKET_NAME, snap2.toString(), snap2));
-      if (!useFullDiff) {
-        when(differ.getSSTDiffListWithFullPath(
-            any(DifferSnapshotInfo.class),
-            any(DifferSnapshotInfo.class),
-            anySet(),
-            anyString()))
-            .thenReturn(Optional.ofNullable(Collections.emptyList()));
-      }
-
-      UncheckedAutoCloseableSupplier<OmSnapshot> rcFromSnapshot =
-          omSnapshotManager.getActiveSnapshot(VOLUME_NAME, BUCKET_NAME, snap1.toString());
-      UncheckedAutoCloseableSupplier<OmSnapshot> rcToSnapshot =
-          omSnapshotManager.getActiveSnapshot(VOLUME_NAME, BUCKET_NAME, snap2.toString());
-      OmSnapshot fromSnapshot = rcFromSnapshot.get();
-      OmSnapshot toSnapshot = rcToSnapshot.get();
-
-      SnapshotInfo fromSnapshotInfo = getMockedSnapshotInfo(snap1);
-      SnapshotInfo toSnapshotInfo = getMockedSnapshotInfo(snap1);
-      when(jobTableIterator.isValid()).thenReturn(false);
-      SnapshotDiffManager spy = spy(snapshotDiffManager);
-      doNothing().when(spy).recordActivity(any(), any());
-      doNothing().when(spy).updateProgress(anyString(), anyDouble());
-      Set<String> deltaFiles = spy.getDeltaFiles(
-          fromSnapshot,
-          toSnapshot,
-          Sets.newHashSet("cf1", "cf2"),
-          fromSnapshotInfo,
-          toSnapshotInfo,
-          false,
-          new TablePrefixInfo(Collections.emptyMap()),
-          snapDiffDir.getAbsolutePath(), diffJobKey);
-      assertEquals(deltaStrings, deltaFiles);
-    }
-  }
-
-  @ParameterizedTest
-  @ValueSource(ints = {0, 1, 2, 5, 10, 100, 1000, 10000})
-  public void testGetDeltaFilesWithDifferThrowException(int numberOfFiles)
-      throws IOException {
-    try (MockedStatic<RdbUtil> mockedRdbUtil = mockStatic(RdbUtil.class);
-         MockedStatic<RocksDiffUtils> mockedRocksDiffUtils =
-             mockStatic(RocksDiffUtils.class)) {
-      Set<String> deltaStrings = new HashSet<>();
-
-      mockedRdbUtil.when(
-              () -> RdbUtil.getSSTFilesForComparison(any(), anySet()))
-          .thenAnswer((Answer<Set<String>>) invocation -> {
-            Set<String> retVal = IntStream.range(0, numberOfFiles)
-                .mapToObj(i -> RandomStringUtils.secure().nextAlphabetic(10))
-                .collect(Collectors.toSet());
-            deltaStrings.addAll(retVal);
-            return retVal;
-          });
-
-      mockedRocksDiffUtils.when(() ->
-              RocksDiffUtils.filterRelevantSstFiles(anySet(), any(), anyMap(), anySet(), any(ManagedRocksDB.class),
-                  any(ManagedRocksDB.class)))
-          .thenAnswer((Answer<Void>) invocationOnMock -> {
-            invocationOnMock.getArgument(0, Set.class).stream()
-                .findAny().ifPresent(val -> {
-                  assertTrue(deltaStrings.contains(val));
-                  invocationOnMock.getArgument(0, Set.class).remove(val);
-                  deltaStrings.remove(val);
-                });
-            return null;
-          });
-      UUID snap1 = UUID.randomUUID();
-      UUID snap2 = UUID.randomUUID();
-      when(snapshotInfoTable.get(SnapshotInfo.getTableKey(VOLUME_NAME, BUCKET_NAME, snap1.toString())))
-          .thenReturn(getSnapshotInfoInstance(VOLUME_NAME, BUCKET_NAME, snap1.toString(), snap1));
-      when(snapshotInfoTable.get(SnapshotInfo.getTableKey(VOLUME_NAME, BUCKET_NAME, snap2.toString())))
-          .thenReturn(getSnapshotInfoInstance(VOLUME_NAME, BUCKET_NAME, snap2.toString(), snap2));
-
-      doThrow(new RuntimeException("File not found exception."))
-          .when(differ)
-          .getSSTDiffListWithFullPath(
-              any(DifferSnapshotInfo.class),
-              any(DifferSnapshotInfo.class),
-              anySet(),
-              anyString());
-
-      UncheckedAutoCloseableSupplier<OmSnapshot> rcFromSnapshot =
-          omSnapshotManager.getActiveSnapshot(VOLUME_NAME, BUCKET_NAME, snap1.toString());
-      UncheckedAutoCloseableSupplier<OmSnapshot> rcToSnapshot =
-          omSnapshotManager.getActiveSnapshot(VOLUME_NAME, BUCKET_NAME, snap2.toString());
-      OmSnapshot fromSnapshot = rcFromSnapshot.get();
-      OmSnapshot toSnapshot = rcToSnapshot.get();
-
-      SnapshotInfo fromSnapshotInfo = getMockedSnapshotInfo(snap1);
-      SnapshotInfo toSnapshotInfo = getMockedSnapshotInfo(snap1);
-      when(jobTableIterator.isValid()).thenReturn(false);
-      String diffJobKey = snap1 + DELIMITER + snap2;
-      SnapshotDiffManager spy = spy(snapshotDiffManager);
-      doNothing().when(spy).recordActivity(any(), any());
-      doNothing().when(spy).updateProgress(anyString(), anyDouble());
-      Set<String> deltaFiles = spy.getDeltaFiles(
-          fromSnapshot,
-          toSnapshot,
-          Sets.newHashSet("cf1", "cf2"),
-          fromSnapshotInfo,
-          toSnapshotInfo,
-          false,
-          new TablePrefixInfo(Collections.emptyMap()),
-          snapDiffDir.getAbsolutePath(), diffJobKey);
-      assertEquals(deltaStrings, deltaFiles);
-
-      rcFromSnapshot.close();
-      rcToSnapshot.close();
-    }
-  }
-
-  private Table<String, ? extends WithParentObjectId> getMockedTable(
-      Map<String, WithParentObjectId> map, String tableName)
-      throws IOException {
-    Table<String, ? extends WithParentObjectId> mocked = mock(Table.class);
-    when(mocked.get(any()))
-        .thenAnswer(invocation -> map.get(invocation.getArgument(0)));
-    when(mocked.getName()).thenReturn(tableName);
-    return mocked;
-  }
-
   private WithParentObjectId getKeyInfo(int objectId, int updateId,
                                         int parentObjectId,
                                         String snapshotTableName) {
@@ -645,6 +398,25 @@ public class TestSnapshotDiffManager {
         .setVolumeName("vol").setBucketName("bucket").setUpdateID(updateId)
         .setReplicationConfig(new ECReplicationConfig(3, 2))
         .setKeyName(name).build();
+  }
+
+  private ClosableIterator<String> getNewIterator(Iterator<String> itr) {
+    return new ClosableIterator<String>() {
+      @Override
+      public boolean hasNext() {
+        return itr.hasNext();
+      }
+
+      @Override
+      public String next() {
+        return itr.next();
+      }
+
+      @Override
+      public void close() {
+
+      }
+    };
   }
 
   /**
@@ -667,47 +439,37 @@ public class TestSnapshotDiffManager {
   public void testObjectIdMapWithTombstoneEntries(boolean nativeLibraryLoaded,
                                                   String snapshotTableName)
       throws IOException, RocksDBException {
-    Set<String> keysIncludingTombstones = IntStream.range(0, 100)
-        .boxed().map(i -> (i + 100) + "/key" + i).collect(Collectors.toSet());
+    List<String> keysIncludingTombstones = IntStream.range(0, 100)
+        .boxed().map(i -> String.valueOf(i % 2) + (i + 100) + "/key" + i).sorted().collect(Collectors.toList());
     // Mocking SST file with keys in SST file excluding tombstones
-    Set<String> keysExcludingTombstones = IntStream.range(0, 50).boxed()
-        .map(i -> (i + 100) + "/key" + i).collect(Collectors.toSet());
+    List<String> keysExcludingTombstones = IntStream.range(0, 50).boxed()
+        .map(i -> String.valueOf(i % 2) + (i + 100) + "/key" + i).sorted().collect(Collectors.toList());
 
     // Mocking SSTFileReader functions to return the above keys list.
     try (MockedConstruction<SstFileSetReader> mockedSSTFileReader =
              mockConstruction(SstFileSetReader.class,
                  (mock, context) -> {
                    when(mock.getKeyStreamWithTombstone(any(), any()))
-                       .thenReturn(keysIncludingTombstones.stream());
+                       .thenReturn(getNewIterator(keysIncludingTombstones.iterator()));
                    when(mock.getKeyStream(any(), any()))
-                       .thenReturn(keysExcludingTombstones.stream());
+                       .thenReturn(getNewIterator(keysExcludingTombstones.iterator()));
                  });
     ) {
       Map<String, WithParentObjectId> toSnapshotTableMap =
           IntStream.concat(IntStream.range(0, 25), IntStream.range(50, 100))
-              .boxed().collect(Collectors.toMap(i -> (i + 100) + "/key" + i,
+              .boxed().collect(Collectors.toMap(i -> String.valueOf(i % 2) + (i + 100) + "/key" + i,
                   i -> getKeyInfo(i, i, i + 100,
                       snapshotTableName)));
-      Table<String, ? extends WithParentObjectId> toSnapshotTable =
-          getMockedTable(toSnapshotTableMap, snapshotTableName);
+      Table<String, WithParentObjectId> toSnapshotTable = new StringInMemoryTestTable<>(toSnapshotTableMap,
+          snapshotTableName);
 
       Map<String, WithParentObjectId> fromSnapshotTableMap =
           IntStream.range(0, 50)
-              .boxed().collect(Collectors.toMap(i -> (i + 100) + "/key" + i,
+              .boxed().collect(Collectors.toMap(i -> String.valueOf(i % 2) + (i + 100) + "/key" + i,
                   i -> getKeyInfo(i, i, i + 100, snapshotTableName)));
 
-      Table<String, ? extends WithParentObjectId> fromSnapshotTable =
-          getMockedTable(fromSnapshotTableMap, snapshotTableName);
-
-      SnapshotDiffManager spy = spy(snapshotDiffManager);
-
-      Boolean isKeyInBucket = doAnswer(invocation -> {
-            String[] split = invocation.getArgument(0, String.class).split("/");
-            String keyName = split[split.length - 1];
-            return Integer.parseInt(keyName.substring(3)) % 2 == 0;
-          }
-      ).when(spy).isKeyInBucket(anyString(), any(), anyString());
-      assertFalse(isKeyInBucket);
+      Table<String, WithParentObjectId> fromSnapshotTable =
+          new StringInMemoryTestTable<>(fromSnapshotTableMap, snapshotTableName);
 
       PersistentMap<byte[], byte[]> oldObjectIdKeyMap =
           new StubbedPersistentMap<>();
@@ -719,12 +481,12 @@ public class TestSnapshotDiffManager {
       Set<Long> oldParentIds = Sets.newHashSet();
       Set<Long> newParentIds = Sets.newHashSet();
 
-      spy.addToObjectIdMap(toSnapshotTable,
-          fromSnapshotTable, Sets.newHashSet("dummy.sst"),
+      snapshotDiffManager.addToObjectIdMap(toSnapshotTable,
+          fromSnapshotTable, Sets.newHashSet(Paths.get("dummy.sst")),
           nativeLibraryLoaded, oldObjectIdKeyMap, newObjectIdKeyMap,
           objectIdsToCheck, Optional.of(oldParentIds),
           Optional.of(newParentIds),
-          new TablePrefixInfo(ImmutableMap.of(DIRECTORY_TABLE, "", KEY_TABLE, "", FILE_TABLE, "")), "");
+          new TablePrefixInfo(ImmutableMap.of(DIRECTORY_TABLE, "0", KEY_TABLE, "0", FILE_TABLE, "0")), "");
 
       try (ClosableIterator<Map.Entry<byte[], byte[]>> oldObjectIdIter =
                oldObjectIdKeyMap.iterator()) {
@@ -740,8 +502,7 @@ public class TestSnapshotDiffManager {
         assertEquals(nativeLibraryLoaded ? 25 : 0, oldObjectIdCnt);
       }
 
-      try (ClosableIterator<Map.Entry<byte[], byte[]>> newObjectIdIter =
-               newObjectIdKeyMap.iterator()) {
+      try (ClosableIterator<Map.Entry<byte[], byte[]>> newObjectIdIter = newObjectIdKeyMap.iterator()) {
         int newObjectIdCnt = 0;
         while (newObjectIdIter.hasNext()) {
           Map.Entry<byte[], byte[]> v = newObjectIdIter.next();
@@ -780,6 +541,8 @@ public class TestSnapshotDiffManager {
     PersistentMap<byte[], Boolean> objectIdToIsDirMap =
         new SnapshotTestUtils.StubbedPersistentMap<>();
     Map<Long, SnapshotDiffReport.DiffType> diffMap = new HashMap<>();
+    AtomicInteger count = new AtomicInteger(0);
+    AtomicInteger maxIndex = new AtomicInteger(0);
     LongStream.range(0, 100).forEach(objectId -> {
       try {
         String key = "key" + objectId;
@@ -799,20 +562,26 @@ public class TestSnapshotDiffManager {
           byte[] renamedKeyBytes = codecRegistry.asRawData(renamedKey);
           newObjectIdKeyMap.put(objectIdVal, renamedKeyBytes);
           diffMap.put(objectId, SnapshotDiffReport.DiffType.RENAME);
+          count.getAndIncrement();
         }
         objectIdToIsDirMap.put(objectIdVal, false);
         if (objectId >= 50 && objectId <= 100 ||
             objectId >= 0 && objectId <= 25 && objectId % 4 > 2) {
           diffMap.put(objectId, SnapshotDiffReport.DiffType.DELETE);
+          count.getAndIncrement();
         }
         if (objectId >= 0 && objectId <= 25 && objectId % 4 == 0) {
           diffMap.put(objectId, SnapshotDiffReport.DiffType.RENAME);
-        }
-        if (objectId >= 0 && objectId <= 25 && objectId % 4 == 2) {
-          diffMap.put(objectId, SnapshotDiffReport.DiffType.MODIFY);
+          count.getAndIncrement();
         }
         if (objectId > 25 && objectId < 50) {
           diffMap.put(objectId, SnapshotDiffReport.DiffType.CREATE);
+          count.getAndIncrement();
+        }
+        if (objectId >= 0 && objectId <= 25 && objectId % 4 == 2) {
+          diffMap.put(objectId, SnapshotDiffReport.DiffType.MODIFY);
+          maxIndex.set(count.get());
+          count.getAndIncrement();
         }
       } catch (IOException e) {
         throw new RuntimeException(e);
@@ -864,20 +633,20 @@ public class TestSnapshotDiffManager {
           .areDiffJobAndSnapshotsActive(volumeName, bucketName, fromSnapName,
               toSnapName);
 
-      long totalDiffEntries = spy.generateDiffReport("jobId",
+      Pair<Long, String> totalDiffEntries = spy.generateDiffReport("jobId",
           fromSnapTable, toSnapTable, null, null,
           objectIdToIsDirMap, oldObjectIdKeyMap, newObjectIdKeyMap,
           volumeName, bucketName, fromSnapName, toSnapName, false,
           Optional.empty(), Optional.empty(), tablePrefixes);
 
-      assertEquals(100, totalDiffEntries);
+      assertEquals(100, totalDiffEntries.getKey());
       SnapshotDiffJob snapshotDiffJob = new SnapshotDiffJob(0, "jobId",
           JobStatus.DONE, "vol", "buck", "fs", "ts", false,
-          true, diffMap.size(), null, 0.0);
+          true, diffMap.size(), null, 0.0, "jobId-4" + leftPad(String.valueOf(maxIndex.get()), 20, '0'));
       SnapshotDiffReportOzone snapshotDiffReportOzone =
           snapshotDiffManager.createPageResponse(snapshotDiffJob, "vol",
               "buck", "fs", "ts",
-              0, Integer.MAX_VALUE);
+              "", Integer.MAX_VALUE);
       Set<SnapshotDiffReport.DiffType> expectedOrder = new LinkedHashSet<>();
       expectedOrder.add(SnapshotDiffReport.DiffType.DELETE);
       expectedOrder.add(SnapshotDiffReport.DiffType.RENAME);
@@ -909,36 +678,52 @@ public class TestSnapshotDiffManager {
    * objectId Map of diff keys to be checked with their corresponding key names.
    */
   @ParameterizedTest
-  @CsvSource({"0,10,1000", "1,10,8", "10,1000,10", "-1,1000,10000",
-      "1,0,1000", "1,-1,1000"})
+  @CsvSource({"0,10", "1,8", "2,8", "3,8"})
   public void testCreatePageResponse(int startIdx,
-                                     int pageSize,
                                      int totalNumberOfRecords)
       throws IOException, RocksDBException {
     String testJobId = "jobId";
     String testJobId2 = "jobId2";
+    Map<Integer, String> pageMap = new HashMap<>();
+    Map<Integer, SnapshotDiffReport.DiffType> typeMap = new HashMap<>();
+    List<Integer> indexList = IntStream.range(0, totalNumberOfRecords).boxed().collect(Collectors.toList());
 
-    IntStream.range(0, totalNumberOfRecords).boxed().forEach(idx -> {
+    for (int idx = 0; idx < totalNumberOfRecords; idx++) {
       try {
+        DiffReportEntry reportEntry = getTestDiffEntry(testJobId, idx);
+        String reportEntryKey = SnapshotDiffManager.getReportKeyForIndex(testJobId, reportEntry.getType(), idx);
+        typeMap.put(idx, reportEntry.getType());
+        pageMap.put(idx, reportEntryKey.split(DELIMITER)[1]);
+        String report2EntryKey = testJobId2 + DELIMITER + idx;
         db.get().put(snapDiffReportTable,
-            codecRegistry.asRawData(SnapshotDiffManager
-                .getReportKeyForIndex(testJobId, idx)),
-            codecRegistry.asRawData(getTestDiffEntry(testJobId, idx)));
+            codecRegistry.asRawData(reportEntryKey),
+            codecRegistry.asRawData(reportEntry));
         db.get().put(snapDiffReportTable,
-            codecRegistry.asRawData(testJobId2 + DELIMITER + idx),
+            codecRegistry.asRawData(report2EntryKey),
             codecRegistry.asRawData(getTestDiffEntry(testJobId2, idx)));
       } catch (IOException | RocksDBException e) {
         throw new RuntimeException(e);
       }
+    }
+    List<SnapshotDiffReport.DiffType> orderedList = Arrays.asList(SnapshotDiffReport.DiffType.DELETE,
+        SnapshotDiffReport.DiffType.RENAME, SnapshotDiffReport.DiffType.CREATE, SnapshotDiffReport.DiffType.MODIFY);
+
+    indexList.sort((idx1, idx2) -> {
+      if (typeMap.get(idx1) != typeMap.get(idx2)) {
+        return orderedList.indexOf(typeMap.get(idx1)) - orderedList.indexOf(typeMap.get(idx2));
+      }
+      return idx1 - idx2;
     });
+
 
     SnapshotDiffJob snapshotDiffJob = new SnapshotDiffJob(0, testJobId,
         JobStatus.DONE, "vol", "buck", "fs", "ts", false,
-        true, totalNumberOfRecords, null, 0.0);
+        true, totalNumberOfRecords, null, 0.0,
+        testJobId + DELIMITER + pageMap.get(indexList.get(indexList.size() - 1)));
 
     SnapshotDiffJob snapshotDiffJob2 = new SnapshotDiffJob(0, testJobId2,
         JobStatus.DONE, "vol", "buck", "fs", "ts", false,
-        true, totalNumberOfRecords, null, 0.0);
+        true, totalNumberOfRecords, null, 0.0, "");
 
     db.get().put(snapDiffJobTable,
         codecRegistry.asRawData(testJobId),
@@ -947,26 +732,30 @@ public class TestSnapshotDiffManager {
     db.get().put(snapDiffJobTable,
         codecRegistry.asRawData(testJobId2),
         codecRegistry.asRawData(snapshotDiffJob2));
+    for (int pageSize = -1; pageSize <= totalNumberOfRecords; pageSize++) {
+      if (pageSize <= 0) {
+        int finalPageSize = pageSize;
+        assertThrows(IOException.class,
+            () -> snapshotDiffManager.createPageResponse(snapshotDiffJob, "vol",
+                "buck", "fs", "ts", pageMap.get(startIdx), finalPageSize));
+        continue;
+      }
+      SnapshotDiffReportOzone snapshotDiffReportOzone =
+          snapshotDiffManager.createPageResponse(snapshotDiffJob, "vol",
+              "buck", "fs", "ts",
+              pageMap.get(startIdx), pageSize);
+      int expectedTotalNumberOfRecords =
+          Math.max(Math.min(pageSize, totalNumberOfRecords - indexList.indexOf(startIdx)), 0);
+      assertEquals(snapshotDiffReportOzone.getDiffList().size(), expectedTotalNumberOfRecords);
+      int idx = indexList.indexOf(startIdx);
+      for (DiffReportEntry entry : snapshotDiffReportOzone.getDiffList()) {
+        assertEquals(getTestDiffEntry(testJobId, indexList.get(idx)), entry);
+        idx++;
+      }
 
-    if (pageSize <= 0 || startIdx < 0) {
-      assertThrows(IOException.class,
-          () -> snapshotDiffManager.createPageResponse(snapshotDiffJob, "vol",
-              "buck", "fs", "ts", startIdx, pageSize));
-      return;
-    }
-    SnapshotDiffReportOzone snapshotDiffReportOzone =
-        snapshotDiffManager.createPageResponse(snapshotDiffJob, "vol",
-            "buck", "fs", "ts",
-            startIdx, pageSize);
-    int expectedTotalNumberOfRecords =
-        Math.max(Math.min(pageSize, totalNumberOfRecords - startIdx), 0);
-    assertEquals(snapshotDiffReportOzone.getDiffList().size(),
-        expectedTotalNumberOfRecords);
-
-    int idx = startIdx;
-    for (DiffReportEntry entry : snapshotDiffReportOzone.getDiffList()) {
-      assertEquals(getTestDiffEntry(testJobId, idx), entry);
-      idx++;
+      assertEquals(snapshotDiffReportOzone.getToken() == null ? null :
+              Integer.parseInt(snapshotDiffReportOzone.getToken().substring(1)),
+          idx == indexList.size() ? null : indexList.get(idx));
     }
   }
 
@@ -1008,7 +797,7 @@ public class TestSnapshotDiffManager {
     // Submit a new job.
     SnapshotDiffResponse snapshotDiffResponse =
         spy.getSnapshotDiffReport(volumeName, bucketName, fromSnapshotName,
-            toSnapshotName, 0, 0, false, false);
+            toSnapshotName, "10", 0, false, false);
 
     assertEquals(JobStatus.IN_PROGRESS,
         snapshotDiffResponse.getJobStatus());
@@ -1020,7 +809,7 @@ public class TestSnapshotDiffManager {
     // Job status should be cancelled until the cleanup
     // service removes the job from the table.
     snapshotDiffResponse = spy.getSnapshotDiffReport(volumeName, bucketName,
-        fromSnapshotName, toSnapshotName, 0, 0, false, false);
+        fromSnapshotName, toSnapshotName, "10", 0, false, false);
 
     assertEquals(JobStatus.CANCELLED,
         snapshotDiffResponse.getJobStatus());
@@ -1033,7 +822,7 @@ public class TestSnapshotDiffManager {
 
     // Response should still be cancelled.
     snapshotDiffResponse = spy.getSnapshotDiffReport(volumeName, bucketName,
-        fromSnapshotName, toSnapshotName, 0, 0, false, false);
+        fromSnapshotName, toSnapshotName, "100000000000000000000", 0, false, false);
 
     assertEquals(JobStatus.CANCELLED,
         snapshotDiffResponse.getJobStatus());
@@ -1083,7 +872,7 @@ public class TestSnapshotDiffManager {
     String jobId = UUID.randomUUID().toString();
     SnapshotDiffJob snapshotDiffJob = new SnapshotDiffJob(0L,
         jobId, jobStatus, volumeName, bucketName, fromSnapshotName, toSnapshotName,
-        true, false, 10, null, 0.0);
+        true, false, 10, null, 0.0, null);
 
     snapDiffJobMap.put(diffJobKey, snapshotDiffJob);
 
@@ -1174,7 +963,7 @@ public class TestSnapshotDiffManager {
     // SnapshotDiffReport
     SnapshotDiffResponse snapshotDiffResponse =
         spy.getSnapshotDiffReport(volumeName, bucketName, fromSnapshotName,
-            toSnapshotName, 0, 0, false, false);
+            toSnapshotName, "100000000000000000000", 0, false, false);
 
     assertEquals(SnapshotDiffResponse.JobStatus.IN_PROGRESS,
         snapshotDiffResponse.getJobStatus());
@@ -1221,7 +1010,7 @@ public class TestSnapshotDiffManager {
         eq(toSnapshotName), eq(false), eq(false));
 
     spy.getSnapshotDiffReport(volumeName, bucketName, fromSnapshotName,
-            toSnapshotName, 0, 0, false, false);
+            toSnapshotName, "10", 0, false, false);
 
     // Invalid status, without listAllStatus true, results in an exception.
     assertThrows(IOException.class, () -> snapshotDiffManager
@@ -1236,7 +1025,7 @@ public class TestSnapshotDiffManager {
         new StubbedPersistentMap<>();
     PersistentMap<byte[], byte[]> newObjIdToKeyMap =
         new StubbedPersistentMap<>();
-    long totalDiffEntries = snapshotDiffManager.generateDiffReport("jobId",
+    Pair<Long, String> totalDiffEntries = snapshotDiffManager.generateDiffReport("jobId",
         keyInfoTable,
         keyInfoTable,
         null,
@@ -1253,7 +1042,7 @@ public class TestSnapshotDiffManager {
         Optional.empty(),
         new TablePrefixInfo(Collections.emptyMap()));
 
-    assertEquals(0, totalDiffEntries);
+    assertEquals(0, totalDiffEntries.getKey());
   }
 
   @Test
@@ -1473,7 +1262,7 @@ public class TestSnapshotDiffManager {
                                          String toSnapshotName) {
     try {
       return diffManager.getSnapshotDiffReport(VOLUME_NAME, BUCKET_NAME,
-          fromSnapshotName, toSnapshotName, 0, 1000, false, false);
+          fromSnapshotName, toSnapshotName, "100000000000000000000", 1000, false, false);
     } catch (IOException exception) {
       throw new RuntimeException(exception);
     }
@@ -1536,81 +1325,6 @@ public class TestSnapshotDiffManager {
     when(bucketInfoTable.get(bucketKey)).thenReturn(bucketInfo);
   }
 
-  @Test
-  public void testGetDeltaFilesWithFullDiff() throws  IOException {
-    SnapshotDiffManager spy = spy(snapshotDiffManager);
-    UUID snap1 = UUID.randomUUID();
-    OmSnapshot fromSnapshot = getMockedOmSnapshot(snap1);
-    UUID snap2 = UUID.randomUUID();
-    OmSnapshot toSnapshot = getMockedOmSnapshot(snap2);
-    Mockito.doAnswer(invocation -> {
-      OmSnapshot snapshot = invocation.getArgument(0);
-      if (snapshot == fromSnapshot) {
-        Map<Integer, String> inodeToFileMap = new HashMap<>();
-        inodeToFileMap.put(1, "1.sst");
-        inodeToFileMap.put(2, "2.sst");
-        inodeToFileMap.put(3, "3.sst");
-        return inodeToFileMap;
-      }
-      if (snapshot == toSnapshot) {
-        Map<Integer, String> inodeToFileMap = new HashMap<>();
-        inodeToFileMap.put(1, "10.sst");
-        inodeToFileMap.put(2, "20.sst");
-        inodeToFileMap.put(4, "4.sst");
-        return inodeToFileMap;
-      }
-      return null;
-    }).when(spy).getSSTFileMapForSnapshot(Mockito.any(OmSnapshot.class),
-        Mockito.anySet());
-    doNothing().when(spy).recordActivity(any(), any());
-    doNothing().when(spy).updateProgress(anyString(), anyDouble());
-    String diffJobKey = snap1 + DELIMITER + snap2;
-    Set<String> deltaFiles = spy.getDeltaFiles(fromSnapshot, toSnapshot, Collections.emptySet(), snapshotInfo,
-        snapshotInfo, true, new TablePrefixInfo(Collections.emptyMap()), null, diffJobKey);
-    Assertions.assertEquals(Sets.newHashSet("3.sst", "4.sst"), deltaFiles);
-  }
-
-  @Test
-  public void testGetSnapshotDiffReportHappyCase() throws Exception {
-    SnapshotInfo fromSnapInfo = snapshotInfo;
-    SnapshotInfo toSnapInfo = snapshotInfoList.get(0);
-
-    Set<String> testDeltaFiles = new HashSet<>();
-
-    SnapshotDiffManager spy = spy(snapshotDiffManager);
-
-    doReturn(testDeltaFiles).when(spy).getDeltaFiles(any(OmSnapshot.class),
-        any(OmSnapshot.class), anySet(), eq(fromSnapInfo), eq(toSnapInfo),
-        eq(false), any(), anyString(),
-        anyString());
-
-    doReturn(testDeltaFiles).when(spy)
-        .getSSTFileListForSnapshot(any(OmSnapshot.class), anySet());
-
-    doNothing().when(spy).addToObjectIdMap(eq(keyInfoTable), eq(keyInfoTable),
-        any(), anyBoolean(), any(), any(), any(), any(), any(), any(), anyString());
-    doNothing().when(spy).checkReportsIntegrity(any(), anyInt(), anyInt());
-
-    doReturn(10L).when(spy).generateDiffReport(anyString(),
-        any(), any(), any(), any(), any(), any(), any(),
-        anyString(), anyString(), anyString(), anyString(), anyBoolean(),
-        any(), any(), any());
-    doReturn(LEGACY).when(spy).getBucketLayout(VOLUME_NAME, BUCKET_NAME,
-        omMetadataManager);
-
-    spy.getSnapshotDiffReport(VOLUME_NAME, BUCKET_NAME, fromSnapInfo.getName(),
-        toSnapInfo.getName(), 0, 1000, false, false);
-
-    Thread.sleep(1000L);
-    spy.getSnapshotDiffReport(VOLUME_NAME, BUCKET_NAME, fromSnapInfo.getName(),
-        toSnapInfo.getName(), 0, 1000, false, false);
-
-    SnapshotDiffJob snapDiffJob = getSnapshotDiffJobFromDb(fromSnapInfo,
-        toSnapInfo);
-    assertEquals(DONE, snapDiffJob.getStatus());
-    assertEquals(10L, snapDiffJob.getTotalDiffEntries());
-  }
-
   /**
    * Tests that only QUEUED jobs are submitted to the executor and rest are
    * short-circuited based on previous one.
@@ -1641,7 +1355,7 @@ public class TestSnapshotDiffManager {
     for (int i = 0; i < snapshotInfoList.size(); i++) {
       SnapshotDiffResponse snapshotDiffReport =
           spy.getSnapshotDiffReport(VOLUME_NAME, BUCKET_NAME,
-              snapshotInfo.getName(), snapshotInfoList.get(i).getName(), 0,
+              snapshotInfo.getName(), snapshotInfoList.get(i).getName(), "100000000000000000000",
               1000, false, false);
       SnapshotDiffJob diffJob = snapDiffJobs.get(i);
       if (diffJob.getStatus() == QUEUED) {

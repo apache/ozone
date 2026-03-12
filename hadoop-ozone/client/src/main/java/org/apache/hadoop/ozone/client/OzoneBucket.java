@@ -23,7 +23,6 @@ import static org.apache.hadoop.ozone.OzoneConsts.QUOTA_RESET;
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.FILE_NOT_FOUND;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -32,6 +31,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Stack;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
@@ -151,6 +151,14 @@ public class OzoneBucket extends WithMetadata {
    * Bucket Owner.
    */
   private String owner;
+  /**
+   * Pending deletion bytes (Includes bytes retained by snapshots).
+   */
+  private long pendingDeleteBytes;
+  /**
+   * Pending deletion namespace (Includes keys retained by snapshots).
+   */
+  private long pendingDeleteNamespace;
 
   protected OzoneBucket(Builder builder) {
     super(builder);
@@ -167,6 +175,8 @@ public class OzoneBucket extends WithMetadata {
     }
     this.usedBytes = builder.usedBytes;
     this.usedNamespace = builder.usedNamespace;
+    this.pendingDeleteBytes = builder.pendingDeleteBytes;
+    this.pendingDeleteNamespace = builder.pendingDeleteNamespace;
     this.creationTime = Instant.ofEpochMilli(builder.creationTime);
     if (builder.modificationTime != 0) {
       this.modificationTime = Instant.ofEpochMilli(builder.modificationTime);
@@ -608,6 +618,14 @@ public class OzoneBucket extends WithMetadata {
 
   public long getUsedNamespace() {
     return usedNamespace;
+  }
+
+  public long getPendingDeleteBytes() {
+    return pendingDeleteBytes;
+  }
+
+  public long getPendingDeleteNamespace() {
+    return pendingDeleteNamespace;
   }
 
   /**
@@ -1101,7 +1119,7 @@ public class OzoneBucket extends WithMetadata {
 
   public static Builder newBuilder(ConfigurationSource conf,
       ClientProtocol proxy) {
-    Preconditions.checkNotNull(proxy, "Client proxy is not set.");
+    Objects.requireNonNull(proxy, "Client proxy is not set.");
     return new Builder(conf, proxy);
   }
 
@@ -1127,6 +1145,8 @@ public class OzoneBucket extends WithMetadata {
     private long quotaInNamespace;
     private BucketLayout bucketLayout;
     private String owner;
+    private long pendingDeleteBytes;
+    private long pendingDeleteNamespace;
 
     protected Builder() {
     }
@@ -1220,6 +1240,16 @@ public class OzoneBucket extends WithMetadata {
 
     public Builder setOwner(String owner) {
       this.owner = owner;
+      return this;
+    }
+
+    public Builder setPendingDeleteBytes(long pendingDeleteBytes) {
+      this.pendingDeleteBytes = pendingDeleteBytes;
+      return this;
+    }
+
+    public Builder setPendingDeleteNamespace(long pendingDeleteNamespace) {
+      this.pendingDeleteNamespace = pendingDeleteNamespace;
       return this;
     }
 

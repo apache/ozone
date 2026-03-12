@@ -29,13 +29,13 @@ import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConf
 import static org.apache.ozone.test.IntLambda.withTextFromSystemIn;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -195,7 +195,7 @@ public class TestOzoneContainerUpgradeShell {
     dnDetails.setPersistedOpState(
         HddsProtos.NodeOperationalState.IN_MAINTENANCE);
     String idFilePath = HddsServerUtil.getDatanodeIdFilePath(config);
-    Preconditions.checkNotNull(idFilePath);
+    Objects.requireNonNull(idFilePath, "idFilePath == null");
     File idFile = new File(idFilePath);
     ContainerUtils.writeDatanodeDetailsTo(dnDetails, idFile, config);
   }

@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.recon.api;
 
 import static java.util.Collections.singletonList;
+import static java.util.Collections.singletonMap;
 import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLIdentityType.USER;
 import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRITE;
@@ -60,7 +61,7 @@ public abstract class NSSummaryTests {
         .setObjectID(10)
         .setUpdateID(100)
         .setAcls(singletonList(OzoneAcl.of(USER, username, ACCESS, WRITE)))
-        .addMetadata("key", "value")
+        .addAllMetadata(singletonMap("key", "value"))
         .build();
     reconOMMetadataManager.getPrefixTable()
         .put(OzoneConsts.OM_KEY_PREFIX, omPrefixInfo);

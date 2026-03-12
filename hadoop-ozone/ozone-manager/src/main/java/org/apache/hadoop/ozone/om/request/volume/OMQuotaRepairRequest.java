@@ -22,11 +22,11 @@ import static org.apache.hadoop.ozone.OzoneConsts.QUOTA_RESET;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.VOLUME_LOCK;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.hdds.utils.db.TableIterator;
@@ -62,7 +62,7 @@ public class OMQuotaRepairRequest extends OMClientRequest {
   @Override
   public OMRequest preExecute(OzoneManager ozoneManager) throws IOException {
     UserGroupInformation ugi = createUGIForApi();
-    if (ozoneManager.getAclsEnabled() && !ozoneManager.isAdmin(ugi)) {
+    if (ozoneManager.isAdminAuthorizationEnabled() && !ozoneManager.isAdmin(ugi)) {
       throw new OMException("Access denied for user " + ugi + ". Admin privilege is required for quota repair.",
           OMException.ResultCodes.ACCESS_DENIED);
     }
@@ -75,7 +75,7 @@ public class OMQuotaRepairRequest extends OMClientRequest {
     final long transactionLogIndex = context.getIndex();
     OzoneManagerProtocolProtos.QuotaRepairRequest quotaRepairRequest =
         getOmRequest().getQuotaRepairRequest();
-    Preconditions.checkNotNull(quotaRepairRequest);
+    Objects.requireNonNull(quotaRepairRequest, "quotaRepairRequest == null");
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     OzoneManagerProtocolProtos.OMResponse.Builder omResponse = OmResponseUtil.getOMResponseBuilder(getOmRequest());
@@ -163,19 +163,21 @@ public class OMQuotaRepairRequest extends OMClientRequest {
             VOLUME_LOCK, omVolumeArgs.getVolume()));
         boolean acquiredVolumeLock = getOmLockDetails().isLockAcquired();
         try {
+          OmVolumeArgs.Builder builder = omVolumeArgs.toBuilder();
           boolean isQuotaReset = false;
           if (omVolumeArgs.getQuotaInBytes() == OLD_QUOTA_DEFAULT) {
-            omVolumeArgs.setQuotaInBytes(QUOTA_RESET);
+            builder.setQuotaInBytes(QUOTA_RESET);
             isQuotaReset = true;
           }
           if (omVolumeArgs.getQuotaInNamespace() == OLD_QUOTA_DEFAULT) {
-            omVolumeArgs.setQuotaInNamespace(QUOTA_RESET);
+            builder.setQuotaInNamespace(QUOTA_RESET);
             isQuotaReset = true;
           }
           if (isQuotaReset) {
+            OmVolumeArgs updated = builder.build();
             metadataManager.getVolumeTable().addCacheEntry(
-                new CacheKey<>(entry.getKey()), CacheValue.get(transactionLogIndex, omVolumeArgs));
-            volUpdateMap.put(entry.getKey(), omVolumeArgs);
+                new CacheKey<>(entry.getKey()), CacheValue.get(transactionLogIndex, updated));
+            volUpdateMap.put(entry.getKey(), updated);
           }
         } finally {
           if (acquiredVolumeLock) {

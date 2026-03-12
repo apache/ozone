@@ -27,7 +27,6 @@ import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_PORT_DEFAUL
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_RATIS_PORT_KEY;
 import static org.apache.hadoop.ozone.om.OMConfigKeys.OZONE_OM_SERVICE_IDS_KEY;
 
-import com.google.common.base.Preconditions;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -35,6 +34,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.ozone.OmUtils;
@@ -305,8 +305,8 @@ public class OMHANodeDetails {
   public static OMNodeDetails getHAOMNodeDetails(OzoneConfiguration conf,
       String serviceId, String nodeId, InetSocketAddress rpcAddress,
       int ratisPort, boolean isListener) {
-    Preconditions.checkNotNull(serviceId);
-    Preconditions.checkNotNull(nodeId);
+    Objects.requireNonNull(serviceId, "serviceId == null");
+    Objects.requireNonNull(nodeId, "nodeId == null");
 
     String httpAddr = OmUtils.getHttpAddressForOMPeerNode(conf,
         serviceId, nodeId, rpcAddress.getHostName());

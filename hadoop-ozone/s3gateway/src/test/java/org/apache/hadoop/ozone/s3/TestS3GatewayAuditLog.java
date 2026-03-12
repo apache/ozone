@@ -120,7 +120,7 @@ public class TestS3GatewayAuditLog {
 
     bucketEndpoint.head(bucketName);
 
-    String expected = "INFO  | S3GAudit | org.apache.hadoop.ozone.s3.endpoint.BucketEndpoint | user=null | ip=null | " +
+    String expected = "INFO  | S3GAudit | org.apache.hadoop.ozone.s3.endpoint.EndpointBase | user=null | ip=null | " +
         "op=HEAD_BUCKET {\"bucket\":\"[bucket]\",\"x-amz-request-id\":\"" +
         requestIdentifier.getRequestId() + "\",\"x-amz-id-2\":\"" +
         requestIdentifier.getAmzId() + "\"} | ret=SUCCESS";
@@ -131,7 +131,7 @@ public class TestS3GatewayAuditLog {
   public void testListBucket() throws Exception {
 
     rootEndpoint.get().getEntity();
-    String expected = "INFO  | S3GAudit | org.apache.hadoop.ozone.s3.endpoint.RootEndpoint | user=null | ip=null | " +
+    String expected = "INFO  | S3GAudit | org.apache.hadoop.ozone.s3.endpoint.EndpointBase | user=null | ip=null | " +
         "op=LIST_S3_BUCKETS {\"x-amz-request-id\":\"" +
         requestIdentifier.getRequestId() + "\",\"x-amz-id-2\":\"" +
         requestIdentifier.getAmzId() + "\"} | ret=SUCCESS";
@@ -152,7 +152,7 @@ public class TestS3GatewayAuditLog {
     parametersMap.put("path", "[key1]");
 
     keyEndpoint.head(bucketName, "key1");
-    String expected = "INFO  | S3GAudit | org.apache.hadoop.ozone.s3.endpoint.ObjectEndpoint | user=null | ip=null | " +
+    String expected = "INFO  | S3GAudit | org.apache.hadoop.ozone.s3.endpoint.EndpointBase | user=null | ip=null | " +
         "op=HEAD_KEY {\"bucket\":\"[bucket]\",\"path\":\"[key1]\",\"x-amz-request-id\":\"" +
         requestIdentifier.getRequestId() + "\",\"x-amz-id-2\":\"" +
         requestIdentifier.getAmzId() + "\"} | ret=SUCCESS";

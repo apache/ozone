@@ -117,5 +117,13 @@ public final class SCMPerformanceMetrics implements MetricsSource {
   public void updateDeleteKeyFailedBlocks(long keys) {
     deleteKeyBlocksFailure.incr(keys);
   }
+
+  public long getDeleteKeySuccessBlocks() {
+    return deleteKeyBlocksSuccess.value();
+  }
+
+  public long getDeleteKeyFailedBlocks() {
+    return deleteKeyBlocksFailure.value();
+  }
 }
 

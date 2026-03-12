@@ -17,8 +17,6 @@
 
 package org.apache.hadoop.ozone.insight;
 
-import static org.apache.hadoop.hdds.conf.ConfigurationReflectionUtil.getFullKey;
-
 import java.lang.reflect.Field;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.cli.HddsVersionProvider;
@@ -54,13 +52,13 @@ public class ConfigurationSubCommand extends BaseInsightSubCommand
 
     Type type = Type.valueOf(insightName.split("\\.")[0].toUpperCase());
 
-    for (Class clazz : insight.getConfigurationClasses()) {
+    for (Class<?> clazz : insight.getConfigurationClasses()) {
       showConfig(clazz, type);
     }
     return null;
   }
 
-  protected void showConfig(Class clazz, Type type) {
+  protected void showConfig(Class<?> clazz, Type type) {
     OzoneConfiguration conf = new OzoneConfiguration();
     conf.addResource(getHost(conf, new Component(type)) + "/conf");
     printConfig(clazz, conf);
@@ -69,21 +67,15 @@ public class ConfigurationSubCommand extends BaseInsightSubCommand
   /**
    * Print all the configuration annotated on the class or any superclass.
    */
-  protected void printConfig(Class clazz, OzoneConfiguration conf) {
-    ConfigGroup configGroup =
-        (ConfigGroup) clazz.getAnnotation(ConfigGroup.class);
+  protected void printConfig(Class<?> clazz, OzoneConfiguration conf) {
+    ConfigGroup configGroup = clazz.getAnnotation(ConfigGroup.class);
     if (configGroup == null) {
       return;
     }
-    printConfig(configGroup, clazz, conf);
-  }
-
-  private void printConfig(ConfigGroup configGroup, Class clazz,
-      OzoneConfiguration conf) {
     for (Field field : clazz.getDeclaredFields()) {
       if (field.isAnnotationPresent(Config.class)) {
         Config config = field.getAnnotation(Config.class);
-        String key = getFullKey(configGroup, config);
+        String key = config.key();
         System.out.println(">>> " + key);
         System.out.println("       default: " + config.defaultValue());
         System.out.println("       current: " + conf.get(key));
@@ -91,10 +83,6 @@ public class ConfigurationSubCommand extends BaseInsightSubCommand
         System.out.println(config.description());
         System.out.println();
         System.out.println();
-      }
-      final Class superclass = clazz.getSuperclass();
-      if (superclass != Object.class) {
-        printConfig(configGroup, superclass, conf);
       }
     }
   }

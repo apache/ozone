@@ -17,9 +17,9 @@
 
 package org.apache.hadoop.hdds.scm.command;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import org.apache.hadoop.hdds.HddsIdFactory;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.CommandStatus;
@@ -44,9 +44,9 @@ public class CommandStatusReportHandler implements
   @Override
   public void onMessage(CommandStatusReportFromDatanode report,
       EventPublisher publisher) {
-    Preconditions.checkNotNull(report);
+    Objects.requireNonNull(report, "report == null");
     List<CommandStatus> cmdStatusList = report.getReport().getCmdStatusList();
-    Preconditions.checkNotNull(cmdStatusList);
+    Objects.requireNonNull(cmdStatusList, "cmdStatusList == null");
     if (LOGGER.isTraceEnabled()) {
       LOGGER.trace("Processing command status report for dn: {}", report
           .getDatanodeDetails());

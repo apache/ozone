@@ -109,7 +109,7 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
     return new ArrayList<>(omKeyInfoList);
   }
 
-  public static RepeatedOmKeyInfo getFromProto(RepeatedKeyInfo repeatedKeyInfo) {
+  public static Builder builderFromProto(RepeatedKeyInfo repeatedKeyInfo) {
     List<OmKeyInfo> list = new ArrayList<>();
     for (KeyInfo k : repeatedKeyInfo.getKeyInfoList()) {
       list.add(OmKeyInfo.getFromProtobuf(k));
@@ -118,7 +118,11 @@ public class RepeatedOmKeyInfo implements CopyObject<RepeatedOmKeyInfo> {
     if (repeatedKeyInfo.hasBucketId()) {
       builder.setBucketId(repeatedKeyInfo.getBucketId());
     }
-    return builder.build();
+    return builder;
+  }
+
+  public static RepeatedOmKeyInfo getFromProto(RepeatedKeyInfo repeatedKeyInfo) {
+    return builderFromProto(repeatedKeyInfo).build();
   }
 
   /**

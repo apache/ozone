@@ -24,19 +24,19 @@ import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.
 import static org.apache.hadoop.ozone.util.MetricUtil.captureLatencyNs;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.protobuf.ProtocolMessageEnum;
 import com.google.protobuf.RpcController;
 import com.google.protobuf.ServiceException;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import org.apache.hadoop.hdds.server.OzoneProtocolMessageDispatcher;
 import org.apache.hadoop.hdds.utils.ProtocolMessageMetrics;
-import org.apache.hadoop.ipc.ProcessingDetails.Timing;
-import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ipc_.ProcessingDetails.Timing;
+import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.OmUtils;
 import org.apache.hadoop.ozone.om.OMPerformanceMetrics;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
+import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
 import org.apache.hadoop.ozone.om.exceptions.OMLeaderNotReadyException;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServer;
@@ -47,8 +47,16 @@ import org.apache.hadoop.ozone.om.request.validation.ValidationContext;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMRequest;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyHint;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyHint.LocalLeaseContext;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.ReadConsistencyProto;
 import org.apache.hadoop.ozone.security.S3SecurityUtil;
+import org.apache.ratis.proto.RaftProtos.CommitInfoProto;
+import org.apache.ratis.proto.RaftProtos.FollowerInfoProto;
+import org.apache.ratis.proto.RaftProtos.ServerRpcProto;
 import org.apache.ratis.protocol.RaftPeerId;
+import org.apache.ratis.server.DivisionInfo;
+import org.apache.ratis.server.RaftServer.Division;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,12 +67,16 @@ import org.slf4j.LoggerFactory;
 public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerProtocolPB {
   private static final Logger LOG = LoggerFactory .getLogger(OzoneManagerProtocolServerSideTranslatorPB.class);
   private static final String OM_REQUESTS_PACKAGE = "org.apache.hadoop.ozone";
+  // same as hadoop ipc config defaults
+  public static final String MAXIMUM_RESPONSE_LENGTH = "ipc.maximum.response.length";
+  public static final int MAXIMUM_RESPONSE_LENGTH_DEFAULT = 134217728;
 
+  private final int maxResponseLength;
   private final OzoneManagerRatisServer omRatisServer;
   private final RequestHandler handler;
   private final OzoneManager ozoneManager;
   private final OzoneProtocolMessageDispatcher<OMRequest, OMResponse,
-      ProtocolMessageEnum> dispatcher;
+      OzoneManagerProtocolProtos.Type> dispatcher;
   private final RequestValidations requestValidations;
   private final OMPerformanceMetrics perfMetrics;
 
@@ -78,7 +90,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
   public OzoneManagerProtocolServerSideTranslatorPB(
       OzoneManager impl,
       OzoneManagerRatisServer ratisServer,
-      ProtocolMessageMetrics<ProtocolMessageEnum> metrics) {
+      ProtocolMessageMetrics<OzoneManagerProtocolProtos.Type> metrics) {
     this.ozoneManager = impl;
     this.perfMetrics = impl.getPerfMetrics();
 
@@ -92,6 +104,8 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
         .fromPackage(OM_REQUESTS_PACKAGE)
         .withinContext(ValidationContext.of(ozoneManager.getVersionManager(), ozoneManager.getMetadataManager()))
         .load();
+    maxResponseLength = ozoneManager.getConfiguration()
+        .getInt(MAXIMUM_RESPONSE_LENGTH, MAXIMUM_RESPONSE_LENGTH_DEFAULT);
   }
 
   /**
@@ -115,6 +129,8 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
     OMResponse response = dispatcher.processRequest(validatedRequest,
         this::processRequest, request.getCmdType(), request.getTraceID());
 
+    logLargeResponseIfNeeded(response);
+
     return captureLatencyNs(perfMetrics.getValidateResponseLatencyNs(),
         () -> requestValidations.validateResponse(request, response));
   }
@@ -136,6 +152,26 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       }
     }
     return response;
+  }
+
+  /**
+   * Logs a warning if the OMResponse size exceeds half of the IPC maximum
+   * response size threshold.
+   *
+   * @param response The OMResponse to check
+   */
+  @VisibleForTesting
+  public void logLargeResponseIfNeeded(OMResponse response) {
+    try {
+      long warnThreshold = maxResponseLength / 2;
+      long respSize = response.getSerializedSize();
+      if (respSize > warnThreshold) {
+        LOG.warn("Large OMResponse detected: cmd={} size={}B threshold={}B ",
+            response.getCmdType(), respSize, warnThreshold);
+      }
+    } catch (Exception e) {
+      LOG.info("Failed to log response size", e);
+    }
   }
 
   private OMResponse internalProcessRequest(OMRequest request) throws ServiceException {
@@ -171,7 +207,7 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
       }
 
       this.lastRequestToSubmit = request;
-      return ozoneManager.getOmExecutionFlow().submit(request);
+      return ozoneManager.getOmExecutionFlow().submit(request, true);
     } finally {
       OzoneManager.setS3Auth(null);
       OzoneManager.setStsTokenIdentifier(null);
@@ -185,14 +221,210 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
 
   private OMResponse submitReadRequestToOM(OMRequest request)
       throws ServiceException {
-    // Check if this OM is the leader.
+    if (request.getCmdType().equals(PrepareStatus)) {
+      // PrepareStatus is an OM request that only target a single OM node.
+      // Therefore, all PrepareStatus requests should be served immediately without failover regardless
+      // of the OM node leadership or the read consistency. See PrepareSubCommand.
+      // The implementation is not ideal, but exists for compatibility reason.
+      return handler.handleReadRequest(request);
+    }
+
+    if (!OmUtils.specifiedReadConsistency(request)) {
+      return submitReadRequestToOmWithoutHint(request);
+    } else {
+      // If read consistency hint is specified, we should try to respect it although
+      // there is no guarantee since it depends on the OM node configuration (e.g.
+      // whether OM Raft server enables linearizable read).
+      ReadConsistencyHint readConsistencyHint = request.getReadConsistencyHint();
+      ReadConsistencyProto readConsistency = readConsistencyHint.getReadConsistency();
+      switch (readConsistency) {
+      case LOCAL_LEASE:
+        return submitReadRequestToOmLocalLease(request,
+            readConsistencyHint.hasLocalLeaseContext() ? readConsistencyHint.getLocalLeaseContext() : null);
+      case LINEARIZABLE_LEADER_ONLY:
+        return submitReadRequestToOmLinearizableLeaderOnly(request);
+      case LINEARIZABLE_ALLOW_FOLLOWER:
+        return submitReadRequestToOmLinearizableAllowFollower(request);
+      case DEFAULT:
+      default:
+        return submitReadRequestToOmDefault(request);
+      }
+    }
+  }
+
+  private OMResponse submitReadRequestToOmWithoutHint(OMRequest request) throws ServiceException {
+    // Read from leader or followers using linearizable read
+    if (ozoneManager.getConfig().isFollowerReadLocalLeaseEnabled() &&
+        allowFollowerReadLocalLease(omRatisServer.getServerDivision(),
+            ozoneManager.getConfig().getFollowerReadLocalLeaseLogLimit(),
+            ozoneManager.getConfig().getFollowerReadLocalLeaseTimeMs())) {
+      ozoneManager.getMetrics().incNumFollowerReadLocalLeaseSuccess();
+      return handler.handleReadRequest(request);
+    }
+    // Get current OM's role
     RaftServerStatus raftServerStatus = omRatisServer.getLeaderStatus();
-    if (raftServerStatus == LEADER_AND_READY ||
-        request.getCmdType().equals(PrepareStatus)) {
+    // === 1. Follower linearizable read ===
+    if (raftServerStatus == NOT_LEADER && omRatisServer.isLinearizableRead()) {
+      ozoneManager.getMetrics().incNumLinearizableRead();
+      return ozoneManager.getOmExecutionFlow().submit(request, false);
+    }
+    // === 2. Leader local read (skip ReadIndex if allowed) ===
+    if (raftServerStatus == LEADER_AND_READY) {
+      if (ozoneManager.getConfig().isAllowLeaderSkipLinearizableRead()) {
+        ozoneManager.getMetrics().incNumLeaderSkipLinearizableRead();
+        // leader directly serves local committed data
+        return handler.handleReadRequest(request);
+      }
+      // otherwise use linearizable path when enabled
+      if (omRatisServer.isLinearizableRead()) {
+        ozoneManager.getMetrics().incNumLinearizableRead();
+        return ozoneManager.getOmExecutionFlow().submit(request, false);
+      }
+
+      // fallback to local read
       return handler.handleReadRequest(request);
     } else {
       throw createLeaderErrorException(raftServerStatus);
     }
+  }
+
+  private OMResponse submitReadRequestToOmLocalLease(OMRequest request, LocalLeaseContext localLeaseContext)
+      throws ServiceException {
+    RaftServerStatus raftServerStatus = omRatisServer.getLeaderStatus();
+    switch (raftServerStatus) {
+    case NOT_LEADER:
+    case LEADER_AND_NOT_READY:
+      if (!ozoneManager.getConfig().isFollowerReadLocalLeaseEnabled()) {
+        throw createLeaderErrorException(raftServerStatus);
+      }
+      long localLeaseLogLimit = localLeaseContext != null && localLeaseContext.hasLogLimit() ?
+          localLeaseContext.getLogLimit() : ozoneManager.getConfig().getFollowerReadLocalLeaseLogLimit();
+      long localLeaseLeaseTimeMs = localLeaseContext != null && localLeaseContext.hasLeaseTimeMs() ?
+          localLeaseContext.getLeaseTimeMs() : ozoneManager.getConfig().getFollowerReadLocalLeaseTimeMs();
+      if (allowFollowerReadLocalLease(omRatisServer.getServerDivision(),
+          localLeaseLogLimit, localLeaseLeaseTimeMs)) {
+        ozoneManager.getMetrics().incNumFollowerReadLocalLeaseSuccess();
+        return handler.handleReadRequest(request);
+      }
+      // The LocalLease lag is too high, trigger failover
+      throw createLeaderErrorException(raftServerStatus);
+    case LEADER_AND_READY:
+      // Although local lease does not apply for leader (since leader is always up-to-date)
+      // We still add the local lease metrics for compatibility reasons
+      ozoneManager.getMetrics().incNumFollowerReadLocalLeaseSuccess();
+      return handler.handleReadRequest(request);
+    default:
+      throw createUnknownRaftServerStatusException(raftServerStatus);
+    }
+  }
+
+  private OMResponse submitReadRequestToOmLinearizableLeaderOnly(OMRequest request) throws ServiceException {
+    RaftServerStatus raftServerStatus = omRatisServer.getLeaderStatus();
+    switch (raftServerStatus) {
+    case NOT_LEADER:
+    case LEADER_AND_NOT_READY:
+      throw createLeaderErrorException(raftServerStatus);
+    case LEADER_AND_READY:
+      if (omRatisServer.isLinearizableRead()) {
+        ozoneManager.getMetrics().incNumLinearizableRead();
+        return ozoneManager.getOmExecutionFlow().submit(request, false);
+      } else {
+        // If linearizable read is not enabled, fallback to leader read
+        return handler.handleReadRequest(request);
+      }
+    default:
+      throw createUnknownRaftServerStatusException(raftServerStatus);
+    }
+  }
+
+  private OMResponse submitReadRequestToOmLinearizableAllowFollower(OMRequest request) throws ServiceException {
+    RaftServerStatus raftServerStatus = omRatisServer.getLeaderStatus();
+    switch (raftServerStatus) {
+    case LEADER_AND_NOT_READY:
+    case NOT_LEADER:
+      if (omRatisServer.isLinearizableRead()) {
+        ozoneManager.getMetrics().incNumLinearizableRead();
+        return ozoneManager.getOmExecutionFlow().submit(request, false);
+      } else {
+        throw createLeaderErrorException(raftServerStatus);
+      }
+    case LEADER_AND_READY:
+      if (ozoneManager.getConfig().isAllowLeaderSkipLinearizableRead()) {
+        ozoneManager.getMetrics().incNumLeaderSkipLinearizableRead();
+        // leader directly serves local committed data
+        return handler.handleReadRequest(request);
+      }
+
+      // If the Raft server read option is not LINEARIZABLE, this will
+      // use leader read
+      if (omRatisServer.isLinearizableRead()) {
+        ozoneManager.getMetrics().incNumLinearizableRead();
+      }
+      return ozoneManager.getOmExecutionFlow().submit(request, false);
+    default:
+      throw createUnknownRaftServerStatusException(raftServerStatus);
+    }
+  }
+
+  private OMResponse submitReadRequestToOmDefault(OMRequest request) throws ServiceException {
+    RaftServerStatus raftServerStatus = omRatisServer.getLeaderStatus();
+    switch (raftServerStatus) {
+    case LEADER_AND_READY:
+      return handler.handleReadRequest(request);
+    case LEADER_AND_NOT_READY:
+    case NOT_LEADER:
+      throw createLeaderErrorException(raftServerStatus);
+    default:
+      throw createUnknownRaftServerStatusException(raftServerStatus);
+    }
+  }
+
+  boolean allowFollowerReadLocalLease(Division ratisDivision, long leaseLogLimit, long leaseTimeMsLimit) {
+    final DivisionInfo divisionInfo = ratisDivision.getInfo();
+    final FollowerInfoProto followerInfo = divisionInfo.getRoleInfoProto().getFollowerInfo();
+    if (followerInfo == null) {
+      LOG.debug("FollowerRead Local Lease not allowed: Not a follower. ");
+      return false; // not follower
+    }
+    final ServerRpcProto leaderInfo = followerInfo.getLeaderInfo();
+    if (leaderInfo == null) {
+      LOG.debug("FollowerRead Local Lease not allowed: No Leader ");
+      return false; // no leader
+    }
+
+    if (leaseTimeMsLimit != -1 && leaderInfo.getLastRpcElapsedTimeMs() > leaseTimeMsLimit) {
+      LOG.debug("FollowerRead Local Lease not allowed: Local lease Time expired. ");
+      ozoneManager.getMetrics().incNumFollowerReadLocalLeaseFailTime();
+      return false; // lease time expired
+    }
+
+    if (leaseLogLimit == -1) {
+      // Allow infinite log lag, which allows unbounded stale reads
+      // There is no need to check the leader lag
+      return true;
+    }
+
+    final RaftPeerId leaderId = divisionInfo.getLeaderId();
+    Long leaderCommit = null;
+    if (leaderId != null) {
+      for (CommitInfoProto i : ratisDivision.getCommitInfos()) {
+        if (i.getServer().getId().equals(leaderId.toByteString())) {
+          leaderCommit = i.getCommitIndex();
+          break;
+        }
+      }
+    }
+    if (leaderCommit == null) {
+      LOG.debug("FollowerRead Local Lease not allowed: Leader Commit not exists. ");
+      return false;
+    }
+
+    boolean ret = divisionInfo.getLastAppliedIndex() + leaseLogLimit >= leaderCommit;
+    if (!ret) {
+      ozoneManager.getMetrics().incNumFollowerReadLocalLeaseFailLog();
+      LOG.debug("FollowerRead Local Lease not allowed: Index Lag exceeds limit. ");
+    }
+    return ret;
   }
 
   private ServiceException createLeaderErrorException(
@@ -214,6 +446,13 @@ public class OzoneManagerProtocolServerSideTranslatorPB implements OzoneManagerP
     LOG.debug(leaderNotReadyException.getMessage());
 
     return new ServiceException(leaderNotReadyException);
+  }
+
+  private ServiceException createUnknownRaftServerStatusException(RaftServerStatus raftServerStatus) {
+    RaftPeerId raftPeerId = omRatisServer.getRaftPeerId();
+    return new ServiceException(
+        new OMException(raftPeerId.toString() + " has unknown raftServerStatus " + raftServerStatus,
+            ResultCodes.INTERNAL_ERROR));
   }
 
   public static Logger getLog() {

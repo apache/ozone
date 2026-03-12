@@ -311,7 +311,9 @@ public class TestMultiTenantVolume {
           OMException.class,
           () -> store.createTenant(tenantId));
 
-      assertThat(e.getMessage()).contains("Invalid volume name: " + tenantId);
+      assertThat(e.getMessage())
+          .contains("unsupported character")
+          .contains("_");
     }
   }
 }

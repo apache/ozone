@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -268,6 +269,14 @@ public class Checksum {
     } finally {
       data.limit(limit);
     }
+  }
+
+  public static void verifySingleChecksum(ByteBuffer buffer, int offset, int bytesPerChecksum,
+      ByteString checksum, ChecksumType checksumType) throws OzoneChecksumException {
+    final ByteBuffer duplicated = buffer.duplicate();
+    duplicated.position(offset).limit(offset + bytesPerChecksum);
+    final ChecksumData cd = new ChecksumData(checksumType, bytesPerChecksum, Collections.singletonList(checksum));
+    verifyChecksum(duplicated, cd, 0);
   }
 
   /**

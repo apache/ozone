@@ -19,7 +19,6 @@ package org.apache.hadoop.ozone.security.acl;
 
 import static org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OzoneObj.StoreType.valueOf;
 
-import com.google.common.base.Preconditions;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -38,8 +37,8 @@ public abstract class OzoneObj implements IOzoneObj {
 
   OzoneObj(ResourceType resType, StoreType storeType) {
 
-    Preconditions.checkNotNull(resType);
-    Preconditions.checkNotNull(storeType);
+    Objects.requireNonNull(resType, "resType == null");
+    Objects.requireNonNull(storeType, "storeType == null");
     this.resType = resType;
     this.storeType = storeType;
   }

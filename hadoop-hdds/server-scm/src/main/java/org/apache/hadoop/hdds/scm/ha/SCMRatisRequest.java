@@ -18,17 +18,17 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.common.base.Preconditions;
-import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.TextFormat;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.Method;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.MethodArgument;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.RequestType;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.SCMRatisRequestProto;
-import org.apache.hadoop.hdds.scm.ha.io.CodecFactory;
+import org.apache.hadoop.hdds.scm.ha.io.ScmCodecFactory;
 import org.apache.ratis.proto.RaftProtos.StateMachineLogEntryProto;
 import org.apache.ratis.protocol.Message;
+import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
+import org.apache.ratis.thirdparty.com.google.protobuf.TextFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -105,15 +105,14 @@ public final class SCMRatisRequest {
       // This is done to avoid MethodNotFoundException in case if argument is
       // subclass type, where as method is defined with super class type.
       argBuilder.setType(parameterTypes[paramCounter++].getName());
-      argBuilder.setValue(CodecFactory.getCodec(argument.getClass())
+      argBuilder.setValue(ScmCodecFactory.getCodec(argument.getClass())
           .serialize(argument));
       args.add(argBuilder.build());
     }
     methodBuilder.addAllArgs(args);
     requestProtoBuilder.setMethod(methodBuilder.build());
-    return Message.valueOf(
-        org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFrom(
-            requestProtoBuilder.build().toByteArray()));
+    final SCMRatisRequestProto requestProto = requestProtoBuilder.build();
+    return Message.valueOf(requestProto.toByteString());
   }
 
   /**
@@ -122,16 +121,38 @@ public final class SCMRatisRequest {
   public static SCMRatisRequest decode(Message message)
       throws InvalidProtocolBufferException {
     final SCMRatisRequestProto requestProto =
-        SCMRatisRequestProto.parseFrom(message.getContent().toByteArray());
+        SCMRatisRequestProto.parseFrom(message.getContent().asReadOnlyByteBuffer());
+
+    // proto2 required-equivalent checks
+    if (!requestProto.hasType()) {
+      throw new InvalidProtocolBufferException("Missing request type");
+    }
+    if (!requestProto.hasMethod()) {
+      throw new InvalidProtocolBufferException("Missing method");
+    }
+
     final Method method = requestProto.getMethod();
+
+    // proto2 required-equivalent checks
+    if (!method.hasName()) {
+      throw new InvalidProtocolBufferException("Missing method name");
+    }
+
     List<Object> args = new ArrayList<>();
     Class<?>[] parameterTypes = new Class[method.getArgsCount()];
     int paramCounter = 0;
     for (MethodArgument argument : method.getArgsList()) {
+      // proto2 required-equivalent checks
+      if (!argument.hasType()) {
+        throw new InvalidProtocolBufferException("Missing argument type");
+      }
+      if (!argument.hasValue()) {
+        throw new InvalidProtocolBufferException("Missing argument value");
+      }
       try {
         final Class<?> clazz = ReflectionUtil.getClass(argument.getType());
         parameterTypes[paramCounter++] = clazz;
-        args.add(CodecFactory.getCodec(clazz)
+        args.add(ScmCodecFactory.getCodec(clazz)
             .deserialize(clazz, argument.getValue()));
       } catch (ClassNotFoundException ex) {
         throw new InvalidProtocolBufferException(argument.getType() +
@@ -151,7 +172,7 @@ public final class SCMRatisRequest {
     StringBuilder builder = new StringBuilder();
     try {
       builder.append(TextFormat.shortDebugString(
-          SCMRatisRequestProto.parseFrom(proto.getLogData().toByteArray())));
+          SCMRatisRequestProto.parseFrom(proto.getLogData().asReadOnlyByteBuffer())));
     } catch (Throwable ex) {
       LOG.error("smProtoToString failed", ex);
       builder.append("smProtoToString failed with");

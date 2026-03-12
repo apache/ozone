@@ -34,7 +34,7 @@ import org.slf4j.Logger;
  * It logs the message type/content on DEBUG/TRACING log for insight and create
  * a new span based on the tracing information.
  */
-public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE, TYPE> {
+public class OzoneProtocolMessageDispatcher<REQUEST, RESPONSE, TYPE extends Enum<TYPE>> {
 
   private final String serviceName;
 

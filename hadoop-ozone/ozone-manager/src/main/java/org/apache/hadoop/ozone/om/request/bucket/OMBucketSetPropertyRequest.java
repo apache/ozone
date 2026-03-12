@@ -19,10 +19,10 @@ package org.apache.hadoop.ozone.om.request.bucket;
 
 import static org.apache.hadoop.ozone.om.lock.OzoneManagerLock.LeveledResource.BUCKET_LOCK;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.nio.file.InvalidPathException;
 import java.util.List;
+import java.util.Objects;
 import org.apache.hadoop.crypto.key.KeyProviderCryptoExtension;
 import org.apache.hadoop.hdds.client.DefaultReplicationConfig;
 import org.apache.hadoop.hdds.protocol.StorageType;
@@ -110,7 +110,7 @@ public class OMBucketSetPropertyRequest extends OMClientRequest {
 
     SetBucketPropertyRequest setBucketPropertyRequest =
         getOmRequest().getSetBucketPropertyRequest();
-    Preconditions.checkNotNull(setBucketPropertyRequest);
+    Objects.requireNonNull(setBucketPropertyRequest, "setBucketPropertyRequest == null");
 
     OMMetadataManager omMetadataManager = ozoneManager.getMetadataManager();
     OMMetrics omMetrics = ozoneManager.getMetrics();

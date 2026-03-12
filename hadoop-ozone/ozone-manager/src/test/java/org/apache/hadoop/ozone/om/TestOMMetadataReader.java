@@ -28,7 +28,7 @@ import static org.mockito.Mockito.when;
 
 import io.grpc.Context;
 import java.net.InetAddress;
-import org.apache.hadoop.ipc.Server;
+import org.apache.hadoop.ipc_.Server;
 import org.apache.hadoop.ozone.audit.AuditLogger;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.security.STSTokenIdentifier;

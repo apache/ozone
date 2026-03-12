@@ -26,8 +26,10 @@ import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeData
 import static org.apache.hadoop.ozone.recon.OMMetadataManagerTestUtils.writeKeyToOm;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -47,6 +49,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import javax.ws.rs.WebApplicationException;
@@ -60,6 +66,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.scm.container.ContainerChecksums;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerStateManager;
@@ -77,6 +84,7 @@ import org.apache.hadoop.ozone.om.helpers.OmDirectoryInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyLocationInfoGroup;
 import org.apache.hadoop.ozone.om.helpers.OmVolumeArgs;
+import org.apache.hadoop.ozone.recon.ReconConstants;
 import org.apache.hadoop.ozone.recon.ReconTestInjector;
 import org.apache.hadoop.ozone.recon.api.types.ContainerDiscrepancyInfo;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
@@ -100,11 +108,14 @@ import org.apache.hadoop.ozone.recon.spi.ReconNamespaceSummaryManager;
 import org.apache.hadoop.ozone.recon.spi.StorageContainerServiceProvider;
 import org.apache.hadoop.ozone.recon.spi.impl.OzoneManagerServiceProviderImpl;
 import org.apache.hadoop.ozone.recon.spi.impl.StorageContainerServiceProviderImpl;
+import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperHelper;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTaskFSO;
 import org.apache.hadoop.ozone.recon.tasks.ContainerKeyMapperTaskOBS;
 import org.apache.hadoop.ozone.recon.tasks.NSSummaryTaskWithFSO;
+import org.apache.hadoop.ozone.recon.tasks.ReconOmTask;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
 import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainers;
+import org.apache.ozone.test.tag.Flaky;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -114,6 +125,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Test for container endpoint.
  */
+@Flaky("HDDS-14178")
 public class TestContainerEndpoint {
 
   @TempDir
@@ -216,7 +228,15 @@ public class TestContainerEndpoint {
     if (!isSetupDone) {
       initializeInjector();
       isSetupDone = true;
+    } else {
+      // Clear shared state before subsequent tests to prevent data leakage
+      ContainerKeyMapperHelper.clearSharedContainerCountMap();
+      ReconConstants.resetTableTruncatedFlags();
+
+      // Reinitialize container tables to clear RocksDB data
+      reconContainerMetadataManager.reinitWithNewContainerDataFromOm(Collections.emptyMap());
     }
+
     omConfiguration = new OzoneConfiguration();
 
     List<OmKeyLocationInfo> omKeyLocationInfoList = new ArrayList<>();
@@ -297,14 +317,27 @@ public class TestContainerEndpoint {
     reprocessContainerKeyMapper();
   }
 
-  private void reprocessContainerKeyMapper() {
+  private void reprocessContainerKeyMapper() throws Exception {
     ContainerKeyMapperTaskOBS containerKeyMapperTaskOBS =
         new ContainerKeyMapperTaskOBS(reconContainerMetadataManager, omConfiguration);
-    containerKeyMapperTaskOBS.reprocess(reconOMMetadataManager);
-
     ContainerKeyMapperTaskFSO containerKeyMapperTaskFSO =
         new ContainerKeyMapperTaskFSO(reconContainerMetadataManager, omConfiguration);
-    containerKeyMapperTaskFSO.reprocess(reconOMMetadataManager);
+
+    // Run both tasks in parallel (like production)
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<ReconOmTask.TaskResult> obsFuture = executor.submit(
+          () -> containerKeyMapperTaskOBS.reprocess(reconOMMetadataManager));
+      Future<ReconOmTask.TaskResult> fsoFuture = executor.submit(
+          () -> containerKeyMapperTaskFSO.reprocess(reconOMMetadataManager));
+
+      // Wait for both to complete
+      obsFuture.get();
+      fsoFuture.get();
+    } finally {
+      executor.shutdown();
+      executor.awaitTermination(10, TimeUnit.SECONDS);
+    }
   }
 
   private void setUpFSOData() throws IOException {
@@ -435,7 +468,7 @@ public class TestContainerEndpoint {
   }
 
   @Test
-  public void testGetKeysForContainer() throws IOException {
+  public void testGetKeysForContainer() throws Exception {
     Response response = containerEndpoint.getKeysForContainer(1L, -1, "");
 
     KeysResponse data = (KeysResponse) response.getEntity();
@@ -480,8 +513,7 @@ public class TestContainerEndpoint {
     // Set up test data for FSO keys
     setUpFSOData();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
-        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
-            reconOMMetadataManager, 10);
+        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager, reconOMMetadataManager, 10, 5, 20, 2000);
     nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
     // Reprocess the container key mapper to ensure the latest mapping is used
     reprocessContainerKeyMapper();
@@ -513,7 +545,7 @@ public class TestContainerEndpoint {
   }
 
   @Test
-  public void testGetKeysForContainerWithPrevKey() throws IOException {
+  public void testGetKeysForContainerWithPrevKey() throws Exception {
     // test if prev-key param works as expected
     Response response = containerEndpoint.getKeysForContainer(
         1L, -1, "/sampleVol/bucketOne/key_one");
@@ -568,8 +600,7 @@ public class TestContainerEndpoint {
     // Reprocess the container key mapper to ensure the latest mapping is used
     reprocessContainerKeyMapper();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
-        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
-            reconOMMetadataManager, 10);
+        new NSSummaryTaskWithFSO(reconNamespaceSummaryManager, reconOMMetadataManager, 10, 5, 20, 2000);
     nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
     response = containerEndpoint.getKeysForContainer(20L, -1, "/0/1/2/file7");
 
@@ -1046,12 +1077,12 @@ public class TestContainerEndpoint {
     final UUID u2 = newDatanode("host2", "127.0.0.2");
     final UUID u3 = newDatanode("host3", "127.0.0.3");
     final UUID u4 = newDatanode("host4", "127.0.0.4");
-    reconContainerManager.upsertContainerHistory(1L, u1, 1L, 1L, "OPEN", 1234L);
-    reconContainerManager.upsertContainerHistory(1L, u2, 2L, 1L, "OPEN", 1234L);
-    reconContainerManager.upsertContainerHistory(1L, u3, 3L, 1L, "OPEN", 1234L);
-    reconContainerManager.upsertContainerHistory(1L, u4, 4L, 1L, "OPEN", 1234L);
+    reconContainerManager.upsertContainerHistory(1L, u1, 1L, 1L, "OPEN", ContainerChecksums.of(1234L, 0L));
+    reconContainerManager.upsertContainerHistory(1L, u2, 2L, 1L, "OPEN", ContainerChecksums.of(1234L, 0L));
+    reconContainerManager.upsertContainerHistory(1L, u3, 3L, 1L, "OPEN", ContainerChecksums.of(1234L, 0L));
+    reconContainerManager.upsertContainerHistory(1L, u4, 4L, 1L, "OPEN", ContainerChecksums.of(1234L, 0L));
 
-    reconContainerManager.upsertContainerHistory(1L, u1, 5L, 1L, "OPEN", 1234L);
+    reconContainerManager.upsertContainerHistory(1L, u1, 5L, 1L, "OPEN", ContainerChecksums.of(1234L, 0L));
 
     Response response = containerEndpoint.getReplicaHistoryForContainer(1L);
     List<ContainerHistory> histories =
@@ -1161,13 +1192,13 @@ public class TestContainerEndpoint {
     long differentChecksum = dataChecksumMismatch ? 2345L : 1234L;
 
     reconContainerManager.upsertContainerHistory(cID, uuid1, 1L, 1L,
-        "UNHEALTHY", differentChecksum);
+        "UNHEALTHY", ContainerChecksums.of(differentChecksum, 0L));
     reconContainerManager.upsertContainerHistory(cID, uuid2, 2L, 1L,
-        "UNHEALTHY", differentChecksum);
+        "UNHEALTHY", ContainerChecksums.of(differentChecksum, 0L));
     reconContainerManager.upsertContainerHistory(cID, uuid3, 3L, 1L,
-        "UNHEALTHY", 1234L);
+        "UNHEALTHY", ContainerChecksums.of(1234L, 0L));
     reconContainerManager.upsertContainerHistory(cID, uuid4, 4L, 1L,
-        "UNHEALTHY", 1234L);
+        "UNHEALTHY", ContainerChecksums.of(1234L, 0L));
   }
 
   protected ContainerWithPipeline getTestContainer(
@@ -1370,7 +1401,7 @@ public class TestContainerEndpoint {
 
   @Test
   public void testGetContainerInsightsNonSCMContainersWithPrevKey()
-      throws IOException, TimeoutException {
+      throws Exception {
 
     // Add 3 more containers to OM making total container in OM to 5
     String[] keys = {"key_three", "key_four", "key_five"};
@@ -1440,7 +1471,7 @@ public class TestContainerEndpoint {
             .stream().map(entry -> entry.getKey()).collect(
                 Collectors.toList());
     deletedContainerKeyList.forEach((ContainerKeyPrefix key) -> {
-      try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
+      try (RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation()) {
         reconContainerMetadataManager
             .batchDeleteContainerMapping(rdbBatchOperation, key);
         reconContainerMetadataManager.commitBatchOperation(rdbBatchOperation);
@@ -1477,7 +1508,7 @@ public class TestContainerEndpoint {
         reconContainerMetadataManager.getKeyPrefixesForContainer(2).entrySet()
             .stream().map(entry -> entry.getKey()).collect(Collectors.toList());
     deletedContainerKeyList.forEach((ContainerKeyPrefix key) -> {
-      try (RDBBatchOperation rdbBatchOperation = new RDBBatchOperation()) {
+      try (RDBBatchOperation rdbBatchOperation = RDBBatchOperation.newAtomicOperation()) {
         reconContainerMetadataManager.batchDeleteContainerMapping(
             rdbBatchOperation, key);
         reconContainerMetadataManager.commitBatchOperation(rdbBatchOperation);
@@ -1567,6 +1598,102 @@ public class TestContainerEndpoint {
     // ContainerID 1 and 2 are missing in SCM but present in OM
     assertThat(missingContainerIdsSCM).contains(1L);
     assertThat(missingContainerIdsSCM).contains(2L);
+  }
+
+  /**
+   * Helper to create a container in SCM with a specific pipeline.
+   */
+  private void createContainerInSCM(long containerId, Pipeline targetPipeline)
+      throws IOException, TimeoutException {
+    ContainerInfo containerInfo = new ContainerInfo.Builder()
+        .setContainerID(containerId)
+        .setReplicationConfig(
+            RatisReplicationConfig.getInstance(ReplicationFactor.THREE))
+        .setState(HddsProtos.LifeCycleState.OPEN)
+        .setOwner("owner" + containerId)
+        .setNumberOfKeys(0)
+        .setPipelineID(targetPipeline.getId())
+        .build();
+    reconContainerManager.addNewContainer(
+        new ContainerWithPipeline(containerInfo, targetPipeline));
+  }
+
+  /**
+   * Helper to verify pipeline isolation for a container missing in OM.
+   */
+  private void verifyPipelineIsolation(ContainerDiscrepancyInfo info,
+      long containerId, PipelineID expectedPipelineId,
+      List<List<Pipeline>> otherPipelineLists) {
+    List<Pipeline> pipelines = info.getPipelines();
+    assertNotNull(pipelines);
+    assertEquals(1, pipelines.size(),
+        "Container " + containerId + " should have exactly 1 pipeline");
+    assertEquals(expectedPipelineId, pipelines.get(0).getId(),
+        "Container " + containerId + " should have correct pipeline");
+    assertEquals("SCM", info.getExistsAt());
+    assertEquals(0, info.getNumberOfKeys());
+    // Verify list isolation
+    for (List<Pipeline> other : otherPipelineLists) {
+      if (other != null) {
+        assertNotSame(pipelines, other,
+            "Container " + containerId + " should have independent list");
+      }
+    }
+  }
+
+  @Test
+  public void testGetContainerInsightsNonOMContainersPipelineIsolation()
+      throws IOException, TimeoutException {
+    // Verifies fix for pipeline accumulation bug: containers missing in OM
+    // should each have their own isolated pipeline list, not shared.
+    
+    // Create 3 different pipelines
+    Pipeline[] pipelines = {
+        getRandomPipeline(), getRandomPipeline(), getRandomPipeline()
+    };
+    for (Pipeline p : pipelines) {
+      reconPipelineManager.addPipeline(p);
+    }
+    
+    // Create 3 containers in SCM with different pipelines (not in OM)
+    long[] containerIds = {501L, 502L, 503L};
+    for (int i = 0; i < containerIds.length; i++) {
+      createContainerInSCM(containerIds[i], pipelines[i]);
+      assertFalse(reconContainerMetadataManager.doesContainerExists(containerIds[i]),
+          "Container " + containerIds[i] + " should NOT exist in OM");
+    }
+    
+    // Call API
+    Response response = containerEndpoint.getContainerMisMatchInsights(10, 500, "OM");
+    assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    
+    Map<String, Object> responseMap = (Map<String, Object>) response.getEntity();
+    List<ContainerDiscrepancyInfo> discrepancies =
+        (List<ContainerDiscrepancyInfo>) responseMap.get("containerDiscrepancyInfo");
+    assertNotNull(discrepancies);
+    
+    // Find containers in response
+    ContainerDiscrepancyInfo[] infos = new ContainerDiscrepancyInfo[3];
+    for (int i = 0; i < containerIds.length; i++) {
+      final long id = containerIds[i];
+      infos[i] = discrepancies.stream()
+          .filter(d -> d.getContainerID() == id)
+          .findFirst()
+          .orElseThrow(() -> new AssertionError(
+              "Container " + id + " not found in mismatch list"));
+    }
+    
+    // Verify pipeline isolation for each container
+    List<Pipeline> pipelineList1 = infos[0].getPipelines();
+    List<Pipeline> pipelineList2 = infos[1].getPipelines();
+    List<Pipeline> pipelineList3 = infos[2].getPipelines();
+    
+    verifyPipelineIsolation(infos[0], containerIds[0], pipelines[0].getId(),
+        Arrays.asList(pipelineList2, pipelineList3));
+    verifyPipelineIsolation(infos[1], containerIds[1], pipelines[1].getId(),
+        Arrays.asList(pipelineList1, pipelineList3));
+    verifyPipelineIsolation(infos[2], containerIds[2], pipelines[2].getId(),
+        Arrays.asList(pipelineList1, pipelineList2));
   }
 
   @Test
@@ -1821,12 +1948,12 @@ public class TestContainerEndpoint {
    * and then verifies that the ContainerEndpoint returns two distinct key records.
    */
   @Test
-  public void testDuplicateFSOKeysForContainerEndpoint() throws IOException {
+  public void testDuplicateFSOKeysForContainerEndpoint() throws Exception {
     // Set up duplicate FSO file keys.
     setUpDuplicateFSOFileKeys();
     NSSummaryTaskWithFSO nSSummaryTaskWithFso =
         new NSSummaryTaskWithFSO(reconNamespaceSummaryManager,
-            reconOMMetadataManager, 10);
+            reconOMMetadataManager, 10, 5, 20, 2000);
     nSSummaryTaskWithFso.reprocessWithFSO(reconOMMetadataManager);
     // Reprocess the container key mappings so that the new keys are loaded.
     reprocessContainerKeyMapper();

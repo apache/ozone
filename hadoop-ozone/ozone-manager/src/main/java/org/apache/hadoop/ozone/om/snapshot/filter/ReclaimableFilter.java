@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.ozone.om.snapshot.filter;
 
-import static org.apache.hadoop.ozone.om.lock.FlatResource.SNAPSHOT_GC_LOCK;
+import static org.apache.hadoop.ozone.om.lock.DAGLeveledResource.SNAPSHOT_GC_LOCK;
 
 import java.io.Closeable;
 import java.io.IOException;

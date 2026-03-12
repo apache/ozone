@@ -179,6 +179,14 @@
     </description>
   </property>
   <property>
+    <name>hdds.datanode.data.dir.permissions</name>
+    <value>700</value>
+    <description>Permissions for the datanode data directories where actual file blocks are stored.
+      The permissions can be either octal or symbolic. If the default permissions are not set
+      then the default value of 700 will be used.
+    </description>
+  </property>
+  <property>
     <name>hdds.datanode.container.db.dir</name>
     <value/>
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
@@ -206,6 +214,15 @@
     <tag>OZONE, CONTAINER, STORAGE, MANAGEMENT</tag>
     <description>Percentage of volume that should be reserved. This space is left free for other usage.
       The value should be between 0-1. Such as 0.1 which means 10% of volume space will be reserved.
+    </description>
+  </property>
+  <property>
+    <name>hdds.datanode.disk.balancer.enabled</name>
+    <value>false</value>
+    <tag>OZONE, DATANODE, DISKBALANCER</tag>
+    <description>If this property is set to true, then the Disk Balancer
+      feature is enabled on Datanodes, and users can use
+      this service. By default, this is disabled.
     </description>
   </property>
   <property>
@@ -370,7 +387,6 @@
       datanode periodically send pipeline report to SCM. Unit could be
       defined with postfix (ns,ms,s,m,h,d)</description>
   </property>
-
 
   <property>
     <name>hdds.prometheus.endpoint.enabled</name>
@@ -651,20 +667,6 @@
     </description>
   </property>
   <property>
-    <name>ozone.om.volume.listall.allowed</name>
-    <value>true</value>
-    <tag>OM, MANAGEMENT</tag>
-    <description>
-      Allows everyone to list all volumes when set to true. Defaults to true.
-      When set to false, non-admin users can only list the volumes they have
-      access to. Admins can always list all volumes. Note that this config
-      only applies to OzoneNativeAuthorizer. For other authorizers, admin
-      needs to set policies accordingly to allow all volume listing
-      e.g. for Ranger, a new policy with special volume "/" can be added to
-      allow group public LIST access.
-    </description>
-  </property>
-  <property>
     <name>ozone.om.db.dirs</name>
     <value/>
     <tag>OZONE, OM, STORAGE, PERFORMANCE</tag>
@@ -680,11 +682,11 @@
   </property>
   <property>
     <name>ozone.om.db.dirs.permissions</name>
-    <value>750</value>
+    <value>700</value>
     <description>
       Permissions for the metadata directories for Ozone Manager. The
       permissions have to be octal or symbolic. If the default permissions are not set
-      then the default value of 750 will be used.
+      then the default value of 700 will be used.
     </description>
   </property>
   <property>
@@ -702,8 +704,16 @@
     </description>
   </property>
   <property>
+    <name>ozone.path.deleting.limit.per.task</name>
+    <value>20000</value>
+    <tag>OZONE, PERFORMANCE, OM</tag>
+    <description>A maximum number of paths(dirs/files) to be deleted by
+      directory deleting service per time interval.
+    </description>
+  </property>
+  <property>
     <name>ozone.metadata.dirs.permissions</name>
-    <value>750</value>
+    <value>700</value>
     <description>
       Permissions for the metadata directories for fallback location for SCM, OM, Recon and DataNodes
       to store their metadata. The permissions have to be octal or symbolic. This is the fallback used in case the
@@ -748,11 +758,11 @@
   </property>
   <property>
     <name>ozone.scm.db.dirs.permissions</name>
-    <value>750</value>
+    <value>700</value>
     <description>
       Permissions for the metadata directories for Storage Container Manager. The
       permissions can either be octal or symbolic. If the default permissions are not set
-      then the default value of 750 will be used.
+      then the default value of 700 will be used.
     </description>
   </property>
   <property>
@@ -778,6 +788,16 @@
     <tag>OZONE, SCM</tag>
     <description>
       The port number of the Ozone SCM block client service.
+    </description>
+  </property>
+  <property>
+    <name>ozone.scm.block.deletion.per.dn.distribution.factor</name>
+    <value>8</value>
+    <tag>OZONE, SCM</tag>
+    <description>
+      Factor with which number of delete blocks sent to each datanode in every interval.
+      If total number of DNs are 100 and hdds.scm.block.deletion.per-interval.max is 500000
+      Then maximum 500000/(100/8) = 40000 blocks will be sent to each DN in every interval.
     </description>
   </property>
   <property>
@@ -1592,6 +1612,15 @@
   </property>
 
   <property>
+    <name>ozone.om.db.checkpoint.use.inode.based.transfer</name>
+    <value>true</value>
+    <tag>OZONE, OM</tag>
+    <description>
+      Denotes if the OM bootstrap inode based transfer implementation is set as default.
+    </description>
+  </property>
+
+  <property>
     <name>hdds.datanode.plugins</name>
     <value/>
     <description>
@@ -1734,6 +1763,16 @@
     <description>
       Percentage of pipelines, where at least one datanode is reported in the
       pipeline.
+    </description>
+  </property>
+
+  <property>
+    <name>hdds.scm.safemode.log.interval</name>
+    <value>1m</value>
+    <tag>HDDS,SCM,OPERATION</tag>
+    <description>
+      Interval at which SCM logs safemode status while SCM is in safemode.
+      Default is 1 minute.
     </description>
   </property>
 
@@ -2346,7 +2385,7 @@
   </property>
   <property>
     <name>ozone.om.ratis.snapshot.max.total.sst.size</name>
-    <value>100000000</value>
+    <value>10737418240</value>
     <tag>OZONE, OM, RATIS</tag>
     <description>
       Max size of SST files in OM Ratis Snapshot tarball.
@@ -2401,6 +2440,20 @@
     <value>false</value>
     <tag>OZONE, SECURITY, ACL</tag>
     <description>Key to enable/disable ozone acls.</description>
+  </property>
+  <property>
+    <name>ozone.authorization.enabled</name>
+    <value>true</value>
+    <tag>OZONE, SECURITY, AUTHORIZATION</tag>
+    <description>
+      Master switch to enable/disable authorization checks in Ozone
+      (admin privilege checks and ACL checks).
+      This property only takes effect when ozone.security.enabled is true.
+      When true: admin privilege checks are always performed, and object
+      ACL checks are controlled by ozone.acl.enabled.
+      When false: no authorization checks are performed.
+      Default is true.
+    </description>
   </property>
   <property>
     <name>ozone.om.kerberos.keytab.file</name>
@@ -3028,7 +3081,14 @@
       Comma separated list of users and groups allowed to access reconfigure protocol.
     </description>
   </property>
-
+  <property>
+    <name>hdds.security.client.datanode.disk.balancer.protocol.acl</name>
+    <value>*</value>
+    <tag>SECURITY</tag>
+    <description>
+      Comma separated list of users and groups allowed to access disk balancer protocol.
+    </description>
+  </property>
   <property>
     <name>hdds.datanode.http.auth.kerberos.principal</name>
     <value>HTTP/_HOST@REALM</value>
@@ -3145,9 +3205,9 @@
       Expert only. Ozone RpcClient attempts talking to each OzoneManager
       ipc.client.connect.max.retries (default = 10) number of times before
       failing over to another OzoneManager, if available. This parameter
-      represents the number of times the client will failover before giving
-      up. This value is kept high so that client does not give up trying to
-      connect to OMs easily.
+      represents the number of times per request the client will failover
+      before giving up. This value is kept high so that client does not
+      give up trying to connect to OMs easily.
     </description>
   </property>
   <property>
@@ -3158,6 +3218,36 @@
       to contact OM. Wait time increases linearly if same OM is retried
       again. If retrying on multiple OMs proxies in round robin fashion, the
       wait time is introduced after all the OM proxies have been attempted once.
+    </description>
+  </property>
+  <property>
+    <name>ozone.client.follower.read.enabled</name>
+    <value>false</value>
+    <description>
+      Enable client to read from OM followers. If false, all client
+      requests are sent to the OM leader.
+    </description>
+  </property>
+  <property>
+    <name>ozone.client.follower.read.default.consistency</name>
+    <value>LINEARIZABLE_ALLOW_FOLLOWER</value>
+    <description>
+      The default consistency when client enables follower read.
+      Currently, the supported follower read consistency are
+      LINEARIZABLE_ALLOW_FOLLOWER and LOCAL_LEASE
+      The default value is LINEARIZABLE_ALLOW_FOLLOWER to preserve the same strong
+      consistency behavior when switching from leader-only read to follower read.
+    </description>
+  </property>
+  <property>
+    <name>ozone.client.leader.read.default.consistency</name>
+    <value>DEFAULT</value>
+    <description>
+      The default consistency when client disables follower read.
+      Currently, the supported leader read consistency are
+      DEFAULT and LINEARIZABLE_LEADER_ONLY.
+      The default value is DEFAULT for backward compatibility reason
+      which is mostly strongly consistent.
     </description>
   </property>
   <property>
@@ -3349,11 +3439,11 @@
   </property>
   <property>
     <name>ozone.recon.db.dirs.permissions</name>
-    <value>750</value>
+    <value>700</value>
     <description>
       Permissions for the metadata directories for Recon. The
       permissions can either be octal or symbolic. If the default permissions are not set
-      then the default value of 750 will be used.
+      then the default value of 700 will be used.
     </description>
   </property>
   <property>
@@ -3556,6 +3646,24 @@
       during task reinitialization. When tasks are being reprocessed on staging DB,
       this buffer holds incoming delta updates to prevent blocking the OM sync process.
       If the buffer overflows, task reinitialization will be triggered.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.dn.metrics.collection.minimum.api.delay</name>
+    <value>30s</value>
+    <tag>OZONE, RECON, DN</tag>
+    <description>
+      Minimum delay in API to start a new task for Jmx collection.
+      It behaves like a rate limiter to avoid unnecessary task creation.
+    </description>
+  </property>
+  <property>
+    <name>ozone.recon.dn.metrics.collection.timeout</name>
+    <value>10m</value>
+    <tag>OZONE, RECON, DN</tag>
+    <description>
+      Maximum time taken for the api to complete.
+      If it exceeds pending tasks will be cancelled.
     </description>
   </property>
   <property>
@@ -4374,6 +4482,43 @@
   </property>
     
   <property>
+    <name>ozone.recon.filesizecount.flush.db.max.threshold</name>
+    <value>200000</value>
+    <tag>OZONE, RECON, PERFORMANCE</tag>
+    <description>
+      Maximum threshold number of entries to hold in memory for File Size Count task in hashmap before flushing to
+      recon derby DB
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.recon.task.reprocess.max.iterators</name>
+    <value>5</value>
+    <tag>OZONE, RECON, PERFORMANCE</tag>
+    <description>
+      Maximum number of iterator threads to use for parallel table iteration during reprocess
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.recon.task.reprocess.max.workers</name>
+    <value>20</value>
+    <tag>OZONE, RECON, PERFORMANCE</tag>
+    <description>
+      Maximum number of worker threads to use for parallel table processing during reprocess
+    </description>
+  </property>
+
+  <property>
+    <name>ozone.recon.task.reprocess.max.keys.in.memory</name>
+    <value>2000</value>
+    <tag>OZONE, RECON, PERFORMANCE</tag>
+    <description>
+      Maximum number of keys to batch in memory before handing to worker threads during parallel reprocess
+    </description>
+  </property>
+    
+  <property>
     <name>ozone.recon.heatmap.provider</name>
     <value></value>
     <tag>OZONE, RECON</tag>
@@ -4824,8 +4969,8 @@
   </property>
   <property>
     <name>hdds.datanode.kerberos.principal</name>
-    <value/>
-    <tag>OZONE, DATANODE</tag>
+    <value>dn/_HOST@REALM</value>
+    <tag>OZONE, SECURITY, KERBEROS, DATANODE</tag>
     <description>
       The Datanode service principal. This is typically set to
       dn/_HOST@REALM.TLD. Each Datanode will substitute _HOST with its

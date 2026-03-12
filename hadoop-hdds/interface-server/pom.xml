@@ -28,7 +28,6 @@
   <properties>
     <!-- no testable code in this module -->
     <maven.test.skip>true</maven.test.skip>
-    <protobuf.version>${protobuf2.version}</protobuf.version>
     <!-- only generated code in this module -->
     <spotbugs.skip>true</spotbugs.skip>
   </properties>
@@ -84,6 +83,7 @@
               <includes>
                 <include>InterSCMProtocol.proto</include>
                 <include>SCMUpdateProtocol.proto</include>
+                <include>SCMRatisProtocol.proto</include>
               </includes>
               <outputDirectory>target/generated-sources/proto-java-for-ratis</outputDirectory>
               <clearOutputDirectory>false</clearOutputDirectory>
@@ -102,6 +102,7 @@
               <excludes>
                 <exclude>InterSCMProtocol.proto</exclude>
                 <exclude>SCMUpdateProtocol.proto</exclude>
+                <exclude>SCMRatisProtocol.proto</exclude>
               </excludes>
               <outputDirectory>target/generated-sources/proto-java-for-protobuf-${protobuf.version}</outputDirectory>
               <clearOutputDirectory>false</clearOutputDirectory>

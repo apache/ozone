@@ -20,17 +20,11 @@ package org.apache.ozone.rocksdiff;
 import static org.apache.hadoop.hdds.StringUtils.getFirstNChars;
 
 import com.google.common.annotations.VisibleForTesting;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
-import org.apache.commons.io.FilenameUtils;
 import org.apache.hadoop.hdds.utils.db.TablePrefixInfo;
-import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksDB;
-import org.apache.ozone.compaction.log.CompactionFileInfo;
 import org.apache.ozone.rocksdb.util.SstFileInfo;
-import org.rocksdb.LiveFileMetaData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,40 +48,40 @@ public final class RocksDiffUtils {
         && prefixForColumnFamily.compareTo(endKeyPrefix) <= 0;
   }
 
-  public static void filterRelevantSstFiles(Set<String> inputFiles,
-                                            TablePrefixInfo tablePrefixInfo,
-                                            Set<String> columnFamiliesToLookup,
-                                            ManagedRocksDB... dbs) {
-    filterRelevantSstFiles(inputFiles, tablePrefixInfo, Collections.emptyMap(), columnFamiliesToLookup, dbs);
-  }
-
   /**
-   * Filter sst files based on prefixes.
+   * Filter sst files based on prefixes. The map of sst files to be filtered would be mutated.
+   * @param <T> Type of the key in the map.
+   * @param filesMapToBeFiltered Map of sst files to be filtered.
+   * @param tablesToLookup Set of column families to be included in the diff.
+   * @param tablePrefixInfo TablePrefixInfo to filter irrelevant SST files.
    */
-  public static void filterRelevantSstFiles(Set<String> inputFiles,
-                                            TablePrefixInfo tablePrefixInfo,
-                                            Map<String, CompactionNode> preExistingCompactionNodes,
-                                            Set<String> columnFamiliesToLookup,
-                                            ManagedRocksDB... dbs) {
-    Map<String, LiveFileMetaData> liveFileMetaDataMap = new HashMap<>();
-    int dbIdx = 0;
-    for (Iterator<String> fileIterator =
-         inputFiles.iterator(); fileIterator.hasNext();) {
-      String filename = FilenameUtils.getBaseName(fileIterator.next());
-      while (!preExistingCompactionNodes.containsKey(filename) && !liveFileMetaDataMap.containsKey(filename)
-          && dbIdx < dbs.length) {
-        liveFileMetaDataMap.putAll(dbs[dbIdx].getLiveMetadataForSSTFiles());
-        dbIdx += 1;
-      }
-      CompactionNode compactionNode = preExistingCompactionNodes.get(filename);
-      if (compactionNode == null) {
-        compactionNode = new CompactionNode(new CompactionFileInfo.Builder(filename)
-            .setValues(liveFileMetaDataMap.get(filename)).build());
-      }
-      if (shouldSkipNode(compactionNode, tablePrefixInfo, columnFamiliesToLookup)) {
+  public static <T> Map<T, SstFileInfo> filterRelevantSstFiles(Map<T, SstFileInfo> filesMapToBeFiltered,
+      Set<String> tablesToLookup, TablePrefixInfo tablePrefixInfo) {
+    for (Iterator<Map.Entry<T, SstFileInfo>> fileIterator = filesMapToBeFiltered.entrySet().iterator();
+         fileIterator.hasNext();) {
+      SstFileInfo sstFileInfo = fileIterator.next().getValue();
+      if (shouldSkipNode(sstFileInfo, tablePrefixInfo, tablesToLookup)) {
         fileIterator.remove();
       }
     }
+    return filesMapToBeFiltered;
+  }
+
+  /**
+   * Filter sst files based on prefixes. The set of sst files to be filtered would be mutated.
+   * @param filesToBeFiltered sst files to be filtered.
+   * @param tablesToLookup Set of column families to be included in the diff.
+   * @param tablePrefixInfo TablePrefixInfo to filter irrelevant SST files.
+   */
+  public static Set<SstFileInfo> filterRelevantSstFiles(Set<SstFileInfo> filesToBeFiltered,
+      Set<String> tablesToLookup, TablePrefixInfo tablePrefixInfo) {
+    for (Iterator<SstFileInfo> fileIterator = filesToBeFiltered.iterator(); fileIterator.hasNext();) {
+      SstFileInfo sstFileInfo = fileIterator.next();
+      if (shouldSkipNode(sstFileInfo, tablePrefixInfo, tablesToLookup)) {
+        fileIterator.remove();
+      }
+    }
+    return filesToBeFiltered;
   }
 
   @VisibleForTesting
