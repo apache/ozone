@@ -174,8 +174,6 @@ public class TestDiskBalancerPolicyPerformance {
     AtomicInteger failureCount = new AtomicInteger(0);
     AtomicLong totalTimeNanos = new AtomicLong(0);
 
-    Random rand = new Random();
-
     for (int i = 0; i < NUM_THREADS; i++) {
       executor.submit(() -> {
         try {
