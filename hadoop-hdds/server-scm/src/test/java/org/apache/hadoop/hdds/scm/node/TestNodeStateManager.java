@@ -38,7 +38,6 @@ import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.node.states.NodeAlreadyExistsException;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
-import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationCheckpoint;
 import org.apache.hadoop.hdds.server.events.Event;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.HddsServerUtil;
@@ -78,8 +77,6 @@ public class TestNodeStateManager {
     // Make NodeStateManager behave as if SCM has completed finalization,
     // unless a test changes the value of this variable.
     SCMContext scmContext = SCMContext.emptyContext();
-    scmContext.setFinalizationCheckpoint(
-        FinalizationCheckpoint.FINALIZATION_COMPLETE);
     eventPublisher = new MockEventPublisher();
     nsm = new NodeStateManager(conf, eventPublisher, scmContext);
   }

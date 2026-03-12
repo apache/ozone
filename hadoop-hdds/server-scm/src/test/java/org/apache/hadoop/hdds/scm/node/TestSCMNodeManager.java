@@ -97,7 +97,6 @@ import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager;
 import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher.NodeReportFromDatanode;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationCheckpoint;
 import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
@@ -120,7 +119,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
@@ -732,17 +730,15 @@ public class TestSCMNodeManager {
     }
   }
 
-  @ParameterizedTest
-  @EnumSource(FinalizationCheckpoint.class)
-  public void testProcessLayoutVersion(FinalizationCheckpoint checkpoint) throws IOException {
-    LOG.info("Testing with SCM finalization checkpoint {}", checkpoint);
-    testProcessLayoutVersionLowerMlv(checkpoint);
-    testProcessLayoutVersionReportHigherMlv(checkpoint);
+  @Test
+  public void testProcessLayoutVersion() throws IOException {
+    testProcessLayoutVersionLowerMlv(true);
+    testProcessLayoutVersionLowerMlv(false);
+    testProcessLayoutVersionReportHigherMlv();
   }
 
   // Currently invoked by testProcessLayoutVersion.
-  public void testProcessLayoutVersionReportHigherMlv(
-      FinalizationCheckpoint currentCheckpoint)
+  public void testProcessLayoutVersionReportHigherMlv()
       throws IOException {
     final int healthCheckInterval = 200; // milliseconds
     final int heartbeatInterval = 1; // seconds
@@ -759,7 +755,6 @@ public class TestSCMNodeManager {
     HDDSLayoutVersionManager lvm  =
         new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
     SCMContext nodeManagerContext = SCMContext.emptyContext();
-    nodeManagerContext.setFinalizationCheckpoint(currentCheckpoint);
     SCMNodeManager nodeManager  = new SCMNodeManager(conf,
         scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf),
         nodeManagerContext, lvm);
@@ -784,16 +779,18 @@ public class TestSCMNodeManager {
   }
 
   // Currently invoked by testProcessLayoutVersion.
-  public void testProcessLayoutVersionLowerMlv(FinalizationCheckpoint
-      currentCheckpoint) throws IOException {
+  public void testProcessLayoutVersionLowerMlv(boolean mvlLessThanSlv) throws IOException {
     OzoneConfiguration conf = new OzoneConfiguration();
     SCMStorageConfig scmStorageConfig = mock(SCMStorageConfig.class);
     when(scmStorageConfig.getClusterID()).thenReturn("xyz111");
     EventPublisher eventPublisher = mock(EventPublisher.class);
-    HDDSLayoutVersionManager lvm  =
-        new HDDSLayoutVersionManager(scmStorageConfig.getLayoutVersion());
+    int currentVersion = HDDSLayoutVersionManager.maxLayoutVersion();
+    if (mvlLessThanSlv) {
+      currentVersion -= 1;
+    }
+    HDDSLayoutVersionManager lvm = new HDDSLayoutVersionManager(currentVersion);
+
     SCMContext nodeManagerContext = SCMContext.emptyContext();
-    nodeManagerContext.setFinalizationCheckpoint(currentCheckpoint);
     SCMNodeManager nodeManager  = new SCMNodeManager(conf,
         scmStorageConfig, eventPublisher, new NetworkTopologyImpl(conf),
         nodeManagerContext, lvm);
@@ -811,7 +808,7 @@ public class TestSCMNodeManager {
     ArgumentCaptor<CommandForDatanode> captor =
         ArgumentCaptor.forClass(CommandForDatanode.class);
 
-    if (currentCheckpoint.hasCrossed(FinalizationCheckpoint.MLV_EQUALS_SLV)) {
+    if (!lvm.needsFinalization()) {
       // If the mlv equals slv checkpoint passed, datanodes with older mlvs
       // should be instructed to finalize.
       verify(eventPublisher, times(1))

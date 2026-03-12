@@ -62,7 +62,6 @@ import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationCheckpoint;
 import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizationContext;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
@@ -450,13 +449,8 @@ public class TestScmDataDistributionFinalization {
       throws Exception {
     GenericTestUtils.waitFor(() -> !scm.isInSafeMode(), 500, 5000);
     GenericTestUtils.waitFor(() -> {
-      FinalizationCheckpoint checkpoint =
-          scm.getScmContext().getFinalizationCheckpoint();
-      LOG.info("Waiting for SCM {} (leader? {}) to finalize. Current " +
-          "finalization checkpoint is {}",
-          scm.getSCMNodeId(), scm.checkLeader(), checkpoint);
-      return checkpoint.hasCrossed(
-          FinalizationCheckpoint.FINALIZATION_COMPLETE);
+      LOG.info("Waiting for SCM {} (leader? {}) to finalize.", scm.getSCMNodeId(), scm.checkLeader());
+      return !scm.getLayoutVersionManager().needsFinalization();
     }, 2_000, 60_000);
   }
 

@@ -760,19 +760,14 @@ public class SCMNodeManager implements NodeManager {
           datanodeDetails.getHostName(), dnSlv, scmSlv);
     }
 
-    if (FinalizationManager.shouldTellDatanodesToFinalize(
-        scmContext.getFinalizationCheckpoint())) {
-      // Because we have crossed the MLV_EQUALS_SLV checkpoint, SCM metadata
-      // layout version will not change. We can now compare it to the
-      // datanodes' metadata layout versions to tell them to finalize.
+    if (FinalizationManager.shouldTellDatanodesToFinalize(scmLayoutVersionManager)) {
+      // Because the finalizationManager / versionManager says finalization is not needed
+      // it means any DN that is reporting a metadata layout version less than the SCM's metadata layout version
+      // can be finalized.
       int scmMlv = scmLayoutVersionManager.getMetadataLayoutVersion();
 
-      // If the datanode mlv < scm mlv, it can not be allowed to be part of
-      // any pipeline. However it can be allowed to join the cluster
       if (dnMlv < scmMlv) {
-        LOG.warn("Data node {} can not be used in any pipeline in the " +
-                "cluster. " + "DataNode MetadataLayoutVersion = {}, SCM " +
-                "MetadataLayoutVersion = {}",
+        LOG.warn("Data node {} has a MetadataLayoutVersion = {}, SCM MetadataLayoutVersion = {}. Sending finalize",
             datanodeDetails.getHostName(), dnMlv, scmMlv);
 
         FinalizeNewLayoutVersionCommand finalizeCmd =

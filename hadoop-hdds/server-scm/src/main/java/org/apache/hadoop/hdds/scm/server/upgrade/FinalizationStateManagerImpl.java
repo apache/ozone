@@ -71,15 +71,12 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
     // Move the upgrade status according to this checkpoint. This is sent
     // back to the client if they query for the current upgrade status.
     versionManager.setUpgradeState(checkpoint.getStatus());
-    // Set the checkpoint in the SCM context so other components can read it.
-    upgradeContext.getSCMContext().setFinalizationCheckpoint(checkpoint);
   }
 
   @Override
   public void setUpgradeContext(SCMUpgradeFinalizationContext context) {
     this.upgradeContext = context;
     FinalizationCheckpoint checkpoint = getFinalizationCheckpoint();
-    upgradeContext.getSCMContext().setFinalizationCheckpoint(checkpoint);
     // Set the version manager's upgrade status (sent back to the client to
     // identify upgrade progress) based on the current checkpoint.
     versionManager.setUpgradeState(checkpoint.getStatus());
