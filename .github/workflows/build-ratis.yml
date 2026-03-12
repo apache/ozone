@@ -123,7 +123,7 @@ jobs:
           echo "netty=$(mvn help:evaluate -N -q -DforceStdout -Dscan=false -Dexpression=shaded.netty.version)" >> $GITHUB_OUTPUT
           echo "protobuf=$(mvn help:evaluate -N -q -DforceStdout -Dscan=false -Dexpression=shaded.protobuf.version)" >> $GITHUB_OUTPUT
   debug:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-slim
     needs:
       - ratis
       - ratis-thirdparty

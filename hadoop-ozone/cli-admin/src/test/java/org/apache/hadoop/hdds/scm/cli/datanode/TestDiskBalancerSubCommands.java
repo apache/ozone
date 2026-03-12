@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DATANODE_CLIENT_PORT_DEFAULT;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -35,13 +36,17 @@ import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DiskBalancerProtocol;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDiskBalancerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerConfigurationProto;
@@ -73,9 +78,9 @@ public class TestDiskBalancerSubCommands {
     
     // Create shared list of in-service datanodes
     inServiceDatanodes = new ArrayList<>();
-    inServiceDatanodes.add("host-1:19864");
-    inServiceDatanodes.add("host-2:19864");
-    inServiceDatanodes.add("host-3:19864");
+    inServiceDatanodes.add("host-1:HDDS_DATANODE_CLIENT_PORT_DEFAULT");
+    inServiceDatanodes.add("host-2:HDDS_DATANODE_CLIENT_PORT_DEFAULT");
+    inServiceDatanodes.add("host-3:HDDS_DATANODE_CLIENT_PORT_DEFAULT");
     
     // Create shared mock protocol
     mockProtocol = mock(DiskBalancerProtocol.class);
@@ -130,13 +135,49 @@ public class TestDiskBalancerSubCommands {
     
     MockedStatic<DiskBalancerSubCommandUtil> mockedUtil = 
         mockStatic(DiskBalancerSubCommandUtil.class);
+    Map<String, String> addressToDisplay = new LinkedHashMap<>();
+    for (String addr : inServiceDatanodes) {
+      addressToDisplay.put(addr, addr);
+    }
     mockedUtil.when(() -> DiskBalancerSubCommandUtil
         .getAllOperableNodesClientRpcAddress(any()))
-        .thenReturn(inServiceDatanodes);
+        .thenReturn(addressToDisplay);
     mockedUtil.when(() -> DiskBalancerSubCommandUtil
         .getSingleNodeDiskBalancerProxy(anyString()))
         .thenReturn(mockProtocol);
-    
+    // Mock getDatanodeHostAndIp(HddsProtos.DatanodeDetailsProto) to format the output
+    mockedUtil.when(() -> DiskBalancerSubCommandUtil
+        .getDatanodeHostAndIp(any(HddsProtos.DatanodeDetailsProto.class)))
+        .thenAnswer(invocation -> {
+          HddsProtos.DatanodeDetailsProto proto = invocation.getArgument(0);
+          return proto.getHostName() + " (" + proto.getIpAddress() + ":" +
+              HDDS_DATANODE_CLIENT_PORT_DEFAULT + ")";
+        });
+    // Mock getDatanodeHostAndIp(String, String, int) to format the output
+    // Return value is used by Mockito internally for mock setup
+    mockedUtil.when(() -> {
+      @SuppressWarnings("RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT")
+      String ignored = DiskBalancerSubCommandUtil
+          .getDatanodeHostAndIp(any(DatanodeDetailsProto.class));
+      // Use the value to avoid "ignored return value" static analysis warnings.
+      System.out.println(ignored);
+    }).thenAnswer(invocation -> {
+      DatanodeDetailsProto proto = invocation.getArgument(0);
+      String hostname = proto.getHostName();
+      String ipAddress = proto.getIpAddress();
+      int port = proto.getPortsList().stream()
+          .filter(p -> p.getName().equals(
+              DatanodeDetails.Port.Name.CLIENT_RPC.name()))
+          .mapToInt(HddsProtos.Port::getValue)
+          .findFirst()
+          .orElse(HDDS_DATANODE_CLIENT_PORT_DEFAULT);
+      String addressPort = ipAddress + ":" + port;
+      if (hostname != null && !hostname.isEmpty() && !hostname.equals(ipAddress)) {
+        return hostname + " (" + addressPort + ")";
+      }
+      return addressPort;
+    });
+
     return new DiskBalancerMocks(mockedConf, mockedClient, mockedUtil);
   }
 
@@ -198,6 +239,25 @@ public class TestDiskBalancerSubCommands {
 
       Pattern p = Pattern.compile("Started DiskBalancer on nodes: \\[host-1, host-2, host-3\\]");
       Matcher m = p.matcher(outContent.toString(DEFAULT_ENCODING));
+      assertTrue(m.find());
+    }
+  }
+
+  @Test
+  public void testStartDiskBalancerWithDuplicateHostnames() throws Exception {
+    DiskBalancerStartSubcommand cmd = new DiskBalancerStartSubcommand();
+    doNothing().when(mockProtocol).startDiskBalancer(any(DiskBalancerConfigurationProto.class));
+
+    try (DiskBalancerMocks mocks = setupAllMocks()) {
+
+      CommandLine c = new CommandLine(cmd);
+      c.parseArgs("host-1", "host-1", "host-2");
+      cmd.call();
+
+      // output should show each host only once
+      String output = outContent.toString(DEFAULT_ENCODING);
+      Pattern p = Pattern.compile("Started DiskBalancer on nodes: \\[host-1, host-2\\]");
+      Matcher m = p.matcher(output);
       assertTrue(m.find());
     }
   }
@@ -633,6 +693,10 @@ public class TestDiskBalancerSubCommands {
     DatanodeDetailsProto nodeProto = DatanodeDetailsProto.newBuilder()
         .setHostName(hostname)
         .setIpAddress("127.0.0.1")
+        .addPorts(HddsProtos.Port.newBuilder()
+            .setName("CLIENT_RPC")
+            .setValue(HDDS_DATANODE_CLIENT_PORT_DEFAULT)
+            .build())
         .build();
 
     DiskBalancerConfigurationProto configProto = DiskBalancerConfigurationProto.newBuilder()
@@ -684,6 +748,10 @@ public class TestDiskBalancerSubCommands {
     DatanodeDetailsProto nodeProto = DatanodeDetailsProto.newBuilder()
         .setHostName(hostname)
         .setIpAddress("127.0.0.1")
+        .addPorts(HddsProtos.Port.newBuilder()
+            .setName("CLIENT_RPC")
+            .setValue(HDDS_DATANODE_CLIENT_PORT_DEFAULT)
+            .build())
         .build();
 
     return DatanodeDiskBalancerInfoProto.newBuilder()

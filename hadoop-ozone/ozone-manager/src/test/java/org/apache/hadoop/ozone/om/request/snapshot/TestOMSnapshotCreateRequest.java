@@ -144,6 +144,7 @@ public class TestOMSnapshotCreateRequest extends TestSnapshotRequestAndResponse 
 
   @Test
   public void testPreExecuteBadOwner() {
+    when(getOzoneManager().isAdminAuthorizationEnabled()).thenReturn(true);
     // Owner is not set for the request.
     OMRequest omRequest = createSnapshotRequest(getVolumeName(),
         getBucketName(), snapshotName1);
