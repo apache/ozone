@@ -64,6 +64,18 @@ public class TraceAllMethod<T> implements InvocationHandler {
         method.getName());
     }
 
+    if (shouldSkipTracing(method, delegateMethod)) {
+      try {
+        return delegateMethod.invoke(delegate, args);
+      } catch (Exception ex) {
+        if (ex.getCause() != null) {
+          throw ex.getCause();
+        } else {
+          throw ex;
+        }
+      }
+    }
+
     try (TracingUtil.TraceCloseable ignored = TracingUtil.createActivatedSpan(name + "." + method.getName())) {
       try {
         return delegateMethod.invoke(delegate, args);
@@ -85,5 +97,18 @@ public class TraceAllMethod<T> implements InvocationHandler {
       }
     }
     return null;
+  }
+
+  private boolean shouldSkipTracing(Method method, Method delegateMethod) {
+    // Skip methods annotated with @SkipTracing
+    if (method.isAnnotationPresent(SkipTracing.class)) {
+      return true;
+    }
+
+    if (delegateMethod != null && delegateMethod.isAnnotationPresent(SkipTracing.class)) {
+      return true;
+    }
+
+    return false;
   }
 }
