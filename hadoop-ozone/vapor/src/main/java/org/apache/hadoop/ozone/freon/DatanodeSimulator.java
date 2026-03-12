@@ -100,7 +100,7 @@ import picocli.CommandLine;
  * datanodes and exabytes of container data.
  * <p>
  * Usage:
- * ozone freon simulate-datanode -t 20 -n 5000 -c 40000
+ * ozone vapor simulate-datanode -t 20 -n 5000 -c 40000
  * -t: number of threads to run datanodes heartbeat.
  * -n: number of data node to simulate.
  * -c: number containers to simulate per datanode.
@@ -119,8 +119,8 @@ import picocli.CommandLine;
     versionProvider = HddsVersionProvider.class,
     mixinStandardHelpOptions = true,
     showDefaultValues = true)
-@MetaInfServices(FreonSubcommand.class)
-public class DatanodeSimulator implements Callable<Void>, FreonSubcommand {
+@MetaInfServices(VaporSubcommand.class)
+public class DatanodeSimulator implements Callable<Void>, VaporSubcommand {
   private static final Logger LOGGER = LoggerFactory.getLogger(
       DatanodeSimulator.class);
 
