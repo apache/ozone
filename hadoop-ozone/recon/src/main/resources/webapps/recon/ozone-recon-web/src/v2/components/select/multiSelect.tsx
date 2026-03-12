@@ -97,8 +97,8 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
         )}
         {isDisabled
           ? placeholder
-          : `${placeholder}: ${selected.length} selected`
-}
+          : `${placeholder}: ${selected.filter((opt) => opt.value !== fixedColumn).length} selected`
+        }
       </components.ValueContainer>
     );
   };
@@ -126,7 +126,7 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
       menuPortalTarget={document.body}
       menuPosition='fixed'
       placeholder={placeholder}
-      value={selected}
+      value={selected.filter((opt) => opt.value !== fixedColumn)}
       isDisabled={isDisabled}
       onChange={(selected: ValueType<Option, true>) => {
         const selectedOpts = (selected as Option[]) ?? [];
