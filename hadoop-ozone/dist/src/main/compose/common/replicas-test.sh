@@ -42,7 +42,11 @@ done
 
 echo "Stopping datanodes for a consistent container.db backup"
 for dn_container in ${datanodes}; do
-  docker stop "${dn_container}" >/dev/null
+  if [ "$(docker inspect -f '{{.State.Running}}' "${dn_container}" 2>/dev/null)" = "true" ]; then
+    docker stop "${dn_container}" >/dev/null
+  else
+    echo "${dn_container} is already stopped before backup"
+  fi
 done
 
 while IFS=$'\t' read -r dn_container db; do
@@ -53,7 +57,9 @@ done < "${backup_manifest}"
 
 echo "Restarting datanodes after backup"
 for dn_container in ${datanodes}; do
-  docker start "${dn_container}" >/dev/null
+  if [ "$(docker inspect -f '{{.State.Running}}' "${dn_container}" 2>/dev/null)" != "true" ]; then
+    docker start "${dn_container}" >/dev/null
+  fi
 done
 
 for dn_container in ${datanodes}; do
