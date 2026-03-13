@@ -15,18 +15,32 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.upgrade;
+package org.apache.hadoop.hdds;
 
-import org.apache.hadoop.hdds.ComponentVersion;
+import org.apache.hadoop.ozone.ClientVersion;
 
 /**
- * Generic Layout feature interface for Ozone.
+ * Invariants for {@link ClientVersion}.
  */
-public interface LayoutFeature extends ComponentVersion {
-  int layoutVersion();
+public class TestClientVersion extends AbstractComponentVersionTest {
 
   @Override
-  default int serialize() {
-    return this.layoutVersion();
+  protected ComponentVersion[] getValues() {
+    return ClientVersion.values();
+  }
+
+  @Override
+  protected ComponentVersion getDefaultVersion() {
+    return ClientVersion.DEFAULT_VERSION;
+  }
+
+  @Override
+  protected ComponentVersion getFutureVersion() {
+    return ClientVersion.FUTURE_VERSION;
+  }
+
+  @Override
+  protected ComponentVersion deserialize(int value) {
+    return ClientVersion.deserialize(value);
   }
 }

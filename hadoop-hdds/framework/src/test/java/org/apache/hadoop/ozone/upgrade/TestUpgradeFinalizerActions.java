@@ -87,6 +87,13 @@ public class TestUpgradeFinalizerActions {
     }
 
     @Override
+    public MockLayoutFeature nextVersion() {
+      // TODO HDDS-14826 will remove the tests that are using this. No need to provide an implementation for this new
+      //  method.
+      return null;
+    }
+
+    @Override
     public String toString() {
       return name() + " (" + serialize() + ")";
     }

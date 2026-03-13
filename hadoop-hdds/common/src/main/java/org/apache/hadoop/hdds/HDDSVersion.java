@@ -21,12 +21,15 @@ import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toMap;
 
 import java.util.Arrays;
-import java.util.Map;
+import java.util.SortedMap;
+import java.util.TreeMap;
 
 /**
  * Versioning for datanode.
  */
 public enum HDDSVersion implements ComponentVersion {
+
+  //////////////////////////////  //////////////////////////////
 
   DEFAULT_VERSION(0, "Initial version"),
 
@@ -36,14 +39,18 @@ public enum HDDSVersion implements ComponentVersion {
   STREAM_BLOCK_SUPPORT(3,
       "This version has support for reading a block by streaming chunks."),
 
+  ZDU(100, "Version that supports zero downtime upgrade"),
+
   FUTURE_VERSION(-1, "Used internally in the client when the server side is "
       + " newer and an unknown server version has arrived to the client.");
 
-  public static final HDDSVersion SOFTWARE_VERSION = latest();
+  //////////////////////////////  //////////////////////////////
 
-  private static final Map<Integer, HDDSVersion> BY_VALUE =
+  private static final SortedMap<Integer, HDDSVersion> BY_VALUE =
       Arrays.stream(values())
-          .collect(toMap(HDDSVersion::serialize, identity()));
+          .collect(toMap(HDDSVersion::serialize, identity(), (v1, v2) -> v1, TreeMap::new));
+
+  public static final HDDSVersion SOFTWARE_VERSION = BY_VALUE.get(BY_VALUE.lastKey());
 
   private final int version;
   private final String description;
@@ -58,31 +65,35 @@ public enum HDDSVersion implements ComponentVersion {
     return description;
   }
 
+  /**
+   * @return The next version immediately following this one and excluding FUTURE_VERSION,
+   *    or null if there is no such version.
+   */
+  @Override
+  public HDDSVersion nextVersion() {
+    int nextOrdinal = ordinal() + 1;
+    if (nextOrdinal >= values().length - 1) {
+      return null;
+    }
+    return values()[nextOrdinal];
+  }
+
   @Override
   public int serialize() {
     return version;
   }
 
+  /**
+   * @param value The serialized version to convert.
+   * @return The version corresponding to this serialized value, or {@link #FUTURE_VERSION} if no matching version is
+   *    found.
+   */
   public static HDDSVersion deserialize(int value) {
     return BY_VALUE.getOrDefault(value, FUTURE_VERSION);
   }
 
   @Override
-  public boolean isSupportedBy(int serializedVersion) {
-    // In order for the other serialized version to support this version's features,
-    // the other version must be equal or larger to this version.
-    return deserialize(serializedVersion).compareTo(this) >= 0;
-  }
-
-  @Override
   public String toString() {
     return name() + " (" + serialize() + ")";
-  }
-
-  private static HDDSVersion latest() {
-    HDDSVersion[] versions = HDDSVersion.values();
-    // The last entry in the array will be `FUTURE_VERSION`. We want the entry prior to this which defines the latest
-    // version in the software.
-    return versions[versions.length - 2];
   }
 }
