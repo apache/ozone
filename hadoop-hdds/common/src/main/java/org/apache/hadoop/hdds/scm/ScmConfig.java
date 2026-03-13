@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
@@ -258,7 +259,7 @@ public class ScmConfig extends ReconfigurableConfig {
     }
 
     public static PipelineExcludedNodes parse(String rawValue) {
-      if (rawValue == null || rawValue.trim().isEmpty()) {
+      if (rawValue == null || StringUtils.isBlank(rawValue)) {
         return EMPTY;
       }
 
