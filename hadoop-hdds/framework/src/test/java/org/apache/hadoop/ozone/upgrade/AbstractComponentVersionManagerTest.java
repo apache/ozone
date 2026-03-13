@@ -126,6 +126,7 @@ public abstract class AbstractComponentVersionManagerTest {
       when(mockVersion.isSupportedBy(any())).thenReturn(false);
 
       assertThrows(IllegalArgumentException.class, () -> versionManager.markFinalized(mockVersion));
+      // The failed finalization call should not have changed the version manager's state.
       assertApparentVersion(versionManager, expectedSoftwareVersion());
       assertFalse(versionManager.needsFinalization());
       assertFalse(versionManager.getUnfinalizedVersions().iterator().hasNext());

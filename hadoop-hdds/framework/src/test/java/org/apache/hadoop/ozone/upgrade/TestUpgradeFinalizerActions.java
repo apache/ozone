@@ -88,8 +88,9 @@ public class TestUpgradeFinalizerActions {
 
     @Override
     public MockLayoutFeature nextVersion() {
-      int nextOrdinal = ordinal() + 1;
-      return nextOrdinal < values().length ? values()[nextOrdinal] : null;
+      // TODO HDDS-14826 will remove the tests that are using this. No need to provide an implementation for this new
+      //  method.
+      return null;
     }
 
     @Override
