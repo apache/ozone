@@ -106,11 +106,12 @@ Conversely, if the incremental import fails for any reason (e.g., RocksDB corrup
 
 ### 4.3. Interaction with Container Reconciliation (HDDS-10239)
 
-HDDS-10239 proposes a Merkle-Tree-based reconciliation for repairing corrupted containers. 
-*   **HDDS-10239 (Merkle Tree)** provides a heavy-weight, fine-grained repair mechanism ideal for data corruption (bit-rot).
-*   **Incremental Replication** provides a lightweight, coarse-grained catch-up mechanism ideal for lagging replicas. 
+HDDS-10239 proposes a Merkle-Tree-based reconciliation for repairing corrupted containers. While both mechanisms address diverged containers, they are optimized for entirely different scenarios and are strictly complementary.
 
-The two mechanisms are strictly complementary. Incremental Replication optimizes the happy path of a lagging Ratis follower, while Merkle Reconciliation handles arbitrary divergence.
+*   **Container Reconciliation (HDDS-10239)** is a fine-grained, heavy-weight repair mechanism designed for arbitrary data divergence (e.g., bit-rot or random chunk corruption). To achieve this, it requires Datanodes to compute Merkle Trees for the entire container, exchange and compare these trees across the network, and then perform individual, chatty `readChunk` RPCs for every missing or corrupted chunk.
+*   **Incremental Replication (This Proposal)** is a lightweight, coarse-grained catch-up mechanism tailored specifically for a lagging Ratis follower (e.g., node reboot or temporary network partition). Because the divergence is strictly linear, we can guarantee the replica is healthy up to its `BlockCommitSequenceId`. Therefore, we completely bypass expensive Merkle Tree computations and chatty RPCs. Instead, we perform a single, highly efficient streaming tarball transfer of the contiguous delta.
+
+Extending the Container Reconciler to handle lagging followers is inefficient because it inherently relies on identifying differences block-by-block and fetching them chunk-by-chunk via RPCs. As discussed in [Section 6.1 (Fetching Missing Chunks via ReadChunk API)](#61-fetching-missing-chunks-via-readchunk-api), avoiding this chatty RPC overhead in favor of a single streaming tarball is one of the primary motivations for Incremental Replication.
 
 ## 5. Upgrade and Compatibility
 
