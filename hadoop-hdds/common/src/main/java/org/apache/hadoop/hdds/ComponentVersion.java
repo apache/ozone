@@ -28,8 +28,15 @@ import org.apache.hadoop.ozone.upgrade.UpgradeAction;
  */
 public interface ComponentVersion {
   /**
-   * @return The serialized representation of this version. This is an opaque value which should not be checked or
-   * compared directly.
+   * Returns an integer representation of this version. To callers outside this class, this is an opaque value which
+   * should not be checked or compared directly.
+   *
+   * To implementors of this interface, versions should serialize such that if version1 < version2,
+   * then version1.serialize() < version2.serialize().
+   * Negative numbers may be used as serialized values to represent unknown future versions which are trivially larger
+   * than all other versions.
+   *
+   * @return The serialized representation of this version.
    */
   int serialize();
 
@@ -44,11 +51,23 @@ public interface ComponentVersion {
   ComponentVersion nextVersion();
 
   /**
-   * Deserializes a ComponentVersion and checks if its feature set is supported by the current ComponentVersion.
+   * Uses the serialized representation of a ComponentVersion to check if its feature set is supported by the current
+   * ComponentVersion.
    *
    * @return true if this version supports the features of the provided version. False otherwise.
    */
-  boolean isSupportedBy(int serializedVersion);
+  default boolean isSupportedBy(int serializedVersion) {
+    if (serialize() < 0) {
+      // Our version is an unknown future version, it is not supported by any other version.
+      return false;
+    } else if (serializedVersion < 0) {
+      // The other version is an unknown future version, it trivially supports all other versions.
+      return true;
+    } else {
+      // If both versions have positive values, they represent concrete versions and we can compare them directly.
+      return serialize() <= serializedVersion;
+    }
+  }
 
   /**
    * @return true if this version supports the features of the provided version. False otherwise.
