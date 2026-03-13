@@ -72,7 +72,6 @@ import org.apache.hadoop.ozone.recon.ReconUtils;
 import org.apache.hadoop.ozone.recon.api.types.DatanodeMetadata;
 import org.apache.hadoop.ozone.recon.api.types.DatanodesResponse;
 import org.apache.hadoop.ozone.recon.common.ReconTestUtils;
-import org.apache.hadoop.ozone.recon.persistence.ContainerHealthSchemaManager;
 import org.apache.hadoop.ozone.recon.recovery.ReconOMMetadataManager;
 import org.apache.hadoop.ozone.recon.scm.ReconPipelineManager;
 import org.apache.hadoop.ozone.recon.scm.ReconStorageContainerManagerFacade;
@@ -205,7 +204,6 @@ public class TestOpenContainerCount {
                     .withContainerDB()
                     .addBinding(NodeEndpoint.class)
                     .addBinding(MetricsServiceProviderFactory.class)
-                    .addBinding(ContainerHealthSchemaManager.class)
                     .addBinding(ReconUtils.class, reconUtilsMock)
                     .addBinding(StorageContainerLocationProtocol.class,
                             mockScmClient)
