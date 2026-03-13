@@ -16,7 +16,7 @@
  */
 
 /**
- * Request's feature validation handling.
+ * Request's validation handling.
  *
  * This package holds facilities to add new situation specific behaviour to
  * request handling without cluttering the basic logic of the request handler
@@ -28,25 +28,29 @@
  *   request type
  * - a client connects to the server but uses an older version of the protocol
  * - a client connects to the server but uses a newer version of the protocol
+ * - a client connects to the server and performs an operation corresponding
+ *   to a feature the server hasn't finalized for which these requests might have
+ *   to be rejected.
  * - the code can handle certain checks that have to run all the time, but at
  *   first we do not see a general use case that we would pull in immediately.
- * These are the current
- * {@link org.apache.hadoop.ozone.om.request.validation.ValidationCondition}s
- * but this list might be extended later on if we see other use cases.
+ * These are the current registered
+ * {@link org.apache.hadoop.ozone.om.request.validation.VersionExtractor}s
+ * which would be extracted out of the om request and all validators
+ * fulfilling the condition would be run.
  *
- * The system uses a reflection based discovery to find methods that are
+ * The system uses a reflection based discovery to find annotations that are
  * annotated with the
- * {@link org.apache.hadoop.ozone.om.request.validation.RequestFeatureValidator}
+ * {@link org.apache.hadoop.ozone.request.validation.RegisterValidator}
  * annotation.
- * This annotation is used to specify the condition in which a certain validator
- * has to be used, the request type to which the validation should be applied,
- * and the request processing phase in which we apply the validation.
+ * This annotation is used to register a particular annotation which in turn would be used to specify
+ * the request type to which the validation should be applied,
+ * and the request processing phase in which we apply the validation and the maxVersion corresponding to which this
+ * is supposed to run.
  *
- * One validator can be applied in multiple
- * {@link org.apache.hadoop.ozone.om.request.validation.ValidationCondition}
- * but a validator has to handle strictly just one
- * {@link org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type
- * }.
+ * One validator can be applied based on multiple trigger conditions, E.g.
+ * A validator registered can have both {@link org.apache.hadoop.ozone.om.request.validation.OMClientVersionValidator},
+ * {@link org.apache.hadoop.ozone.om.request.validation.OMLayoutVersionValidator}
+ *
  * The main reason to avoid validating multiple request types with the same
  * validator, is that these validators have to be simple methods without state
  * any complex validation has to happen in the reql request handling.
