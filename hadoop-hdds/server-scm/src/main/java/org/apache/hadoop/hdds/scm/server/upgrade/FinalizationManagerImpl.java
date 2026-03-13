@@ -31,15 +31,11 @@ import org.apache.hadoop.ozone.upgrade.BasicUpgradeFinalizer;
 import org.apache.hadoop.ozone.upgrade.DefaultUpgradeFinalizationExecutor;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalizationExecutor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Class to initiate SCM finalization and query its progress.
  */
 public class FinalizationManagerImpl implements FinalizationManager {
-  private static final Logger LOG = LoggerFactory
-      .getLogger(FinalizationManagerImpl.class);
 
   private SCMUpgradeFinalizer upgradeFinalizer;
   private SCMUpgradeFinalizationContext context;

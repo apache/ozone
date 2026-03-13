@@ -47,9 +47,6 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
   // Ensures that we are not in the process of updating checkpoint state as
   // we read it to determine the current checkpoint.
   private final ReadWriteLock checkpointLock;
-  // SCM transaction buffer flushes asynchronously, so we must keep the most
-  // up-to-date DB information in memory as well for reads.
-  private volatile boolean hasFinalizingMark;
   private SCMUpgradeFinalizationContext upgradeContext;
   private final SCMUpgradeFinalizer upgradeFinalizer;
 
@@ -59,12 +56,6 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
     this.upgradeFinalizer = builder.upgradeFinalizer;
     this.versionManager = this.upgradeFinalizer.getVersionManager();
     this.checkpointLock = new ReentrantReadWriteLock();
-    initialize();
-  }
-
-  private void initialize() throws IOException {
-    this.hasFinalizingMark =
-        finalizationStore.isExist(OzoneConsts.FINALIZING_KEY);
   }
 
   @Override
