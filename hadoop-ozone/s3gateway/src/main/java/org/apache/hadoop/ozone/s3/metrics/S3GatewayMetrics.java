@@ -29,6 +29,7 @@ import org.apache.hadoop.metrics2.MetricsSystem;
 import org.apache.hadoop.metrics2.annotation.Metric;
 import org.apache.hadoop.metrics2.annotation.Metrics;
 import org.apache.hadoop.metrics2.lib.DefaultMetricsSystem;
+import org.apache.hadoop.metrics2.lib.MetricsAnnotations;
 import org.apache.hadoop.metrics2.lib.MetricsRegistry;
 import org.apache.hadoop.metrics2.lib.MutableCounterLong;
 import org.apache.hadoop.ozone.OzoneConsts;
@@ -307,20 +308,30 @@ public final class S3GatewayMetrics implements Closeable, MetricsSource {
     if (instance != null) {
       return instance;
     }
-    MetricsSystem ms = DefaultMetricsSystem.instance();
-    instance = ms.register(SOURCE_NAME, "S3 Gateway Metrics",
-        new S3GatewayMetrics(conf));
+    boolean metricsEnabled = conf.getBoolean(
+        S3GatewayConfigKeys.OZONE_S3G_METRICS_ENABLED,
+        S3GatewayConfigKeys.OZONE_S3G_METRICS_ENABLED_DEFAULT);
+    instance = new S3GatewayMetrics(conf);
+    if (metricsEnabled) {
+      MetricsSystem ms = DefaultMetricsSystem.instance();
+      instance = ms.register(SOURCE_NAME, "S3 Gateway Metrics", instance);
+    } else {
+      // Initialize annotated metrics fields without publishing the source.
+      MetricsAnnotations.makeSource(instance);
+    }
     return instance;
   }
 
   /**
    * Unregister the metrics instance.
    */
-  public static void unRegister() {
+  public static synchronized void unRegister() {
     IOUtils.closeQuietly(instance);
     instance = null;
     MetricsSystem ms = DefaultMetricsSystem.instance();
-    ms.unregisterSource(SOURCE_NAME);
+    if (ms.getSource(SOURCE_NAME) != null) {
+      ms.unregisterSource(SOURCE_NAME);
+    }
   }
 
   @Override
