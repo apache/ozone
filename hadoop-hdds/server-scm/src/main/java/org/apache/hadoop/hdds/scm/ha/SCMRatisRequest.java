@@ -180,7 +180,7 @@ public final class SCMRatisRequest {
         Type genericType = clazz;
         if (argument.hasGenericType()) {
           Class<?> genericClazz = ReflectionUtil.getClass(argument.getGenericType());
-          genericType = new SimpleParameterizedType(clazz, genericClazz);
+          genericType = new ScmParameterizedType(clazz, genericClazz);
         }
         genericParameterTypes[paramCounter] = genericType;
         if (genericType instanceof Class<?>) {
@@ -225,53 +225,5 @@ public final class SCMRatisRequest {
       builder.append(ex.getMessage());
     }
     return builder.toString();
-  }
-
-  /**
-   * Simple implementation of ParameterizedType used to reconstruct
-   * generic types such as List<T> during decode.
-   */
-  private static final class SimpleParameterizedType
-      implements ParameterizedType {
-
-    private final Type rawType;
-    private final Type[] actualTypeArguments;
-
-    private SimpleParameterizedType(Type rawType, Type... actualTypeArguments) {
-      this.rawType = rawType;
-      this.actualTypeArguments = actualTypeArguments.clone();
-    }
-
-    @Override
-    public Type[] getActualTypeArguments() {
-      return actualTypeArguments.clone();
-    }
-
-    @Override
-    public Type getRawType() {
-      return rawType;
-    }
-
-    @Override
-    public Type getOwnerType() {
-      return null;
-    }
-
-    @Override
-    public String getTypeName() {
-      StringBuilder sb = new StringBuilder();
-      sb.append(((Class<?>) rawType).getName());
-      if (actualTypeArguments.length > 0) {
-        sb.append('<');
-        for (int i = 0; i < actualTypeArguments.length; i++) {
-          if (i > 0) {
-            sb.append(',');
-          }
-          sb.append(actualTypeArguments[i].getTypeName());
-        }
-        sb.append('>');
-      }
-      return sb.toString();
-    }
   }
 }
