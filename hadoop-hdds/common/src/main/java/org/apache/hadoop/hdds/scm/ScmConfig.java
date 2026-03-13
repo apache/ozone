@@ -296,7 +296,9 @@ public class ScmConfig extends ReconfigurableConfig {
     }
 
     public boolean isExcluded(DatanodeDetails datanodeDetails) {
-      Objects.requireNonNull(datanodeDetails, "datanodeDetails cannot be null");
+      if (datanodeDetails == null) {
+        return false;
+      }
       if (excludedDatanodeIds.contains(datanodeDetails.getID())) {
         return true;
       }
