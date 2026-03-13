@@ -1722,10 +1722,20 @@
           <version>${maven-compiler-plugin.version}</version>
           <configuration>
             <useIncrementalCompilation>false</useIncrementalCompilation>
-            <compilerArgs>
-              <arg>-AartifactId=${project.artifactId}</arg>
-            </compilerArgs>
           </configuration>
+          <executions>
+            <execution>
+              <id>default-compile</id>
+              <goals>
+                <goal>compile</goal>
+              </goals>
+              <configuration>
+                <compilerArgs>
+                  <arg>-AartifactId=${project.artifactId}</arg>
+                </compilerArgs>
+              </configuration>
+            </execution>
+          </executions>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
