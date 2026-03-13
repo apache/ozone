@@ -27,21 +27,8 @@ import org.apache.hadoop.hdds.utils.db.Table;
 public interface FinalizationStateManager {
 
   @Replicate
-  void addFinalizingMark() throws IOException;
-
-  @Replicate
-  void removeFinalizingMark() throws IOException;
-
-  @Replicate
   void finalizeLayoutFeatures(Integer toLayoutVersion)
       throws IOException;
-
-  /**
-   * @param query The checkpoint to check for being crossed.
-   * @return true if SCM's disk state indicates this checkpoint has been
-   * crossed. False otherwise.
-   */
-  boolean crossedCheckpoint(FinalizationCheckpoint query);
 
   FinalizationCheckpoint getFinalizationCheckpoint();
 

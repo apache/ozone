@@ -18,11 +18,9 @@
 package org.apache.hadoop.hdds.scm.server.upgrade;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Objects;
-import java.util.concurrent.ThreadFactory;
 import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
@@ -47,7 +45,6 @@ public class FinalizationManagerImpl implements FinalizationManager {
   private SCMUpgradeFinalizationContext context;
   private SCMStorageConfig storage;
   private final FinalizationStateManager finalizationStateManager;
-  private ThreadFactory threadFactory;
 
   /**
    * For test classes to inject their own state manager.
@@ -88,9 +85,6 @@ public class FinalizationManagerImpl implements FinalizationManager {
     finalizationStateManager.setUpgradeContext(this.context);
 
     String prefix = scmContext != null ? scmContext.threadNamePrefix() : "";
-    this.threadFactory = new ThreadFactoryBuilder()
-        .setNameFormat(prefix + "FinalizationManager-%d")
-        .build();
   }
 
   @Override
@@ -117,11 +111,6 @@ public class FinalizationManagerImpl implements FinalizationManager {
   public BasicUpgradeFinalizer<SCMUpgradeFinalizationContext,
       HDDSLayoutVersionManager> getUpgradeFinalizer() {
     return upgradeFinalizer;
-  }
-
-  @Override
-  public FinalizationCheckpoint getCheckpoint() {
-    return finalizationStateManager.getFinalizationCheckpoint();
   }
 
   @Override

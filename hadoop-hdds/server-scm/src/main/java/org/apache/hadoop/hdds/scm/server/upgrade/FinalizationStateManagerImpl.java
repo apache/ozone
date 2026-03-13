@@ -83,19 +83,6 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
   }
 
   @Override
-  public void addFinalizingMark() throws IOException {
-    checkpointLock.writeLock().lock();
-    try {
-      hasFinalizingMark = true;
-    } finally {
-      checkpointLock.writeLock().unlock();
-    }
-    transactionBuffer.addToBuffer(finalizationStore,
-        OzoneConsts.FINALIZING_KEY, "");
-    publishCheckpoint(FinalizationCheckpoint.FINALIZATION_STARTED);
-  }
-
-  @Override
   public void finalizeLayoutFeatures(Integer toVersion) throws IOException {
     int startLayoutVersion = versionManager.getMetadataLayoutVersion() + 1;
     for (int version = startLayoutVersion; version <= toVersion; version++) {
@@ -133,38 +120,6 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
     }
     transactionBuffer.addToBuffer(finalizationStore,
         OzoneConsts.LAYOUT_VERSION_KEY, String.valueOf(layoutVersion));
-  }
-
-  @Override
-  public void removeFinalizingMark() throws IOException {
-    checkpointLock.writeLock().lock();
-    try {
-      hasFinalizingMark = false;
-    } finally {
-      checkpointLock.writeLock().unlock();
-    }
-    transactionBuffer.removeFromBuffer(finalizationStore,
-        OzoneConsts.FINALIZING_KEY);
-
-    // All prior checkpoints should have been crossed when this method is
-    // called, leaving us at the finalization complete checkpoint.
-    // If this is not the case, this SCM (leader or follower) has encountered
-    // a bug leaving it in an inconsistent upgrade finalization state.
-    // It should terminate to avoid further damage.
-    FinalizationCheckpoint checkpoint = getFinalizationCheckpoint();
-    if (checkpoint != FinalizationCheckpoint.FINALIZATION_COMPLETE) {
-      String errorMessage = String.format("SCM upgrade finalization " +
-              "is in an unknown state. Expected %s but was %s",
-          FinalizationCheckpoint.FINALIZATION_COMPLETE, checkpoint);
-      ExitUtils.terminate(1, errorMessage, LOG);
-    }
-
-    publishCheckpoint(FinalizationCheckpoint.FINALIZATION_COMPLETE);
-  }
-
-  @Override
-  public boolean crossedCheckpoint(FinalizationCheckpoint query) {
-    return getFinalizationCheckpoint().hasCrossed(query);
   }
 
   @Override

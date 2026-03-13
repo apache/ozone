@@ -42,8 +42,6 @@ public interface FinalizationManager {
   BasicUpgradeFinalizer<SCMUpgradeFinalizationContext, HDDSLayoutVersionManager>
       getUpgradeFinalizer();
 
-  FinalizationCheckpoint getCheckpoint();
-
   void buildUpgradeContext(NodeManager nodeManager,
                                   SCMContext scmContext);
 
