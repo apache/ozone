@@ -29,7 +29,6 @@ import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.TypeKind;
-import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
@@ -55,7 +54,7 @@ import javax.tools.Diagnostic;
 public class RegisterValidatorProcessor extends AbstractProcessor {
 
   public static final String ANNOTATION_SIMPLE_NAME = "RegisterValidator";
-  public static final String VERSION_CLASS_NAME = "org.apache.hadoop.hdds.ComponentVersion";
+  public static final String VERSION_CLASS_NAME = "org.apache.hadoop.ozone.Version";
   public static final String REQUEST_PROCESSING_PHASE_CLASS_NAME = "org.apache.hadoop.ozone.om.request.validation" +
       ".RequestProcessingPhase";
   public static final String APPLY_BEFORE_METHOD_NAME = "applyBefore";
@@ -87,13 +86,11 @@ public class RegisterValidatorProcessor extends AbstractProcessor {
     Types types = processingEnv.getTypeUtils();
     TypeElement expectedReturnInterface = expectedReturnClass == null || expectedReturnClass.equals("") ? null :
         elementUtils.getTypeElement(expectedReturnClass);
-    TypeMirror expectedType = expectedReturnInterface == null
-        ? null : types.erasure(expectedReturnInterface.asType());
     return method.getSimpleName().toString().equals(expectedMethodName) && (expectedReturnType == null ||
         TypeKind.ARRAY.equals(method.getReturnType().getKind()) &&
             types.asElement(((ArrayType)method.getReturnType()).getComponentType()).getKind() == expectedReturnType) &&
         (expectedReturnInterface == null ||
-            types.isAssignable(types.erasure(types.asElement(method.getReturnType()).asType()), expectedType));
+            types.isAssignable(types.asElement(method.getReturnType()).asType(), expectedReturnInterface.asType()));
   }
 
   private boolean validateMethod(ExecutableElement method, String expectedMethodName, ElementKind expectedReturnType,
@@ -102,13 +99,11 @@ public class RegisterValidatorProcessor extends AbstractProcessor {
     Types types = processingEnv.getTypeUtils();
     TypeElement expectedReturnInterface = expectedReturnClass == null || expectedReturnClass.equals("") ? null :
         elementUtils.getTypeElement(expectedReturnClass);
-    TypeMirror expectedType = expectedReturnInterface == null
-        ? null : types.erasure(expectedReturnInterface.asType());
     return method.getSimpleName().toString().equals(expectedMethodName) && (expectedReturnType == null ||
         types.asElement(method.getReturnType()) != null &&
             types.asElement(method.getReturnType()).getKind() == expectedReturnType) &&
         (expectedReturnInterface == null ||
-            types.isAssignable(types.erasure(types.asElement(method.getReturnType()).asType()), expectedType));
+            types.isAssignable(types.asElement(method.getReturnType()).asType(), expectedReturnInterface.asType()));
   }
 
   private void processElements(Set<? extends Element> annotatedElements) {
