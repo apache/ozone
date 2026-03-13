@@ -112,7 +112,6 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
     checkpointLock.writeLock().lock();
     try {
       this.finalizationStore = newFinalizationStore;
-      initialize();
 
       int dbLayoutVersion = getDBLayoutVersion();
       int currentLayoutVersion = versionManager.getMetadataLayoutVersion();
