@@ -83,8 +83,6 @@ public class FinalizationManagerImpl implements FinalizationManager {
             .build();
 
     finalizationStateManager.setUpgradeContext(this.context);
-
-    String prefix = scmContext != null ? scmContext.threadNamePrefix() : "";
   }
 
   @Override

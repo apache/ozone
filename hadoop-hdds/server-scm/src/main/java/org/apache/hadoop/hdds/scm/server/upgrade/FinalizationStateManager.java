@@ -30,8 +30,6 @@ public interface FinalizationStateManager {
   void finalizeLayoutFeatures(Integer toLayoutVersion)
       throws IOException;
 
-  FinalizationCheckpoint getFinalizationCheckpoint();
-
   void setUpgradeContext(SCMUpgradeFinalizationContext context);
 
   /**

@@ -29,7 +29,7 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
-import org.apache.ratis.util.ExitUtils;
+import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,19 +67,9 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
         finalizationStore.isExist(OzoneConsts.FINALIZING_KEY);
   }
 
-  private void publishCheckpoint(FinalizationCheckpoint checkpoint) {
-    // Move the upgrade status according to this checkpoint. This is sent
-    // back to the client if they query for the current upgrade status.
-    versionManager.setUpgradeState(checkpoint.getStatus());
-  }
-
   @Override
   public void setUpgradeContext(SCMUpgradeFinalizationContext context) {
     this.upgradeContext = context;
-    FinalizationCheckpoint checkpoint = getFinalizationCheckpoint();
-    // Set the version manager's upgrade status (sent back to the client to
-    // identify upgrade progress) based on the current checkpoint.
-    versionManager.setUpgradeState(checkpoint.getStatus());
   }
 
   @Override
@@ -116,47 +106,10 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
     }
 
     if (!versionManager.needsFinalization()) {
-      publishCheckpoint(FinalizationCheckpoint.MLV_EQUALS_SLV);
+      versionManager.setUpgradeState(UpgradeFinalization.Status.FINALIZATION_DONE);
     }
     transactionBuffer.addToBuffer(finalizationStore,
         OzoneConsts.LAYOUT_VERSION_KEY, String.valueOf(layoutVersion));
-  }
-
-  @Override
-  public FinalizationCheckpoint getFinalizationCheckpoint() {
-    // Get a point-in-time snapshot of the finalization state under the lock,
-    // then use this to determine which checkpoint we were on at that time.
-    boolean mlvBehindSlvSnapshot;
-    boolean hasFinalizingMarkSnapshot;
-    checkpointLock.readLock().lock();
-    try {
-      mlvBehindSlvSnapshot = versionManager.needsFinalization();
-      hasFinalizingMarkSnapshot = hasFinalizingMark;
-    } finally {
-      checkpointLock.readLock().unlock();
-    }
-
-    FinalizationCheckpoint currentCheckpoint = null;
-    for (FinalizationCheckpoint checkpoint: FinalizationCheckpoint.values()) {
-      if (checkpoint.isCurrent(hasFinalizingMarkSnapshot,
-          mlvBehindSlvSnapshot)) {
-        currentCheckpoint = checkpoint;
-        break;
-      }
-    }
-
-    // SCM cannot function if it does not know which finalization checkpoint
-    // it is on, so it must terminate. This should only happen in the case of
-    // a serious bug.
-    if (currentCheckpoint == null) {
-      String errorMessage = String.format("SCM upgrade finalization " +
-              "is in an unknown state.%nFinalizing mark present? %b%n" +
-              "Metadata layout version behind software layout version? %b",
-          hasFinalizingMarkSnapshot, mlvBehindSlvSnapshot);
-      ExitUtils.terminate(1, errorMessage, LOG);
-    }
-
-    return currentCheckpoint;
   }
 
   /**
@@ -184,12 +137,8 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
         // that the UpgradeFinalizationExecutor contains. Just run the
         // upgrade actions for the layout features, set the finalization
         // checkpoint, and increase the version in the VERSION file.
-        for (int version = currentLayoutVersion + 1; version <= dbLayoutVersion;
-             version++) {
-          finalizeLayoutFeatureLocal(version);
-        }
+        finalizeLayoutFeatures(dbLayoutVersion);
       }
-      publishCheckpoint(getFinalizationCheckpoint());
     } catch (Exception ex) {
       LOG.error("Failed to reinitialize finalization state", ex);
       throw new IOException(ex);
