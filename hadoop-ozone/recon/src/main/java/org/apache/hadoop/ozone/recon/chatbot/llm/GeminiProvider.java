@@ -25,8 +25,7 @@ import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
 import org.apache.hadoop.ozone.recon.chatbot.security.CredentialHelper;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpRequest;
+import java.net.HttpURLConnection;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -36,9 +35,15 @@ import java.util.Map;
  * Direct provider for Google Gemini models.
  *
  * <p>
- * Uses the native Gemini REST API at
- * {@code generativelanguage.googleapis.com/v1beta/models/{model}:generateContent}
- * which supports all Gemini models including preview releases.
+ * Gemini uses a different API format than OpenAI:
+ * <ul>
+ * <li>System message is in a separate {@code systemInstruction}
+ * field</li>
+ * <li>Messages use {@code parts[].text} instead of
+ * {@code content}</li>
+ * <li>API key is passed as a query parameter, not a header</li>
+ * <li>Response uses {@code candidates[].content.parts[].text}</li>
+ * </ul>
  * </p>
  */
 public class GeminiProvider extends DirectLLMProvider {
@@ -66,37 +71,35 @@ public class GeminiProvider extends DirectLLMProvider {
 
     @Override
     protected String getDefaultBaseUrl() {
-        return ChatbotConfigKeys.OZONE_RECON_CHATBOT_GEMINI_BASE_URL_DEFAULT;
+        return ChatbotConfigKeys
+            .OZONE_RECON_CHATBOT_GEMINI_BASE_URL_DEFAULT;
     }
 
     @Override
-    protected HttpRequest buildChatRequest(
+    protected HttpURLConnection buildChatRequest(
             List<LLMProvider.ChatMessage> messages,
             String model, String apiKey,
             Map<String, Object> params) throws IOException {
 
         ObjectNode body = MAPPER.createObjectNode();
 
-        // Native Gemini format: system goes in "systemInstruction",
-        // user/assistant messages go in "contents".
-        ArrayNode contentsArray = body.putArray("contents");
+        // Handle system message separately for Gemini.
+        ArrayNode contents = body.putArray("contents");
         for (LLMProvider.ChatMessage msg : messages) {
             if ("system".equals(msg.getRole())) {
-                // System message is a top-level field in native API.
                 ObjectNode sysInstruction = body.putObject("systemInstruction");
                 ArrayNode sysParts = sysInstruction.putArray("parts");
                 sysParts.addObject().put("text", msg.getContent());
             } else {
-                ObjectNode turn = contentsArray.addObject();
-                // Gemini uses "model" instead of "assistant".
-                turn.put("role",
-                        "assistant".equals(msg.getRole()) ? "model" : msg.getRole());
-                ArrayNode parts = turn.putArray("parts");
+                ObjectNode content = contents.addObject();
+                String role = "assistant".equals(msg.getRole()) ? "model" : msg.getRole();
+                content.put("role", role);
+                ArrayNode parts = content.putArray("parts");
                 parts.addObject().put("text", msg.getContent());
             }
         }
 
-        // Map standard params to Gemini's generationConfig.
+        // Map standard params to Gemini equivalents.
         ObjectNode genConfig = body.putObject("generationConfig");
         if (params != null) {
             if (params.containsKey("max_tokens")) {
@@ -104,22 +107,16 @@ public class GeminiProvider extends DirectLLMProvider {
                         ((Number) params.get("max_tokens")).intValue());
             }
             if (params.containsKey("temperature")) {
-                genConfig.put("temperature",
-                        ((Number) params.get("temperature")).doubleValue());
+                genConfig.put("temperature", ((Number) params.get("temperature")).doubleValue());
             }
         }
 
-        // Native API uses API key as query parameter.
-        String url = getBaseUrl() + "/v1beta/models/" + model + ":generateContent"
-                + "?key=" + apiKey;
+        String url = getBaseUrl()
+            + "/v1beta/models/" + model + ":generateContent" + "?key=" + apiKey;
 
-        return HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(java.time.Duration.ofMillis(timeoutMs))
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(
-                        MAPPER.writeValueAsString(body)))
-                .build();
+        HttpURLConnection conn = createPostConnection(url);
+        writeBody(conn, MAPPER.writeValueAsString(body));
+        return conn;
     }
 
     @Override
@@ -128,7 +125,6 @@ public class GeminiProvider extends DirectLLMProvider {
         try {
             JsonNode root = MAPPER.readTree(responseBody);
 
-            // Native Gemini response uses "candidates" array.
             JsonNode candidates = root.get("candidates");
             if (candidates == null || !candidates.isArray()
                     || candidates.isEmpty()) {
@@ -137,33 +133,29 @@ public class GeminiProvider extends DirectLLMProvider {
             }
 
             JsonNode firstCandidate = candidates.get(0);
-            JsonNode content = firstCandidate.path("content");
-            JsonNode parts = content.path("parts");
+            JsonNode content = firstCandidate.get("content");
+            JsonNode parts = content != null ? content.get("parts") : null;
 
-            // Concatenate all text parts (skip thoughtSignature etc.).
             StringBuilder text = new StringBuilder();
-            for (JsonNode part : parts) {
-                if (part.has("text")) {
-                    text.append(part.get("text").asText());
+            if (parts != null && parts.isArray()) {
+                for (JsonNode part : parts) {
+                    if (part.has("text")) {
+                        text.append(part.get("text").asText());
+                    }
                 }
             }
 
-            // Parse usage metadata.
+            JsonNode usageMetadata = root.get("usageMetadata");
             int promptTokens = 0;
             int completionTokens = 0;
-            JsonNode usage = root.get("usageMetadata");
-            if (usage != null) {
-                promptTokens = usage.path("promptTokenCount").asInt(0);
-                completionTokens = usage.path("candidatesTokenCount").asInt(0);
+            if (usageMetadata != null) {
+                promptTokens = usageMetadata.path("promptTokenCount").asInt(0);
+                completionTokens = usageMetadata.path("candidatesTokenCount").asInt(0);
             }
 
             Map<String, Object> metadata = new HashMap<>();
             metadata.put("finish_reason",
                     firstCandidate.path("finishReason").asText("unknown"));
-            metadata.put("response_id",
-                    root.path("responseId").asText(""));
-            metadata.put("model_version",
-                    root.path("modelVersion").asText(model));
             metadata.put("provider", getProviderName());
 
             return new LLMProvider.LLMResponse(
@@ -181,7 +173,9 @@ public class GeminiProvider extends DirectLLMProvider {
     @Override
     public List<String> getSupportedModels() {
         return Arrays.asList(
-                "gemini-2.5-pro", "gemini-2.5-flash",
-                "gemini-3-flash-preview", "gemini-3.1-pro-preview");
+                "gemini-2.5-pro",
+                "gemini-2.5-flash",
+                "gemini-3-flash-preview",
+                "gemini-3.1-pro-preview");
     }
 }

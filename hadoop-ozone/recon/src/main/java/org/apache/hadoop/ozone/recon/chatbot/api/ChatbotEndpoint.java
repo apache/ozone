@@ -32,6 +32,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -97,13 +98,13 @@ public class ChatbotEndpoint {
   public Response chat(ChatRequest request) {
     if (!isChatbotEnabled()) {
       return Response.status(Response.Status.SERVICE_UNAVAILABLE)
-          .entity(Map.of("error", "Chatbot service is not enabled"))
+          .entity(Collections.singletonMap("error", "Chatbot service is not enabled"))
           .build();
     }
 
     if (request.getQuery() == null || request.getQuery().trim().isEmpty()) {
       return Response.status(Response.Status.BAD_REQUEST)
-          .entity(Map.of("error", "Query cannot be empty"))
+          .entity(Collections.singletonMap("error", "Query cannot be empty"))
           .build();
     }
 
@@ -129,7 +130,7 @@ public class ChatbotEndpoint {
     } catch (Exception e) {
       LOG.error("Error processing chat request", e);
       return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-          .entity(Map.of("error", e.getMessage()))
+          .entity(Collections.singletonMap("error", e.getMessage()))
           .build();
     }
   }
@@ -142,17 +143,17 @@ public class ChatbotEndpoint {
   public Response getSupportedModels() {
     if (!isChatbotEnabled()) {
       return Response.status(Response.Status.SERVICE_UNAVAILABLE)
-          .entity(Map.of("error", "Chatbot service is not enabled"))
+          .entity(Collections.singletonMap("error", "Chatbot service is not enabled"))
           .build();
     }
 
     try {
       List<String> models = llmProvider.getSupportedModels();
-      return Response.ok(Map.of("models", models)).build();
+      return Response.ok(Collections.singletonMap("models", models)).build();
     } catch (Exception e) {
       LOG.error("Error fetching supported models", e);
       return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-          .entity(Map.of("error", "Failed to fetch models"))
+          .entity(Collections.singletonMap("error", "Failed to fetch models"))
           .build();
     }
   }

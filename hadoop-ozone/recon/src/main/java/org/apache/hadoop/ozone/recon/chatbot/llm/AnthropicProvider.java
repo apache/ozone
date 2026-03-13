@@ -25,8 +25,7 @@ import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
 import org.apache.hadoop.ozone.recon.chatbot.security.CredentialHelper;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpRequest;
+import java.net.HttpURLConnection;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -38,7 +37,8 @@ import java.util.Map;
  * <p>
  * Anthropic uses a different API format:
  * <ul>
- * <li>API key in {@code x-api-key} header (not Authorization: Bearer)</li>
+ * <li>API key in {@code x-api-key} header (not Authorization:
+ * Bearer)</li>
  * <li>Requires {@code anthropic-version} header</li>
  * <li>System message is a top-level parameter, not in the messages
  * array</li>
@@ -78,7 +78,7 @@ public class AnthropicProvider extends DirectLLMProvider {
     }
 
     @Override
-    protected HttpRequest buildChatRequest(
+    protected HttpURLConnection buildChatRequest(
             List<LLMProvider.ChatMessage> messages,
             String model, String apiKey,
             Map<String, Object> params) throws IOException {
@@ -113,16 +113,14 @@ public class AnthropicProvider extends DirectLLMProvider {
             body.put("max_tokens", 4096);
         }
 
-        return HttpRequest.newBuilder()
-                .uri(URI.create(getBaseUrl() + "/v1/messages"))
-                .timeout(java.time.Duration.ofMillis(timeoutMs))
-                .header("Content-Type", "application/json")
-                .header("x-api-key", apiKey)
-                .header("anthropic-version", ANTHROPIC_VERSION)
-                .header("anthropic-beta", ANTHROPIC_BETA_CONTEXT)
-                .POST(HttpRequest.BodyPublishers.ofString(
-                        MAPPER.writeValueAsString(body)))
-                .build();
+        String url = getBaseUrl() + "/v1/messages";
+
+        HttpURLConnection conn = createPostConnection(url);
+        conn.setRequestProperty("x-api-key", apiKey);
+        conn.setRequestProperty("anthropic-version", ANTHROPIC_VERSION);
+        conn.setRequestProperty("anthropic-beta", ANTHROPIC_BETA_CONTEXT);
+        writeBody(conn, MAPPER.writeValueAsString(body));
+        return conn;
     }
 
     @Override

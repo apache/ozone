@@ -23,8 +23,7 @@ import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
 import org.apache.hadoop.ozone.recon.chatbot.security.CredentialHelper;
 
 import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpRequest;
+import java.net.HttpURLConnection;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -58,24 +57,23 @@ public class OpenAIProvider extends DirectLLMProvider {
 
     @Override
     protected String getDefaultBaseUrl() {
-        return ChatbotConfigKeys.OZONE_RECON_CHATBOT_OPENAI_BASE_URL_DEFAULT;
+        return ChatbotConfigKeys
+            .OZONE_RECON_CHATBOT_OPENAI_BASE_URL_DEFAULT;
     }
 
     @Override
-    protected HttpRequest buildChatRequest(
+    protected HttpURLConnection buildChatRequest(
             List<LLMProvider.ChatMessage> messages,
             String model, String apiKey,
             Map<String, Object> params) throws IOException {
 
         ObjectNode body = buildOpenAIRequestBody(messages, model, params);
-        return HttpRequest.newBuilder()
-                .uri(URI.create(getBaseUrl() + "/v1/chat/completions"))
-                .timeout(java.time.Duration.ofMillis(timeoutMs))
-                .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer " + apiKey)
-                .POST(HttpRequest.BodyPublishers.ofString(
-                        MAPPER.writeValueAsString(body)))
-                .build();
+        String url = getBaseUrl() + "/v1/chat/completions";
+
+        HttpURLConnection conn = createPostConnection(url);
+        conn.setRequestProperty("Authorization", "Bearer " + apiKey);
+        writeBody(conn, MAPPER.writeValueAsString(body));
+        return conn;
     }
 
     @Override

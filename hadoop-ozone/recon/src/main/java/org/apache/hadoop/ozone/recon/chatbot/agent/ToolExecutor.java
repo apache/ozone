@@ -28,14 +28,13 @@ import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedReader;
 import java.io.IOException;
-import java.net.URI;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -48,15 +47,18 @@ public class ToolExecutor {
   private static final Logger LOG =
       LoggerFactory.getLogger(ToolExecutor.class);
   private static final ObjectMapper MAPPER = new ObjectMapper();
-  private static final String LIST_KEYS_ENDPOINT_SUFFIX = "/keys/listKeys";
+  private static final String LIST_KEYS_ENDPOINT_SUFFIX =
+      "/keys/listKeys";
   private static final String NAMESPACE_DU_SUFFIX = "/namespace/du";
-  private static final String NAMESPACE_USAGE_SUFFIX = "/namespace/usage";
+  private static final String NAMESPACE_USAGE_SUFFIX =
+      "/namespace/usage";
   private static final String TASKS_SUFFIX = "/tasks";
   private static final String TASKS_STATUS_SUFFIX = "/tasks/status";
   private static final String TASK_STATUS_SUFFIX = "/task/status";
+  private static final int CONNECT_TIMEOUT_MS = 30_000;
+  private static final int READ_TIMEOUT_MS = 30_000;
 
   private final String reconBaseUrl;
-  private final HttpClient httpClient;
   private final int defaultMaxRecords;
   private final int defaultMaxPages;
   private final int defaultPageSize;
@@ -67,9 +69,6 @@ public class ToolExecutor {
     // Default to localhost for local development
     this.reconBaseUrl = "http://localhost:9888";
 
-    this.httpClient = HttpClient.newBuilder()
-        .connectTimeout(Duration.ofSeconds(30))
-        .build();
     this.defaultMaxRecords = configuration.getInt(
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_MAX_RECORDS,
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_MAX_RECORDS_DEFAULT);
@@ -80,28 +79,26 @@ public class ToolExecutor {
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_PAGE_SIZE,
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_PAGE_SIZE_DEFAULT);
 
-    LOG.info("ToolExecutor initialized with Recon URL: {}, maxRecords={}, " +
-            "maxPages={}, pageSize={}",
-        reconBaseUrl, defaultMaxRecords, defaultMaxPages, defaultPageSize);
+    LOG.info("ToolExecutor initialized with Recon URL: {}, "
+            + "maxRecords={}, maxPages={}, pageSize={}",
+        reconBaseUrl, defaultMaxRecords, defaultMaxPages,
+        defaultPageSize);
   }
 
   /**
-   * Executes a tool call with bounded paging policy and returns execution
-   * coverage metadata along with the response payload.
+   * Executes a tool call with bounded paging policy and returns
+   * execution coverage metadata along with the response payload.
    */
   public ToolExecutionOutcome executeToolCallWithPolicy(
       String endpoint, String method, Map<String, String> parameters,
       int maxRecords, int maxPages, int pageSize)
-      throws IOException, InterruptedException {
+      throws IOException {
 
-    Map<String, String> safeParams =
-        parameters == null ? new HashMap<>() : new HashMap<>(parameters);
+    Map<String, String> safeParams = parameters == null ? new HashMap<>() : new HashMap<>(parameters);
     String fullEndpoint = normalizeEndpoint(endpoint);
 
-    if (fullEndpoint.endsWith(LIST_KEYS_ENDPOINT_SUFFIX) &&
-        "GET".equalsIgnoreCase(method)) {
-      return executeListKeysWithPaging(fullEndpoint, method, safeParams,
-          maxRecords, maxPages, pageSize);
+    if (fullEndpoint.endsWith(LIST_KEYS_ENDPOINT_SUFFIX) && "GET".equalsIgnoreCase(method)) {
+      return executeListKeysWithPaging(fullEndpoint, method, safeParams, maxRecords, maxPages, pageSize);
     }
 
     JsonNode response = executeSingleCall(fullEndpoint, method, safeParams);
@@ -113,17 +110,18 @@ public class ToolExecutor {
   private ToolExecutionOutcome executeListKeysWithPaging(
       String endpoint, String method, Map<String, String> parameters,
       int maxRecords, int maxPages, int pageSize)
-      throws IOException, InterruptedException {
+      throws IOException {
 
     String startPrefix = parameters.get("startPrefix");
-    if (startPrefix == null || startPrefix.trim().isEmpty() ||
-        "/".equals(startPrefix.trim())) {
-      throw new IllegalArgumentException("listKeys requires 'startPrefix' at " +
-          "bucket level or deeper (for example /volume/bucket).");
+    if (startPrefix == null || startPrefix.trim().isEmpty() || "/".equals(startPrefix.trim())) {
+      throw new IllegalArgumentException(
+          "listKeys requires 'startPrefix' at bucket level or deeper (for example /volume/bucket).");
     }
 
-    int requestedLimit = parsePositiveInt(parameters.get("limit"), pageSize);
-    int effectivePageSize = Math.max(1, Math.min(pageSize, requestedLimit));
+    int requestedLimit = parsePositiveInt(
+        parameters.get("limit"), pageSize);
+    int effectivePageSize = Math.max(1,
+        Math.min(pageSize, requestedLimit));
     int safeMaxRecords = Math.max(1, maxRecords);
     int safeMaxPages = Math.max(1, maxPages);
 
@@ -173,7 +171,8 @@ public class ToolExecutor {
       }
       nextCursor = lastKey;
 
-      if (recordsProcessed >= safeMaxRecords || pagesFetched >= safeMaxPages) {
+      if (recordsProcessed >= safeMaxRecords
+          || pagesFetched >= safeMaxPages) {
         truncated = true;
       }
     }
@@ -189,23 +188,44 @@ public class ToolExecutor {
     merged.put("recordsProcessed", recordsProcessed);
     merged.put("pagesFetched", pagesFetched);
 
-    return new ToolExecutionOutcome(merged, recordsProcessed, pagesFetched,
-        truncated, nextCursor, createLimitsMap(safeMaxRecords,
-        safeMaxPages, effectivePageSize));
+    return new ToolExecutionOutcome(merged, recordsProcessed, pagesFetched, truncated, nextCursor,
+        createLimitsMap(safeMaxRecords, safeMaxPages, effectivePageSize));
   }
 
   private JsonNode executeSingleCall(String endpoint, String method,
                                      Map<String, String> parameters)
-      throws IOException, InterruptedException {
+      throws IOException {
     String resolvedEndpoint = replacePathParameters(endpoint, parameters);
     String url = buildUrl(resolvedEndpoint, parameters);
     LOG.debug("Executing tool call: {} {}", method, url);
 
-    HttpRequest request = buildRequest(url, method);
-    HttpResponse<String> response = httpClient.send(
-        request, HttpResponse.BodyHandlers.ofString());
-    ensureSuccess(response);
-    return parseJsonSafely(response.body());
+    HttpURLConnection conn = null;
+    try {
+      conn = (HttpURLConnection) new URL(url).openConnection();
+      conn.setRequestMethod(
+          "GET".equalsIgnoreCase(method) ? "GET" : "POST");
+      conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
+      conn.setReadTimeout(READ_TIMEOUT_MS);
+      conn.setRequestProperty("Accept", "application/json");
+      conn.setRequestProperty("Content-Type", "application/json");
+
+      int statusCode = conn.getResponseCode();
+      if (statusCode != 200) {
+        String errorBody = readErrorStream(conn);
+        String errorMsg = String.format(
+            "API request failed with status %d: %s",
+            statusCode, errorBody);
+        LOG.error(errorMsg);
+        throw new IOException(errorMsg);
+      }
+
+      String body = readInputStream(conn);
+      return parseJsonSafely(body);
+    } finally {
+      if (conn != null) {
+        conn.disconnect();
+      }
+    }
   }
 
   private String normalizeEndpoint(String endpoint) {
@@ -214,27 +234,20 @@ public class ToolExecutor {
     }
     String fullEndpoint = endpoint;
     if (!fullEndpoint.startsWith("/api/v1/")) {
-      fullEndpoint = "/api/v1" +
-          (endpoint.startsWith("/") ? endpoint : "/" + endpoint);
+      fullEndpoint = "/api/v1" + (endpoint.startsWith("/") ? endpoint : "/" + endpoint);
     }
     if (fullEndpoint.endsWith(NAMESPACE_DU_SUFFIX)) {
       String mapped = fullEndpoint.substring(
-          0, fullEndpoint.length() - NAMESPACE_DU_SUFFIX.length()) +
-          NAMESPACE_USAGE_SUFFIX;
+          0, fullEndpoint.length() - NAMESPACE_DU_SUFFIX.length()) + NAMESPACE_USAGE_SUFFIX;
       LOG.info("Mapped deprecated endpoint {} to {}", fullEndpoint, mapped);
       fullEndpoint = mapped;
     }
-    if (fullEndpoint.endsWith(TASKS_STATUS_SUFFIX) ||
-        fullEndpoint.endsWith(TASKS_SUFFIX)) {
+    if (fullEndpoint.endsWith(TASKS_STATUS_SUFFIX) || fullEndpoint.endsWith(TASKS_SUFFIX)) {
       String mapped;
       if (fullEndpoint.endsWith(TASKS_STATUS_SUFFIX)) {
-        mapped = fullEndpoint.substring(
-            0, fullEndpoint.length() - TASKS_STATUS_SUFFIX.length()) +
-            TASK_STATUS_SUFFIX;
+        mapped = fullEndpoint.substring(0, fullEndpoint.length() - TASKS_STATUS_SUFFIX.length()) + TASK_STATUS_SUFFIX;
       } else {
-        mapped = fullEndpoint.substring(
-            0, fullEndpoint.length() - TASKS_SUFFIX.length()) +
-            TASK_STATUS_SUFFIX;
+        mapped = fullEndpoint.substring(0, fullEndpoint.length() - TASKS_SUFFIX.length()) + TASK_STATUS_SUFFIX;
       }
       LOG.info("Mapped deprecated endpoint {} to {}", fullEndpoint, mapped);
       fullEndpoint = mapped;
@@ -261,39 +274,45 @@ public class ToolExecutor {
       if (!endpoint.contains("{" + entry.getKey() + "}")) {
         urlBuilder.append(firstParam ? "?" : "&");
         String value = entry.getValue() == null ? "" : entry.getValue();
-        urlBuilder.append(entry.getKey()).append("=")
-            .append(URLEncoder.encode(value, StandardCharsets.UTF_8));
+        try {
+          urlBuilder.append(entry.getKey()).append("=").append(URLEncoder.encode(value, "UTF-8"));
+        } catch (UnsupportedEncodingException e) {
+          throw new RuntimeException("UTF-8 not supported", e);
+        }
         firstParam = false;
       }
     }
     return urlBuilder.toString();
   }
 
-  private HttpRequest buildRequest(String url, String method) {
-    HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
-        .uri(URI.create(url))
-        .timeout(Duration.ofSeconds(30))
-        .header("Accept", "application/json")
-        .header("Content-Type", "application/json");
-
-    if ("GET".equalsIgnoreCase(method)) {
-      requestBuilder.GET();
-    } else if ("POST".equalsIgnoreCase(method)) {
-      requestBuilder.POST(HttpRequest.BodyPublishers.noBody());
-    } else {
-      throw new IllegalArgumentException("Unsupported HTTP method: " + method);
+  private String readInputStream(HttpURLConnection conn)
+      throws IOException {
+    StringBuilder sb = new StringBuilder();
+    try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"))) {
+      String line;
+      while ((line = br.readLine()) != null) {
+        sb.append(line);
+      }
     }
-    return requestBuilder.build();
+    return sb.toString();
   }
 
-  private void ensureSuccess(HttpResponse<String> response) throws IOException {
-    if (response.statusCode() != 200) {
-      String errorMsg = String.format(
-          "API request failed with status %d: %s",
-          response.statusCode(), response.body());
-      LOG.error(errorMsg);
-      throw new IOException(errorMsg);
+  private String readErrorStream(HttpURLConnection conn) {
+    try {
+      if (conn.getErrorStream() != null) {
+        StringBuilder sb = new StringBuilder();
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(conn.getErrorStream(), "UTF-8"))) {
+          String line;
+          while ((line = br.readLine()) != null) {
+            sb.append(line);
+          }
+        }
+        return sb.toString();
+      }
+    } catch (IOException e) {
+      LOG.debug("Failed to read error stream", e);
     }
+    return "";
   }
 
   private JsonNode parseJsonSafely(String body) throws IOException {
@@ -364,8 +383,10 @@ public class ToolExecutor {
     private final String nextCursor;
     private final Map<String, Object> limitsApplied;
 
-    public ToolExecutionOutcome(Object responseBody, int recordsProcessed,
-                                int pagesFetched, boolean truncated,
+    public ToolExecutionOutcome(Object responseBody,
+                                int recordsProcessed,
+                                int pagesFetched,
+                                boolean truncated,
                                 String nextCursor,
                                 Map<String, Object> limitsApplied) {
       this.responseBody = responseBody;

@@ -29,6 +29,7 @@ import org.apache.hadoop.ozone.recon.chatbot.llm.LLMProvider.LLMResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -280,11 +281,13 @@ public class ChatbotAgent {
       } catch (Exception e) {
         LOG.error("Tool call failed for endpoint: {}",
             toolCall.getEndpoint(), e);
-        responses.put(responseKey,
-            Map.of("error", e.getMessage()));
-        executionMetadata.put(responseKey, Map.of(
-            "error", e.getMessage(),
-            "truncated", false));
+        Map<String, Object> errorMap = new HashMap<>();
+        errorMap.put("error", e.getMessage());
+        responses.put(responseKey, errorMap);
+        Map<String, Object> errorMeta = new HashMap<>();
+        errorMeta.put("error", e.getMessage());
+        errorMeta.put("truncated", false);
+        executionMetadata.put(responseKey, errorMeta);
       }
     }
 
@@ -607,9 +610,16 @@ public class ChatbotAgent {
       if (is == null) {
         return "";
       }
-      return new String(is.readAllBytes(), StandardCharsets.UTF_8);
+      ByteArrayOutputStream result = new ByteArrayOutputStream();
+      byte[] buffer = new byte[8192];
+      int length;
+      while ((length = is.read(buffer)) != -1) {
+        result.write(buffer, 0, length);
+      }
+      return result.toString(StandardCharsets.UTF_8.name());
     } catch (IOException e) {
-      LOG.error("Failed to load API guide/schema resource: {}", resourcePath, e);
+      LOG.error("Failed to load API guide/schema resource: {}",
+          resourcePath, e);
       return "";
     }
   }

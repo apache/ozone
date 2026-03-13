@@ -26,12 +26,13 @@ import org.apache.hadoop.ozone.recon.chatbot.security.CredentialHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedReader;
 import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,13 +49,13 @@ import java.util.Map;
  */
 public abstract class DirectLLMProvider {
 
-    private static final Logger LOG = LoggerFactory.getLogger(DirectLLMProvider.class);
+    private static final Logger LOG =
+        LoggerFactory.getLogger(DirectLLMProvider.class);
 
     protected static final ObjectMapper MAPPER = new ObjectMapper();
 
     protected final OzoneConfiguration configuration;
     protected final CredentialHelper credentialHelper;
-    protected final HttpClient httpClient;
     protected final int timeoutMs;
 
     protected DirectLLMProvider(OzoneConfiguration configuration,
@@ -63,9 +64,6 @@ public abstract class DirectLLMProvider {
         this.configuration = configuration;
         this.credentialHelper = credentialHelper;
         this.timeoutMs = timeoutMs;
-        this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofMillis(timeoutMs))
-                .build();
     }
 
     // ---- Template methods (override in subclasses) ----
@@ -83,15 +81,15 @@ public abstract class DirectLLMProvider {
     protected abstract String getDefaultBaseUrl();
 
     /**
-     * Builds the provider-specific HTTP request for a chat completion.
+     * Builds the provider-specific HTTP connection for a chat completion.
      *
      * @param messages the chat messages
      * @param model    the model identifier
      * @param apiKey   the resolved API key
-     * @param params   additional parameters (temperature, max_tokens …)
-     * @return a ready-to-send {@link HttpRequest}
+     * @param params   additional parameters (temperature, max_tokens ...)
+     * @return a configured {@link HttpURLConnection} ready to execute
      */
-    protected abstract HttpRequest buildChatRequest(
+    protected abstract HttpURLConnection buildChatRequest(
             List<LLMProvider.ChatMessage> messages,
             String model,
             String apiKey,
@@ -146,33 +144,42 @@ public abstract class DirectLLMProvider {
                             + getApiKeyConfigKey() + "'");
         }
 
+        HttpURLConnection conn = null;
         try {
-            HttpRequest request = buildChatRequest(
+            conn = buildChatRequest(
                     messages, model, resolvedKey,
                     parameters != null ? parameters : new HashMap<>());
 
-            LOG.debug("Sending chat request to {}: model={}", getProviderName(),
-                    model);
+            LOG.debug("Sending chat request to {}: model={}",
+                    getProviderName(), model);
 
-            HttpResponse<String> response = httpClient.send(
-                    request, HttpResponse.BodyHandlers.ofString());
+            int statusCode = conn.getResponseCode();
 
-            if (response.statusCode() != 200) {
-                String errorMsg = String.format(
-                        "%s request failed with status %d: %s",
-                        getProviderName(), response.statusCode(), response.body());
+            String responseBody;
+            if (statusCode == 200) {
+                responseBody = readResponse(conn);
+            } else {
+                responseBody = readErrorResponse(conn);
+                String errorMsg =
+                    String.format("%s request failed with status %d: %s", getProviderName(), statusCode, responseBody);
                 LOG.error(errorMsg);
-                throw new LLMProvider.LLMException(errorMsg, response.statusCode());
+                throw new LLMProvider.LLMException(errorMsg, statusCode);
             }
 
-            return parseResponse(response.body(), model);
+            return parseResponse(responseBody, model);
 
-        } catch (IOException | InterruptedException e) {
+        } catch (LLMProvider.LLMException e) {
+            throw e;
+        } catch (IOException e) {
             LOG.error("Failed to communicate with {}", getProviderName(), e);
             throw new LLMProvider.LLMException(
                     "Failed to communicate with " + getProviderName() + ": "
                             + e.getMessage(),
                     e);
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
+            }
         }
     }
 
@@ -182,6 +189,73 @@ public abstract class DirectLLMProvider {
     public boolean isAvailable() {
         String key = credentialHelper.getSecret(getApiKeyConfigKey());
         return key != null && !key.isEmpty();
+    }
+
+    // ---- HTTP helpers ----
+
+    /**
+     * Creates and configures a POST connection for the given URL.
+     */
+    protected HttpURLConnection createPostConnection(String url)
+        throws IOException {
+        HttpURLConnection conn =
+            (HttpURLConnection) new URL(url).openConnection();
+        conn.setRequestMethod("POST");
+        conn.setDoOutput(true);
+        conn.setConnectTimeout(timeoutMs);
+        conn.setReadTimeout(timeoutMs);
+        conn.setRequestProperty("Content-Type", "application/json");
+        return conn;
+    }
+
+    /**
+     * Writes a JSON body to the connection output stream.
+     */
+    protected void writeBody(HttpURLConnection conn, String body)
+        throws IOException {
+        try (OutputStream os = conn.getOutputStream()) {
+            os.write(body.getBytes(StandardCharsets.UTF_8));
+            os.flush();
+        }
+    }
+
+    /**
+     * Reads the successful response body from a connection.
+     */
+    protected String readResponse(HttpURLConnection conn) throws IOException {
+        StringBuilder sb = new StringBuilder();
+        try (BufferedReader br = new BufferedReader(
+                new InputStreamReader(conn.getInputStream(),
+                    StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                sb.append(line);
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Reads the error response body from a connection.
+     */
+    protected String readErrorResponse(HttpURLConnection conn) {
+        try {
+            if (conn.getErrorStream() != null) {
+                StringBuilder sb = new StringBuilder();
+                try (BufferedReader br = new BufferedReader(
+                    new InputStreamReader(conn.getErrorStream(),
+                        StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = br.readLine()) != null) {
+                        sb.append(line);
+                    }
+                }
+                return sb.toString();
+            }
+        } catch (IOException e) {
+            LOG.debug("Failed to read error stream", e);
+        }
+        return "";
     }
 
     // ---- Helpers shared by OpenAI-compatible providers ----
