@@ -54,6 +54,8 @@ public class ReconRestServletModule extends ServletModule {
       "v1").build().toString();
   public static final String API_PACKAGE = "org.apache.hadoop.ozone.recon.api";
 
+  public static final String CHATBOT_API_PACKAGE = "org.apache.hadoop.ozone.recon.chatbot.api";
+
   private static final Logger LOG =
       LoggerFactory.getLogger(ReconRestServletModule.class);
 
@@ -65,7 +67,7 @@ public class ReconRestServletModule extends ServletModule {
 
   @Override
   protected void configureServlets() {
-    configureApi(BASE_API_PATH, API_PACKAGE);
+    configureApi(BASE_API_PATH, API_PACKAGE, CHATBOT_API_PACKAGE);
   }
 
   private void configureApi(String baseApiPath, String... packages) {
