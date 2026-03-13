@@ -120,9 +120,18 @@ const FileSizeDistribution: React.FC<FileSizeDistributionProps> = ({
       new Map<number, number>
     );
 
+    // Sort the map by file size before computing labels so that x-axis labels
+    // and bar values are derived from the same ordered sequence.
+    // Without sorting first, labels computed from the unsorted map would be
+    // misaligned with bar values from the sorted map, causing wrong size ranges
+    // to be shown for large buckets (e.g. 100 GiB files displayed as 512 KiB-1 MiB).
+    const sortedFileCountMap = new Map(
+      [...fileCountMap.entries()].sort((a, b) => a[0] - b[0])
+    );
+
     // Calculate the previous power of 2 to find the lower bound of the range
     // Ex: for 2048, the lower bound is 1024
-    const fileCountValues = Array.from(fileCountMap.keys()).map(value => {
+    const fileCountValues = Array.from(sortedFileCountMap.keys()).map(value => {
       const upperbound = size(value);
       const upperboundPwr = Math.log2(value);
       // For 1024 i.e 2^10, the lower bound is 0, so we start binning after 2^10
@@ -132,8 +141,7 @@ const FileSizeDistribution: React.FC<FileSizeDistributionProps> = ({
 
     setFilePlotData({
       fileCountValues: fileCountValues,
-      // set the sorted value by size for the map
-      fileCountMap: new Map([...fileCountMap.entries()].sort((a, b) => a[0] - b[0]))
+      fileCountMap: sortedFileCountMap
     });
   }
 

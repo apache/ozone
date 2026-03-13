@@ -1329,6 +1329,18 @@
   },
   "fileSizeCounts": [
     {
+      "volume": "voltpb",
+      "bucket": "buck1pb",
+      "fileSize": 137438953472,
+      "count": 2857
+    },
+    {
+      "volume": "voltpb",
+      "bucket": "buck2pb",
+      "fileSize": 137438953472,
+      "count": 143
+    },
+    {
       "volume": "vol1",
       "bucket": "bucket1",
       "fileSize": 1024,
@@ -1367,13 +1379,25 @@
     {
       "volume": "vol2",
       "bucket": "bucket7",
-      "fileSize": 1024,
-      "count": 54
+      "fileSize": 1048576,
+      "count": 410
+    },
+    {
+      "volume": "vol2",
+      "bucket": "bucket8",
+      "fileSize": 16777216,
+      "count": 94
     },
     {
       "volume": "vol3",
-      "bucket": "bucket8",
-      "fileSize": 131072,
+      "bucket": "bucket9",
+      "fileSize": 134217728,
+      "count": 38
+    },
+    {
+      "volume": "vol3",
+      "bucket": "bucket10",
+      "fileSize": 1024,
       "count": 217
     }
   ],
