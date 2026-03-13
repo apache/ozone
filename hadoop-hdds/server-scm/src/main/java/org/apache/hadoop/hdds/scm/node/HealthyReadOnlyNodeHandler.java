@@ -96,15 +96,14 @@ public class HealthyReadOnlyNodeHandler
       }
     }
 
-    //add node back if it is not present in networkTopology
+    // Always ensure the node is in the topology. Using unconditional add
+    // rather than a contains-then-add check to avoid a race with
+    // DeadNodeHandler, which may remove the node between the check and
+    // the add. InnerNodeImpl.add() is idempotent for existing nodes.
     NetworkTopology nt = nodeManager.getClusterNetworkTopologyMap();
-    if (!nt.contains(datanodeDetails)) {
-      nt.add(datanodeDetails);
-      // make sure after DN is added back into topology, DatanodeDetails
-      // instance returned from nodeStateManager has parent correctly set.
-      Objects.requireNonNull(
-          nodeManager.getNode(datanodeDetails.getID())
-              .getParent(), "Parent == null");
-    }
+    nt.add(datanodeDetails);
+    Objects.requireNonNull(
+        nodeManager.getNode(datanodeDetails.getID())
+            .getParent(), "Parent == null");
   }
 }
