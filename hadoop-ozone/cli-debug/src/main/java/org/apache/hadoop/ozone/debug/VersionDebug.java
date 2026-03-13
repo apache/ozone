@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.ComponentVersion;
-import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.HDDSVersion;
 import org.apache.hadoop.hdds.cli.DebugSubcommand;
 import org.apache.hadoop.hdds.server.JsonUtils;

@@ -45,7 +45,7 @@ class TestOMVersionManager extends AbstractComponentVersionManagerTest {
     }
   }
 
-  private static Stream<Arguments> preFinalizedVersionArgs() {
+  public static Stream<Arguments> preFinalizedVersionArgs() {
     return ALL_VERSIONS.stream()
         .limit(ALL_VERSIONS.size() - 1)
         .map(Arguments::of);
