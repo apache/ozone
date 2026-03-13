@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-slim
     steps:
       - name: Checkout project
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Check pull request title
         env:
           TITLE: ${{ github.event.pull_request.title }}
