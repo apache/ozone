@@ -29,10 +29,10 @@ import org.apache.hadoop.ozone.upgrade.UpgradeAction;
 public interface ComponentVersion {
   /**
    * Returns an integer representation of this version. To callers outside this class, this is an opaque value which
-   * should not be checked or compared directly.
+   * should not be checked or compared directly. {@link #isSupportedBy} should be used for version comparisons.
    *
-   * To implementors of this interface, versions should serialize such that if version1 < version2,
-   * then version1.serialize() < version2.serialize().
+   * To implementors of this interface, versions should serialize such that version1 <= version2
+   * if and only if version1.serialize() <= version2.serialize().
    * Negative numbers may be used as serialized values to represent unknown future versions which are trivially larger
    * than all other versions.
    *
