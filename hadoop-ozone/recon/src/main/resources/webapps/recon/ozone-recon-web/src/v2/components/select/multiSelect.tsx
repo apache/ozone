@@ -124,7 +124,6 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
         Option
       }}
       menuPortalTarget={document.body}
-      menuPosition='fixed'
       placeholder={placeholder}
       value={selected.filter((opt) => opt.value !== fixedColumn)}
       isDisabled={isDisabled}
