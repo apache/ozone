@@ -24,6 +24,8 @@ import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.anySet;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -35,9 +37,11 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
-import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
+import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.common.helpers.ExcludeList;
@@ -61,12 +65,11 @@ class TestWritableRatisContainerProvider {
   private static final int CONTAINER_SIZE = 1234;
   private static final ExcludeList NO_EXCLUSION = new ExcludeList();
 
-  private final OzoneConfiguration conf = new OzoneConfiguration();
   private final PipelineChoosePolicy policy = new RandomPipelineChoosePolicy();
   private final AtomicLong containerID = new AtomicLong(1);
 
   @Mock
-  private PipelineManager pipelineManager;
+  private PipelineManagerImpl pipelineManager;
 
   @Mock
   private ContainerManager containerManager;
@@ -118,6 +121,73 @@ class TestWritableRatisContainerProvider {
     verifyPipelineCreated();
   }
 
+  @Test
+  void configuredExcludedPipelineReturnsNoContainerUntilGoodPipelineAppears()
+      throws Exception {
+    DatanodeDetails excludedDn = MockDatanodeDetails.randomDatanodeDetails();
+    Pipeline excludedPipeline = MockPipeline.createPipeline(asList(
+        excludedDn,
+        MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails()));
+    Pipeline allowedPipeline = MockPipeline.createPipeline(3);
+    ContainerInfo containerFromAllowedPipeline =
+        pipelineHasContainer(allowedPipeline);
+    List<Pipeline> listWithAllowedPipeline = new ArrayList<>();
+    listWithAllowedPipeline.add(allowedPipeline);
+    listWithAllowedPipeline.add(excludedPipeline);
+    when(pipelineManager.getPipelines(REPLICATION_CONFIG, OPEN, emptySet(), emptySet()))
+        .thenReturn(new ArrayList<>(singletonList(excludedPipeline)))
+        .thenReturn(new ArrayList<>(singletonList(excludedPipeline)))
+        .thenReturn(listWithAllowedPipeline);
+    when(pipelineManager.createPipeline(REPLICATION_CONFIG))
+        .thenThrow(new SCMException(SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE));
+
+    ScmConfig.PipelineExcludedNodes pipelineExcludedNodes =
+        ScmConfig.PipelineExcludedNodes.parse(excludedDn.getUuidString());
+    WritableRatisContainerProvider subject = createSubject(pipelineExcludedNodes);
+
+    assertThrows(IOException.class, () -> subject.getContainer(
+        CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION));
+
+    ContainerInfo container = subject.getContainer(CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, NO_EXCLUSION);
+
+    assertSame(containerFromAllowedPipeline, container);
+    verify(pipelineManager, times(1)).createPipeline(REPLICATION_CONFIG);
+  }
+
+  @Test
+  void usesExcludeListFallbackButStillFiltersConfiguredExcludedPipelines()
+      throws Exception {
+    DatanodeDetails excludedDn = MockDatanodeDetails.randomDatanodeDetails();
+    Pipeline excludedPipeline = MockPipeline.createPipeline(asList(
+        excludedDn,
+        MockDatanodeDetails.randomDatanodeDetails(),
+        MockDatanodeDetails.randomDatanodeDetails()));
+    Pipeline allowedPipeline = MockPipeline.createPipeline(3);
+    ContainerInfo containerFromAllowedPipeline =
+        pipelineHasContainer(allowedPipeline);
+
+    ExcludeList excludeList = new ExcludeList();
+    excludeList.addDatanode(MockDatanodeDetails.randomDatanodeDetails());
+    when(pipelineManager.getPipelines(eq(REPLICATION_CONFIG), eq(OPEN),
+        anySet(), anySet()))
+        .thenReturn(emptyList());
+    when(pipelineManager.getPipelines(REPLICATION_CONFIG, OPEN))
+        .thenReturn(new ArrayList<>(asList(excludedPipeline, allowedPipeline)));
+
+    ScmConfig.PipelineExcludedNodes pipelineExcludedNodes =
+        ScmConfig.PipelineExcludedNodes.parse(excludedDn.getUuidString());
+
+    ContainerInfo container = createSubject(pipelineExcludedNodes)
+        .getContainer(CONTAINER_SIZE, REPLICATION_CONFIG, OWNER, excludeList);
+
+    assertSame(containerFromAllowedPipeline, container);
+    verify(pipelineManager).getPipelines(eq(REPLICATION_CONFIG), eq(OPEN),
+        eq(excludeList.getDatanodes()), eq(excludeList.getPipelineIds()));
+    verify(pipelineManager).getPipelines(REPLICATION_CONFIG, OPEN);
+    verify(pipelineManager, never()).createPipeline(REPLICATION_CONFIG);
+  }
+
   private void existingPipelines(Pipeline... pipelines) {
     existingPipelines(new ArrayList<>(asList(pipelines)));
   }
@@ -157,6 +227,14 @@ class TestWritableRatisContainerProvider {
   }
 
   private WritableRatisContainerProvider createSubject() {
+    return new WritableRatisContainerProvider(
+        pipelineManager, containerManager, policy);
+  }
+
+  private WritableRatisContainerProvider createSubject(
+      ScmConfig.PipelineExcludedNodes pipelineExcludedNodes) {
+    when(pipelineManager.getPipelineExcludedNodesConfig())
+        .thenReturn(pipelineExcludedNodes);
     return new WritableRatisContainerProvider(
         pipelineManager, containerManager, policy);
   }
