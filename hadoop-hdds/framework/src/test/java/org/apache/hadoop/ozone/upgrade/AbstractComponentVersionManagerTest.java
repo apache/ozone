@@ -135,7 +135,8 @@ public abstract class AbstractComponentVersionManagerTest {
   private void assertApparentVersion(ComponentVersionManager versionManager, ComponentVersion apparentVersion) {
     assertEquals(apparentVersion, versionManager.getApparentVersion());
     assertTrue(versionManager.isAllowed(apparentVersion), apparentVersion + " should be allowed");
-    assertEquals(expectedSoftwareVersion(), versionManager.getSoftwareVersion(), "Software version should never change");
+    assertEquals(expectedSoftwareVersion(), versionManager.getSoftwareVersion(),
+        "Software version should never change");
     if (!versionManager.needsFinalization()) {
       assertTrue(versionManager.isAllowed(expectedSoftwareVersion()),
           "Software version should always be allowed when finalized");

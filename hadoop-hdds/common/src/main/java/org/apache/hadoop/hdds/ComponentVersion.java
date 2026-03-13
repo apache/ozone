@@ -41,7 +41,7 @@ public interface ComponentVersion {
   int serialize();
 
   /**
-   * @return The description of the version enum value.
+   * @return The description of this version.
    */
   String description();
 
