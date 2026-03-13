@@ -93,12 +93,6 @@ public class TestUpgradeFinalizerActions {
     }
 
     @Override
-    public boolean isSupportedBy(int serializedVersion) {
-      // TODO HDDS-14826 will remove this test. No need to add handling for this new method.
-      return false;
-    }
-
-    @Override
     public String toString() {
       return name() + " (" + serialize() + ")";
     }

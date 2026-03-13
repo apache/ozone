@@ -195,12 +195,6 @@ public class TestAbstractLayoutVersionManager {
           // TODO HDDS-14826 will remove this test. No need to add handling for this new method.
           return null;
         }
-
-        @Override
-        public boolean isSupportedBy(int serializedVersion) {
-          // TODO HDDS-14826 will remove this test. No need to add handling for this new method.
-          return false;
-        }
       };
     }
     return lfs;
