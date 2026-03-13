@@ -142,7 +142,9 @@ abstract class RDBStoreAbstractIterator<RAW>
   public final Table.KeyValue<RAW, RAW> next() {
     setCurrentEntry();
     if (currentEntry != null) {
-      rocksDBIterator.get().next();
+      if (!isDbClosed()) {
+        rocksDBIterator.get().next();
+      }
       return currentEntry;
     }
     throw new NoSuchElementException("RocksDB Store has no more elements");
