@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.upgrade;
+package org.apache.hadoop.ozone.om.upgrade;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -23,30 +23,29 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.ComponentVersion;
-import org.apache.hadoop.hdds.HDDSVersion;
+import org.apache.hadoop.ozone.OzoneManagerVersion;
 import org.apache.hadoop.ozone.upgrade.AbstractComponentVersionManagerTest;
 import org.apache.hadoop.ozone.upgrade.ComponentVersionManager;
 import org.junit.jupiter.params.provider.Arguments;
 
 /**
- * Tests for {@link HDDSVersionManager}.
+ * Tests for {@link OMVersionManager}.
  */
-class TestHDDSVersionManager extends AbstractComponentVersionManagerTest {
+class TestOMVersionManager extends AbstractComponentVersionManagerTest {
 
   private static final List<ComponentVersion> ALL_VERSIONS;
 
   static {
-    ALL_VERSIONS = new ArrayList<>(Arrays.asList(HDDSLayoutFeature.values()));
-
-    for (HDDSVersion version : HDDSVersion.values()) {
+    ALL_VERSIONS = new ArrayList<>(Arrays.asList(OMLayoutFeature.values()));
+    for (OzoneManagerVersion version : OzoneManagerVersion.values()) {
       // Add all defined versions after and including ZDU to get the complete version list.
-      if (HDDSVersion.ZDU.isSupportedBy(version) && version != HDDSVersion.FUTURE_VERSION) {
+      if (OzoneManagerVersion.ZDU.isSupportedBy(version) && version != OzoneManagerVersion.FUTURE_VERSION) {
         ALL_VERSIONS.add(version);
       }
     }
   }
 
-  public static Stream<Arguments> preFinalizedVersionArgs() {
+  private static Stream<Arguments> preFinalizedVersionArgs() {
     return ALL_VERSIONS.stream()
         .limit(ALL_VERSIONS.size() - 1)
         .map(Arguments::of);
@@ -54,7 +53,7 @@ class TestHDDSVersionManager extends AbstractComponentVersionManagerTest {
 
   @Override
   protected ComponentVersionManager createManager(int serializedApparentVersion) throws IOException {
-    return new HDDSVersionManager(serializedApparentVersion);
+    return new OMVersionManager(serializedApparentVersion);
   }
 
   @Override
@@ -64,6 +63,6 @@ class TestHDDSVersionManager extends AbstractComponentVersionManagerTest {
 
   @Override
   protected ComponentVersion expectedSoftwareVersion() {
-    return HDDSVersion.SOFTWARE_VERSION;
+    return OzoneManagerVersion.SOFTWARE_VERSION;
   }
 }
