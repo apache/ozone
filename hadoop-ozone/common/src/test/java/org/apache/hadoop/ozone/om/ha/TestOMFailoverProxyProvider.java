@@ -38,8 +38,10 @@ import java.util.StringJoiner;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.ozone.ha.ConfUtils;
+import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.ratis.protocol.exceptions.StateMachineException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -252,6 +254,18 @@ public class TestOMFailoverProxyProvider {
       String expectedDtService = String.join(",", nodeAddrs);
       assertEquals(expectedDtService, dtService.toString());
     }
+  }
+
+  /**
+   * If OM is in prepare mode it should still retry.
+   */
+  @Test
+  public void testShouldFailoverOnPreparedStateMachineException() {
+    OMException omEx = new OMException("prepared",
+        OMException.ResultCodes.NOT_SUPPORTED_OPERATION_WHEN_PREPARED);
+    StateMachineException smEx = new StateMachineException("sme", omEx);
+
+    assertTrue(provider.shouldFailover(smEx));
   }
 
 }
