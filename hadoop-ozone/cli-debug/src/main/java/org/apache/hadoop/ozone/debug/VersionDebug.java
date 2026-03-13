@@ -22,7 +22,7 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import org.apache.hadoop.hdds.ComponentVersion;
-import org.apache.hadoop.hdds.HDDSVersion;
+import org.apache.hadoop.hdds.DatanodeVersion;
 import org.apache.hadoop.hdds.cli.DebugSubcommand;
 import org.apache.hadoop.hdds.server.JsonUtils;
 import org.apache.hadoop.ozone.ClientVersion;
@@ -52,19 +52,18 @@ public class VersionDebug implements Callable<Void>, DebugSubcommand {
         ),
         "components", ImmutableSortedMap.of(
             "client", asMap(ClientVersion.CURRENT),
-            "datanode", asMap(HDDSVersion.SOFTWARE_VERSION),
-            "om", asMap(OzoneManagerVersion.SOFTWARE_VERSION)
+            "datanode", asMap(DatanodeVersion.CURRENT),
+            "om", asMap(OzoneManagerVersion.CURRENT)
         )
     )));
     return null;
   }
 
-  private static <T extends Enum<T> & ComponentVersion>
-      Map<String, Object> asMap(T version) {
+  private static <T extends Enum<T> & ComponentVersion> Map<String, Object> asMap(T version) {
     return ImmutableSortedMap.of(
         "componentVersion", ImmutableSortedMap.of(
             "name", version.name(),
-            "protoValue", version.serialize()
+            "protoValue", version.toProtoValue()
         )
     );
   }
