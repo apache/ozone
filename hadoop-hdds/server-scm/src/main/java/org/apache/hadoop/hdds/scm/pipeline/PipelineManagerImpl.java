@@ -18,14 +18,17 @@
 package org.apache.hadoop.hdds.scm.pipeline;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
@@ -41,10 +44,12 @@ import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.SCMCommonPlacementPolicy;
+import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
@@ -97,6 +102,8 @@ public class PipelineManagerImpl implements PipelineManager {
   // SCM is already out of SafeMode.
   private AtomicBoolean freezePipelineCreation;
   private final Clock clock;
+  private final ScmConfig.PipelineExcludedNodes pipelineExcludedNodes;
+  private final Set<DatanodeDetails> configuredExcludedDatanodeDetails;
 
   @SuppressWarnings("checkstyle:parameterNumber")
   protected PipelineManagerImpl(ConfigurationSource conf,
@@ -124,6 +131,8 @@ public class PipelineManagerImpl implements PipelineManager {
         HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL_DEFAULT,
         TimeUnit.MILLISECONDS);
     this.freezePipelineCreation = new AtomicBoolean();
+    this.pipelineExcludedNodes = conf.getObject(ScmConfig.class).getPipelineExcludedNodes();
+    this.configuredExcludedDatanodeDetails = resolvePipelineExcludedNodesToDatanodeDetails();
   }
 
   @SuppressWarnings("checkstyle:parameterNumber")
@@ -216,8 +225,8 @@ public class PipelineManagerImpl implements PipelineManager {
       throw new IllegalArgumentException("Replication type must be EC");
     }
     checkIfPipelineCreationIsAllowed(replicationConfig);
-    return pipelineFactory.create(replicationConfig, excludedNodes,
-        favoredNodes);
+    List<DatanodeDetails> allExcludedNodes = mergeConfiguredExcludedNodes(excludedNodes);
+    return pipelineFactory.create(replicationConfig, allExcludedNodes, favoredNodes);
   }
 
   /**
@@ -250,13 +259,13 @@ public class PipelineManagerImpl implements PipelineManager {
       List<DatanodeDetails> excludedNodes, List<DatanodeDetails> favoredNodes)
       throws IOException {
     checkIfPipelineCreationIsAllowed(replicationConfig);
+    List<DatanodeDetails> allExcludedNodes = mergeConfiguredExcludedNodes(excludedNodes);
 
     acquireWriteLock();
     final Pipeline pipeline;
     try {
       try {
-        pipeline = pipelineFactory.create(replicationConfig,
-            excludedNodes, favoredNodes);
+        pipeline = pipelineFactory.create(replicationConfig, allExcludedNodes, favoredNodes);
       } catch (IOException e) {
         metrics.incNumPipelineCreationFailed();
         throw e;
@@ -300,6 +309,45 @@ public class PipelineManagerImpl implements PipelineManager {
       releaseWriteLock();
     }
     recordMetricsForPipeline(pipeline);
+  }
+
+  private List<DatanodeDetails> mergeConfiguredExcludedNodes(List<DatanodeDetails> excludedNodes) {
+    if ((excludedNodes == null || excludedNodes.isEmpty()) && configuredExcludedDatanodeDetails.isEmpty()) {
+      return Collections.emptyList();
+    }
+    if (excludedNodes == null || excludedNodes.isEmpty()) {
+      return new ArrayList<>(configuredExcludedDatanodeDetails);
+    }
+    if (configuredExcludedDatanodeDetails.isEmpty()) {
+      return excludedNodes;
+    }
+
+    Set<DatanodeDetails> mergedExcludedNodes =
+        new HashSet<>(configuredExcludedDatanodeDetails);
+    mergedExcludedNodes.addAll(excludedNodes);
+    return new ArrayList<>(mergedExcludedNodes);
+  }
+
+  private Set<DatanodeDetails> resolvePipelineExcludedNodesToDatanodeDetails() {
+    if (pipelineExcludedNodes.isEmpty()) {
+      return Collections.emptySet();
+    }
+
+    Set<DatanodeDetails> resolved = new HashSet<>();
+    for (DatanodeID datanodeID : pipelineExcludedNodes.getExcludedDatanodeIds()) {
+      DatanodeDetails datanodeDetails = nodeManager.getNode(datanodeID);
+      if (datanodeDetails != null) {
+        resolved.add(datanodeDetails);
+      }
+    }
+    for (String address : pipelineExcludedNodes.getExcludedAddressTokens()) {
+      List<DatanodeDetails> datanodes = nodeManager.getNodesByAddress(address);
+      if (datanodes != null) {
+        resolved.addAll(datanodes);
+      }
+    }
+
+    return ImmutableSet.copyOf(resolved);
   }
 
   private boolean factorOne(ReplicationConfig replicationConfig) {
@@ -858,6 +906,10 @@ public class PipelineManagerImpl implements PipelineManager {
   @VisibleForTesting
   public PipelineStateManager getStateManager() {
     return stateManager;
+  }
+
+  ScmConfig.PipelineExcludedNodes getPipelineExcludedNodesConfig() {
+    return pipelineExcludedNodes;
   }
 
   @VisibleForTesting

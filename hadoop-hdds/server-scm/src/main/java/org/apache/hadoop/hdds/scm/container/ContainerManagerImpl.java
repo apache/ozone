@@ -34,11 +34,13 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
+import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.metrics.SCMContainerManagerMetrics;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
@@ -80,6 +82,7 @@ public class ContainerManagerImpl implements ContainerManager {
   private final Random random = new Random();
 
   private final long maxContainerSize;
+  private final ScmConfig.PipelineExcludedNodes pipelineExcludedNodes;
 
   /**
    *
@@ -108,6 +111,9 @@ public class ContainerManagerImpl implements ContainerManager {
 
     maxContainerSize = (long) conf.getStorageSize(ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
         ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
+    pipelineExcludedNodes =
+        new OzoneConfiguration(conf).getObject(ScmConfig.class)
+            .getPipelineExcludedNodes();
 
     this.scmContainerManagerMetrics = SCMContainerManagerMetrics.create();
   }
@@ -182,6 +188,7 @@ public class ContainerManagerImpl implements ContainerManager {
     try {
       pipelines = pipelineManager
           .getPipelines(replicationConfig, Pipeline.PipelineState.OPEN);
+      pipelines.removeIf(pipelineExcludedNodes::isExcluded);
       if (!pipelines.isEmpty()) {
         pipeline = pipelines.get(random.nextInt(pipelines.size()));
         containerInfo = createContainer(pipeline, owner);
@@ -209,6 +216,7 @@ public class ContainerManagerImpl implements ContainerManager {
       try {
         pipelines = pipelineManager
             .getPipelines(replicationConfig, Pipeline.PipelineState.OPEN);
+        pipelines.removeIf(pipelineExcludedNodes::isExcluded);
         if (!pipelines.isEmpty()) {
           pipeline = pipelines.get(random.nextInt(pipelines.size()));
           containerInfo = createContainer(pipeline, owner);

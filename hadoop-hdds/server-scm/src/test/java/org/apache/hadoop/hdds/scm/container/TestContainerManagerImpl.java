@@ -27,8 +27,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -345,6 +349,43 @@ public class TestContainerManagerImpl {
     assertEquals(1, containerManager.getContainers().size());
     assertNotNull(
         containerManager.getContainer(admin.containerID()));
+  }
+
+  /**
+   * First there's only one pipeline, and a DN in that pipeline is excluded, so container creation fails. Then
+   * another allowed is made availabel and container creation passes.
+   */
+  @Test
+  void testAllocateContainerFiltersConfiguredExcludedPipelines()
+      throws Exception {
+    OzoneConfiguration conf = SCMTestUtils.getConf(new File(testDir, "exclude"));
+    RatisReplicationConfig replicationConfig =
+        RatisReplicationConfig.getInstance(ReplicationFactor.THREE);
+    List<Pipeline> pipelines = pipelineManager.getPipelines(replicationConfig, Pipeline.PipelineState.OPEN);
+    assertEquals(1, pipelines.size());
+    Pipeline excludedPipeline = pipelines.get(0);
+    String excludedUuid = excludedPipeline.getNodes().get(0).getUuidString();
+    conf.set("hdds.scm.pipeline.exclude.datanodes", excludedUuid);
+
+    ContainerManager manager = new ContainerManagerImpl(conf,
+        scmhaManager, sequenceIdGen, pipelineManager,
+        SCMDBDefinition.CONTAINERS.getTable(dbStore), pendingOpsMock);
+    clearInvocations(pipelineManager);
+
+    // No non-excluded pipeline is available, and pipeline creation is blocked.
+    doThrow(new IOException("No pipeline available"))
+        .when(pipelineManager).createPipeline(replicationConfig);
+    assertThrows(IOException.class, () -> manager.allocateContainer(replicationConfig, "admin"));
+    verify(pipelineManager, times(1)).createPipeline(replicationConfig);
+
+    // Make a new pipeline available and ensure allocation succeeds.
+    doCallRealMethod().when(pipelineManager).createPipeline(replicationConfig);
+    Pipeline allowedPipeline = pipelineManager.createPipeline(replicationConfig);
+    clearInvocations(pipelineManager);
+
+    ContainerInfo container = manager.allocateContainer(replicationConfig, "admin");
+    assertEquals(allowedPipeline.getId(), container.getPipelineID());
+    verify(pipelineManager, never()).createPipeline(replicationConfig);
   }
 
   @Test

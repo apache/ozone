@@ -33,8 +33,10 @@ import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.IOException;
@@ -47,6 +49,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -57,6 +60,7 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.PipelineChoosePolicy;
+import org.apache.hadoop.hdds.scm.ScmConfig;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
@@ -70,6 +74,8 @@ import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
 import org.apache.hadoop.hdds.scm.net.NetworkTopologyImpl;
 import org.apache.hadoop.hdds.scm.net.NodeSchema;
 import org.apache.hadoop.hdds.scm.net.NodeSchemaManager;
+import org.apache.hadoop.hdds.scm.node.NodeManager;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.WritableECContainerProvider.WritableECContainerProviderConfig;
 import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.CapacityPipelineChoosePolicy;
 import org.apache.hadoop.hdds.scm.pipeline.choose.algorithms.HealthyPipelineChoosePolicy;
@@ -553,6 +559,92 @@ public class TestWritableECContainerProvider {
     assertNotNull(container);
     verify(pipelineManagerSpy).createPipeline(repConfig, excludedNodes,
         Collections.emptyList());
+  }
+
+  @ParameterizedTest
+  @MethodSource("policies")
+  public void testConfiguredExcludedPipelineFilteredBeforeSelection(
+      PipelineChoosePolicy policy) throws IOException {
+    /*
+    This test first has only one pipeline, and a DN in that pipeline is excluded by configuration. Since there's only
+     one pipeline and that's excluded, no container can be selected from that. Also since there are only 3 (mocked)
+     Datanodes and one out of them is excluded, no new pipelines can be created either. So
+     WritableECContainerProvider#getContainer should throw an IOException. WRT code coverage, this tests the first if
+      branch `if (openPipelineCount < maximumPipelines)` in getContainer(), when that throws, the while loop is not
+      entered because all pipelines are excluded. Then it also hits the `maximumPipelines = nodeCount;` path where
+      maximum pipelines limit is increased. That path also throws since no new pipelines can be created.
+     */
+
+    // pipelinePerVolumeFactor set to 0 and minimumPipelines set to 2 so that getMaximumPipelines() returns 2
+    providerConf.setPipelinePerVolumeFactor(0);
+    providerConf.setMinimumPipelines(2);
+
+    NodeManager localNodeManager = mock(NodeManager.class);
+    when(localNodeManager.getNodeCount(NodeStatus.inServiceHealthy())).thenReturn(3);
+    PipelineManagerImpl localPipelineManager = mock(PipelineManagerImpl.class);
+    ContainerManager localContainerManager = mock(ContainerManager.class);
+
+    DatanodeDetails excludedDn = MockDatanodeDetails.randomDatanodeDetails();
+    Pipeline excludedPipeline = createEcPipelineWithFirstNode(excludedDn);
+
+    // there's only one pipeline (excludedPipeline)
+    when(localPipelineManager.getPipelineCount(repConfig, Pipeline.PipelineState.OPEN)).thenReturn(1);
+    List<Pipeline> pipelines = new ArrayList<>();
+    pipelines.add(excludedPipeline);
+    when(localPipelineManager.getPipelines(repConfig, Pipeline.PipelineState.OPEN)).thenReturn(pipelines);
+    when(localPipelineManager.getPipelineExcludedNodesConfig()).thenReturn(ScmConfig.PipelineExcludedNodes.parse(
+        excludedDn.getUuidString()));
+
+    WritableContainerProvider<ECReplicationConfig> localProvider = new WritableECContainerProvider(
+        providerConf, getMaxContainerSize(), localNodeManager, localPipelineManager, localContainerManager, policy);
+    assertThrows(IOException.class, () -> localProvider.getContainer(1, repConfig, OWNER, new ExcludeList()));
+
+    /*
+    Now, we introduce another pipeline to the cluster which is not excluded. So now a container from this allowed
+    pipeline can be selected. WRT code coverage, this additionally tests the while loop branch
+    `while (!existingPipelines.isEmpty())`.
+     */
+    Pipeline allowedPipeline = createEcPipelineWithFirstNode(MockDatanodeDetails.randomDatanodeDetails());
+    pipelines.add(allowedPipeline);
+    ContainerID allowedContainerId = ContainerID.valueOf(100L);
+    NavigableSet<ContainerID> allowedContainerSet = new TreeSet<>();
+    allowedContainerSet.add(allowedContainerId);
+    ContainerInfo allowedContainer = new ContainerInfo.Builder()
+        .setContainerID(allowedContainerId.getId())
+        .setPipelineID(allowedPipeline.getId())
+        .build();
+    // there are two pipelines in the cluster now
+    when(localPipelineManager.getPipelineCount(repConfig, Pipeline.PipelineState.OPEN)).thenReturn(2);
+    when(localNodeManager.getNodeCount(NodeStatus.inServiceHealthy())).thenReturn(6);
+    when(localPipelineManager.getContainersInPipeline(allowedPipeline.getId())).thenReturn(allowedContainerSet);
+    when(localContainerManager.getContainer(allowedContainerId)).thenReturn(allowedContainer);
+
+    ContainerInfo selected = localProvider.getContainer(1, repConfig, OWNER, new ExcludeList());
+
+    assertEquals(allowedContainer, selected);
+    verify(localPipelineManager, never()).getContainersInPipeline(excludedPipeline.getId());
+  }
+
+  private Pipeline createEcPipelineWithFirstNode(DatanodeDetails firstNode) {
+    List<DatanodeDetails> nodes = new ArrayList<>();
+    nodes.add(firstNode);
+    while (nodes.size() < repConfig.getRequiredNodes()) {
+      nodes.add(MockDatanodeDetails.randomDatanodeDetails());
+    }
+
+    Map<DatanodeDetails, Integer> nodeIndexes = new HashMap<>();
+    int ecIndex = 1;
+    for (DatanodeDetails dn : nodes) {
+      nodeIndexes.put(dn, ecIndex++);
+    }
+
+    return Pipeline.newBuilder()
+        .setId(PipelineID.randomId())
+        .setState(Pipeline.PipelineState.OPEN)
+        .setReplicationConfig(repConfig)
+        .setNodes(nodes)
+        .setReplicaIndexes(nodeIndexes)
+        .build();
   }
 
   private ContainerInfo createContainer(Pipeline pipeline,
