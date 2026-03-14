@@ -28,16 +28,24 @@ import org.apache.hadoop.hdds.scm.container.replication.ContainerCheckRequest;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp;
 import org.apache.hadoop.hdds.scm.container.replication.QuasiClosedStuckReplicaCount;
+import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Class to check for the replication of the replicas in quasi-closed stuck containers. As we want to maintain
- * as much data and information as possible, the rule for QC stuck container is to maintain 2 copies of each origin
- * if there is more than 1 origin. If there is only 1 origin, then we need to maintain 3 copies.
+ * as much data and information as possible, the rule for QC stuck container is to maintain a configurable number
+ * of copies of the origin with the highest BCSID (bestOriginCopies, default 3), and a configurable number of copies
+ * of each other origin (otherOriginCopies, default 2). If there is only 1 origin, bestOriginCopies copies are kept.
  */
 public class QuasiClosedStuckReplicationCheck  extends AbstractCheck {
   private static final Logger LOG = LoggerFactory.getLogger(QuasiClosedStuckReplicationCheck.class);
+
+  private final ReplicationManager.ReplicationManagerConfiguration rmConf;
+
+  public QuasiClosedStuckReplicationCheck(ReplicationManager.ReplicationManagerConfiguration rmConf) {
+    this.rmConf = rmConf;
+  }
 
   public static boolean shouldHandleAsQuasiClosedStuck(ContainerInfo containerInfo, Set<ContainerReplica> replicas) {
     if (containerInfo.getState() != QUASI_CLOSED) {
@@ -46,8 +54,11 @@ public class QuasiClosedStuckReplicationCheck  extends AbstractCheck {
     if (!QuasiClosedContainerHandler.isQuasiClosedStuck(containerInfo, replicas)) {
       return false;
     }
-    QuasiClosedStuckReplicaCount replicaCount = new QuasiClosedStuckReplicaCount(replicas, 0);
-    if (replicaCount.availableOrigins() == 1) {
+    long distinctOrigins = replicas.stream()
+        .map(ContainerReplica::getOriginDatanodeId)
+        .distinct()
+        .count();
+    if (distinctOrigins == 1) {
       // This is the 3 copies of a single origin case, so allow it to be handled via the normal under-replicated
       // handler.
       return false;
@@ -70,8 +81,10 @@ public class QuasiClosedStuckReplicationCheck  extends AbstractCheck {
       return true;
     }
 
-    QuasiClosedStuckReplicaCount replicaCount = new QuasiClosedStuckReplicaCount(
-        request.getContainerReplicas(), request.getMaintenanceRedundancy());
+    QuasiClosedStuckReplicaCount replicaCount = new QuasiClosedStuckReplicaCount(request.getContainerReplicas(),
+        request.getMaintenanceRedundancy(),
+        rmConf.getQuasiClosedStuckBestOriginCopies(),
+        rmConf.getQuasiClosedStuckOtherOriginCopies());
 
     if (!replicaCount.hasHealthyReplicas()) {
       // All unhealthy are handled by a different handler
