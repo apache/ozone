@@ -26,6 +26,7 @@ import org.apache.hadoop.hdds.annotation.InterfaceAudience;
 import org.apache.hadoop.hdds.utils.MetadataKeyFilters.KeyPrefixFilter;
 import org.apache.hadoop.hdds.utils.db.RocksDatabase.ColumnFamily;
 import org.apache.hadoop.util.Time;
+import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -222,6 +223,14 @@ class RDBTable implements Table<byte[], byte[]> {
       CodecBuffer prefix, IteratorType type) throws RocksDatabaseException {
     return new RDBStoreCodecBufferIterator(db.newIterator(family, false),
         this, prefix, type);
+  }
+
+  boolean isClosed() {
+    return db.isClosed();
+  }
+
+  UncheckedAutoCloseable acquireIterator() throws RocksDatabaseException {
+    return db.acquire();
   }
 
   @Override

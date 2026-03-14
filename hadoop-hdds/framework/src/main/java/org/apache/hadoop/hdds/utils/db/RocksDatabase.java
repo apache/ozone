@@ -427,7 +427,7 @@ public final class RocksDatabase implements Closeable {
     }
   }
 
-  private UncheckedAutoCloseable acquire() throws RocksDatabaseException {
+  UncheckedAutoCloseable acquire() throws RocksDatabaseException {
     if (isClosed()) {
       throw new RocksDatabaseException("Rocks Database is closed");
     }
