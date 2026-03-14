@@ -182,13 +182,14 @@ public class FilePerBlockStrategy implements ChunkManager {
 
     ChunkUtils.writeData(channel, chunkFile.getName(), data, offset, chunkLength, volume);
 
-    // When overwriting, update the bytes used if the new length is greater than the old length
-    // This is to ensure that the bytes used is updated correctly when overwriting a smaller chunk
-    // with a larger chunk at the end of the block.
+    // When overwriting, if the file extended beyond its previous length,
+    // we need to account for the delta in blockBytes, usedSpace and committedBytes.
     if (overwrite) {
       long fileLengthAfterWrite = offset + chunkLength;
       if (fileLengthAfterWrite > fileLengthBeforeWrite) {
-        containerData.getStatistics().updateWrite(fileLengthAfterWrite - fileLengthBeforeWrite, false);
+        long delta = fileLengthAfterWrite - fileLengthBeforeWrite;
+        containerData.getStatistics().incrementBlockBytes(delta);
+        containerData.incrWriteBytes(delta);
       }
     }
 
