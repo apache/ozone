@@ -1,0 +1,163 @@
+openapi: 3.0.0
+info:
+  title: Apache Ozone Recon API
+  description: REST API for querying Ozone Recon cluster information
+  version: 1.0.0
+
+paths:
+  /api/v1/clusterState:
+    get:
+      summary: Get overall cluster state
+      description: Returns cluster overview including datanodes, containers, pipelines
+      responses:
+        '200':
+          description: Cluster state information
+
+  /api/v1/containers/unhealthy:
+    get:
+      summary: Get unhealthy containers
+      description: Returns containers that are missing, under-replicated, over-replicated, or mis-replicated
+      responses:
+        '200':
+          description: List of unhealthy containers
+
+  /api/v1/containers/missing:
+    get:
+      summary: Get missing containers
+      description: Returns containers that are completely missing from the cluster
+      responses:
+        '200':
+          description: List of missing containers
+
+  /api/v1/keys/open/summary:
+    get:
+      summary: Get open keys summary
+      description: Returns summary of keys that are currently open
+      responses:
+        '200':
+          description: Open keys summary
+
+  /api/v1/keys/listKeys:
+    get:
+      summary: List keys with filters
+      description: Returns keys/files under a startPrefix with filters like replicationType, creationDate, and keySize.
+      parameters:
+        - name: replicationType
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Replication type filter (for example RATIS or EC)
+        - name: creationDate
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Include keys created after this date (format MM-dd-yyyy HH:mm:ss)
+        - name: keySize
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+          description: Include keys with size greater than or equal to this value in bytes
+        - name: startPrefix
+          in: query
+          required: false
+          schema:
+            type: string
+            default: /
+          description: Path prefix to search from (must be bucket level or deeper)
+        - name: prevKey
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Pagination cursor to continue from previous result
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1000
+          description: Maximum number of keys returned
+      responses:
+        '200':
+          description: List keys response
+
+  /api/v1/datanodes:
+    get:
+      summary: List all datanodes
+      description: Returns information about all datanodes in the cluster
+      responses:
+        '200':
+          description: List of datanodes
+
+  /api/v1/pipelines:
+    get:
+      summary: Get pipeline information
+      description: Returns information about all pipelines
+      responses:
+        '200':
+          description: Pipeline information
+
+  /api/v1/namespace/summary:
+    get:
+      summary: Get namespace summary
+      parameters:
+        - name: path
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Path to get summary for (e.g., /vol1/bucket1)
+      description: Returns summary information for a specific path
+      responses:
+        '200':
+          description: Namespace summary
+
+  /api/v1/namespace/usage:
+    get:
+      summary: Get disk usage
+      parameters:
+        - name: path
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Path to get disk usage for
+      description: Returns disk usage for a specific path
+      responses:
+        '200':
+          description: Disk usage information
+
+  /api/v1/volumes:
+    get:
+      summary: List all volumes
+      description: Returns list of all volumes
+      responses:
+        '200':
+          description: List of volumes
+
+  /api/v1/buckets:
+    get:
+      summary: List all buckets
+      parameters:
+        - name: volume
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter buckets by volume
+      description: Returns list of buckets, optionally filtered by volume
+      responses:
+        '200':
+          description: List of buckets
+
+  /api/v1/task/status:
+    get:
+      summary: Get background task status
+      description: Returns status of background tasks
+      responses:
+        '200':
+          description: Task status information
