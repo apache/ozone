@@ -17,6 +17,9 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.util.List;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.SCMRatisResponseProto;
 import org.apache.hadoop.hdds.scm.ha.io.ScmCodecFactory;
 import org.apache.ratis.protocol.Message;
@@ -65,19 +68,38 @@ public final class SCMRatisResponse {
     return exception;
   }
 
-  public static Message encode(final Object result)
-      throws InvalidProtocolBufferException {
+  public static Message encode(final Class<?> returnType,
+      final Type genericReturnType,
+      final Object result) throws InvalidProtocolBufferException {
 
     if (result == null) {
       return Message.EMPTY;
     }
 
-    final Class<?> type = result.getClass();
-    final SCMRatisResponseProto response = SCMRatisResponseProto.newBuilder()
-        .setType(type.getName())
-        .setValue(ScmCodecFactory.getCodec(type).serialize(result))
-        .build();
-    return Message.valueOf(UnsafeByteOperations.unsafeWrap(response.toByteString().asReadOnlyByteBuffer()));
+    final SCMRatisResponseProto.Builder responseBuilder =
+        SCMRatisResponseProto.newBuilder();
+
+    responseBuilder.setType(returnType.getName());
+
+    if (genericReturnType instanceof ParameterizedType) {
+      ParameterizedType pt = (ParameterizedType) genericReturnType;
+      Type rawType = pt.getRawType();
+      Type[] actualTypes = pt.getActualTypeArguments();
+
+      if (rawType instanceof Class<?>
+          && List.class.isAssignableFrom((Class<?>) rawType)
+          && actualTypes.length == 1
+          && actualTypes[0] instanceof Class<?>) {
+        responseBuilder.setGenericType(((Class<?>) actualTypes[0]).getName());
+      }
+    }
+
+    responseBuilder.setValue(
+        ScmCodecFactory.getCodec(genericReturnType).serialize(result));
+
+    final SCMRatisResponseProto response = responseBuilder.build();
+    return Message.valueOf(UnsafeByteOperations.unsafeWrap(
+        response.toByteString().asReadOnlyByteBuffer()));
   }
 
   public static SCMRatisResponse decode(RaftClientReply reply)
@@ -103,13 +125,37 @@ public final class SCMRatisResponse {
     }
 
     try {
-      final Class<?> type = ReflectionUtil.getClass(responseProto.getType());
-      return new SCMRatisResponse(ScmCodecFactory.getCodec(type)
-          .deserialize(type, responseProto.getValue()));
+      final Class<?> clazz = ReflectionUtil.getClass(responseProto.getType());
+
+      Type genericType = clazz;
+      if (responseProto.hasGenericType()) {
+        Class<?> genericClazz =
+            ReflectionUtil.getClass(responseProto.getGenericType());
+        genericType = new ScmParameterizedType(clazz, genericClazz);
+      }
+
+      final Object decoded;
+      if (genericType instanceof Class<?>) {
+        decoded = ScmCodecFactory.getCodec((Class<?>) genericType)
+            .deserialize((Class<?>) genericType, responseProto.getValue());
+      } else if (genericType instanceof ParameterizedType) {
+        ParameterizedType pt = (ParameterizedType) genericType;
+        Type rawType = pt.getRawType();
+        if (!(rawType instanceof Class<?>)) {
+          throw new InvalidProtocolBufferException(
+              "Unsupported raw type: " + rawType);
+        }
+        decoded = ScmCodecFactory.getCodec(genericType)
+            .deserialize((Class<?>) rawType, responseProto.getValue());
+      } else {
+        throw new InvalidProtocolBufferException(
+            "Unsupported generic type: " + genericType);
+      }
+
+      return new SCMRatisResponse(decoded);
     } catch (ClassNotFoundException e) {
       throw new InvalidProtocolBufferException(responseProto.getType() +
           " cannot be decoded!" + e.getMessage());
     }
   }
-
 }

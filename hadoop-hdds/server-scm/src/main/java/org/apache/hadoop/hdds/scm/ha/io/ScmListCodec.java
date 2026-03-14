@@ -21,59 +21,62 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.ListArgument;
-import org.apache.hadoop.hdds.scm.ha.ReflectionUtil;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 
 /**
  * {@link ScmCodec} for {@link List} objects.
  */
-public class ScmListCodec implements ScmCodec<Object> {
+public class ScmListCodec<T> implements ScmCodec<List<T>> {
+
+  private final Class<T> elementType;
+  private final ScmCodec<T> elementCodec;
+
+  public ScmListCodec(Class<T> elementType, ScmCodec<T> elementCodec) {
+    this.elementType = elementType;
+    this.elementCodec = elementCodec;
+  }
 
   @Override
-  public ByteString serialize(Object object)
+  public ByteString serialize(List<T> object)
       throws InvalidProtocolBufferException {
     final ListArgument.Builder listArgs = ListArgument.newBuilder();
-    final List<?> values = (List<?>) object;
-    if (!values.isEmpty()) {
-      Class<?> type = values.get(0).getClass();
-      listArgs.setType(type.getName());
-      for (Object value : values) {
-        listArgs.addValue(ScmCodecFactory.getCodec(type).serialize(value));
-      }
-    } else {
-      listArgs.setType(Object.class.getName());
+
+    listArgs.setType(elementType.getName());
+    for (T value : object) {
+      listArgs.addValue(elementCodec.serialize(value));
     }
     return listArgs.build().toByteString();
   }
 
   @Override
-  public Object deserialize(Class<?> type, ByteString value)
+  public List<T> deserialize(Class<?> type, ByteString value)
       throws InvalidProtocolBufferException {
     try {
-      // If argument type is the generic interface, then determine a
-      // concrete implementation.
       Class<?> concreteType = (type == List.class) ? ArrayList.class : type;
 
-      List<Object> result = (List<Object>) concreteType.newInstance();
-      final ListArgument listArgs = (ListArgument) ReflectionUtil
-          .getMethod(ListArgument.class, "parseFrom", byte[].class)
-          .invoke(null, (Object) value.toByteArray());
+      @SuppressWarnings("unchecked")
+      List<T> result =
+          (List<T>) concreteType.getDeclaredConstructor().newInstance();
 
-      // proto2 required-equivalent check
+      final ListArgument listArgs = ListArgument.parseFrom(value.toByteArray());
+
       if (!listArgs.hasType()) {
         throw new InvalidProtocolBufferException("Missing ListArgument.type");
       }
 
-      final Class<?> dataType = ReflectionUtil.getClass(listArgs.getType());
+      if (!listArgs.getType().equals(elementType.getName())) {
+        throw new InvalidProtocolBufferException(
+            "List element type mismatch, expected " + elementType.getName()
+                + " but got " + listArgs.getType());
+      }
+
       for (ByteString element : listArgs.getValueList()) {
-        result.add(ScmCodecFactory.getCodec(dataType)
-            .deserialize(dataType, element));
+        result.add(elementCodec.deserialize(elementType, element));
       }
       return result;
     } catch (InstantiationException | NoSuchMethodException |
-        IllegalAccessException | InvocationTargetException |
-        ClassNotFoundException ex) {
+             IllegalAccessException | InvocationTargetException ex) {
       throw new InvalidProtocolBufferException(
           "Message cannot be decoded: " + ex.getMessage());
     }

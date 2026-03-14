@@ -18,6 +18,8 @@
 package org.apache.hadoop.hdds.scm.ha;
 
 import com.google.common.base.Preconditions;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.Method;
@@ -41,23 +43,28 @@ public final class SCMRatisRequest {
   private final String operation;
   private final Object[] arguments;
   private final Class<?>[] parameterTypes;
+  private final Type[] genericParameterTypes;
   private static final Logger LOG = LoggerFactory
       .getLogger(SCMRatisRequest.class);
 
   private SCMRatisRequest(final RequestType type, final String operation,
-      final Class<?>[] parameterTypes, final Object... arguments) {
+      final Class<?>[] parameterTypes, final Type[] genericParameterTypes, final Object... arguments) {
     this.type = type;
     this.operation = operation;
     this.parameterTypes = parameterTypes;
+    this.genericParameterTypes = genericParameterTypes;
     this.arguments = arguments;
   }
 
   public static SCMRatisRequest of(final RequestType type,
       final String operation,
       final Class<?>[] parameterTypes,
+      final Type[] genericParameterTypes,
       final Object... arguments) {
     Preconditions.checkState(parameterTypes.length == arguments.length);
-    return new SCMRatisRequest(type, operation, parameterTypes, arguments);
+    Preconditions.checkState(genericParameterTypes.length == arguments.length);
+    return new SCMRatisRequest(type, operation, parameterTypes,
+        genericParameterTypes, arguments);
   }
 
   /**
@@ -101,13 +108,28 @@ public final class SCMRatisRequest {
     int paramCounter = 0;
     for (Object argument : arguments) {
       final MethodArgument.Builder argBuilder = MethodArgument.newBuilder();
+      final Class<?> parameterType = parameterTypes[paramCounter];
+      final Type genericParameterType = genericParameterTypes[paramCounter];
       // Set actual method parameter type, not actual argument type.
       // This is done to avoid MethodNotFoundException in case if argument is
       // subclass type, where as method is defined with super class type.
-      argBuilder.setType(parameterTypes[paramCounter++].getName());
-      argBuilder.setValue(ScmCodecFactory.getCodec(argument.getClass())
+      argBuilder.setType(parameterType.getName());
+      if (genericParameterType instanceof ParameterizedType) {
+        ParameterizedType pt = (ParameterizedType) genericParameterType;
+        Type rawType = pt.getRawType();
+        Type[] actualTypes = pt.getActualTypeArguments();
+
+        if (rawType instanceof Class<?>
+            && List.class.isAssignableFrom((Class<?>) rawType)
+            && actualTypes.length == 1
+            && actualTypes[0] instanceof Class<?>) {
+          argBuilder.setGenericType(((Class<?>) actualTypes[0]).getName());
+        }
+      }
+      argBuilder.setValue(ScmCodecFactory.getCodec(genericParameterType)
           .serialize(argument));
       args.add(argBuilder.build());
+      paramCounter++;
     }
     methodBuilder.addAllArgs(args);
     requestProtoBuilder.setMethod(methodBuilder.build());
@@ -140,6 +162,8 @@ public final class SCMRatisRequest {
 
     List<Object> args = new ArrayList<>();
     Class<?>[] parameterTypes = new Class[method.getArgsCount()];
+    Type[] genericParameterTypes = new Type[method.getArgsCount()];
+
     int paramCounter = 0;
     for (MethodArgument argument : method.getArgsList()) {
       // proto2 required-equivalent checks
@@ -151,16 +175,38 @@ public final class SCMRatisRequest {
       }
       try {
         final Class<?> clazz = ReflectionUtil.getClass(argument.getType());
-        parameterTypes[paramCounter++] = clazz;
-        args.add(ScmCodecFactory.getCodec(clazz)
-            .deserialize(clazz, argument.getValue()));
+        parameterTypes[paramCounter] = clazz;
+
+        Type genericType = clazz;
+        if (argument.hasGenericType()) {
+          Class<?> genericClazz = ReflectionUtil.getClass(argument.getGenericType());
+          genericType = new ScmParameterizedType(clazz, genericClazz);
+        }
+        genericParameterTypes[paramCounter] = genericType;
+        if (genericType instanceof Class<?>) {
+          args.add(ScmCodecFactory.getCodec((Class<?>) genericType)
+              .deserialize((Class<?>) genericType, argument.getValue()));
+        } else if (genericType instanceof ParameterizedType) {
+          ParameterizedType pt = (ParameterizedType) genericType;
+          Type rawType = pt.getRawType();
+          if (!(rawType instanceof Class<?>)) {
+            throw new InvalidProtocolBufferException(
+                "Unsupported raw type: " + rawType);
+          }
+          args.add(ScmCodecFactory.getCodec(genericType)
+              .deserialize((Class<?>) rawType, argument.getValue()));
+        } else {
+          throw new InvalidProtocolBufferException(
+              "Unsupported generic type: " + genericType);
+        }
+        paramCounter++;
       } catch (ClassNotFoundException ex) {
         throw new InvalidProtocolBufferException(argument.getType() +
             " cannot be decoded!" + ex.getMessage());
       }
     }
     return new SCMRatisRequest(requestProto.getType(),
-        method.getName(), parameterTypes, args.toArray());
+        method.getName(), parameterTypes, genericParameterTypes, args.toArray());
   }
 
   /**
@@ -180,5 +226,4 @@ public final class SCMRatisRequest {
     }
     return builder.toString();
   }
-
 }

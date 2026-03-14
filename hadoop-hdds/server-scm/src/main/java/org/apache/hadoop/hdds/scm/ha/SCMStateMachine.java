@@ -186,10 +186,15 @@ public class SCMStateMachine extends BaseStateMachine {
             request.getType());
       }
 
-      final Object result = handler.getClass().getMethod(
-          request.getOperation(), request.getParameterTypes())
-          .invoke(handler, request.getArguments());
-      return SCMRatisResponse.encode(result);
+      final java.lang.reflect.Method method = handler.getClass().getMethod(
+          request.getOperation(), request.getParameterTypes());
+
+      final Object result = method.invoke(handler, request.getArguments());
+
+      return SCMRatisResponse.encode(
+          method.getReturnType(),
+          method.getGenericReturnType(),
+          result);
     } catch (NoSuchMethodException | SecurityException ex) {
       throw new InvalidProtocolBufferException(ex.getMessage());
     } catch (InvocationTargetException e) {

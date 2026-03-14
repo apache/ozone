@@ -22,11 +22,14 @@ import static org.apache.ratis.util.Preconditions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.lang.reflect.Method;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
 import org.apache.hadoop.hdds.scm.ha.io.ScmListCodec;
+import org.apache.hadoop.hdds.scm.ha.io.ScmStringCodec;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
@@ -45,7 +48,7 @@ public class TestSCMRatisRequest {
     Object[] args = new Object[] {pipelineID.getProtobuf()};
     String operation = "test";
     SCMRatisRequest request = SCMRatisRequest.of(PIPELINE, operation,
-        new Class[]{pipelineID.getProtobuf().getClass()}, args);
+        new Class[]{pipelineID.getProtobuf().getClass()}, new Type[]{pipelineID.getProtobuf().getClass()}, args);
     assertEquals(operation, SCMRatisRequest.decode(request.encode()).getOperation());
     assertEquals(args[0], SCMRatisRequest.decode(request.encode()).getArguments()[0]);
   }
@@ -56,7 +59,7 @@ public class TestSCMRatisRequest {
     // Non proto args
     Object[] args = new Object[] {pipelineID};
     SCMRatisRequest request = SCMRatisRequest.of(PIPELINE, "test",
-        new Class[]{pipelineID.getClass()}, args);
+        new Class[]{pipelineID.getClass()}, new Type[]{pipelineID.getClass()}, args);
     // Should throw exception there.
     assertThrows(InvalidProtocolBufferException.class,
         request::encode);
@@ -79,8 +82,10 @@ public class TestSCMRatisRequest {
     pids.add(PipelineID.randomId().getProtobuf());
     Object[] args = new Object[] {pids};
     String operation = "test";
+    Method method = getClass().getDeclaredMethod(
+        "pipelineIdListMethod", List.class);
     SCMRatisRequest request = SCMRatisRequest.of(PIPELINE, operation,
-        new Class[]{pids.getClass()}, args);
+        method.getParameterTypes(), method.getGenericParameterTypes(), args);
     assertEquals(operation, SCMRatisRequest.decode(request.encode()).getOperation());
     assertEquals(args[0], SCMRatisRequest.decode(request.encode()).getArguments()[0]);
   }
@@ -90,9 +95,13 @@ public class TestSCMRatisRequest {
     final Long value = 10L;
     String operation = "test";
     SCMRatisRequest request = SCMRatisRequest.of(PIPELINE, operation,
-        new Class[]{value.getClass()}, value);
+        new Class[]{value.getClass()}, new Type[]{value.getClass()}, value);
     assertEquals(operation, SCMRatisRequest.decode(request.encode()).getOperation());
     assertEquals(value, SCMRatisRequest.decode(request.encode()).getArguments()[0]);
+  }
+
+  @SuppressWarnings("unused")
+  private void pipelineIdListMethod(List<HddsProtos.PipelineID> pids) {
   }
 
   @Test
@@ -216,7 +225,8 @@ public class TestSCMRatisRequest {
             .addValue(ByteString.copyFromUtf8("x"))
             .build();
 
-    ScmListCodec codec = new ScmListCodec();
+    ScmListCodec codec = new ScmListCodec(
+        String.class, new ScmStringCodec());
 
     InvalidProtocolBufferException ex = assertThrows(
         InvalidProtocolBufferException.class,
