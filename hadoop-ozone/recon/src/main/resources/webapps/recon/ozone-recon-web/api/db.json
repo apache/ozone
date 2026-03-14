@@ -6874,7 +6874,7 @@
       "totalOzoneCapacity": 879519597390,
       "totalOzoneFreeSpace": 539776978944,
       "totalOzoneUsedSpace": 30679040,
-      "totalOzonePreAllocatedContainerSpace":1022024
+      "totalOzoneCommittedSpace":1022024
     },
     "globalNamespace": {
         "totalUsedSpace": 12349932,
@@ -6886,7 +6886,7 @@
           "openKeyAndFileBytes": 19255266,
           "multipartOpenKeyBytes": 0
         },
-        "committedKeyBytes": 1249923
+        "finalizedKeyBytes": 1249923
     },
     "dataNodeUsage": [
         {
