@@ -18,12 +18,17 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import java.io.IOException;
+import java.util.Locale;
 import org.rocksdb.RocksDBException;
 
 /**
  * Exceptions converted from {@link RocksDBException}.
  */
 public class RocksDatabaseException extends IOException {
+  private static final String NO_SPACE = "nospace";
+  private static final String NO_SPACE_LEFT_ON_DEVICE =
+      "no space left on device";
+
   private static String getStatus(RocksDBException e) {
     return e.getStatus() == null ? "NULL_STATUS" : e.getStatus().getCodeString();
   }
@@ -43,5 +48,36 @@ public class RocksDatabaseException extends IOException {
 
   public RocksDatabaseException() {
     super();
+  }
+
+  private static boolean containsNoSpace(String text) {
+    if (text == null) {
+      return false;
+    }
+    String lowerCase = text.toLowerCase(Locale.ROOT);
+    return lowerCase.contains(NO_SPACE_LEFT_ON_DEVICE)
+        || lowerCase.contains(NO_SPACE);
+  }
+
+  /**
+   * Returns true if the exception chain indicates a no-space RocksDB failure.
+   */
+  public static boolean isNoSpaceError(Throwable throwable) {
+    Throwable current = throwable;
+    while (current != null) {
+      if (containsNoSpace(current.getMessage())) {
+        return true;
+      }
+      if (current instanceof RocksDBException) {
+        RocksDBException rocksException = (RocksDBException) current;
+        if (rocksException.getStatus() != null
+            && (containsNoSpace(rocksException.getStatus().getCodeString())
+            || containsNoSpace(rocksException.getStatus().getState()))) {
+          return true;
+        }
+      }
+      current = current.getCause();
+    }
+    return false;
   }
 }
