@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
-import com.google.common.primitives.Ints;
+import java.nio.ByteBuffer;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 
@@ -28,11 +28,11 @@ public class ScmIntegerCodec implements ScmCodec<Integer> {
   @Override
   public ByteString serialize(Integer object) {
     // toByteArray returns a new array
-    return UnsafeByteOperations.unsafeWrap(Ints.toByteArray(object));
+    return UnsafeByteOperations.unsafeWrap(ByteBuffer.allocate(Integer.BYTES).putInt(object).array());
   }
 
   @Override
   public Integer deserialize(Class<?> type, ByteString value) {
-    return Ints.fromByteArray(value.toByteArray());
+    return ByteBuffer.wrap(value.toByteArray()).getInt();
   }
 }

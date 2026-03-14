@@ -18,7 +18,6 @@
 package org.apache.hadoop.ozone.common;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.primitives.Ints;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -70,7 +69,7 @@ public class Checksum {
   }
 
   public static ByteString int2ByteString(int n) {
-    return UnsafeByteOperations.unsafeWrap(Ints.toByteArray(n));
+    return UnsafeByteOperations.unsafeWrap(ByteBuffer.allocate(Integer.BYTES).putInt(n).array());
   }
 
   private static Function<ByteBuffer, ByteString> newChecksumByteBufferFunction(
