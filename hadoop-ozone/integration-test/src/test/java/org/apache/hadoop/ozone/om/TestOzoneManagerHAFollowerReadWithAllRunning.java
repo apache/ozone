@@ -487,7 +487,9 @@ public class TestOzoneManagerHAFollowerReadWithAllRunning extends TestOzoneManag
       // This will trigger getServiceId so the client should point to the leader
       leaderOnlyClient = OzoneClientFactory.getRpcClient(getOmServiceId(), clientConf);
       ObjectStore leaderOnlyObjectStore = leaderOnlyClient.getObjectStore();
-      assertNull(OmTestUtil.getFollowerReadFailoverProxyProvider(leaderOnlyObjectStore));
+      // FollowerReadProxyProvider is the unified proxy provider regardless of whether follower
+      // read is enabled or not
+      assertNotNull(OmTestUtil.getFollowerReadFailoverProxyProvider(leaderOnlyObjectStore));
       HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> leaderProxyProvider =
           OmTestUtil.getFailoverProxyProvider(leaderOnlyObjectStore);
 
