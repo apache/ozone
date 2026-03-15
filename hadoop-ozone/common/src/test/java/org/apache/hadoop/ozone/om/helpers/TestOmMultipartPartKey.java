@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.stream.IntStream;
 import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.CodecBuffer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -71,6 +72,31 @@ public class TestOmMultipartPartKey {
     assertEquals("upload-abc", decoded.toString());
   }
 
+  @Test
+  public void testCodecBufferRoundTripFullKey() throws Exception {
+    OmMultipartPartKey key = OmMultipartPartKey.of("upload-buffer", 1024);
+
+    assertTrue(codec.supportCodecBuffer());
+    try (CodecBuffer buffer = codec.toHeapCodecBuffer(key)) {
+      OmMultipartPartKey decoded = codec.fromCodecBuffer(buffer);
+      assertEquals(key, decoded);
+      assertTrue(decoded.hasPartNumber());
+      assertEquals(1024, decoded.getPartNumber().intValue());
+    }
+  }
+
+  @Test
+  public void testCodecBufferRoundTripPrefixKey() throws Exception {
+    OmMultipartPartKey key = OmMultipartPartKey.prefix("upload-prefix-buffer");
+
+    assertTrue(codec.supportCodecBuffer());
+    try (CodecBuffer buffer = codec.toHeapCodecBuffer(key)) {
+      OmMultipartPartKey decoded = codec.fromCodecBuffer(buffer);
+      assertEquals(key, decoded);
+      assertFalse(decoded.hasPartNumber());
+    }
+  }
+
   // Test to validate that the full key is decoded correctly
   // when the part number has a low byte same as the separator byte i.e. 2F.
   @ParameterizedTest
@@ -97,5 +123,48 @@ public class TestOmMultipartPartKey {
   public void testDecodeRejectsEmptyKey() {
     assertThrows(IllegalArgumentException.class,
         () -> codec.fromPersistedFormat(new byte[0]));
+  }
+
+  @Test
+  public void testCodecBufferDecodeRejectsInvalidKeyWithoutSeparator() {
+    try (CodecBuffer buffer = CodecBuffer.wrap("invalid".getBytes(UTF_8))) {
+      assertThrows(IllegalArgumentException.class,
+          () -> codec.fromCodecBuffer(buffer));
+    }
+  }
+
+  @Test
+  public void testCodecBufferDecodeRejectsEmptyKey() {
+    try (CodecBuffer buffer = CodecBuffer.wrap(new byte[0])) {
+      assertThrows(IllegalArgumentException.class,
+          () -> codec.fromCodecBuffer(buffer));
+    }
+  }
+
+  @Test
+  public void testDecodeRejectsMalformedKeyWithMiddleSeparatorOnly() {
+    byte[] malformed = "up/xx".getBytes(UTF_8);
+    assertThrows(IllegalArgumentException.class,
+        () -> codec.fromPersistedFormat(malformed));
+  }
+
+  @Test
+  public void testFactoryRejectsNullPartNumber() {
+    assertThrows(NullPointerException.class,
+        () -> OmMultipartPartKey.of("upload-id", null));
+  }
+
+  @Test
+  public void testFactoryRejectsNullUploadId() {
+    assertThrows(NullPointerException.class,
+        () -> OmMultipartPartKey.of(null, 1));
+    assertThrows(NullPointerException.class,
+        () -> OmMultipartPartKey.prefix(null));
+  }
+
+  @Test
+  public void testDecodeRejectsNullRawData() {
+    assertThrows(NullPointerException.class,
+        () -> codec.fromPersistedFormat(null));
   }
 }

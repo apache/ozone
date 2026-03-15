@@ -478,7 +478,7 @@ public interface OMMetadataManager extends DBStoreHAManager, AutoCloseable {
    * the information about the parts of a Multipart Upload Key.
    * @return Table
    */
-  Table<OmMultipartPartKey, OmMultipartPartInfo> getMultipartPartTable();
+  Table<OmMultipartPartKey, OmMultipartPartInfo> getMultipartPartsTable();
 
   @Override
   Table<String, TransactionInfo> getTransactionInfoTable();

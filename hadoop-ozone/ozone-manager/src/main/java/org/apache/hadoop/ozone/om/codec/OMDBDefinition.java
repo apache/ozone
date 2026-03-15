@@ -232,7 +232,7 @@ public final class OMDBDefinition extends DBDefinition.WithMap {
           OmMultipartKeyInfo.getCodec());
 
   public static final String MULTIPART_PARTS_TABLE = "multipartPartsTable";
-  /** multipartPartsTable: /uploadId/partNumber :- PartKeyInfo. */
+  /** multipartPartsTable: uploadId/partNumber :- PartKeyInfo. */
   public static final DBColumnFamilyDefinition<OmMultipartPartKey, OmMultipartPartInfo> MULTIPART_PARTS_TABLE_DEF
       = new DBColumnFamilyDefinition<>(MULTIPART_PARTS_TABLE,
       OmMultipartPartKey.getCodec(),

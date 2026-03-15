@@ -162,7 +162,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
   private Table<String, OmKeyInfo> openKeyTable;
   private Table<String, OmMultipartKeyInfo> multipartInfoTable;
-  private Table<OmMultipartPartKey, OmMultipartPartInfo> multipartPartTable;
+  private Table<OmMultipartPartKey, OmMultipartPartInfo> multipartPartsTable;
   private Table<String, RepeatedOmKeyInfo> deletedTable;
 
   private Table<String, OmDirectoryInfo> dirTable;
@@ -390,8 +390,8 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
   }
 
   @Override
-  public Table<OmMultipartPartKey, OmMultipartPartInfo> getMultipartPartTable() {
-    return multipartPartTable;
+  public Table<OmMultipartPartKey, OmMultipartPartInfo> getMultipartPartsTable() {
+    return multipartPartsTable;
   }
 
   /**
@@ -472,7 +472,7 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
 
     openKeyTable = initializer.get(OMDBDefinition.OPEN_KEY_TABLE_DEF);
     multipartInfoTable = initializer.get(OMDBDefinition.MULTIPART_INFO_TABLE_DEF);
-    multipartPartTable = initializer.get(OMDBDefinition.MULTIPART_PARTS_TABLE_DEF);
+    multipartPartsTable = initializer.get(OMDBDefinition.MULTIPART_PARTS_TABLE_DEF);
     deletedTable = initializer.get(OMDBDefinition.DELETED_TABLE_DEF);
 
     dirTable = initializer.get(OMDBDefinition.DIRECTORY_TABLE_DEF);
@@ -1529,24 +1529,26 @@ public class OmMetadataManagerImpl implements OMMetadataManager,
           expiredMPUs.get(mapKey)
               .addMultipartUploads(builder.setName(dbMultipartInfoKey)
                   .build());
-          if (omMultipartKeyInfo.getSchemaVersion() == 0) {
-            numParts += omMultipartKeyInfo.getPartKeyInfoMap().size();
-          } else {
-            OmMultipartPartKey prefix =
-                OmMultipartPartKey.prefix(expiredMultipartUpload.getUploadId());
-            try (TableIterator<OmMultipartPartKey, ? extends KeyValue<OmMultipartPartKey, OmMultipartPartInfo>>
-                     partIterator = getMultipartPartTable().iterator(prefix)) {
-              while (partIterator.hasNext()) {
-                KeyValue<OmMultipartPartKey, OmMultipartPartInfo> partEntry =
-                    partIterator.next();
-                if (!expiredMultipartUpload.getUploadId().equals(
-                    partEntry.getKey().getUploadId())) {
-                  break;
-                }
-                numParts++;
-              }
-            }
-          }
+          numParts += omMultipartKeyInfo.getPartKeyInfoMap().size();
+          // TODO: Uncomment this when the complete flow for MPU split table is done
+          // if (omMultipartKeyInfo.getSchemaVersion() == 0) {
+          //   numParts += omMultipartKeyInfo.getPartKeyInfoMap().size();
+          // } else {
+          //   OmMultipartPartKey prefix =
+          //       OmMultipartPartKey.prefix(expiredMultipartUpload.getUploadId());
+          //   try (TableIterator<OmMultipartPartKey, ? extends KeyValue<OmMultipartPartKey, OmMultipartPartInfo>>
+          //            partIterator = getMultipartPartsTable().iterator(prefix)) {
+          //     while (partIterator.hasNext()) {
+          //       KeyValue<OmMultipartPartKey, OmMultipartPartInfo> partEntry =
+          //           partIterator.next();
+          //       if (!expiredMultipartUpload.getUploadId().equals(
+          //           partEntry.getKey().getUploadId())) {
+          //         break;
+          //       }
+          //       numParts++;
+          //     }
+          //   }
+          // }
         }
 
       }
