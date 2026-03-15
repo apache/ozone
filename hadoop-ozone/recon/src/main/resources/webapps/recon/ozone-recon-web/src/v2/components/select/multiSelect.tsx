@@ -40,7 +40,9 @@ interface MultiSelectProps extends ReactSelectProps<Option, true> {
   options: Option[];
   selected: Option[];
   placeholder: string;
-  fixedColumn: string;
+  // Accept a single key or an array of keys for columns that are always
+  // selected, hidden from the dropdown, and preserved through Unselect All.
+  fixedColumn: string | string[];
   columnLength: number;
   style?: StylesConfig<Option, true>;
   showSearch?: boolean;
@@ -96,8 +98,13 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
   // Ref to the outer container div — used to detect "focus left the widget".
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const fixedOption = fixedColumn ? options.find((opt) => opt.value === fixedColumn) : undefined;
-  const selectableOptions = fixedColumn ? options.filter((opt) => opt.value !== fixedColumn) : options;
+  // Normalise fixedColumn to an array of keys for uniform handling.
+  const fixedKeys: string[] = Array.isArray(fixedColumn)
+    ? fixedColumn.filter(Boolean)
+    : fixedColumn ? [fixedColumn] : [];
+
+  const fixedOptions = options.filter((opt) => fixedKeys.includes(opt.value));
+  const selectableOptions = options.filter((opt) => !fixedKeys.includes(opt.value));
 
   // Always-current values for use inside stable useMemo components.
   const stateRef = useRef({
@@ -108,7 +115,8 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
     selected,
     options,
     selectableOptions,
-    fixedOption,
+    fixedOptions,
+    fixedKeys,
     onChange,
     setIsMenuOpen,
     containerRef
@@ -121,7 +129,8 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
     selected,
     options,
     selectableOptions,
-    fixedOption,
+    fixedOptions,
+    fixedKeys,
     onChange,
     setIsMenuOpen,
     containerRef
@@ -146,7 +155,7 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
         )}
         {isDisabled
           ? placeholder
-          : `${placeholder}: ${selected.filter((opt) => opt.value !== fixedColumn).length} selected`
+          : `${placeholder}: ${selected.filter((opt) => !fixedKeys.includes(opt.value)).length} selected`
         }
       </components.ValueContainer>
     );
@@ -176,7 +185,7 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
         showSelectAll,
         selected,
         selectableOptions,
-        fixedOption,
+        fixedOptions,
         options,
         onChange
       } = stateRef.current;
@@ -185,11 +194,11 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
         selectableOptions.every((opt: Option) => selected.some((s: Option) => s.value === opt.value));
 
       const handleSelectAll = () => {
-        onChange(fixedOption ? [fixedOption, ...selectableOptions] : selectableOptions);
+        onChange([...fixedOptions, ...selectableOptions]);
       };
 
       const handleUnselectAll = () => {
-        onChange(fixedOption ? [fixedOption] : ([] as Option[]));
+        onChange(fixedOptions as Option[]);
       };
 
       return (
@@ -314,11 +323,11 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
       }}
       menuPortalTarget={document.body}
       placeholder={placeholder}
-      value={selected.filter((opt) => opt.value !== fixedColumn)}
+      value={selected.filter((opt) => !fixedKeys.includes(opt.value))}
       isDisabled={isDisabled}
       onChange={(selectedValue: ValueType<Option, true>) => {
         const selectedOpts = (selectedValue as Option[]) ?? [];
-        const withFixed = fixedOption ? [fixedOption, ...selectedOpts] : selectedOpts;
+        const withFixed = [...fixedOptions, ...selectedOpts];
         if (selectedOpts.length === selectableOptions.length) return onChange!(options);
         return onChange!(withFixed);
       }}

@@ -272,7 +272,7 @@ const Buckets: React.FC<{}> = () => {
                 placeholder='Columns'
                 onChange={handleColumnChange}
                 onTagClose={() => { }}
-                fixedColumn='name'
+                fixedColumn={['name', 'volumeName']}
                 columnLength={COLUMNS.length}
                 showSearch={true}
                 showSelectAll={true} />
