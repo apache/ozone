@@ -624,8 +624,11 @@ public final class RocksDatabase implements Closeable {
   Supplier<Integer> keyMayExist(ColumnFamily family,
       ByteBuffer key, ByteBuffer out) throws RocksDatabaseException {
     try (UncheckedAutoCloseable ignored = acquire()) {
+      // keyMayExist may advance the input ByteBuffer position in native code.
+      // Always pass a duplicate so callers can safely reuse the original key
+      // buffer for a follow-up point-get.
       final KeyMayExist result = db.get().keyMayExist(
-          family.getHandle(), key, out);
+          family.getHandle(), key.duplicate(), out);
       switch (result.exists) {
       case kNotExist: return null;
       case kExistsWithValue: return () -> result.valueLength;
@@ -879,6 +882,12 @@ public final class RocksDatabase implements Closeable {
         boolean isKeyWithPrefixPresent = RocksDiffUtils.isKeyWithPrefixPresent(
             prefixForColumnFamily, firstDbKey, lastDbKey);
         if (!isKeyWithPrefixPresent) {
+          ColumnFamilyHandle handle = getColumnFamilyHandle(sstFileColumnFamily);
+          if (handle == null) {
+            LOG.warn("Skipping sst file deletion for {}: no handle found for column family {}",
+                liveFileMetaData.fileName(), sstFileColumnFamily);
+            continue;
+          }
           LOG.info("Deleting sst file: {} with start key: {} and end key: {} "
                   + "corresponding to column family {} from db: {}. "
                   + "Prefix for the column family: {}.",
@@ -887,7 +896,7 @@ public final class RocksDatabase implements Closeable {
               StringUtils.bytes2String(liveFileMetaData.columnFamilyName()),
               db.get().getName(),
               prefixForColumnFamily);
-          db.deleteFile(liveFileMetaData);
+          db.deleteFile(handle, liveFileMetaData);
         }
       }
     }

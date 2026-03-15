@@ -204,7 +204,9 @@
     <reflections.version>0.10.2</reflections.version>
     <reload4j.version>1.2.26</reload4j.version>
     <restrict-imports.enforcer.version>3.0.0</restrict-imports.enforcer.version>
-    <rocksdb.version>7.7.3</rocksdb.version>
+    <rocksdb.source.version>10.10.1</rocksdb.source.version>
+    <rocksdb.version>10.10.1-SNAPSHOT</rocksdb.version>
+    <rocksdbjni.groupId>io.github.smengcl</rocksdbjni.groupId>
     <servlet-api.version>3.1.0</servlet-api.version>
     <shell-executable>bash</shell-executable>
     <slf4j.version>2.0.17</slf4j.version>
@@ -335,6 +337,11 @@
         <version>${aws-java-sdk2.version}</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>${rocksdbjni.groupId}</groupId>
+        <artifactId>rocksdbjni</artifactId>
+        <version>${rocksdb.version}</version>
       </dependency>
 
       <dependency>
@@ -1554,11 +1561,6 @@
         </exclusions>
       </dependency>
       <dependency>
-        <groupId>org.rocksdb</groupId>
-        <artifactId>rocksdbjni</artifactId>
-        <version>${rocksdb.version}</version>
-      </dependency>
-      <dependency>
         <groupId>org.springframework</groupId>
         <artifactId>spring-core</artifactId>
         <version>${spring.version}</version>
@@ -2161,7 +2163,7 @@
                 <ignoredNonTestScopedDependency>org.apache.ozone:hdds-client:jar</ignoredNonTestScopedDependency>
                 <ignoredNonTestScopedDependency>org.apache.ozone:ozone-interface-client:jar</ignoredNonTestScopedDependency>
                 <ignoredNonTestScopedDependency>org.glassfish.jersey.core:jersey-common:jar</ignoredNonTestScopedDependency>
-                <ignoredNonTestScopedDependency>org.rocksdb:rocksdbjni:jar</ignoredNonTestScopedDependency>
+                <ignoredNonTestScopedDependency>io.github.smengcl:rocksdbjni:jar</ignoredNonTestScopedDependency>
                 <ignoredNonTestScopedDependency>org.springframework:spring-core:jar</ignoredNonTestScopedDependency>
               </ignoredNonTestScopedDependencies>
             </configuration>
@@ -2442,6 +2444,17 @@
       </snapshots>
       <id>apache.snapshots.https</id>
       <url>https://repository.apache.org/content/repositories/snapshots</url>
+    </repository>
+    <repository>
+      <releases>
+        <enabled>false</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+        <updatePolicy>always</updatePolicy>
+      </snapshots>
+      <id>central.sonatype.snapshots</id>
+      <url>https://central.sonatype.com/repository/maven-snapshots/</url>
     </repository>
   </repositories>
 

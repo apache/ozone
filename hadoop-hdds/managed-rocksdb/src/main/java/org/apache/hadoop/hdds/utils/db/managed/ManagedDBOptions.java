@@ -34,7 +34,6 @@ public class ManagedDBOptions extends DBOptions {
   private final UncheckedAutoCloseable leakTracker = track(this);
   private final AtomicReference<Logger> loggerRef = new AtomicReference<>();
 
-  @Override
   public DBOptions setLogger(Logger logger) {
     IOUtils.close(LOG, loggerRef.getAndSet(logger));
     return super.setLogger(logger);
