@@ -132,16 +132,25 @@ execute_robot_test ${OM} -v "PREFIX:${prefix}" debug/ozone-debug-tests-ec3-2.rob
 
 echo "Overwriting container.db with the backup db"
 echo "Restoring backup at ${target_container_db} on ${container}"
-docker exec "${container}" rm -rf "${target_container_db}" \
-  && docker cp "${backup_container_db}" "${container}:${target_container_db}" \
-  && docker exec "${container}" sudo chown -R hadoop:hadoop "${target_container_db}" \
-  || exit 1
 echo "Removing dn.ratis state for pipeline ${pipeline_id} on ${container}"
-docker exec "${container}" rm -rf "/data/metadata/dn.ratis/${pipeline_id}" || exit 1
-
 docker stop "${container}"
 
 wait_for_datanode "${container}" STALE 60
+
+container_image="$(docker inspect -f '{{.Config.Image}}' "${container}")"
+docker run --rm --volumes-from "${container}" \
+  -v "${local_db_backup_path}:${local_db_backup_path}:ro" \
+  --entrypoint bash "${container_image}" -c '
+    set -euo pipefail
+    target_container_db="$1"
+    pipeline_id="$2"
+    backup_container_db="$3"
+
+    rm -rf "${target_container_db}" "/data/metadata/dn.ratis/${pipeline_id}"
+    mkdir -p "$(dirname "${target_container_db}")"
+    cp -a "${backup_container_db}" "${target_container_db}"
+    chown -R hadoop:hadoop "${target_container_db}"
+  ' _ "${target_container_db}" "${pipeline_id}" "${backup_container_db}" || exit 1
 
 docker start "${container}"
 
