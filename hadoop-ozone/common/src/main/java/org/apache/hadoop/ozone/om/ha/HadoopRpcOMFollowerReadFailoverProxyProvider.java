@@ -99,13 +99,14 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
   public HadoopRpcOMFollowerReadFailoverProxyProvider(
       HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> leaderProxy
   ) {
-    this(leaderProxy, ReadConsistency.LINEARIZABLE_ALLOW_FOLLOWER, ReadConsistency.DEFAULT);
+    this(leaderProxy, ReadConsistency.LINEARIZABLE_ALLOW_FOLLOWER, ReadConsistency.DEFAULT, true);
   }
 
   public HadoopRpcOMFollowerReadFailoverProxyProvider(
       HadoopRpcOMFailoverProxyProvider<OzoneManagerProtocolPB> leaderProxy,
       ReadConsistency followerReadConsistencyType,
-      ReadConsistency leaderReadConsistencyType) {
+      ReadConsistency leaderReadConsistencyType,
+      boolean useFollowerRead) {
     Preconditions.assertTrue(followerReadConsistencyType.allowFollowerRead(),
         "Invalid follower read consistency " + followerReadConsistencyType);
     Preconditions.assertTrue(!leaderReadConsistencyType.allowFollowerRead(),
@@ -120,7 +121,7 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
         FollowerReadInvocationHandler.class.getClassLoader(),
         new Class<?>[] {OzoneManagerProtocolPB.class}, new FollowerReadInvocationHandler());
     combinedProxy = new ProxyInfo<>(wrappedProxy, combinedInfo);
-    this.useFollowerRead = true;
+    this.useFollowerRead = useFollowerRead;
     this.followerReadConsistency = followerReadConsistencyType.getHint();
     this.leaderReadConsistency = leaderReadConsistencyType.getHint();
   }
