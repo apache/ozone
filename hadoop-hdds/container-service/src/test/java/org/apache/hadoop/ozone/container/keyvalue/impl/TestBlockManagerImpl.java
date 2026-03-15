@@ -22,11 +22,15 @@ import static org.apache.hadoop.ozone.OzoneConsts.INCREMENTAL_CHUNK_LIST;
 import static org.apache.hadoop.ozone.container.keyvalue.helpers.KeyValueContainerUtil.isSameSchemaVersion;
 import static org.apache.hadoop.ozone.container.keyvalue.impl.BlockManagerImpl.FULL_CHUNK;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -39,6 +43,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
+import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.helpers.ChunkInfo;
@@ -53,9 +58,12 @@ import org.apache.hadoop.ozone.container.keyvalue.ContainerTestVersionInfo;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainer;
 import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
+import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.MockedStatic;
 
 /**
  * This class is used to test key related operations on the container.
@@ -141,6 +149,25 @@ public class TestBlockManagerImpl {
   @AfterEach
   public void cleanup() {
     BlockUtils.shutdownCache(config);
+  }
+
+  @Test
+  public void testFinalizationStatusCachedForIncrementalChunkListChecks() {
+    config = new OzoneConfiguration();
+    try (MockedStatic<VersionedDatanodeFeatures> mockedFeatures =
+             mockStatic(VersionedDatanodeFeatures.class)) {
+      mockedFeatures.when(() -> VersionedDatanodeFeatures.isFinalized(
+              HDDSLayoutFeature.HBASE_SUPPORT))
+          .thenReturn(false, false, true);
+
+      BlockManagerImpl manager = new BlockManagerImpl(config);
+      assertFalse(manager.isIncrementalChunkListFeatureFinalized());
+      assertTrue(manager.isIncrementalChunkListFeatureFinalized());
+      assertTrue(manager.isIncrementalChunkListFeatureFinalized());
+
+      mockedFeatures.verify(() -> VersionedDatanodeFeatures.isFinalized(
+          HDDSLayoutFeature.HBASE_SUPPORT), times(3));
+    }
   }
 
   @ContainerTestVersionInfo.ContainerTest
