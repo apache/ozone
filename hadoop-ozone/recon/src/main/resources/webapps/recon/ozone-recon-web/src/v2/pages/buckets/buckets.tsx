@@ -262,7 +262,9 @@ const Buckets: React.FC<{}> = () => {
                 onChange={handleVolumeChange}
                 fixedColumn=''
                 onTagClose={() => { }}
-                columnLength={volumeOptions.length} />
+                columnLength={volumeOptions.length}
+                showSearch={true}
+                showSelectAll={true} />
               <MultiSelect
                 options={columnOptions}
                 defaultValue={selectedColumns}
@@ -271,7 +273,9 @@ const Buckets: React.FC<{}> = () => {
                 onChange={handleColumnChange}
                 onTagClose={() => { }}
                 fixedColumn='name'
-                columnLength={COLUMNS.length} />
+                columnLength={COLUMNS.length}
+                showSearch={true}
+                showSelectAll={true} />
               <SingleSelect
                 options={LIMIT_OPTIONS}
                 defaultValue={selectedLimit}
