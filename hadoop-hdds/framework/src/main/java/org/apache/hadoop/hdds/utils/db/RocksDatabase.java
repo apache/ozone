@@ -396,7 +396,9 @@ public final class RocksDatabase implements Closeable {
   }
 
   private void waitAndClose() {
-    // wait till all access to rocks db is process to avoid crash while close
+    // Wait until all active operations (including open iterators) complete.
+    // Iterators acquired after DB close is triggered will fast-fail in
+    // hasNext(), so this loop is expected to complete quickly in practice.
     while (!counter.compareAndSet(0, Long.MIN_VALUE)) {
       try {
         Thread.currentThread().sleep(1);

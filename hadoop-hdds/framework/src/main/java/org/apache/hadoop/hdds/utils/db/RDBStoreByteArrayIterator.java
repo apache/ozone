@@ -29,7 +29,7 @@ class RDBStoreByteArrayIterator extends RDBStoreAbstractIterator<byte[]> {
   }
 
   RDBStoreByteArrayIterator(ManagedRocksIterator iterator,
-      RDBTable table, byte[] prefix, IteratorType type) {
+      RDBTable table, byte[] prefix, IteratorType type) throws RocksDatabaseException {
     super(iterator, table, copyPrefix(prefix), type);
     seekToFirst();
   }

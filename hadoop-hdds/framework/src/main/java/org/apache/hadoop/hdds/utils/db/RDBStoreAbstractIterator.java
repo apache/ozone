@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.utils.db;
 
 import java.util.NoSuchElementException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
 import org.apache.ratis.util.UncheckedAutoCloseable;
@@ -50,25 +51,21 @@ abstract class RDBStoreAbstractIterator<RAW>
   private final RAW prefix;
 
   private final IteratorType type;
+  private final AtomicBoolean iteratorClosed = new AtomicBoolean(false);
 
-  RDBStoreAbstractIterator(ManagedRocksIterator iterator, RDBTable table, RAW prefix, IteratorType type) {
+  RDBStoreAbstractIterator(ManagedRocksIterator iterator, RDBTable table, RAW prefix, IteratorType type)
+      throws RocksDatabaseException {
     this.rocksDBIterator = iterator;
     this.rocksDBTable = table;
     this.prefix = prefix;
     this.type = type;
-    this.dbRef = acquireDbRef(table);
-  }
-
-  private static UncheckedAutoCloseable acquireDbRef(RDBTable table) {
-    if (table == null) {
-      return null;
-    }
     try {
-      return table.acquireIterator();
+      this.dbRef = table != null ? table.acquireIterator() : null;
     } catch (RocksDatabaseException e) {
-      LOG.warn("Failed to acquire DB reference for iterator on table {}: {}",
-          table.getName(), e.getMessage());
-      return null;
+      // Close the already-allocated native iterator to avoid a resource leak
+      // before propagating; the caller never gets a reference to this object.
+      iterator.close();
+      throw e;
     }
   }
 
@@ -152,6 +149,10 @@ abstract class RDBStoreAbstractIterator<RAW>
 
   @Override
   public final void seekToFirst() {
+    if (isDbClosed()) {
+      currentEntry = null;
+      return;
+    }
     if (prefix == null) {
       rocksDBIterator.get().seekToFirst();
     } else {
@@ -162,6 +163,10 @@ abstract class RDBStoreAbstractIterator<RAW>
 
   @Override
   public final void seekToLast() {
+    if (isDbClosed()) {
+      currentEntry = null;
+      return;
+    }
     if (prefix == null) {
       rocksDBIterator.get().seekToLast();
     } else {
@@ -172,6 +177,10 @@ abstract class RDBStoreAbstractIterator<RAW>
 
   @Override
   public final Table.KeyValue<RAW, RAW> seek(RAW key) {
+    if (isDbClosed()) {
+      currentEntry = null;
+      return null;
+    }
     seek0(key);
     setCurrentEntry();
     return currentEntry;
@@ -182,6 +191,11 @@ abstract class RDBStoreAbstractIterator<RAW>
     if (rocksDBTable == null) {
       throw new UnsupportedOperationException("remove");
     }
+    if (isDbClosed()) {
+      LOG.warn("Skipping removeFromDB for table {}: underlying RocksDB is closed",
+          rocksDBTable.getName());
+      return;
+    }
     if (currentEntry != null) {
       delete(currentEntry.getKey());
     } else {
@@ -191,9 +205,11 @@ abstract class RDBStoreAbstractIterator<RAW>
 
   @Override
   public void close() {
-    rocksDBIterator.close();
-    if (dbRef != null) {
-      dbRef.close();
+    if (iteratorClosed.compareAndSet(false, true)) {
+      rocksDBIterator.close();
+      if (dbRef != null) {
+        dbRef.close();
+      }
     }
   }
 }
