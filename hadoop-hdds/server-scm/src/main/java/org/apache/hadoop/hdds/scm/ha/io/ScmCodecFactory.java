@@ -19,8 +19,6 @@ package org.apache.hadoop.hdds.scm.ha.io;
 
 import com.google.protobuf.Message;
 import com.google.protobuf.ProtocolMessageEnum;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
@@ -48,7 +46,6 @@ import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferExce
 public final class ScmCodecFactory {
 
   private static Map<Class<?>, ScmCodec<?>> codecs = new HashMap<>();
-  private static Map<Type, ScmCodec<?>> genericCodecs = new HashMap<>();
 
   static {
     putProto(ContainerID.getDefaultInstance());
@@ -58,6 +55,7 @@ public final class ScmCodecFactory {
     putProto(DeletedBlocksTransaction.getDefaultInstance());
     putProto(DeletedBlocksTransactionSummary.getDefaultInstance());
 
+    codecs.put(List.class, new ScmListCodec());
     codecs.put(Integer.class, new ScmIntegerCodec());
     codecs.put(Long.class, new ScmLongCodec());
     codecs.put(String.class, new ScmStringCodec());
@@ -85,28 +83,6 @@ public final class ScmCodecFactory {
 
   private ScmCodecFactory() { }
 
-  public static ScmCodec getCodec(Type type)
-      throws InvalidProtocolBufferException {
-    if (type instanceof Class<?>) {
-      return getCodec((Class<?>) type);
-    }
-
-    if (type instanceof ParameterizedType) {
-      ParameterizedType pt = (ParameterizedType) type;
-      Type rawType = pt.getRawType();
-      Type[] actualTypes = pt.getActualTypeArguments();
-
-      if (rawType instanceof Class<?>
-          && List.class.isAssignableFrom((Class<?>) rawType)
-          && actualTypes.length == 1
-          && actualTypes[0] instanceof Class<?>) {
-        return getOrCreateListCodec((Class<?>) actualTypes[0], type);
-      }
-    }
-
-    throw new InvalidProtocolBufferException("Codec for " + type + " not found!");
-  }
-
   public static ScmCodec getCodec(Class<?> type)
       throws InvalidProtocolBufferException {
     final List<Class<?>> classes = new ArrayList<>();
@@ -120,18 +96,5 @@ public final class ScmCodecFactory {
     }
     throw new InvalidProtocolBufferException(
         "Codec for " + type + " not found!");
-  }
-
-  private static ScmCodec<?> getOrCreateListCodec(Class<?> elementType, Type genericType)
-      throws InvalidProtocolBufferException {
-    ScmCodec<?> codec = genericCodecs.get(genericType);
-    if (codec != null) {
-      return codec;
-    }
-
-    ScmCodec<?> elementCodec = getCodec(elementType);
-    ScmListCodec listCodec = new ScmListCodec(elementType, elementCodec);
-    genericCodecs.put(genericType, listCodec);
-    return listCodec;
   }
 }

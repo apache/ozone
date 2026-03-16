@@ -44,7 +44,6 @@ message Method {
 message MethodArgument {
   optional string type = 1;
   optional bytes value = 2;
-  optional string genericType = 3;
 }
 
 message ListArgument {
@@ -62,5 +61,4 @@ message SCMRatisResponseProto {
 
   optional string type = 2;
   optional bytes value = 3;
-  optional string genericType = 4;
 }

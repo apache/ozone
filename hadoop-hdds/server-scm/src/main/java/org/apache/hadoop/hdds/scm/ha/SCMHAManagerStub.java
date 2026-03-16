@@ -226,15 +226,12 @@ public final class SCMHAManagerStub implements SCMHAManager {
               "No handler found for request type " + request.getType());
         }
 
-        final java.lang.reflect.Method method = handler.getClass().getMethod(
-            request.getOperation(), request.getParameterTypes());
+        final Object result = handler.getClass()
+            .getMethod(request.getOperation(),
+                request.getParameterTypes())
+            .invoke(handler, request.getArguments());
 
-        final Object result = method.invoke(handler, request.getArguments());
-
-        return SCMRatisResponse.encode(
-            method.getReturnType(),
-            method.getGenericReturnType(),
-            result);
+        return SCMRatisResponse.encode(result);
       } catch (NoSuchMethodException | SecurityException ex) {
         throw new InvalidProtocolBufferException(ex.getMessage());
       } catch (InvocationTargetException e) {
