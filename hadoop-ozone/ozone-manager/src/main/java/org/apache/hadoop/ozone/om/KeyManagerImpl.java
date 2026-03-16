@@ -1518,6 +1518,9 @@ public class KeyManagerImpl implements KeyManager {
     OmKeyInfo fileKeyInfo = null;
     OmKeyInfo dirKeyInfo = null;
     OmKeyInfo fakeDirKeyInfo = null;
+    boolean needFakeDir = false;
+    BucketLayout layout = null;
+
     metadataManager.getLock().acquireReadLock(BUCKET_LOCK, volumeName,
         bucketName);
     try {
@@ -1530,8 +1533,7 @@ public class KeyManagerImpl implements KeyManager {
       // Check if the key is a file.
       String fileKeyBytes = metadataManager.getOzoneKey(
               volumeName, bucketName, keyName);
-      BucketLayout layout =
-          getBucketLayout(metadataManager, volumeName, bucketName);
+      layout = getBucketLayout(metadataManager, volumeName, bucketName);
       fileKeyInfo = metadataManager.getKeyTable(layout).get(fileKeyBytes);
       String dirKey = OzoneFSUtils.addTrailingSlashIfNeeded(keyName);
 
@@ -1541,8 +1543,7 @@ public class KeyManagerImpl implements KeyManager {
                 volumeName, bucketName, dirKey);
         dirKeyInfo = metadataManager.getKeyTable(layout).get(dirKeyBytes);
         if (dirKeyInfo == null) {
-          fakeDirKeyInfo =
-              createFakeDirIfShould(volumeName, bucketName, keyName, layout);
+          needFakeDir = true;
         }
       }
     } finally {
@@ -1574,6 +1575,13 @@ public class KeyManagerImpl implements KeyManager {
 
     if (dirKeyInfo != null) {
       return new OzoneFileStatus(dirKeyInfo, scmBlockSize, true);
+    }
+
+    // Called outside the lock: may open a RocksDB iterator that is slow
+    // when there are many tombstones to skip over.
+    if (needFakeDir) {
+      fakeDirKeyInfo =
+          createFakeDirIfShould(volumeName, bucketName, keyName, layout);
     }
 
     if (fakeDirKeyInfo != null) {
