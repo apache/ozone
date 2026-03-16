@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicateContainerCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReplicateContainerCommandProto.Builder;
@@ -42,6 +43,7 @@ public final class ReplicateContainerCommand
   private int replicaIndex = 0;
   private ReplicationCommandPriority priority =
       ReplicationCommandPriority.NORMAL;
+  private StorageType storageType;
 
   public static ReplicateContainerCommand fromSources(long containerID,
       List<DatanodeDetails> sourceDatanodes) {
@@ -82,6 +84,14 @@ public final class ReplicateContainerCommand
     this.priority = priority;
   }
 
+  public void setStorageType(StorageType storageType) {
+    this.storageType = storageType;
+  }
+
+  public StorageType getStorageType() {
+    return storageType;
+  }
+
   @Override
   public Type getType() {
     return SCMCommandProto.Type.replicateContainerCommand;
@@ -105,6 +115,9 @@ public final class ReplicateContainerCommand
       builder.setTarget(targetDatanode.getProtoBufMessage());
     }
     builder.setPriority(priority);
+    if (storageType != null) {
+      builder.setStorageType(storageType.toProto());
+    }
     return builder.build();
   }
 
@@ -130,6 +143,9 @@ public final class ReplicateContainerCommand
     }
     if (protoMessage.hasPriority()) {
       cmd.setPriority(protoMessage.getPriority());
+    }
+    if (protoMessage.hasStorageType()) {
+      cmd.setStorageType(StorageType.valueOf(protoMessage.getStorageType()));
     }
     return cmd;
   }

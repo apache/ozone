@@ -19,6 +19,7 @@ package org.apache.hadoop.hdds.scm.storage;
 
 import java.util.Objects;
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
 import org.apache.hadoop.security.token.Token;
@@ -43,6 +44,8 @@ public class BlockLocationInfo {
   // The block is under construction. Apply to hsynced file last block.
   private boolean underConstruction;
 
+  private StorageType storageType;
+
   protected BlockLocationInfo(Builder builder) {
     this.blockID = builder.blockID;
     this.pipeline = builder.pipeline;
@@ -51,6 +54,7 @@ public class BlockLocationInfo {
     this.token = builder.token;
     this.partNumber = builder.partNumber;
     this.createVersion = builder.createVersion;
+    this.storageType = builder.storageType;
   }
 
   public void setCreateVersion(long version) {
@@ -121,6 +125,14 @@ public class BlockLocationInfo {
     return this.underConstruction;
   }
 
+  public StorageType getStorageType() {
+    return storageType;
+  }
+
+  public void setStorageType(StorageType storageType) {
+    this.storageType = storageType;
+  }
+
   /**
    * Builder of BlockLocationInfo.
    */
@@ -132,6 +144,7 @@ public class BlockLocationInfo {
     private Pipeline pipeline;
     private int partNumber;
     private long createVersion;
+    private StorageType storageType;
 
     public Builder setBlockID(BlockID blockId) {
       this.blockID = blockId;
@@ -165,6 +178,11 @@ public class BlockLocationInfo {
 
     public Builder setCreateVersion(long version) {
       this.createVersion = version;
+      return this;
+    }
+
+    public Builder setStorageType(StorageType storageType) {
+      this.storageType = storageType;
       return this;
     }
 

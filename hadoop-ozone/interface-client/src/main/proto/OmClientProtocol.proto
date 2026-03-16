@@ -1109,6 +1109,7 @@ message KeyLocation {
     optional hadoop.hdds.Pipeline pipeline = 7;
 
     optional int32 partNumber = 9 [default = -1];
+    optional hadoop.hdds.StorageTypeProto storageType = 10;
 }
 
 message KeyLocationList {

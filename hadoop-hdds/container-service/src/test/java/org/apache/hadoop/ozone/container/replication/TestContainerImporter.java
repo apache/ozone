@@ -22,6 +22,7 @@ import static org.apache.hadoop.ozone.container.replication.CopyContainerCompres
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.atLeastOnce;
@@ -49,6 +50,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -232,6 +234,65 @@ class TestContainerImporter {
         targetVolume, NO_COMPRESSION);
 
     assertEquals(Optional.empty(), containerData.lastDataScanTime());
+  }
+
+  @Test
+  void testChooseNextVolumeWithStorageType() throws IOException {
+    // Set up two volumes: SSD and DISK
+    File ssdDir = new File(tempDir, "ssd");
+    File diskDir = new File(tempDir, "disk");
+    assertTrue(ssdDir.mkdirs());
+    assertTrue(diskDir.mkdirs());
+
+    OzoneConfiguration typedConf = new OzoneConfiguration();
+    typedConf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
+        "[SSD]" + ssdDir.getAbsolutePath() + ","
+            + "[DISK]" + diskDir.getAbsolutePath());
+    VolumeChoosingPolicy policy = VolumeChoosingPolicyFactory.getPolicy(
+        typedConf);
+    MutableVolumeSet typedVolumeSet = new MutableVolumeSet("test", typedConf,
+        null, StorageVolume.VolumeType.DATA_VOLUME, null);
+    ContainerImporter typedImporter = new ContainerImporter(typedConf,
+        containerSet, controllerMock, typedVolumeSet, policy);
+
+    // Choose SSD volume
+    HddsVolume ssdVolume = typedImporter.chooseNextVolume(1, StorageType.SSD);
+    assertEquals(org.apache.hadoop.fs.StorageType.SSD,
+        ssdVolume.getStorageType());
+
+    // Choose DISK volume
+    HddsVolume diskVolume = typedImporter.chooseNextVolume(1, StorageType.DISK);
+    assertEquals(org.apache.hadoop.fs.StorageType.DISK,
+        diskVolume.getStorageType());
+  }
+
+  @Test
+  void testChooseNextVolumeFallback() throws IOException {
+    // Set up only DISK volumes
+    File diskDir = new File(tempDir, "disk-only");
+    assertTrue(diskDir.mkdirs());
+
+    OzoneConfiguration diskOnlyConf = new OzoneConfiguration();
+    diskOnlyConf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
+        "[DISK]" + diskDir.getAbsolutePath());
+    VolumeChoosingPolicy policy = VolumeChoosingPolicyFactory.getPolicy(
+        diskOnlyConf);
+    MutableVolumeSet diskOnlyVolumeSet = new MutableVolumeSet("test",
+        diskOnlyConf, null, StorageVolume.VolumeType.DATA_VOLUME, null);
+    ContainerImporter diskOnlyImporter = new ContainerImporter(diskOnlyConf,
+        containerSet, controllerMock, diskOnlyVolumeSet, policy);
+
+    // Request SSD but only DISK available — should fall back
+    HddsVolume volume = diskOnlyImporter.chooseNextVolume(1, StorageType.SSD);
+    assertEquals(org.apache.hadoop.fs.StorageType.DISK,
+        volume.getStorageType());
+  }
+
+  @Test
+  void testChooseNextVolumeNullStorageType() throws IOException {
+    // null storageType should return any volume without filtering
+    HddsVolume volume = containerImporter.chooseNextVolume(1, null);
+    assertThat(volume).isNotNull();
   }
 
   private File containerTarFile(long id, ContainerData data) throws IOException {

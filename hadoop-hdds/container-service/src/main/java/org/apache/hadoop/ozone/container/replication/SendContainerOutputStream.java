@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.ozone.container.replication;
 
+import org.apache.hadoop.hdds.protocol.StorageType;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerRequest;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.io.grpc.stub.CallStreamObserver;
@@ -28,14 +30,23 @@ class SendContainerOutputStream extends GrpcOutputStream<SendContainerRequest> {
 
   private final CopyContainerCompression compression;
   private final Long size;
+  private final StorageType storageType;
 
   SendContainerOutputStream(
       CallStreamObserver<SendContainerRequest> streamObserver,
       long containerId, int bufferSize, CopyContainerCompression compression,
       Long size) {
+    this(streamObserver, containerId, bufferSize, compression, size, null);
+  }
+
+  SendContainerOutputStream(
+      CallStreamObserver<SendContainerRequest> streamObserver,
+      long containerId, int bufferSize, CopyContainerCompression compression,
+      Long size, StorageType storageType) {
     super(streamObserver, containerId, bufferSize);
     this.compression = compression;
     this.size = size;
+    this.storageType = storageType;
   }
 
   @Override
@@ -45,10 +56,16 @@ class SendContainerOutputStream extends GrpcOutputStream<SendContainerRequest> {
         .setData(data)
         .setOffset(getWrittenBytes())
         .setCompression(compression.toProto());
-    
-    // Include container size in the first request
-    if (getWrittenBytes() == 0 && size != null) {
-      requestBuilder.setSize(size);
+
+    // Include container size and storageType in the first request
+    if (getWrittenBytes() == 0) {
+      if (size != null) {
+        requestBuilder.setSize(size);
+      }
+      if (storageType != null) {
+        requestBuilder.setStorageType(
+            ContainerProtos.StorageTypeProto.valueOf(storageType.name()));
+      }
     }
     getStreamObserver().onNext(requestBuilder.build());
   }

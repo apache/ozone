@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerRequest;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerResponse;
@@ -55,6 +56,7 @@ class SendContainerRequestHandler
   private CopyContainerCompression compression;
   private final ZeroCopyMessageMarshaller<SendContainerRequest> marshaller;
   private long spaceToReserve = 0;
+  private StorageType storageType;
 
   SendContainerRequestHandler(
       ContainerImporter importer,
@@ -85,12 +87,16 @@ class SendContainerRequestHandler
 
       if (containerId == -1) {
         containerId = req.getContainerID();
-        
+
         // Use container size if available, otherwise fall back to default
         spaceToReserve = importer.getSpaceToReserve(
             req.hasSize() ? req.getSize() : null);
 
-        volume = importer.chooseNextVolume(spaceToReserve);
+        if (req.hasStorageType()) {
+          storageType = StorageType.valueOf(
+              req.getStorageType().name());
+        }
+        volume = importer.chooseNextVolume(spaceToReserve, storageType);
 
         Path dir = ContainerImporter.getUntarDirectory(volume);
         Files.createDirectories(dir);

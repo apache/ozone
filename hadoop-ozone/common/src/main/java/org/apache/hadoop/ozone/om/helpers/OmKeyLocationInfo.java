@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om.helpers;
 
 import org.apache.hadoop.hdds.client.BlockID;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.storage.BlockLocationInfo;
 import org.apache.hadoop.hdds.security.token.OzoneBlockTokenIdentifier;
@@ -83,6 +84,12 @@ public final class OmKeyLocationInfo extends BlockLocationInfo {
     }
 
     @Override
+    public Builder setStorageType(StorageType storageType) {
+      super.setStorageType(storageType);
+      return this;
+    }
+
+    @Override
     public OmKeyLocationInfo build() {
       return new OmKeyLocationInfo(this);
     }
@@ -122,6 +129,9 @@ public final class OmKeyLocationInfo extends BlockLocationInfo {
         builder.setPipeline(pipeline.getProtobufMessage(clientVersion));
       }
     }
+    if (getStorageType() != null) {
+      builder.setStorageType(getStorageType().toProto());
+    }
     return builder.build();
   }
 
@@ -141,6 +151,9 @@ public final class OmKeyLocationInfo extends BlockLocationInfo {
       Token<OzoneBlockTokenIdentifier> token =
           OMPBHelper.tokenFromProto(keyLocation.getToken());
       builder.setToken(token);
+    }
+    if (keyLocation.hasStorageType()) {
+      builder.setStorageType(StorageType.valueOf(keyLocation.getStorageType()));
     }
     return builder.build();
   }

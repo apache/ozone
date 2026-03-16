@@ -22,7 +22,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -33,6 +36,7 @@ import java.util.concurrent.Semaphore;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.ozone.container.common.impl.ContainerSet;
 import org.apache.hadoop.ozone.container.common.interfaces.VolumeChoosingPolicy;
@@ -41,6 +45,7 @@ import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.common.volume.VolumeChoosingPolicyFactory;
 import org.apache.hadoop.ozone.container.ozoneimpl.ContainerController;
+import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.ozone.test.GenericTestUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -115,5 +120,42 @@ public class TestDownloadAndImportReplicator {
 
     // Verify commit space is released
     assertEquals(initialCommittedBytes, volume.getCommittedBytes());
+  }
+
+  @Test
+  public void testPullReplicatorPassesStorageType() throws Exception {
+    long containerId = 2;
+    // Create a spy importer to verify method calls
+    OzoneConfiguration spyConf = new OzoneConfiguration();
+    spyConf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
+        tempDir.getAbsolutePath());
+    VolumeChoosingPolicy volumeChoosingPolicy =
+        VolumeChoosingPolicyFactory.getPolicy(spyConf);
+    ContainerSet containerSet = newContainerSet(0);
+    ContainerImporter importerSpy = spy(new ContainerImporter(spyConf,
+        containerSet, mock(ContainerController.class), volumeSet,
+        volumeChoosingPolicy));
+
+    DownloadAndImportReplicator pullReplicator =
+        new DownloadAndImportReplicator(spyConf, containerSet, importerSpy,
+            downloader);
+
+    // Mock downloader to return null (download failure);
+    // chooseNextVolume is called before download
+    when(downloader.getContainerDataFromReplicas(anyLong(), any(), any(),
+        any()))
+        .thenReturn(null);
+
+    ReplicateContainerCommand cmd =
+        ReplicateContainerCommand.fromSources(containerId,
+            Collections.singletonList(mock(DatanodeDetails.class)));
+    cmd.setStorageType(StorageType.ARCHIVE);
+    ReplicationTask task = new ReplicationTask(cmd, pullReplicator);
+
+    pullReplicator.replicate(task);
+
+    // Verify chooseNextVolume was called with ARCHIVE
+    verify(importerSpy).chooseNextVolume(anyLong(),
+        eq(StorageType.ARCHIVE));
   }
 }

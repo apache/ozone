@@ -229,7 +229,8 @@ public abstract class OMKeyRequest extends OMClientRequest {
           .setBlockID(blockID)
           .setLength(scmBlockSize)
           .setOffset(0)
-          .setPipeline(allocatedBlock.getPipeline());
+          .setPipeline(allocatedBlock.getPipeline())
+          .setStorageType(storageType);
       if (grpcBlockTokenEnabled) {
         builder.setToken(secretManager.generateToken(remoteUser, blockID,
             EnumSet.of(READ, WRITE), scmBlockSize));

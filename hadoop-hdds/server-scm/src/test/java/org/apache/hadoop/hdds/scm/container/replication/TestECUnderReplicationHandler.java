@@ -73,6 +73,7 @@ import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
 import org.apache.hadoop.hdds.scm.ContainerPlacementStatus;
@@ -103,6 +104,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 
 /**
  * Tests the ECUnderReplicationHandling functionality.
@@ -1148,6 +1150,71 @@ public class TestECUnderReplicationHandler {
     // entering_maintenance source.
     DatanodeDetails target = cmds.iterator().next().getKey();
     assertEquals(maintReplica.getDatanodeDetails(), target);
+  }
+
+  @Test
+  public void testReconstructionCommandCarriesStorageType() throws IOException {
+    // Create a container with storageType SSD
+    ContainerInfo containerWithStorageType = new ContainerInfo.Builder()
+        .setContainerID(container.getContainerID())
+        .setPipelineID(container.getPipelineID())
+        .setState(HddsProtos.LifeCycleState.CLOSED)
+        .setOwner("scm")
+        .setReplicationConfig(repConfig)
+        .setStorageType(StorageType.SSD)
+        .build();
+
+    Set<ContainerReplica> availableReplicas = createReplicas(4);
+    ECUnderReplicationHandler ecURH =
+        new ECUnderReplicationHandler(policy, conf, replicationManager);
+    UnderReplicatedHealthResult result =
+        mock(UnderReplicatedHealthResult.class);
+    when(result.getContainerInfo()).thenReturn(containerWithStorageType);
+
+    ecURH.processAndSendCommands(availableReplicas, emptyList(), result,
+        remainingMaintenanceRedundancy);
+    assertEquals(1, commandsSent.size());
+    SCMCommand<?> cmd = commandsSent.iterator().next().getValue();
+    assertThat(cmd).isInstanceOf(ReconstructECContainersCommand.class);
+    assertEquals(StorageType.SSD,
+        ((ReconstructECContainersCommand) cmd).getStorageType());
+  }
+
+  @Test
+  public void testReplicateCommandCarriesStorageType() throws IOException {
+    // Create a container with storageType SSD
+    ContainerInfo containerWithStorageType = new ContainerInfo.Builder()
+        .setContainerID(container.getContainerID())
+        .setPipelineID(container.getPipelineID())
+        .setState(HddsProtos.LifeCycleState.CLOSED)
+        .setOwner("scm")
+        .setReplicationConfig(repConfig)
+        .setStorageType(StorageType.SSD)
+        .build();
+
+    // Decommissioning index triggers a replicate command
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(Pair.of(DECOMMISSIONING, 1), Pair.of(IN_SERVICE, 2),
+            Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
+            Pair.of(IN_SERVICE, 5));
+
+    ECUnderReplicationHandler ecURH =
+        new ECUnderReplicationHandler(policy, conf, replicationManager);
+    UnderReplicatedHealthResult result =
+        mock(UnderReplicatedHealthResult.class);
+    when(result.getContainerInfo()).thenReturn(containerWithStorageType);
+
+    ecURH.processAndSendCommands(availableReplicas, emptyList(), result,
+        remainingMaintenanceRedundancy);
+
+    // Verify that the ContainerInfo passed to sendThrottledReplicationCommand
+    // has storageType SSD
+    ArgumentCaptor<ContainerInfo> containerCaptor =
+        ArgumentCaptor.forClass(ContainerInfo.class);
+    verify(replicationManager).sendThrottledReplicationCommand(
+        containerCaptor.capture(), anyList(), any(DatanodeDetails.class),
+        anyInt());
+    assertEquals(StorageType.SSD, containerCaptor.getValue().getStorageType());
   }
 
   public Set<Pair<DatanodeDetails, SCMCommand<?>>>

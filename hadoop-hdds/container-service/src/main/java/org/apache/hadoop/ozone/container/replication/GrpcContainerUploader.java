@@ -25,6 +25,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails.Port;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerRequest;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.SendContainerResponse;
 import org.apache.hadoop.hdds.security.SecurityConfig;
@@ -59,8 +60,16 @@ public class GrpcContainerUploader implements ContainerUploader {
 
   @Override
   public OutputStream startUpload(long containerId, DatanodeDetails target,
-      CompletableFuture<Void> callback, CopyContainerCompression compression) throws IOException {
-    
+      CompletableFuture<Void> callback, CopyContainerCompression compression)
+      throws IOException {
+    return startUpload(containerId, target, callback, compression, null);
+  }
+
+  @Override
+  public OutputStream startUpload(long containerId, DatanodeDetails target,
+      CompletableFuture<Void> callback, CopyContainerCompression compression,
+      StorageType storageType) throws IOException {
+
     // Get container size from local datanode instead of using passed replicateSize
     Long containerSize = null;
     Container<?> container = containerController.getContainer(containerId);
@@ -69,7 +78,7 @@ public class GrpcContainerUploader implements ContainerUploader {
           containerId, target, container.getContainerData().getBytesUsed());
       containerSize = container.getContainerData().getBytesUsed();
     }
-    
+
     GrpcReplicationClient client = createReplicationClient(target, compression);
     try {
       // gRPC runtime always provides implementation of CallStreamObserver
@@ -82,7 +91,8 @@ public class GrpcContainerUploader implements ContainerUploader {
               (CallStreamObserver<SendContainerRequest>) client.upload(
               responseObserver), responseObserver);
       return new SendContainerOutputStream(requestStream, containerId,
-          GrpcReplicationService.BUFFER_SIZE, compression, containerSize) {
+          GrpcReplicationService.BUFFER_SIZE, compression, containerSize,
+          storageType) {
         @Override
         public void close() throws IOException {
           try {

@@ -61,7 +61,8 @@ public class PushReplicator implements ContainerReplicator {
     CountingOutputStream output = null;
     try {
       output = new CountingOutputStream(
-          uploader.startUpload(containerID, target, fut, compression));
+          uploader.startUpload(containerID, target, fut, compression,
+              task.getStorageType()));
       source.copyData(containerID, output, compression);
       fut.get();
 

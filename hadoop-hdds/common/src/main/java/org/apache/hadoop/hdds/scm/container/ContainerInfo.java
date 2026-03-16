@@ -28,6 +28,7 @@ import org.apache.commons.lang3.builder.EqualsBuilder;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.utils.db.Codec;
@@ -87,6 +88,7 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
   private long sequenceId;
   // Health state of the container (determined by ReplicationManager)
   private ContainerHealthState healthState;
+  private final StorageType storageType;
 
   private ContainerInfo(Builder b) {
     containerID = ContainerID.valueOf(b.containerID);
@@ -102,6 +104,7 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
     replicationConfig = b.replicationConfig;
     clock = b.clock;
     healthState = b.healthState != null ? b.healthState : ContainerHealthState.HEALTHY;
+    storageType = b.storageType;
   }
 
   public static Codec<ContainerInfo> getCodec() {
@@ -125,6 +128,9 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
 
     if (info.hasPipelineID()) {
       builder.setPipelineID(PipelineID.getFromProtobuf(info.getPipelineID()));
+    }
+    if (info.hasStorageType()) {
+      builder.setStorageType(StorageType.valueOf(info.getStorageType()));
     }
     return builder.build();
 
@@ -288,7 +294,15 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
       builder.setPipelineID(getPipelineID().getProtobuf());
     }
 
+    if (storageType != null) {
+      builder.setStorageType(storageType.toProto());
+    }
+
     return builder.build();
+  }
+
+  public StorageType getStorageType() {
+    return storageType;
   }
 
   public String getOwner() {
@@ -390,6 +404,7 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
     private PipelineID pipelineID;
     private ReplicationConfig replicationConfig;
     private ContainerHealthState healthState;
+    private StorageType storageType;
 
     public Builder setPipelineID(PipelineID pipelineId) {
       this.pipelineID = pipelineId;
@@ -444,6 +459,11 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
 
     public Builder setHealthState(ContainerHealthState healthState) {
       this.healthState = healthState;
+      return this;
+    }
+
+    public Builder setStorageType(StorageType storageType) {
+      this.storageType = storageType;
       return this;
     }
 

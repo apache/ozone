@@ -149,7 +149,7 @@ message DatanodeBlockID {
   required int64 localID = 2;
   optional uint64 blockCommitSequenceId = 3 [default = 0];
   optional int32 replicaIndex = 4;
-
+  optional StorageTypeProto storageType = 5;
 }
 
 message KeyValue {
@@ -557,6 +557,7 @@ message SendContainerRequest {
   optional int64 checksum = 4;
   optional CopyContainerCompressProto compression = 5;
   optional int64 size = 6;
+  optional StorageTypeProto storageType = 7;
 }
 
 message SendContainerResponse {

@@ -25,7 +25,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -147,11 +149,30 @@ public class ContainerImporter {
   }
 
   HddsVolume chooseNextVolume(long spaceToReserve) throws IOException {
-    // Choose volume that can hold both container in tmp and dest directory
-    LOG.debug("Choosing volume to reserve space : {}", spaceToReserve);
-    return volumeChoosingPolicy.chooseVolume(
-        StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
-        spaceToReserve);
+    return chooseNextVolume(spaceToReserve, null);
+  }
+
+  HddsVolume chooseNextVolume(long spaceToReserve,
+      org.apache.hadoop.hdds.protocol.StorageType storageType)
+      throws IOException {
+    LOG.debug("Choosing volume to reserve space : {}, storageType: {}",
+        spaceToReserve, storageType);
+    List<HddsVolume> volumes =
+        StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList());
+    if (storageType != null) {
+      org.apache.hadoop.fs.StorageType fsStorageType =
+          org.apache.hadoop.fs.StorageType.valueOf(storageType.name());
+      List<HddsVolume> filtered = volumes.stream()
+          .filter(v -> v.getStorageType() == fsStorageType)
+          .collect(Collectors.toList());
+      if (!filtered.isEmpty()) {
+        volumes = filtered;
+      } else {
+        LOG.warn("No volumes found with storage type {}, falling back to"
+            + " all volumes for replication", storageType);
+      }
+    }
+    return volumeChoosingPolicy.chooseVolume(volumes, spaceToReserve);
   }
 
   public static Path getUntarDirectory(HddsVolume hddsVolume)

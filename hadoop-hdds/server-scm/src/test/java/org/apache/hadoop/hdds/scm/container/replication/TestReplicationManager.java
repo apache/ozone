@@ -72,6 +72,7 @@ import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.SCMCommandProto;
@@ -84,6 +85,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
 import org.apache.hadoop.hdds.scm.container.ReplicationManagerReport;
+import org.apache.hadoop.hdds.scm.container.TestContainerInfo;
 import org.apache.hadoop.hdds.scm.container.placement.algorithms.ContainerPlacementStatusDefault;
 import org.apache.hadoop.hdds.scm.events.SCMEvents;
 import org.apache.hadoop.hdds.scm.exceptions.SCMException;
@@ -1757,6 +1759,32 @@ public class TestReplicationManager {
         "Second report should have sample limit of 50");
     assertEquals(newLimit, sample2.size(),
         "Second report should have 50 samples after reconfiguration");
+  }
+
+  @Test
+  public void testSendThrottledReplicationCommandSetsStorageType()
+      throws Exception {
+    ContainerInfo containerWithStorageType =
+        TestContainerInfo.newBuilderForTest()
+            .setContainerID(1)
+            .setState(HddsProtos.LifeCycleState.CLOSED)
+            .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
+            .setStorageType(StorageType.SSD)
+            .build();
+
+    DatanodeDetails source = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    mockReplicationCommandCounts(any -> 0, any -> 0);
+
+    replicationManager.sendThrottledReplicationCommand(
+        containerWithStorageType,
+        Collections.singletonList(source), target, 0);
+
+    assertEquals(1, commandsSent.size());
+    SCMCommand<?> cmd = commandsSent.iterator().next().getValue();
+    assertThat(cmd).isInstanceOf(ReplicateContainerCommand.class);
+    assertEquals(StorageType.SSD,
+        ((ReplicateContainerCommand) cmd).getStorageType());
   }
 
   @SafeVarargs

@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleState;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
@@ -198,6 +199,17 @@ public interface ContainerManager {
   ContainerInfo getMatchingContainer(long size, String owner,
                                      Pipeline pipeline,
                                      Set<ContainerID> excludedContainerIDS);
+
+  /**
+   * Returns ContainerInfo which matches the requirements, recording the
+   * storageType on newly allocated containers.
+   */
+  @Nullable
+  default ContainerInfo getMatchingContainer(long size, String owner,
+      Pipeline pipeline, Set<ContainerID> excludedContainerIDS,
+      StorageType storageType) {
+    return getMatchingContainer(size, owner, pipeline, excludedContainerIDS);
+  }
 
   /**
    * Once after report processor handler completes, call this to notify

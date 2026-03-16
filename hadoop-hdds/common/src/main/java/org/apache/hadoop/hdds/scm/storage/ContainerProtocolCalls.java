@@ -436,17 +436,21 @@ public final class ContainerProtocolCalls  {
   public static XceiverClientReply writeChunkAsync(
       XceiverClientSpi xceiverClient, ChunkInfo chunk, BlockID blockID,
       ByteString data, String tokenString,
-      int replicationIndex, BlockData blockData, boolean close)
+      int replicationIndex, BlockData blockData, boolean close,
+      ContainerProtos.StorageTypeProto storageType)
       throws IOException, ExecutionException, InterruptedException {
 
+    DatanodeBlockID.Builder blkIDBuilder = DatanodeBlockID.newBuilder()
+        .setContainerID(blockID.getContainerID())
+        .setLocalID(blockID.getLocalID())
+        .setBlockCommitSequenceId(blockID.getBlockCommitSequenceId())
+        .setReplicaIndex(replicationIndex);
+    if (storageType != null) {
+      blkIDBuilder.setStorageType(storageType);
+    }
     WriteChunkRequestProto.Builder writeChunkRequest =
         WriteChunkRequestProto.newBuilder()
-            .setBlockID(DatanodeBlockID.newBuilder()
-                .setContainerID(blockID.getContainerID())
-                .setLocalID(blockID.getLocalID())
-                .setBlockCommitSequenceId(blockID.getBlockCommitSequenceId())
-                .setReplicaIndex(replicationIndex)
-                .build())
+            .setBlockID(blkIDBuilder.build())
             .setChunkData(chunk)
             .setData(data);
     if (blockData != null) {
@@ -546,6 +550,15 @@ public final class ContainerProtocolCalls  {
       throws IOException {
     createContainer(client, containerID, encodedToken,
         ContainerProtos.ContainerDataProto.State.RECOVERING, replicaIndex);
+  }
+
+  @InterfaceStability.Evolving
+  public static void createRecoveringContainer(XceiverClientSpi client,
+      long containerID, String encodedToken, int replicaIndex,
+      ContainerProtos.StorageTypeProto storageType) throws IOException {
+    createContainer(client, containerID, encodedToken,
+        ContainerProtos.ContainerDataProto.State.RECOVERING, replicaIndex,
+        storageType);
   }
 
   /**

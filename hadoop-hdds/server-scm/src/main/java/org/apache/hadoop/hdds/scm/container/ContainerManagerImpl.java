@@ -34,6 +34,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
@@ -227,7 +228,13 @@ public class ContainerManagerImpl implements ContainerManager {
 
   private ContainerInfo createContainer(Pipeline pipeline, String owner)
       throws IOException {
-    final ContainerInfo containerInfo = allocateContainer(pipeline, owner);
+    return createContainer(pipeline, owner, null);
+  }
+
+  private ContainerInfo createContainer(Pipeline pipeline, String owner,
+      StorageType storageType) throws IOException {
+    final ContainerInfo containerInfo =
+        allocateContainer(pipeline, owner, storageType);
     if (LOG.isTraceEnabled()) {
       LOG.trace("New container allocated: {}", containerInfo);
     }
@@ -235,7 +242,8 @@ public class ContainerManagerImpl implements ContainerManager {
   }
 
   private ContainerInfo allocateContainer(final Pipeline pipeline,
-                                          final String owner)
+                                          final String owner,
+                                          final StorageType storageType)
       throws IOException {
     if (!pipelineManager.hasEnoughSpace(pipeline, maxContainerSize)) {
       LOG.debug("Cannot allocate a new container because pipeline {} does not have the required space {}.",
@@ -266,6 +274,10 @@ public class ContainerManagerImpl implements ContainerManager {
     } else {
       containerInfoBuilder.setReplicationFactor(
           ReplicationConfig.getLegacyFactor(pipeline.getReplicationConfig()));
+    }
+
+    if (storageType != null) {
+      containerInfoBuilder.setStorageType(storageType.toProto());
     }
 
     containerStateManager.addContainer(containerInfoBuilder.build());
@@ -350,13 +362,22 @@ public class ContainerManagerImpl implements ContainerManager {
   @Override
   public ContainerInfo getMatchingContainer(final long size, final String owner,
       final Pipeline pipeline, final Set<ContainerID> excludedContainerIDs) {
+    return getMatchingContainer(size, owner, pipeline, excludedContainerIDs,
+        null);
+  }
+
+  @Override
+  public ContainerInfo getMatchingContainer(final long size, final String owner,
+      final Pipeline pipeline, final Set<ContainerID> excludedContainerIDs,
+      final StorageType storageType) {
     NavigableSet<ContainerID> containerIDs;
     ContainerInfo containerInfo;
     try {
       synchronized (pipeline.getId()) {
         containerIDs = getContainersForOwner(pipeline, owner);
         if (containerIDs.size() < pipelineManager.openContainerLimit(pipeline.getNodes())) {
-          ContainerInfo allocated = allocateContainer(pipeline, owner);
+          ContainerInfo allocated =
+              createContainer(pipeline, owner, storageType);
           if (allocated != null) {
             // New container was created, refresh IDs so it becomes eligible.
             containerIDs = getContainersForOwner(pipeline, owner);
@@ -366,7 +387,7 @@ public class ContainerManagerImpl implements ContainerManager {
         containerInfo = containerStateManager.getMatchingContainer(
             size, owner, pipeline.getId(), containerIDs);
         if (containerInfo == null) {
-          containerInfo = allocateContainer(pipeline, owner);
+          containerInfo = createContainer(pipeline, owner, storageType);
         }
         return containerInfo;
       }

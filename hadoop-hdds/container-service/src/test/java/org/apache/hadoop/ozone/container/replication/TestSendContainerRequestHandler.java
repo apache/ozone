@@ -24,10 +24,12 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -35,6 +37,7 @@ import java.io.IOException;
 import java.util.stream.Stream;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.conf.StorageUnit;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ScmConfigKeys;
 import org.apache.hadoop.hdds.scm.container.common.helpers.StorageContainerException;
@@ -234,6 +237,39 @@ public class TestSendContainerRequestHandler {
     // Verify specific calculations
     assertEquals(2 * overallocatedSize, overallocatedReservation);
     assertEquals(2 * containerMaxSize, defaultReservation);
+  }
+
+  @Test
+  public void testHandlerPassesStorageTypeToImporter() throws Exception {
+    long containerId = 10;
+
+    ContainerProtos.SendContainerRequest request =
+        ContainerProtos.SendContainerRequest.newBuilder()
+            .setContainerID(containerId)
+            .setData(ByteString.copyFromUtf8("test"))
+            .setOffset(0)
+            .setCompression(NO_COMPRESSION.toProto())
+            .setStorageType(ContainerProtos.StorageTypeProto.SSD)
+            .build();
+
+    sendContainerRequestHandler.onNext(request);
+
+    // Verify importer.chooseNextVolume was called with StorageType.SSD
+    verify(importer).chooseNextVolume(anyLong(), eq(StorageType.SSD));
+  }
+
+  @Test
+  public void testHandlerPassesNullStorageTypeWhenNotSet() throws Exception {
+    long containerId = 11;
+
+    ContainerProtos.SendContainerRequest request = createRequest(
+        containerId, ByteString.copyFromUtf8("test"), 0, null);
+
+    sendContainerRequestHandler.onNext(request);
+
+    // Verify importer.chooseNextVolume was called with null storageType
+    verify(importer).chooseNextVolume(anyLong(),
+        eq((StorageType) null));
   }
 
   private ContainerProtos.SendContainerRequest createRequest(

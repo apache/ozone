@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.hdds.HddsIdFactory;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.conf.StorageUnit;
@@ -367,7 +368,8 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
             new ReconstructECContainersCommand(container.getContainerID(),
                 sourceDatanodesWithIndex, selectedDatanodes,
                 integers2ByteString(missingIndexes),
-                repConfig);
+                repConfig, HddsIdFactory.getLongId(),
+                container.getStorageType());
         // This can throw a CommandTargetOverloadedException, but there is no
         // point in retrying here. The sources we picked already have the
         // overloaded nodes excluded, so we should not get an overloaded
@@ -611,6 +613,7 @@ public class ECUnderReplicationHandler implements UnhealthyReplicationHandler {
       // For EC containers, we need to track the replica index which is
       // to be replicated, so add it to the command.
       replicateCommand.setReplicaIndex(replica.getReplicaIndex());
+      replicateCommand.setStorageType(container.getStorageType());
       replicationManager.sendDatanodeCommand(replicateCommand, container,
           target);
     }

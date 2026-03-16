@@ -475,6 +475,7 @@ public class RatisUnderReplicationHandler
         ReplicateContainerCommand command =
             ReplicateContainerCommand.fromSources(
                 containerInfo.getContainerID(), sources);
+        command.setStorageType(containerInfo.getStorageType());
         replicationManager.sendDatanodeCommand(command, containerInfo, target);
         commandsSent++;
       }

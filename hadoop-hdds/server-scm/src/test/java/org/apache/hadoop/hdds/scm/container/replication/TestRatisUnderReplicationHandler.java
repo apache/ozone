@@ -33,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
@@ -54,6 +55,7 @@ import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State;
@@ -720,6 +722,45 @@ public class TestRatisUnderReplicationHandler {
     commandsSent.clear();
     testProcessing(replicas, Collections.emptyList(),
             getUnderReplicatedHealthResult(), 2, 2);
+  }
+
+  @Test
+  public void testReplicationCommandCarriesStorageType()
+      throws IOException {
+    // Create a container with storageType ARCHIVE
+    ContainerInfo containerWithStorageType = new ContainerInfo.Builder()
+        .setContainerID(container.getContainerID())
+        .setPipelineID(container.getPipelineID())
+        .setState(HddsProtos.LifeCycleState.CLOSED)
+        .setOwner("scm")
+        .setReplicationConfig(RATIS_REPLICATION_CONFIG)
+        .setStorageType(StorageType.ARCHIVE)
+        .build();
+
+    Set<ContainerReplica> replicas
+        = createReplicas(containerWithStorageType.containerID(), State.CLOSED, 0);
+
+    RatisUnderReplicationHandler handler =
+        new RatisUnderReplicationHandler(policy, conf, replicationManager);
+
+    UnderReplicatedHealthResult healthResult =
+        mock(UnderReplicatedHealthResult.class);
+    when(healthResult.getContainerInfo()).thenReturn(containerWithStorageType);
+
+    handler.processAndSendCommands(replicas, Collections.emptyList(),
+        healthResult, 2);
+    assertEquals(2, commandsSent.size());
+
+    // Verify that the ContainerInfo passed to sendThrottledReplicationCommand
+    // has storageType ARCHIVE
+    ArgumentCaptor<ContainerInfo> containerCaptor =
+        ArgumentCaptor.forClass(ContainerInfo.class);
+    verify(replicationManager, times(2)).sendThrottledReplicationCommand(
+        containerCaptor.capture(), anyList(), any(DatanodeDetails.class),
+        anyInt());
+    for (ContainerInfo captured : containerCaptor.getAllValues()) {
+      assertEquals(StorageType.ARCHIVE, captured.getStorageType());
+    }
   }
 
   /**

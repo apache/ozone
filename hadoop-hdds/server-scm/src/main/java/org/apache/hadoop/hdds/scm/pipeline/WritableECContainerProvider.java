@@ -115,7 +115,8 @@ public class WritableECContainerProvider
           Pipeline.PipelineState.OPEN);
       if (openPipelineCount < maximumPipelines) {
         try {
-          return allocateContainer(repConfig, size, owner, excludeList);
+          return allocateContainer(repConfig, size, owner, excludeList,
+              storageType);
         } catch (IOException e) {
           LOG.warn("Unable to allocate a container with {} existing ones; "
               + "requested size={}, replication={}, owner={}, {}",
@@ -187,7 +188,8 @@ public class WritableECContainerProvider
       }
       if (openPipelineCount < maximumPipelines) {
         synchronized (this) {
-          return allocateContainer(repConfig, size, owner, excludeList);
+          return allocateContainer(repConfig, size, owner, excludeList,
+              storageType);
         }
       }
       throw new IOException("Pipeline limit (" + maximumPipelines
@@ -211,8 +213,8 @@ public class WritableECContainerProvider
   }
 
   private ContainerInfo allocateContainer(ReplicationConfig repConfig,
-      long size, String owner, ExcludeList excludeList)
-      throws IOException {
+      long size, String owner, ExcludeList excludeList,
+      StorageType storageType) throws IOException {
 
     List<DatanodeDetails> excludedNodes = Collections.emptyList();
     if (!excludeList.getDatanodes().isEmpty()) {
@@ -224,7 +226,8 @@ public class WritableECContainerProvider
     // the returned ContainerInfo should not be null (due to not enough space in the Datanodes specifically) because
     // this is a new pipeline and pipeline creation checks for sufficient space in the Datanodes
     ContainerInfo container =
-        containerManager.getMatchingContainer(size, owner, newPipeline);
+        containerManager.getMatchingContainer(size, owner, newPipeline,
+            Collections.emptySet(), storageType);
     if (container == null) {
       // defensive null handling
       throw new IOException("Could not allocate a new container");

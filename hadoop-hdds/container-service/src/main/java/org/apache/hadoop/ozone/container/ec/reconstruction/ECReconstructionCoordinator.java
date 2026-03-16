@@ -48,6 +48,7 @@ import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
@@ -145,7 +146,8 @@ public class ECReconstructionCoordinator implements Closeable {
   public void reconstructECContainerGroup(long containerID,
       ECReplicationConfig repConfig,
       SortedMap<Integer, DatanodeDetails> sourceNodeMap,
-      SortedMap<Integer, DatanodeDetails> targetNodeMap) throws IOException {
+      SortedMap<Integer, DatanodeDetails> targetNodeMap,
+      StorageType storageType) throws IOException {
 
     Pipeline pipeline = rebuildInputPipeline(repConfig, sourceNodeMap);
 
@@ -168,7 +170,7 @@ public class ECReconstructionCoordinator implements Closeable {
             containerID, dn, index);
         containerOperationClient
             .createRecoveringContainer(containerID, dn, repConfig,
-                containerToken, index);
+                containerToken, index, storageType);
         recoveringContainersCreatedDNs.add(dn);
       }
 
@@ -232,7 +234,8 @@ public class ECReconstructionCoordinator implements Closeable {
         containerOperationClient.singleNodePipeline(datanodeDetails,
             repConfig, replicaIndex),
         BufferPool.empty(), ozoneClientConfig,
-        blockLocationInfo.getToken(), clientMetrics, streamBufferArgs, ecReconstructWriteExecutor);
+        blockLocationInfo.getToken(), clientMetrics, streamBufferArgs, ecReconstructWriteExecutor,
+        null);
   }
 
   @VisibleForTesting

@@ -32,6 +32,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import org.apache.commons.lang3.builder.HashCodeBuilder;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.ozone.test.TestClock;
@@ -129,6 +130,29 @@ public class TestContainerInfo {
     assertEquals(initialStateEnterTime, subject.getStateEnterTime());
 
     assertThrows(IllegalStateException.class, subject::revertState);
+  }
+
+  @Test
+  void getProtobufWithStorageType() {
+    ContainerInfo container = newBuilderForTest()
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
+        .setStorageType(StorageType.SSD)
+        .build();
+
+    HddsProtos.ContainerInfoProto proto = container.getProtobuf();
+    ContainerInfo recovered = ContainerInfo.fromProtobuf(proto);
+    assertEquals(StorageType.SSD, recovered.getStorageType());
+  }
+
+  @Test
+  void getProtobufWithNullStorageType() {
+    ContainerInfo container = newBuilderForTest()
+        .setReplicationConfig(RatisReplicationConfig.getInstance(THREE))
+        .build();
+
+    HddsProtos.ContainerInfoProto proto = container.getProtobuf();
+    ContainerInfo recovered = ContainerInfo.fromProtobuf(proto);
+    assertEquals(null, recovered.getStorageType());
   }
 
   public static ContainerInfo.Builder newBuilderForTest() {

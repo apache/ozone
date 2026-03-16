@@ -28,6 +28,7 @@ import java.util.Set;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State;
 import org.apache.hadoop.hdds.scm.XceiverClientManager;
@@ -159,12 +160,23 @@ public class ECContainerOperationClient implements Closeable {
   public void createRecoveringContainer(long containerID, DatanodeDetails dn,
       ECReplicationConfig repConfig, String encodedToken, int replicaIndex)
       throws IOException {
+    createRecoveringContainer(containerID, dn, repConfig, encodedToken,
+        replicaIndex, null);
+  }
+
+  public void createRecoveringContainer(long containerID, DatanodeDetails dn,
+      ECReplicationConfig repConfig, String encodedToken, int replicaIndex,
+      StorageType storageType) throws IOException {
     XceiverClientSpi xceiverClient = this.xceiverClientManager.acquireClient(
         singleNodePipeline(dn, repConfig));
     try {
+      ContainerProtos.StorageTypeProto storageTypeProto =
+          storageType != null
+              ? ContainerProtos.StorageTypeProto.valueOf(storageType.name())
+              : null;
       ContainerProtocolCalls
           .createRecoveringContainer(xceiverClient, containerID, encodedToken,
-              replicaIndex);
+              replicaIndex, storageTypeProto);
     } finally {
       this.xceiverClientManager.releaseClient(xceiverClient, false);
     }

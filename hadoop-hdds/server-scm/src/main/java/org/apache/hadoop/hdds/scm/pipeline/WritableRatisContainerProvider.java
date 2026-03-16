@@ -186,7 +186,8 @@ public class WritableRatisContainerProvider
         availablePipelines = PipelineStorageTypeFilter.filter(
             availablePipelines, nodeManager, storageType);
       }
-      return selectContainer(availablePipelines, req, owner, excludeList);
+      return selectContainer(availablePipelines, req, owner, excludeList,
+          storageType);
     } finally {
       pipelineManager.releaseReadLock();
     }
@@ -209,15 +210,16 @@ public class WritableRatisContainerProvider
 
   private @Nullable ContainerInfo selectContainer(
       List<Pipeline> availablePipelines, PipelineRequestInformation req,
-      String owner, ExcludeList excludeList) {
+      String owner, ExcludeList excludeList, StorageType storageType) {
 
     while (!availablePipelines.isEmpty()) {
       Pipeline pipeline = pipelineChoosePolicy.choosePipeline(
           availablePipelines, req);
 
       // look for OPEN containers that match the criteria.
-      final ContainerInfo containerInfo = containerManager.getMatchingContainer(
-          req.getSize(), owner, pipeline, excludeList.getContainerIds());
+      final ContainerInfo containerInfo =
+          containerManager.getMatchingContainer(req.getSize(), owner,
+              pipeline, excludeList.getContainerIds(), storageType);
 
       if (containerInfo != null) {
         return containerInfo;

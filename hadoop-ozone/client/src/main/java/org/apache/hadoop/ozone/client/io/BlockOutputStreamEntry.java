@@ -29,6 +29,7 @@ import java.util.function.Supplier;
 import org.apache.hadoop.fs.Syncable;
 import org.apache.hadoop.hdds.client.BlockID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.scm.ContainerClientMetrics;
 import org.apache.hadoop.hdds.scm.OzoneClientConfig;
 import org.apache.hadoop.hdds.scm.StreamBufferArgs;
@@ -70,6 +71,7 @@ public class BlockOutputStreamEntry extends OutputStream {
   private final ContainerClientMetrics clientMetrics;
   private final StreamBufferArgs streamBufferArgs;
   private final Supplier<ExecutorService> executorServiceSupplier;
+  private final ContainerProtos.StorageTypeProto storageType;
 
   /**
    * An indicator that this BlockOutputStream is created to handoff writes from another faulty BlockOutputStream.
@@ -97,6 +99,7 @@ public class BlockOutputStreamEntry extends OutputStream {
     this.streamBufferArgs = b.streamBufferArgs;
     this.executorServiceSupplier = b.executorServiceSupplier;
     this.isHandlingRetry = b.forRetry;
+    this.storageType = b.storageType;
   }
 
   @Override
@@ -155,7 +158,7 @@ public class BlockOutputStreamEntry extends OutputStream {
   void createOutputStream() throws IOException {
     outputStream = new RatisBlockOutputStream(blockID, length, xceiverClientManager,
         pipeline, bufferPool, config, token, clientMetrics, streamBufferArgs,
-        executorServiceSupplier);
+        executorServiceSupplier, storageType);
   }
 
   ContainerClientMetrics getClientMetrics() {
@@ -398,6 +401,10 @@ public class BlockOutputStreamEntry extends OutputStream {
     return this.bufferPool;
   }
 
+  ContainerProtos.StorageTypeProto getStorageType() {
+    return this.storageType;
+  }
+
   /**
    * Builder class for ChunkGroupOutputStreamEntry.
    * */
@@ -415,6 +422,7 @@ public class BlockOutputStreamEntry extends OutputStream {
     private StreamBufferArgs streamBufferArgs;
     private Supplier<ExecutorService> executorServiceSupplier;
     private boolean forRetry;
+    private ContainerProtos.StorageTypeProto storageType;
 
     public Pipeline getPipeline() {
       return pipeline;
@@ -482,6 +490,11 @@ public class BlockOutputStreamEntry extends OutputStream {
 
     public Builder setForRetry(boolean forRetry) {
       this.forRetry = forRetry;
+      return this;
+    }
+
+    public Builder setStorageType(ContainerProtos.StorageTypeProto storageType) {
+      this.storageType = storageType;
       return this;
     }
 

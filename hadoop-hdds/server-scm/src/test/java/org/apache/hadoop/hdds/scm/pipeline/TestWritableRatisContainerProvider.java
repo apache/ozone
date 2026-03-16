@@ -24,6 +24,8 @@ import static java.util.Collections.singletonList;
 import static org.apache.hadoop.hdds.scm.pipeline.Pipeline.PipelineState.OPEN;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -143,7 +145,8 @@ class TestWritableRatisContainerProvider {
         .setPipelineID(pipeline.getId())
         .build();
 
-    when(containerManager.getMatchingContainer(CONTAINER_SIZE, OWNER, pipeline, emptySet()))
+    when(containerManager.getMatchingContainer(
+        eq((long) CONTAINER_SIZE), eq(OWNER), eq(pipeline), eq(emptySet()), any()))
         .thenReturn(container);
 
     return container;

@@ -103,6 +103,7 @@ public class BlockOutputStream extends OutputStream {
       = new AtomicReference<>();
 
   private final BlockData.Builder containerBlockData;
+  private final ContainerProtos.StorageTypeProto storageType;
   private volatile XceiverClientFactory xceiverClientFactory;
   private XceiverClientSpi xceiverClient;
   private OzoneClientConfig config;
@@ -177,7 +178,8 @@ public class BlockOutputStream extends OutputStream {
       OzoneClientConfig config,
       Token<? extends TokenIdentifier> token,
       ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs,
-      Supplier<ExecutorService> blockOutputStreamResourceProvider
+      Supplier<ExecutorService> blockOutputStreamResourceProvider,
+      ContainerProtos.StorageTypeProto storageType
   ) throws IOException {
     this.xceiverClientFactory = xceiverClientManager;
     this.config = config;
@@ -195,6 +197,10 @@ public class BlockOutputStream extends OutputStream {
     if (replicationIndex > 0) {
       blkIDBuilder.setReplicaIndex(replicationIndex);
     }
+    if (storageType != null) {
+      blkIDBuilder.setStorageType(storageType);
+    }
+    this.storageType = storageType;
     this.containerBlockData = BlockData.newBuilder().setBlockID(
         blkIDBuilder.build()).addMetadata(keyValue);
     this.pipeline = pipeline;
@@ -964,7 +970,8 @@ public class BlockOutputStream extends OutputStream {
       }
 
       asyncReply = writeChunkAsync(xceiverClient, chunkInfo,
-          blockID.get(), data, tokenString, replicationIndex, blockData, close);
+          blockID.get(), data, tokenString, replicationIndex, blockData, close,
+          storageType);
       CompletableFuture<ContainerCommandResponseProto>
           respFuture = asyncReply.getResponse();
       validateFuture = respFuture.thenApplyAsync(e -> {

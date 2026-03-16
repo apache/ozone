@@ -495,15 +495,36 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         ContainerProtos.ContainerType.KeyValueContainer;
     createRequest.setContainerType(containerType);
 
+    ContainerProtos.StorageTypeProto storageType = null;
     if (containerRequest.hasWriteChunk()) {
-      createRequest.setReplicaIndex(
-          containerRequest.getWriteChunk().getBlockID().getReplicaIndex());
+      ContainerProtos.DatanodeBlockID bid =
+          containerRequest.getWriteChunk().getBlockID();
+      createRequest.setReplicaIndex(bid.getReplicaIndex());
+      if (bid.hasStorageType()) {
+        storageType = bid.getStorageType();
+      }
     }
 
     if (containerRequest.hasPutBlock()) {
-      createRequest.setReplicaIndex(
-          containerRequest.getPutBlock().getBlockData().getBlockID()
-              .getReplicaIndex());
+      ContainerProtos.DatanodeBlockID bid =
+          containerRequest.getPutBlock().getBlockData().getBlockID();
+      createRequest.setReplicaIndex(bid.getReplicaIndex());
+      if (bid.hasStorageType()) {
+        storageType = bid.getStorageType();
+      }
+    }
+
+    if (containerRequest.hasPutSmallFile()) {
+      ContainerProtos.DatanodeBlockID bid =
+          containerRequest.getPutSmallFile()
+              .getBlock().getBlockData().getBlockID();
+      if (bid.hasStorageType()) {
+        storageType = bid.getStorageType();
+      }
+    }
+
+    if (storageType != null) {
+      createRequest.setStorageType(storageType);
     }
 
     ContainerCommandRequestProto.Builder requestBuilder =

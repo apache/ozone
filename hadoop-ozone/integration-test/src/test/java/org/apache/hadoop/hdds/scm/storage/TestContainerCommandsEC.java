@@ -374,7 +374,7 @@ public class TestContainerCommandsEC {
       // Attempt to reconstruct the container.
       coordinator.reconstructECContainerGroup(orphanContainerID,
           (ECReplicationConfig) repConfig,
-          sourceNodeMap, targetNodeMap);
+          sourceNodeMap, targetNodeMap, null);
     }
 
     // Check the block listing for the recovered containers 4 or 5 and they
@@ -759,7 +759,7 @@ public class TestContainerCommandsEC {
 
         coordinator.reconstructECContainerGroup(conID,
             (ECReplicationConfig) containerPipeline.getReplicationConfig(),
-            sourceNodeMap, targetNodeMap);
+            sourceNodeMap, targetNodeMap, null);
 
         // Assert the original container metadata with the new recovered one
         Iterator<Map.Entry<Integer, DatanodeDetails>> iterator =
@@ -918,7 +918,7 @@ public class TestContainerCommandsEC {
                    null, ECReconstructionMetrics.create(), "")) {
         coordinator.reconstructECContainerGroup(conID,
             (ECReplicationConfig) containerPipeline.getReplicationConfig(),
-            sourceNodeMap, targetNodeMap);
+            sourceNodeMap, targetNodeMap, null);
       }
     });
     final DatanodeDetails targetDNToCheckContainerCLeaned = goodTargetNode;

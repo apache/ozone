@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.container.replication;
 import java.util.List;
 import java.util.Objects;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 
 /**
@@ -127,6 +128,10 @@ public class ReplicationTask extends AbstractReplicationTask {
 
   DatanodeDetails getTarget() {
     return cmd.getTargetDatanode();
+  }
+
+  public StorageType getStorageType() {
+    return cmd.getStorageType();
   }
 
   @Override

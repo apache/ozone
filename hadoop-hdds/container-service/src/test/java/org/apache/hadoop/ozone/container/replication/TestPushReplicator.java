@@ -25,6 +25,7 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -35,7 +36,9 @@ import java.util.function.Consumer;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.container.replication.AbstractReplicationTask.Status;
+import org.apache.hadoop.ozone.protocol.commands.ReplicateContainerCommand;
 import org.apache.ozone.test.SpyOutputStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -122,6 +125,45 @@ class TestPushReplicator {
     output.assertClosedExactlyOnce();
   }
 
+  @Test
+  void pushReplicatorPassesStorageType() throws IOException {
+    // GIVEN
+    long containerID = randomContainerID();
+    DatanodeDetails target = MockDatanodeDetails.randomDatanodeDetails();
+    SpyOutputStream output = new SpyOutputStream(NULL_OUTPUT_STREAM);
+
+    ContainerReplicationSource source = mock(ContainerReplicationSource.class);
+    ContainerUploader uploader = mock(ContainerUploader.class);
+    ArgumentCaptor<CompletableFuture<Void>> futureCaptor =
+        ArgumentCaptor.forClass(CompletableFuture.class);
+
+    when(uploader.startUpload(eq(containerID), eq(target),
+        futureCaptor.capture(), any(CopyContainerCompression.class),
+        eq(StorageType.SSD)))
+        .thenReturn(output);
+
+    doAnswer(invocation -> {
+      futureCaptor.getValue().complete(null);
+      return null;
+    }).when(source).copyData(eq(containerID), any(), any());
+
+    PushReplicator replicator = new PushReplicator(conf, source, uploader);
+
+    ReplicateContainerCommand cmd =
+        ReplicateContainerCommand.toTarget(containerID, target);
+    cmd.setStorageType(StorageType.SSD);
+    ReplicationTask task = new ReplicationTask(cmd, replicator);
+
+    // WHEN
+    replicator.replicate(task);
+
+    // THEN
+    verify(uploader).startUpload(eq(containerID), eq(target),
+        any(CompletableFuture.class), any(CopyContainerCompression.class),
+        eq(StorageType.SSD));
+    assertEquals(Status.DONE, task.getStatus());
+  }
+
   private static long randomContainerID() {
     return ThreadLocalRandom.current().nextLong();
   }
@@ -140,7 +182,8 @@ class TestPushReplicator {
 
     when(
         uploader.startUpload(eq(containerID), eq(target),
-            futureArgument.capture(), compressionArgument.capture()
+            futureArgument.capture(), compressionArgument.capture(),
+            any()
         ))
         .thenReturn(outputStream);
 

@@ -49,7 +49,11 @@ public class ECBlockOutputStreamEntryPool extends BlockOutputStreamEntryPool {
             .setToken(subKeyInfo.getToken())
             .setClientMetrics(getClientMetrics())
             .setStreamBufferArgs(getStreamBufferArgs())
-            .setExecutorServiceSupplier(getExecutorServiceSupplier());
+            .setExecutorServiceSupplier(getExecutorServiceSupplier())
+            .setStorageType(subKeyInfo.getStorageType() != null
+                ? org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
+                    .StorageTypeProto.valueOf(subKeyInfo.getStorageType().name())
+                : null);
     return b.build();
   }
 

@@ -82,10 +82,12 @@ public class ECBlockOutputStream extends BlockOutputStream {
       OzoneClientConfig config,
       Token<? extends TokenIdentifier> token,
       ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs,
-      Supplier<ExecutorService> executorServiceSupplier
+      Supplier<ExecutorService> executorServiceSupplier,
+      ContainerProtos.StorageTypeProto storageType
   ) throws IOException {
     super(blockID, -1, xceiverClientManager,
-        pipeline, bufferPool, config, token, clientMetrics, streamBufferArgs, executorServiceSupplier);
+        pipeline, bufferPool, config, token, clientMetrics, streamBufferArgs, executorServiceSupplier,
+        storageType);
     // In EC stream, there will be only one node in pipeline.
     this.datanodeDetails = pipeline.getClosestNode();
   }

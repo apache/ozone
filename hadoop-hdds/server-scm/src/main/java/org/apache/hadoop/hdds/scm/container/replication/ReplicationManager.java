@@ -531,6 +531,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
     ReplicateContainerCommand cmd =
         ReplicateContainerCommand.toTarget(containerID, target);
     cmd.setReplicaIndex(replicaIndex);
+    cmd.setStorageType(containerInfo.getStorageType());
     sendDatanodeCommand(cmd, containerInfo, source);
   }
 

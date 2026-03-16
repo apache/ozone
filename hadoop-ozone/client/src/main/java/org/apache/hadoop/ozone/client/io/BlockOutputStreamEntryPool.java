@@ -168,6 +168,10 @@ public class BlockOutputStreamEntryPool implements KeyMetadataAware {
             .setStreamBufferArgs(streamBufferArgs)
             .setExecutorServiceSupplier(executorServiceSupplier)
             .setForRetry(forRetry)
+            .setStorageType(subKeyInfo.getStorageType() != null
+                ? org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos
+                    .StorageTypeProto.valueOf(subKeyInfo.getStorageType().name())
+                : null)
             .build();
   }
 

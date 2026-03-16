@@ -74,7 +74,8 @@ public class DownloadAndImportReplicator implements ContainerReplicator {
 
     try {
       targetVolume = containerImporter.chooseNextVolume(
-          containerImporter.getDefaultReplicationSpace());
+          containerImporter.getDefaultReplicationSpace(),
+          task.getStorageType());
 
       // Wait for the download. This thread pool is limiting the parallel
       // downloads, so it's ok to block here and wait for the full download.

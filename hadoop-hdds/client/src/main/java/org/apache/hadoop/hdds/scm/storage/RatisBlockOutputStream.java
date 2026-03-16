@@ -78,10 +78,12 @@ public class RatisBlockOutputStream extends BlockOutputStream
       OzoneClientConfig config,
       Token<? extends TokenIdentifier> token,
       ContainerClientMetrics clientMetrics, StreamBufferArgs streamBufferArgs,
-      Supplier<ExecutorService> blockOutputStreamResourceProvider
+      Supplier<ExecutorService> blockOutputStreamResourceProvider,
+      org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.StorageTypeProto storageType
   ) throws IOException {
     super(blockID, blockSize, xceiverClientManager, pipeline,
-        bufferPool, config, token, clientMetrics, streamBufferArgs, blockOutputStreamResourceProvider);
+        bufferPool, config, token, clientMetrics, streamBufferArgs, blockOutputStreamResourceProvider,
+        storageType);
     this.commitWatcher = new CommitWatcher(bufferPool, getXceiverClient());
   }
 

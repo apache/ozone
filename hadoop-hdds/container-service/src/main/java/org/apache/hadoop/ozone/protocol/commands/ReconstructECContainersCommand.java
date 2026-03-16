@@ -25,6 +25,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.HddsIdFactory;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReconstructECContainersCommandProto;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ReconstructECContainersCommandProto.Builder;
@@ -40,25 +41,36 @@ public class ReconstructECContainersCommand
   private final List<DatanodeDetails> targetDatanodes;
   private final ByteString missingContainerIndexes;
   private final ECReplicationConfig ecReplicationConfig;
+  private final StorageType storageType;
 
   public ReconstructECContainersCommand(long containerID,
       List<DatanodeDetailsAndReplicaIndex> sources,
       List<DatanodeDetails> targetDatanodes, ByteString missingContainerIndexes,
       ECReplicationConfig ecReplicationConfig) {
     this(containerID, sources, targetDatanodes, missingContainerIndexes,
-        ecReplicationConfig, HddsIdFactory.getLongId());
+        ecReplicationConfig, HddsIdFactory.getLongId(), null);
   }
 
   public ReconstructECContainersCommand(long containerID,
       List<DatanodeDetailsAndReplicaIndex> sourceDatanodes,
       List<DatanodeDetails> targetDatanodes, ByteString missingContainerIndexes,
       ECReplicationConfig ecReplicationConfig, long id) {
+    this(containerID, sourceDatanodes, targetDatanodes,
+        missingContainerIndexes, ecReplicationConfig, id, null);
+  }
+
+  public ReconstructECContainersCommand(long containerID,
+      List<DatanodeDetailsAndReplicaIndex> sourceDatanodes,
+      List<DatanodeDetails> targetDatanodes, ByteString missingContainerIndexes,
+      ECReplicationConfig ecReplicationConfig, long id,
+      StorageType storageType) {
     super(id);
     this.containerID = containerID;
     this.sources = sourceDatanodes;
     this.targetDatanodes = targetDatanodes;
     this.missingContainerIndexes = missingContainerIndexes;
     this.ecReplicationConfig = ecReplicationConfig;
+    this.storageType = storageType;
     if (targetDatanodes.size() != missingContainerIndexes.size()) {
       throw new IllegalArgumentException("Number of target datanodes and " +
           "container indexes should be same");
@@ -83,6 +95,9 @@ public class ReconstructECContainersCommand
     }
     builder.setMissingContainerIndexes(missingContainerIndexes);
     builder.setEcReplicationConfig(ecReplicationConfig.toProto());
+    if (storageType != null) {
+      builder.setStorageType(storageType.toProto());
+    }
     return builder.build();
   }
 
@@ -98,11 +113,13 @@ public class ReconstructECContainersCommand
         protoMessage.getTargetsList().stream()
             .map(DatanodeDetails::getFromProtoBuf).collect(Collectors.toList());
 
+    StorageType st = protoMessage.hasStorageType()
+        ? StorageType.valueOf(protoMessage.getStorageType()) : null;
     return new ReconstructECContainersCommand(protoMessage.getContainerID(),
         srcDatanodeDetails, targetDatanodeDetails,
         protoMessage.getMissingContainerIndexes(),
         new ECReplicationConfig(protoMessage.getEcReplicationConfig()),
-        protoMessage.getCmdId());
+        protoMessage.getCmdId(), st);
   }
 
   public long getContainerID() {
@@ -123,6 +140,10 @@ public class ReconstructECContainersCommand
 
   public ECReplicationConfig getEcReplicationConfig() {
     return ecReplicationConfig;
+  }
+
+  public StorageType getStorageType() {
+    return storageType;
   }
 
   @Override

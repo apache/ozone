@@ -428,6 +428,7 @@ message ReplicateContainerCommandProto {
   optional int32 replicaIndex = 4;
   optional DatanodeDetailsProto target = 5;
   optional ReplicationCommandPriority priority = 6 [default = NORMAL];
+  optional StorageTypeProto storageType = 7;
 }
 
 /**
@@ -441,6 +442,7 @@ message ReconstructECContainersCommandProto {
   required bytes missingContainerIndexes = 4;
   required ECReplicationConfig ecReplicationConfig = 5;
   required int64 cmdId = 6;
+  optional StorageTypeProto storageType = 7;
 }
 
 message DatanodeDetailsAndReplicaIndexProto {

@@ -28,6 +28,7 @@ import java.util.stream.IntStream;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand;
 import org.apache.hadoop.ozone.protocol.commands.ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex;
 
@@ -42,6 +43,7 @@ public class ECReconstructionCommandInfo {
   private final ByteString missingContainerIndexes;
   private final long deadlineMsSinceEpoch;
   private final long term;
+  private final StorageType storageType;
 
   public ECReconstructionCommandInfo(ReconstructECContainersCommand cmd) {
     this.containerID = cmd.getContainerID();
@@ -49,6 +51,7 @@ public class ECReconstructionCommandInfo {
     this.missingContainerIndexes = cmd.getMissingContainerIndexes();
     this.deadlineMsSinceEpoch = cmd.getDeadline();
     this.term = cmd.getTerm();
+    this.storageType = cmd.getStorageType();
 
     sourceNodeMap = cmd.getSources().stream()
         .collect(toMap(
@@ -95,6 +98,10 @@ public class ECReconstructionCommandInfo {
 
   public long getTerm() {
     return term;
+  }
+
+  public StorageType getStorageType() {
+    return storageType;
   }
 
 }

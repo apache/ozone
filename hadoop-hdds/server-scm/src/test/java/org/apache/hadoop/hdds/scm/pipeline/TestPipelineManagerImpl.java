@@ -411,12 +411,14 @@ public class TestPipelineManagerImpl {
   public void testPipelineCreationFailedMetric() throws Exception {
     PipelineManagerImpl pipelineManager = createPipelineManager(true);
 
-    // No pipeline at start
+    // Capture baseline counters (may be non-zero from prior tests
+    // sharing the same JMX metrics registry)
     MetricsRecordBuilder metrics = getMetrics(
         SCMPipelineMetrics.class.getSimpleName());
-    long numPipelineAllocated = getLongCounter("NumPipelineAllocated",
+    long baselineAllocated = getLongCounter("NumPipelineAllocated",
         metrics);
-    assertEquals(0, numPipelineAllocated);
+    long baselineFailed = getLongCounter("NumPipelineCreationFailed",
+        metrics);
 
     // 3 DNs are unhealthy.
     // Create 5 pipelines (Use up 15 Datanodes)
@@ -430,12 +432,12 @@ public class TestPipelineManagerImpl {
 
     metrics = getMetrics(
         SCMPipelineMetrics.class.getSimpleName());
-    numPipelineAllocated = getLongCounter("NumPipelineAllocated", metrics);
-    assertEquals(maxPipelineCount, numPipelineAllocated);
+    long numPipelineAllocated = getLongCounter("NumPipelineAllocated", metrics);
+    assertEquals(maxPipelineCount, numPipelineAllocated - baselineAllocated);
 
     long numPipelineCreateFailed = getLongCounter(
         "NumPipelineCreationFailed", metrics);
-    assertEquals(0, numPipelineCreateFailed);
+    assertEquals(0, numPipelineCreateFailed - baselineFailed);
 
     //This should fail...
     SCMException e =
@@ -447,11 +449,11 @@ public class TestPipelineManagerImpl {
     metrics = getMetrics(
         SCMPipelineMetrics.class.getSimpleName());
     numPipelineAllocated = getLongCounter("NumPipelineAllocated", metrics);
-    assertEquals(maxPipelineCount, numPipelineAllocated);
+    assertEquals(maxPipelineCount, numPipelineAllocated - baselineAllocated);
 
     numPipelineCreateFailed = getLongCounter(
         "NumPipelineCreationFailed", metrics);
-    assertEquals(1, numPipelineCreateFailed);
+    assertEquals(1, numPipelineCreateFailed - baselineFailed);
 
     // clean up
     pipelineManager.close();
@@ -882,7 +884,7 @@ public class TestPipelineManagerImpl {
     pipelineManager.addContainerToPipeline(
         allocatedPipeline.getId(), container.containerID());
     doReturn(container).when(containerManager).getMatchingContainer(anyLong(),
-        anyString(), eq(allocatedPipeline), any());
+        anyString(), eq(allocatedPipeline), any(), any());
 
 
     assertTrue(pipelineManager.getPipelines(repConfig,  OPEN)

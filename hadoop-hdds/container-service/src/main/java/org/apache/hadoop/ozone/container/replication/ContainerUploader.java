@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.concurrent.CompletableFuture;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.StorageType;
 
 /**
  * Client-side interface for sending a container to a target datanode.
@@ -29,4 +30,10 @@ public interface ContainerUploader {
   OutputStream startUpload(long containerId, DatanodeDetails target,
       CompletableFuture<Void> callback, CopyContainerCompression compression)
       throws IOException;
+
+  default OutputStream startUpload(long containerId, DatanodeDetails target,
+      CompletableFuture<Void> callback, CopyContainerCompression compression,
+      StorageType storageType) throws IOException {
+    return startUpload(containerId, target, callback, compression);
+  }
 }

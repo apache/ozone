@@ -80,7 +80,8 @@ public class ECReconstructionCoordinatorTask
           reconstructionCommandInfo.getContainerID(),
           reconstructionCommandInfo.getEcReplicationConfig(),
           reconstructionCommandInfo.getSourceNodeMap(),
-          reconstructionCommandInfo.getTargetNodeMap());
+          reconstructionCommandInfo.getTargetNodeMap(),
+          reconstructionCommandInfo.getStorageType());
       long elapsed = Time.monotonicNow() - start;
       setStatus(Status.DONE);
       LOG.info("{} in {} ms", this, elapsed);

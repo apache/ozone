@@ -31,6 +31,7 @@ import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
+import org.apache.hadoop.hdds.protocol.StorageType;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.junit.jupiter.api.Test;
 
@@ -111,6 +112,58 @@ public class TestReconstructionECContainersCommands {
       dns.add(MockDatanodeDetails.randomDatanodeDetails());
     }
     return dns;
+  }
+
+  @Test
+  public void testStorageTypeRoundTrip() {
+    byte[] missingIndexes = {1, 2};
+    final ByteString missingContainerIndexes =
+        UnsafeByteOperations.unsafeWrap(missingIndexes);
+    ECReplicationConfig ecReplicationConfig = new ECReplicationConfig(3, 2);
+    final List<DatanodeDetails> dnDetails = getDNDetails(5);
+
+    List<ReconstructECContainersCommand.DatanodeDetailsAndReplicaIndex>
+        sources = dnDetails.stream().map(
+          a -> new ReconstructECContainersCommand
+              .DatanodeDetailsAndReplicaIndex(a, dnDetails.indexOf(a)))
+        .collect(Collectors.toList());
+    List<DatanodeDetails> targets = getDNDetails(2);
+    ReconstructECContainersCommand cmd =
+        new ReconstructECContainersCommand(1L, sources, targets,
+            missingContainerIndexes, ecReplicationConfig, 42L,
+            StorageType.SSD);
+
+    assertEquals(StorageType.SSD, cmd.getStorageType());
+
+    StorageContainerDatanodeProtocolProtos
+        .ReconstructECContainersCommandProto proto = cmd.getProto();
+    ReconstructECContainersCommand fromProto =
+        ReconstructECContainersCommand.getFromProtobuf(proto);
+
+    assertEquals(StorageType.SSD, fromProto.getStorageType());
+    assertEquals(cmd.getContainerID(), fromProto.getContainerID());
+  }
+
+  @Test
+  public void testStorageTypeNullRoundTrip() {
+    byte[] missingIndexes = {1};
+    final ByteString missingContainerIndexes =
+        UnsafeByteOperations.unsafeWrap(missingIndexes);
+    ECReplicationConfig ecReplicationConfig = new ECReplicationConfig(3, 2);
+    List<DatanodeDetails> targets = getDNDetails(1);
+
+    ReconstructECContainersCommand cmd =
+        new ReconstructECContainersCommand(2L, Collections.emptyList(),
+            targets, missingContainerIndexes, ecReplicationConfig);
+
+    assertEquals(null, cmd.getStorageType());
+
+    StorageContainerDatanodeProtocolProtos
+        .ReconstructECContainersCommandProto proto = cmd.getProto();
+    ReconstructECContainersCommand fromProto =
+        ReconstructECContainersCommand.getFromProtobuf(proto);
+
+    assertEquals(null, fromProto.getStorageType());
   }
 
 }
