@@ -17,11 +17,13 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
-import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.ListArgument;
-import org.apache.hadoop.hdds.scm.ha.ReflectionUtil;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 
@@ -29,53 +31,82 @@ import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferExce
  * {@link ScmCodec} for {@link List} objects.
  */
 public class ScmListCodec implements ScmCodec<Object> {
+  private static final ByteString EMPTY_LIST = ListArgument.newBuilder()
+      .setType(Object.class.getName())
+      .build()
+      .toByteString();
 
-  @Override
-  public ByteString serialize(Object object)
-      throws InvalidProtocolBufferException {
-    final ListArgument.Builder listArgs = ListArgument.newBuilder();
-    final List<?> values = (List<?>) object;
-    if (!values.isEmpty()) {
-      Class<?> type = values.get(0).getClass();
-      listArgs.setType(type.getName());
-      for (Object value : values) {
-        listArgs.addValue(ScmCodecFactory.getCodec(type).serialize(value));
-      }
-    } else {
-      listArgs.setType(Object.class.getName());
+  private final Map<String, Class<?>> classes;
+
+  public ScmListCodec(Collection<Class<?>> classes) {
+    final Map<String, Class<?>> map = new TreeMap<>();
+    for (Class<?> c : classes) {
+      map.put(c.getName(), c);
     }
-    return listArgs.build().toByteString();
+    map.put(List.class.getName(), List.class);
+    this.classes = Collections.unmodifiableMap(map);
+  }
+
+  private Class<?> getClass(String type) throws InvalidProtocolBufferException {
+    final Class<?> clazz = classes.get(type);
+    if (clazz == null) {
+      throw new InvalidProtocolBufferException("Class not found for type: " + type);
+    }
+    return clazz;
   }
 
   @Override
-  public Object deserialize(Class<?> type, ByteString value)
-      throws InvalidProtocolBufferException {
-    try {
-      // If argument type is the generic interface, then determine a
-      // concrete implementation.
-      Class<?> concreteType = (type == List.class) ? ArrayList.class : type;
-
-      List<Object> result = (List<Object>) concreteType.newInstance();
-      final ListArgument listArgs = (ListArgument) ReflectionUtil
-          .getMethod(ListArgument.class, "parseFrom", byte[].class)
-          .invoke(null, (Object) value.toByteArray());
-
-      // proto2 required-equivalent check
-      if (!listArgs.hasType()) {
-        throw new InvalidProtocolBufferException("Missing ListArgument.type");
-      }
-
-      final Class<?> dataType = ReflectionUtil.getClass(listArgs.getType());
-      for (ByteString element : listArgs.getValueList()) {
-        result.add(ScmCodecFactory.getCodec(dataType)
-            .deserialize(dataType, element));
-      }
-      return result;
-    } catch (InstantiationException | NoSuchMethodException |
-        IllegalAccessException | InvocationTargetException |
-        ClassNotFoundException ex) {
-      throw new InvalidProtocolBufferException(
-          "Message cannot be decoded: " + ex.getMessage());
+  public ByteString serialize(Object object) throws InvalidProtocolBufferException {
+    if (!(object instanceof List)) {
+      throw new InvalidProtocolBufferException("Unexpected non-list object: " + object.getClass());
     }
+    final List<?> elements = (List<?>) object;
+    if (elements.isEmpty()) {
+      return EMPTY_LIST;
+    }
+
+    Class<?> runtimeClass = elements.get(0).getClass();
+
+    Class<?> registeredClass = null;
+    for (Class<?> clazz : classes.values()) {
+      if (clazz.isAssignableFrom(runtimeClass)) {
+        registeredClass = clazz;
+        break;
+      }
+    }
+
+    if (registeredClass == null) {
+      throw new InvalidProtocolBufferException(
+          "Unsupported list element type: " + runtimeClass.getName());
+    }
+
+    final String elementType = registeredClass.getName();
+
+    final ScmCodec<Object> elementCodec =
+        ScmCodecFactory.getCodec(getClass(elementType));
+    final ListArgument.Builder builder = ListArgument.newBuilder()
+        .setType(elementType);
+    for (Object e : elements) {
+      builder.addValue(elementCodec.serialize(e));
+    }
+    return builder.build().toByteString();
+  }
+
+  @Override
+  public Object deserialize(Class<?> type, ByteString value) throws InvalidProtocolBufferException {
+    if (!List.class.isAssignableFrom(type)) {
+      throw new InvalidProtocolBufferException("Unexpected non-list type: " + type);
+    }
+    final ListArgument argument = ListArgument.parseFrom(value.asReadOnlyByteBuffer());
+    if (!argument.hasType()) {
+      throw new InvalidProtocolBufferException("Missing ListArgument.type: " + argument);
+    }
+    final Class<?> elementClass = getClass(argument.getType());
+    final ScmCodec<?> elementCodec = ScmCodecFactory.getCodec(elementClass);
+    final List<Object> list = new ArrayList<>();
+    for (ByteString element : argument.getValueList()) {
+      list.add(elementCodec.deserialize(elementClass, element));
+    }
+    return list;
   }
 }

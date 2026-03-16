@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
@@ -216,7 +217,7 @@ public class TestSCMRatisRequest {
             .addValue(ByteString.copyFromUtf8("x"))
             .build();
 
-    ScmListCodec codec = new ScmListCodec();
+    ScmListCodec codec = new ScmListCodec(Collections.emptyList());
 
     InvalidProtocolBufferException ex = assertThrows(
         InvalidProtocolBufferException.class,

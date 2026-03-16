@@ -55,7 +55,6 @@ public final class ScmCodecFactory {
     putProto(DeletedBlocksTransaction.getDefaultInstance());
     putProto(DeletedBlocksTransactionSummary.getDefaultInstance());
 
-    codecs.put(List.class, new ScmListCodec());
     codecs.put(Integer.class, new ScmIntegerCodec());
     codecs.put(Long.class, new ScmLongCodec());
     codecs.put(String.class, new ScmStringCodec());
@@ -69,6 +68,9 @@ public final class ScmCodecFactory {
     putEnum(LifeCycleEvent.class, LifeCycleEvent::forNumber);
     putEnum(PipelineState.class, PipelineState::forNumber);
     putEnum(NodeType.class, NodeType::forNumber);
+
+    // Must be the last one
+    codecs.put(List.class, new ScmListCodec(codecs.keySet()));
   }
 
   static <T extends Message> void putProto(T proto) {
