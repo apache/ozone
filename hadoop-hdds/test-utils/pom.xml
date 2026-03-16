@@ -34,10 +34,6 @@ https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
   <dependencies>
     <dependency>
-      <groupId>org.assertj</groupId>
-      <artifactId>assertj-core</artifactId>
-    </dependency>
-    <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
     </dependency>
