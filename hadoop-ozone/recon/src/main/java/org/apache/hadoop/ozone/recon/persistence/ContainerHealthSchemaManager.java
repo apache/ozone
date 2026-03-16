@@ -302,6 +302,46 @@ public class ContainerHealthSchemaManager {
   }
 
   /**
+   * Preserve existing inStateSince values for records that remain in the
+   * same unhealthy state across scan cycles.
+   */
+  public List<UnhealthyContainerRecord> applyExistingInStateSince(
+      List<UnhealthyContainerRecord> records,
+      List<Long> containerIds) {
+    if (records == null || records.isEmpty()
+        || containerIds == null || containerIds.isEmpty()) {
+      return records;
+    }
+
+    Map<ContainerStateKey, Long> existingByContainerAndState =
+        getExistingInStateSinceByContainerIds(containerIds);
+    if (existingByContainerAndState.isEmpty()) {
+      return records;
+    }
+
+    List<UnhealthyContainerRecord> withPreservedInStateSince =
+        new ArrayList<>(records.size());
+    for (UnhealthyContainerRecord record : records) {
+      Long existingInStateSince = existingByContainerAndState.get(
+          new ContainerStateKey(record.getContainerId(),
+              record.getContainerState()));
+      if (existingInStateSince == null) {
+        withPreservedInStateSince.add(record);
+      } else {
+        withPreservedInStateSince.add(new UnhealthyContainerRecord(
+            record.getContainerId(),
+            record.getContainerState(),
+            existingInStateSince,
+            record.getExpectedReplicaCount(),
+            record.getActualReplicaCount(),
+            record.getReplicaDelta(),
+            record.getReason()));
+      }
+    }
+    return withPreservedInStateSince;
+  }
+
+  /**
    * Get summary of unhealthy containers grouped by state from UNHEALTHY_CONTAINERS table.
    */
   public List<UnhealthyContainersSummary> getUnhealthyContainersSummary() {

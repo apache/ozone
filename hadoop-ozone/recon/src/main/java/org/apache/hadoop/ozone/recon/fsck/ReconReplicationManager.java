@@ -386,33 +386,32 @@ public class ReconReplicationManager extends ReplicationManager {
         ContainerID containerId = container.containerID();
         try {
           if (missingContainers.contains(containerId)) {
-            handleMissingContainer(containerId, currentTime,
-                existingInStateSinceByContainerAndState, recordsToInsert, chunkStats);
+            handleMissingContainer(containerId, currentTime, recordsToInsert,
+                chunkStats);
           }
           if (underReplicatedContainers.contains(containerId)) {
             chunkStats.incrementUnderRepCount();
             handleReplicaStateContainer(containerId, currentTime,
                 UnHealthyContainerStates.UNDER_REPLICATED,
-                existingInStateSinceByContainerAndState, recordsToInsert,
+                recordsToInsert,
                 negativeSizeRecorded, chunkStats);
           }
           if (overReplicatedContainers.contains(containerId)) {
             chunkStats.incrementOverRepCount();
             handleReplicaStateContainer(containerId, currentTime,
                 UnHealthyContainerStates.OVER_REPLICATED,
-                existingInStateSinceByContainerAndState, recordsToInsert,
+                recordsToInsert,
                 negativeSizeRecorded, chunkStats);
           }
           if (misReplicatedContainers.contains(containerId)) {
             chunkStats.incrementMisRepCount();
             handleReplicaStateContainer(containerId, currentTime,
                 UnHealthyContainerStates.MIS_REPLICATED,
-                existingInStateSinceByContainerAndState, recordsToInsert,
+                recordsToInsert,
                 negativeSizeRecorded, chunkStats);
           }
           if (replicaMismatchContainers.contains(containerId)) {
-            processReplicaMismatchContainer(containerId, currentTime,
-                existingInStateSinceByContainerAndState, recordsToInsert);
+            processReplicaMismatchContainer(containerId, currentTime, recordsToInsert);
             totalReplicaMismatchCount++;
           }
         } catch (ContainerNotFoundException e) {
@@ -421,6 +420,8 @@ public class ReconReplicationManager extends ReplicationManager {
         }
       }
 
+      recordsToInsert = healthSchemaManager.applyExistingInStateSince(
+          recordsToInsert, chunkContainerIds);
       totalStats.add(chunkStats);
       persistUnhealthyRecords(existingContainerIdsToDelete, recordsToInsert);
     }
@@ -436,7 +437,6 @@ public class ReconReplicationManager extends ReplicationManager {
   private void handleMissingContainer(
       ContainerID containerId,
       long currentTime,
-      Map<ContainerStateKey, Long> existingInStateSinceByContainerAndState,
       List<ContainerHealthSchemaManager.UnhealthyContainerRecord> recordsToInsert,
       ProcessingStats stats) throws ContainerNotFoundException {
     ContainerInfo container = containerManager.getContainer(containerId);
@@ -445,9 +445,7 @@ public class ReconReplicationManager extends ReplicationManager {
       stats.incrementEmptyMissingCount();
       recordsToInsert.add(createRecord(container,
           UnHealthyContainerStates.EMPTY_MISSING,
-          resolveInStateSince(container.getContainerID(),
-              UnHealthyContainerStates.EMPTY_MISSING, currentTime,
-              existingInStateSinceByContainerAndState),
+          currentTime,
           expected, 0,
           "Container has no replicas and no keys"));
       return;
@@ -456,9 +454,7 @@ public class ReconReplicationManager extends ReplicationManager {
     stats.incrementMissingCount();
     recordsToInsert.add(createRecord(container,
         UnHealthyContainerStates.MISSING,
-        resolveInStateSince(container.getContainerID(),
-            UnHealthyContainerStates.MISSING, currentTime,
-            existingInStateSinceByContainerAndState),
+        currentTime,
         expected, 0,
         "No replicas available"));
   }
@@ -467,7 +463,6 @@ public class ReconReplicationManager extends ReplicationManager {
       ContainerID containerId,
       long currentTime,
       UnHealthyContainerStates targetState,
-      Map<ContainerStateKey, Long> existingInStateSinceByContainerAndState,
       List<ContainerHealthSchemaManager.UnhealthyContainerRecord> recordsToInsert,
       Set<Long> negativeSizeRecorded,
       ProcessingStats stats) throws ContainerNotFoundException {
@@ -476,17 +471,15 @@ public class ReconReplicationManager extends ReplicationManager {
     int expected = container.getReplicationConfig().getRequiredNodes();
     int actual = replicas.size();
     recordsToInsert.add(createRecord(container, targetState,
-        resolveInStateSince(container.getContainerID(), targetState,
-            currentTime, existingInStateSinceByContainerAndState),
+        currentTime,
         expected, actual, reasonForState(targetState)));
     addNegativeSizeRecordIfNeeded(container, currentTime, actual, recordsToInsert,
-        existingInStateSinceByContainerAndState, negativeSizeRecorded, stats);
+        negativeSizeRecorded, stats);
   }
 
   private void processReplicaMismatchContainer(
       ContainerID containerId,
       long currentTime,
-      Map<ContainerStateKey, Long> existingInStateSinceByContainerAndState,
       List<ContainerHealthSchemaManager.UnhealthyContainerRecord> recordsToInsert) throws ContainerNotFoundException {
     ContainerInfo container = containerManager.getContainer(containerId);
     Set<ContainerReplica> replicas = containerManager.getContainerReplicas(containerId);
@@ -494,9 +487,7 @@ public class ReconReplicationManager extends ReplicationManager {
     int actual = replicas.size();
     recordsToInsert.add(createRecord(container,
         UnHealthyContainerStates.REPLICA_MISMATCH,
-        resolveInStateSince(container.getContainerID(),
-            UnHealthyContainerStates.REPLICA_MISMATCH, currentTime,
-            existingInStateSinceByContainerAndState),
+        currentTime,
         expected, actual,
         "Data checksum mismatch across replicas"));
   }
@@ -532,7 +523,6 @@ public class ReconReplicationManager extends ReplicationManager {
       long currentTime,
       int actualReplicaCount,
       List<ContainerHealthSchemaManager.UnhealthyContainerRecord> recordsToInsert,
-      Map<ContainerStateKey, Long> existingInStateSinceByContainerAndState,
       Set<Long> negativeSizeRecorded,
       ProcessingStats stats) {
     if (isNegativeSize(container)
@@ -540,20 +530,11 @@ public class ReconReplicationManager extends ReplicationManager {
       int expected = container.getReplicationConfig().getRequiredNodes();
       recordsToInsert.add(createRecord(container,
           UnHealthyContainerStates.NEGATIVE_SIZE,
-          resolveInStateSince(container.getContainerID(),
-              UnHealthyContainerStates.NEGATIVE_SIZE, currentTime,
-              existingInStateSinceByContainerAndState),
+          currentTime,
           expected, actualReplicaCount,
           "Container reports negative usedBytes"));
       stats.incrementNegativeSizeCount();
     }
-  }
-
-  private long resolveInStateSince(long containerId, UnHealthyContainerStates state,
-      long currentTime, Map<ContainerStateKey, Long> existingInStateSinceByContainerAndState) {
-    Long inStateSince = existingInStateSinceByContainerAndState.get(
-        new ContainerStateKey(containerId, state.toString()));
-    return inStateSince == null ? currentTime : inStateSince;
   }
 
   private String reasonForState(UnHealthyContainerStates state) {
