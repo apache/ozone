@@ -21,7 +21,7 @@ import javax.inject.Inject;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
 import org.apache.hadoop.ozone.recon.chatbot.agent.ChatbotAgent;
-import org.apache.hadoop.ozone.recon.chatbot.llm.LLMProvider;
+import org.apache.hadoop.ozone.recon.chatbot.llm.LLMClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,15 +52,15 @@ public class ChatbotEndpoint {
   private static final Logger LOG = LoggerFactory.getLogger(ChatbotEndpoint.class);
 
   private final ChatbotAgent chatbotAgent;
-  private final LLMProvider llmProvider;
+  private final LLMClient llmClient;
   private final OzoneConfiguration configuration;
 
   @Inject
   public ChatbotEndpoint(ChatbotAgent chatbotAgent,
-      LLMProvider llmProvider,
+      LLMClient llmClient,
       OzoneConfiguration configuration) {
     this.chatbotAgent = chatbotAgent;
-    this.llmProvider = llmProvider;
+    this.llmClient = llmClient;
     this.configuration = configuration;
 
     LOG.info("ChatbotEndpoint initialized via Guice injection");
@@ -84,8 +84,8 @@ public class ChatbotEndpoint {
     Map<String, Object> response = new HashMap<>();
     boolean enabled = isChatbotEnabled();
     response.put("enabled", enabled);
-    response.put("llmProviderAvailable",
-        enabled && llmProvider != null && llmProvider.isAvailable());
+    response.put("llmClientAvailable",
+        enabled && llmClient != null && llmClient.isAvailable());
     return Response.ok(response).build();
   }
 
@@ -153,7 +153,7 @@ public class ChatbotEndpoint {
     }
 
     try {
-      List<String> models = llmProvider.getSupportedModels();
+      List<String> models = llmClient.getSupportedModels();
       return Response.ok(Collections.singletonMap("models", models)).build();
     } catch (Exception e) {
       LOG.error("Error fetching supported models", e);

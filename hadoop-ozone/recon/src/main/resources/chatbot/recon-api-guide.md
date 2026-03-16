@@ -2618,7 +2618,7 @@ Each **datanode object** includes:
 
 Reports DataNodes that were removed or decommissioned from the cluster.
 
-Returned by `/datanodes/removed`.
+Returned by `/datanodes/remove`.
 
 **Fields**
 
@@ -2650,7 +2650,7 @@ Each **removed datanode** includes:
 
 Details current decommissioning progress for each DataNode.
 
-Returned by `/datanodes/decommission`.
+Returned by `/datanodes/decommission/info`.
 
 **Fields**
 
@@ -2729,7 +2729,7 @@ Here’s a **complete and Gemini-optimized documentation block** for the
 
 Describes full metadata and network topology details of a single Ozone **DataNode**.
 
-Used in APIs like `/datanodes`, `/datanodes/decommission`, and internal cluster diagnostics.
+Used in APIs like `/datanodes`, `/datanodes/decommission/info`, and internal cluster diagnostics.
 
 ---
 

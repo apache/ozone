@@ -22,8 +22,8 @@ import com.google.inject.Scopes;
 import org.apache.hadoop.ozone.recon.chatbot.agent.ChatbotAgent;
 import org.apache.hadoop.ozone.recon.chatbot.agent.ToolExecutor;
 import org.apache.hadoop.ozone.recon.chatbot.api.ChatbotEndpoint;
-import org.apache.hadoop.ozone.recon.chatbot.llm.LLMProvider;
-import org.apache.hadoop.ozone.recon.chatbot.llm.LLMProviderRouter;
+import org.apache.hadoop.ozone.recon.chatbot.llm.LLMClient;
+import org.apache.hadoop.ozone.recon.chatbot.llm.LLMDispatcher;
 import org.apache.hadoop.ozone.recon.chatbot.security.CredentialHelper;
 
 /**
@@ -37,7 +37,7 @@ public class ChatbotModule extends AbstractModule {
     bind(CredentialHelper.class).in(Scopes.SINGLETON);
 
     // Bind LLM provider — router delegates to direct providers
-    bind(LLMProvider.class).to(LLMProviderRouter.class).in(Scopes.SINGLETON);
+    bind(LLMClient.class).to(LLMDispatcher.class).in(Scopes.SINGLETON);
 
     // Bind agent components
     bind(ToolExecutor.class).in(Scopes.SINGLETON);

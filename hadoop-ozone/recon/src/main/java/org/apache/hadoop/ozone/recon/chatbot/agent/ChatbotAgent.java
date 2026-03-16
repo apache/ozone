@@ -23,9 +23,9 @@ import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.ozone.recon.chatbot.ChatbotConfigKeys;
-import org.apache.hadoop.ozone.recon.chatbot.llm.LLMProvider;
-import org.apache.hadoop.ozone.recon.chatbot.llm.LLMProvider.ChatMessage;
-import org.apache.hadoop.ozone.recon.chatbot.llm.LLMProvider.LLMResponse;
+import org.apache.hadoop.ozone.recon.chatbot.llm.LLMClient;
+import org.apache.hadoop.ozone.recon.chatbot.llm.LLMClient.ChatMessage;
+import org.apache.hadoop.ozone.recon.chatbot.llm.LLMClient.LLMResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,7 +57,7 @@ public class ChatbotAgent {
   private static final String LIST_KEYS_ENDPOINT_SUFFIX = "/keys/listKeys";
 
   // The connection to Gemini/OpenAI
-  private final LLMProvider llmProvider;
+  private final LLMClient llmClient;
 
   // The hands that execute the internal API calls
   private final ToolExecutor toolExecutor;
@@ -81,10 +81,10 @@ public class ChatbotAgent {
   private volatile String currentProvider;
 
   @Inject
-  public ChatbotAgent(LLMProvider llmProvider,
+  public ChatbotAgent(LLMClient llmClient,
                       ToolExecutor toolExecutor,
                       OzoneConfiguration configuration) {
-    this.llmProvider = llmProvider;
+    this.llmClient = llmClient;
     this.toolExecutor = toolExecutor;
 
     // Read the Schema (Cheat Sheet) from the resources' folder.
@@ -253,7 +253,7 @@ public class ChatbotAgent {
     }
 
     // Send the request to the LLM
-    LLMResponse response = llmProvider.chatCompletion(messages, model, apiKey, parameters);
+    LLMResponse response = llmClient.chatCompletion(messages, model, apiKey, parameters);
 
     LOG.info("Tool selection LLM response: model={}, promptTokens={}, completionTokens={}, totalTokens={}",
         response.getModel(),
@@ -348,7 +348,7 @@ public class ChatbotAgent {
     }
 
     // Send the request to the LLM
-    LLMResponse response = llmProvider.chatCompletion(messages, model, apiKey, parameters);
+    LLMResponse response = llmClient.chatCompletion(messages, model, apiKey, parameters);
 
     LOG.info("Summarization LLM response: model={}, promptTokens={}, " +
             "completionTokens={}, totalTokens={}",
@@ -389,7 +389,7 @@ public class ChatbotAgent {
       parameters.put("_provider", currentProvider);
     }
 
-    LLMResponse response = llmProvider.chatCompletion(
+    LLMResponse response = llmClient.chatCompletion(
         messages, model, apiKey, parameters);
 
     return response.getContent();

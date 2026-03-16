@@ -33,13 +33,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Tests for {@link LLMProviderRouter}.
+ * Tests for {@link LLMDispatcher}.
  */
-public class TestLLMProviderRouter {
+public class TestLLMDispatcher {
 
     private OzoneConfiguration conf;
     private CredentialHelper credentialHelper;
-    private LLMProviderRouter router;
+    private LLMDispatcher router;
 
     @BeforeEach
     public void setUp() {
@@ -47,20 +47,20 @@ public class TestLLMProviderRouter {
         // Set Gemini as default provider.
         conf.set(ChatbotConfigKeys.OZONE_RECON_CHATBOT_PROVIDER, "gemini");
         credentialHelper = new CredentialHelper(conf);
-        router = new LLMProviderRouter(conf, credentialHelper);
+        router = new LLMDispatcher(conf, credentialHelper);
     }
 
     @Test
     public void testEmptyMessagesThrows() {
-        List<LLMProvider.ChatMessage> messages = new ArrayList<>();
-        assertThrows(LLMProvider.LLMException.class, () -> {
+        List<LLMClient.ChatMessage> messages = new ArrayList<>();
+        assertThrows(LLMClient.LLMException.class, () -> {
             router.chatCompletion(messages, "gpt-4", null, new HashMap<>());
         });
     }
 
     @Test
     public void testNullMessagesThrows() {
-        assertThrows(LLMProvider.LLMException.class, () -> {
+        assertThrows(LLMClient.LLMException.class, () -> {
             router.chatCompletion(null, "gpt-4", null, new HashMap<>());
         });
     }
@@ -85,7 +85,7 @@ public class TestLLMProviderRouter {
                 "test-key");
         // Recreate helper and router with new config.
         credentialHelper = new CredentialHelper(conf);
-        router = new LLMProviderRouter(conf, credentialHelper);
+        router = new LLMDispatcher(conf, credentialHelper);
         assertTrue(router.isAvailable());
     }
 
@@ -94,11 +94,11 @@ public class TestLLMProviderRouter {
         // Verify gemini model routes to gemini provider by checking
         // that chatCompletion throws LLMException about missing key
         // (not about unknown provider).
-        List<LLMProvider.ChatMessage> messages = new ArrayList<>();
-        messages.add(new LLMProvider.ChatMessage("user", "hello"));
+        List<LLMClient.ChatMessage> messages = new ArrayList<>();
+        messages.add(new LLMClient.ChatMessage("user", "hello"));
 
-        LLMProvider.LLMException ex = assertThrows(
-                LLMProvider.LLMException.class,
+        LLMClient.LLMException ex = assertThrows(
+                LLMClient.LLMException.class,
                 () -> router.chatCompletion(
                         messages, "gemini-2.0-flash", null, new HashMap<>()));
         assertTrue(ex.getMessage().contains("gemini"),
@@ -107,11 +107,11 @@ public class TestLLMProviderRouter {
 
     @Test
     public void testRoutingOpenAIModel() {
-        List<LLMProvider.ChatMessage> messages = new ArrayList<>();
-        messages.add(new LLMProvider.ChatMessage("user", "hello"));
+        List<LLMClient.ChatMessage> messages = new ArrayList<>();
+        messages.add(new LLMClient.ChatMessage("user", "hello"));
 
-        LLMProvider.LLMException ex = assertThrows(
-                LLMProvider.LLMException.class,
+        LLMClient.LLMException ex = assertThrows(
+                LLMClient.LLMException.class,
                 () -> router.chatCompletion(
                         messages, "gpt-4", null, new HashMap<>()));
         assertTrue(ex.getMessage().contains("openai"),
@@ -120,11 +120,11 @@ public class TestLLMProviderRouter {
 
     @Test
     public void testRoutingClaudeModel() {
-        List<LLMProvider.ChatMessage> messages = new ArrayList<>();
-        messages.add(new LLMProvider.ChatMessage("user", "hello"));
+        List<LLMClient.ChatMessage> messages = new ArrayList<>();
+        messages.add(new LLMClient.ChatMessage("user", "hello"));
 
-        LLMProvider.LLMException ex = assertThrows(
-                LLMProvider.LLMException.class,
+        LLMClient.LLMException ex = assertThrows(
+                LLMClient.LLMException.class,
                 () -> router.chatCompletion(
                         messages, "claude-3-sonnet-20240229", null, new HashMap<>()));
         assertTrue(ex.getMessage().contains("anthropic"),
@@ -133,12 +133,12 @@ public class TestLLMProviderRouter {
 
     @Test
     public void testUnknownModelUsesDefault() {
-        List<LLMProvider.ChatMessage> messages = new ArrayList<>();
-        messages.add(new LLMProvider.ChatMessage("user", "hello"));
+        List<LLMClient.ChatMessage> messages = new ArrayList<>();
+        messages.add(new LLMClient.ChatMessage("user", "hello"));
 
         // Unknown model should route to the default (gemini).
-        LLMProvider.LLMException ex = assertThrows(
-                LLMProvider.LLMException.class,
+        LLMClient.LLMException ex = assertThrows(
+                LLMClient.LLMException.class,
                 () -> router.chatCompletion(
                         messages, "some-unknown-model", null, new HashMap<>()));
         assertTrue(ex.getMessage().contains("gemini"),
@@ -149,13 +149,13 @@ public class TestLLMProviderRouter {
     public void testCustomDefaultProvider() {
         conf.set(ChatbotConfigKeys.OZONE_RECON_CHATBOT_PROVIDER, "openai");
         credentialHelper = new CredentialHelper(conf);
-        router = new LLMProviderRouter(conf, credentialHelper);
+        router = new LLMDispatcher(conf, credentialHelper);
 
-        List<LLMProvider.ChatMessage> messages = new ArrayList<>();
-        messages.add(new LLMProvider.ChatMessage("user", "hello"));
+        List<LLMClient.ChatMessage> messages = new ArrayList<>();
+        messages.add(new LLMClient.ChatMessage("user", "hello"));
 
-        LLMProvider.LLMException ex = assertThrows(
-                LLMProvider.LLMException.class,
+        LLMClient.LLMException ex = assertThrows(
+                LLMClient.LLMException.class,
                 () -> router.chatCompletion(
                         messages, "some-unknown-model", null, new HashMap<>()));
         assertTrue(ex.getMessage().contains("openai"),

@@ -21,17 +21,17 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * LLMProvider is the "Master Contract" for the whole Chatbot system.
+ * LLMClient is the "Master Contract" for the whole Chatbot system.
  * 
  * Purpose:
  * The ChatbotAgent doesn't know (or care) if it's talking to OpenAI, Gemini, or a Local LLM.
- * It strictly relies on this interface. This interface forces every AI provider to guarantee
+ * It strictly relies on this interface. This interface forces every AI client to guarantee
  * that they will accept exactly the same input and return exactly the same output.
  * 
  * By using this contract, we can add 10 new AI models to Recon tomorrow,
  * and we will never have to edit the ChatbotAgent's code to support them!
  */
-public interface LLMProvider {
+public interface LLMClient {
 
   /**
    * The core action: Send a conversation to an AI and wait for its answer.
@@ -51,12 +51,12 @@ public interface LLMProvider {
       Map<String, Object> parameters) throws LLMException;
 
   /**
-   * Quick check to see if this provider is ready to work (e.g., does it have an API key saved?)
+   * Quick check to see if this client is ready to work (e.g., does it have an API key saved?)
    */
   boolean isAvailable();
 
   /**
-   * Asks the AI provider for a list of all the different models it supports right now.
+   * Asks the AI client for a list of all the different models it supports right now.
    * We use this to populate the drop-down menu in the user interface!
    */
   List<String> getSupportedModels();
