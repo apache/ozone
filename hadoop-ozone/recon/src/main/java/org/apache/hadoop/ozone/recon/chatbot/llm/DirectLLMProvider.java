@@ -146,9 +146,7 @@ public abstract class DirectLLMProvider {
 
         HttpURLConnection conn = null;
         try {
-            conn = buildChatRequest(
-                    messages, model, resolvedKey,
-                    parameters != null ? parameters : new HashMap<>());
+            conn = buildChatRequest(messages, model, resolvedKey, parameters != null ? parameters : new HashMap<>());
 
             LOG.debug("Sending chat request to {}: model={}",
                     getProviderName(), model);

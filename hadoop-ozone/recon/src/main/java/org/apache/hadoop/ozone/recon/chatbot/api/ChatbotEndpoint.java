@@ -96,12 +96,15 @@ public class ChatbotEndpoint {
   @Path("/chat")
   @Consumes(MediaType.APPLICATION_JSON)
   public Response chat(ChatRequest request) {
+
+    // Safety check 1: If chatbot is disabled, throw a 503 Service Unavailable error immediately.
     if (!isChatbotEnabled()) {
       return Response.status(Response.Status.SERVICE_UNAVAILABLE)
           .entity(Collections.singletonMap("error", "Chatbot service is not enabled"))
           .build();
     }
 
+    // Safety check 2: If the user didn't really ask a question, throw a 400 Bad Request.
     if (request.getQuery() == null || request.getQuery().trim().isEmpty()) {
       return Response.status(Response.Status.BAD_REQUEST)
           .entity(Collections.singletonMap("error", "Query cannot be empty"))
@@ -114,13 +117,15 @@ public class ChatbotEndpoint {
           request.getModel() == null ? "default" : request.getModel(),
           request.getProvider() == null ? "auto" : request.getProvider());
 
-      // Process the query — API key resolved from JCEKS by the provider.
+      // Pass the user's question to the Brain (ChatbotAgent) to do all the hard work.
+      // This step takes a few seconds because it talks to Gemini and the Recon APIs.
       String response = chatbotAgent.processQuery(
           request.getQuery(),
           request.getModel(),
           request.getProvider(),
           null);
 
+      // Take the answer the ChatbotAgent gave us, format it into a Response object
       ChatResponse chatResponse = new ChatResponse();
       chatResponse.setResponse(response);
       chatResponse.setSuccess(true);
@@ -159,13 +164,16 @@ public class ChatbotEndpoint {
   }
 
   /**
-   * Masks user ID for safe logging while preserving traceability.
+   * Helper function: Masks user ID for safe logging.
+   * E.g., turns "admin@example.com" into "ad***@example.com"
+   * This is important so we don't leak user identities in system logs.
    */
   private String sanitizeUserId(String userId) {
     if (userId == null || userId.isEmpty()) {
       return "none";
     }
     int atIndex = userId.indexOf('@');
+    // If it's an email address...
     if (atIndex > 0 && atIndex < userId.length() - 1) {
       String local = userId.substring(0, atIndex);
       String domain = userId.substring(atIndex + 1);
@@ -173,15 +181,25 @@ public class ChatbotEndpoint {
           : local.substring(0, 2) + "***";
       return maskedLocal + "@" + domain;
     }
+
+    // If it's just a short username
     if (userId.length() <= 4) {
       return "****";
     }
+
+    // If it's a longer username
     return userId.substring(0, 2) + "***" +
         userId.substring(userId.length() - 2);
   }
 
+  // =========================================================================
+  // Data Transfer Objects (DTOs)
+  // These are simple classes that translate JSON into Java objects and vice versa.
+  // =========================================================================
   /**
-   * Chat request DTO.
+   * Chat request DTO. (This maps to the JSON we send in our Curl command)
+   * The JsonIgnoreProperties annotation tells the JSON parser not to crash
+   * if the user sends an extra field we aren't expecting.
    */
   @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
   public static class ChatRequest {
@@ -224,7 +242,7 @@ public class ChatbotEndpoint {
   }
 
   /**
-   * Chat response DTO.
+   * Chat response DTO. (This maps to the JSON we send BACK to the user)
    */
   @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
   public static class ChatResponse {

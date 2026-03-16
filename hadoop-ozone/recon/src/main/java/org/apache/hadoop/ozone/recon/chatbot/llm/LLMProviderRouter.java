@@ -60,20 +60,16 @@ public class LLMProviderRouter implements LLMProvider {
                 ChatbotConfigKeys.OZONE_RECON_CHATBOT_TIMEOUT_MS_DEFAULT);
 
         this.providers = new HashMap<>();
-        providers.put("openai",
-                new OpenAIProvider(configuration, credentialHelper, timeoutMs));
-        providers.put("gemini",
-                new GeminiProvider(configuration, credentialHelper, timeoutMs));
-        providers.put("anthropic",
-                new AnthropicProvider(configuration, credentialHelper, timeoutMs));
+        providers.put("openai", new OpenAIProvider(configuration, credentialHelper, timeoutMs));
+        providers.put("gemini", new GeminiProvider(configuration, credentialHelper, timeoutMs));
+        providers.put("anthropic", new AnthropicProvider(configuration, credentialHelper, timeoutMs));
 
         this.defaultProviderName = configuration.get(
                 ChatbotConfigKeys.OZONE_RECON_CHATBOT_PROVIDER,
                 ChatbotConfigKeys.OZONE_RECON_CHATBOT_PROVIDER_DEFAULT);
 
-        LOG.info("LLMProviderRouter initialized: defaultProvider={}, "
-                + "registeredProviders={}",
-                defaultProviderName, providers.keySet());
+      LOG.info("LLMProviderRouter initialized: defaultProvider={}, registeredProviders={}", defaultProviderName,
+          providers.keySet());
     }
 
     @Override
@@ -141,9 +137,7 @@ public class LLMProviderRouter implements LLMProvider {
 
             if (lowerModel.startsWith("gemini-")) {
                 return getProvider("gemini");
-            } else if (lowerModel.startsWith("gpt-")
-                    || lowerModel.startsWith("o1")
-                    || lowerModel.startsWith("o3")) {
+            } else if (lowerModel.startsWith("gpt-") || lowerModel.startsWith("o1") || lowerModel.startsWith("o3")) {
                 return getProvider("openai");
             } else if (lowerModel.startsWith("claude-")) {
                 return getProvider("anthropic");
@@ -167,9 +161,8 @@ public class LLMProviderRouter implements LLMProvider {
     private DirectLLMProvider getDefaultProvider() throws LLMException {
         DirectLLMProvider provider = providers.get(defaultProviderName);
         if (provider == null) {
-            throw new LLMException(
-                    "Default provider '" + defaultProviderName + "' not found. "
-                            + "Available: " + providers.keySet());
+          throw new LLMException(
+              "Default provider '" + defaultProviderName + "' not found. " + "Available: " + providers.keySet());
         }
         return provider;
     }

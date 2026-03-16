@@ -42,7 +42,8 @@ import java.util.regex.Pattern;
 
 /**
  * Main chatbot agent that orchestrates the conversation flow.
- * Handles tool selection, API calls, and response summarization.
+ * Handles tool selection (figuring out what API to call), executing those calls,
+ * and summarization (feeding the data back to the LLM to write a nice answer).
  */
 @Singleton
 public class ChatbotAgent {
@@ -51,12 +52,23 @@ public class ChatbotAgent {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
   private static final Pattern JSON_PATTERN = Pattern.compile("\\{.*\\}", Pattern.DOTALL);
+
+  // A specific Recon API endpoint we want to handle carefully because it can return millions of rows.
   private static final String LIST_KEYS_ENDPOINT_SUFFIX = "/keys/listKeys";
 
+  // The connection to Gemini/OpenAI
   private final LLMProvider llmProvider;
+
+  // The hands that execute the internal API calls
   private final ToolExecutor toolExecutor;
+
+  // The Cheat Sheet of all available APIs loaded from the .md file
   private final String apiSchema;
+
+  // Max API calls we allow per question (so the LLM doesn't DOS our server)
   private final int maxToolCalls;
+
+
   private final String defaultModel;
   private final int maxRecordsPerAnswer;
   private final int maxPagesPerAnswer;
@@ -72,7 +84,11 @@ public class ChatbotAgent {
       OzoneConfiguration configuration) {
     this.llmProvider = llmProvider;
     this.toolExecutor = toolExecutor;
+
+    // Read the Schema (Cheat Sheet) from the resources' folder.
     this.apiSchema = loadApiSchema();
+
+    // Load all the safeguards and settings from ozone-site.xml
     this.maxToolCalls = configuration.getInt(
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_MAX_TOOL_CALLS,
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_MAX_TOOL_CALLS_DEFAULT);
@@ -99,7 +115,7 @@ public class ChatbotAgent {
   }
 
   /**
-   * Processes a user query and returns a response.
+   * THE MAIN ENTRY POINT. Processes a user query and returns a response.
    *
    * @param userQuery the user's question
    * @param model     the LLM model to use
@@ -110,78 +126,87 @@ public class ChatbotAgent {
   public String processQuery(String userQuery, String model,
       String provider, String apiKey)
       throws Exception {
+
+    // Safety check
     if (userQuery == null || userQuery.trim().isEmpty()) {
       throw new IllegalArgumentException("Query cannot be empty");
     }
 
-    String effectiveModel = (model != null && !model.isEmpty())
-        ? model
-        : defaultModel;
+    // Use default model if the user didn't specify one.
+    String effectiveModel = (model != null && !model.isEmpty()) ? model : defaultModel;
 
     // Store provider so private helper methods can inject it
     // into LLM call parameters.
     this.currentProvider = provider;
 
-    LOG.info("Processing query with model: {}, provider: {}",
-        effectiveModel,
-        provider == null ? "auto" : provider);
+    LOG.info("Processing query with model: {}, provider: {}", effectiveModel, provider == null ? "auto" : provider);
 
-    // Step 1: Get tool call from LLM
+    // STEP 1: Ask the LLM what API tools it wants to use to answer the question.
     ToolCall toolCall = getToolCall(userQuery, effectiveModel, apiKey);
 
+    // If the LLM doesn't know what API to call...
     if (toolCall == null) {
       // No suitable endpoint found
       LOG.info("Tool selection result: NO_SUITABLE_ENDPOINT; using fallback");
       return handleFallback(userQuery, effectiveModel, apiKey);
     }
 
-    // Check if this is a documentation query
+    // If the user asked a general question (e.g. "What is Ozone?"), the LLM answers it directly without an API call.
     if (toolCall.isDocumentationQuery()) {
       LOG.info("Tool selection result: DOCUMENTATION_QUERY (no Recon API call)");
       return toolCall.getAnswer();
     }
 
-    // Step 2: Validate and execute tool calls
+    // STEP 2: Execute the internal Recon API calls
     Map<String, Object> apiResponses;
     Map<String, Object> executionMetadata = new HashMap<>();
+
+    // Scenario A: LLM says we need to call MULTIPLE APIs to get the answer
     if (toolCall.isMultipleEndpoints()) {
+
       if (toolCall.getToolCalls() == null || toolCall.getToolCalls().isEmpty()) {
         LOG.warn("LLM returned MULTI_ENDPOINT but no tool calls");
         return handleFallback(userQuery, effectiveModel, apiKey);
       }
       LOG.info("Tool selection result: MULTI_ENDPOINT count={}",
           toolCall.getToolCalls().size());
-      String clarification = buildClarificationForToolCalls(
-          toolCall.getToolCalls());
+
+      // Check if the LLM asked for something dangerous (like scanning the whole cluster without a limit)
+      String clarification = buildClarificationForToolCalls(toolCall.getToolCalls());
       if (clarification != null) {
         LOG.info("Execution policy returned clarification for multi-endpoint " +
             "request: {}", clarification);
         return clarification;
       }
       for (ToolCall selected : toolCall.getToolCalls()) {
-        LOG.info("Selected Recon API: method={}, endpoint={}, paramKeys={}",
+        LOG.info("Selected Recon API: method={}, endpoint={}, paramKeys={}, reasoning={}",
             selected.getMethod(),
             selected.getEndpoint(),
-            selected.getParameters() == null ? "[]" : selected.getParameters().keySet());
+            selected.getParameters() == null ? "[]" : selected.getParameters().keySet(),
+            selected.getReasoning());
       }
-      apiResponses = executeMultipleToolCalls(toolCall.getToolCalls(),
-          executionMetadata);
+
+      // Execute all the API calls securely
+      apiResponses = executeMultipleToolCalls(toolCall.getToolCalls(), executionMetadata);
+
+      // Scenario B: LLM says we only need ONE API call
     } else {
       if (toolCall.getEndpoint() == null || toolCall.getEndpoint().isEmpty()) {
         LOG.warn("LLM returned SINGLE_ENDPOINT with empty endpoint");
         return handleFallback(userQuery, effectiveModel, apiKey);
       }
-      LOG.info("Tool selection result: SINGLE_ENDPOINT method={}, endpoint={}, " +
-          "paramKeys={}",
+      LOG.info("Tool selection result: SINGLE_ENDPOINT method={}, endpoint={}, paramKeys={}, reasoning={}",
           toolCall.getMethod(),
           toolCall.getEndpoint(),
-          toolCall.getParameters() == null ? "[]" : toolCall.getParameters().keySet());
+          toolCall.getParameters() == null ? "[]" : toolCall.getParameters().keySet(),
+          toolCall.getReasoning());
       String clarification = validateToolCallForExecution(toolCall);
       if (clarification != null) {
         LOG.info("Execution policy returned clarification for endpoint {}: {}",
             toolCall.getEndpoint(), clarification);
         return clarification;
       }
+      // Go fetch the data using our ToolExecutor!
       ToolExecutor.ToolExecutionOutcome outcome = toolExecutor.executeToolCallWithPolicy(
           toolCall.getEndpoint(),
           toolCall.getMethod(),
@@ -189,24 +214,27 @@ public class ChatbotAgent {
           maxRecordsPerAnswer,
           maxPagesPerAnswer,
           pageSizePerCall);
+
+      // Save the raw JSON data the API returned
       apiResponses = new HashMap<>();
       apiResponses.put(toolCall.getEndpoint(), outcome.getResponseBody());
       executionMetadata.put(toolCall.getEndpoint(),
           createExecutionMetadataMap(outcome));
     }
 
-    // Step 3: Summarize response
+    // STEP 3: Send the raw JSON data BACK to the LLM to format a nice answer
     LOG.info("Summarization input prepared: endpointCount={}, endpoints={}",
         apiResponses.size(), apiResponses.keySet());
-    return summarizeResponse(userQuery, apiResponses,
-        executionMetadata, effectiveModel, apiKey);
+    return summarizeResponse(userQuery, apiResponses, executionMetadata, effectiveModel, apiKey);
   }
 
   /**
-   * Gets the tool call(s) from the LLM based on the user query.
+   * "Step 1" Helper: Talks to the LLM and asks for a JSON object telling us which API to call.
    */
   private ToolCall getToolCall(String userQuery, String model, String apiKey)
       throws Exception {
+
+    // Build the "cheat sheet" prompt (includes the recon-api-guide.md)
     String systemPrompt = buildToolSelectionPrompt();
     String userPrompt = "User Query: " + userQuery;
 
@@ -214,6 +242,7 @@ public class ChatbotAgent {
     messages.add(new ChatMessage("system", systemPrompt));
     messages.add(new ChatMessage("user", userPrompt));
 
+    // Tuning the LLM: Temperature 0.1 means we want it to be very strict and robotic, not creative.
     Map<String, Object> parameters = new HashMap<>();
     parameters.put("temperature", 0.1);
     parameters.put("max_tokens", 8192);
@@ -221,11 +250,10 @@ public class ChatbotAgent {
       parameters.put("_provider", currentProvider);
     }
 
-    LLMResponse response = llmProvider.chatCompletion(
-        messages, model, apiKey, parameters);
+    // Send the request to the LLM
+    LLMResponse response = llmProvider.chatCompletion(messages, model, apiKey, parameters);
 
-    LOG.info("Tool selection LLM response: model={}, promptTokens={}, " +
-        "completionTokens={}, totalTokens={}",
+    LOG.info("Tool selection LLM response: model={}, promptTokens={}, completionTokens={}, totalTokens={}",
         response.getModel(),
         response.getPromptTokens(),
         response.getCompletionTokens(),
@@ -244,9 +272,9 @@ public class ChatbotAgent {
       return null;
     }
 
+    // Convert the JSON string into our Java "ToolCall" object
     String jsonStr = matcher.group();
     JsonNode jsonNode = MAPPER.readTree(jsonStr);
-
     return parseToolCall(jsonNode);
   }
 
@@ -261,8 +289,7 @@ public class ChatbotAgent {
       ToolCall toolCall = toolCalls.get(i);
       String responseKey = buildResponseKey(toolCall, i, toolCalls.size());
       try {
-        LOG.info("Executing Recon API call: method={}, endpoint={}",
-            toolCall.getMethod(), toolCall.getEndpoint());
+        LOG.info("Executing Recon API call: method={}, endpoint={}", toolCall.getMethod(), toolCall.getEndpoint());
         ToolExecutor.ToolExecutionOutcome outcome = toolExecutor.executeToolCallWithPolicy(
             toolCall.getEndpoint(),
             toolCall.getMethod(),
@@ -272,15 +299,13 @@ public class ChatbotAgent {
             pageSizePerCall);
         responses.put(responseKey, outcome.getResponseBody());
         executionMetadata.put(responseKey, createExecutionMetadataMap(outcome));
-        LOG.info("Recon API call completed: endpoint={}, records={}, pages={}, " +
-            "truncated={}",
+        LOG.info("Recon API call completed: endpoint={}, records={}, pages={}, truncated={}",
             toolCall.getEndpoint(),
             outcome.getRecordsProcessed(),
             outcome.getPagesFetched(),
             outcome.isTruncated());
       } catch (Exception e) {
-        LOG.error("Tool call failed for endpoint: {}",
-            toolCall.getEndpoint(), e);
+        LOG.error("Tool call failed for endpoint: {}", toolCall.getEndpoint(), e);
         Map<String, Object> errorMap = new HashMap<>();
         errorMap.put("error", e.getMessage());
         responses.put(responseKey, errorMap);
@@ -295,21 +320,24 @@ public class ChatbotAgent {
   }
 
   /**
-   * Summarizes the API response(s) using the LLM.
+   * "Step 3" Helper: Takes the raw JSON API data and asks the LLM to write a sentence about it.
    */
   private String summarizeResponse(String userQuery,
       Map<String, Object> apiResponses,
       Map<String, Object> executionMetadata,
       String model, String apiKey)
       throws Exception {
+
+    // Give the LLM a new set of rules
     String systemPrompt = buildSummarizationPrompt();
-    String userPrompt = buildSummarizationUserPrompt(
-        userQuery, apiResponses, executionMetadata);
+    // Stitch the raw JSON strings and the user's original question together
+    String userPrompt = buildSummarizationUserPrompt(userQuery, apiResponses, executionMetadata);
 
     List<ChatMessage> messages = new ArrayList<>();
     messages.add(new ChatMessage("system", systemPrompt));
     messages.add(new ChatMessage("user", userPrompt));
 
+    // Temperature 0.3 allows a tiny bit more natural/human-like language creativity.
     Map<String, Object> parameters = new HashMap<>();
     parameters.put("temperature", 0.3);
     parameters.put("max_tokens", 2000);
@@ -317,8 +345,8 @@ public class ChatbotAgent {
       parameters.put("_provider", currentProvider);
     }
 
-    LLMResponse response = llmProvider.chatCompletion(
-        messages, model, apiKey, parameters);
+    // Send the request to the LLM
+    LLMResponse response = llmProvider.chatCompletion(messages, model, apiKey, parameters);
 
     LOG.info("Summarization LLM response: model={}, promptTokens={}, " +
         "completionTokens={}, totalTokens={}",
@@ -331,18 +359,22 @@ public class ChatbotAgent {
   }
 
   /**
-   * Handles queries that don't match any API endpoint.
+   * Helper: If the user asks "What is the meaning of life?", we use this to say
+   * "Sorry, I only know about Hadoop."
    */
   private String handleFallback(String userQuery, String model, String apiKey)
       throws Exception {
     String prompt = String.format(
         "The user asked: \"%s\"\n\n" +
             "This question cannot be answered using the available " +
-            "Ozone Recon API endpoints. Provide a helpful response that:\n" +
-            "1. Politely explains you can only answer questions about " +
+            "Ozone Recon API endpoints.\n\n" +
+            "Provide a helpful response that:\n" +
+            "1. Politely explains that you can only answer questions about " +
             "Ozone Recon cluster data\n" +
-            "2. Briefly mentions the types of information you can provide\n" +
-            "3. Suggests how they might rephrase if it's related to Ozone",
+            "2. Briefly mentions the types of information you can provide " +
+            "(containers, keys, datanodes, pipelines, cluster state, etc.)\n" +
+            "3. Suggests how they might rephrase their question if it's related to Ozone\n\n" +
+            "Keep the response friendly and concise.",
         userQuery);
 
     List<ChatMessage> messages = new ArrayList<>();
@@ -362,31 +394,42 @@ public class ChatbotAgent {
   }
 
   /**
-   * Builds the system prompt for tool selection.
+   * Creates the master rules (System Prompt) we send to the LLM during Step 1.
+   * Notice how we teach the LLM exactly what JSON to output!
    */
   private String buildToolSelectionPrompt() {
-    return "You are an expert on Apache Ozone Recon API.\n\n" +
-        "Analyze user queries and determine the appropriate response:\n" +
-        "1. For DATA queries: Identify the API endpoint(s) to call\n" +
-        "2. For DOCUMENTATION queries: Respond with information directly\n\n" +
-        "For SINGLE endpoint queries, return JSON:\n" +
+    return "You are an expert on Apache Ozone Recon, a service that provides insights into Ozone cluster data.\n\n" +
+        "Your task is to analyze user queries and determine the appropriate response:\n\n" +
+        "1. **For DATA queries** (asking for current cluster information): Identify the most appropriate API endpoint(s) to call\n" +
+        "2. **For DOCUMENTATION queries** (asking about API use cases, purposes, or capabilities): Respond with a DOCUMENTATION_QUERY and provide the information directly\n\n" +
+        "IMPORTANT: If the user's question requires data from MULTIPLE API endpoints to give a complete answer, return ALL needed endpoints in an array.\n\n" +
+        "For SINGLE endpoint DATA queries, return this JSON format:\n" +
         "{\n" +
         "  \"endpoint\": \"/api/v1/path\",\n" +
         "  \"method\": \"GET\",\n" +
         "  \"parameters\": {},\n" +
-        "  \"reasoning\": \"explanation\"\n" +
+        "  \"reasoning\": \"Brief explanation of why this endpoint was chosen\"\n" +
         "}\n\n" +
-        "For MULTIPLE endpoint queries, return JSON:\n" +
+        "For MULTIPLE endpoint DATA queries, return this JSON format:\n" +
         "{\n" +
-        "  \"tool_calls\": [...],\n" +
+        "  \"tool_calls\": [\n" +
+        "    { \"endpoint\": \"/api/v1/path1\", \"method\": \"GET\", \"parameters\": {}, \"reasoning\": \"Explain what data this provides\" },\n" +
+        "    { \"endpoint\": \"/api/v1/path2\", \"method\": \"GET\", \"parameters\": {}, \"reasoning\": \"Explain what data this provides\" }\n" +
+        "  ],\n" +
         "  \"requires_multiple_calls\": true\n" +
         "}\n\n" +
-        "For DOCUMENTATION queries, return JSON:\n" +
+        "Examples requiring MULTIPLE endpoints:\n" +
+        "- \"How many total keys and how many are open?\" -> /clusterState + /keys/open/summary\n" +
+        "- \"Show datanodes and pipeline status\" -> /datanodes + /pipelines\n" +
+        "- \"List unhealthy and missing containers\" -> /containers/unhealthy + /containers/missing\n" +
+        "- \"Cluster state and open keys summary\" -> /clusterState + /keys/open/summary\n\n" +
+        "For DOCUMENTATION queries, return this JSON format:\n" +
         "{\n" +
         "  \"type\": \"DOCUMENTATION_QUERY\",\n" +
-        "  \"answer\": \"direct answer\"\n" +
+        "  \"answer\": \"Direct answer based on the API guide\",\n" +
+        "  \"reasoning\": \"Explanation of what documentation was referenced\"\n" +
         "}\n\n" +
-        "If no suitable endpoint, respond: NO_SUITABLE_ENDPOINT\n\n" +
+        "If the query cannot be answered by any available API endpoint OR documentation, respond with: NO_SUITABLE_ENDPOINT\n\n" +
         "Safety rules:\n" +
         "- Do not invent parameter values.\n" +
         "- For /keys/listKeys, always provide startPrefix with at least " +
@@ -399,18 +442,27 @@ public class ChatbotAgent {
    */
   private String buildSummarizationPrompt() {
     return "You are an expert on Apache Ozone Recon data analysis.\n\n" +
-        "Analyze API response data and provide clear, concise summaries.\n\n" +
+        "Your task is to analyze API response data and provide clear, concise summaries that directly answer the user's question.\n\n" +
         "Guidelines:\n" +
-        "- Focus on key information that answers the question\n" +
+        "- Focus on the key information that answers the user's specific question\n" +
+        "- Combine information from all endpoints to give a comprehensive response if multiple endpoints were called\n" +
+        "- Clearly present numbers, counts, and statistics from each data source\n" +
         "- Use clear, non-technical language when possible\n" +
-        "- Include relevant numbers and statistics\n" +
-        "- Highlight problems (unhealthy containers, etc.)\n" +
-        "- If execution metadata says response was truncated, clearly mention " +
-        "that the answer is based on limited records/pages\n" +
-        "- If truncated and a next cursor is present, suggest user provide a " +
-        "specific page/range and limit for deeper analysis\n" +
-        "- Keep responses concise but informative\n" +
-        "- Use Markdown formatting for readability";
+        "- If the data shows problems (unhealthy containers, missing data, etc.), highlight them\n" +
+        "- If the API response is empty, doesn't contain relevant data, or an endpoint failed, say so clearly\n" +
+        "- If execution metadata says response was truncated, clearly mention that the answer is based on limited records/pages\n" +
+        "- If truncated and a next cursor is present, suggest user provide a specific page/range and limit for deeper analysis\n" +
+        "- Keep responses cohesive, well-structured, and informative\n\n" +
+        "IMPORTANT: Format your response using proper Markdown syntax:\n" +
+        "- Use **bold** for emphasis (e.g., **5 datanodes**)\n" +
+        "- For bullet lists, ALWAYS add a blank line before the list starts\n" +
+        "- Use hyphens (-) for bullet points, not asterisks (*)\n" +
+        "- Example:\n" +
+        "  Here are the datanodes:\n" +
+        "  \n" +
+        "  - datanode1: HEALTHY\n" +
+        "  - datanode2: HEALTHY\n\n" +
+        "Format your response as a direct, complete answer to the user's question.";
   }
 
   /**
@@ -459,14 +511,24 @@ public class ChatbotAgent {
     return clarificationMessages.get(0);
   }
 
+
+  /**
+   * Safety check: Ensure the LLM didn't try to crash our server.
+   */
   private String validateToolCallForExecution(ToolCall toolCall) {
     if (!requireSafeScope || toolCall == null || toolCall.getEndpoint() == null) {
       return null;
     }
     String endpoint = normalizeEndpoint(toolCall.getEndpoint());
+
+    // If the LLM tries to query the "/keys/listKeys" endpoint...
     if (!endpoint.endsWith(LIST_KEYS_ENDPOINT_SUFFIX)) {
       return null;
     }
+
+    // We MUST make sure it provides a specific bucket to search in.
+    // If it asks for the ENTIRE cluster ("/"), we block it and ask for clarification,
+    // otherwise our server would run out of memory!
     String startPrefix = null;
     if (toolCall.getParameters() != null) {
       startPrefix = toolCall.getParameters().get("startPrefix");
@@ -482,7 +544,7 @@ public class ChatbotAgent {
       return "The provided startPrefix must start with '/'. Please use " +
           "a value like /<volume>/<bucket> or deeper path.";
     }
-    return null;
+    return null; // All good
   }
 
   private String normalizeEndpoint(String endpoint) {
@@ -525,6 +587,7 @@ public class ChatbotAgent {
         "DOCUMENTATION_QUERY".equals(jsonNode.get("type").asText())) {
       toolCall.setDocumentationQuery(true);
       toolCall.setAnswer(jsonNode.path("answer").asText(""));
+      toolCall.setReasoning(jsonNode.path("reasoning").asText(""));
       return toolCall;
     }
 
@@ -578,8 +641,11 @@ public class ChatbotAgent {
     return toolCall;
   }
 
+  // =========================================================================
+  // File Loading
+  // =========================================================================
   /**
-   * Loads the API schema from resources.
+   * Loads the Markdown or Yaml schema file (the "Cheat Sheet").
    */
   private String loadApiSchema() {
     String fromMarkdown = loadApiGuideFromClasspath("chatbot/recon-api-guide.md");
@@ -625,7 +691,7 @@ public class ChatbotAgent {
   }
 
   /**
-   * Represents a tool call or set of tool calls.
+   * Data Transfer Object representing the JSON tool call the LLM returned.
    */
   private static class ToolCall {
     private String endpoint;

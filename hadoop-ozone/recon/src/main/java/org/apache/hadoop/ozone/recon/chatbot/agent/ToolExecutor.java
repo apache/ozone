@@ -47,21 +47,19 @@ public class ToolExecutor {
   private static final Logger LOG =
       LoggerFactory.getLogger(ToolExecutor.class);
   private static final ObjectMapper MAPPER = new ObjectMapper();
-  private static final String LIST_KEYS_ENDPOINT_SUFFIX =
-      "/keys/listKeys";
-  private static final String NAMESPACE_DU_SUFFIX = "/namespace/du";
-  private static final String NAMESPACE_USAGE_SUFFIX =
-      "/namespace/usage";
-  private static final String TASKS_SUFFIX = "/tasks";
-  private static final String TASKS_STATUS_SUFFIX = "/tasks/status";
-  private static final String TASK_STATUS_SUFFIX = "/task/status";
+
+  // We define the specific String suffixes for APIs we want to explicitly watch out for
+  private static final String LIST_KEYS_ENDPOINT_SUFFIX = "/keys/listKeys";
+
+  // Hardcoded security timeouts. If Recon takes longer than 30 seconds to connect
+  // or return data, kill the request so we don't freeze the chatbot.
   private static final int CONNECT_TIMEOUT_MS = 30_000;
   private static final int READ_TIMEOUT_MS = 30_000;
 
   private final String reconBaseUrl;
-  private final int defaultMaxRecords;
-  private final int defaultMaxPages;
-  private final int defaultPageSize;
+  private final int defaultMaxRecords;  // Max records to fetch in total
+  private final int defaultMaxPages;   // Max pages to loop through
+  private final int defaultPageSize;  // Default size of one page
 
   @Inject
   public ToolExecutor(OzoneConfiguration configuration) {
@@ -79,77 +77,98 @@ public class ToolExecutor {
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_PAGE_SIZE,
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_PAGE_SIZE_DEFAULT);
 
-    LOG.info("ToolExecutor initialized with Recon URL: {}, "
-            + "maxRecords={}, maxPages={}, pageSize={}",
-        reconBaseUrl, defaultMaxRecords, defaultMaxPages,
-        defaultPageSize);
+    LOG.info("ToolExecutor initialized with Recon URL: {}, maxRecords={}, maxPages={}, pageSize={}",
+        reconBaseUrl, defaultMaxRecords, defaultMaxPages, defaultPageSize);
   }
 
   /**
-   * Executes a tool call with bounded paging policy and returns
-   * execution coverage metadata along with the response payload.
+   * What this does: It receives the request from the ChatbotAgent, cleans up the URL, and decides if it needs the
+   * complex paging system (for listKeys) or just a simple, single network hit (for everything else).
    */
   public ToolExecutionOutcome executeToolCallWithPolicy(
-      String endpoint, String method, Map<String, String> parameters,
-      int maxRecords, int maxPages, int pageSize)
-      throws IOException {
+      String endpoint,
+      String method,
+      Map<String, String> parameters,
+      int maxRecords,
+      int maxPages,
+      int pageSize) throws IOException {
 
+    // First, make a safe copy of the parameters (like `limit=10`) so we can edit it without breaking anything
     Map<String, String> safeParams = parameters == null ? new HashMap<>() : new HashMap<>(parameters);
+
+    // Normalize string. E.g., Change "clusterState" to "/api/v1/clusterState"
     String fullEndpoint = normalizeEndpoint(endpoint);
 
+    // If the LLM asked to list keys, redirect to our special paging loop logic!
     if (fullEndpoint.endsWith(LIST_KEYS_ENDPOINT_SUFFIX) && "GET".equalsIgnoreCase(method)) {
       return executeListKeysWithPaging(fullEndpoint, method, safeParams, maxRecords, maxPages, pageSize);
     }
 
+    // For EVERY OTHER endpoint, just run a single, normal HTTP request
     JsonNode response = executeSingleCall(fullEndpoint, method, safeParams);
+
+    // Count how many records we got back and return our structured DTO tracker
     int records = estimateRecordCount(response);
-    return new ToolExecutionOutcome(response, records, 1, false,
-        null, createLimitsMap(maxRecords, maxPages, pageSize));
+    return new ToolExecutionOutcome(response, records, 1, false, null,
+        createLimitsMap(maxRecords, maxPages, pageSize));
   }
 
+
+  /**
+   *  The listKeys Pager - It uses a while() loop to continuously execute API calls, stitching all the
+   *  individual pages into one massive JSON array until it runs out of data or hits a hard security constraint limit.
+   */
   private ToolExecutionOutcome executeListKeysWithPaging(
       String endpoint, String method, Map<String, String> parameters,
       int maxRecords, int maxPages, int pageSize)
       throws IOException {
 
+    // Safety Check: Did the LLM provide a bucket path to search in?
     String startPrefix = parameters.get("startPrefix");
     if (startPrefix == null || startPrefix.trim().isEmpty() || "/".equals(startPrefix.trim())) {
       throw new IllegalArgumentException(
           "listKeys requires 'startPrefix' at bucket level or deeper (for example /volume/bucket).");
     }
 
-    int requestedLimit = parsePositiveInt(
-        parameters.get("limit"), pageSize);
-    int effectivePageSize = Math.max(1,
-        Math.min(pageSize, requestedLimit));
+    // Figure out limits... Either use what the LLM specifically requested, or our system defaults.
+    int requestedLimit = parsePositiveInt(parameters.get("limit"), pageSize);
+    int effectivePageSize = Math.max(1, Math.min(pageSize, requestedLimit));
     int safeMaxRecords = Math.max(1, maxRecords);
     int safeMaxPages = Math.max(1, maxPages);
 
-    ObjectNode merged = null;
-    ArrayNode aggregatedKeys = MAPPER.createArrayNode();
-    String nextCursor = parameters.get("prevKey");
-    int recordsProcessed = 0;
-    int pagesFetched = 0;
-    boolean truncated = false;
 
+    ObjectNode merged = null;                               // This will hold the final, massive JSON object
+    ArrayNode aggregatedKeys = MAPPER.createArrayNode();    // This will hold all the individual rows we find
+    String nextCursor = parameters.get("prevKey");          // The "ID" of the last record so we know where to pick up
+    int recordsProcessed = 0;                               // Counter for rows
+    int pagesFetched = 0;                                   // Counter for pages
+    boolean truncated = false;                              // Did we hit a hard limit?
+
+    // THE ENGINE LOOP: Keep pulling pages until we hit our max Page count or Record count
     while (pagesFetched < safeMaxPages && recordsProcessed < safeMaxRecords) {
+      // Calculate how many records we still need and inject it into the API call
       Map<String, String> pageParams = new HashMap<>(parameters);
       int remaining = safeMaxRecords - recordsProcessed;
       int pageLimit = Math.max(1, Math.min(effectivePageSize, remaining));
       pageParams.put("limit", String.valueOf(pageLimit));
+
+      // If we have a cursor from a previous page, inject it so Recon gives us the NEXT page
       if (nextCursor != null && !nextCursor.isEmpty()) {
         pageParams.put("prevKey", nextCursor);
       } else {
         pageParams.remove("prevKey");
       }
 
+      // FIRE THE API CALL FOR A SINGLE PAGE!
       JsonNode pageResponse = executeSingleCall(endpoint, method, pageParams);
       pagesFetched++;
 
+      // If this is the first page, copy all the root JSON data (like total counts) into our master `merged` object
       if (merged == null && pageResponse != null && pageResponse.isObject()) {
         merged = ((ObjectNode) pageResponse).deepCopy();
       }
 
+      // Loop over the list of keys (the rows) that Recon just gave us
       JsonNode keys = pageResponse == null ? null : pageResponse.get("keys");
       int pageCount = 0;
       if (keys != null && keys.isArray()) {
@@ -164,6 +183,7 @@ public class ToolExecutor {
         }
       }
 
+      // Find the ID of the last row on this page so we can pass it into the loop for the next page
       String lastKey = extractStringField(pageResponse, "lastKey");
       if (lastKey == null || lastKey.isEmpty() || pageCount == 0) {
         nextCursor = null;
@@ -171,12 +191,13 @@ public class ToolExecutor {
       }
       nextCursor = lastKey;
 
-      if (recordsProcessed >= safeMaxRecords
-          || pagesFetched >= safeMaxPages) {
+      // If we hit limits, flag this dataset as truncated
+      if (recordsProcessed >= safeMaxRecords || pagesFetched >= safeMaxPages) {
         truncated = true;
       }
     }
 
+    // Now that the loop is finished, reconstruct the final JSON block
     if (merged == null) {
       merged = MAPPER.createObjectNode();
     }
@@ -184,33 +205,42 @@ public class ToolExecutor {
     if (nextCursor != null) {
       merged.put("lastKey", nextCursor);
     }
+    // Inject our metadata so ChatbotAgent can see what happened
     merged.put("truncated", truncated);
     merged.put("recordsProcessed", recordsProcessed);
     merged.put("pagesFetched", pagesFetched);
 
+    // Package the results and send them back up to the ChatbotAgent
     return new ToolExecutionOutcome(merged, recordsProcessed, pagesFetched, truncated, nextCursor,
         createLimitsMap(safeMaxRecords, safeMaxPages, effectivePageSize));
   }
 
+  /**
+   * The Actual HTTP Execution.
+   */
   private JsonNode executeSingleCall(String endpoint, String method,
                                      Map<String, String> parameters)
       throws IOException {
-    String resolvedEndpoint = replacePathParameters(endpoint, parameters);
-    String url = buildUrl(resolvedEndpoint, parameters);
+    String url = buildUrl(endpoint, parameters);
     LOG.debug("Executing tool call: {} {}", method, url);
 
     HttpURLConnection conn = null;
     try {
+      // Connect to the Recon URL
       conn = (HttpURLConnection) new URL(url).openConnection();
       conn.setRequestMethod(
           "GET".equalsIgnoreCase(method) ? "GET" : "POST");
       conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
       conn.setReadTimeout(READ_TIMEOUT_MS);
+
+      // Tell Recon we expect to receive JSON data format
       conn.setRequestProperty("Accept", "application/json");
       conn.setRequestProperty("Content-Type", "application/json");
 
+      // Execute request.
       int statusCode = conn.getResponseCode();
       if (statusCode != 200) {
+        // If the server threw a 500 error or a 404, capture the failure text and throw an exception
         String errorBody = readErrorStream(conn);
         String errorMsg = String.format(
             "API request failed with status %d: %s",
@@ -219,9 +249,11 @@ public class ToolExecutor {
         throw new IOException(errorMsg);
       }
 
+      // Request succeeded! Read the raw byte data and convert it into a string
       String body = readInputStream(conn);
       return parseJsonSafely(body);
     } finally {
+      // Always disconnect to free up memory on the server
       if (conn != null) {
         conn.disconnect();
       }
@@ -233,56 +265,50 @@ public class ToolExecutor {
       throw new IllegalArgumentException("Tool endpoint cannot be empty");
     }
     String fullEndpoint = endpoint;
+
+    // Ensure the path always starts with "/api/v1/"
     if (!fullEndpoint.startsWith("/api/v1/")) {
       fullEndpoint = "/api/v1" + (endpoint.startsWith("/") ? endpoint : "/" + endpoint);
-    }
-    if (fullEndpoint.endsWith(NAMESPACE_DU_SUFFIX)) {
-      String mapped = fullEndpoint.substring(
-          0, fullEndpoint.length() - NAMESPACE_DU_SUFFIX.length()) + NAMESPACE_USAGE_SUFFIX;
-      LOG.info("Mapped deprecated endpoint {} to {}", fullEndpoint, mapped);
-      fullEndpoint = mapped;
-    }
-    if (fullEndpoint.endsWith(TASKS_STATUS_SUFFIX) || fullEndpoint.endsWith(TASKS_SUFFIX)) {
-      String mapped;
-      if (fullEndpoint.endsWith(TASKS_STATUS_SUFFIX)) {
-        mapped = fullEndpoint.substring(0, fullEndpoint.length() - TASKS_STATUS_SUFFIX.length()) + TASK_STATUS_SUFFIX;
-      } else {
-        mapped = fullEndpoint.substring(0, fullEndpoint.length() - TASKS_SUFFIX.length()) + TASK_STATUS_SUFFIX;
-      }
-      LOG.info("Mapped deprecated endpoint {} to {}", fullEndpoint, mapped);
-      fullEndpoint = mapped;
     }
     return fullEndpoint;
   }
 
-  private String replacePathParameters(String endpoint,
-                                       Map<String, String> parameters) {
-    String resolved = endpoint;
-    for (Map.Entry<String, String> entry : parameters.entrySet()) {
-      String placeholder = "{" + entry.getKey() + "}";
-      if (resolved.contains(placeholder)) {
-        resolved = resolved.replace(placeholder, entry.getValue());
-      }
-    }
-    return resolved;
-  }
-
+  /**
+   * Transforms the LLM's parameters into a raw URL.
+   * Handles both Path parameters (e.g. {path}) and Query parameters (e.g. ?limit=10).
+   */
   private String buildUrl(String endpoint, Map<String, String> parameters) {
-    StringBuilder urlBuilder = new StringBuilder(reconBaseUrl + endpoint);
-    boolean firstParam = !endpoint.contains("?");
+    String resolvedPath = endpoint;
+    StringBuilder queryBuilder = new StringBuilder();
+    boolean firstQueryParam = !endpoint.contains("?");
+
     for (Map.Entry<String, String> entry : parameters.entrySet()) {
-      if (!endpoint.contains("{" + entry.getKey() + "}")) {
-        urlBuilder.append(firstParam ? "?" : "&");
-        String value = entry.getValue() == null ? "" : entry.getValue();
+      String key = entry.getKey();
+      String value = entry.getValue() == null ? "" : entry.getValue();
+      String placeholder = "{" + key + "}";
+
+      // 1. Is it a Path Parameter? (e.g. replacing {path} with "vol1/bucket2")
+      // If the provided endpoint string contains the placeholder block, we replace it 
+      // directly inline and do NOT add it to the URL query string.
+      if (resolvedPath.contains(placeholder)) {
+        resolvedPath = resolvedPath.replace(placeholder, value);
+      } 
+      // 2. Otherwise, it must be an optional Query Parameter!
+      // If the placeholder block wasn't found, we assume this is a URL filter (like ?limit=10)
+      // and append it safely encoded to the end of the URL.
+      else {
+        queryBuilder.append(firstQueryParam ? "?" : "&");
         try {
-          urlBuilder.append(entry.getKey()).append("=").append(URLEncoder.encode(value, "UTF-8"));
+          queryBuilder.append(key).append("=").append(URLEncoder.encode(value, "UTF-8"));
         } catch (UnsupportedEncodingException e) {
           throw new RuntimeException("UTF-8 not supported", e);
         }
-        firstParam = false;
+        firstQueryParam = false;
       }
     }
-    return urlBuilder.toString();
+
+    // Combine the base URL, the resolved path, and the query string
+    return reconBaseUrl + resolvedPath + queryBuilder.toString();
   }
 
   private String readInputStream(HttpURLConnection conn)
