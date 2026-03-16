@@ -24,6 +24,7 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT_STAGE;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -490,6 +491,50 @@ public class TestHddsDispatcher {
       assertThat(logCapturer.getOutput())
           .contains("ContainerID " + writeChunkRequest.getContainerID()
               + " creation failed , Result: DISK_OUT_OF_SPACE");
+    } finally {
+      ContainerMetrics.remove();
+    }
+  }
+
+  @Test
+  public void testWriteChunkWithContainerAlreadyExistsDoesNotMarkUnhealthy()
+      throws IOException {
+    String testDirPath = testDir.getPath();
+    try {
+      UUID scmId = UUID.randomUUID();
+      OzoneConfiguration conf = new OzoneConfiguration();
+      conf.set(HDDS_DATANODE_DIR_KEY, testDirPath);
+      conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDirPath);
+      DatanodeDetails dd = randomDatanodeDetails();
+      HddsDispatcher hddsDispatcher = createDispatcher(dd, scmId, conf);
+      ContainerCommandRequestProto initialWriteChunkRequest =
+          getWriteChunkRequest(dd.getUuidString(), 1L, 1L);
+
+      ContainerCommandResponseProto initialResponse =
+          hddsDispatcher.dispatch(initialWriteChunkRequest, null);
+      assertEquals(ContainerProtos.Result.SUCCESS, initialResponse.getResult());
+
+      ContainerCommandRequestProto writeChunkRequest =
+          getWriteChunkRequest(dd.getUuidString(), 1L, 2L);
+      HddsDispatcher mockDispatcher = spy(hddsDispatcher);
+      ContainerCommandResponseProto.Builder builder =
+          getContainerCommandResponse(writeChunkRequest,
+              ContainerProtos.Result.CONTAINER_ALREADY_EXISTS, "");
+
+      doReturn(null).doCallRealMethod().when(mockDispatcher)
+          .getContainer(writeChunkRequest.getContainerID());
+      doReturn(builder.build()).when(mockDispatcher)
+          .createContainer(writeChunkRequest);
+
+      ContainerCommandResponseProto response = assertDoesNotThrow(
+          () -> mockDispatcher.dispatch(writeChunkRequest, null));
+      assertEquals(ContainerProtos.Result.CONTAINER_ALREADY_EXISTS,
+          response.getResult());
+
+      Container container = mockDispatcher.getContainer(
+          writeChunkRequest.getContainerID());
+      assertTrue(container.getContainerData().isOpen());
+      assertFalse(container.getContainerData().isUnhealthy());
     } finally {
       ContainerMetrics.remove();
     }
