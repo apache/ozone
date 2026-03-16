@@ -21,20 +21,28 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Interface for LLM providers.
- * Abstracts the communication with different LLM services.
+ * LLMProvider is the "Master Contract" for the whole Chatbot system.
+ * 
+ * Purpose:
+ * The ChatbotAgent doesn't know (or care) if it's talking to OpenAI, Gemini, or a Local LLM.
+ * It strictly relies on this interface. This interface forces every AI provider to guarantee
+ * that they will accept exactly the same input and return exactly the same output.
+ * 
+ * By using this contract, we can add 10 new AI models to Recon tomorrow,
+ * and we will never have to edit the ChatbotAgent's code to support them!
  */
 public interface LLMProvider {
 
   /**
-   * Sends a chat completion request to the LLM.
+   * The core action: Send a conversation to an AI and wait for its answer.
    *
-   * @param messages   list of chat messages
-   * @param model      the model to use
-   * @param apiKey     user's API key (optional, may use system key)
-   * @param parameters additional parameters (temperature, max_tokens, etc.)
-   * @return the LLM response
-   * @throws LLMException if the request fails
+   * @param messages   The back-and-forth chat history so far (System Prompts, User Questions, etc.)
+   * @param model      The specific model name (e.g. "gpt-4" or "gemini-pro")
+   * @param apiKey     The user's password/token (if they didn't provide one, the backend will use the system's token)
+   * @param parameters Extra rules like "temperature" (how creative the AI should be) or
+   *                   "max_tokens" (how long the answer can be)
+   * @return A standardized LLMResponse object containing the AI's final text.
+   * @throws LLMException if the internet drops, the API key is wrong, or the AI crashes.
    */
   LLMResponse chatCompletion(
       List<ChatMessage> messages,
@@ -43,24 +51,28 @@ public interface LLMProvider {
       Map<String, Object> parameters) throws LLMException;
 
   /**
-   * Checks if the provider is available and healthy.
-   *
-   * @return true if the provider is available
+   * Quick check to see if this provider is ready to work (e.g., does it have an API key saved?)
    */
   boolean isAvailable();
 
   /**
-   * Gets the list of supported models.
-   *
-   * @return list of model names
+   * Asks the AI provider for a list of all the different models it supports right now.
+   * We use this to populate the drop-down menu in the user interface!
    */
   List<String> getSupportedModels();
 
+  // =========================================================================
+  // Data Transfer Objects (DTOs)
+  // These are the standardized containers we use to pass information around.
+  // =========================================================================
+
   /**
-   * Represents a chat message.
+   * A single message in a conversation.
+   * Every message needs a "role" (who is speaking: user or assistant) 
+   * and "content" (what they actually said).
    */
   class ChatMessage {
-    private final String role; // "system", "user", "assistant"
+    private final String role;
     private final String content;
 
     public ChatMessage(String role, String content) {
@@ -78,13 +90,25 @@ public interface LLMProvider {
   }
 
   /**
-   * Represents an LLM response.
+   * The standardized package that every AI MUST return when it finishes thinking.
+   * Instead of OpenAI returning one JSON format and Gemini returning a completely different one,
+   * our background code forces them both to output this clean Java object.
    */
   class LLMResponse {
+    
+    // The actual text the AI typed out
     private final String content;
+    
+    // Which AI model specifically answered this? (e.g. "gpt-4")
     private final String model;
+    
+    // How many "words" the user asked
     private final int promptTokens;
+    
+    // How many "words" the AI answered with
     private final int completionTokens;
+    
+    // Extra sneaky information about the answer (like why it stopped typing)
     private final Map<String, Object> metadata;
 
     public LLMResponse(String content, String model,
@@ -113,6 +137,7 @@ public interface LLMProvider {
       return completionTokens;
     }
 
+    // Helps us track total costs! AI companies charge by the Total Token.
     public int getTotalTokens() {
       return promptTokens + completionTokens;
     }
@@ -123,9 +148,13 @@ public interface LLMProvider {
   }
 
   /**
-   * Exception thrown when LLM operations fail.
+   * A standardized Error object. 
+   * No matter which AI crashes, we wrap their specific crash report in an LLMException
+   * so the ChatbotAgent always knows how to "catch" it and show a friendly error to the user.
    */
   class LLMException extends Exception {
+    
+    // Keep track of the HTTP Error Code (like 401 Unauthorized or 404 Not Found)
     private final int statusCode;
 
     public LLMException(String message) {
