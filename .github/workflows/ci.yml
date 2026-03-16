@@ -42,11 +42,11 @@ jobs:
       needs-kubernetes-tests: ${{ steps.selective-checks.outputs.needs-kubernetes-tests }}
     steps:
       - name: "Checkout ${{ github.ref }} ( ${{ github.sha }} )"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Fetch incoming commit ${{ github.sha }} with its parent
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.sha }}
           fetch-depth: 2
@@ -85,9 +85,9 @@ jobs:
       fail-fast: false
     steps:
       - name: Checkout project
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Cache for npm dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.pnpm-store
@@ -96,7 +96,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-
       - name: Cache for maven dependencies
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.m2/repository/*/*/*
@@ -105,7 +105,7 @@ jobs:
           restore-keys: |
             maven-repo-
       - name: Setup java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: ${{ matrix.java }}
@@ -114,7 +114,7 @@ jobs:
         env:
           DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
       - name: Store binaries for tests
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ozone-bin
           path: |
@@ -122,13 +122,13 @@ jobs:
             !hadoop-ozone/dist/target/ozone-*-src.tar.gz
           retention-days: 1
       - name: Store source tarball for compilation
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ozone-src
           path: hadoop-ozone/dist/target/ozone-*-src.tar.gz
           retention-days: 1
       - name: Store Maven repo for tests
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ozone-repo
           path: |
@@ -152,7 +152,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Download Ozone source tarball
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ozone-src
       - name: Untar sources
@@ -165,7 +165,7 @@ jobs:
           git config user.email 'noreply@github.com'
           git commit --allow-empty -a -m 'workaround for HADOOP-19011'
       - name: Cache for maven dependencies
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.m2/repository/*/*/*
@@ -174,7 +174,7 @@ jobs:
           restore-keys: |
             maven-repo-
       - name: Setup java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: ${{ matrix.java }}
@@ -195,15 +195,15 @@ jobs:
       fail-fast: false
     steps:
       - name: Checkout project
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         if: matrix.check != 'bats'
       - name: Checkout project with history
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
         if: matrix.check == 'bats'
       - name: Cache for maven dependencies
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.m2/repository/*/*/*
@@ -213,7 +213,7 @@ jobs:
             maven-repo-
         if: ${{ !contains('author,bats', matrix.check) }}
       - name: Setup java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: 8
@@ -226,7 +226,7 @@ jobs:
         run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ matrix.check }}/summary.txt
         if: ${{ !cancelled() }}
       - name: Archive build results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
         with:
           name: ${{ matrix.check }}
@@ -245,9 +245,9 @@ jobs:
       fail-fast: false
     steps:
       - name: Checkout project
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Cache for maven dependencies
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.m2/repository/*/*/*
@@ -256,7 +256,7 @@ jobs:
           restore-keys: |
             maven-repo-
       - name: Setup java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: 8
@@ -269,7 +269,7 @@ jobs:
         run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ matrix.check }}/summary.txt
         if: ${{ !cancelled() }}
       - name: Archive build results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
         with:
           name: ${{ matrix.check }}
@@ -284,9 +284,9 @@ jobs:
     if: needs.build-info.outputs.needs-dependency-check == 'true'
     steps:
       - name: Checkout project
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Cache for maven dependencies
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.m2/repository/*/*/*
@@ -295,7 +295,7 @@ jobs:
           restore-keys: |
             maven-repo-
       - name: Download compiled Ozone binaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ozone-bin
       - name: Untar binaries
@@ -307,7 +307,7 @@ jobs:
           export OZONE_DIST_DIR=`pwd`/dist
           ./hadoop-ozone/dev-support/checks/dependency.sh
       - name: Archive build results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: dependency
@@ -322,9 +322,9 @@ jobs:
     if: needs.build-info.outputs.needs-dependency-check == 'true'
     steps:
       - name: Checkout project
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Cache for maven dependencies
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.m2/repository/*/*/*
@@ -334,7 +334,7 @@ jobs:
             maven-repo-
       - name: Download Ozone repo
         id: download-ozone-repo
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ozone-repo
           path: |
@@ -347,7 +347,7 @@ jobs:
         run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
         if: ${{ !cancelled() }}
       - name: Archive build results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: ${{ github.job }}
@@ -367,9 +367,9 @@ jobs:
       fail-fast: false
     steps:
       - name: Checkout project
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Cache for maven dependencies
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.m2/repository/*/*/*
@@ -378,7 +378,7 @@ jobs:
           restore-keys: |
             maven-repo-
       - name: Download compiled Ozone binaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ozone-bin
       - name: Untar binaries
@@ -388,7 +388,7 @@ jobs:
           rm ozone*.tar.gz
           sudo chmod -R a+rwX hadoop-ozone/dist/target
       - name: Setup java 11
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: 11 # Hadoop may not work with newer Java
@@ -407,7 +407,7 @@ jobs:
         run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
         if: ${{ !cancelled() }}
       - name: Archive build results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: acceptance-${{ matrix.suite }}
@@ -423,9 +423,9 @@ jobs:
     if: needs.build-info.outputs.needs-kubernetes-tests == 'true'
     steps:
       - name: Checkout project
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Cache for maven dependencies
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.m2/repository/*/*/*
@@ -434,7 +434,7 @@ jobs:
           restore-keys: |
             maven-repo-
       - name: Download compiled Ozone binaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ozone-bin
       - name: Untar binaries
@@ -452,7 +452,7 @@ jobs:
         run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
         if: ${{ !cancelled() }}
       - name: Archive build results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: kubernetes
@@ -481,9 +481,9 @@ jobs:
       fail-fast: false
     steps:
       - name: Checkout project
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Cache for maven dependencies
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.m2/repository/*/*/*
@@ -493,14 +493,14 @@ jobs:
             maven-repo-
       - name: Download Ozone repo
         id: download-ozone-repo
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ozone-repo
           path: |
             ~/.m2/repository/org/apache/ozone
         continue-on-error: true
       - name: Setup java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: 8
@@ -523,7 +523,7 @@ jobs:
         run: hadoop-ozone/dev-support/checks/_summary.sh target/${{ github.job }}/summary.txt
         if: ${{ !cancelled() }}
       - name: Archive build results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: it-${{ matrix.profile }}
@@ -539,11 +539,11 @@ jobs:
       - integration
     steps:
       - name: Checkout project
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Cache for maven dependencies
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.m2/repository/*/*/*
@@ -552,7 +552,7 @@ jobs:
           restore-keys: |
             maven-repo-
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: target/artifacts
       - name: Untar binaries
@@ -562,7 +562,7 @@ jobs:
       - name: Calculate combined coverage
         run: ./hadoop-ozone/dev-support/checks/coverage.sh
       - name: Setup java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: 17
@@ -573,7 +573,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
       - name: Archive build results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: target/coverage

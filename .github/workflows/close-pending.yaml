@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Execute close-pending script
         if: github.repository == 'apache/ozone'
         run: ./.github/close-pending.sh
