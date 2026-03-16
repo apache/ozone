@@ -48,134 +48,134 @@ import java.util.Map;
  */
 public class GeminiProvider extends DirectLLMProvider {
 
-    public GeminiProvider(OzoneConfiguration configuration,
-            CredentialHelper credentialHelper,
-            int timeoutMs) {
-        super(configuration, credentialHelper, timeoutMs);
+  public GeminiProvider(OzoneConfiguration configuration,
+                        CredentialHelper credentialHelper,
+                        int timeoutMs) {
+    super(configuration, credentialHelper, timeoutMs);
+  }
+
+  @Override
+  public String getProviderName() {
+    return "gemini";
+  }
+
+  @Override
+  protected String getApiKeyConfigKey() {
+    return ChatbotConfigKeys.OZONE_RECON_CHATBOT_GEMINI_API_KEY;
+  }
+
+  @Override
+  protected String getBaseUrlConfigKey() {
+    return ChatbotConfigKeys.OZONE_RECON_CHATBOT_GEMINI_BASE_URL;
+  }
+
+  @Override
+  protected String getDefaultBaseUrl() {
+    return ChatbotConfigKeys
+        .OZONE_RECON_CHATBOT_GEMINI_BASE_URL_DEFAULT;
+  }
+
+  @Override
+  protected HttpURLConnection buildChatRequest(
+      List<LLMProvider.ChatMessage> messages,
+      String model, String apiKey,
+      Map<String, Object> params) throws IOException {
+
+    ObjectNode body = MAPPER.createObjectNode();
+
+    // Handle system message separately for Gemini.
+    ArrayNode contents = body.putArray("contents");
+    for (LLMProvider.ChatMessage msg : messages) {
+      if ("system".equals(msg.getRole())) {
+        ObjectNode sysInstruction = body.putObject("systemInstruction");
+        ArrayNode sysParts = sysInstruction.putArray("parts");
+        sysParts.addObject().put("text", msg.getContent());
+      } else {
+        ObjectNode content = contents.addObject();
+        String role = "assistant".equals(msg.getRole()) ? "model" : msg.getRole();
+        content.put("role", role);
+        ArrayNode parts = content.putArray("parts");
+        parts.addObject().put("text", msg.getContent());
+      }
     }
 
-    @Override
-    public String getProviderName() {
-        return "gemini";
+    // Map standard params to Gemini equivalents.
+    ObjectNode genConfig = body.putObject("generationConfig");
+    if (params != null) {
+      if (params.containsKey("max_tokens")) {
+        genConfig.put("maxOutputTokens",
+            ((Number) params.get("max_tokens")).intValue());
+      }
+      if (params.containsKey("temperature")) {
+        genConfig.put("temperature", ((Number) params.get("temperature")).doubleValue());
+      }
     }
 
-    @Override
-    protected String getApiKeyConfigKey() {
-        return ChatbotConfigKeys.OZONE_RECON_CHATBOT_GEMINI_API_KEY;
-    }
+    String url = getBaseUrl()
+        + "/v1beta/models/" + model + ":generateContent" + "?key=" + apiKey;
 
-    @Override
-    protected String getBaseUrlConfigKey() {
-        return ChatbotConfigKeys.OZONE_RECON_CHATBOT_GEMINI_BASE_URL;
-    }
+    HttpURLConnection conn = createPostConnection(url);
+    writeBody(conn, MAPPER.writeValueAsString(body));
+    return conn;
+  }
 
-    @Override
-    protected String getDefaultBaseUrl() {
-        return ChatbotConfigKeys
-            .OZONE_RECON_CHATBOT_GEMINI_BASE_URL_DEFAULT;
-    }
+  @Override
+  protected LLMProvider.LLMResponse parseResponse(
+      String responseBody, String model) throws LLMProvider.LLMException {
+    try {
+      JsonNode root = MAPPER.readTree(responseBody);
 
-    @Override
-    protected HttpURLConnection buildChatRequest(
-            List<LLMProvider.ChatMessage> messages,
-            String model, String apiKey,
-            Map<String, Object> params) throws IOException {
+      JsonNode candidates = root.get("candidates");
+      if (candidates == null || !candidates.isArray()
+          || candidates.isEmpty()) {
+        throw new LLMProvider.LLMException(
+            "Invalid Gemini response: no candidates found");
+      }
 
-        ObjectNode body = MAPPER.createObjectNode();
+      JsonNode firstCandidate = candidates.get(0);
+      JsonNode content = firstCandidate.get("content");
+      JsonNode parts = content != null ? content.get("parts") : null;
 
-        // Handle system message separately for Gemini.
-        ArrayNode contents = body.putArray("contents");
-        for (LLMProvider.ChatMessage msg : messages) {
-            if ("system".equals(msg.getRole())) {
-                ObjectNode sysInstruction = body.putObject("systemInstruction");
-                ArrayNode sysParts = sysInstruction.putArray("parts");
-                sysParts.addObject().put("text", msg.getContent());
-            } else {
-                ObjectNode content = contents.addObject();
-                String role = "assistant".equals(msg.getRole()) ? "model" : msg.getRole();
-                content.put("role", role);
-                ArrayNode parts = content.putArray("parts");
-                parts.addObject().put("text", msg.getContent());
-            }
+      StringBuilder text = new StringBuilder();
+      if (parts != null && parts.isArray()) {
+        for (JsonNode part : parts) {
+          if (part.has("text")) {
+            text.append(part.get("text").asText());
+          }
         }
+      }
 
-        // Map standard params to Gemini equivalents.
-        ObjectNode genConfig = body.putObject("generationConfig");
-        if (params != null) {
-            if (params.containsKey("max_tokens")) {
-                genConfig.put("maxOutputTokens",
-                        ((Number) params.get("max_tokens")).intValue());
-            }
-            if (params.containsKey("temperature")) {
-                genConfig.put("temperature", ((Number) params.get("temperature")).doubleValue());
-            }
-        }
+      JsonNode usageMetadata = root.get("usageMetadata");
+      int promptTokens = 0;
+      int completionTokens = 0;
+      if (usageMetadata != null) {
+        promptTokens = usageMetadata.path("promptTokenCount").asInt(0);
+        completionTokens = usageMetadata.path("candidatesTokenCount").asInt(0);
+      }
 
-        String url = getBaseUrl()
-            + "/v1beta/models/" + model + ":generateContent" + "?key=" + apiKey;
+      Map<String, Object> metadata = new HashMap<>();
+      metadata.put("finish_reason",
+          firstCandidate.path("finishReason").asText("unknown"));
+      metadata.put("provider", getProviderName());
 
-        HttpURLConnection conn = createPostConnection(url);
-        writeBody(conn, MAPPER.writeValueAsString(body));
-        return conn;
+      return new LLMProvider.LLMResponse(
+          text.toString(), model, promptTokens,
+          completionTokens, metadata);
+
+    } catch (LLMProvider.LLMException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new LLMProvider.LLMException(
+          "Failed to parse Gemini response", e);
     }
+  }
 
-    @Override
-    protected LLMProvider.LLMResponse parseResponse(
-            String responseBody, String model) throws LLMProvider.LLMException {
-        try {
-            JsonNode root = MAPPER.readTree(responseBody);
-
-            JsonNode candidates = root.get("candidates");
-            if (candidates == null || !candidates.isArray()
-                    || candidates.isEmpty()) {
-                throw new LLMProvider.LLMException(
-                        "Invalid Gemini response: no candidates found");
-            }
-
-            JsonNode firstCandidate = candidates.get(0);
-            JsonNode content = firstCandidate.get("content");
-            JsonNode parts = content != null ? content.get("parts") : null;
-
-            StringBuilder text = new StringBuilder();
-            if (parts != null && parts.isArray()) {
-                for (JsonNode part : parts) {
-                    if (part.has("text")) {
-                        text.append(part.get("text").asText());
-                    }
-                }
-            }
-
-            JsonNode usageMetadata = root.get("usageMetadata");
-            int promptTokens = 0;
-            int completionTokens = 0;
-            if (usageMetadata != null) {
-                promptTokens = usageMetadata.path("promptTokenCount").asInt(0);
-                completionTokens = usageMetadata.path("candidatesTokenCount").asInt(0);
-            }
-
-            Map<String, Object> metadata = new HashMap<>();
-            metadata.put("finish_reason",
-                    firstCandidate.path("finishReason").asText("unknown"));
-            metadata.put("provider", getProviderName());
-
-            return new LLMProvider.LLMResponse(
-                    text.toString(), model, promptTokens,
-                    completionTokens, metadata);
-
-        } catch (LLMProvider.LLMException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new LLMProvider.LLMException(
-                    "Failed to parse Gemini response", e);
-        }
-    }
-
-    @Override
-    public List<String> getSupportedModels() {
-        return Arrays.asList(
-                "gemini-2.5-pro",
-                "gemini-2.5-flash",
-                "gemini-3-flash-preview",
-                "gemini-3.1-pro-preview");
-    }
+  @Override
+  public List<String> getSupportedModels() {
+    return Arrays.asList(
+        "gemini-2.5-pro",
+        "gemini-2.5-flash",
+        "gemini-3-flash-preview",
+        "gemini-3.1-pro-preview");
+  }
 }

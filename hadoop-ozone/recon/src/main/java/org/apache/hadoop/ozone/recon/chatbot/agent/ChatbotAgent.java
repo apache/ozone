@@ -75,13 +75,15 @@ public class ChatbotAgent {
   private final int pageSizePerCall;
   private final boolean requireSafeScope;
 
-  /** Set per-request by processQuery; used to inject provider hint. */
+  /**
+   * Set per-request by processQuery; used to inject provider hint.
+   */
   private volatile String currentProvider;
 
   @Inject
   public ChatbotAgent(LLMProvider llmProvider,
-      ToolExecutor toolExecutor,
-      OzoneConfiguration configuration) {
+                      ToolExecutor toolExecutor,
+                      OzoneConfiguration configuration) {
     this.llmProvider = llmProvider;
     this.toolExecutor = toolExecutor;
 
@@ -109,7 +111,7 @@ public class ChatbotAgent {
         ChatbotConfigKeys.OZONE_RECON_CHATBOT_EXEC_REQUIRE_SAFE_SCOPE_DEFAULT);
 
     LOG.info("ChatbotAgent initialized with model={}, maxRecords={}, " +
-        "maxPages={}, pageSize={}, requireSafeScope={}",
+            "maxPages={}, pageSize={}, requireSafeScope={}",
         defaultModel, maxRecordsPerAnswer, maxPagesPerAnswer,
         pageSizePerCall, requireSafeScope);
   }
@@ -124,7 +126,7 @@ public class ChatbotAgent {
    * @return the chatbot response
    */
   public String processQuery(String userQuery, String model,
-      String provider, String apiKey)
+                             String provider, String apiKey)
       throws Exception {
 
     // Safety check
@@ -323,9 +325,9 @@ public class ChatbotAgent {
    * "Step 3" Helper: Takes the raw JSON API data and asks the LLM to write a sentence about it.
    */
   private String summarizeResponse(String userQuery,
-      Map<String, Object> apiResponses,
-      Map<String, Object> executionMetadata,
-      String model, String apiKey)
+                                   Map<String, Object> apiResponses,
+                                   Map<String, Object> executionMetadata,
+                                   String model, String apiKey)
       throws Exception {
 
     // Give the LLM a new set of rules
@@ -349,7 +351,7 @@ public class ChatbotAgent {
     LLMResponse response = llmProvider.chatCompletion(messages, model, apiKey, parameters);
 
     LOG.info("Summarization LLM response: model={}, promptTokens={}, " +
-        "completionTokens={}, totalTokens={}",
+            "completionTokens={}, totalTokens={}",
         response.getModel(),
         response.getPromptTokens(),
         response.getCompletionTokens(),
@@ -469,8 +471,8 @@ public class ChatbotAgent {
    * Builds the user prompt for summarization.
    */
   private String buildSummarizationUserPrompt(String userQuery,
-      Map<String, Object> apiResponses,
-      Map<String, Object> executionMetadata) {
+                                              Map<String, Object> apiResponses,
+                                              Map<String, Object> executionMetadata) {
     StringBuilder sb = new StringBuilder();
     sb.append("User asked: \"").append(userQuery).append("\"\n\n");
 
@@ -644,6 +646,7 @@ public class ChatbotAgent {
   // =========================================================================
   // File Loading
   // =========================================================================
+
   /**
    * Loads the Markdown or Yaml schema file (the "Cheat Sheet").
    */

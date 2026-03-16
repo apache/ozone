@@ -44,54 +44,54 @@ import java.io.IOException;
 @Singleton
 public class CredentialHelper {
 
-    private static final Logger LOG = LoggerFactory.getLogger(CredentialHelper.class);
+  private static final Logger LOG = LoggerFactory.getLogger(CredentialHelper.class);
 
-    private final OzoneConfiguration configuration;
+  private final OzoneConfiguration configuration;
 
-    @Inject
-    public CredentialHelper(OzoneConfiguration configuration) {
-        this.configuration = configuration;
+  @Inject
+  public CredentialHelper(OzoneConfiguration configuration) {
+    this.configuration = configuration;
+  }
+
+  /**
+   * Reads a secret identified by {@code configKey} from the Hadoop
+   * Credential Provider. Falls back to a plaintext read from
+   * {@code ozone-site.xml} when no provider is configured or the key
+   * is not present in the provider.
+   *
+   * @param configKey the Hadoop configuration key that names the secret
+   * @return the secret value, or an empty string if not found anywhere
+   */
+  public String getSecret(String configKey) {
+    // 1. Try the JCEKS credential provider first.
+    try {
+      char[] keyChars = configuration.getPassword(configKey);
+      if (keyChars != null && keyChars.length > 0) {
+        LOG.debug("Resolved '{}' from credential provider", configKey);
+        return new String(keyChars);
+      }
+    } catch (IOException e) {
+      LOG.warn("Failed to read '{}' from credential provider, "
+          + "falling back to plaintext config", configKey, e);
     }
 
-    /**
-     * Reads a secret identified by {@code configKey} from the Hadoop
-     * Credential Provider. Falls back to a plaintext read from
-     * {@code ozone-site.xml} when no provider is configured or the key
-     * is not present in the provider.
-     *
-     * @param configKey the Hadoop configuration key that names the secret
-     * @return the secret value, or an empty string if not found anywhere
-     */
-    public String getSecret(String configKey) {
-        // 1. Try the JCEKS credential provider first.
-        try {
-            char[] keyChars = configuration.getPassword(configKey);
-            if (keyChars != null && keyChars.length > 0) {
-                LOG.debug("Resolved '{}' from credential provider", configKey);
-                return new String(keyChars);
-            }
-        } catch (IOException e) {
-            LOG.warn("Failed to read '{}' from credential provider, "
-                    + "falling back to plaintext config", configKey, e);
-        }
-
-        // 2. Fallback: backward-compatible plaintext read.
-        String plaintext = configuration.get(configKey, "");
-        if (plaintext != null && !plaintext.isEmpty()) {
-            LOG.debug("Resolved '{}' from plaintext configuration", configKey);
-        }
-        return plaintext;
+    // 2. Fallback: backward-compatible plaintext read.
+    String plaintext = configuration.get(configKey, "");
+    if (plaintext != null && !plaintext.isEmpty()) {
+      LOG.debug("Resolved '{}' from plaintext configuration", configKey);
     }
+    return plaintext;
+  }
 
-    /**
-     * Checks whether a secret exists for the given config key (in
-     * either JCEKS or plaintext config).
-     *
-     * @param configKey the configuration key to check
-     * @return {@code true} if a non-empty secret is available
-     */
-    public boolean hasSecret(String configKey) {
-        String value = getSecret(configKey);
-        return value != null && !value.isEmpty();
-    }
+  /**
+   * Checks whether a secret exists for the given config key (in
+   * either JCEKS or plaintext config).
+   *
+   * @param configKey the configuration key to check
+   * @return {@code true} if a non-empty secret is available
+   */
+  public boolean hasSecret(String configKey) {
+    String value = getSecret(configKey);
+    return value != null && !value.isEmpty();
+  }
 }

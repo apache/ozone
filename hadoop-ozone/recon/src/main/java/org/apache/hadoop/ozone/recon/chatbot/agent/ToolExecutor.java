@@ -115,8 +115,8 @@ public class ToolExecutor {
 
 
   /**
-   *  The listKeys Pager - It uses a while() loop to continuously execute API calls, stitching all the
-   *  individual pages into one massive JSON array until it runs out of data or hits a hard security constraint limit.
+   * The listKeys Pager - It uses a while() loop to continuously execute API calls, stitching all the
+   * individual pages into one massive JSON array until it runs out of data or hits a hard security constraint limit.
    */
   private ToolExecutionOutcome executeListKeysWithPaging(
       String endpoint, String method, Map<String, String> parameters,
@@ -292,7 +292,7 @@ public class ToolExecutor {
       // directly inline and do NOT add it to the URL query string.
       if (resolvedPath.contains(placeholder)) {
         resolvedPath = resolvedPath.replace(placeholder, value);
-      } 
+      }
       // 2. Otherwise, it must be an optional Query Parameter!
       // If the placeholder block wasn't found, we assume this is a URL filter (like ?limit=10)
       // and append it safely encoded to the end of the URL.

@@ -29,9 +29,9 @@ public interface LLMProvider {
   /**
    * Sends a chat completion request to the LLM.
    *
-   * @param messages list of chat messages
-   * @param model the model to use
-   * @param apiKey user's API key (optional, may use system key)
+   * @param messages   list of chat messages
+   * @param model      the model to use
+   * @param apiKey     user's API key (optional, may use system key)
    * @param parameters additional parameters (temperature, max_tokens, etc.)
    * @return the LLM response
    * @throws LLMException if the request fails
