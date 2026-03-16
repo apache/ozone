@@ -23,6 +23,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
 
 import java.io.Closeable;
 import java.io.File;
@@ -31,11 +35,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
-import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
-import java.nio.channels.FileLock;
-import java.nio.channels.ReadableByteChannel;
-import java.nio.channels.WritableByteChannel;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -78,13 +78,15 @@ class TestRandomAccessFileChannel {
       raf.write(1);
     }
 
-    final TrackingRandomAccessFile trackingRaf = new TrackingRandomAccessFile(f);
+    final FileChannel failingChannel = mock(FileChannel.class);
+    doThrow(new IOException("simulated close failure")).when(failingChannel).close();
+    final RandomAccessFile spyRaf = spy(new RandomAccessFile(f, "rw"));
     setField(c, "blockFile", f);
-    setField(c, "channel", new FailingCloseFileChannel());
-    setField(c, "raf", trackingRaf);
+    setField(c, "channel", failingChannel);
+    setField(c, "raf", spyRaf);
 
     assertDoesNotThrow(c::close);
-    assertTrue(trackingRaf.isClosed(), "raf.close() should still be called");
+    verify(spyRaf).close();
   }
 
   @Test
@@ -143,115 +145,6 @@ class TestRandomAccessFileChannel {
     final Field f = RandomAccessFileChannel.class.getDeclaredField(name);
     f.setAccessible(true);
     f.set(target, value);
-  }
-
-  private static final class TrackingRandomAccessFile extends RandomAccessFile {
-    private volatile boolean closed;
-
-    private TrackingRandomAccessFile(File f) throws FileNotFoundException {
-      super(f, "rw");
-    }
-
-    @Override
-    public void close() throws IOException {
-      closed = true;
-      super.close();
-    }
-
-    private boolean isClosed() {
-      return closed;
-    }
-  }
-
-  /**
-   * {@link FileChannel#close()} is final (inherited), so we implement a minimal {@link FileChannel}
-   * and throw from {@link #implCloseChannel()} to simulate close failure.
-   */
-  private static final class FailingCloseFileChannel extends FileChannel {
-    @Override
-    protected void implCloseChannel() throws IOException {
-      throw new IOException("simulated close failure");
-    }
-
-    @Override
-    public int read(ByteBuffer dst) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public long read(ByteBuffer[] dsts, int offset, int length) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public int write(ByteBuffer src) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public long write(ByteBuffer[] srcs, int offset, int length) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public long position() {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public FileChannel position(long newPosition) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public long size() {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public FileChannel truncate(long size) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public void force(boolean metaData) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public long transferTo(long position, long count, WritableByteChannel target) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public long transferFrom(ReadableByteChannel src, long position, long count) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public int read(ByteBuffer dst, long position) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public int write(ByteBuffer src, long position) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public MappedByteBuffer map(MapMode mode, long position, long size) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public FileLock lock(long position, long size, boolean shared) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public FileLock tryLock(long position, long size, boolean shared) {
-      throw new UnsupportedOperationException();
-    }
   }
 }
 
