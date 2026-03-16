@@ -35,6 +35,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.hadoop.hdds.StringUtils;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedColumnFamilyOptions;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedDBOptions;
@@ -219,6 +220,57 @@ public class TestRDBStoreIteratorWithDBClose {
         "Scan should exit cleanly without throwing when DB is closed concurrently");
     assertTrue(scanCompleted.get(),
         "Scan loop should complete (via hasNext() returning false), not hang");
+
+    executor.shutdown();
+  }
+
+  /**
+   * Verifies that forEachRemaining() exits cleanly without errors when the database is closed
+   * concurrently during iteration.
+   */
+  @Test
+  public void testForEachRemainingExitsCleanlyOnConcurrentDBClose() throws Exception {
+    RDBTable table = rdbStore.getTable(TABLE_NAME);
+
+    int threadCount = 5;
+    CountDownLatch allStarted = new CountDownLatch(threadCount);
+    ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+    List<Future<Integer>> futures = new ArrayList<>();
+
+    for (int t = 0; t < threadCount; t++) {
+      futures.add(executor.submit(() -> {
+        AtomicInteger seen = new AtomicInteger(0);
+        try (Table.KeyValueIterator<byte[], byte[]> iter =
+            table.iterator((byte[]) null, KEY_AND_VALUE)) {
+          allStarted.countDown();
+          // forEachRemaining() is the exact "while (hasNext()) { next(); }" loop
+          // that the race condition can affect.
+          iter.forEachRemaining(kv -> {
+            seen.incrementAndGet();
+            try {
+              Thread.sleep(1); // slow scan to maximise race window
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+            }
+          });
+        }
+        return seen.get();
+      }));
+    }
+
+    assertTrue(allStarted.await(10, TimeUnit.SECONDS),
+        "All scanner threads should start within 10 seconds");
+
+    // Close the DB while threads are mid-scan; this is the race trigger.
+    rdbStore.close();
+
+    for (Future<Integer> future : futures) {
+      assertDoesNotThrow(() -> {
+        int count = future.get(10, TimeUnit.SECONDS);
+        assertTrue(count >= 0 && count <= ENTRY_COUNT,
+            "Thread should have observed between 0 and " + ENTRY_COUNT + " entries");
+      }, "forEachRemaining must exit cleanly without NoSuchElementException");
+    }
 
     executor.shutdown();
   }
