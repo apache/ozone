@@ -331,7 +331,6 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
     if (lockDetails.get().isLockAcquired()) {
       try {
         if (!cleanupFunction.get()) {
-          lockDetails.set(emptyUnlockFunction.get());
           throw new IllegalStateException("Failed to acquire lock as cleanup did not drain the cache.");
         }
       } catch (Throwable t) {
