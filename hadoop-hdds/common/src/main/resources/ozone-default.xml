@@ -2405,6 +2405,20 @@
     <description>Key to enable/disable ozone acls.</description>
   </property>
   <property>
+    <name>ozone.authorization.enabled</name>
+    <value>true</value>
+    <tag>OZONE, SECURITY, AUTHORIZATION</tag>
+    <description>
+      Master switch to enable/disable authorization checks in Ozone
+      (admin privilege checks and ACL checks).
+      This property only takes effect when ozone.security.enabled is true.
+      When true: admin privilege checks are always performed, and object
+      ACL checks are controlled by ozone.acl.enabled.
+      When false: no authorization checks are performed.
+      Default is true.
+    </description>
+  </property>
+  <property>
     <name>ozone.om.kerberos.keytab.file</name>
     <value>/etc/security/keytabs/OM.keytab</value>
     <tag>OZONE, SECURITY, KERBEROS</tag>

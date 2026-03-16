@@ -58,5 +58,9 @@ export const selectStyles: StylesConfig<Option, true> = {
   }),
   indicatorSeparator: () => ({
     display: 'none'
+  }),
+  menuPortal: (baseStyles) => ({
+    ...baseStyles,
+    zIndex: 9999
   })
 }

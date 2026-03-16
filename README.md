@@ -119,10 +119,7 @@ For more information, you can check the [Contribution guideline](./CONTRIBUTING.
 
 All contributions are welcome.
 
- 1. Please open a [Jira](https://issues.apache.org/jira/projects/HDDS/issues) issue
- 2. And create a pull request
-
-For more information, you can check the [Contribution guideline](./CONTRIBUTING.md)
+Please see the [Contribution guideline](./CONTRIBUTING.md) for details.
 
 ## License
 

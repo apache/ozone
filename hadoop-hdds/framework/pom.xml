@@ -385,6 +385,9 @@
             <annotationProcessor>org.apache.hadoop.hdds.conf.ConfigFileGenerator</annotationProcessor>
             <annotationProcessor>org.apache.ozone.annotations.ReplicateAnnotationProcessor</annotationProcessor>
           </annotationProcessors>
+          <compilerArgs>
+            <arg>-AartifactId=${project.artifactId}</arg>
+          </compilerArgs>
         </configuration>
       </plugin>
       <plugin>
