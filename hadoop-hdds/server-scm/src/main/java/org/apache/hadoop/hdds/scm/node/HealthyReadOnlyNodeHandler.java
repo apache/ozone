@@ -102,8 +102,9 @@ public class HealthyReadOnlyNodeHandler
     // the add. InnerNodeImpl.add() is idempotent for existing nodes.
     NetworkTopology nt = nodeManager.getClusterNetworkTopologyMap();
     nt.add(datanodeDetails);
-    Objects.requireNonNull(
-        nodeManager.getNode(datanodeDetails.getID())
-            .getParent(), "Parent == null");
+    DatanodeDetails node = nodeManager.getNode(datanodeDetails.getID());
+    if (node != null) {
+      Objects.requireNonNull(node, "Parent == null");
+    }
   }
 }

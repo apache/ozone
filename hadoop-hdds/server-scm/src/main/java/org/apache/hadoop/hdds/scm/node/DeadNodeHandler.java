@@ -77,6 +77,14 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
                         final EventPublisher publisher) {
 
     try {
+      NodeStatus currentStatus =
+          nodeManager.getNodeStatus(datanodeDetails);
+
+      if (currentStatus.getHealth() != HddsProtos.NodeState.DEAD) {
+        LOG.info("Skip event for dead node {} since the current " +
+            "state is {}", datanodeDetails, currentStatus.getHealth());
+        return;
+      }
 
       /*
        * We should have already destroyed all the pipelines on this datanode
@@ -124,15 +132,15 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
       // resurrected (DEAD -> HEALTHY_READONLY) via a heartbeat. Removing a
       // resurrected node from the topology would leave it reachable but
       // invisible to the placement policy.
-      NodeStatus currentStatus =
-          nodeManager.getNodeStatus(datanodeDetails);
+      currentStatus = nodeManager.getNodeStatus(datanodeDetails);
       if (currentStatus.getHealth() == HddsProtos.NodeState.DEAD) {
         NetworkTopology nt = nodeManager.getClusterNetworkTopologyMap();
         if (nt.contains(datanodeDetails)) {
           nt.remove(datanodeDetails);
-          Preconditions.checkState(
-              nodeManager.getNode(datanodeDetails.getID())
-                  .getParent() == null);
+          DatanodeDetails node = nodeManager.getNode(datanodeDetails.getID());
+          if (node != null) {
+            Preconditions.checkState(node.getParent() == null);
+          }
         }
       } else {
         LOG.info("Skipping topology removal for dead node {} whose current " +
