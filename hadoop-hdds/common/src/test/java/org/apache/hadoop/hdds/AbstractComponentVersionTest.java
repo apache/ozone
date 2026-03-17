@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds;
 import static org.apache.hadoop.hdds.ComponentVersionTestUtils.assertNotSupportedBy;
 import static org.apache.hadoop.hdds.ComponentVersionTestUtils.assertSupportedBy;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -107,8 +108,16 @@ public abstract class AbstractComponentVersionTest {
   public void testFutureVersionSupportsAllKnownVersions() {
     ComponentVersion[] values = getValues();
     int unknownFutureVersion = Integer.MAX_VALUE;
-    for (ComponentVersion requiredFeature : values) {
-      assertTrue(requiredFeature.isSupportedBy(unknownFutureVersion));
+    for (ComponentVersion knownVersion : values) {
+      if (knownVersion == getFutureVersion()) {
+        // FUTURE_VERSION with serialized value < 0 is considered larger than any version with a concrete
+        // positive value.
+        assertFalse(knownVersion.isSupportedBy(unknownFutureVersion), knownVersion +
+            " should not support unknown future version " + unknownFutureVersion);
+      } else {
+        assertTrue(knownVersion.isSupportedBy(unknownFutureVersion), knownVersion +
+            " should support unknown future version " + unknownFutureVersion);
+      }
     }
   }
 
