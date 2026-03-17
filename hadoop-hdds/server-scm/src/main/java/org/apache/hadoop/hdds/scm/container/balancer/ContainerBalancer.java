@@ -40,7 +40,7 @@ import org.slf4j.LoggerFactory;
  * Container balancer is a service in SCM to move containers between over- and
  * under-utilized datanodes.
  */
-public class ContainerBalancer extends StatefulService {
+public class ContainerBalancer extends StatefulService<ContainerBalancerConfigurationProto> {
 
   private static final AtomicInteger ID = new AtomicInteger();
 
@@ -65,7 +65,8 @@ public class ContainerBalancer extends StatefulService {
    * @param scm the storage container manager
    */
   public ContainerBalancer(StorageContainerManager scm) {
-    super(scm.getStatefulServiceStateManager());
+    super(scm.getStatefulServiceStateManager(),
+        ContainerBalancerConfigurationProto.getDefaultInstance().getParserForType());
     this.scm = scm;
     this.ozoneConfiguration = scm.getConfiguration();
     this.config = ozoneConfiguration.getObject(
@@ -131,8 +132,7 @@ public class ContainerBalancer extends StatefulService {
   @Override
   public boolean shouldRun() {
     try {
-      ContainerBalancerConfigurationProto proto =
-          readConfiguration(ContainerBalancerConfigurationProto.class);
+      final ContainerBalancerConfigurationProto proto = readConfiguration();
       if (proto == null) {
         LOG.warn("Could not find persisted configuration for {} when checking" +
             " if ContainerBalancer should run. ContainerBalancer should not " +
@@ -209,14 +209,6 @@ public class ContainerBalancer extends StatefulService {
   }
 
   /**
-   * @return Name of this service.
-   */
-  @Override
-  public String getServiceName() {
-    return ContainerBalancer.class.getSimpleName();
-  }
-
-  /**
    * Starts ContainerBalancer as an SCMService. Validates state, reads and
    * validates persisted configuration, and then starts the balancing
    * thread.
@@ -233,9 +225,9 @@ public class ContainerBalancer extends StatefulService {
     try {
       // should be leader-ready, out of safe mode, and not running already
       validateState(false);
-      ContainerBalancerConfigurationProto proto;
+      final ContainerBalancerConfigurationProto proto;
       try {
-        proto = readConfiguration(ContainerBalancerConfigurationProto.class);
+        proto = readConfiguration();
       } catch (IOException e) {
         throw new InvalidContainerBalancerConfigurationException("Could not " +
             "retrieve persisted configuration while starting " +
