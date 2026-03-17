@@ -28,6 +28,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ChecksumType;
+import org.apache.hadoop.hdds.utils.db.IntegerCodec;
 import org.apache.hadoop.ozone.common.utils.BufferUtils;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
@@ -69,7 +70,7 @@ public class Checksum {
   }
 
   public static ByteString int2ByteString(int n) {
-    return UnsafeByteOperations.unsafeWrap(ByteBuffer.allocate(Integer.BYTES).putInt(n).array());
+    return UnsafeByteOperations.unsafeWrap(IntegerCodec.get().toByteArray(n));
   }
 
   private static Function<ByteBuffer, ByteString> newChecksumByteBufferFunction(

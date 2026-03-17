@@ -105,11 +105,9 @@ public final class TestCodec {
   /** Make sure that {@link IntegerCodec} is compatible with {@link ByteBuffer}. */
   static void runTestInts(int original) {
     final IntegerCodec codec = IntegerCodec.get();
-    final byte[] bytes = ByteBuffer.allocate(Integer.BYTES)
-        .putInt(original)
-        .array();
+    final byte[] bytes = codec.toByteArray(original);
     assertArrayEquals(bytes, codec.toPersistedFormat(original));
-    assertEquals(original, ByteBuffer.wrap(bytes).getInt());
+    assertEquals(original, codec.fromByteArray(bytes));
     assertEquals(original, codec.fromPersistedFormat(bytes));
   }
 
@@ -136,11 +134,9 @@ public final class TestCodec {
   /** Make sure that {@link LongCodec} is compatible with {@link ByteBuffer}. */
   static void runTestLongs(long original) {
     final LongCodec codec = LongCodec.get();
-    final byte[] bytes = ByteBuffer.allocate(Long.BYTES)
-        .putLong(original)
-        .array();
+    final byte[] bytes = codec.toByteArray(original);
     assertArrayEquals(bytes, codec.toPersistedFormat(original));
-    assertEquals(original, ByteBuffer.wrap(bytes).getLong());
+    assertEquals(original, codec.fromByteArray(bytes));
     assertEquals(original, codec.fromPersistedFormat(bytes));
   }
 

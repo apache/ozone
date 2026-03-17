@@ -20,7 +20,6 @@ package org.apache.hadoop.ozone.container.metadata;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_DB_PROFILE;
 import static org.apache.hadoop.hdds.utils.db.DBStoreBuilder.HDDS_DEFAULT_DB_PROFILE;
 
-import java.nio.ByteBuffer;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
@@ -166,7 +165,7 @@ public class DatanodeSchemaThreeDBDefinition extends AbstractDatanodeDBDefinitio
   public static String getContainerKeyPrefix(long containerID) {
     // NOTE: Rocksdb normally needs a fixed length prefix.
     return FixedLengthStringCodec.bytes2String(
-        ByteBuffer.allocate(Long.BYTES).putLong(containerID).array())
+        LongCodec.get().toByteArray(containerID))
         + separator;
   }
 
@@ -188,7 +187,7 @@ public class DatanodeSchemaThreeDBDefinition extends AbstractDatanodeDBDefinitio
   public static long getContainerId(String key) {
     int index = getContainerKeyPrefixLength();
     String cid = key.substring(0, index);
-    return ByteBuffer.wrap(FixedLengthStringCodec.string2Bytes(cid)).getLong();
+    return LongCodec.get().fromByteArray(FixedLengthStringCodec.string2Bytes(cid));
   }
 
   private void setSeparator(String keySeparator) {

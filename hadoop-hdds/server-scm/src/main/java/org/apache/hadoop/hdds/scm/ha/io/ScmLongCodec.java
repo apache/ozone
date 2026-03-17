@@ -17,7 +17,7 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
-import java.nio.ByteBuffer;
+import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 
@@ -29,12 +29,12 @@ public class ScmLongCodec implements ScmCodec<Long> {
   @Override
   public ByteString serialize(Long object) {
     // toByteArray returns a new array
-    return UnsafeByteOperations.unsafeWrap(ByteBuffer.allocate(Long.BYTES).putLong(object).array());
+    return UnsafeByteOperations.unsafeWrap(LongCodec.get().toByteArray(object));
   }
 
   @Override
   public Long deserialize(Class<?> type, ByteString value) {
-    return ByteBuffer.wrap(value.toByteArray()).getLong();
+    return LongCodec.get().fromByteArray(value.toByteArray());
   }
 
 }
