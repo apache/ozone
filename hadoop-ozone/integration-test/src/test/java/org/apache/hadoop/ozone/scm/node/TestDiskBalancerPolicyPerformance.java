@@ -363,7 +363,7 @@ public class TestDiskBalancerPolicyPerformance {
         Assertions.fail(e.getMessage());
       }
 
-      if (!isOpen && bytesUsed > 0) {
+      if (!isOpen) {
         closedContainerIDs.add(ContainerID.valueOf((long) i));
       }
     }
