@@ -86,6 +86,7 @@ class TestRandomAccessFileChannel {
     setField(c, "raf", spyRaf);
 
     assertDoesNotThrow(c::close);
+    verify(failingChannel).close();
     verify(spyRaf).close();
   }
 
@@ -116,6 +117,8 @@ class TestRandomAccessFileChannel {
     assertEquals(0, zeroSizedBuffer.remaining());
     assertEquals(0, zeroSizedBuffer.position());
     assertEquals(0, zeroSizedBuffer.limit());
+
+    c.close();
   }
 
   @Test

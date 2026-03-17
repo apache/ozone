@@ -80,7 +80,7 @@ public class RandomAccessFileChannel implements Closeable {
    * this method tries to fill up the buffer until either
    * (1) the buffer is full, or (2) it has reached end-of-stream.
    *
-   * @return ture if the caller should continue to read;
+   * @return true if the caller should continue to read;
    *         otherwise, it has reached end-of-stream, return false;
    */
   public synchronized boolean read(ByteBuffer buffer) throws IOException {
