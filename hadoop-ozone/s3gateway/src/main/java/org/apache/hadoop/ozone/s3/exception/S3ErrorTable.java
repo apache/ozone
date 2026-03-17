@@ -114,6 +114,9 @@ public final class S3ErrorTable {
       "AccessDenied", "User doesn't have the right to access this " +
       "resource.", HTTP_FORBIDDEN);
 
+  public static final OS3Exception EXPIRED_TOKEN = new OS3Exception(
+      "ExpiredToken", "The provided token has expired.", HTTP_FORBIDDEN);
+
   public static final OS3Exception PRECOND_FAILED = new OS3Exception(
       "PreconditionFailed", "At least one of the pre-conditions you " +
       "specified did not hold", HTTP_PRECON_FAILED);

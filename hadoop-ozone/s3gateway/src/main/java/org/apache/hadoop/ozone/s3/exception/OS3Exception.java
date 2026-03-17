@@ -17,10 +17,12 @@
 
 package org.apache.hadoop.ozone.s3.exception;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.fasterxml.jackson.module.jaxb.JaxbAnnotationModule;
+import com.google.common.base.Strings;
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
@@ -58,6 +60,14 @@ public class OS3Exception extends RuntimeException {
 
   @XmlElement(name = "RequestId")
   private String requestId;
+
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  @XmlElement(name = "HostId")
+  private String hostId;
+
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  @XmlElement(name = "Token-0")
+  private String token0;
 
   @XmlTransient
   private int httpCode;
@@ -125,6 +135,22 @@ public class OS3Exception extends RuntimeException {
     this.resource = resource;
   }
 
+  public String getHostId() {
+    return hostId;
+  }
+
+  public void setHostId(String hostId) {
+    this.hostId = hostId;
+  }
+
+  public String getToken0() {
+    return token0;
+  }
+
+  public void setToken0(String token0) {
+    this.token0 = token0;
+  }
+
   public int getHttpCode() {
     return httpCode;
   }
@@ -146,16 +172,20 @@ public class OS3Exception extends RuntimeException {
 
     //When we get exception log it, and return exception as xml from actual
     // exception data. So, falling back to construct from exception.
-    String formatString = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
-        "<Error>" +
-        "<Code>%s</Code>" +
-        "<Message>%s</Message>" +
-        "<Resource>%s</Resource>" +
-        "<RequestId>%s</RequestId>" +
-        "</Error>";
-    return String.format(formatString, this.getCode(),
-        this.getErrorMessage(), this.getResource(),
-        this.getRequestId());
+    final StringBuilder builder = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
+        .append("<Error>")
+        .append("<Code>").append(this.getCode()).append("</Code>")
+        .append("<Message>").append(this.getErrorMessage()).append("</Message>")
+        .append("<Resource>").append(this.getResource()).append("</Resource>")
+        .append("<RequestId>").append(this.getRequestId()).append("</RequestId>");
+    if (!Strings.isNullOrEmpty(this.getHostId())) {
+      builder.append("<HostId>").append(this.getHostId()).append("</HostId>");
+    }
+    if (!Strings.isNullOrEmpty(this.getToken0())) {
+      builder.append("<Token-0>").append(this.getToken0()).append("</Token-0>");
+    }
+    builder.append("</Error>");
+    return builder.toString();
   }
 
   /** Create a copy with specific message. */
