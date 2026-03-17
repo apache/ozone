@@ -284,8 +284,8 @@ public class ReconTaskControllerImpl implements ReconTaskController {
         reconContainerMetadataManager.reinitialize(reconDBProvider);
         reconGlobalStatsManager.reinitialize(reconDBProvider);
         reconFileMetadataManager.reinitialize(reconDBProvider);
+        localReconOmTaskMap.values().forEach(ReconOmTask::init);
         recordAllTaskStatus(localReconOmTaskMap, 0, omMetadataManager.getLastSequenceNumberFromDB());
-
         // Track reprocess success
         controllerMetrics.incrReprocessSuccessCount();
 
