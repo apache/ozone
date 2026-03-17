@@ -24,9 +24,9 @@ import static org.apache.hadoop.hdds.scm.protocolPB.ContainerCommandResponseBuil
 import static org.apache.hadoop.ozone.container.common.ContainerTestUtils.COMMIT_STAGE;
 import static org.apache.hadoop.ozone.container.common.impl.ContainerImplTestUtils.newContainerSet;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.any;
@@ -497,8 +497,7 @@ public class TestHddsDispatcher {
   }
 
   @Test
-  public void testWriteChunkWithContainerAlreadyExistsDoesNotMarkUnhealthy()
-      throws IOException {
+  public void testCreateContainerWhenAlreadyExistsDoesNotMarkUnhealthy() throws IOException {
     String testDirPath = testDir.getPath();
     try {
       UUID scmId = UUID.randomUUID();
@@ -507,32 +506,31 @@ public class TestHddsDispatcher {
       conf.set(OzoneConfigKeys.OZONE_METADATA_DIRS, testDirPath);
       DatanodeDetails dd = randomDatanodeDetails();
       HddsDispatcher hddsDispatcher = createDispatcher(dd, scmId, conf);
-      ContainerCommandRequestProto initialWriteChunkRequest =
-          getWriteChunkRequest(dd.getUuidString(), 1L, 1L);
 
+      // Create container via WriteChunk
+      ContainerCommandRequestProto writeChunkRequest =
+          getWriteChunkRequest(dd.getUuidString(), 1L, 1L);
       ContainerCommandResponseProto initialResponse =
-          hddsDispatcher.dispatch(initialWriteChunkRequest, null);
+          hddsDispatcher.dispatch(writeChunkRequest, null);
       assertEquals(ContainerProtos.Result.SUCCESS, initialResponse.getResult());
 
-      ContainerCommandRequestProto writeChunkRequest =
-          getWriteChunkRequest(dd.getUuidString(), 1L, 2L);
-      HddsDispatcher mockDispatcher = spy(hddsDispatcher);
-      ContainerCommandResponseProto.Builder builder =
-          getContainerCommandResponse(writeChunkRequest,
-              ContainerProtos.Result.CONTAINER_ALREADY_EXISTS, "");
+      // Send direct CreateContainer for existing container
+      ContainerCommandRequestProto createRequest =
+          ContainerCommandRequestProto.newBuilder()
+              .setCmdType(ContainerProtos.Type.CreateContainer)
+              .setContainerID(1L)
+              .setCreateContainer(ContainerProtos.CreateContainerRequestProto.newBuilder()
+                  .setContainerType(ContainerProtos.ContainerType.KeyValueContainer)
+                  .build())
+              .setDatanodeUuid(dd.getUuidString())
+              .build();
 
-      doReturn(null).doCallRealMethod().when(mockDispatcher)
-          .getContainer(writeChunkRequest.getContainerID());
-      doReturn(builder.build()).when(mockDispatcher)
-          .createContainer(writeChunkRequest);
+      ContainerCommandResponseProto response =
+          hddsDispatcher.dispatch(createRequest, null);
+      assertEquals(ContainerProtos.Result.CONTAINER_ALREADY_EXISTS, response.getResult());
 
-      ContainerCommandResponseProto response = assertDoesNotThrow(
-          () -> mockDispatcher.dispatch(writeChunkRequest, null));
-      assertEquals(ContainerProtos.Result.CONTAINER_ALREADY_EXISTS,
-          response.getResult());
-
-      Container container = mockDispatcher.getContainer(
-          writeChunkRequest.getContainerID());
+      Container container = hddsDispatcher.getContainer(1L);
+      assertNotNull(container);
       assertTrue(container.getContainerData().isOpen());
       assertFalse(container.getContainerData().isUnhealthy());
     } finally {
