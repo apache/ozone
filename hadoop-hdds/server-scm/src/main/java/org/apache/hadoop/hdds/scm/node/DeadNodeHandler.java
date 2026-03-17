@@ -100,7 +100,7 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
       closeContainers(datanodeDetails, publisher);
       destroyPipelines(datanodeDetails);
 
-      boolean isNodeInMaintenance = nodeManager.getNodeStatus(datanodeDetails).isInMaintenance();
+      boolean isNodeInMaintenance = currentStatus.isInMaintenance();
 
       // Remove the container replicas associated with the dead node unless it
       // is IN_MAINTENANCE
