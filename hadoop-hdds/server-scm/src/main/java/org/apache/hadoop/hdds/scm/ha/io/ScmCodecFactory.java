@@ -50,7 +50,6 @@ import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferExce
 public final class ScmCodecFactory {
 
   private static Map<Class<?>, ScmCodec<?>> codecs = new HashMap<>();
-  private static ClassResolver resolver;
 
   static {
     putProto(ContainerID.getDefaultInstance());
@@ -75,7 +74,7 @@ public final class ScmCodecFactory {
     putEnum(NodeType.class, NodeType::forNumber);
 
     // Must be the last one
-    resolver = new ClassResolver(codecs.keySet());
+    final ClassResolver resolver = new ClassResolver(codecs.keySet());
     codecs.put(List.class, new ScmListCodec(resolver));
   }
 
