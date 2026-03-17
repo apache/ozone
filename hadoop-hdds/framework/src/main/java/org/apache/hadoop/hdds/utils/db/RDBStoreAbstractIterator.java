@@ -194,7 +194,8 @@ abstract class RDBStoreAbstractIterator<RAW>
     if (isDbClosed()) {
       LOG.warn("Skipping removeFromDB for table {}: underlying RocksDB is closed",
           rocksDBTable.getName());
-      return;
+      throw new RocksDatabaseException("Cannot removeFromDB: underlying RocksDB for table "
+          + rocksDBTable.getName() + "is closed");
     }
     if (currentEntry != null) {
       delete(currentEntry.getKey());
