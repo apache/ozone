@@ -90,6 +90,17 @@ public class S3STSEndpoint extends S3STSEndpointBase {
   private static final String UNSUPPORTED_OPERATION = "UnsupportedOperation";
   private static final String MALFORMED_POLICY_DOCUMENT = "MalformedPolicyDocument";
 
+  // JAXBContext is relatively expensive to create and is threadsafe, so cache and reuse
+  private static final JAXBContext JAXB_CONTEXT;
+
+  static {
+    try {
+      JAXB_CONTEXT = JAXBContext.newInstance(S3AssumeRoleResponseXml.class);
+    } catch (JAXBException e) {
+      throw new RuntimeException("Failed to initialize JAXBContext: " + e, e);
+    }
+  }
+
   @Inject
   private RequestIdentifier requestIdentifier;
 
@@ -330,8 +341,7 @@ public class S3STSEndpoint extends S3STSEndpointBase {
       meta.setRequestId(requestId);
       response.setResponseMetadata(meta);
 
-      final JAXBContext jaxbContext = JAXBContext.newInstance(S3AssumeRoleResponseXml.class);
-      final Marshaller marshaller = jaxbContext.createMarshaller();
+      final Marshaller marshaller = JAXB_CONTEXT.createMarshaller();
       marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
       final StringWriter stringWriter = new StringWriter();
       marshaller.marshal(response, stringWriter);
