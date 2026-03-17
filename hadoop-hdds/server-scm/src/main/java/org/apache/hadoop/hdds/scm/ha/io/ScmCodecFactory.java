@@ -22,9 +22,13 @@ import com.google.protobuf.ProtocolMessageEnum;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.IntFunction;
 import org.apache.commons.lang3.ClassUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerID;
@@ -46,6 +50,7 @@ import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferExce
 public final class ScmCodecFactory {
 
   private static Map<Class<?>, ScmCodec<?>> codecs = new HashMap<>();
+  private static ClassResolver resolver;
 
   static {
     putProto(ContainerID.getDefaultInstance());
@@ -70,7 +75,8 @@ public final class ScmCodecFactory {
     putEnum(NodeType.class, NodeType::forNumber);
 
     // Must be the last one
-    codecs.put(List.class, new ScmListCodec(codecs.keySet()));
+    resolver = new ClassResolver(codecs.keySet());
+    codecs.put(List.class, new ScmListCodec(resolver));
   }
 
   static <T extends Message> void putProto(T proto) {
@@ -98,5 +104,48 @@ public final class ScmCodecFactory {
     }
     throw new InvalidProtocolBufferException(
         "Codec for " + type + " not found!");
+  }
+
+  /** Resolve the codec class from a given class. */
+  static class ClassResolver {
+    private final Map<String, Class<?>> provided;
+    private final Map<String, Class<?>> resolved = new ConcurrentHashMap<>();
+
+    ClassResolver(Collection<Class<?>> provided) {
+      final Map<String, Class<?>> map = new TreeMap<>();
+      for (Class<?> c : provided) {
+        map.put(c.getName(), c);
+      }
+      map.put(List.class.getName(), List.class);
+      this.provided = Collections.unmodifiableMap(map);
+    }
+
+    Class<?> get(String className) throws InvalidProtocolBufferException {
+      final Class<?> c = provided.get(className);
+      if (c != null) {
+        return c;
+      }
+      throw new InvalidProtocolBufferException("Class not found for " + className);
+    }
+
+    Class<?> get(Class<?> clazz) throws InvalidProtocolBufferException {
+      final String className = clazz.getName();
+      final Class<?> c = provided.get(className);
+      if (c != null) {
+        return c;
+      }
+      final Class<?> found = resolved.get(className);
+      if (found != null) {
+        return found;
+      }
+
+      for (Class<?> base : provided.values()) {
+        if (base.isAssignableFrom(clazz)) {
+          resolved.put(className, base);
+          return base;
+        }
+      }
+      throw new InvalidProtocolBufferException("Failed to resolve " + clazz);
+    }
   }
 }

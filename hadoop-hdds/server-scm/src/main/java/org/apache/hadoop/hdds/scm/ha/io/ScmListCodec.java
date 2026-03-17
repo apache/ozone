@@ -18,11 +18,7 @@
 package org.apache.hadoop.hdds.scm.ha.io;
 
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.ListArgument;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
@@ -30,62 +26,33 @@ import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferExce
 /**
  * {@link ScmCodec} for {@link List} objects.
  */
-public class ScmListCodec implements ScmCodec<Object> {
+class ScmListCodec implements ScmCodec<Object> {
   private static final ByteString EMPTY_LIST = ListArgument.newBuilder()
       .setType(Object.class.getName())
       .build()
       .toByteString();
 
-  private final Map<String, Class<?>> classes;
+  private final ScmCodecFactory.ClassResolver resolver;
 
-  public ScmListCodec(Collection<Class<?>> classes) {
-    final Map<String, Class<?>> map = new TreeMap<>();
-    for (Class<?> c : classes) {
-      map.put(c.getName(), c);
-    }
-    map.put(List.class.getName(), List.class);
-    this.classes = Collections.unmodifiableMap(map);
-  }
-
-  private Class<?> getClass(String type) throws InvalidProtocolBufferException {
-    final Class<?> clazz = classes.get(type);
-    if (clazz == null) {
-      throw new InvalidProtocolBufferException("Class not found for type: " + type);
-    }
-    return clazz;
+  ScmListCodec(ScmCodecFactory.ClassResolver resolver) {
+    this.resolver = resolver;
   }
 
   @Override
   public ByteString serialize(Object object) throws InvalidProtocolBufferException {
     if (!(object instanceof List)) {
-      throw new InvalidProtocolBufferException("Unexpected non-list object: " + object.getClass());
+      throw new InvalidProtocolBufferException(
+          "Unexpected non-list object: " + object.getClass());
     }
     final List<?> elements = (List<?>) object;
     if (elements.isEmpty()) {
       return EMPTY_LIST;
     }
 
-    Class<?> runtimeClass = elements.get(0).getClass();
-
-    Class<?> registeredClass = null;
-    for (Class<?> clazz : classes.values()) {
-      if (clazz.isAssignableFrom(runtimeClass)) {
-        registeredClass = clazz;
-        break;
-      }
-    }
-
-    if (registeredClass == null) {
-      throw new InvalidProtocolBufferException(
-          "Unsupported list element type: " + runtimeClass.getName());
-    }
-
-    final String elementType = registeredClass.getName();
-
-    final ScmCodec<Object> elementCodec =
-        ScmCodecFactory.getCodec(getClass(elementType));
+    final Class<?> resolved = resolver.get(elements.get(0).getClass());
+    final ScmCodec<Object> elementCodec = ScmCodecFactory.getCodec(resolved);
     final ListArgument.Builder builder = ListArgument.newBuilder()
-        .setType(elementType);
+        .setType(resolved.getName());
     for (Object e : elements) {
       builder.addValue(elementCodec.serialize(e));
     }
@@ -93,15 +60,19 @@ public class ScmListCodec implements ScmCodec<Object> {
   }
 
   @Override
-  public Object deserialize(Class<?> type, ByteString value) throws InvalidProtocolBufferException {
+  public Object deserialize(Class<?> type, ByteString value)
+      throws InvalidProtocolBufferException {
     if (!List.class.isAssignableFrom(type)) {
-      throw new InvalidProtocolBufferException("Unexpected non-list type: " + type);
+      throw new InvalidProtocolBufferException(
+          "Unexpected non-list type: " + type);
     }
-    final ListArgument argument = ListArgument.parseFrom(value.asReadOnlyByteBuffer());
+    final ListArgument argument = ListArgument.parseFrom(
+        value.asReadOnlyByteBuffer());
     if (!argument.hasType()) {
-      throw new InvalidProtocolBufferException("Missing ListArgument.type: " + argument);
+      throw new InvalidProtocolBufferException(
+          "Missing ListArgument.type: " + argument);
     }
-    final Class<?> elementClass = getClass(argument.getType());
+    final Class<?> elementClass = resolver.get(argument.getType());
     final ScmCodec<?> elementCodec = ScmCodecFactory.getCodec(elementClass);
     final List<Object> list = new ArrayList<>();
     for (ByteString element : argument.getValueList()) {
