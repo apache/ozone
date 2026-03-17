@@ -194,6 +194,8 @@ public abstract class EndpointBase {
     } catch (OMException ex) {
       if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
+      } else if (isExpiredToken(ex)) {
+        throw newError(S3ErrorTable.EXPIRED_TOKEN, s3Auth.getAccessID(), ex);
       } else if (ex.getResult() == ResultCodes.INVALID_TOKEN) {
         throw newError(S3ErrorTable.ACCESS_DENIED,
             s3Auth.getAccessID(), ex);
@@ -259,6 +261,8 @@ public abstract class EndpointBase {
       if (ex.getResult() == ResultCodes.BUCKET_NOT_FOUND
           || ex.getResult() == ResultCodes.VOLUME_NOT_FOUND) {
         throw newError(S3ErrorTable.NO_SUCH_BUCKET, bucketName, ex);
+      } else if (isExpiredToken(ex)) {
+        throw newError(S3ErrorTable.EXPIRED_TOKEN, s3Auth.getAccessID(), ex);
       } else if (ex.getResult() == ResultCodes.INVALID_TOKEN) {
         throw newError(S3ErrorTable.ACCESS_DENIED,
             s3Auth.getAccessID(), ex);
@@ -294,6 +298,8 @@ public abstract class EndpointBase {
       getMetrics().updateCreateBucketFailureStats(startNanos);
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw newError(S3ErrorTable.ACCESS_DENIED, bucketName, ex);
+      } else if (isExpiredToken(ex)) {
+        throw newError(S3ErrorTable.EXPIRED_TOKEN, s3Auth.getAccessID(), ex);
       } else if (ex.getResult() == ResultCodes.INVALID_TOKEN) {
         throw newError(S3ErrorTable.ACCESS_DENIED,
             s3Auth.getAccessID(), ex);
@@ -322,6 +328,8 @@ public abstract class EndpointBase {
       if (ex.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw newError(S3ErrorTable.ACCESS_DENIED,
             s3BucketName, ex);
+      } else if (isExpiredToken(ex)) {
+        throw newError(S3ErrorTable.EXPIRED_TOKEN, s3Auth.getAccessID(), ex);
       } else if (ex.getResult() == ResultCodes.INVALID_TOKEN) {
         throw newError(S3ErrorTable.ACCESS_DENIED,
             s3Auth.getAccessID(), ex);
@@ -377,6 +385,8 @@ public abstract class EndpointBase {
       } else  if (e.getResult() == ResultCodes.PERMISSION_DENIED) {
         throw newError(S3ErrorTable.ACCESS_DENIED,
             "listBuckets", e);
+      } else if (isExpiredToken(e)) {
+        throw newError(S3ErrorTable.EXPIRED_TOKEN, s3Auth.getAccessID(), e);
       } else if (e.getResult() == ResultCodes.INVALID_TOKEN) {
         throw newError(S3ErrorTable.ACCESS_DENIED,
             s3Auth.getAccessID(), e);
@@ -683,6 +693,10 @@ public abstract class EndpointBase {
     return result == ResultCodes.PERMISSION_DENIED
         || result == ResultCodes.INVALID_TOKEN
         || result == ResultCodes.REVOKED_TOKEN;
+  }
+
+  protected boolean isExpiredToken(OMException ex) {
+    return ex.getResult() == ResultCodes.TOKEN_EXPIRED;
   }
 
   protected ReplicationConfig getReplicationConfig(OzoneBucket ozoneBucket) throws OS3Exception {
