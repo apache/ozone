@@ -68,12 +68,12 @@ public class TestTraceAllMethod {
    */
   public static class ServiceImpl implements Service {
 
+    private boolean spanActive = false;
+
     @Override
     public String otherMethod(String name) {
       return "Hello " + name;
     }
-
-    private boolean spanActive = false;
 
     @Override
     @SkipTracing
