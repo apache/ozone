@@ -393,13 +393,9 @@ public interface NodeManager extends StorageContainerNodeProtocol,
    */
   NetworkTopology getClusterNetworkTopologyMap();
 
-  int minHealthyVolumeNum(List <DatanodeDetails> dnList);
-
   int totalHealthyVolumeCount();
 
   int pipelineLimit(DatanodeDetails dn);
-
-  int minPipelineLimit(List<DatanodeDetails> dn);
 
   /**
    * Gets the peers in all the pipelines for the particular datnode.
@@ -424,4 +420,6 @@ public interface NodeManager extends StorageContainerNodeProtocol,
   default void removeNode(DatanodeDetails datanodeDetails) throws NodeNotFoundException, IOException {
 
   }
+
+  int openContainerLimit(List<DatanodeDetails> datanodes);
 }

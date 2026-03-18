@@ -87,6 +87,7 @@ export type ExpandedRowState = {
 
 export type ContainerState = {
   lastUpdated: number;
+  totalContainers: number;
   columnOptions: Option[];
   missingContainerData: Container[];
   underReplicatedContainerData: Container[];

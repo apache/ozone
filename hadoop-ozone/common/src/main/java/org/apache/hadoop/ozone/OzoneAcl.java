@@ -26,7 +26,7 @@ import static org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType.WRI
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
-import com.google.protobuf.ProtoUtils;
+import com.google.protobuf.UnsafeByteOperations;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
@@ -310,7 +310,7 @@ public final class OzoneAcl {
     final byte first = (byte) aclBits;
     final byte second = (byte) (aclBits >>> 8);
     final byte[] bytes = second != 0 ? new byte[]{first, second} : new byte[]{first};
-    return ProtoUtils.unsafeByteString(bytes);
+    return UnsafeByteOperations.unsafeWrap(bytes);
   }
 
   @JsonIgnore

@@ -161,7 +161,8 @@ public class InfoSubcommand extends ScmSubcommand {
         }
       }
       System.out.printf("Container State: %s%n", container.getContainerInfo().getState());
-
+      System.out.printf("SequenceId: %s%n", container.getContainerInfo().getSequenceId());
+      
       // Print pipeline of an existing container.
       String machinesStr = container.getPipeline().getNodes().stream().map(
               InfoSubcommand::buildDatanodeDetails)
@@ -189,7 +190,8 @@ public class InfoSubcommand extends ScmSubcommand {
     if (replica.getReplicaIndex() != -1) {
       sb.append(" ReplicaIndex: ").append(replica.getReplicaIndex()).append(';');
     }
-    sb.append(" Origin: ").append(replica.getPlaceOfBirth().toString()).append(';')
+    sb.append(" SequenceId: ").append(replica.getSequenceId()).append(';')
+        .append(" Origin: ").append(replica.getPlaceOfBirth().toString()).append(';')
         .append(" Location: ").append(buildDatanodeDetails(replica.getDatanodeDetails()));
     return sb.toString();
   }

@@ -96,6 +96,8 @@ public final class S3Consts {
   public static final String EXPECTED_BUCKET_OWNER_HEADER = "x-amz-expected-bucket-owner";
   public static final String EXPECTED_SOURCE_BUCKET_OWNER_HEADER = "x-amz-source-expected-bucket-owner";
 
+  public static final String CHECKSUM_HEADER = "Content-MD5";
+
   //Never Constructed
   private S3Consts() {
 

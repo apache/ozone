@@ -17,22 +17,36 @@
 
 package org.apache.hadoop.ozone.s3.endpoint;
 
+import static java.net.HttpURLConnection.HTTP_BAD_REQUEST;
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static java.net.HttpURLConnection.HTTP_NOT_IMPLEMENTED;
 import static java.net.HttpURLConnection.HTTP_OK;
+import static org.apache.hadoop.ozone.OzoneAcl.AclScope.ACCESS;
+import static org.apache.hadoop.ozone.s3.endpoint.EndpointTestUtils.assertErrorResponse;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_ARGUMENT;
+import static org.apache.hadoop.ozone.s3.exception.S3ErrorTable.INVALID_REQUEST;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import org.apache.hadoop.ozone.OzoneAcl;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.client.OzoneBucket;
 import org.apache.hadoop.ozone.client.OzoneClient;
 import org.apache.hadoop.ozone.client.OzoneClientStub;
 import org.apache.hadoop.ozone.client.OzoneVolume;
@@ -55,6 +69,7 @@ public class TestBucketAcl {
   private HttpHeaders headers;
   private BucketEndpoint bucketEndpoint;
   private static final String ACL_MARKER = "acl";
+  private static final String WHITESPACE_ONLY = "  ";
 
   @BeforeEach
   public void setup() throws IOException {
@@ -255,12 +270,86 @@ public class TestBucketAcl {
   }
 
   @Test
-  public void testBucketNotExist() throws Exception {
+  public void testBucketNotExist() {
     when(parameterMap.containsKey(ACL_MARKER)).thenReturn(true);
     when(headers.getHeaderString(S3Acl.GRANT_READ))
         .thenReturn(S3Acl.ACLIdentityType.USER.getHeaderType() + "=root");
     OS3Exception e = assertThrows(OS3Exception.class, () ->
         bucketEndpoint.get("bucket-not-exist"));
     assertEquals(e.getHttpCode(), HTTP_NOT_FOUND);
+  }
+
+  @Test
+  public void testPutAclWithInvalidXmlBody() {
+    InputStream body = new ByteArrayInputStream(
+        "not-xml".getBytes(StandardCharsets.UTF_8));
+
+    WebApplicationException wae = assertThrows(WebApplicationException.class,
+        () -> bucketEndpoint.put(BUCKET_NAME, body));
+
+    OS3Exception os3 = assertInstanceOf(OS3Exception.class, wae.getCause());
+
+    assertEquals(INVALID_REQUEST.getCode(), os3.getCode());
+    assertEquals(HTTP_BAD_REQUEST, os3.getHttpCode());
+  }
+
+  @Test
+  public void testPutAclWithInvalidGrantHeaderValue() {
+    when(headers.getHeaderString(S3Acl.GRANT_FULL_CONTROL))
+        .thenReturn("id\"owner-id\"");
+    assertErrorResponse(INVALID_ARGUMENT, () -> bucketEndpoint.put(BUCKET_NAME, null));
+  }
+
+  @Test
+  public void testPutAclWithBothHeadersAndBody() throws Exception {
+    // Header: READ
+    when(headers.getHeaderString(S3Acl.GRANT_READ))
+        .thenReturn("id=owner-id");
+
+    // Body: FULL_CONTROL (from resource xml)
+    InputStream body = TestBucketAcl.class.getClassLoader()
+        .getResourceAsStream("userAccessControlList.xml");
+    assertNotNull(body, "userAccessControlList.xml not found in test resources");
+
+    Response resp = bucketEndpoint.put(BUCKET_NAME, body);
+    assertEquals(HTTP_OK, resp.getStatus());
+
+    OzoneBucket bucket = bucketEndpoint.getClient()
+        .getObjectStore()
+        .getS3Bucket(BUCKET_NAME);
+
+    List<OzoneAcl> acls = bucket.getAcls();
+    assertFalse(acls.isEmpty());
+
+    OzoneAcl ownerAcl = acls.stream()
+        .filter(acl -> "owner-id".equals(acl.getName())
+            && acl.getAclScope() == ACCESS)
+        .findFirst()
+        .orElseThrow(() -> new AssertionError("owner-id ACL not found"));
+
+    List<IAccessAuthorizer.ACLType> permissions = ownerAcl.getAclList();
+
+    assertThat(permissions)
+        .contains(IAccessAuthorizer.ACLType.READ);
+
+    assertFalse(permissions.contains(IAccessAuthorizer.ACLType.ALL),
+        "FULL_CONTROL/ALL from body should not be applied when header is present");
+  }
+  
+  @Test
+  public void testPutAclWithEmptyGrantHeaderValue() throws Exception {
+    when(headers.getHeaderString(S3Acl.GRANT_FULL_CONTROL))
+        .thenReturn(""); // empty
+
+    Response resp = bucketEndpoint.put(BUCKET_NAME, null);
+
+    assertEquals(HTTP_OK, resp.getStatus());
+  }
+
+  @Test
+  public void testPutAclWithWhitespaceGrantHeaderValue() {
+    when(headers.getHeaderString(S3Acl.GRANT_FULL_CONTROL))
+        .thenReturn(WHITESPACE_ONLY); // whitespace only
+    assertErrorResponse(INVALID_ARGUMENT, () -> bucketEndpoint.put(BUCKET_NAME, null));
   }
 }

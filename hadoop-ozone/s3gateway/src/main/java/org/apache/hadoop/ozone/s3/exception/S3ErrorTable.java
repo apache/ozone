@@ -164,6 +164,10 @@ public final class S3ErrorTable {
       "XAmzContentSHA256Mismatch", "The provided 'x-amz-content-sha256' header does " +
       "not match the computed hash.", HTTP_BAD_REQUEST);
 
+  public static final OS3Exception BAD_DIGEST = new OS3Exception(
+      "BadDigest", "The Content-MD5 or checksum value that you specified did not match what the server received.",
+      HTTP_BAD_REQUEST);
+
   private static Function<Exception, OS3Exception> generateInternalError =
       e -> new OS3Exception("InternalError", e.getMessage(), HTTP_INTERNAL_ERROR);
 

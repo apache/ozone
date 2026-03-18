@@ -40,6 +40,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -50,7 +51,6 @@ import java.util.concurrent.TimeoutException;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
-import org.apache.hadoop.hdds.conf.StorageUnit;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.fs.SpaceUsageCheckFactory;
 import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
@@ -245,7 +245,7 @@ public class TestDiskBalancerTask {
     conf.setFromObject(diskBalancerConfiguration);
     diskBalancerService = new DiskBalancerServiceTestImpl(ozoneContainer,
         100, conf, 1);
-    DiskBalancerService.setReplicaDeletionDelayMills(0);
+    diskBalancerService.setReplicaDeletionDelay(0);
     KeyValueContainer.setInjector(kvFaultInjector);
   }
 
@@ -282,6 +282,11 @@ public class TestDiskBalancerTask {
     State originalState = container.getContainerState();
     assertEquals(initialSourceUsed + CONTAINER_SIZE, sourceVolume.getCurrentUsage().getUsedSpace());
     assertEquals(initialDestUsed, destVolume.getCurrentUsage().getUsedSpace());
+    Iterator<Long> containerIterator = sourceVolume.getContainerIterator();
+    assertTrue(containerIterator.hasNext());
+    assertEquals(CONTAINER_ID, containerIterator.next());
+    containerIterator = destVolume.getContainerIterator();
+    assertFalse(containerIterator.hasNext());
 
     String oldContainerPath = container.getContainerData().getContainerPath();
     if (containerState == State.QUASI_CLOSED) {
@@ -305,6 +310,12 @@ public class TestDiskBalancerTask {
     assertEquals(CONTAINER_SIZE, diskBalancerService.getMetrics().getSuccessBytes());
     assertEquals(initialDestCommitted, destVolume.getCommittedBytes());
     assertEquals(initialSourceDelta, diskBalancerService.getDeltaSizes().get(sourceVolume));
+
+    containerIterator = sourceVolume.getContainerIterator();
+    assertFalse(containerIterator.hasNext());
+    containerIterator = destVolume.getContainerIterator();
+    assertTrue(containerIterator.hasNext());
+    assertEquals(CONTAINER_ID, containerIterator.next());
   }
 
   @ContainerTestVersionInfo.ContainerTest
@@ -552,11 +563,8 @@ public class TestDiskBalancerTask {
 
     GenericTestUtils.LogCapturer serviceLog = GenericTestUtils.LogCapturer.captureLogs(DiskBalancerService.class);
     DiskBalancerService.DiskBalancerTask task = getTask();
-    long defaultContainerSize = (long) conf.getStorageSize(
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE,
-        ScmConfigKeys.OZONE_SCM_CONTAINER_SIZE_DEFAULT, StorageUnit.BYTES);
-    // verify committed space is reserved for destination volume
-    assertEquals(defaultContainerSize, destVolume.getCommittedBytes() - initialDestCommitted);
+    // verify committed space is reserved for destination volume (uses actual container size)
+    assertEquals(CONTAINER_SIZE, destVolume.getCommittedBytes() - initialDestCommitted);
 
     // delete the container from containerSet to simulate a failure
     containerSet.removeContainer(CONTAINER_ID);
@@ -580,7 +588,7 @@ public class TestDiskBalancerTask {
       throws IOException, InterruptedException {
     setLayoutAndSchemaForTest(versionInfo);
     long delay = 2000L; // 2 second delay
-    DiskBalancerService.setReplicaDeletionDelayMills(delay);
+    diskBalancerService.setReplicaDeletionDelay(delay);
 
     Container container = createContainer(CONTAINER_ID, sourceVolume, State.CLOSED);
     KeyValueContainerData keyValueContainerData = (KeyValueContainerData) container.getContainerData();
@@ -614,7 +622,7 @@ public class TestDiskBalancerTask {
       throws IOException, InterruptedException, TimeoutException {
     LogCapturer serviceLog = LogCapturer.captureLogs(DiskBalancerService.class);
 
-    // Create a CLOSED container which will be selected by DefaultContainerChoosingPolicy
+    // Create a CLOSED container which will be selected by DefaultVolumeContainerChoosingPolicy
     Container container = createContainer(CONTAINER_ID, sourceVolume, State.CLOSED);
     long initialSourceUsed = sourceVolume.getCurrentUsage().getUsedSpace();
     long initialDestUsed = destVolume.getCurrentUsage().getUsedSpace();

@@ -37,7 +37,7 @@ import org.apache.hadoop.ozone.client.OzoneClientFactory;
 import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.om.OMConfigKeys;
-import org.apache.hadoop.ozone.om.OmFailoverProxyUtil;
+import org.apache.hadoop.ozone.om.OmTestUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ratis.utils.OzoneManagerRatisUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -96,9 +96,7 @@ public class TestOzoneManagerSnapshotProvider {
 
     retVolumeinfo.createBucket(bucketName);
 
-    String leaderOMNodeId = OmFailoverProxyUtil
-        .getFailoverProxyProvider(objectStore.getClientProxy())
-        .getCurrentProxyOMNodeId();
+    final String leaderOMNodeId = OmTestUtil.getCurrentOmProxyNodeId(objectStore);
 
     OzoneManager leaderOM = cluster.getOzoneManager(leaderOMNodeId);
 

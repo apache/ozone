@@ -62,8 +62,6 @@ import org.apache.hadoop.ozone.client.OzoneVolume;
 import org.apache.hadoop.ozone.client.VolumeArgs;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
-import org.apache.hadoop.ozone.client.rpc.RpcClient;
-import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerRatisServerConfig;
 import org.apache.hadoop.ozone.security.acl.OzoneObj;
 import org.junit.jupiter.api.AfterAll;
@@ -274,13 +272,8 @@ public abstract class TestOzoneManagerHA {
    * Stop the current leader OM.
    */
   protected void stopLeaderOM() {
-    //Stop the leader OM.
-    HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider =
-        OmFailoverProxyUtil.getFailoverProxyProvider(
-            (RpcClient) objectStore.getClientProxy());
-
     // The omFailoverProxyProvider will point to the current leader OM node.
-    String leaderOMNodeId = omFailoverProxyProvider.getCurrentProxyOMNodeId();
+    final String leaderOMNodeId = OmTestUtil.getCurrentOmProxyNodeId(getObjectStore());
 
     // Stop one of the ozone manager, to see when the OM leader changes
     // multipart upload is happening successfully or not.

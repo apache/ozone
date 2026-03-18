@@ -48,7 +48,7 @@ public class OMInterServiceProtocolClientSideImpl implements
    */
   private static final RpcController NULL_RPC_CONTROLLER = null;
 
-  private final HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider;
+  private final HadoopRpcOMFailoverProxyProvider<OMInterServiceProtocolPB> omFailoverProxyProvider;
 
   private final OMInterServiceProtocolPB rpcProxy;
 
@@ -58,7 +58,7 @@ public class OMInterServiceProtocolClientSideImpl implements
     RPC.setProtocolEngine(OzoneConfiguration.of(conf),
         OMInterServiceProtocolPB.class, ProtobufRpcEngine.class);
 
-    this.omFailoverProxyProvider = new HadoopRpcOMFailoverProxyProvider(
+    this.omFailoverProxyProvider = new HadoopRpcOMFailoverProxyProvider<>(
             conf, ugi, omServiceId, OMInterServiceProtocolPB.class);
 
     int maxFailovers = conf.getInt(

@@ -31,10 +31,13 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.inject.Singleton;
 import jakarta.annotation.Nonnull;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.sql.Timestamp;
 import java.text.ParseException;
@@ -49,8 +52,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.BlockingQueue;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.StreamingOutput;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.HddsConfigKeys;
@@ -876,5 +883,39 @@ public class ReconUtils {
       }
     }
     return -1;
+  }
+
+  public static  <T> Response downloadCsv(
+      String fileName,
+      List<String> headers,
+      List<T> data,
+      List<Function<T, Object>> columnExtractors) {
+
+    StreamingOutput stream = output -> {
+      CSVFormat format = CSVFormat.DEFAULT.builder()
+          .setHeader(headers.toArray(new String[0]))
+          .build();
+
+      try (CSVPrinter printer = new CSVPrinter(
+          new BufferedWriter(new OutputStreamWriter(output, StandardCharsets.UTF_8)),
+          format)) {
+
+        for (T item : data) {
+          List<Object> row = new ArrayList<>();
+          for (Function<T, Object> extractor : columnExtractors) {
+            row.add(extractor.apply(item));
+          }
+          printer.printRecord(row);
+        }
+
+        printer.flush();
+      }
+    };
+
+    return Response.ok(stream)
+        .type("text/csv")
+        .header("Content-Disposition",
+            "attachment; filename=\"" + fileName + "\"")
+        .build();
   }
 }
