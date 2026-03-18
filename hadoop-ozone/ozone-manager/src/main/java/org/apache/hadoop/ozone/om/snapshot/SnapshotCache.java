@@ -390,8 +390,8 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
     dbMap.compute(evictionKey, (k, v) -> {
       ReferenceCounted<OmSnapshot> result = null;
       if (v == null) {
-        LOG.warn("SnapshotId '{}' does not exist in cache. The RocksDB " +
-            "instance of the Snapshot may not be closed properly.", k);
+        LOG.info("SnapshotId '{}' does not exist in cache during cleanup; "
+            + "it may have already been invalidated, closed, and removed.", k);
       } else if (v.getTotalRefCount() > 0) {
         LOG.debug("SnapshotId {} is still being referenced ({}), skipping its clean up.", k, v.getTotalRefCount());
         result = v;
