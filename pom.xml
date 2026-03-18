@@ -1674,6 +1674,17 @@
           <groupId>dev.aspectj</groupId>
           <artifactId>aspectj-maven-plugin</artifactId>
           <version>${aspectj-plugin.version}</version>
+          <configuration>
+            <complianceLevel>${maven.compiler.release}</complianceLevel>
+            <argumentFileDirectory>${project.build.directory}/aspectj-build</argumentFileDirectory>
+          </configuration>
+          <dependencies>
+            <dependency>
+              <groupId>org.aspectj</groupId>
+              <artifactId>aspectjtools</artifactId>
+              <version>${aspectj.version}</version>
+            </dependency>
+          </dependencies>
         </plugin>
         <plugin>
           <groupId>org.codehaus.mojo</groupId>
@@ -2559,6 +2570,23 @@
       <properties>
         <aspectj.version>${aspectj.java21.version}</aspectj.version>
       </properties>
+    </profile>
+    <profile>
+      <id>java9+</id>
+      <activation>
+        <jdk>[9,]</jdk>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>dev.aspectj</groupId>
+            <artifactId>aspectj-maven-plugin</artifactId>
+            <configuration>
+              <release>${maven.compiler.release}</release>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
     </profile>
     <profile>
       <id>go-offline</id>
