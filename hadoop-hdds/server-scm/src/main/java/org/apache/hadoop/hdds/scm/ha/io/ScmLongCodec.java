@@ -24,7 +24,7 @@ import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 /**
  * {@link ScmCodec} for {@code Long} objects.
  */
-public class ScmLongCodec implements ScmCodec<Long> {
+class ScmLongCodec implements ScmCodec<Long> {
 
   @Override
   public ByteString serialize(Long object) {

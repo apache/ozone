@@ -27,10 +27,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.primitives.Ints;
+import com.google.common.primitives.Longs;
 import com.google.common.primitives.Shorts;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
@@ -102,12 +103,12 @@ public final class TestCodec {
     runTestInts(original);
   }
 
-  /** Make sure that {@link IntegerCodec} is compatible with {@link ByteBuffer}. */
+  /** Make sure that {@link IntegerCodec} and {@link Ints} are compatible. */
   static void runTestInts(int original) {
     final IntegerCodec codec = IntegerCodec.get();
-    final byte[] bytes = codec.toByteArray(original);
+    final byte[] bytes = Ints.toByteArray(original);
     assertArrayEquals(bytes, codec.toPersistedFormat(original));
-    assertEquals(original, codec.fromByteArray(bytes));
+    assertEquals(original, Ints.fromByteArray(bytes));
     assertEquals(original, codec.fromPersistedFormat(bytes));
   }
 
@@ -131,12 +132,12 @@ public final class TestCodec {
     runTestLongs(original);
   }
 
-  /** Make sure that {@link LongCodec} is compatible with {@link ByteBuffer}. */
+  /** Make sure that {@link LongCodec} and {@link Longs} are compatible. */
   static void runTestLongs(long original) {
     final LongCodec codec = LongCodec.get();
-    final byte[] bytes = codec.toByteArray(original);
+    final byte[] bytes = Longs.toByteArray(original);
     assertArrayEquals(bytes, codec.toPersistedFormat(original));
-    assertEquals(original, codec.fromByteArray(bytes));
+    assertEquals(original, Longs.fromByteArray(bytes));
     assertEquals(original, codec.fromPersistedFormat(bytes));
   }
 

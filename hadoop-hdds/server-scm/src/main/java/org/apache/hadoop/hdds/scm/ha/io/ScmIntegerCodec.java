@@ -24,7 +24,7 @@ import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 /**
  * Encodes/decodes an integer to a byte string.
  */
-public class ScmIntegerCodec implements ScmCodec<Integer> {
+class ScmIntegerCodec implements ScmCodec<Integer> {
   @Override
   public ByteString serialize(Integer object) {
     // toByteArray returns a new array
