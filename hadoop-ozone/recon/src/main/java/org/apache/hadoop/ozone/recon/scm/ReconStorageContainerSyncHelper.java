@@ -34,6 +34,8 @@ class ReconStorageContainerSyncHelper {
 
   private static final String IPC_MAXIMUM_DATA_LENGTH = "ipc.maximum.data.length";
   private static final int IPC_MAXIMUM_DATA_LENGTH_DEFAULT = 128 * 1024 * 1024;
+
+  // Assumption of size of 1 ContainerID proto here is 12 bytes
   private static final long CONTAINER_ID_PROTO_SIZE_BYTES = 12;
 
   private static final Logger LOG = LoggerFactory
@@ -98,17 +100,14 @@ class ReconStorageContainerSyncHelper {
   }
 
   private long getContainerCountPerCall(long totalContainerCount) {
-    // Assumption of size of 1 ContainerID proto here is 12 bytes
-    long totalIdsSizeBytes = CONTAINER_ID_PROTO_SIZE_BYTES * totalContainerCount;
-    long hadoopRPCSize = ozoneConfiguration.getInt(IPC_MAXIMUM_DATA_LENGTH, IPC_MAXIMUM_DATA_LENGTH_DEFAULT);
-    long countByRpc = totalIdsSizeBytes <=
-        hadoopRPCSize ? totalContainerCount :
-        Math.round(Math.floor(
-            hadoopRPCSize / (double) CONTAINER_ID_PROTO_SIZE_BYTES));
-
-    long containerIdMaxBatchSize = ozoneConfiguration.getLong(
+    long hadoopRPCSize = ozoneConfiguration.getInt(
+        IPC_MAXIMUM_DATA_LENGTH, IPC_MAXIMUM_DATA_LENGTH_DEFAULT);
+    long countByRpcLimit = hadoopRPCSize / CONTAINER_ID_PROTO_SIZE_BYTES;
+    long countByBatchLimit = ozoneConfiguration.getLong(
         OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE,
         OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE_DEFAULT);
-    return Math.min(countByRpc, containerIdMaxBatchSize);
+
+    long batchSize = Math.min(countByRpcLimit, countByBatchLimit);
+    return Math.min(totalContainerCount, batchSize);
   }
 }

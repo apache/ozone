@@ -225,11 +225,11 @@ public final class  ReconServerConfigKeys {
    * Maximum number of ContainerIDs to fetch from SCM per RPC call
    * during container sync. Each ContainerID is approximately 12 bytes
    * on the wire. Reduce this value on memory-constrained Recon nodes.
-   * Default: 1,000,000 (~32MB heap per batch, 4 calls for a 4M container cluster)
+   * Default: 500,000 (~16MB heap per batch, 8 calls for a 4M container cluster)
    */
   public static final String OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE =
       "ozone.recon.scm.container.id.batch.size";
-  public static final long OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE_DEFAULT = 1_000_000;
+  public static final long OZONE_RECON_SCM_CONTAINER_ID_BATCH_SIZE_DEFAULT = 500_000;
 
   /**
    * Private constructor for utility class.
