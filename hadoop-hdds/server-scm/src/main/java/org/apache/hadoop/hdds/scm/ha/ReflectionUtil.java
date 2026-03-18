@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
-import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -45,23 +44,5 @@ public final class ReflectionUtil {
       classCache.put(className, Class.forName(className));
     }
     return classCache.get(className);
-  }
-
-  /**
-   * Returns a {@code Method} object that reflects the specified public
-   * member method of the given {@code Class} object.
-   *
-   * @param clazz the class object which has the method
-   * @param methodName the name of the method
-   * @param arg the list of parameters
-   * @return the {@code Method} object that matches the specified
-   *         {@code name} and {@code parameterTypes}
-   * @throws NoSuchMethodException if a matching method is not found
-   *         or if the name is "&lt;init&gt;"or "&lt;clinit&gt;".
-   */
-  public static Method getMethod(
-      final Class<?> clazz, final String methodName, final Class<?>... arg)
-      throws NoSuchMethodException {
-    return clazz.getMethod(methodName, arg);
   }
 }
