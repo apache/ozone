@@ -82,25 +82,32 @@ public class EmptyContainerHandler extends AbstractCheck {
         String originIds = replicas.stream()
             .map(r -> r.getOriginDatanodeId().toString())
             .collect(Collectors.joining(", "));
-        LOG.info("Deleting empty QUASI_CLOSED container {} with {} replicas from originIds: [{}]. " +
-                "If resurrected, container will transition to CLOSED but may have QUASI_CLOSED replicas.",
-                containerInfo.containerID(), replicas.size(), originIds);
-        // delete replicas if they are quasi-closed and empty
-        deleteContainerReplicas(containerInfo, replicas);
-
-        if (containerInfo.getReplicationType() == HddsProtos.ReplicationType.RATIS) {
-          if (replicas.stream().filter(r -> r.getSequenceId() != null)
-                  .noneMatch(r -> r.getSequenceId() == containerInfo.getSequenceId())) {
-            // don't update container state if replica seqid don't match with container seq id
-            return true;
-          }
+        long maxReplicaBCSID = replicas.stream()
+            .filter(r -> r.getSequenceId() != null)
+            .mapToLong(ContainerReplica::getSequenceId)
+            .max()
+            .orElse(containerInfo.getSequenceId());
+        
+        // Update container bcsId to max replica bcsId before deletion
+        // This ensures resurrection logic uses the correct bcsId for stale replica detection
+        if (maxReplicaBCSID > containerInfo.getSequenceId()) {
+          LOG.info("Updating bcsId for empty QUASI_CLOSED container {} from {} to {} before deletion",
+              containerInfo.containerID(), containerInfo.getSequenceId(), maxReplicaBCSID);
+          containerInfo.updateSequenceId(maxReplicaBCSID);
         }
+        
+        LOG.info("Deleting empty QUASI_CLOSED container {} (container BCSID={}, max replica BCSID={}) with {} " +
+            "replicas from originIds: [{}]. If resurrected, container will transition to QUASI_CLOSED",
+            containerInfo.containerID(), containerInfo.getSequenceId(), maxReplicaBCSID,
+            replicas.size(), originIds);
         // Update the container's state - transition to CLOSED first, then DELETE
         // QUASI_CLOSED -> CLOSED requires FORCE_CLOSE event
         replicationManager.updateContainerState(
                 containerInfo.containerID(), HddsProtos.LifeCycleEvent.FORCE_CLOSE);
         replicationManager.updateContainerState(
                 containerInfo.containerID(), HddsProtos.LifeCycleEvent.DELETE);
+        // Delete replicas AFTER transitioning to DELETING state
+        deleteContainerReplicas(containerInfo, replicas);
       }
       return true;
     } else if (containerInfo.getState() == HddsProtos.LifeCycleState.CLOSED
@@ -161,26 +168,25 @@ public class EmptyContainerHandler extends AbstractCheck {
   /**
    * Deletes the specified container's replicas if they are empty.
    * For CLOSED containers, replicas must also be CLOSED.
-   * For QUASI_CLOSED containers, replicas can be in any state (QUASI_CLOSED, OPEN, CLOSING, UNHEALTHY).
+   * For QUASI_CLOSED containers, replicas can be in any state (QUASI_CLOSED, OPEN, CLOSING, UNHEALTHY),
+   * but delete commands should be sent to replicas in stable states (QUASI_CLOSED or CLOSED).
    *
    * @param containerInfo ContainerInfo to delete
    * @param replicas Set of ContainerReplica
    */
   private void deleteContainerReplicas(final ContainerInfo containerInfo,
       final Set<ContainerReplica> replicas) {
-    boolean isQuasiClosed = containerInfo.getState() == HddsProtos.LifeCycleState.QUASI_CLOSED;
-
-    if (!isQuasiClosed) {
-      Preconditions.assertSame(HddsProtos.LifeCycleState.CLOSED,
-          containerInfo.getState(), "container state");
-    }
-
     for (ContainerReplica rp : replicas) {
-      if (!isQuasiClosed) {
-        Preconditions.assertSame(ContainerReplicaProto.State.CLOSED,
-            rp.getState(), "replica state");
-      }
       Preconditions.assertSame(true, rp.isEmpty(), "replica empty");
+
+      // Only send delete commands to replicas in CLOSED/QUASI_CLOSED states
+      if (rp.getState() != ContainerReplicaProto.State.QUASI_CLOSED
+          && rp.getState() != ContainerReplicaProto.State.CLOSED) {
+        LOG.info("Skipping delete command for replica in {} state for empty container {} on datanode {}. " +
+            "Will retry after replica transitions to QUASI_CLOSED or CLOSED.",
+            rp.getState(), containerInfo.containerID(), rp.getDatanodeDetails());
+        continue;
+      }
 
       try {
         replicationManager.sendDeleteCommand(containerInfo,

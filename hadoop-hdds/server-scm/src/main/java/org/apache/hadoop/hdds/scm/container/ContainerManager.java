@@ -144,6 +144,15 @@ public interface ContainerManager {
   void transitionDeletingOrDeletedToClosedState(ContainerID containerID) throws IOException;
 
   /**
+   * Bypasses the container state machine to change a container's state from DELETING/DELETED to CLOSED/QUASI_CLOSED.
+   *
+   * @param containerID id of the container to transition
+   * @param targetState the target state (must be CLOSED or QUASI_CLOSED)
+   * @throws IOException
+   */
+  void transitionDeletingOrDeletedToTargetState(ContainerID containerID, LifeCycleState targetState) throws IOException;
+
+  /**
    * Returns the latest list of replicas for given containerId.
    *
    * @param containerID Container ID

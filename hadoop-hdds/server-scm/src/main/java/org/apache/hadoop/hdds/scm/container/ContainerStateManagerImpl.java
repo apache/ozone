@@ -417,6 +417,34 @@ public final class ContainerStateManagerImpl
   }
 
   @Override
+  public void transitionDeletingOrDeletedToTargetState(HddsProtos.ContainerID containerID,
+                                                       LifeCycleState targetState) throws IOException {
+    if (targetState != CLOSED && targetState != QUASI_CLOSED) {
+      throw new IllegalArgumentException("Target state must be CLOSED or QUASI_CLOSED, got: " + targetState);
+    }
+
+    final ContainerID id = ContainerID.getFromProtobuf(containerID);
+
+    try (AutoCloseableLock ignored = writeLock(id)) {
+      if (containers.contains(id)) {
+        final ContainerInfo oldInfo = containers.getContainerInfo(id);
+        final LifeCycleState oldState = oldInfo.getState();
+        if (oldState != DELETING && oldState != DELETED) {
+          throw new InvalidContainerStateException("Cannot transition container " + id + " from " + oldState +
+                  " back to " + targetState + ". The container must be in the DELETING or DELETED state.");
+        }
+        ExecutionUtil.create(() -> {
+          containers.updateState(id, oldState, targetState);
+          transactionBuffer.addToBuffer(containerStore, id, containers.getContainerInfo(id));
+        }).onException(() -> {
+          transactionBuffer.addToBuffer(containerStore, id, oldInfo);
+          containers.updateState(id, targetState, oldState);
+        }).execute();
+      }
+    }
+  }
+
+  @Override
   public Set<ContainerReplica> getContainerReplicas(final ContainerID id) {
     try (AutoCloseableLock ignored = readLock(id)) {
       return containers.getContainerReplicas(id);

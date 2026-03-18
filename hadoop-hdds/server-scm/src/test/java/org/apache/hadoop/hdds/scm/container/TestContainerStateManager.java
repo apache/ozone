@@ -159,6 +159,13 @@ public class TestContainerStateManager {
       return null;
     }).when(containerManager).transitionDeletingOrDeletedToClosedState(any(ContainerID.class));
 
+    doAnswer(invocation -> {
+      containerStateManager.transitionDeletingOrDeletedToTargetState(
+          ((ContainerID) invocation.getArgument(0)).getProtobuf(), invocation.getArgument(1));
+      return null;
+    }).when(containerManager).transitionDeletingOrDeletedToTargetState(
+        any(ContainerID.class), any(HddsProtos.LifeCycleState.class));
+
   }
 
   @AfterEach

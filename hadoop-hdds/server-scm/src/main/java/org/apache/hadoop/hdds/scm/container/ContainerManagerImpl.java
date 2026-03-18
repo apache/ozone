@@ -310,6 +310,22 @@ public class ContainerManagerImpl implements ContainerManager {
   }
 
   @Override
+  public void transitionDeletingOrDeletedToTargetState(ContainerID containerID, LifeCycleState targetState)
+          throws IOException {
+    HddsProtos.ContainerID proto = containerID.getProtobuf();
+    lock.lock();
+    try {
+      if (containerExist(containerID)) {
+        containerStateManager.transitionDeletingOrDeletedToTargetState(proto, targetState);
+      } else {
+        throw new ContainerNotFoundException(containerID);
+      }
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  @Override
   public Set<ContainerReplica> getContainerReplicas(final ContainerID id)
       throws ContainerNotFoundException {
     final Set<ContainerReplica> replicas = containerStateManager.getContainerReplicas(id);

@@ -183,6 +183,17 @@ public interface ContainerStateManager {
   void transitionDeletingOrDeletedToClosedState(HddsProtos.ContainerID id) throws IOException;
 
   /**
+   * Bypasses the container state machine to change a container's state from DELETING/DELETED to CLOSED/QUASI_CLOSED.
+   *
+   * @param id id of the container to transition
+   * @param targetState the target state (must be CLOSED or QUASI_CLOSED)
+   * @throws IOException
+   */
+  @Replicate
+  void transitionDeletingOrDeletedToTargetState(HddsProtos.ContainerID id, LifeCycleState targetState)
+      throws IOException;
+
+  /**
    *
    */
   // Make this as @Replicate
