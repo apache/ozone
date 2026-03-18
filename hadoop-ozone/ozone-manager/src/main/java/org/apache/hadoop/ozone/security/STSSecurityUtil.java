@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.security;
 
 import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.INVALID_TOKEN;
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_EXPIRED;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -71,7 +72,7 @@ public final class STSSecurityUtil {
    * @throws SecretManager.InvalidToken if the token is invalid
    */
   private static STSTokenIdentifier verifyAndDecryptToken(Token<STSTokenIdentifier> token,
-      SecretKeyClient secretKeyClient, Clock clock) throws SecretManager.InvalidToken {
+      SecretKeyClient secretKeyClient, Clock clock) throws SecretManager.InvalidToken, OMException {
     if (!STSTokenIdentifier.KIND_NAME.equals(token.getKind())) {
       throw new SecretManager.InvalidToken("Invalid STS token - kind is incorrect: " + token.getKind());
     }
@@ -109,7 +110,7 @@ public final class STSSecurityUtil {
 
     // Check expiration
     if (tokenId.isExpired(clock.instant())) {
-      throw new SecretManager.InvalidToken("Invalid STS token - token expired at " + tokenId.getExpiry());
+      throw new OMException("Invalid STS token - token expired at " + tokenId.getExpiry(), TOKEN_EXPIRED);
     }
 
     // Verify token signature against the original identifier bytes

@@ -17,6 +17,7 @@
 
 package org.apache.hadoop.ozone.security;
 
+import static org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes.TOKEN_EXPIRED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -179,7 +180,8 @@ public class TestSTSSecurityUtil {
     assertThatThrownBy(() ->
         STSSecurityUtil.constructValidateAndDecryptSTSToken(tokenString, secretKeyClient, clock))
         .isInstanceOf(OMException.class)
-        .hasMessageContaining("Invalid STS token format: Invalid STS token - token expired at");
+        .satisfies(exception -> assertThat(((OMException) exception).getResult()).isEqualTo(TOKEN_EXPIRED))
+        .hasMessageContaining("Invalid STS token - token expired at");
   }
 
   @Test
