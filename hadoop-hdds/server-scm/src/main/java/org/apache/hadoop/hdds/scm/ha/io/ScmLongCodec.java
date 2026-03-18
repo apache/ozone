@@ -17,24 +17,24 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
-import com.google.common.primitives.Longs;
+import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 
 /**
  * {@link ScmCodec} for {@code Long} objects.
  */
-public class ScmLongCodec implements ScmCodec<Long> {
+class ScmLongCodec implements ScmCodec<Long> {
 
   @Override
   public ByteString serialize(Long object) {
     // toByteArray returns a new array
-    return UnsafeByteOperations.unsafeWrap(Longs.toByteArray(object));
+    return UnsafeByteOperations.unsafeWrap(LongCodec.get().toByteArray(object));
   }
 
   @Override
   public Long deserialize(Class<?> type, ByteString value) {
-    return Longs.fromByteArray(value.toByteArray());
+    return LongCodec.get().fromByteArray(value.toByteArray());
   }
 
 }
