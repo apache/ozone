@@ -190,8 +190,8 @@
               </transformers>
               <relocations>
                 <relocation>
-                  <pattern>org.</pattern>
-                  <shadedPattern>${ozone.shaded.prefix}.org.</shadedPattern>
+                  <pattern>org</pattern>
+                  <shadedPattern>${ozone.shaded.prefix}.org</shadedPattern>
                   <excludes>
                     <exclude>org.apache.hadoop.**</exclude>
                     <exclude>org.apache.log4j.**</exclude>
