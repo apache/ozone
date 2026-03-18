@@ -25,6 +25,7 @@ import static org.apache.ozone.rocksdiff.RocksDBCheckpointDiffer.COLUMN_FAMILIES
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.CacheLoader;
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -137,7 +138,7 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
 
   @VisibleForTesting
   Set<UUID> getPendingEvictionQueue() {
-    return pendingEvictionQueue;
+    return Collections.unmodifiableSet(pendingEvictionQueue);
   }
 
   /**
