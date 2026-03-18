@@ -295,7 +295,8 @@ public class OMFileCreateRequest extends OMKeyRequest {
           .setOpenVersion(openVersion).build())
           .setCmdType(CreateFile);
       omClientResponse = new OMFileCreateResponse(omResponse.build(),
-          omKeyInfo, missingParentInfos, clientID, omBucketInfo.copyObject());
+          omKeyInfo, missingParentInfos, clientID, omBucketInfo.copyObject(),
+          isRecursive, isOverWrite);
 
       result = Result.SUCCESS;
     } catch (IOException | InvalidPathException ex) {

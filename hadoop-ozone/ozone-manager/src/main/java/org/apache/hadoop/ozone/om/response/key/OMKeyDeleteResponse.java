@@ -30,9 +30,11 @@ import org.apache.hadoop.ozone.OzoneConsts;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 
 /**
  * Response for DeleteKey request.
@@ -93,6 +95,12 @@ public class OMKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
             batchOperation, dbOpenKey, deletedOpenKeyInfo);
       }
     }
+
+    // Add to completed requests table.
+    omMetadataManager.getCompletedRequestInfoTable()
+        .putWithBatch(batchOperation, omKeyInfo.getUpdateID(),
+            getCompletedRequestInfo(omKeyInfo.getUpdateID()));
+
   }
 
   protected OmKeyInfo getOmKeyInfo() {
@@ -107,4 +115,15 @@ public class OMKeyDeleteResponse extends AbstractOMKeyDeleteResponse {
     return omBucketInfo;
   }
 
+  protected OmCompletedRequestInfo getCompletedRequestInfo(long trxnLogIndex) {
+    return OmCompletedRequestInfo.newBuilder()
+        .setTrxLogIndex(trxnLogIndex)
+        .setCmdType(Type.DeleteKey)
+        .setCreationTime(System.currentTimeMillis())
+        .setVolumeName(omKeyInfo.getVolumeName())
+        .setBucketName(omKeyInfo.getBucketName())
+        .setKeyName(omKeyInfo.getKeyName())
+        .setOpArgs(new OmCompletedRequestInfo.OperationArgs.NoArgs())
+        .build();
+  }
 }

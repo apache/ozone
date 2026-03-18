@@ -30,10 +30,12 @@ import org.apache.hadoop.hdds.utils.db.BatchOperation;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmBucketInfo;
+import org.apache.hadoop.ozone.om.helpers.OmCompletedRequestInfo;
 import org.apache.hadoop.ozone.om.helpers.OmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.response.CleanupTableInfo;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.OMResponse;
+import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos.Type;
 
 /**
  * Response for CommitKey request.
@@ -105,6 +107,12 @@ public class OMKeyCommitResponse extends OmKeyResponse {
     omMetadataManager.getBucketTable().putWithBatch(batchOperation,
         omMetadataManager.getBucketKey(omBucketInfo.getVolumeName(),
             omBucketInfo.getBucketName()), omBucketInfo);
+
+    // Add to completed requests table.
+    omMetadataManager.getCompletedRequestInfoTable()
+        .putWithBatch(batchOperation, omKeyInfo.getUpdateID(),
+            getCompletedRequestInfo(omKeyInfo.getUpdateID()));
+
   }
 
   protected String getOpenKeyName() {
@@ -153,5 +161,17 @@ public class OMKeyCommitResponse extends OmKeyResponse {
 
   public OmKeyInfo getNewOpenKeyInfo() {
     return newOpenKeyInfo;
+  }
+
+  protected OmCompletedRequestInfo getCompletedRequestInfo(long trxnLogIndex) {
+    return OmCompletedRequestInfo.newBuilder()
+        .setTrxLogIndex(trxnLogIndex)
+        .setCmdType(Type.CommitKey)
+        .setCreationTime(System.currentTimeMillis())
+        .setVolumeName(omKeyInfo.getVolumeName())
+        .setBucketName(omKeyInfo.getBucketName())
+        .setKeyName(omKeyInfo.getKeyName())
+        .setOpArgs(new OmCompletedRequestInfo.OperationArgs.NoArgs())
+        .build();
   }
 }
