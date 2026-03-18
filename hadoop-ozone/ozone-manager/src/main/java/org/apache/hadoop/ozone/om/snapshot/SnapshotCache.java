@@ -336,6 +336,11 @@ public class SnapshotCache implements ReferenceCountedCallback, AutoCloseable {
         }
       } catch (Throwable t) {
         lockDetails.set(emptyUnlockFunction.get());
+        try {
+          lockDetails.set(emptyUnlockFunction.get());
+        } catch (Throwable unlockThrowable) {
+          t.addSuppressed(unlockThrowable);
+        }
         throw t;
       }
     }

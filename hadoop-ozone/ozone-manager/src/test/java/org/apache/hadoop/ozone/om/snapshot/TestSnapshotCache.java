@@ -570,7 +570,8 @@ class TestSnapshotCache {
   @DisplayName("Close failure keeps snapshot in eviction queue for retry")
   void testCloseFailureRetriesSnapshot() throws Exception {
 
-    snapshotCache = new SnapshotCache(cacheLoader, CACHE_SIZE_LIMIT, omMetrics, 0, true, newAcquiringLock());
+    IOzoneManagerLock acquiringLock = newAcquiringLock();
+    snapshotCache = new SnapshotCache(cacheLoader, CACHE_SIZE_LIMIT, omMetrics, 0, true, acquiringLock);
     final UUID snapshotId = UUID.randomUUID();
 
     final AtomicBoolean failCloseOnce = new AtomicBoolean(true);
@@ -601,6 +602,8 @@ class TestSnapshotCache {
 
     // First cleanup attempt fails to close; entry should remain in dbMap and key should stay queued for retry.
     assertThrows(IllegalStateException.class, () -> snapshotCache.lock());
+    verify(acquiringLock, times(1)).acquireResourceWriteLock(eq(SNAPSHOT_DB_LOCK));
+    verify(acquiringLock, times(1)).releaseResourceWriteLock(eq(SNAPSHOT_DB_LOCK));
     assertTrue(snapshotCache.getDbMap().containsKey(snapshotId));
     assertTrue(snapshotCache.getPendingEvictionQueue().contains(snapshotId));
     assertEquals(1, omMetrics.getNumSnapshotCacheSize());
