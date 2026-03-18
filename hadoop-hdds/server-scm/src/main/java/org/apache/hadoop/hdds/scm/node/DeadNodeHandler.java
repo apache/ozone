@@ -138,6 +138,8 @@ public class DeadNodeHandler implements EventHandler<DatanodeDetails> {
         if (nt.contains(datanodeDetails)) {
           nt.remove(datanodeDetails);
           DatanodeDetails node = nodeManager.getNode(datanodeDetails.getID());
+          // make sure after DN is added back into topology, DatanodeDetails
+          // instance returned from nodeStateManager has parent correctly set.
           if (node != null) {
             Preconditions.checkState(node.getParent() == null);
           }

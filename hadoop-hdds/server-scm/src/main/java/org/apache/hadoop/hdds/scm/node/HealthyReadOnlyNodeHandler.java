@@ -17,8 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.node;
 
-import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.Objects;
 import java.util.Set;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -104,7 +104,9 @@ public class HealthyReadOnlyNodeHandler
     nt.add(datanodeDetails);
     DatanodeDetails node = nodeManager.getNode(datanodeDetails.getID());
     if (node != null) {
-      Preconditions.checkState(node.getParent() == null);
+      // make sure after DN is added back into topology, DatanodeDetails
+      // instance returned from nodeStateManager has parent correctly set.
+      Objects.requireNonNull(node.getParent(), "Parent == null");
     }
   }
 }
