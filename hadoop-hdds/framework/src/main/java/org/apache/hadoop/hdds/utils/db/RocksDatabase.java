@@ -772,17 +772,24 @@ public final class RocksDatabase implements Closeable {
 
   public ManagedRocksIterator newIterator(ColumnFamily family)
       throws RocksDatabaseException {
-    try (UncheckedAutoCloseable ignored = acquire()) {
-      return managed(db.get().newIterator(family.getHandle()));
+    final UncheckedAutoCloseable ref = acquire();
+    try {
+      return managed(db.get().newIterator(family.getHandle()), ref);
+    } catch (RuntimeException e) {
+      ref.close();
+      throw e;
     }
   }
 
   public ManagedRocksIterator newIterator(ColumnFamily family,
       boolean fillCache) throws RocksDatabaseException {
-    try (UncheckedAutoCloseable ignored = acquire();
-         ManagedReadOptions readOptions = new ManagedReadOptions()) {
+    final UncheckedAutoCloseable ref = acquire();
+    try (ManagedReadOptions readOptions = new ManagedReadOptions()) {
       readOptions.setFillCache(fillCache);
-      return managed(db.get().newIterator(family.getHandle(), readOptions));
+      return managed(db.get().newIterator(family.getHandle(), readOptions), ref);
+    } catch (RuntimeException e) {
+      ref.close();
+      throw e;
     }
   }
 

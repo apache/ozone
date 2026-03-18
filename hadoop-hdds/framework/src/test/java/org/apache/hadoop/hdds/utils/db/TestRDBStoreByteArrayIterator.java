@@ -73,19 +73,11 @@ public class TestRDBStoreByteArrayIterator {
   }
 
   RDBStoreByteArrayIterator newIterator() {
-    try {
-      return new RDBStoreByteArrayIterator(managedRocksIterator, null, null, KEY_AND_VALUE);
-    } catch (RocksDatabaseException e) {
-      throw new RuntimeException(e);
-    }
+    return new RDBStoreByteArrayIterator(managedRocksIterator, null, null, KEY_AND_VALUE);
   }
 
   RDBStoreByteArrayIterator newIterator(byte[] prefix) {
-    try {
-      return new RDBStoreByteArrayIterator(managedRocksIterator, rocksTableMock, prefix, KEY_AND_VALUE);
-    } catch (RocksDatabaseException e) {
-      throw new RuntimeException(e);
-    }
+    return new RDBStoreByteArrayIterator(managedRocksIterator, rocksTableMock, prefix, KEY_AND_VALUE);
   }
 
   @Test

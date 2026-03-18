@@ -73,19 +73,11 @@ public class TestRDBStoreCodecBufferIterator {
   }
 
   RDBStoreCodecBufferIterator newIterator() {
-    try {
-      return new RDBStoreCodecBufferIterator(managedRocksIterator, null, null, KEY_AND_VALUE);
-    } catch (RocksDatabaseException e) {
-      throw new RuntimeException(e);
-    }
+    return new RDBStoreCodecBufferIterator(managedRocksIterator, null, null, KEY_AND_VALUE);
   }
 
   RDBStoreCodecBufferIterator newIterator(CodecBuffer prefix) {
-    try {
-      return new RDBStoreCodecBufferIterator(managedRocksIterator, rdbTableMock, prefix, KEY_AND_VALUE);
-    } catch (RocksDatabaseException e) {
-      throw new RuntimeException(e);
-    }
+    return new RDBStoreCodecBufferIterator(managedRocksIterator, rdbTableMock, prefix, KEY_AND_VALUE);
   }
 
   Answer<Integer> newAnswerInt(String name, int b) {

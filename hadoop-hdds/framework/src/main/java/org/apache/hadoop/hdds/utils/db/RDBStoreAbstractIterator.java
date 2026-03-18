@@ -21,7 +21,6 @@ import java.util.NoSuchElementException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import org.apache.hadoop.hdds.utils.db.managed.ManagedRocksIterator;
-import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,35 +37,16 @@ abstract class RDBStoreAbstractIterator<RAW>
 
   private final ManagedRocksIterator rocksDBIterator;
   private final RDBTable rocksDBTable;
-  /**
-   * Holds a reference count on the underlying RocksDatabase for the lifetime
-   * of this iterator. This prevents the DB from being physically closed while
-   * the iterator is still in use, eliminating the TOCTOU race between
-   * isClosed() and native iterator calls.
-   */
-  private final UncheckedAutoCloseable dbRef;
   private Table.KeyValue<RAW, RAW> currentEntry;
-  // This is for schemas that use a fixed-length
-  // prefix for each key.
   private final RAW prefix;
-
   private final IteratorType type;
   private final AtomicBoolean iteratorClosed = new AtomicBoolean(false);
 
-  RDBStoreAbstractIterator(ManagedRocksIterator iterator, RDBTable table, RAW prefix, IteratorType type)
-      throws RocksDatabaseException {
+  RDBStoreAbstractIterator(ManagedRocksIterator iterator, RDBTable table, RAW prefix, IteratorType type) {
     this.rocksDBIterator = iterator;
     this.rocksDBTable = table;
     this.prefix = prefix;
     this.type = type;
-    try {
-      this.dbRef = table != null ? table.acquireIterator() : null;
-    } catch (RocksDatabaseException e) {
-      // Close the already-allocated native iterator to avoid a resource leak
-      // before propagating; the caller never gets a reference to this object.
-      iterator.close();
-      throw e;
-    }
   }
 
   IteratorType getType() {
@@ -208,9 +188,6 @@ abstract class RDBStoreAbstractIterator<RAW>
   public void close() {
     if (iteratorClosed.compareAndSet(false, true)) {
       rocksDBIterator.close();
-      if (dbRef != null) {
-        dbRef.close();
-      }
     }
   }
 }
