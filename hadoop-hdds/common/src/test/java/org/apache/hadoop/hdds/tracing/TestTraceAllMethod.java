@@ -20,6 +20,8 @@ package org.apache.hadoop.hdds.tracing;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import io.opentelemetry.api.trace.Span;
+import java.io.IOException;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -52,6 +54,12 @@ public class TestTraceAllMethod {
       return otherMethod("default");
     }
 
+    String skippedMethod();
+
+    void throwingMethod() throws IOException;
+
+    String normalMethod();
+
     String otherMethod(String name);
   }
 
@@ -63,6 +71,32 @@ public class TestTraceAllMethod {
     @Override
     public String otherMethod(String name) {
       return "Hello " + name;
+    }
+
+    private boolean spanActive = false;
+
+    @Override
+    @SkipTracing
+    public String skippedMethod() {
+      this.spanActive = Span.current().getSpanContext().isValid();
+      return "skipped";
+    }
+
+    @Override
+    @SkipTracing
+    public void throwingMethod() throws IOException {
+      this.spanActive = Span.current().getSpanContext().isValid();
+      throw new IOException("Original Exception");
+    }
+
+    @Override
+    public String normalMethod() {
+      this.spanActive = Span.current().getSpanContext().isValid();
+      return "normal";
+    }
+
+    public boolean wasSpanActive() {
+      return spanActive;
     }
   }
 }

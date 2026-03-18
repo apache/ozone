@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.ozone.om.protocolPB;
 
-import org.apache.hadoop.hdds.tracing.SkipTracing;
 import org.apache.hadoop.ozone.om.protocol.OzoneManagerProtocol;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
 
@@ -34,7 +33,6 @@ public interface OzoneManagerClientProtocol extends OzoneManagerProtocol {
    */
   void setThreadLocalS3Auth(S3Auth s3Auth);
 
-  @SkipTracing
   S3Auth getThreadLocalS3Auth();
 
   void clearThreadLocalS3Auth();
