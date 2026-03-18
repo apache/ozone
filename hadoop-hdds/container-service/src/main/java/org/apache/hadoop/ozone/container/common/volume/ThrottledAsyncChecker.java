@@ -117,39 +117,41 @@ public class ThrottledAsyncChecker<K, V> implements AsyncChecker<K, V> {
   @Override
   public Optional<ListenableFuture<V>> schedule(
       Checkable<K, V> target, K context) {
-    if (checksInProgress.containsKey(target)) {
-      return Optional.empty();
-    }
-
-    if (completedChecks.containsKey(target)) {
-      final ThrottledAsyncChecker.LastCheckResult<V> result =
-          completedChecks.get(target);
-      final long msSinceLastCheck = timer.monotonicNow() - result.completedAt;
-      if (msSinceLastCheck < minMsBetweenChecks) {
-        if (LOG.isDebugEnabled()) {
-          LOG.debug("Skipped checking {}. Time since last check {}ms " +
-                  "is less than the min gap {}ms.",
-              target, msSinceLastCheck, minMsBetweenChecks);
-        }
+    synchronized (ThrottledAsyncChecker.this) {
+      if (checksInProgress.containsKey(target)) {
         return Optional.empty();
       }
+
+      if (completedChecks.containsKey(target)) {
+        final ThrottledAsyncChecker.LastCheckResult<V> result =
+            completedChecks.get(target);
+        final long msSinceLastCheck = timer.monotonicNow() - result.completedAt;
+        if (msSinceLastCheck < minMsBetweenChecks) {
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Skipped checking {}. Time since last check {}ms " +
+                    "is less than the min gap {}ms.",
+                target, msSinceLastCheck, minMsBetweenChecks);
+          }
+          return Optional.empty();
+        }
+      }
+
+      LOG.info("Scheduling a check for {}", target);
+      final ListenableFuture<V> lfWithoutTimeout = executorService.submit(
+          () -> target.check(context));
+      final ListenableFuture<V> lf;
+
+      if (diskCheckTimeout > 0) {
+        lf = Futures.withTimeout(lfWithoutTimeout, diskCheckTimeout, TimeUnit.MILLISECONDS,
+            scheduledExecutorService);
+      } else {
+        lf = lfWithoutTimeout;
+      }
+
+      checksInProgress.put(target, lf);
+      addResultCachingCallback(target, lf);
+      return Optional.of(lf);
     }
-
-    LOG.info("Scheduling a check for {}", target);
-    final ListenableFuture<V> lfWithoutTimeout = executorService.submit(
-        () -> target.check(context));
-    final ListenableFuture<V> lf;
-
-    if (diskCheckTimeout > 0) {
-      lf = Futures.withTimeout(lfWithoutTimeout, diskCheckTimeout, TimeUnit.MILLISECONDS,
-              scheduledExecutorService);
-    } else {
-      lf = lfWithoutTimeout;
-    }
-
-    checksInProgress.put(target, lf);
-    addResultCachingCallback(target, lf);
-    return Optional.of(lf);
   }
 
   /**
