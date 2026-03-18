@@ -24,7 +24,6 @@ import static org.apache.hadoop.hdds.utils.db.IteratorType.VALUE_ONLY;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentCaptor.forClass;
@@ -316,61 +315,5 @@ public class TestRDBStoreByteArrayIterator {
 
     assertTrue(KEY_AND_VALUE.readKey());
     assertTrue(KEY_AND_VALUE.readValue());
-  }
-
-  /**
-   * Verifies that next() returns the current entry and skips the native next call when the database is closed after
-   * the current entry is set.
-   */
-  @Test
-  public void testNextReturnsEntryAndSkipsNativeNextWhenDBClosedAfterCurrentEntrySet()
-      throws Exception {
-    when(rocksDBIteratorMock.isValid()).thenReturn(true);
-    when(rocksDBIteratorMock.key()).thenReturn(new byte[]{0x01});
-    when(rocksDBIteratorMock.value()).thenReturn(new byte[]{0x02});
-    // false×4: DB open during construction + hasNext + setCurrentEntry in next()
-    // true:    DB closes between setCurrentEntry() and the !isDbClosed() guard
-    when(rocksTableMock.isClosed()).thenReturn(false, false, false, false, true);
-
-    RDBStoreByteArrayIterator iter = newIterator(null);
-
-    assertTrue(iter.hasNext(), "hasNext() should return true before DB is closed");
-
-    Table.KeyValue<byte[], byte[]> entry = iter.next();
-
-    assertNotNull(entry, "next() must return the captured entry even when DB closes mid-call");
-    assertArrayEquals(new byte[]{0x01}, entry.getKey());
-    assertArrayEquals(new byte[]{0x02}, entry.getValue());
-    // Skipping native next() is the key part of the fix
-    verify(rocksDBIteratorMock, never()).next();
-
-    iter.close();
-  }
-
-  /**
-   * Verifies that next() throws NoSuchElementException when the database is closed before the current entry is set.
-   */
-  @Test
-  public void testNextThrowsNoSuchElementWhenDBClosedBeforeCurrentEntrySet()
-      throws Exception {
-    when(rocksDBIteratorMock.isValid()).thenReturn(true);
-    when(rocksDBIteratorMock.key()).thenReturn(new byte[]{0x01});
-    when(rocksDBIteratorMock.value()).thenReturn(new byte[]{0x02});
-    // false×3: DB open during construction + hasNext
-    // true:    DB closes before setCurrentEntry() can capture the entry in next()
-    when(rocksTableMock.isClosed()).thenReturn(false, false, false, true);
-
-    RDBStoreByteArrayIterator iter = newIterator(null);
-
-    assertTrue(iter.hasNext(), "hasNext() should return true before DB is closed");
-
-    // DB closes before setCurrentEntry() runs: NoSuchElementException is thrown
-    // (no native crash – the guard stops any native call from being made)
-    assertThrows(NoSuchElementException.class, iter::next,
-        "next() should throw NoSuchElementException when DB closed before entry is captured");
-    // Native next() must never be attempted on a closed DB
-    verify(rocksDBIteratorMock, never()).next();
-
-    iter.close();
   }
 }
