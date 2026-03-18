@@ -25,6 +25,7 @@ import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Nullable;
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
@@ -326,17 +327,30 @@ public class HddsVolume extends StorageVolume {
       return VolumeCheckResult.HEALTHY;
     }
 
+    // We attempt to open RocksDb twice to ignore any transient errors
+    // and to confirm that we actually cannot open RocksDb in readonly mode.
     final boolean isVolumeTestResultHealthy = true;
-    try (ManagedOptions managedOptions = new ManagedOptions();
-         ManagedRocksDB ignored = ManagedRocksDB.openReadOnly(managedOptions, dbFile.toString())) {
-      volumeTestResultQueue.add(isVolumeTestResultHealthy);
-    } catch (Exception e) {
-      if (Thread.currentThread().isInterrupted()) {
-        throw new InterruptedException("Check of database for volume " + this + " interrupted.");
+    final int maxAttempts = 2;
+    final Duration maxRetryGap = getDatanodeConfig().getDiskCheckRetryGap();
+    for (int attempt = 0; attempt < maxAttempts; attempt++) {
+      try (ManagedOptions managedOptions = new ManagedOptions();
+           ManagedRocksDB ignored = ManagedRocksDB.openReadOnly(managedOptions, dbFile.toString())) {
+        volumeTestResultQueue.add(isVolumeTestResultHealthy);
+        break;
+      } catch (Exception e) {
+        if (Thread.currentThread().isInterrupted()) {
+          throw new InterruptedException("Check of database for volume " + this + " interrupted.");
+        }
+
+        if (attempt == maxAttempts - 1) {
+          LOG.error("Could not open Volume DB located at {}", dbFile, e);
+          volumeTestResultQueue.add(!isVolumeTestResultHealthy);
+          volumeTestFailureCount.incrementAndGet();
+        } else {
+          LOG.warn("Could not open Volume DB located at {}", dbFile, e);
+          Thread.sleep(maxRetryGap.toMillis());
+        }
       }
-      LOG.warn("Could not open Volume DB located at {}", dbFile, e);
-      volumeTestResultQueue.add(!isVolumeTestResultHealthy);
-      volumeTestFailureCount.incrementAndGet();
     }
 
     if (volumeTestResultQueue.size() > volumeTestCount
