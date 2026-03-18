@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-slim
     steps:
       - name: Download generated documentation
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: config-documentation
           path: .
@@ -95,7 +95,7 @@ jobs:
       
       - name: Checkout ozone repository for script access
         if: steps.check-changes.outputs.changed == 'true'
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.sha }}
           path: ozone-repo

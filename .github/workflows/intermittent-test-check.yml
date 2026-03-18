@@ -77,7 +77,7 @@ jobs:
     outputs:
       matrix: ${{steps.generate.outputs.matrix}}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.inputs.ref }}
       - id: generate
@@ -105,11 +105,11 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Checkout project
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event.inputs.ref }}
       - name: Cache for maven dependencies
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.m2/repository/*/*/*
@@ -119,13 +119,13 @@ jobs:
             maven-repo-
       - name: Download Ratis repo
         if: ${{ github.event.inputs.ratis-ref != '' }}
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ratis-jars
           path: |
             ~/.m2/repository/org/apache/ratis
       - name: Setup java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: ${{ github.event.inputs.java-version }}
@@ -144,7 +144,7 @@ jobs:
 
           hadoop-ozone/dev-support/checks/build.sh $args
       - name: Store Maven repo for tests
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ozone-repo
           path: |
@@ -163,11 +163,11 @@ jobs:
         split: ${{fromJson(needs.prepare-job.outputs.matrix)}}  # Define  splits
       fail-fast: ${{ fromJson(github.event.inputs.fail-fast) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ github.event.inputs.ref }}
       - name: Cache for maven dependencies
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.m2/repository/*/*/*
@@ -177,21 +177,21 @@ jobs:
             maven-repo-
       - name: Download Ratis repo
         if: ${{ github.event.inputs.ratis-ref != '' }}
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ratis-jars
           path: |
             ~/.m2/repository/org/apache/ratis
       - name: Download Ozone repo
         id: download-ozone-repo
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ozone-repo
           path: |
             ~/.m2/repository/org/apache/ozone
         continue-on-error: true
       - name: Setup java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: ${{ github.event.inputs.java-version }}
@@ -228,7 +228,7 @@ jobs:
         run: hadoop-ozone/dev-support/checks/_summary.sh target/unit/summary.txt
         if: ${{ !cancelled() }}
       - name: Archive build results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: ${{ failure() }}
         with:
           name: result-${{ github.run_number }}-${{ github.run_id }}-split-${{ matrix.split }}
@@ -239,7 +239,7 @@ jobs:
     runs-on: ubuntu-slim
     steps:
       - name: Download build results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
       - name: Count failures
         run: |
           failures=$(find . -name 'summary.txt' | grep --text -v 'iteration' | xargs grep --text -v 'exit code: 0' | wc -l)
