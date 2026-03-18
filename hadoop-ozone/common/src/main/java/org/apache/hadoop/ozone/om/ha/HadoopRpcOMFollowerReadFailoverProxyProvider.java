@@ -413,8 +413,8 @@ public class HadoopRpcOMFollowerReadFailoverProxyProvider implements FailoverPro
       return;
     }
 
-    int indexOfTargetNodeId = leaderProxy.getOMProxyMap().indexOf(initialOmNodeId);
-    if (indexOfTargetNodeId == -1) {
+    Integer indexOfTargetNodeId = leaderProxy.getOMProxyMap().indexOf(initialOmNodeId);
+    if (indexOfTargetNodeId == null) {
       return;
     }
 
