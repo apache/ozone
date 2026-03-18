@@ -17,24 +17,34 @@
 
 package org.apache.hadoop.ozone.container.diskbalancer.policy;
 
-import java.util.Map;
-import org.apache.commons.lang3.tuple.Pair;
+import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
-import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 
 /**
- * This interface specifies the policy for choosing volumes to balance.
+ * Result of consolidated volume and container selection for disk balancing.
+ * Contains the container to move and its source and destination volumes.
  */
-public interface DiskBalancerVolumeChoosingPolicy {
-  /**
-   * Choose a pair of volumes for balancing.
-   *
-   * @param volumeSet - volumes to choose from.
-   * @param thresholdPercentage the threshold percentage in range (0, 100) to choose the source volume.
-   * @param deltaSizes - the sizes changes of inProgress balancing jobs.
-   * @param containerSize - the estimated size of container to be moved.
-   * @return Source volume and Dest volume.
-   */
-  Pair<HddsVolume, HddsVolume> chooseVolume(MutableVolumeSet volumeSet,
-      double thresholdPercentage, Map<HddsVolume, Long> deltaSizes, long containerSize);
+public final class ContainerCandidate {
+  private final ContainerData containerData;
+  private final HddsVolume sourceVolume;
+  private final HddsVolume destVolume;
+
+  public ContainerCandidate(ContainerData containerData,
+      HddsVolume sourceVolume, HddsVolume destVolume) {
+    this.containerData = containerData;
+    this.sourceVolume = sourceVolume;
+    this.destVolume = destVolume;
+  }
+
+  public ContainerData getContainerData() {
+    return containerData;
+  }
+
+  public HddsVolume getSourceVolume() {
+    return sourceVolume;
+  }
+
+  public HddsVolume getDestVolume() {
+    return destVolume;
+  }
 }
