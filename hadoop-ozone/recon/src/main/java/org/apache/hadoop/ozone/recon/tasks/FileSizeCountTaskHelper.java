@@ -182,7 +182,7 @@ public abstract class FileSizeCountTaskHelper {
 
     try (ParallelTableIteratorOperation<String, OmKeyInfo> keyIter =
              new ParallelTableIteratorOperation<>(omMetadataManager, omKeyInfoTable,
-                 StringCodec.get(), maxIterators, perWorkerThreshold)) {
+                 StringCodec.get(), maxIterators, maxWorkers, maxKeysInMemory, perWorkerThreshold)) {
       keyIter.performTaskOnTableVals(taskName, null, null, kvOperation);
     } catch (Exception ex) {
       LOG.error("Unable to populate File Size Count for {} in RocksDB.", taskName, ex);
