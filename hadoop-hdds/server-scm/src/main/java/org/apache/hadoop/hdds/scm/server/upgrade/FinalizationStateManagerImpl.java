@@ -99,8 +99,11 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
   }
 
   @Override
-  public void finalizeLayoutFeature(Integer layoutVersion) throws IOException {
-    finalizeLayoutFeatureLocal(layoutVersion);
+  public void finalizeLayoutFeatures(Integer toVersion) throws IOException {
+    int startLayoutVersion = versionManager.getMetadataLayoutVersion() + 1;
+    for (int version = startLayoutVersion; version <= toVersion; version++) {
+      finalizeLayoutFeatureLocal(version);
+    }
   }
 
   /**
@@ -115,9 +118,15 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
       // version. This is updated in the replicated finalization steps.
       // Layout version will be written to the DB as well so followers can
       // finalize from a snapshot.
-      HDDSLayoutFeature feature =
-          (HDDSLayoutFeature)versionManager.getFeature(layoutVersion);
-      upgradeFinalizer.replicatedFinalizationSteps(feature, upgradeContext);
+      if (versionManager.getMetadataLayoutVersion() >= layoutVersion) {
+        LOG.warn("Attempting to finalize layout feature for layout version {}, but " +
+            "current metadata layout version is {}. Skipping finalization for this layout version.",
+            layoutVersion, versionManager.getMetadataLayoutVersion());
+      } else {
+        HDDSLayoutFeature feature =
+            (HDDSLayoutFeature) versionManager.getFeature(layoutVersion);
+        upgradeFinalizer.replicatedFinalizationSteps(feature, upgradeContext);
+      }
     } finally {
       checkpointLock.writeLock().unlock();
     }

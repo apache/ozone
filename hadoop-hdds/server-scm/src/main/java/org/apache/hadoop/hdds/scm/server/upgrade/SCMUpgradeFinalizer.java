@@ -70,22 +70,33 @@ public class SCMUpgradeFinalizer extends
 
   @Override
   public void finalizeLayoutFeature(LayoutFeature lf,
-      SCMUpgradeFinalizationContext context) throws UpgradeException {
-    // Run upgrade actions, update VERSION file, and update layout version in
-    // DB.
+       SCMUpgradeFinalizationContext context) throws UpgradeException {
+    throw new UnsupportedOperationException("FinalizeLayoutFeature is not supported in this implemementation. " +
+        "Please use finalizeLayoutFeatures instead.");
+  }
+
+  @Override
+  public void finalizeLayoutFeatures(Iterable<LayoutFeature> features, SCMUpgradeFinalizationContext context)
+      throws UpgradeException {
+    int lastLv = -1;
+    for (LayoutFeature lf : features) {
+      lastLv = lf.layoutVersion();
+    }
     try {
-      context.getFinalizationStateManager()
-          .finalizeLayoutFeature(lf.layoutVersion());
+      if (lastLv > -1) {
+        // If there are no feature to finalize we just skip this and the finalize operation is a noop.
+        context.getFinalizationStateManager().finalizeLayoutFeatures(lastLv);
+      } else {
+        LOG.info("No layout features to finalize.");
+      }
     } catch (IOException ex) {
-      throw new UpgradeException(ex,
-          UpgradeException.ResultCodes.LAYOUT_FEATURE_FINALIZATION_FAILED);
+      throw new UpgradeException(ex, UpgradeException.ResultCodes.LAYOUT_FEATURE_FINALIZATION_FAILED);
     }
   }
 
   /**
    * Run on each SCM (leader and follower) when a layout feature is being
-   * finalized to run its finalization actions, update the VERSION file, and
-   * move the state of its in memory datanodes to healthy readonly.
+   * finalized to run its finalization actions, update the VERSION file.
    *
    * @param lf The layout feature that is being finalized.
    * @param context Supplier of objects needed to run the steps.
