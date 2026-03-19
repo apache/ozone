@@ -53,7 +53,7 @@ class ScmListCodec implements ScmCodec<Object> {
     final Class<?> resolved = resolver.get(elementType);
 
     final ScmCodec<Object> elementCodec =
-        (ScmCodec<Object>) ScmCodecFactory.getCodec(resolved.getName());
+        (ScmCodec<Object>) ScmCodecFactory.getInstance().getCodec(resolved.getName());
 
     final ListArgument.Builder builder = ListArgument.newBuilder()
         .setType(resolved.getName());
@@ -80,7 +80,7 @@ class ScmListCodec implements ScmCodec<Object> {
     final String elementType = argument.getType();
     final Class<?> elementClass = resolver.get(elementType);
 
-    final ScmCodec<?> elementCodec = ScmCodecFactory.getCodec(elementType);
+    final ScmCodec<?> elementCodec = ScmCodecFactory.getInstance().getCodec(elementType);
     final List<Object> list = new ArrayList<>();
     for (ByteString element : argument.getValueList()) {
       list.add(elementCodec.deserialize(elementClass, element));

@@ -47,11 +47,13 @@ import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferExce
  */
 public final class ScmCodecFactory {
 
-  private static Map<Class<?>, ScmCodec<?>> codecs = new HashMap<>();
+  private final Map<Class<?>, ScmCodec<?>> codecs = new HashMap<>();
 
-  private static final ClassResolver RESOLVER;
+  private final ClassResolver resolver;
 
-  static {
+  private static final ScmCodecFactory INSTANCE = new ScmCodecFactory();
+
+  private ScmCodecFactory() {
     putProto(ContainerID.getDefaultInstance());
     putProto(PipelineID.getDefaultInstance());
     putProto(Pipeline.getDefaultInstance());
@@ -74,25 +76,27 @@ public final class ScmCodecFactory {
     putEnum(NodeType.class, NodeType::forNumber);
 
     // Must be the last one
-    RESOLVER = new ClassResolver(codecs.keySet());
-    codecs.put(List.class, new ScmListCodec(RESOLVER));
+    resolver = new ClassResolver(codecs.keySet());
+    codecs.put(List.class, new ScmListCodec(resolver));
   }
 
-  static <T extends Message> void putProto(T proto) {
+  private <T extends Message> void putProto(T proto) {
     codecs.put(proto.getClass(),
         new ScmNonShadedGeneratedMessageCodec<>(proto.getParserForType()));
   }
 
-  static <T extends Enum<T> & ProtocolMessageEnum> void putEnum(
+  private <T extends Enum<T> & ProtocolMessageEnum> void putEnum(
       Class<T> enumClass, IntFunction<T> forNumber) {
     codecs.put(enumClass, new ScmEnumCodec<>(enumClass, forNumber));
   }
 
-  private ScmCodecFactory() { }
+  public static ScmCodecFactory getInstance() {
+    return INSTANCE;
+  }
 
-  public static ScmCodec getCodec(String className)
+  public ScmCodec getCodec(String className)
       throws InvalidProtocolBufferException {
-    final Class<?> clazz = RESOLVER.get(className);
+    final Class<?> clazz = resolver.get(className);
 
     final ScmCodec<?> codec = codecs.get(clazz);
     if (codec != null) {
