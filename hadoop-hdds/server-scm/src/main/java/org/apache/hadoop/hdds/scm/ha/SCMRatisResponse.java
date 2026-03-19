@@ -73,9 +73,10 @@ public final class SCMRatisResponse {
     }
 
     final Class<?> type = result.getClass();
+    final String typeName = type.getName();
     final SCMRatisResponseProto response = SCMRatisResponseProto.newBuilder()
-        .setType(type.getName())
-        .setValue(ScmCodecFactory.getCodec(type).serialize(result))
+        .setType(typeName)
+        .setValue(ScmCodecFactory.getCodec(typeName).serialize(result))
         .build();
     return Message.valueOf(UnsafeByteOperations.unsafeWrap(response.toByteString().asReadOnlyByteBuffer()));
   }
@@ -103,8 +104,9 @@ public final class SCMRatisResponse {
     }
 
     try {
-      final Class<?> type = ReflectionUtil.getClass(responseProto.getType());
-      return new SCMRatisResponse(ScmCodecFactory.getCodec(type)
+      final String typeName = responseProto.getType();
+      final Class<?> type = ReflectionUtil.getClass(typeName);
+      return new SCMRatisResponse(ScmCodecFactory.getCodec(typeName)
           .deserialize(type, responseProto.getValue()));
     } catch (ClassNotFoundException e) {
       throw new InvalidProtocolBufferException(responseProto.getType() +

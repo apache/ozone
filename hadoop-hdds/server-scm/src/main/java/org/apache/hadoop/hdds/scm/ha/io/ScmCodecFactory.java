@@ -21,7 +21,6 @@ import com.google.protobuf.Message;
 import com.google.protobuf.ProtocolMessageEnum;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -30,7 +29,6 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.IntFunction;
-import org.apache.commons.lang3.ClassUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
@@ -50,6 +48,8 @@ import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferExce
 public final class ScmCodecFactory {
 
   private static Map<Class<?>, ScmCodec<?>> codecs = new HashMap<>();
+
+  private static final ClassResolver RESOLVER;
 
   static {
     putProto(ContainerID.getDefaultInstance());
@@ -74,8 +74,8 @@ public final class ScmCodecFactory {
     putEnum(NodeType.class, NodeType::forNumber);
 
     // Must be the last one
-    final ClassResolver resolver = new ClassResolver(codecs.keySet());
-    codecs.put(List.class, new ScmListCodec(resolver));
+    RESOLVER = new ClassResolver(codecs.keySet());
+    codecs.put(List.class, new ScmListCodec(RESOLVER));
   }
 
   static <T extends Message> void putProto(T proto) {
@@ -90,19 +90,17 @@ public final class ScmCodecFactory {
 
   private ScmCodecFactory() { }
 
-  public static ScmCodec getCodec(Class<?> type)
+  public static ScmCodec getCodec(String className)
       throws InvalidProtocolBufferException {
-    final List<Class<?>> classes = new ArrayList<>();
-    classes.add(type);
-    classes.addAll(ClassUtils.getAllSuperclasses(type));
-    classes.addAll(ClassUtils.getAllInterfaces(type));
-    for (Class<?> clazz : classes) {
-      if (codecs.containsKey(clazz)) {
-        return codecs.get(clazz);
-      }
+    final Class<?> clazz = RESOLVER.get(className);
+
+    final ScmCodec<?> codec = codecs.get(clazz);
+    if (codec != null) {
+      return codec;
     }
+
     throw new InvalidProtocolBufferException(
-        "Codec for " + type + " not found!");
+        "Codec for " + className + " not found!");
   }
 
   /** Resolve the codec class from a given class. */
@@ -124,18 +122,18 @@ public final class ScmCodecFactory {
       if (c != null) {
         return c;
       }
-      throw new InvalidProtocolBufferException("Class not found for " + className);
-    }
 
-    Class<?> get(Class<?> clazz) throws InvalidProtocolBufferException {
-      final String className = clazz.getName();
-      final Class<?> c = provided.get(className);
-      if (c != null) {
-        return c;
-      }
       final Class<?> found = resolved.get(className);
       if (found != null) {
         return found;
+      }
+
+      final Class<?> clazz;
+      try {
+        clazz = Class.forName(className);
+      } catch (ClassNotFoundException e) {
+        throw new InvalidProtocolBufferException(
+            "Class not found for " + className, e);
       }
 
       for (Class<?> base : provided.values()) {
@@ -144,7 +142,8 @@ public final class ScmCodecFactory {
           return base;
         }
       }
-      throw new InvalidProtocolBufferException("Failed to resolve " + clazz);
+
+      throw new InvalidProtocolBufferException("Failed to resolve " + className);
     }
   }
 }

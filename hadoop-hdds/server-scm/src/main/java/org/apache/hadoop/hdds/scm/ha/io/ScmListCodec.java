@@ -49,8 +49,12 @@ class ScmListCodec implements ScmCodec<Object> {
       return EMPTY_LIST;
     }
 
-    final Class<?> resolved = resolver.get(elements.get(0).getClass());
-    final ScmCodec<Object> elementCodec = ScmCodecFactory.getCodec(resolved);
+    final String elementType = elements.get(0).getClass().getName();
+    final Class<?> resolved = resolver.get(elementType);
+
+    final ScmCodec<Object> elementCodec =
+        (ScmCodec<Object>) ScmCodecFactory.getCodec(resolved.getName());
+
     final ListArgument.Builder builder = ListArgument.newBuilder()
         .setType(resolved.getName());
     for (Object e : elements) {
@@ -72,8 +76,11 @@ class ScmListCodec implements ScmCodec<Object> {
       throw new InvalidProtocolBufferException(
           "Missing ListArgument.type: " + argument);
     }
-    final Class<?> elementClass = resolver.get(argument.getType());
-    final ScmCodec<?> elementCodec = ScmCodecFactory.getCodec(elementClass);
+
+    final String elementType = argument.getType();
+    final Class<?> elementClass = resolver.get(elementType);
+
+    final ScmCodec<?> elementCodec = ScmCodecFactory.getCodec(elementType);
     final List<Object> list = new ArrayList<>();
     for (ByteString element : argument.getValueList()) {
       list.add(elementCodec.deserialize(elementClass, element));

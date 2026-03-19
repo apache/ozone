@@ -104,8 +104,9 @@ public final class SCMRatisRequest {
       // Set actual method parameter type, not actual argument type.
       // This is done to avoid MethodNotFoundException in case if argument is
       // subclass type, where as method is defined with super class type.
-      argBuilder.setType(parameterTypes[paramCounter++].getName());
-      argBuilder.setValue(ScmCodecFactory.getCodec(argument.getClass())
+      final String parameterType = parameterTypes[paramCounter++].getName();
+      argBuilder.setType(parameterType);
+      argBuilder.setValue(ScmCodecFactory.getCodec(parameterType)
           .serialize(argument));
       args.add(argBuilder.build());
     }
@@ -150,9 +151,10 @@ public final class SCMRatisRequest {
         throw new InvalidProtocolBufferException("Missing argument value");
       }
       try {
+        final String argumentType = argument.getType();
         final Class<?> clazz = ReflectionUtil.getClass(argument.getType());
         parameterTypes[paramCounter++] = clazz;
-        args.add(ScmCodecFactory.getCodec(clazz)
+        args.add(ScmCodecFactory.getCodec(argumentType)
             .deserialize(clazz, argument.getValue()));
       } catch (ClassNotFoundException ex) {
         throw new InvalidProtocolBufferException(argument.getType() +
