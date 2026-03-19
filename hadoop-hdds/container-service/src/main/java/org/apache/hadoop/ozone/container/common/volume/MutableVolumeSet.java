@@ -337,9 +337,9 @@ public class MutableVolumeSet implements VolumeSet {
         failedVolumeMap.put(volumeRoot, volume);
         volumeHealthMetrics.decrementHealthyVolumes();
         volumeHealthMetrics.incrementFailedVolumes();
-        LOG.info("Moving Volume : {} to failed Volumes", volumeRoot);
+        LOG.error("Moving Volume : {} to failed Volumes", volumeRoot);
       } else if (failedVolumeMap.containsKey(volumeRoot)) {
-        LOG.info("Volume : {} is not active", volumeRoot);
+        LOG.warn("Volume : {} is not active", volumeRoot);
       } else {
         LOG.warn("Volume : {} does not exist in VolumeSet", volumeRoot);
       }

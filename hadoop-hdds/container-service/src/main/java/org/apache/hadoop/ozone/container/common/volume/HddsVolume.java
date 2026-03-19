@@ -632,7 +632,7 @@ public class HddsVolume extends StorageVolume {
     DatanodeStoreCache.getInstance().removeDB(containerDBPath);
     dbLoaded.set(false);
     dbLoadFailure.set(false);
-    LOG.info("SchemaV3 db is stopped at {} for volume {}", containerDBPath,
+    LOG.warn("SchemaV3 db is stopped at {} for volume {}", containerDBPath,
         getStorageID());
   }
 
@@ -648,7 +648,7 @@ public class HddsVolume extends StorageVolume {
       volumeInfoMetrics.dbCompactTimesNanoSecondsIncr(
           Time.monotonicNowNanos() - start);
     } catch (Exception e) {
-      LOG.warn("compact rocksdb error in {}", dbFilePath, e);
+      LOG.error("compact rocksdb error in {}", dbFilePath, e);
     }
   }
 }
