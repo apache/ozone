@@ -164,10 +164,10 @@ public abstract class ContainerKeyMapperHelper {
           throw new UncheckedIOException(e);
         }
       };
-      
+
       try (ParallelTableIteratorOperation<String, OmKeyInfo> keyIter =
                new ParallelTableIteratorOperation<>(omMetadataManager, omKeyInfoTable,
-                   StringCodec.get(), maxIterators, perWorkerThreshold)) {
+                   StringCodec.get(), maxIterators, maxWorkers, maxKeysInMemory, perWorkerThreshold)) {
         keyIter.performTaskOnTableVals(taskName, null, null, kvOperation);
       }
 

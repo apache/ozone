@@ -53,28 +53,38 @@ public class ParallelTableIteratorOperation<K extends Comparable<K>, V> implemen
   private final Codec<K> keyCodec;
 
   // Thread Pools
-  private final ExecutorService iteratorExecutor; // 5
-  private final long maxNumberOfVals;
+  private final ExecutorService iteratorExecutor;
+  private final ExecutorService valueExecutors;
+
+  private final int maxNumberOfVals;
   private final OMMetadataManager metadataManager;
   private final int maxIteratorTasks;
+  private final int maxWorkerTasks;
   private final long logCountThreshold;
 
   private static final Logger LOG = LoggerFactory.getLogger(ParallelTableIteratorOperation.class);
 
-  public ParallelTableIteratorOperation(OMMetadataManager metadataManager, Table<K, V> table, Codec<K> keyCodec,
-                                        int iteratorCount, long logThreshold) {
-    this.table = table;
-    this.keyCodec = keyCodec;
-    this.metadataManager = metadataManager;
-    this.maxIteratorTasks = 2 * iteratorCount;  // Allow up to 10 pending iterator tasks
+    public ParallelTableIteratorOperation(OMMetadataManager metadataManager, Table<K, V> table, Codec<K> keyCodec,
+                                          int iteratorCount, int workerCount, int maxNumberOfValsInMemory,
+                                          long logThreshold) {
+      this.table = table;
+      this.keyCodec = keyCodec;
+      this.metadataManager = metadataManager;
+      this.maxIteratorTasks = 2 * iteratorCount;
+      this.maxWorkerTasks = workerCount * 2;
 
-    // Create team of iterator threads with UNLIMITED queue
-    // LinkedBlockingQueue() with no size = can hold infinite pending tasks
-    this.iteratorExecutor = new ThreadPoolExecutor(iteratorCount, iteratorCount, 1, TimeUnit.MINUTES,
-                    new LinkedBlockingQueue<>());
-    this.logCountThreshold = logThreshold;
-    this.maxNumberOfVals = Math.max(1000, this.logCountThreshold / (iteratorCount));
-  }
+      // Create team of iterator threads with UNLIMITED queue
+      // LinkedBlockingQueue() with no size = can hold infinite pending tasks
+      this.iteratorExecutor = new ThreadPoolExecutor(iteratorCount, iteratorCount, 1, TimeUnit.MINUTES,
+                      new LinkedBlockingQueue<>());
+      // Create team of worker threads with UNLIMITED queue
+      this.valueExecutors = new ThreadPoolExecutor(workerCount, workerCount, 1, TimeUnit.MINUTES,
+          new LinkedBlockingQueue<>());
+
+      // Calculate batch size per worker
+      this.maxNumberOfVals = Math.max(10, maxNumberOfValsInMemory / (workerCount));
+      this.logCountThreshold = logThreshold;
+    }
 
   private List<K> getBounds(K startKey, K endKey) throws IOException {
     Set<K> keys = new HashSet<>();
