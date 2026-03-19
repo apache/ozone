@@ -38,6 +38,8 @@ abstract class RDBStoreAbstractIterator<RAW>
   private final ManagedRocksIterator rocksDBIterator;
   private final RDBTable rocksDBTable;
   private Table.KeyValue<RAW, RAW> currentEntry;
+  // This is for schemas that use a fixed-length
+  // prefix for each key.
   private final RAW prefix;
   private final IteratorType type;
   private final AtomicBoolean isIteratorClosed = new AtomicBoolean(false);
