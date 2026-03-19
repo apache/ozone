@@ -32,6 +32,7 @@ import javax.xml.XMLConstants;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.UnmarshallerHandler;
 import javax.xml.parsers.SAXParserFactory;
+import org.apache.hadoop.util.XMLUtils;
 import org.xml.sax.InputSource;
 import org.xml.sax.XMLReader;
 
@@ -51,7 +52,7 @@ public class MessageUnmarshaller<T> implements MessageBodyReader<T> {
 
     try {
       context = JAXBContext.newInstance(cls);
-      saxParserFactory = SAXParserFactory.newInstance();
+      saxParserFactory = XMLUtils.newSecureSAXParserFactory();
       saxParserFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
     } catch (Exception ex) {
       throw new AssertionError("Can not instantiate XML parser for " + cls.getSimpleName(), ex);

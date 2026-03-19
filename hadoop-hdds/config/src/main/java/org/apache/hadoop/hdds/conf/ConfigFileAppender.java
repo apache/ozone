@@ -31,6 +31,7 @@ import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
+import org.apache.hadoop.util.XMLUtils;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
@@ -48,7 +49,7 @@ public class ConfigFileAppender {
 
   public ConfigFileAppender() {
     try {
-      DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+      DocumentBuilderFactory factory = XMLUtils.newSecureDocumentBuilderFactory();
       factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
       builder = factory.newDocumentBuilder();
     } catch (Exception ex) {
@@ -113,7 +114,7 @@ public class ConfigFileAppender {
    */
   public void write(Writer writer) {
     try {
-      TransformerFactory factory = TransformerFactory.newInstance();
+      TransformerFactory factory = XMLUtils.newSecureTransformerFactory();
       factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
       Transformer transformer = factory.newTransformer();
 

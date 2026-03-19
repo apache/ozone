@@ -35,6 +35,7 @@ import javax.xml.parsers.ParserConfigurationException;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.hadoop.hdds.scm.net.NodeSchema.LayerType;
 import org.apache.hadoop.hdds.server.YamlUtils;
+import org.apache.hadoop.util.XMLUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
@@ -174,7 +175,7 @@ public final class NodeSchemaLoader {
       ParserConfigurationException, SAXException, IOException {
     LOG.info("Loading network topology layer schema file");
     // Read and parse the schema file.
-    DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+    DocumentBuilderFactory dbf = XMLUtils.newSecureDocumentBuilderFactory();
     dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
     dbf.setIgnoringComments(true);
     DocumentBuilder builder = dbf.newDocumentBuilder();
