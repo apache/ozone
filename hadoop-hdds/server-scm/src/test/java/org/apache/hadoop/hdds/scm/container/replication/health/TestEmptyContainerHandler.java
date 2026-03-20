@@ -317,15 +317,7 @@ public class TestEmptyContainerHandler {
         .build();
 
     assertAndVerify(readRequest, true, 0, 1);
-    
-    // Should delete all 3 replicas and update state twice (FORCE_CLOSE + DELETE)
-    assertTrue(emptyContainerHandler.handle(request));
-    verify(replicationManager, times(3)).sendDeleteCommand(any(ContainerInfo.class), anyInt(),
-        any(DatanodeDetails.class), eq(false));
-    assertEquals(1, request.getReport().getStat(ContainerHealthState.EMPTY));
-    // QUASI_CLOSED requires 2 state updates: FORCE_CLOSE + DELETE
-    verify(replicationManager, times(2)).updateContainerState(
-        any(ContainerID.class), any(HddsProtos.LifeCycleEvent.class));
+    assertAndVerify(request, true, 3, 1);
   }
 
   /**

@@ -415,7 +415,7 @@ class TestReplicationManagerIntegration {
     replicationManager.getConfig().setInterval(Duration.ofSeconds(1));
     replicationManager.notifyStatusChanged();
 
-    // QUASI_CLOSED -> CLOSED -> DELETING
+    // QUASI_CLOSED -> DELETING
     GenericTestUtils.waitFor(() -> {
       try {
         ContainerInfo info = containerManager.getContainer(cid);

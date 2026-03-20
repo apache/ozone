@@ -100,10 +100,7 @@ public class EmptyContainerHandler extends AbstractCheck {
             "replicas from originIds: [{}]. If resurrected, container will transition to QUASI_CLOSED",
             containerInfo.containerID(), containerInfo.getSequenceId(), maxReplicaBCSID,
             replicas.size(), originIds);
-        // Update the container's state - transition to CLOSED first, then DELETE
-        // QUASI_CLOSED -> CLOSED requires FORCE_CLOSE event
-        replicationManager.updateContainerState(
-                containerInfo.containerID(), HddsProtos.LifeCycleEvent.FORCE_CLOSE);
+        // Update the container's state
         replicationManager.updateContainerState(
                 containerInfo.containerID(), HddsProtos.LifeCycleEvent.DELETE);
         // Delete replicas AFTER transitioning to DELETING state
