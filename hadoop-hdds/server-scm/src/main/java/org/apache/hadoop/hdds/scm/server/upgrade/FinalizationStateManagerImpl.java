@@ -96,7 +96,10 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
       checkpointLock.writeLock().unlock();
     }
 
-    if (!versionManager.needsFinalization()) {
+    if (!versionManager.needsFinalization() && !upgradeContext.getSCMContext().isLeader()) {
+      // Only the followers complete finalize here, the leader must wait until the DNs
+      // have finalized before making finalization done, otherwise a polling client could
+      // be told it is complete too early.
       versionManager.setUpgradeState(UpgradeFinalization.Status.FINALIZATION_DONE);
     }
     transactionBuffer.addToBuffer(finalizationStore,

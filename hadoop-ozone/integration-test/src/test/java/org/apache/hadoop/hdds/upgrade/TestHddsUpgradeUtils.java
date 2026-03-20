@@ -28,7 +28,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -83,16 +82,16 @@ public final class TestHddsUpgradeUtils {
    * Helper function to test Post-Upgrade conditions on the SCM
    */
   public static void testPostUpgradeConditionsSCM(
-      List<StorageContainerManager> scms, int numContainers, int numDatanodes) {
+      List<StorageContainerManager> scms, int numContainers) {
     for (StorageContainerManager scm : scms) {
       LOG.info("Testing post upgrade conditions on SCM with node ID: {}",
           scm.getSCMNodeId());
-      testPostUpgradeConditionsSCM(scm, numContainers, numDatanodes);
+      testPostUpgradeConditionsSCM(scm, numContainers);
     }
   }
 
   public static void testPostUpgradeConditionsSCM(StorageContainerManager scm,
-                                                  int numContainers, int numDatanodes) {
+                                                  int numContainers) {
     HDDSLayoutVersionManager scmVersionManager = scm.getLayoutVersionManager();
     assertEquals(scmVersionManager.getSoftwareLayoutVersion(),
         scmVersionManager.getMetadataLayoutVersion());
@@ -126,8 +125,7 @@ public final class TestHddsUpgradeUtils {
    * Helper function to test Post-Upgrade conditions on all the DataNodes.
    */
   public static void testPostUpgradeConditionsDataNodes(
-      List<HddsDatanodeService> datanodes, int numContainers,
-      ContainerProtos.ContainerDataProto.State... validClosedContainerStates) {
+      List<HddsDatanodeService> datanodes, int numContainers) {
     try {
       GenericTestUtils.waitFor(() -> {
         for (HddsDatanodeService dataNode : datanodes) {

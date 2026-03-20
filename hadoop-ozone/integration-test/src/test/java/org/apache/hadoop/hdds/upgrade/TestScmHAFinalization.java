@@ -17,7 +17,6 @@
 
 package org.apache.hadoop.hdds.upgrade;
 
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
@@ -122,9 +121,9 @@ public class TestScmHAFinalization {
     waitForScmsToFinalize(cluster.getStorageContainerManagersList());
 
     TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
-        cluster.getStorageContainerManagersList(), 0, NUM_DATANODES);
+        cluster.getStorageContainerManagersList(), 0);
     TestHddsUpgradeUtils.testPostUpgradeConditionsDataNodes(
-        cluster.getHddsDatanodes(), 0, CLOSED);
+        cluster.getHddsDatanodes(), 0);
   }
 
   @Test
@@ -160,9 +159,9 @@ public class TestScmHAFinalization {
     waitForScmsToFinalize(activeScms);
 
     TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
-        activeScms, 0, NUM_DATANODES);
+        activeScms, 0);
     TestHddsUpgradeUtils.testPostUpgradeConditionsDataNodes(
-        cluster.getHddsDatanodes(), 0, CLOSED);
+        cluster.getHddsDatanodes(), 0);
 
     // Move SCM log index farther ahead to make sure a snapshot install
     // happens on the restarted SCM.
@@ -178,7 +177,7 @@ public class TestScmHAFinalization {
     waitForScmToFinalize(inactiveScm);
 
     TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
-        inactiveScm, 0, NUM_DATANODES);
+        inactiveScm, 0);
 
     // Use log to verify a snapshot was installed.
     assertThat(logCapture.getOutput()).contains("New SCM snapshot " +
