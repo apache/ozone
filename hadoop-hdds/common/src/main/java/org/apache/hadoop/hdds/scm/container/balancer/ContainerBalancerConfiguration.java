@@ -146,6 +146,13 @@ public final class ContainerBalancerConfiguration {
           "data node is very high")
   private boolean triggerDuEnable = false;
 
+  @Config(key = "hdds.container.balancer.include.closed.container.with.non.closed.replicas", type = ConfigType.BOOLEAN,
+      defaultValue = "false", tags = {ConfigTag.BALANCER},
+      description = "Whether to include CLOSED containers for balancing " +
+          "that have the minimum required closed replicas, even if additional " +
+          "replicas are in a non-closed state")
+  private boolean includeClosedContainerWithNonClosedReplicas = false;
+
   /**
    * Gets the threshold value for Container Balancer.
    *
@@ -432,6 +439,24 @@ public final class ContainerBalancerConfiguration {
     this.excludeNodes = excludeNodes;
   }
 
+  /**
+   * Get the includeClosedContainerWithNonClosedReplicas value for Container Balancer.
+   *
+   * @return the boolean value of includeClosedContainerWithNonClosedReplicas
+   */
+  public Boolean getIncludeClosedContainerWithNonClosedReplicas() {
+    return includeClosedContainerWithNonClosedReplicas;
+  }
+
+  /**
+   * Set the includeClosedContainerWithNonClosedReplicas value for Container Balancer.
+   *
+   * @param enable the boolean value to be set to includeClosedContainerWithNonClosedReplicas
+   */
+  public void setIncludeClosedContainerWithNonClosedReplicas(boolean enable) {
+    includeClosedContainerWithNonClosedReplicas = enable;
+  }
+
   @Override
   public String toString() {
     return String.format("Container Balancer Configuration values:%n" +
@@ -478,7 +503,9 @@ public final class ContainerBalancerConfiguration {
         "Datanodes Specified to be Balanced",
         includeNodes.equals("") ? "None" : includeNodes,
         "Datanodes Excluded from Balancing",
-        excludeNodes.equals("") ? "None" : excludeNodes);
+        excludeNodes.equals("") ? "None" : excludeNodes,
+        "Whether to include CLOSED containers with non-closed replicas for balancing",
+        includeClosedContainerWithNonClosedReplicas);
   }
 
   public ContainerBalancerConfigurationProto.Builder toProtobufBuilder() {
@@ -500,7 +527,8 @@ public final class ContainerBalancerConfiguration {
         .setExcludeDatanodes(excludeNodes)
         .setMoveNetworkTopologyEnable(networkTopologyEnable)
         .setTriggerDuBeforeMoveEnable(triggerDuEnable)
-        .setMoveReplicationTimeout(moveReplicationTimeout);
+        .setMoveReplicationTimeout(moveReplicationTimeout)
+        .setIncludeClosedContainerWithNonClosedReplicas(includeClosedContainerWithNonClosedReplicas);
     return builder;
   }
 
@@ -554,6 +582,9 @@ public final class ContainerBalancerConfiguration {
     }
     if (proto.hasMoveReplicationTimeout()) {
       config.setMoveReplicationTimeout(proto.getMoveReplicationTimeout());
+    }
+    if (proto.hasIncludeClosedContainerWithNonClosedReplicas()) {
+      config.setIncludeClosedContainerWithNonClosedReplicas(proto.getIncludeClosedContainerWithNonClosedReplicas());
     }
     return config;
   }

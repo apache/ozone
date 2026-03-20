@@ -199,6 +199,8 @@ public class ContainerBalancerSelectionCriteria {
    * Checks whether specified container is closed. Also checks if the replica
    * on the specified datanode is CLOSED. Assumes that there will only be one
    * replica of a container on a particular Datanode.
+   * If hdds.container.balancer.include.closed.container.with.non.closed.replicas config is set to true,
+   * check for minimum required closed replicas, even if additional replicas are in a non-closed state.
    * @param container container to check
    * @param datanodeDetails datanode on which a replica of the container is
    * present
@@ -213,12 +215,24 @@ public class ContainerBalancerSelectionCriteria {
       return false;
     }
 
-    for (ContainerReplica replica : replicas) {
-      if (replica.getDatanodeDetails().equals(datanodeDetails)) {
-        // don't consider replica if it's not closed
-        // assumption: there's only one replica of this container on this DN
-        return replica.getState().equals(ContainerReplicaProto.State.CLOSED);
-      }
+    ContainerReplica targetReplica = replicas.stream()
+        .filter(r -> r.getDatanodeDetails().equals(datanodeDetails))
+        .findFirst()
+        .orElse(null);
+
+    if (targetReplica == null) {
+      return false;
+    }
+    if (targetReplica.getState().equals(ContainerReplicaProto.State.CLOSED)) {
+      return true;
+    }
+    // Replica is NOT closed - only allow if config is enabled AND we have enough CLOSED replicas
+    if (balancerConfiguration.getIncludeClosedContainerWithNonClosedReplicas()) {
+      long numReplicasClosed = replicas.stream()
+          .filter(r -> r.getState() == ContainerReplicaProto.State.CLOSED)
+          .count();
+      int minimumRequiredNodes = container.getReplicationConfig().getRequiredNodes();
+      return numReplicasClosed >= minimumRequiredNodes;
     }
 
     return false;

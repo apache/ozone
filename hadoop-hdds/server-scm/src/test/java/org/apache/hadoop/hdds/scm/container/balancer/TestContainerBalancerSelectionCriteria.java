@@ -20,6 +20,7 @@ package org.apache.hadoop.hdds.scm.container.balancer;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeOperationalState.IN_SERVICE;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.CLOSED;
+import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto.State.QUASI_CLOSED;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -57,8 +58,11 @@ import org.junit.jupiter.api.Test;
 public class TestContainerBalancerSelectionCriteria {
 
   private ContainerBalancerSelectionCriteria criteria;
+  private ContainerBalancerConfiguration balancerConfiguration;
   private ContainerManager containerManager;
   private ReplicationManager replicationManager;
+  private NodeManager nodeManager;
+  private FindSourceStrategy findSourceStrategy;
   private DatanodeDetails source;
   private ContainerInfo containerInfo;
   private ContainerID containerID;
@@ -66,13 +70,13 @@ public class TestContainerBalancerSelectionCriteria {
   @BeforeEach
   public void setup() throws Exception {
     OzoneConfiguration conf = new OzoneConfiguration();
-    ContainerBalancerConfiguration balancerConfiguration = conf.getObject(ContainerBalancerConfiguration.class);
+    balancerConfiguration = conf.getObject(ContainerBalancerConfiguration.class);
     balancerConfiguration.setMaxSizeToMovePerIteration(100 * OzoneConsts.GB);
 
-    NodeManager nodeManager = mock(NodeManager.class);
+    nodeManager = mock(NodeManager.class);
     containerManager = mock(ContainerManager.class);
     replicationManager = mock(ReplicationManager.class);
-    FindSourceStrategy findSourceStrategy = mock(FindSourceStrategy.class);
+    findSourceStrategy = mock(FindSourceStrategy.class);
 
     source = MockDatanodeDetails.randomDatanodeDetails();
     containerInfo = ReplicationTestUtil.createContainerInfo(RatisReplicationConfig.getInstance(THREE), 1L,
@@ -134,5 +138,48 @@ public class TestContainerBalancerSelectionCriteria {
     verify(containerManager, times(1)).getContainerReplicas(containerID);
     verify(replicationManager, times(1)).getContainerReplicationHealth(
         eq(containerInfo), anySet());
+  }
+
+  @Test
+  public void shouldIncludeClosedContainerWithNonClosedReplicas() throws Exception {
+    DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn3 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn4 = MockDatanodeDetails.randomDatanodeDetails();
+
+    // Create replicas: 3 CLOSED replicas (minimum required) + 1 QUASI_CLOSED replica
+    Set<ContainerReplica> replicas = new HashSet<>();
+    replicas.add(ReplicationTestUtil.createContainerReplica(containerID, 0, IN_SERVICE,
+        CLOSED, 1L, OzoneConsts.GB, source, source.getID()));
+    replicas.add(ReplicationTestUtil.createContainerReplica(containerID, 0, IN_SERVICE,
+        CLOSED, 1L, OzoneConsts.GB, dn2, dn2.getID()));
+    replicas.add(ReplicationTestUtil.createContainerReplica(containerID, 0, IN_SERVICE,
+        CLOSED, 1L, OzoneConsts.GB, dn3, dn3.getID()));
+    replicas.add(ReplicationTestUtil.createContainerReplica(containerID, 0, IN_SERVICE,
+        QUASI_CLOSED, 1L, OzoneConsts.GB, dn4, dn4.getID()));
+
+    // Update the mock to return the new replica set
+    when(containerManager.getContainerReplicas(containerID)).thenReturn(replicas);
+
+    balancerConfiguration.setIncludeClosedContainerWithNonClosedReplicas(true);
+    ContainerBalancerSelectionCriteria configEnabled = new ContainerBalancerSelectionCriteria(
+        balancerConfiguration, nodeManager, replicationManager,
+        containerManager, findSourceStrategy, new HashMap<>());
+
+    // With config enabled, even the QUASI_CLOSED replica can be moved
+    // because the cluster has enough CLOSED replicas
+    assertFalse(configEnabled.shouldBeExcluded(containerID, source, 0L));
+    assertFalse(configEnabled.shouldBeExcluded(containerID, dn4, 0L));
+
+    // Verify behavior when config is disabled (default)
+    balancerConfiguration.setIncludeClosedContainerWithNonClosedReplicas(false);
+    ContainerBalancerSelectionCriteria criteriaDisabled = new ContainerBalancerSelectionCriteria(
+        balancerConfiguration, nodeManager, replicationManager,
+        containerManager, findSourceStrategy, new HashMap<>());
+
+    // With config disabled, the CLOSED replica can still be moved
+    assertFalse(criteriaDisabled.shouldBeExcluded(containerID, source, 0L));
+
+    // But the QUASI_CLOSED replica should be excluded when config is disabled
+    assertTrue(criteriaDisabled.shouldBeExcluded(containerID, dn4, 0L));
   }
 }
