@@ -304,6 +304,9 @@ public final class XceiverServerRatis implements XceiverServerSpi {
     RaftServerConfigKeys.LeaderElection.setPreVote(properties,
         ratisServerConfig.isPreVoteEnabled());
 
+    RaftServerConfigKeys.Log.setAppendEntriesComposeEnabled(properties,
+        ratisServerConfig.isAppendEntriesComposeEnabled());
+
     // Set the ratis storage directory
     Collection<String> storageDirPaths =
             HddsServerUtil.getOzoneDatanodeRatisDirectory(conf);
