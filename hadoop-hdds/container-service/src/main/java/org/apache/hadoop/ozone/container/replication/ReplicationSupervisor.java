@@ -85,6 +85,26 @@ public final class ReplicationSupervisor {
    */
   private final Set<AbstractReplicationTask> inFlight;
 
+  private final Map<String, AtomicInteger> inFlightReplicationsPerVolume =
+      new ConcurrentHashMap<>();
+
+  public void incrementInFlightReplication(String volumeRoot) {
+    inFlightReplicationsPerVolume.computeIfAbsent(volumeRoot,
+        k -> new AtomicInteger(0)).incrementAndGet();
+  }
+
+  public void decrementInFlightReplication(String volumeRoot) {
+    AtomicInteger counter = inFlightReplicationsPerVolume.get(volumeRoot);
+    if (counter != null) {
+      counter.decrementAndGet();
+    }
+  }
+
+  public int getInFlightReplications(String volumeRoot) {
+    AtomicInteger counter = inFlightReplicationsPerVolume.get(volumeRoot);
+    return counter == null ? 0 : counter.get();
+  }
+
   private final Map<Class<?>, AtomicInteger> taskCounter =
       new ConcurrentHashMap<>();
   private int maxQueueSize;

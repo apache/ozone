@@ -173,34 +173,6 @@ public class DatanodeStateMachine implements Closeable {
     connectionManager = new SCMConnectionManager(conf);
     context = new StateContext(this.conf, DatanodeStates.getInitState(), this,
         threadNamePrefix);
-    // OzoneContainer instance is used in a non-thread safe way by the context
-    // past to its constructor, so we much synchronize its access. See
-    // HDDS-3116 for more details.
-    constructionLock.writeLock().lock();
-    try {
-      container = new OzoneContainer(this.datanodeDetails,
-          conf, context, certClient, secretKeyClient);
-    } finally {
-      constructionLock.writeLock().unlock();
-    }
-    nextHB = new AtomicLong(Time.monotonicNow());
-
-    ContainerImporter importer = new ContainerImporter(conf,
-        container.getContainerSet(),
-        container.getController(),
-        container.getVolumeSet());
-    ContainerReplicator pullReplicator = new DownloadAndImportReplicator(
-        conf, container.getContainerSet(),
-        importer,
-        new SimpleContainerDownloader(conf, certClient));
-    ContainerReplicator pushReplicator = new PushReplicator(conf,
-        new OnDemandContainerReplicationSource(container.getController()),
-        new GrpcContainerUploader(conf, certClient)
-    );
-
-    pullReplicatorWithMetrics = new MeasuredReplicator(pullReplicator, "pull");
-    pushReplicatorWithMetrics = new MeasuredReplicator(pushReplicator, "push");
-
     ReplicationConfig replicationConfig =
         conf.getObject(ReplicationConfig.class);
     supervisor = ReplicationSupervisor.newBuilder()
@@ -210,6 +182,36 @@ public class DatanodeStateMachine implements Closeable {
         .clock(clock)
         .build();
 
+    // OzoneContainer instance is used in a non-thread safe way by the context
+    // past to its constructor, so we much synchronize its access. See
+    // HDDS-3116 for more details.
+    constructionLock.writeLock().lock();
+    try {
+      container = new OzoneContainer(this.datanodeDetails,
+          conf, context, certClient, secretKeyClient, supervisor);
+    } finally {
+      constructionLock.writeLock().unlock();
+    }
+    nextHB = new AtomicLong(Time.monotonicNow());
+
+    ContainerImporter importer = new ContainerImporter(conf,
+        container.getContainerSet(),
+        container.getController(),
+        container.getVolumeSet(),
+        supervisor);
+    ContainerReplicator pullReplicator = new DownloadAndImportReplicator(
+        conf, container.getContainerSet(),
+        importer,
+        new SimpleContainerDownloader(conf, certClient),
+        supervisor);
+    ContainerReplicator pushReplicator = new PushReplicator(conf,
+        new OnDemandContainerReplicationSource(container.getController()),
+        new GrpcContainerUploader(conf, certClient)
+    );
+
+    pullReplicatorWithMetrics = new MeasuredReplicator(pullReplicator, "pull");
+    pushReplicatorWithMetrics = new MeasuredReplicator(pushReplicator, "push");
+
     replicationSupervisorMetrics =
         ReplicationSupervisorMetrics.create(supervisor);
 
@@ -217,7 +219,7 @@ public class DatanodeStateMachine implements Closeable {
 
     ecReconstructionCoordinator = new ECReconstructionCoordinator(
         conf, certClient, secretKeyClient, context, ecReconstructionMetrics,
-        threadNamePrefix);
+        threadNamePrefix, supervisor);
 
     // This is created as an instance variable as Mockito needs to access it in
     // a test. The test mocks it in a running mini-cluster.

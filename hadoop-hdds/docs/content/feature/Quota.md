@@ -1,6 +1,6 @@
 ---
 title: "Quota in Ozone"
-date: "2020-October-22"
+date: "2020-10-22"
 weight: 4
 summary: Quota in Ozone
 icon: user

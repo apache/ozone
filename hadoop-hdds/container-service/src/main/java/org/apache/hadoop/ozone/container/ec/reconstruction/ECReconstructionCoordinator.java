@@ -49,6 +49,7 @@ import org.apache.hadoop.ozone.client.io.ECBlockInputStreamProxy;
 import org.apache.hadoop.ozone.client.io.ECBlockReconstructedStripeInputStream;
 import org.apache.hadoop.ozone.container.common.helpers.BlockData;
 import org.apache.hadoop.ozone.container.common.statemachine.StateContext;
+import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.security.token.Token;
 import org.apache.ratis.util.MemoizedSupplier;
 import org.slf4j.Logger;
@@ -116,13 +117,16 @@ public class ECReconstructionCoordinator implements Closeable {
   private final ECReconstructionMetrics metrics;
   private final StateContext context;
   private final OzoneClientConfig ozoneClientConfig;
+  private final ReplicationSupervisor replicationSupervisor;
 
   public ECReconstructionCoordinator(
       ConfigurationSource conf, CertificateClient certificateClient,
       SecretKeySignerClient secretKeyClient, StateContext context,
       ECReconstructionMetrics metrics,
-      String threadNamePrefix) throws IOException {
+      String threadNamePrefix,
+      ReplicationSupervisor supervisor) throws IOException {
     this.context = context;
+    this.replicationSupervisor = supervisor;
     this.containerOperationClient = new ECContainerOperationClient(conf,
         certificateClient);
     this.byteBufferPool = new ElasticByteBufferPool();

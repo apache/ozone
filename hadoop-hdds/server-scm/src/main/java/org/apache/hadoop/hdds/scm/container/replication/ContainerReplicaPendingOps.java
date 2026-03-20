@@ -17,391 +17,180 @@
  */
 package org.apache.hadoop.hdds.scm.container.replication;
 
-import com.google.common.util.concurrent.Striped;
-import org.apache.hadoop.hdds.client.ReplicationType;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
+import org.apache.hadoop.util.Time;
 
-import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.CopyOnWriteArrayList;
 
-import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.ADD;
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.DELETE;
 
 /**
- * Class to track pending replication operations across the cluster. For
- * each container with a pending replication or pending delete, there will
- * be an entry in this class mapping ContainerID to a list of the pending
- * operations.
+ * Class to track pending replications for a container.
  */
 public class ContainerReplicaPendingOps {
 
-  private static final int RATIS_COUNTER_INDEX = 0;
-  private static final int EC_COUNTER_INDEX = 1;
+  private final Map<ContainerID, List<ContainerReplicaOp>> pendingOps;
+  private final List<ContainerReplicaPendingOpsSubscriber> subscribers;
+  private ReplicationManagerMetrics replicationMetrics;
+  private final java.time.Clock clock;
 
-  private final Clock clock;
-  private final ConcurrentHashMap<ContainerID, List<ContainerReplicaOp>>
-      pendingOps = new ConcurrentHashMap<>();
-  private final Striped<ReadWriteLock> stripedLock = Striped.readWriteLock(64);
-  private final ReentrantReadWriteLock globalLock =
-      new ReentrantReadWriteLock();
-  private final ConcurrentHashMap<PendingOpType, AtomicLong[]>
-      pendingOpCount = new ConcurrentHashMap<>();
-  private ReplicationManagerMetrics replicationMetrics = null;
-  private final List<ContainerReplicaPendingOpsSubscriber> subscribers =
-      new ArrayList<>();
-
-  public ContainerReplicaPendingOps(Clock clock) {
+  public ContainerReplicaPendingOps(java.time.Clock clock) {
     this.clock = clock;
-    resetCounters();
+    pendingOps = new ConcurrentHashMap<>();
+    subscribers = new CopyOnWriteArrayList<>();
   }
 
-  private void resetCounters() {
-    for (PendingOpType opType: PendingOpType.values()) {
-      AtomicLong[] counters = new AtomicLong[2];
-      counters[RATIS_COUNTER_INDEX] = new AtomicLong(0);
-      counters[EC_COUNTER_INDEX] = new AtomicLong(0);
-      pendingOpCount.put(opType, counters);
-    }
+  public void setReplicationMetrics(ReplicationManagerMetrics metrics) {
+    this.replicationMetrics = metrics;
   }
 
-  /**
-   * Clears all pendingOps and resets all the counters to zero.
-   */
-  public void clear() {
-    // We block all other concurrent access with the global lock to prevent
-    // the map and counters getting out of sync if there are concurrent updates
-    // happening when the class is cleared.
-    globalLock.writeLock().lock();
-    try {
-      pendingOps.clear();
-      resetCounters();
-    } finally {
-      globalLock.writeLock().unlock();
-    }
+  public void registerSubscriber(ContainerReplicaPendingOpsSubscriber subscriber) {
+    subscribers.add(subscriber);
   }
 
-  /**
-   * Get all the ContainerReplicaOp's associated with the given ContainerID.
-   * A new list is created and returned, so it can be modified by the caller,
-   * but any changes will not be reflected in the internal map.
-   * @param containerID The ContainerID for which to retrieve the pending
-   *                      ops.
-   * @return Standalone list of ContainerReplica or an empty list if none exist.
-   */
+  public void unregisterSubscriber(ContainerReplicaPendingOpsSubscriber subscriber) {
+    subscribers.remove(subscriber);
+  }
+
   public List<ContainerReplicaOp> getPendingOps(ContainerID containerID) {
-    Lock lock = readLock(containerID);
-    lock(lock);
-    try {
-      List<ContainerReplicaOp> ops = pendingOps.get(containerID);
-      if (ops == null) {
-        return Collections.emptyList();
-      }
-      return new ArrayList<>(ops);
-    } finally {
-      unlock(lock);
-    }
+    List<ContainerReplicaOp> ops = pendingOps.get(containerID);
+    return ops == null ? Collections.emptyList() : Collections.unmodifiableList(ops);
   }
 
-  /**
-   * Store a ContainerReplicaOp to add a replica for the given ContainerID.
-   * @param containerID ContainerID for which to add a replica
-   * @param target The target datanode
-   * @param replicaIndex The replica index (zero for Ratis, > 0 for EC)
-   * @param deadlineEpochMillis The time by which the replica should have been
-   *                            added and reported by the datanode, or it will
-   *                            be discarded.
-   */
-  public void scheduleAddReplica(ContainerID containerID,
-      DatanodeDetails target, int replicaIndex, long deadlineEpochMillis) {
-    addReplica(ADD, containerID, target, replicaIndex, deadlineEpochMillis);
+  public void scheduleAddReplica(ContainerID containerID, DatanodeDetails target,
+      int replicaIndex, SCMCommand<?> command, long scmDeadlineEpochMs,
+      long containerSize, long scheduledEpochMs, DatanodeDetails decommissionSource) {
+    addReplica(ADD, containerID, target, replicaIndex, command,
+        scmDeadlineEpochMs, containerSize, decommissionSource);
   }
 
-  /**
-   * Store a ContainerReplicaOp to delete a replica for the given ContainerID.
-   * @param containerID ContainerID for which to delete a replica
-   * @param target The target datanode
-   * @param replicaIndex The replica index (zero for Ratis, > 0 for EC)
-   * @param deadlineEpochMillis The time by which the replica should have been
-   *                            deleted and reported by the datanode, or it will
-   *                            be discarded.
-   */
-  public void scheduleDeleteReplica(ContainerID containerID,
-      DatanodeDetails target, int replicaIndex, long deadlineEpochMillis) {
-    addReplica(DELETE, containerID, target, replicaIndex, deadlineEpochMillis);
+  public void scheduleAddReplica(ContainerID containerID, DatanodeDetails target,
+      int replicaIndex, long scmDeadlineEpochMs) {
+    scheduleAddReplica(containerID, target, replicaIndex, null,
+        scmDeadlineEpochMs, 0, Time.now(), null);
   }
 
-  /**
-   * Remove a stored ContainerReplicaOp from the given ContainerID as it has
-   * been replicated successfully.
-   * @param containerID ContainerID for which to complete the replication
-   * @param target The target Datanode
-   * @param replicaIndex The replica index (zero for Ratis, > 0 for EC)
-   * @return True if a pending replica was found and removed, false otherwise.
-   */
-  public boolean completeAddReplica(ContainerID containerID,
-      DatanodeDetails target, int replicaIndex) {
-    boolean completed = completeOp(ADD, containerID, target, replicaIndex);
-    if (isMetricsNotNull() && completed) {
-      if (isEC(replicaIndex)) {
-        replicationMetrics.incrEcReplicasCreatedTotal();
-      } else {
-        replicationMetrics.incrReplicasCreatedTotal();
-      }
-    }
-    return completed;
+  public void scheduleDeleteReplica(ContainerID containerID, DatanodeDetails target,
+      int replicaIndex, long scmDeadlineEpochMs) {
+    scheduleDeleteReplica(containerID, target, replicaIndex, null,
+        scmDeadlineEpochMs, null);
   }
 
-
-  /**
-   * Remove a stored ContainerReplicaOp from the given ContainerID as it has
-   * been deleted successfully.
-   * @param containerID ContainerID for which to complete the deletion
-   * @param target The target Datanode
-   * @param replicaIndex The replica index (zero for Ratis, > 0 for EC)
-   * @return True if a pending replica was found and removed, false otherwise.
-   */
-  public boolean completeDeleteReplica(ContainerID containerID,
-      DatanodeDetails target, int replicaIndex) {
-    boolean completed = completeOp(DELETE, containerID, target, replicaIndex);
-    if (isMetricsNotNull() && completed) {
-      if (isEC(replicaIndex)) {
-        replicationMetrics.incrEcReplicasDeletedTotal();
-      } else {
-        replicationMetrics.incrReplicasDeletedTotal();
-      }
-    }
-    return completed;
-  }
-
-  /**
-   * Remove a stored pending operation from the given ContainerID.
-   * @param containerID ContainerID for which to remove the op.
-   * @param op ContainerReplicaOp to remove
-   * @return True if an element was found and deleted, false otherwise.
-   */
-  public boolean removeOp(ContainerID containerID,
-      ContainerReplicaOp op) {
-    return completeOp(op.getOpType(), containerID, op.getTarget(),
-        op.getReplicaIndex());
-  }
-
-  /**
-   * Iterate over all pending entries and remove any which have expired, meaning
-   * they have not completed the operation inside the given time.
-   */
-  public void removeExpiredEntries() {
-    for (ContainerID containerID : pendingOps.keySet()) {
-      // List of expired ops that subscribers will be notified about
-      List<ContainerReplicaOp> expiredOps = new ArrayList<>();
-
-      // Rather than use an entry set, we get the map entry again. This is
-      // to protect against another thread modifying the value after this
-      // iterator started. Once we lock on the ContainerID object, no other
-      // changes can occur to the list of ops associated with it.
-      Lock lock = writeLock(containerID);
-      lock(lock);
-      try {
-        List<ContainerReplicaOp> ops = pendingOps.get(containerID);
-        if (ops == null) {
-          // There should not be null entries, but another thread may have
-          // removed the map entry after the iterator was started.
-          continue;
-        }
-        Iterator<ContainerReplicaOp> iterator = ops.listIterator();
-        while (iterator.hasNext()) {
-          ContainerReplicaOp op = iterator.next();
-          if (clock.millis() > op.getDeadlineEpochMillis()) {
-            iterator.remove();
-            expiredOps.add(op);
-            decrementCounter(op.getOpType(), op.getReplicaIndex());
-            updateTimeoutMetrics(op);
-          }
-        }
-        if (ops.size() == 0) {
-          pendingOps.remove(containerID);
-        }
-      } finally {
-        unlock(lock);
-      }
-
-      // notify if there are expired ops
-      if (!expiredOps.isEmpty()) {
-        notifySubscribers(expiredOps, containerID, true);
-      }
-    }
-  }
-
-  private void updateTimeoutMetrics(ContainerReplicaOp op) {
-    if (op.getOpType() == ADD && isMetricsNotNull()) {
-      if (isEC(op.getReplicaIndex())) {
-        replicationMetrics.incrEcReplicaCreateTimeoutTotal();
-      } else {
-        replicationMetrics.incrReplicaCreateTimeoutTotal();
-      }
-    } else if (op.getOpType() == DELETE && isMetricsNotNull()) {
-      if (isEC(op.getReplicaIndex())) {
-        replicationMetrics.incrEcReplicaDeleteTimeoutTotal();
-      } else {
-        replicationMetrics.incrReplicaDeleteTimeoutTotal();
-      }
-    }
+  public void scheduleDeleteReplica(ContainerID containerID, DatanodeDetails target,
+      int replicaIndex, SCMCommand<?> command, long scmDeadlineEpochMs,
+      DatanodeDetails decommissionSource) {
+    addReplica(DELETE, containerID, target, replicaIndex, command,
+        scmDeadlineEpochMs, 0, decommissionSource);
   }
 
   private void addReplica(ContainerReplicaOp.PendingOpType opType,
       ContainerID containerID, DatanodeDetails target, int replicaIndex,
-      long deadlineEpochMillis) {
-    Lock lock = writeLock(containerID);
-    lock(lock);
-    try {
-      List<ContainerReplicaOp> ops = pendingOps.computeIfAbsent(
-          containerID, s -> new ArrayList<>());
-      ops.add(new ContainerReplicaOp(opType,
-          target, replicaIndex, deadlineEpochMillis));
-      incrementCounter(opType, replicaIndex);
-    } finally {
-      unlock(lock);
-    }
+      SCMCommand<?> command, long scmDeadlineEpochMs, long containerSize,
+      DatanodeDetails decommissionSource) {
+    pendingOps.computeIfAbsent(containerID, k -> new CopyOnWriteArrayList<>())
+        .add(new ContainerReplicaOp(opType, target, replicaIndex, command,
+            scmDeadlineEpochMs, containerSize, decommissionSource));
+  }
+
+  public boolean completeAddReplica(ContainerID containerID, DatanodeDetails target,
+      int replicaIndex) {
+    return completeOp(ADD, containerID, target, replicaIndex);
+  }
+
+  public boolean completeDeleteReplica(ContainerID containerID, DatanodeDetails target,
+      int replicaIndex) {
+    return completeOp(DELETE, containerID, target, replicaIndex);
   }
 
   private boolean completeOp(ContainerReplicaOp.PendingOpType opType,
       ContainerID containerID, DatanodeDetails target, int replicaIndex) {
-    boolean found = false;
-    // List of completed ops that subscribers will be notified about
-    List<ContainerReplicaOp> completedOps = new ArrayList<>();
-    Lock lock = writeLock(containerID);
-    lock(lock);
-    try {
-      List<ContainerReplicaOp> ops = pendingOps.get(containerID);
-      if (ops != null) {
-        Iterator<ContainerReplicaOp> iterator = ops.listIterator();
-        while (iterator.hasNext()) {
-          ContainerReplicaOp op = iterator.next();
-          if (op.getOpType() == opType
-              && op.getTarget().equals(target)
-              && op.getReplicaIndex() == replicaIndex) {
-            found = true;
-            completedOps.add(op);
-            iterator.remove();
-            decrementCounter(op.getOpType(), replicaIndex);
-          }
+    List<ContainerReplicaOp> ops = pendingOps.get(containerID);
+    if (ops != null) {
+      ContainerReplicaOp foundOp = null;
+      for (ContainerReplicaOp op : ops) {
+        if (op.getOpType() == opType && op.getTarget().equals(target)
+            && op.getReplicaIndex() == replicaIndex) {
+          foundOp = op;
+          break;
         }
-        if (ops.size() == 0) {
+      }
+      if (foundOp != null) {
+        ops.remove(foundOp);
+        notifySubscribers(foundOp, containerID, false);
+        if (ops.isEmpty()) {
           pendingOps.remove(containerID);
         }
+        return true;
       }
-    } finally {
-      unlock(lock);
     }
-
-    if (found) {
-      notifySubscribers(completedOps, containerID, false);
-    }
-    return found;
+    return false;
   }
 
-  /**
-   * Notifies subscribers about the specified ops by calling
-   * ContainerReplicaPendingOpsSubscriber#opCompleted.
-   *
-   * @param ops the ops to send notifications for
-   * @param containerID the container that ops belong to
-   * @param timedOut true if the ops (each one) expired, false if they completed
-   */
-  private void notifySubscribers(List<ContainerReplicaOp> ops,
-      ContainerID containerID, boolean timedOut) {
-    for (ContainerReplicaOp op : ops) {
-      for (ContainerReplicaPendingOpsSubscriber subscriber : subscribers) {
-        subscriber.opCompleted(op, containerID, timedOut);
+  public void removeExpiredOps(long scmDeadlineEpochMs) {
+    for (Map.Entry<ContainerID, List<ContainerReplicaOp>> entry : pendingOps.entrySet()) {
+      List<ContainerReplicaOp> ops = entry.getValue();
+      List<ContainerReplicaOp> expiredOps = new ArrayList<>();
+      for (ContainerReplicaOp op : ops) {
+        if (op.getDeadlineEpochMillis() < scmDeadlineEpochMs) {
+          expiredOps.add(op);
+        }
+      }
+      for (ContainerReplicaOp op : expiredOps) {
+        ops.remove(op);
+        notifySubscribers(op, entry.getKey(), true);
+      }
+      if (ops.isEmpty()) {
+        pendingOps.remove(entry.getKey());
       }
     }
   }
 
-  /**
-   * Registers a subscriber that will be notified about completed ops.
-   *
-   * @param subscriber object that wants to subscribe
-   */
-  public void registerSubscriber(
-      ContainerReplicaPendingOpsSubscriber subscriber) {
-    subscribers.add(subscriber);
+  private void notifySubscribers(ContainerReplicaOp op, ContainerID containerID,
+      boolean timedOut) {
+    for (ContainerReplicaPendingOpsSubscriber subscriber : subscribers) {
+      subscriber.opCompleted(op, containerID, timedOut);
+    }
   }
 
-  private Lock writeLock(ContainerID containerID) {
-    return stripedLock.get(containerID).writeLock();
-  }
-
-  private Lock readLock(ContainerID containerID) {
-    return stripedLock.get(containerID).readLock();
-  }
-
-  private void lock(Lock lock) {
-    // We always take the global lock in shared / read mode as the only time it
-    // will block is when the class is getting cleared to remove all operations.
-    globalLock.readLock().lock();
-    lock.lock();
-  }
-
-  private void unlock(Lock lock) {
-    globalLock.readLock().unlock();
-    lock.unlock();
-  }
-
-  private boolean isMetricsNotNull() {
-    return replicationMetrics != null;
-  }
-
-  public void setReplicationMetrics(
-      ReplicationManagerMetrics replicationMetrics) {
-    this.replicationMetrics = replicationMetrics;
-  }
-
-  public long getPendingOpCount(PendingOpType opType) {
-    AtomicLong[] counters = pendingOpCount.get(opType);
+  public long getPendingOpCount(ContainerReplicaOp.PendingOpType opType,
+      HddsProtos.ReplicationType replicationType) {
     long count = 0;
-    for (AtomicLong counter : counters) {
-      count += counter.get();
+    for (List<ContainerReplicaOp> ops : pendingOps.values()) {
+      for (ContainerReplicaOp op : ops) {
+        if (op.getOpType() == opType) {
+          if (replicationType == HddsProtos.ReplicationType.EC && op.getReplicaIndex() > 0) {
+            count++;
+          } else if (replicationType == HddsProtos.ReplicationType.RATIS && op.getReplicaIndex() == 0) {
+            count++;
+          }
+        }
+      }
     }
     return count;
   }
 
-  public long getPendingOpCount(PendingOpType opType, ReplicationType type) {
-    int index = RATIS_COUNTER_INDEX;
-    if (type == ReplicationType.EC) {
-      index = EC_COUNTER_INDEX;
+  public long getPendingOpCount(ContainerReplicaOp.PendingOpType opType) {
+    long count = 0;
+    for (List<ContainerReplicaOp> ops : pendingOps.values()) {
+      for (ContainerReplicaOp op : ops) {
+        if (op.getOpType() == opType) {
+          count++;
+        }
+      }
     }
-    return pendingOpCount.get(opType)[index].get();
+    return count;
   }
 
-  private long incrementCounter(PendingOpType type, int replicaIndex) {
-    return pendingOpCount.get(type)[counterIndex(replicaIndex)]
-        .incrementAndGet();
+  public void clear() {
+    pendingOps.clear();
   }
-
-  private long decrementCounter(PendingOpType type, int replicaIndex) {
-    return pendingOpCount.get(type)[counterIndex(replicaIndex)]
-        .decrementAndGet();
-  }
-
-  private int counterIndex(int replicaIndex) {
-    if (isEC(replicaIndex)) {
-      return EC_COUNTER_INDEX;
-    } else {
-      return RATIS_COUNTER_INDEX;
-    }
-  }
-
-  private boolean isEC(int replicaIndex) {
-    return replicaIndex > 0;
-  }
-
 }

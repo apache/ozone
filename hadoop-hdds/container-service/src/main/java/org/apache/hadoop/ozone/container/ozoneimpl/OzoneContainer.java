@@ -50,6 +50,7 @@ import org.apache.hadoop.ozone.container.common.transport.server.XceiverServerSp
 import org.apache.hadoop.ozone.container.common.transport.server.ratis.XceiverServerRatis;
 import org.apache.hadoop.ozone.container.common.utils.ContainerInspectorUtil;
 import org.apache.hadoop.ozone.container.common.utils.HddsVolumeUtil;
+import org.apache.hadoop.ozone.container.common.utils.StorageVolumeUtil;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
 import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
@@ -59,6 +60,7 @@ import org.apache.hadoop.ozone.container.keyvalue.statemachine.background.StaleR
 import org.apache.hadoop.ozone.container.replication.ContainerImporter;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer;
 import org.apache.hadoop.ozone.container.replication.ReplicationServer.ReplicationConfig;
+import org.apache.hadoop.ozone.container.replication.ReplicationSupervisor;
 import org.apache.hadoop.ozone.container.upgrade.VersionedDatanodeFeatures.SchemaV3;
 import org.apache.hadoop.util.DiskChecker.DiskOutOfSpaceException;
 import org.apache.hadoop.util.Timer;
@@ -76,6 +78,7 @@ import java.util.Map;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_TIMEOUT_DEFAULT;
@@ -138,10 +141,11 @@ public class OzoneContainer {
    * @throws DiskOutOfSpaceException
    * @throws IOException
    */
-  public OzoneContainer(
-      DatanodeDetails datanodeDetails, ConfigurationSource conf,
-      StateContext context, CertificateClient certClient,
-      SecretKeyVerifierClient secretKeyClient) throws IOException {
+  public OzoneContainer(DatanodeDetails datanodeDetails,
+      ConfigurationSource conf, StateContext context,
+      CertificateClient certClient, SecretKeyVerifierClient secretKeyClient,
+      ReplicationSupervisor supervisor) throws IOException {
+
     config = conf;
     this.datanodeDetails = datanodeDetails;
     this.context = context;
@@ -211,12 +215,14 @@ public class OzoneContainer {
 
     replicationServer = new ReplicationServer(
         controller,
-        conf.getObject(ReplicationConfig.class),
+        conf.getObject(ReplicationServer.ReplicationConfig.class),
         secConf,
         certClient,
         new ContainerImporter(conf, containerSet, controller,
-            volumeSet),
-        datanodeDetails.threadNamePrefix());
+            volumeSet, supervisor),
+        datanodeDetails.threadNamePrefix(),
+        supervisor);
+
 
     readChannel = new XceiverServerGrpc(
         datanodeDetails, config, hddsDispatcher, certClient);

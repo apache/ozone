@@ -212,7 +212,7 @@ public class TestECUnderReplicationHandler {
     assertEquals(parity - remainingRedundancy, e.getRequiredNodes());
     assertEquals(e.getRequiredNodes() - excluded.size(), e.getAvailableNodes());
     verify(replicationManager, never())
-        .sendThrottledReconstructionCommand(any(), any());
+        .sendThrottledReconstructionCommand(any(), any(), any());
     assertEquals(1, metrics.getECPartialReconstructionSkippedTotal());
   }
 
@@ -271,7 +271,7 @@ public class TestECUnderReplicationHandler {
     assertEquals(parity - remainingRedundancy, e.getRequiredNodes());
     assertEquals(e.getRequiredNodes() - excluded.size(), e.getAvailableNodes());
     verify(replicationManager, times(1))
-        .sendThrottledReconstructionCommand(any(), any());
+        .sendThrottledReconstructionCommand(any(), any(), any());
     assertEquals(1, metrics.getECPartialReconstructionCriticalTotal());
   }
 
@@ -300,7 +300,7 @@ public class TestECUnderReplicationHandler {
     assertEquals(singletonList(excludedByRM), spy.excludedNodes(0));
     assertUsedNodes(replicas, spy.usedNodes(0));
     verify(replicationManager, times(1))
-        .sendThrottledReconstructionCommand(any(), any());
+        .sendThrottledReconstructionCommand(any(), any(), any());
   }
 
   private static void assertUsedNodes(Set<ContainerReplica> replicas,
@@ -354,7 +354,7 @@ public class TestECUnderReplicationHandler {
 
     doThrow(new CommandTargetOverloadedException("Overloaded"))
         .when(replicationManager).sendThrottledReconstructionCommand(
-            any(), any());
+            any(), any(), any());
 
     assertThrows(CommandTargetOverloadedException.class, () ->
         testUnderReplicationWithMissingIndexes(ImmutableList.of(5),
@@ -375,6 +375,45 @@ public class TestECUnderReplicationHandler {
     ReplicateContainerCommand cmd = (ReplicateContainerCommand) cmds
         .iterator().next().getValue();
     assertEquals(1, cmd.getReplicaIndex());
+  }
+
+  @Test
+  public void testUnderReplicationWithDecommissionIndexOverloaded()
+      throws IOException, NodeNotFoundException {
+    Set<ContainerReplica> availableReplicas = ReplicationTestUtil
+        .createReplicas(Pair.of(DECOMMISSIONING, 1), Pair.of(IN_SERVICE, 2),
+            Pair.of(IN_SERVICE, 3), Pair.of(IN_SERVICE, 4),
+            Pair.of(IN_SERVICE, 5));
+
+    // Mark the source node as overloaded
+    DatanodeDetails sourceNode = availableReplicas.stream()
+        .filter(r -> r.getReplicaIndex() == 1).findFirst().get()
+        .getDatanodeDetails();
+    when(replicationManager.getQueuedReplicationCount(sourceNode))
+        .thenReturn(10);
+    replicationManager.getConfig()
+        .setDecommissionEcReconstructionThreshold(5);
+
+    ECUnderReplicationHandler ecURH =
+        new ECUnderReplicationHandler(
+            policy, conf, replicationManager);
+    UnderReplicatedHealthResult result =
+        mock(UnderReplicatedHealthResult.class);
+    when(result.isUnrecoverable()).thenReturn(false);
+    when(result.getContainerInfo()).thenReturn(container);
+
+    ecURH.processAndSendCommands(availableReplicas, ImmutableList.of(),
+        result, remainingMaintenanceRedundancy);
+
+    // One reconstruct command should be sent for index 1
+    assertEquals(1, commandsSent.size());
+    SCMCommand<?> cmd = commandsSent.iterator().next().getValue();
+    assertEquals(SCMCommandProto.Type.reconstructECContainersCommand,
+        cmd.getType());
+    ReconstructECContainersCommand reconCmd =
+        (ReconstructECContainersCommand) cmd;
+    assertEquals(1, reconCmd.getMissingContainerIndexes().size());
+    assertEquals(1, (int) reconCmd.getMissingContainerIndexes().byteAt(0));
   }
 
 
@@ -431,7 +470,7 @@ public class TestECUnderReplicationHandler {
             Pair.of(IN_SERVICE, 5));
     doThrow(new CommandTargetOverloadedException("Overloaded"))
         .when(replicationManager).sendThrottledReplicationCommand(
-            any(), anyList(), any(), anyInt());
+            any(), anyList(), any(), anyInt(), any());
 
     assertThrows(CommandTargetOverloadedException.class, () ->
         testUnderReplicationWithMissingIndexes(

@@ -61,6 +61,7 @@ public class ContainerImporter {
   private final MutableVolumeSet volumeSet;
   private final VolumeChoosingPolicy volumeChoosingPolicy;
   private final long containerSize;
+  private final ReplicationSupervisor replicationSupervisor;
 
   private final Set<Long> importContainerProgress
       = Collections.synchronizedSet(new HashSet<>());
@@ -70,10 +71,12 @@ public class ContainerImporter {
   public ContainerImporter(@Nonnull ConfigurationSource conf,
                            @Nonnull ContainerSet containerSet,
                            @Nonnull ContainerController controller,
-                           @Nonnull MutableVolumeSet volumeSet) {
+                           @Nonnull MutableVolumeSet volumeSet,
+                           @Nonnull ReplicationSupervisor supervisor) {
     this.containerSet = containerSet;
     this.controller = controller;
     this.volumeSet = volumeSet;
+    this.replicationSupervisor = supervisor;
     try {
       volumeChoosingPolicy = VolumeChoosingPolicyFactory.getPolicy(conf);
     } catch (Exception e) {
@@ -147,9 +150,21 @@ public class ContainerImporter {
 
   HddsVolume chooseNextVolume() throws IOException {
     // Choose volume that can hold both container in tmp and dest directory
-    return volumeChoosingPolicy.chooseVolume(
-        StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList()),
-        containerSize * 2);
+    List<HddsVolume> hddsVolumes =
+        StorageVolumeUtil.getHddsVolumesList(volumeSet.getVolumesList());
+    List<HddsVolume> nonBusyVolumes = hddsVolumes.stream()
+        .filter(v -> replicationSupervisor
+            .getInFlightReplications(v.getVolumeRootDir()) == 0)
+        .collect(java.util.stream.Collectors.toList());
+
+    if (!nonBusyVolumes.isEmpty()) {
+      try {
+        return volumeChoosingPolicy.chooseVolume(nonBusyVolumes, containerSize * 2);
+      } catch (IOException e) {
+        LOG.debug("Failed to choose from non-busy volumes, falling back to all volumes.", e);
+      }
+    }
+    return volumeChoosingPolicy.chooseVolume(hddsVolumes, containerSize * 2);
   }
 
   public static Path getUntarDirectory(HddsVolume hddsVolume)

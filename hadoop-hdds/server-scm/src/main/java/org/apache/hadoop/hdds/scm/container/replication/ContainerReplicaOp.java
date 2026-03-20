@@ -18,6 +18,7 @@
 package org.apache.hadoop.hdds.scm.container.replication;
 
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
+import org.apache.hadoop.ozone.protocol.commands.SCMCommand;
 
 /**
  * Class to wrap details used to track pending replications.
@@ -35,6 +36,9 @@ public class ContainerReplicaOp {
   private final DatanodeDetails target;
   private final int replicaIndex;
   private final long deadlineEpochMillis;
+  private final long containerSize;
+  private final SCMCommand<?> command;
+  private final DatanodeDetails decommissionSource;
 
   public static ContainerReplicaOp create(PendingOpType opType,
       DatanodeDetails target, int replicaIndex) {
@@ -43,11 +47,21 @@ public class ContainerReplicaOp {
   }
 
   public ContainerReplicaOp(PendingOpType opType,
-      DatanodeDetails target, int replicaIndex, long deadlineEpochMillis) {
+      DatanodeDetails target, int replicaIndex, SCMCommand<?> command,
+      long deadlineEpochMillis, long containerSize,
+      DatanodeDetails decommissionSource) {
     this.opType = opType;
     this.target = target;
     this.replicaIndex = replicaIndex;
+    this.command = command;
     this.deadlineEpochMillis = deadlineEpochMillis;
+    this.containerSize = containerSize;
+    this.decommissionSource = decommissionSource;
+  }
+
+  public ContainerReplicaOp(PendingOpType opType,
+      DatanodeDetails target, int replicaIndex, long deadlineEpochMillis) {
+    this(opType, target, replicaIndex, null, deadlineEpochMillis, 0, null);
   }
 
   public PendingOpType getOpType() {
@@ -64,6 +78,18 @@ public class ContainerReplicaOp {
 
   public long getDeadlineEpochMillis() {
     return deadlineEpochMillis;
+  }
+
+  public long getContainerSize() {
+    return containerSize;
+  }
+
+  public SCMCommand<?> getCommand() {
+    return command;
+  }
+
+  public DatanodeDetails getDecommissionSource() {
+    return decommissionSource;
   }
 
 }

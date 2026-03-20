@@ -55,6 +55,7 @@ import static org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProt
 import static org.apache.hadoop.hdds.scm.exceptions.SCMException.ResultCodes.FAILED_TO_FIND_SUITABLE_NODE;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
+import static org.mockito.Mockito.anyLong;
 import static org.mockito.Mockito.anyList;
 import static org.mockito.Mockito.anyBoolean;
 import static org.mockito.Mockito.doAnswer;
@@ -396,7 +397,7 @@ public final class ReplicationTestUtil {
       commandsSent.add(Pair.of(sources.get(0), command));
       return null;
     }).when(mock).sendThrottledReplicationCommand(
-        any(ContainerInfo.class), anyList(), any(DatanodeDetails.class), anyInt());
+        any(ContainerInfo.class), anyList(), any(DatanodeDetails.class), anyInt(), any());
   }
 
   /**
@@ -422,7 +423,7 @@ public final class ReplicationTestUtil {
       ReconstructECContainersCommand cmd = invocationOnMock.getArgument(1);
       commandsSent.add(Pair.of(cmd.getTargetDatanodes().get(0), cmd));
       return null;
-    }).when(mock).sendThrottledReconstructionCommand(any(ContainerInfo.class), any());
+    }).when(mock).sendThrottledReconstructionCommand(any(ContainerInfo.class), any(), any());
   }
 
   /**
@@ -440,7 +441,7 @@ public final class ReplicationTestUtil {
       SCMCommand<?> command = invocationOnMock.getArgument(0);
       commandsSent.add(Pair.of(target, command));
       return null;
-    }).when(mock).sendDatanodeCommand(any(), any(), any());
+    }).when(mock).sendDatanodeCommand(any(), any(), any(), anyLong(), any());
   }
 
   /**
