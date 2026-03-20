@@ -190,13 +190,12 @@
               </transformers>
               <relocations>
                 <relocation>
-                  <pattern>org</pattern>
-                  <shadedPattern>${ozone.shaded.prefix}.org</shadedPattern>
+                  <pattern>org.</pattern>
+                  <shadedPattern>${ozone.shaded.prefix}.org.</shadedPattern>
                   <excludes>
                     <exclude>org.apache.hadoop.**</exclude>
                     <exclude>org.apache.log4j.**</exclude>
                     <exclude>org.apache.ozone.**</exclude>
-                    <exclude>org.apache.ratis.**</exclude>
                     <!-- These packages are the ones that are not shaded in the hadoop release package.
                       To prevent conflicts, we do not include these packages in the ozone client release package.
                       Ozone will use hadoop / JVM to provide these dependencies. -->
@@ -208,10 +207,6 @@
                     <exclude>org.xml.sax.**</exclude>
                     <exclude>org.wildfly.**</exclude>
                   </excludes>
-                </relocation>
-                <relocation>
-                  <pattern>org.apache.ratis</pattern>
-                  <shadedPattern>${ozone.shaded.prefix}.org.apache.ratis</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>com</pattern>
@@ -233,24 +228,24 @@
                   <shadedPattern>${ozone.shaded.prefix}.google.</shadedPattern>
                 </relocation>
                 <relocation>
-                  <pattern>net.jcip</pattern>
-                  <shadedPattern>${ozone.shaded.prefix}.net.jcip</shadedPattern>
+                  <pattern>net.jcip.</pattern>
+                  <shadedPattern>${ozone.shaded.prefix}.net.jcip.</shadedPattern>
                 </relocation>
                 <relocation>
-                  <pattern>javassist</pattern>
-                  <shadedPattern>${ozone.shaded.prefix}.javassist</shadedPattern>
+                  <pattern>javassist.</pattern>
+                  <shadedPattern>${ozone.shaded.prefix}.javassist.</shadedPattern>
                 </relocation>
                 <relocation>
-                  <pattern>javax.xml.bind</pattern>
-                  <shadedPattern>${ozone.shaded.prefix}.javax.xml.bind</shadedPattern>
+                  <pattern>javax.xml.bind.</pattern>
+                  <shadedPattern>${ozone.shaded.prefix}.javax.xml.bind.</shadedPattern>
                 </relocation>
                 <relocation>
-                  <pattern>javax.activation</pattern>
-                  <shadedPattern>${ozone.shaded.prefix}.javax.activation</shadedPattern>
+                  <pattern>javax.activation.</pattern>
+                  <shadedPattern>${ozone.shaded.prefix}.javax.activation.</shadedPattern>
                 </relocation>
                 <relocation>
-                  <pattern>jakarta.annotation</pattern>
-                  <shadedPattern>${ozone.shaded.prefix}.jakarta.annotation</shadedPattern>
+                  <pattern>jakarta.annotation.</pattern>
+                  <shadedPattern>${ozone.shaded.prefix}.jakarta.annotation.</shadedPattern>
                 </relocation>
                 <relocation>
                   <pattern>kotlin.</pattern>
@@ -286,12 +281,12 @@
 
                 <!-- handling some special packages with special names -->
                 <relocation>
-                  <pattern>okio</pattern>
-                  <shadedPattern>${ozone.shaded.prefix}.okio</shadedPattern>
+                  <pattern>okio.</pattern>
+                  <shadedPattern>${ozone.shaded.prefix}.okio.</shadedPattern>
                 </relocation>
                 <relocation>
-                  <pattern>okhttp3</pattern>
-                  <shadedPattern>${ozone.shaded.prefix}.okhttp3</shadedPattern>
+                  <pattern>okhttp3.</pattern>
+                  <shadedPattern>${ozone.shaded.prefix}.okhttp3.</shadedPattern>
                 </relocation>
               </relocations>
             </configuration>
