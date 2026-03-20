@@ -157,8 +157,8 @@ public class QuasiClosedStuckReplicaCount {
           misReplicatedOrigins.add(new MisReplicatedOrigin(entry.getValue(), additionalReplicas));
         }
       } else {
-        if (inService.size() < bestOriginCopies) {
-          int additionalReplicas = bestOriginCopies - inService.size();
+        if (inService.size() < 3) {
+          int additionalReplicas = 3 - inService.size();
           misReplicatedOrigins.add(new MisReplicatedOrigin(entry.getValue(), additionalReplicas));
         }
       }
@@ -188,7 +188,7 @@ public class QuasiClosedStuckReplicaCount {
 
   /**
    * Returns True is the container is over-replicated. This means that if we have a single origin, there are more than
-   * bestOrigin copies. If we have multiple origins, there are more than target copies of each origin.
+   * 3 copies. If we have multiple origins, there are more than target copies of each origin.
    * The over replication check ignore maintenance replicas. The container may become over replicated when maintenance
    * ends.
    *
@@ -199,12 +199,12 @@ public class QuasiClosedStuckReplicaCount {
   }
 
   public List<MisReplicatedOrigin> getOverReplicatedOrigins() {
-    // If there is only a single origin, we expect bestOriginCopies copies.
+    // If there is only a single origin, we expect 3 copies.
     if (replicasByOrigin.size() == 1) {
       final DatanodeID origin = replicasByOrigin.keySet().iterator().next();
       final Set<ContainerReplica> inService = getInService(origin);
-      if (inService.size() > bestOriginCopies) {
-        return Collections.singletonList(new MisReplicatedOrigin(inService, inService.size() - bestOriginCopies));
+      if (inService.size() > 3) {
+        return Collections.singletonList(new MisReplicatedOrigin(inService, inService.size() - 3));
       }
       return Collections.emptyList();
     }

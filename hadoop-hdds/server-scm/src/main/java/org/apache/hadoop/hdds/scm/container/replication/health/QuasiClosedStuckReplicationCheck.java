@@ -54,11 +54,8 @@ public class QuasiClosedStuckReplicationCheck  extends AbstractCheck {
     if (!QuasiClosedContainerHandler.isQuasiClosedStuck(containerInfo, replicas)) {
       return false;
     }
-    long distinctOrigins = replicas.stream()
-        .map(ContainerReplica::getOriginDatanodeId)
-        .distinct()
-        .count();
-    if (distinctOrigins == 1) {
+    QuasiClosedStuckReplicaCount replicaCount = new QuasiClosedStuckReplicaCount(replicas, 0, 3, 2);
+    if (replicaCount.availableOrigins() == 1) {
       // This is the 3 copies of a single origin case, so allow it to be handled via the normal under-replicated
       // handler.
       return false;
