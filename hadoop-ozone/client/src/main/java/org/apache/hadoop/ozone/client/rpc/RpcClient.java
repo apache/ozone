@@ -126,7 +126,6 @@ import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
-import org.apache.hadoop.ozone.client.protocol.ListStatusLightOptions;
 import org.apache.hadoop.ozone.om.OmConfig;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.AssumeRoleResponseInfo;
@@ -2304,21 +2303,16 @@ public class RpcClient implements ClientProtocol {
   }
 
   @Override
-  public List<OzoneFileStatusLight> listStatusLight(ListStatusLightOptions options)
-      throws IOException {
-    OmKeyArgs keyArgs = prepareOmKeyArgs(options.getVolumeName(),
-        options.getBucketName(), options.getKeyName());
-    if (options.getListPrefix() != null && !options.getListPrefix().isEmpty()) {
-      keyArgs = keyArgs.toBuilder().setListPrefix(options.getListPrefix()).build();
-    }
+  public List<OzoneFileStatusLight> listStatusLight(String volumeName,
+      String bucketName, String keyName, boolean recursive, String startKey,
+      long numEntries, boolean allowPartialPrefixes) throws IOException {
+    OmKeyArgs keyArgs = prepareOmKeyArgs(volumeName, bucketName, keyName);
     if (omVersion.compareTo(OzoneManagerVersion.LIGHTWEIGHT_LIST_STATUS) >= 0) {
-      return ozoneManagerClient.listStatusLight(
-          keyArgs, options.isRecursive(), options.getStartKey(), options.getNumEntries(),
-          options.isAllowPartialPrefixes());
+      return ozoneManagerClient.listStatusLight(keyArgs, recursive, startKey,
+          numEntries, allowPartialPrefixes);
     } else {
-      return ozoneManagerClient.listStatus(
-          keyArgs, options.isRecursive(), options.getStartKey(), options.getNumEntries(),
-              options.isAllowPartialPrefixes())
+      return ozoneManagerClient.listStatus(keyArgs, recursive, startKey,
+              numEntries, allowPartialPrefixes)
           .stream()
           .map(OzoneFileStatusLight::fromOzoneFileStatus)
           .collect(Collectors.toList());

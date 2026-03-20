@@ -51,7 +51,6 @@ import org.apache.hadoop.ozone.client.io.OzoneDataStreamOutput;
 import org.apache.hadoop.ozone.client.io.OzoneInputStream;
 import org.apache.hadoop.ozone.client.io.OzoneOutputStream;
 import org.apache.hadoop.ozone.client.protocol.ClientProtocol;
-import org.apache.hadoop.ozone.client.protocol.ListStatusLightOptions;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.helpers.BasicOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
@@ -1433,22 +1432,13 @@ public class OzoneBucket extends WithMetadata {
         }
       }
 
-      // 2. Get immediate children by listStatusLight method
-      // When delimiterKeyPrefix is "" (root listing), pass getKeyPrefix() as listPrefix
-      // for STS auth so OM checks LIST on that prefix instead of "*".
-      final String listPrefix = (delimiterKeyPrefix.isEmpty() && !getKeyPrefix().isEmpty())
-          ? getKeyPrefix() : null;
+      // 2. Get immediate children by listStatusLight method.
+      // Reuse keyName for root listings with non-empty keyPrefix so STS auth
+      // can evaluate LIST on that prefix.
+      final String requestKeyName = (delimiterKeyPrefix.isEmpty() && !getKeyPrefix().isEmpty())
+          ? getKeyPrefix() : delimiterKeyPrefix;
       final List<OzoneFileStatusLight> statuses = proxy.listStatusLight(
-          ListStatusLightOptions.builder()
-              .setVolumeName(volumeName)
-              .setBucketName(name)
-              .setKeyName(delimiterKeyPrefix)
-              .setRecursive(false)
-              .setStartKey(startKey)
-              .setNumEntries(listCacheSize)
-              .setAllowPartialPrefixes(false)
-              .setListPrefix(listPrefix)
-              .build());
+          volumeName, name, requestKeyName, false, startKey, listCacheSize, false);
 
       if (addedKeyPrefix && !statuses.isEmpty()) {
         // previous round already include the startKey, so remove it
@@ -1687,21 +1677,12 @@ public class OzoneBucket extends WithMetadata {
       }
 
       // 2. Get immediate children by listStatus method.
-      // When delimiterKeyPrefix is "" (root listing), pass getKeyPrefix() as listPrefix
-      // for STS auth so OM checks LIST on that prefix instead of "*".
-      String listPrefix = (getDelimiterKeyPrefix().isEmpty() && !getKeyPrefix().isEmpty())
-          ? getKeyPrefix() : null;
-      List<OzoneFileStatusLight> statuses = proxy.listStatusLight(
-          ListStatusLightOptions.builder()
-              .setVolumeName(volumeName)
-              .setBucketName(name)
-              .setKeyName(getDelimiterKeyPrefix())
-              .setRecursive(false)
-              .setStartKey(startKey)
-              .setNumEntries(listCacheSize)
-              .setAllowPartialPrefixes(false)
-              .setListPrefix(listPrefix)
-              .build());
+      // Reuse keyName for root listings with non-empty keyPrefix so STS auth
+      // can evaluate LIST on that prefix.
+      final String requestKeyName = (getDelimiterKeyPrefix().isEmpty() && !getKeyPrefix().isEmpty())
+          ? getKeyPrefix() : getDelimiterKeyPrefix();
+      final List<OzoneFileStatusLight> statuses = proxy.listStatusLight(
+          volumeName, name, requestKeyName, false, startKey, listCacheSize, false);
 
       if (!statuses.isEmpty()) {
         // If findFirstStartKey is false, indicates that the keyPrefix is an

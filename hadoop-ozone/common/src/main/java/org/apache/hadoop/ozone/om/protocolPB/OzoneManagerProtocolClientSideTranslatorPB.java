@@ -2370,7 +2370,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .build();
 
     ListStatusRequest.Builder listStatusRequestBuilder = createListStatusRequestBuilder(keyArgs, recursive, startKey,
-        numEntries, allowPartialPrefixes, null);
+        numEntries, allowPartialPrefixes);
 
     OMRequest omRequest = createOMRequest(Type.ListStatus)
         .setListStatusRequest(listStatusRequestBuilder.build())
@@ -2399,7 +2399,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
         .build();
 
     ListStatusRequest.Builder listStatusRequestBuilder = createListStatusRequestBuilder(keyArgs, recursive, startKey,
-        numEntries, allowPartialPrefixes, args.getListPrefix());
+        numEntries, allowPartialPrefixes);
 
     OMRequest omRequest = createOMRequest(Type.ListStatusLight)
         .setListStatusRequest(listStatusRequestBuilder.build())
@@ -2417,7 +2417,7 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
   }
 
   private ListStatusRequest.Builder createListStatusRequestBuilder(KeyArgs keyArgs, boolean recursive, String startKey,
-      long numEntries, boolean allowPartialPrefixes, String listPrefix) {
+      long numEntries, boolean allowPartialPrefixes) {
     ListStatusRequest.Builder listStatusRequestBuilder =
         ListStatusRequest.newBuilder()
             .setKeyArgs(keyArgs)
@@ -2432,9 +2432,6 @@ public final class OzoneManagerProtocolClientSideTranslatorPB
 
     if (allowPartialPrefixes) {
       listStatusRequestBuilder.setAllowPartialPrefix(allowPartialPrefixes);
-    }
-    if (listPrefix != null && !listPrefix.isEmpty()) {
-      listStatusRequestBuilder.setListPrefix(listPrefix);
     }
     return listStatusRequestBuilder;
   }

@@ -1250,17 +1250,14 @@ public class OzoneManagerRequestHandler implements RequestHandler {
   private ListStatusLightResponse listStatusLight(
       ListStatusRequest request, int clientVersion) throws IOException {
     KeyArgs keyArgs = request.getKeyArgs();
-    OmKeyArgs.Builder omKeyArgsBuilder = new OmKeyArgs.Builder()
+    OmKeyArgs omKeyArgs = new OmKeyArgs.Builder()
         .setVolumeName(keyArgs.getVolumeName())
         .setBucketName(keyArgs.getBucketName())
         .setKeyName(keyArgs.getKeyName())
         .setSortDatanodesInPipeline(false)
         .setLatestVersionLocation(true)
-        .setHeadOp(keyArgs.getHeadOp());
-    if (request.hasListPrefix() && !request.getListPrefix().isEmpty()) {
-      omKeyArgsBuilder.setListPrefix(request.getListPrefix());
-    }
-    OmKeyArgs omKeyArgs = omKeyArgsBuilder.build();
+        .setHeadOp(keyArgs.getHeadOp())
+        .build();
     boolean allowPartialPrefixes =
         request.hasAllowPartialPrefix() && request.getAllowPartialPrefix();
     List<OzoneFileStatusLight> statuses =

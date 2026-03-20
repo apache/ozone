@@ -1003,16 +1003,6 @@ public interface ClientProtocol {
   /**
    * Lightweight listStatus API.
    *
-   * @param options Encapsulates volume, bucket, key, recursive, startKey,
-   *                numEntries, allowPartialPrefixes, and optional listPrefix.
-   * @return list of file status
-   */
-  List<OzoneFileStatusLight> listStatusLight(ListStatusLightOptions options)
-      throws IOException;
-
-  /**
-   * Lightweight listStatus API (convenience overload without listPrefix).
-   *
    * @param volumeName Volume name
    * @param bucketName Bucket name
    * @param keyName    Absolute path of the entry to be listed
@@ -1025,12 +1015,9 @@ public interface ClientProtocol {
    *                             this is needed in context of ListKeys
    * @return list of file status
    */
-  default List<OzoneFileStatusLight> listStatusLight(String volumeName,
+  List<OzoneFileStatusLight> listStatusLight(String volumeName,
       String bucketName, String keyName, boolean recursive, String startKey,
-      long numEntries, boolean allowPartialPrefixes) throws IOException {
-    return listStatusLight(ListStatusLightOptions.of(volumeName, bucketName,
-        keyName, recursive, startKey, numEntries, allowPartialPrefixes));
-  }
+      long numEntries, boolean allowPartialPrefixes) throws IOException;
 
   /**
    * Add acl for Ozone object. Return true if acl is added successfully else

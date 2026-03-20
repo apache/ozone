@@ -61,9 +61,6 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
   // This allows a key to be created an committed atomically if the original has not
   // been modified.
   private Long expectedDataGeneration = null;
-  // Original S3/list prefix when keyName is empty (root listing). Used for STS
-  // auth to check LIST on this prefix instead of "*".
-  private final String listPrefix;
 
   private OmKeyArgs(Builder b) {
     super(b);
@@ -85,7 +82,6 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     this.ownerName = b.ownerName;
     this.tags = b.tags.build();
     this.expectedDataGeneration = b.expectedDataGeneration;
-    this.listPrefix = b.listPrefix;
   }
 
   public boolean getIsMultipartKey() {
@@ -168,14 +164,6 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     return expectedDataGeneration;
   }
 
-  /**
-   * Original S3/list prefix when keyName is empty (root listing).
-   * Used for STS auth to check LIST on this prefix instead of "*".
-   */
-  public String getListPrefix() {
-    return listPrefix;
-  }
-
   @Override
   public Map<String, String> toAuditMap() {
     Map<String, String> auditMap = new LinkedHashMap<>();
@@ -246,7 +234,6 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
     private boolean forceUpdateContainerCacheFromSCM;
     private final MapBuilder<String, String> tags;
     private Long expectedDataGeneration = null;
-    private String listPrefix = null;
 
     public Builder() {
       this(AclListBuilder.empty());
@@ -278,7 +265,6 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
       this.expectedDataGeneration = obj.expectedDataGeneration;
       this.tags = MapBuilder.of(obj.tags);
       this.acls = AclListBuilder.of(obj.acls);
-      this.listPrefix = obj.listPrefix;
     }
 
     public Builder setVolumeName(String volume) {
@@ -409,11 +395,6 @@ public final class OmKeyArgs extends WithMetadata implements Auditable {
 
     public Builder setExpectedDataGeneration(long generation) {
       this.expectedDataGeneration = generation;
-      return this;
-    }
-
-    public Builder setListPrefix(String prefix) {
-      this.listPrefix = prefix;
       return this;
     }
 
