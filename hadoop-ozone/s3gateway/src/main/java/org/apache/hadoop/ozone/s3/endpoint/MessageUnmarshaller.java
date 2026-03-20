@@ -53,7 +53,6 @@ public class MessageUnmarshaller<T> implements MessageBodyReader<T> {
     try {
       context = JAXBContext.newInstance(cls);
       saxParserFactory = XMLUtils.newSecureSAXParserFactory();
-      saxParserFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
     } catch (Exception ex) {
       throw new AssertionError("Can not instantiate XML parser for " + cls.getSimpleName(), ex);
     }

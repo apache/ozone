@@ -176,7 +176,6 @@ public final class NodeSchemaLoader {
     LOG.info("Loading network topology layer schema file");
     // Read and parse the schema file.
     DocumentBuilderFactory dbf = XMLUtils.newSecureDocumentBuilderFactory();
-    dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
     dbf.setIgnoringComments(true);
     DocumentBuilder builder = dbf.newDocumentBuilder();
     Document doc = builder.parse(inputStream);

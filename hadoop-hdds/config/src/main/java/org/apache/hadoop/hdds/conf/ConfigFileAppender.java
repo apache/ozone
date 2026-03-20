@@ -50,7 +50,6 @@ public class ConfigFileAppender {
   public ConfigFileAppender() {
     try {
       DocumentBuilderFactory factory = XMLUtils.newSecureDocumentBuilderFactory();
-      factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
       builder = factory.newDocumentBuilder();
     } catch (Exception ex) {
       throw new ConfigurationException("Can initialize new configuration", ex);
@@ -115,7 +114,6 @@ public class ConfigFileAppender {
   public void write(Writer writer) {
     try {
       TransformerFactory factory = XMLUtils.newSecureTransformerFactory();
-      factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
       Transformer transformer = factory.newTransformer();
 
       transformer.setOutputProperty(OutputKeys.ENCODING,
