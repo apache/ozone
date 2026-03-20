@@ -57,22 +57,22 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * Verifies that ReconTaskControllerImpl.reInitializeTasks() correctly replaces
- * the registered task with the staged task (via reconOmTasks.putAll(stagedTaskMap))
- * so that subsequent delta events use the fresh in-memory state from reprocess().
+ * Verifies that ReconTaskControllerImpl.reInitializeTasks() correctly refreshes
+ * the in-memory state of the registered task via {@link ReconOmTask#init()} after
+ * the staged DB is swapped in, so that subsequent delta events use the up-to-date
+ * base count from reprocess().
  *
  * <p>This test exercises the production code path through
- * {@link ReconTaskControllerImpl#reInitializeTasks} and will FAIL without the fix
- * that adds {@code reconOmTasks.putAll(stagedTaskMap)} after a successful reinit.
+ * {@link ReconTaskControllerImpl#reInitializeTasks} and will FAIL without the call
+ * to {@code ReconOmTask.init()} on each registered task after a successful reinit.
  *
- * <p>Two properties are validated:
+ * <p>The flow under test:
  * <ol>
- *   <li><b>Reference change</b>: after reinit the task stored in reconOmTasks must be
- *       the staged task (a new object), not the original. Fails if putAll is absent.</li>
- *   <li><b>Correct incremental count</b>: the staged task has a fresh objectCountMap
- *       (from its reprocess()), so a subsequent delta PUT produces the right total.
- *       Without the fix the original task's stale map (base=5) produces 5+1=6 instead
- *       of the correct 8+1=9.</li>
+ *   <li>The staged task runs {@code reprocess()}, writing count=8 to the staged DB.</li>
+ *   <li>{@code replaceStagedDb()} swaps the staged DB in as the live DB.</li>
+ *   <li>{@code reconGlobalStatsManager.reinitialize()} points the manager at the new DB.</li>
+ *   <li>{@code init()} is called on the original (registered) task, which reloads
+ *       {@code objectCountMap} from the now-updated DB (base=8).</li>
  * </ol>
  */
 public class TestOmTableInsightTaskStaleCounterAfterReinit extends AbstractReconSqlDBTest {
@@ -141,17 +141,19 @@ public class TestOmTableInsightTaskStaleCounterAfterReinit extends AbstractRecon
    *
    *   Phase 2 — reInitializeTasks (3 more volumes added, total 8)
    *     getStagedTask() returns a new OmTableInsightTask (the "staged task")
-   *     stagedTask.reprocess() → objectCountMap = {volumeTableCount: 8}, writes 8 to DB
-   *     reconOmTasks.putAll(stagedTaskMap) → staged task replaces original  ← THE FIX
+   *     stagedTask.reprocess() → writes {volumeTableCount: 8} to the staged DB
+   *     replaceStagedDb() → staged DB becomes the live DB
+   *     reconGlobalStatsManager.reinitialize() → manager now reads from the new DB
+   *     originalTask.init() → reloads objectCountMap from DB → {volumeTableCount: 8}  ← THE FIX
    *     globalStatsTable DB = {volumeTableCount: 8}
    *
-   *   Phase 3 — delta PUT event via the task now in reconOmTasks
-   *     taskAfterReinit is the staged task (objectCountMap base = 8)
+   *   Phase 3 — delta PUT event routed through the (same) original task in reconOmTasks
+   *     originalTask.objectCountMap base = 8  (refreshed by init())
    *     8 + 1 = 9  → globalStatsTable DB = {volumeTableCount: 9}  ← CORRECT
    *
-   *   Without the fix:
-   *     reconOmTasks still holds the original task (objectCountMap base = 5)
-   *     assertNotSame fails  OR  5 + 1 = 6 ≠ 9  →  test fails
+   *   Without the fix (init() not called):
+   *     originalTask.objectCountMap is still stale (base = 5)
+   *     5 + 1 = 6 ≠ 9  →  test fails
    * </pre>
    */
   @Test
