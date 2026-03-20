@@ -105,7 +105,7 @@ public final class TracingUtil {
       // ignore and use the default value.
     }
     // Pass the config to parseSpanSamplingConfig to get spans to eb sampled.
-    Map<String, LoopSampler> spanMap = parseSpanSamplingConfig(spanSamplingConfig != null ? spanSamplingConfig : "");
+    Map<String, LoopSampler> spanMap = parseSpanSamplingConfig(spanSamplingConfig);
 
     Resource resource = Resource.create(Attributes.of(AttributeKey.stringKey("service.name"), serviceName));
     OtlpGrpcSpanExporter spanExporter = OtlpGrpcSpanExporter.builder()
