@@ -29,6 +29,7 @@ import org.apache.hadoop.hdds.upgrade.HDDSLayoutFeature;
 import org.apache.hadoop.hdds.upgrade.HDDSLayoutVersionManager;
 import org.apache.hadoop.hdds.utils.db.Table;
 import org.apache.hadoop.ozone.OzoneConsts;
+import org.apache.hadoop.ozone.upgrade.LayoutFeature;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,9 +66,8 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
 
   @Override
   public void finalizeLayoutFeatures(Integer toVersion) throws IOException {
-    int startLayoutVersion = versionManager.getMetadataLayoutVersion() + 1;
-    for (int version = startLayoutVersion; version <= toVersion; version++) {
-      finalizeLayoutFeatureLocal(version);
+    for (LayoutFeature feature : versionManager.unfinalizedFeatures()) {
+      finalizeLayoutFeatureLocal((HDDSLayoutFeature) feature);
     }
   }
 
@@ -75,7 +75,7 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
    * A version of finalizeLayoutFeature without the {@link Replicate}
    * annotation that can be called by followers to finalize from a snapshot.
    */
-  private void finalizeLayoutFeatureLocal(Integer layoutVersion)
+  private void finalizeLayoutFeatureLocal(HDDSLayoutFeature layoutFeature)
       throws IOException {
     checkpointLock.writeLock().lock();
     try {
@@ -83,14 +83,12 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
       // version. This is updated in the replicated finalization steps.
       // Layout version will be written to the DB as well so followers can
       // finalize from a snapshot.
-      if (versionManager.getMetadataLayoutVersion() >= layoutVersion) {
+      if (versionManager.getMetadataLayoutVersion() >= layoutFeature.layoutVersion()) {
         LOG.warn("Attempting to finalize layout feature for layout version {}, but " +
             "current metadata layout version is {}. Skipping finalization for this layout version.",
-            layoutVersion, versionManager.getMetadataLayoutVersion());
+            layoutFeature.layoutVersion(), versionManager.getMetadataLayoutVersion());
       } else {
-        HDDSLayoutFeature feature =
-            (HDDSLayoutFeature) versionManager.getFeature(layoutVersion);
-        upgradeFinalizer.replicatedFinalizationSteps(feature, upgradeContext);
+        upgradeFinalizer.replicatedFinalizationSteps(layoutFeature, upgradeContext);
       }
     } finally {
       checkpointLock.writeLock().unlock();
@@ -103,7 +101,7 @@ public class FinalizationStateManagerImpl implements FinalizationStateManager {
       versionManager.setUpgradeState(UpgradeFinalization.Status.FINALIZATION_DONE);
     }
     transactionBuffer.addToBuffer(finalizationStore,
-        OzoneConsts.LAYOUT_VERSION_KEY, String.valueOf(layoutVersion));
+        OzoneConsts.LAYOUT_VERSION_KEY, String.valueOf(layoutFeature.layoutVersion()));
   }
 
   /**
