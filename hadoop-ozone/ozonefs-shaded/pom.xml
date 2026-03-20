@@ -209,6 +209,9 @@
                   </excludes>
                 </relocation>
                 <relocation>
+                  <!-- TODO: pattern should be "com." (with trailing dot) to avoid unintended shading,
+                  but this causes intermittent Ratis gRPC client timeouts. Fix root cause first.
+                  See https://issues.apache.org/jira/browse/HDDS-14869 -->
                   <pattern>com</pattern>
                   <shadedPattern>${ozone.shaded.prefix}.com</shadedPattern>
                   <excludes>
