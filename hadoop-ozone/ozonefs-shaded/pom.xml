@@ -193,13 +193,12 @@
               </transformers>
               <relocations>
                 <relocation>
-                  <pattern>org</pattern>
-                  <shadedPattern>${shaded.prefix}.org</shadedPattern>
+                  <pattern>org.</pattern>
+                  <shadedPattern>${shaded.prefix}.org.</shadedPattern>
                   <excludes>
                     <exclude>org.apache.hadoop.**</exclude>
                     <exclude>org.apache.log4j.**</exclude>
                     <exclude>org.apache.ozone.**</exclude>
-                    <exclude>org.apache.ratis.**</exclude>
                     <!-- These packages are the ones that are not shaded in the hadoop release package.
                       To prevent conflicts, we do not include these packages in the ozone client release package.
                       Ozone will use hadoop / JVM to provide these dependencies. -->
@@ -213,10 +212,9 @@
                   </excludes>
                 </relocation>
                 <relocation>
-                  <pattern>org.apache.ratis</pattern>
-                  <shadedPattern>${shaded.prefix}.org.apache.ratis</shadedPattern>
-                </relocation>
-                <relocation>
+                  <!-- TODO: pattern should be "com." (with trailing dot) to avoid unintended shading,
+                  but this causes intermittent Ratis gRPC client timeouts. Fix root cause first.
+                  See https://issues.apache.org/jira/browse/HDDS-14869 -->
                   <pattern>com</pattern>
                   <shadedPattern>${shaded.prefix}.com</shadedPattern>
                   <excludes>
@@ -233,44 +231,44 @@
                   </excludes>
                 </relocation>
                 <relocation>
-                  <pattern>google</pattern>
-                  <shadedPattern>${shaded.prefix}.google</shadedPattern>
+                  <pattern>google.</pattern>
+                  <shadedPattern>${shaded.prefix}.google.</shadedPattern>
                 </relocation>
                 <relocation>
-                  <pattern>net.jcip</pattern>
-                  <shadedPattern>${shaded.prefix}.net.jcip</shadedPattern>
+                  <pattern>net.jcip.</pattern>
+                  <shadedPattern>${shaded.prefix}.net.jcip.</shadedPattern>
                 </relocation>
                 <relocation>
-                  <pattern>javassist</pattern>
-                  <shadedPattern>${shaded.prefix}.javassist</shadedPattern>
+                  <pattern>javassist.</pattern>
+                  <shadedPattern>${shaded.prefix}.javassist.</shadedPattern>
                 </relocation>
                 <relocation>
-                  <pattern>javax.xml.bind</pattern>
-                  <shadedPattern>${shaded.prefix}.javax.xml.bind</shadedPattern>
+                  <pattern>javax.xml.bind.</pattern>
+                  <shadedPattern>${shaded.prefix}.javax.xml.bind.</shadedPattern>
                 </relocation>
                 <relocation>
-                  <pattern>javax.activation</pattern>
-                  <shadedPattern>${shaded.prefix}.javax.activation</shadedPattern>
+                  <pattern>javax.activation.</pattern>
+                  <shadedPattern>${shaded.prefix}.javax.activation.</shadedPattern>
                 </relocation>
                 <relocation>
-                  <pattern>jakarta.annotation</pattern>
-                  <shadedPattern>${shaded.prefix}.jakarta.annotation</shadedPattern>
+                  <pattern>jakarta.annotation.</pattern>
+                  <shadedPattern>${shaded.prefix}.jakarta.annotation.</shadedPattern>
                 </relocation>
                 <relocation>
-                  <pattern>kotlin</pattern>
-                  <shadedPattern>${shaded.prefix}.kotlin</shadedPattern>
+                  <pattern>kotlin.</pattern>
+                  <shadedPattern>${shaded.prefix}.kotlin.</shadedPattern>
                 </relocation>
                 <relocation>
-                  <pattern>picocli</pattern>
-                  <shadedPattern>${shaded.prefix}.picocli</shadedPattern>
+                  <pattern>picocli.</pattern>
+                  <shadedPattern>${shaded.prefix}.picocli.</shadedPattern>
                 </relocation>
                 <relocation>
-                  <pattern>info</pattern>
-                  <shadedPattern>${shaded.prefix}.info</shadedPattern>
+                  <pattern>info.</pattern>
+                  <shadedPattern>${shaded.prefix}.info.</shadedPattern>
                 </relocation>
                 <relocation>
-                  <pattern>io</pattern>
-                  <shadedPattern>${shaded.prefix}.io</shadedPattern>
+                  <pattern>io.</pattern>
+                  <shadedPattern>${shaded.prefix}.io.</shadedPattern>
                   <excludes>
                     <exclude>io!netty!*</exclude>
                     <!-- Exclude config keys for Hadoop that look like package names -->
@@ -290,12 +288,12 @@
 
                 <!-- handling some special packages with special names -->
                 <relocation>
-                  <pattern>okio</pattern>
-                  <shadedPattern>${shaded.prefix}.okio</shadedPattern>
+                  <pattern>okio.</pattern>
+                  <shadedPattern>${shaded.prefix}.okio.</shadedPattern>
                 </relocation>
                 <relocation>
-                  <pattern>okhttp3</pattern>
-                  <shadedPattern>${shaded.prefix}.okhttp3</shadedPattern>
+                  <pattern>okhttp3.</pattern>
+                  <shadedPattern>${shaded.prefix}.okhttp3.</shadedPattern>
                 </relocation>
               </relocations>
             </configuration>
