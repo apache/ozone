@@ -52,6 +52,8 @@ public final class TracingUtil {
   private static final String OTEL_EXPORTER_OTLP_ENDPOINT_DEFAULT = "http://localhost:4317";
   private static final String OTEL_TRACES_SAMPLER_ARG = "OTEL_TRACES_SAMPLER_ARG";
   private static final double OTEL_TRACES_SAMPLER_RATIO_DEFAULT = 1.0;
+  private static final String OTEL_SPAN_SAMPLING = "OTEL_SPAN_SAMPLING";
+  private static final String OTEL_TRACES_SAMPLER_CONFIG_DEFAULT = "";
 
   private static volatile boolean isInit = false;
   private static Tracer tracer = OpenTelemetry.noop().getTracer("noop");
@@ -69,7 +71,7 @@ public final class TracingUtil {
     }
 
     try {
-      initialize(serviceName);
+      initialize(serviceName, conf);
       isInit = true;
       LOG.info("Initialized tracing service: {}", serviceName);
     } catch (Exception e) {
@@ -77,7 +79,7 @@ public final class TracingUtil {
     }
   }
 
-  private static void initialize(String serviceName) {
+  private static void initialize(String serviceName, ConfigurationSource conf) {
     String otelEndPoint = System.getenv(OTEL_EXPORTER_OTLP_ENDPOINT);
     if (otelEndPoint == null || otelEndPoint.isEmpty()) {
       otelEndPoint = OTEL_EXPORTER_OTLP_ENDPOINT_DEFAULT;
@@ -93,16 +95,39 @@ public final class TracingUtil {
       // ignore and use the default value.
     }
 
+    String spanSamplingConfig = OTEL_TRACES_SAMPLER_CONFIG_DEFAULT;
+    try {
+      String spanStrConfig = System.getenv(OTEL_SPAN_SAMPLING);
+      if (spanStrConfig != null && !spanStrConfig.isEmpty()) {
+        spanSamplingConfig = spanStrConfig;
+      }
+    } catch (Exception ex) {
+      // ignore and use the default value.
+    }
+    // Pass the config to parseSpanSamplingConfig to get spans to eb sampled.
+    Map<String, LoopSampler> spanMap = parseSpanSamplingConfig(spanSamplingConfig != null ? spanSamplingConfig : "");
+
     Resource resource = Resource.create(Attributes.of(AttributeKey.stringKey("service.name"), serviceName));
     OtlpGrpcSpanExporter spanExporter = OtlpGrpcSpanExporter.builder()
         .setEndpoint(otelEndPoint)
         .build();
 
     SimpleSpanProcessor spanProcessor = SimpleSpanProcessor.builder(spanExporter).build();
+
+    // Choose sampler based on span sampling config. If it is empty use trace based sampling only.
+    // else use custom SpanSampler.
+    Sampler sampler;
+    if (spanMap.isEmpty()) {
+      sampler = Sampler.traceIdRatioBased(samplerRatio);
+    } else {
+      Sampler rootSampler = Sampler.traceIdRatioBased(samplerRatio);
+      sampler = new SpanSampler(rootSampler, spanMap);
+    }
+
     SdkTracerProvider tracerProvider = SdkTracerProvider.builder()
         .addSpanProcessor(spanProcessor)
         .setResource(resource)
-        .setSampler(Sampler.traceIdRatioBased(samplerRatio))
+        .setSampler(sampler)
         .build();
     OpenTelemetry openTelemetry = OpenTelemetrySdk.builder()
         .setTracerProvider(tracerProvider)
@@ -175,6 +200,41 @@ public final class TracingUtil {
     return conf.getBoolean(
         ScmConfigKeys.HDDS_TRACING_ENABLED,
         ScmConfigKeys.HDDS_TRACING_ENABLED_DEFAULT);
+  }
+
+  /** Function to parse span sampling config. The input is in thr form <span_name>:<sample_rate>.
+   * The sample rate must be a natural number (1,2,3). Any value other than that will LOG an error.
+   * */
+  private static Map<String, LoopSampler> parseSpanSamplingConfig(String configStr) {
+    Map<String, LoopSampler> result = new HashMap<>();
+    if (configStr == null || configStr.isEmpty()) {
+      return result;
+    }
+
+    for (String entry : configStr.split(",")) {
+      String trimmed = entry.trim();
+      int colon = trimmed.indexOf(':');
+      if (colon <= 0 || colon >= trimmed.length() - 1) {
+        continue;
+      }
+
+      String name = trimmed.substring(0, colon).trim();
+      String val = trimmed.substring(colon + 1).trim();
+
+      try {
+        // Long.parseLong strictly rejects decimals (throws NumberFormatException)
+        long interval = Long.parseLong(val);
+
+        // LoopSampler constructor strictly rejects <= 0 (throws IllegalArgumentException)
+        result.put(name, new LoopSampler(interval));
+
+      } catch (NumberFormatException e) {
+        LOG.error("Invalid ratio '{}' for span '{}': decimals not allowed", val, name);
+      } catch (IllegalArgumentException e) {
+        LOG.error("Invalid ratio '{}' for span '{}': {}", val, name, e.getMessage());
+      }
+    }
+    return result;
   }
 
   /**
@@ -255,6 +315,48 @@ public final class TracingUtil {
 
   public static Span getActiveSpan() {
     return Span.current();
+  }
+
+  /**
+   * Import a parent span context and make it current without creating a new span.
+   * When next span is created, it will use this context as parent.
+   *
+   * @param encodedParent Encoded parent span context
+   * @return A Scope that should be closed when done, or null if no valid parent
+   */
+  public static Scope importAndActivateContext(String encodedParent) {
+    if (encodedParent == null || encodedParent.isEmpty()) {
+      return null;
+    }
+
+    W3CTraceContextPropagator propagator = W3CTraceContextPropagator.getInstance();
+    Context extractedContext = propagator.extract(Context.current(), encodedParent, new TextExtractor());
+
+    if (Span.fromContext(extractedContext).getSpanContext().isValid()) {
+      return extractedContext.makeCurrent();
+    }
+
+    return null;
+  }
+
+  /**
+   * Execute the given runnable with the imported parent span context activated.
+   * This propagates the trace context to the current thread without creating
+   * a new span.
+   *
+   * @param encodedParent Encoded parent span context (can be null or empty)
+   * @param runnable The code to execute within the imported context
+   */
+  public static <E extends Exception> void executeWithImportedContext(
+      String encodedParent, CheckedRunnable<E> runnable) throws E {
+    Scope scope = importAndActivateContext(encodedParent);
+    try {
+      runnable.run();
+    } finally {
+      if (scope != null) {
+        scope.close();
+      }
+    }
   }
 
   /**

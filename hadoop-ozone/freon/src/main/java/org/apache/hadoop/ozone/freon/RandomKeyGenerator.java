@@ -311,8 +311,8 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
     if (validateWrites) {
       commonInitialMD = DigestUtils.getDigest(DIGEST_ALGORITHM);
       for (long nrRemaining = keySize.toBytes(); nrRemaining > 0;
-          nrRemaining -= bufferSize) {
-        int curSize = (int)Math.min(bufferSize, nrRemaining);
+           nrRemaining -= bufferSize) {
+        int curSize = (int) Math.min(bufferSize, nrRemaining);
         commonInitialMD.update(keyValueBuffer, 0, curSize);
       }
     }
@@ -333,8 +333,10 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
     LOG.info("validateWrites : {}", validateWrites);
     LOG.info("Number of Validate Threads: {}", numOfValidateThreads);
     LOG.info("cleanObjects : {}", cleanObjects);
+
+    String currentSpanContext = TracingUtil.exportCurrentSpan();
     for (int i = 0; i < numOfThreads; i++) {
-      executor.execute(new ObjectCreator());
+      executor.execute(new ObjectCreator(currentSpanContext));
     }
 
     ExecutorService validateExecutor = null;
@@ -360,7 +362,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
 
     // wait until all keys are added or exception occurred.
     while ((numberOfKeysAdded.get() != totalKeyCount)
-           && exception == null) {
+        && exception == null) {
       Thread.sleep(CHECK_INTERVAL_MILLIS);
     }
     executor.shutdown();
@@ -689,9 +691,9 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
     /**
      * Constructs a new ozone keyValidate.
      *
-     * @param bucket    bucket part
-     * @param keyName   key part
-     * @param digest    digest of this key's full value
+     * @param bucket  bucket part
+     * @param keyName key part
+     * @param digest  digest of this key's full value
      */
     KeyValidate(OzoneBucket bucket, String keyName, byte[] digest) {
       this.bucket = bucket;
@@ -701,28 +703,34 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
   }
 
   private class ObjectCreator implements Runnable {
+    private final String parentSpanContext;
+
+    ObjectCreator(String parentSpanContext) {
+      this.parentSpanContext = parentSpanContext;
+    }
+
     @Override
     public void run() {
-      int v;
-      while ((v = volumeCounter.getAndIncrement()) < numOfVolumes) {
-        if (!createVolume(v)) {
-          return;
+      TracingUtil.executeWithImportedContext(parentSpanContext, () -> {
+        int v;
+        while ((v = volumeCounter.getAndIncrement()) < numOfVolumes) {
+          if (!createVolume(v)) {
+            return;
+          }
         }
-      }
-
-      int b;
-      while ((b = bucketCounter.getAndIncrement()) < totalBucketCount) {
-        if (!createBucket(b)) {
-          return;
+        int b;
+        while ((b = bucketCounter.getAndIncrement()) < totalBucketCount) {
+          if (!createBucket(b)) {
+            return;
+          }
         }
-      }
-
-      long k;
-      while ((k = keyCounter.getAndIncrement()) < totalKeyCount) {
-        if (!createKey(k)) {
-          return;
+        long k;
+        while ((k = keyCounter.getAndIncrement()) < totalKeyCount) {
+          if (!createKey(k)) {
+            return;
+          }
         }
-      }
+      });
     }
   }
 
@@ -919,7 +927,7 @@ public final class RandomKeyGenerator implements Callable<Void>, FreonSubcommand
    * threads).
    *
    * @return may return null if this thread is interrupted, or if any other
-   *   thread encounters an exception (and stores it to {@code exception})
+   * thread encounters an exception (and stores it to {@code exception})
    */
   private <T> T waitUntilAddedToMap(Map<Integer, T> map, Integer i) {
     while (exception == null && !map.containsKey(i)) {
