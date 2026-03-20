@@ -246,18 +246,42 @@ public class StorageVolumeChecker {
 
     // Wait until our timeout elapses, after which we give up on
     // the remaining volumes.
-    if (!latch.await(maxAllowedTimeForCheckMs, TimeUnit.MILLISECONDS)) {
-      LOG.warn("checkAllVolumes timed out after {} ms",
-          maxAllowedTimeForCheckMs);
-    }
+    boolean completedOnTime =
+        latch.await(maxAllowedTimeForCheckMs, TimeUnit.MILLISECONDS);
 
     synchronized (this) {
-      // All volumes that have not been detected as healthy should be
-      // considered failed. This is a superset of 'failedVolumes'.
-      //
-      // Make a copy under the mutex as Sets.difference() returns a view
-      // of a potentially changing set.
-      return new HashSet<>(Sets.difference(allVolumes, healthyVolumes));
+      if (!completedOnTime) {
+        LOG.warn("checkAllVolumes timed out after {} ms."
+            + " Evaluating per-volume latch-timeout tolerance.",
+            maxAllowedTimeForCheckMs);
+      }
+
+      // Volumes that explicitly reported FAILED via check() are always
+      // returned — the IO-failure sliding window in StorageVolume.check()
+      // already applied its own tolerance.
+      final Set<StorageVolume> result = new HashSet<>(failedVolumes);
+
+      // Volumes that completed as healthy: reset their timeout counter so a
+      // single transient timeout does not combine with an unrelated future one.
+      for (StorageVolume v : healthyVolumes) {
+        v.resetTimeoutCount();
+      }
+
+      // Volumes still pending (neither healthy nor explicitly failed):
+      // these timed out. Apply per-volume consecutive-timeout tolerance.
+      final Set<StorageVolume> pendingVolumes =
+          new HashSet<>(Sets.difference(allVolumes,
+              Sets.union(healthyVolumes, failedVolumes)));
+
+      for (StorageVolume v : pendingVolumes) {
+        if (v.recordCheckTimeout()) {
+          // Tolerance exceeded — mark as failed.
+          result.add(v);
+        }
+        // else: within tolerance this round — omit from failed set.
+      }
+
+      return result;
     }
   }
 

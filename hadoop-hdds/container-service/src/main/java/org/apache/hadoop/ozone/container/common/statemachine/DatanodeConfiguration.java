@@ -61,6 +61,8 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   public static final String FAILED_DB_VOLUMES_TOLERATED_KEY = "hdds.datanode.failed.db.volumes.tolerated";
   public static final String DISK_CHECK_MIN_GAP_KEY = "hdds.datanode.disk.check.min.gap";
   public static final String DISK_CHECK_TIMEOUT_KEY = "hdds.datanode.disk.check.timeout";
+  public static final String DISK_CHECK_TIMEOUT_TOLERATED_KEY =
+      "hdds.datanode.disk.check.timeout.tolerated";
 
   // Minimum space should be left on volume.
   // Ex: If volume has 1000GB and minFreeSpace is configured as 10GB,
@@ -98,6 +100,12 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   static final Duration DISK_CHECK_MIN_GAP_DEFAULT = Duration.ofMinutes(10);
 
   static final Duration DISK_CHECK_TIMEOUT_DEFAULT = Duration.ofMinutes(10);
+
+  /**
+   * Default number of consecutive latch timeouts tolerated per volume before
+   * it is marked as failed. Value 0 restores the legacy zero-tolerance behavior.
+   */
+  public static final int DISK_CHECK_TIMEOUT_TOLERATED_DEFAULT = 1;
 
   static final boolean CONTAINER_SCHEMA_V3_ENABLED_DEFAULT = true;
   static final long ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT = 32 * 1024 * 1024;
@@ -404,6 +412,18 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   )
   private Duration diskCheckTimeout = DISK_CHECK_TIMEOUT_DEFAULT;
 
+  @Config(key = "hdds.datanode.disk.check.timeout.tolerated",
+      defaultValue = "1",
+      type = ConfigType.INT,
+      tags = { DATANODE },
+      description = "Number of consecutive checkAllVolumes latch timeouts"
+          + " that a single volume may accumulate before it is marked as"
+          + " FAILED. A timeout occurs when the volume's async health check"
+          + " does not complete within hdds.datanode.disk.check.timeout."
+          + " Minimum value is 1."
+  )
+  private int diskCheckTimeoutTolerated = DISK_CHECK_TIMEOUT_TOLERATED_DEFAULT;
+
   @Config(key = "hdds.datanode.chunk.data.validation.check",
       defaultValue = "false",
       type = ConfigType.BOOLEAN,
@@ -688,6 +708,13 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
       diskCheckTimeout = DISK_CHECK_TIMEOUT_DEFAULT;
     }
 
+    if (diskCheckTimeoutTolerated < 1) {
+      LOG.warn("{} must be >= 1 but was set to {}. Defaulting to {}",
+          DISK_CHECK_TIMEOUT_TOLERATED_KEY, diskCheckTimeoutTolerated,
+          DISK_CHECK_TIMEOUT_TOLERATED_DEFAULT);
+      diskCheckTimeoutTolerated = DISK_CHECK_TIMEOUT_TOLERATED_DEFAULT;
+    }
+
     if (blockDeleteCommandWorkerInterval.isNegative()) {
       LOG.warn(BLOCK_DELETE_COMMAND_WORKER_INTERVAL +
           " must be greater than zero and was set to {}. Defaulting to {}",
@@ -905,6 +932,14 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   public void setDiskCheckTimeout(Duration duration) {
     diskCheckTimeout = duration;
+  }
+
+  public int getDiskCheckTimeoutTolerated() {
+    return diskCheckTimeoutTolerated;
+  }
+
+  public void setDiskCheckTimeoutTolerated(int tolerance) {
+    this.diskCheckTimeoutTolerated = tolerance;
   }
 
   public int getBlockDeleteThreads() {

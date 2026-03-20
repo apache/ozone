@@ -19,6 +19,8 @@ package org.apache.hadoop.ozone.container.common.volume;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.nio.file.Path;
@@ -339,6 +341,82 @@ public class TestStorageVolumeHealthChecks {
     volume.format(CLUSTER_ID);
     volume.createTmpDirs(CLUSTER_ID);
     volume.check(false);
+  }
+
+  /**
+   * With the default tolerance of 1, the first simulated latch timeout must
+   * NOT increment the volume's counter beyond tolerance (counter = 1 which
+   * is not > 1), so {@code recordCheckTimeout()} returns false.
+   */
+  @ParameterizedTest
+  @MethodSource("volumeBuilders")
+  public void testFirstTimeoutIsTolerated(StorageVolume.Builder<?> builder)
+      throws Exception {
+    DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
+    dnConf.setDiskCheckTimeoutTolerated(1);
+    CONF.setFromObject(dnConf);
+    builder.conf(CONF);
+    StorageVolume volume = builder.build();
+    volume.format(CLUSTER_ID);
+    volume.createTmpDirs(CLUSTER_ID);
+
+    assertEquals(0, volume.getConsecutiveTimeoutCount());
+    // First simulated latch timeout: tolerance not exceeded.
+    assertFalse(volume.recordCheckTimeout(),
+        "First timeout should be tolerated");
+    assertEquals(1, volume.getConsecutiveTimeoutCount());
+  }
+
+  /**
+   * With tolerance = 1, the second consecutive latch timeout must cause
+   * {@code recordCheckTimeout()} to return true (counter = 2 > 1).
+   */
+  @ParameterizedTest
+  @MethodSource("volumeBuilders")
+  public void testSecondConsecutiveTimeoutFails(StorageVolume.Builder<?> builder)
+      throws Exception {
+    DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
+    dnConf.setDiskCheckTimeoutTolerated(1);
+    CONF.setFromObject(dnConf);
+    builder.conf(CONF);
+    StorageVolume volume = builder.build();
+    volume.format(CLUSTER_ID);
+    volume.createTmpDirs(CLUSTER_ID);
+
+    assertFalse(volume.recordCheckTimeout(), "First timeout should be tolerated");
+    assertTrue(volume.recordCheckTimeout(),
+        "Second consecutive timeout should exceed tolerance and return true");
+    assertEquals(2, volume.getConsecutiveTimeoutCount());
+  }
+
+  /**
+   * A successful healthy check resets the timeout counter so a subsequent
+   * single timeout is tolerated again (not combined with the earlier one).
+   */
+  @ParameterizedTest
+  @MethodSource("volumeBuilders")
+  public void testSuccessfulCheckResetsTimeoutCounter(StorageVolume.Builder<?> builder)
+      throws Exception {
+    DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
+    dnConf.setDiskCheckTimeoutTolerated(1);
+    CONF.setFromObject(dnConf);
+    builder.conf(CONF);
+    StorageVolume volume = builder.build();
+    volume.format(CLUSTER_ID);
+    volume.createTmpDirs(CLUSTER_ID);
+
+    // Simulate one tolerated timeout.
+    assertFalse(volume.recordCheckTimeout(), "First timeout should be tolerated");
+    assertEquals(1, volume.getConsecutiveTimeoutCount());
+
+    // Simulate a successful check round — counter must reset.
+    volume.resetTimeoutCount();
+    assertEquals(0, volume.getConsecutiveTimeoutCount());
+
+    // A new single timeout after reset is tolerated again.
+    assertFalse(volume.recordCheckTimeout(),
+        "Timeout after successful reset should be tolerated again");
+    assertEquals(1, volume.getConsecutiveTimeoutCount());
   }
 
   /**

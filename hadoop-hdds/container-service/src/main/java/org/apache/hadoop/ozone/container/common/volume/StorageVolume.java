@@ -113,6 +113,16 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
   private Queue<Boolean> ioTestSlidingWindow;
   private int healthCheckFileSize;
 
+  /*
+  Fields used to implement latch-timeout tolerance (Option C).
+  When checkAllVolumes() times out and this volume has not yet reported a
+  result, consecutiveTimeoutCount is incremented. The volume is only marked
+  FAILED by a timeout when consecutiveTimeoutCount > timeoutTolerance.
+  The counter is reset to 0 each time the volume completes a healthy check.
+   */
+  private final int timeoutTolerance;
+  private final AtomicInteger consecutiveTimeoutCount;
+
   /**
    * Type for StorageVolume.
    */
@@ -164,6 +174,8 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
       this.ioTestSlidingWindow = new LinkedList<>();
       this.currentIOFailureCount = new AtomicInteger(0);
       this.healthCheckFileSize = dnConf.getVolumeHealthCheckFileSize();
+      this.timeoutTolerance = dnConf.getDiskCheckTimeoutTolerated();
+      this.consecutiveTimeoutCount = new AtomicInteger(0);
     } else {
       storageDir = new File(b.volumeRootStr);
       volumeUsage = null;
@@ -174,6 +186,8 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
       this.ioFailureTolerance = 0;
       this.conf = null;
       this.dnConf = null;
+      this.timeoutTolerance = 0;
+      this.consecutiveTimeoutCount = new AtomicInteger(0);
     }
     this.storageDirStr = storageDir.getAbsolutePath();
   }
@@ -738,6 +752,52 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
     }
 
     return VolumeCheckResult.HEALTHY;
+  }
+
+  /**
+   * Called by {@link StorageVolumeChecker} when {@code checkAllVolumes()}
+   * latch times out and this volume has not yet reported a result.
+   *
+   * <p>Increments the consecutive latch-timeout counter. Returns {@code true}
+   * if the counter now exceeds the configured tolerance, meaning the volume
+   * should be added to the failed set. Returns {@code false} if the timeout
+   * is still within tolerance and the volume should be spared this round.
+   *
+   * @return true if the volume should be considered FAILED; false otherwise.
+   */
+  public synchronized boolean recordCheckTimeout() {
+    int count = consecutiveTimeoutCount.incrementAndGet();
+    if (count > timeoutTolerance) {
+      LOG.error("Volume {} has exceeded consecutive latch-timeout tolerance"
+              + " (count: {} > tolerance: {}). Marking FAILED.",
+          this, count, timeoutTolerance);
+      return true;
+    }
+    LOG.warn("Volume {} health check timed out (consecutive latch timeouts:"
+            + " {} / tolerance: {}). Disk I/O may be transiently saturated"
+            + " or a JVM GC burst may have contributed."
+            + " Volume will be failed if the next check also times out.",
+        this, count, timeoutTolerance);
+    return false;
+  }
+
+  /**
+   * Resets the consecutive latch-timeout counter to 0.
+   *
+   * <p>Called by {@link StorageVolumeChecker} when a volume completes a
+   * healthy check round, indicating the transient condition has resolved.
+   */
+  public synchronized void resetTimeoutCount() {
+    int prev = consecutiveTimeoutCount.getAndSet(0);
+    if (prev > 0 && LOG.isDebugEnabled()) {
+      LOG.debug("Volume {} completed healthy check. Consecutive"
+          + " latch-timeout counter reset from {} to 0.", this, prev);
+    }
+  }
+
+  @VisibleForTesting
+  public int getConsecutiveTimeoutCount() {
+    return consecutiveTimeoutCount.get();
   }
 
   @Override
