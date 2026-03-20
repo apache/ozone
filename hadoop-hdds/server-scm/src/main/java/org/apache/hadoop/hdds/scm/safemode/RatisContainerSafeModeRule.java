@@ -21,7 +21,9 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 import org.apache.ratis.util.Preconditions;
 
@@ -52,6 +54,21 @@ public class RatisContainerSafeModeRule extends AbstractContainerSafeModeRule {
       Preconditions.assertSame(1, minReplica, "minReplica");
       incrementContainersWithMinReplicas();
       getSafeModeMetrics().incCurrentContainersWithOneReplicaReportedCount();
+    } else {
+      // we received a container report that SCM was unaware of when it initialized
+      // check if the container state is closed/quasi-closed and if yes count it
+      try {
+        ContainerInfo containerInfo = getContainerManager().getContainer(containerID);
+        if (isClosed(containerInfo)) {
+          addContainer(containerInfo);
+          incrementContainersWithMinReplicas();
+          getClosedContainers().put(containerID, containerID);
+          getOpenContainers().remove(containerID);
+          getSafeModeMetrics().incCurrentContainersWithOneReplicaReportedCount();
+        }
+      } catch (ContainerNotFoundException cnfe) {
+        // log it
+      }
     }
   }
 

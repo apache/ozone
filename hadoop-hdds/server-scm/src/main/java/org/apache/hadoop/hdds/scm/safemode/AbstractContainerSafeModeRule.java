@@ -50,6 +50,8 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
   private final double safeModeCutoff;
   private final AtomicInteger totalContainers = new AtomicInteger();
   private final AtomicInteger containersWithMinReplicas = new AtomicInteger();
+  private final Map<ContainerID, ContainerID> openContainers = new ConcurrentHashMap<>();
+  private final Map<ContainerID, ContainerID> closedContainers = new ConcurrentHashMap<>();
 
   public AbstractContainerSafeModeRule(ConfigurationSource conf, SCMSafeModeManager safeModeManager,
       ContainerManager containerManager, EventQueue eventQueue) {
@@ -57,6 +59,18 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
     this.containerManager = containerManager;
     this.safeModeCutoff = getSafeModeCutoff(conf);
     initializeRule();
+  }
+
+  public ContainerManager getContainerManager() {
+    return containerManager;
+  }
+
+  public Map<ContainerID, ContainerID> getClosedContainers() {
+    return closedContainers;
+  }
+
+  public Map<ContainerID, ContainerID> getOpenContainers() {
+    return openContainers;
   }
 
   protected abstract ReplicationType getContainerType();
@@ -73,10 +87,20 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
 
   protected void initializeRule() {
     containers.clear();
+    openContainers.clear();
+    closedContainers.clear();
     containerManager.getContainers(getContainerType()).stream()
-        .filter(this::isClosed)
         .filter(c -> c.getNumberOfKeys() > 0)
-        .forEach(c -> containers.put(c.containerID(), c.getReplicationConfig().getMinimumNodes()));
+        .forEach(c -> {
+              if (isClosed(c)) {
+                containers.put(c.containerID(), c.getReplicationConfig().getMinimumNodes());
+                closedContainers.put(c.containerID(), c.containerID());
+              }
+              if (isOpen(c)) {
+                openContainers.put(c.containerID(),c.containerID());
+              }
+            }
+        );
     totalContainers.set(containers.size());
     final long cutOff = (long) Math.ceil(getTotalNumberOfContainers() * getSafeModeCutoff());
     getSafeModeMetrics().setNumContainerReportedThreshold(getContainerType(), cutOff);
@@ -89,6 +113,18 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
 
   protected int getTotalNumberOfContainers() {
     return totalContainers.get();
+  }
+
+  protected void addContainer(ContainerInfo containerInfo) {
+    if (containers.putIfAbsent(containerInfo.containerID(), containerInfo.getReplicationConfig().getMinimumNodes()) == null) {
+      totalContainers.getAndIncrement();
+    }
+  }
+
+  protected void removeContainer(ContainerInfo containerInfo) {
+    if (containers.remove(containerInfo.containerID()) != null) {
+      totalContainers.getAndDecrement();
+    }
   }
 
   protected double getSafeModeCutoff() {
@@ -135,14 +171,42 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
 
   @Override
   public synchronized void refresh(boolean forceRefresh) {
-    if (forceRefresh || !validate()) {
+    if (forceRefresh) {
       initializeRule();
+    }
+    if (!validate()) {
+      // iterate through open containers and check if any of them have moved to closed state
+      for(ContainerID containerID : openContainers.keySet()) {
+        try {
+        ContainerInfo containerInfo = containerManager.getContainer(containerID);
+        if (isClosed(containerInfo)) {
+          addContainer(containerInfo);
+          openContainers.remove(containerID);
+        } } catch (ContainerNotFoundException e) {
+          // log
+        }
+      }
+      // iterate through closed containers and check if any of them have moved to deleted state
+      for(ContainerID containerID : closedContainers.keySet()) {
+        try {
+        ContainerInfo containerInfo = containerManager.getContainer(containerID);
+        if (isDeleted(containerInfo)) {
+          removeContainer(containerInfo);
+          closedContainers.remove(containerID);
+        }} catch (ContainerNotFoundException e) {
+          // log
+        }
+      }
     }
   }
 
+
   @Override
   protected void cleanup() {
-    getContainers().clear();
+    if (containers != null) containers.clear();
+    if (openContainers != null) openContainers.clear();
+    if (closedContainers != null) closedContainers.clear();
+    if (totalContainers != null) totalContainers.set(0);
   }
 
   /**
@@ -165,6 +229,18 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
   protected boolean isClosed(ContainerInfo container) {
     final LifeCycleState state = container.getState();
     return state == LifeCycleState.QUASI_CLOSED || state == LifeCycleState.CLOSED;
+  }
+
+  protected boolean isOpen(ContainerInfo container) {
+    final LifeCycleState state = container.getState();
+    // should we include CLOSING?
+    return state == LifeCycleState.OPEN;
+  }
+
+  private boolean isDeleted(ContainerInfo container) {
+    final LifeCycleState state = container.getState();
+    // should we include DELETING ?
+    return state == LifeCycleState.DELETED;
   }
 
   protected int getMinReplica(ContainerID id) {

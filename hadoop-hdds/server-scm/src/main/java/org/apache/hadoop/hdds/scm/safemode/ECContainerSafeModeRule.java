@@ -23,7 +23,9 @@ import org.apache.hadoop.hdds.conf.ConfigurationSource;
 import org.apache.hadoop.hdds.protocol.DatanodeID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationType;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
+import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
+import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.server.events.EventQueue;
 
 /**
@@ -58,6 +60,28 @@ public class ECContainerSafeModeRule extends AbstractContainerSafeModeRule {
         getContainers().remove(containerID);
         incrementContainersWithMinReplicas();
         getSafeModeMetrics().incCurrentContainersWithECDataReplicaReportedCount();
+      }
+    } else {
+      // we received a container report that SCM was unaware of when it initialized
+      // check if the container state is closed/quasi-closed and if yes count it
+      try {
+        ContainerInfo containerInfo = getContainerManager().getContainer(containerID);
+        if (isClosed(containerInfo)) {
+          addContainer(containerInfo);
+          getClosedContainers().put(containerID,containerID);
+          getOpenContainers().remove(containerID);
+          final Map<DatanodeID, DatanodeID> replicas =
+              ecContainerDNsMap.computeIfAbsent(containerID, key -> new ConcurrentHashMap<>());
+          replicas.put(datanodeID, datanodeID);
+
+          if (replicas.size() >= getMinReplica(containerID)) {
+            getContainers().remove(containerID);
+            incrementContainersWithMinReplicas();
+            getSafeModeMetrics().incCurrentContainersWithECDataReplicaReportedCount();
+          }
+        }
+      } catch (ContainerNotFoundException cnfe) {
+        // log it
       }
     }
   }
