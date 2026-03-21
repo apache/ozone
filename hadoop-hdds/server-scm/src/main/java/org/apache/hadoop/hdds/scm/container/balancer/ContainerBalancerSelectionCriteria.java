@@ -199,48 +199,71 @@ public class ContainerBalancerSelectionCriteria {
    * Checks whether specified container is closed. Also checks if the replica
    * on the specified datanode is CLOSED. Assumes that there will only be one
    * replica of a container on a particular Datanode.
-   * If hdds.container.balancer.include.closed.container.with.non.closed.replicas config is set to true,
-   * check for minimum required closed replicas, even if additional replicas are in a non-closed state.
+   * <p>
+   * With hdds.container.balancer.include.non.standard.containers set to true:
+   * - CLOSED containers: Allows moving QUASI_CLOSED replicas if minimum CLOSED replicas exist
+   * - QUASI_CLOSED containers: Allows moving if all replicas are QUASI_CLOSED
+   *
    * @param container container to check
-   * @param datanodeDetails datanode on which a replica of the container is
-   * present
-   * @return true if container LifeCycleState is
-   * {@link HddsProtos.LifeCycleState#CLOSED} and its replica on the
-   * specified datanode is CLOSED, else false
+   * @param datanodeDetails datanode on which a replica of the container is present
+   * @param replicas all replicas of the container
+   * @return true if container and replica are eligible for balancing, else false
    */
   private boolean isContainerClosed(ContainerInfo container,
                                     DatanodeDetails datanodeDetails,
                                     Set<ContainerReplica> replicas) {
-    if (!container.getState().equals(HddsProtos.LifeCycleState.CLOSED)) {
-      return false;
-    }
-
+    HddsProtos.LifeCycleState containerState = container.getState();
+    // Find the specific replica on this datanode
     ContainerReplica targetReplica = replicas.stream()
         .filter(r -> r.getDatanodeDetails().equals(datanodeDetails))
         .findFirst()
         .orElse(null);
-
     if (targetReplica == null) {
       return false;
     }
-    if (targetReplica.getState().equals(ContainerReplicaProto.State.CLOSED)) {
-      return true;
+    ContainerReplicaProto.State replicaState = targetReplica.getState();
+    
+    // Case 1: Container is CLOSED
+    if (containerState == HddsProtos.LifeCycleState.CLOSED) {
+      if (replicaState == ContainerReplicaProto.State.CLOSED) {
+        return true;
+      }
+      
+      // With config enabled: Also allow QUASI_CLOSED replicas if we have minimum required CLOSED replicas
+      if (balancerConfiguration.getIncludeNonStandardContainers()) {
+        long numClosedReplicas = replicas.stream()
+            .filter(r -> r.getState() == ContainerReplicaProto.State.CLOSED)
+            .count();
+        int minRequiredReplicas = container.getReplicationConfig().getRequiredNodes();
+        
+        if (numClosedReplicas >= minRequiredReplicas) {
+          return replicaState == ContainerReplicaProto.State.QUASI_CLOSED;
+        }
+      }
+      return false;
     }
-    // Replica is NOT closed - only allow if config is enabled AND we have enough CLOSED replicas
-    if (balancerConfiguration.getIncludeClosedContainerWithNonClosedReplicas()) {
-      long numReplicasClosed = replicas.stream()
-          .filter(r -> r.getState() == ContainerReplicaProto.State.CLOSED)
-          .count();
-      int minimumRequiredNodes = container.getReplicationConfig().getRequiredNodes();
-      return numReplicasClosed >= minimumRequiredNodes;
+    
+    // Case 2: Container is QUASI_CLOSED
+    if (containerState == HddsProtos.LifeCycleState.QUASI_CLOSED) {
+      if (!balancerConfiguration.getIncludeNonStandardContainers()) {
+        return false;
+      }
+      
+      // Only allow if ALL replicas are QUASI_CLOSED
+      // This ensures we don't move containers with mixed replica states
+      return replicas.stream()
+          .allMatch(r -> r.getState() == ContainerReplicaProto.State.QUASI_CLOSED);
     }
-
     return false;
   }
 
   /**
    * This asks replication manager whether a container is under/over/mis replicated. The intention is the same as
    * isContainerReplicatingOrDeleting but the check is done in a different way to be doubly sure.
+   * <p>
+   * With hdds.container.balancer.include.non.standard.containers set to true:
+   * - OVER_REPLICATED containers are allowed
+   *
    * @param container container to check
    * @param replicas the container's replicas
    * @return false if it should not be moved, true otherwise
@@ -248,12 +271,20 @@ public class ContainerBalancerSelectionCriteria {
   private boolean isContainerHealthyForMove(ContainerInfo container, Set<ContainerReplica> replicas) {
     ContainerHealthResult.HealthState state =
         replicationManager.getContainerReplicationHealth(container, replicas).getHealthState();
-    if (state != ContainerHealthResult.HealthState.HEALTHY) {
-      LOG.debug("Excluding container {} with replicas {} as its health is {}.", container, replicas, state);
-      return false;
+    if (state == ContainerHealthResult.HealthState.HEALTHY) {
+      return true;
     }
 
-    return true;
+    // OVER_REPLICATED containers allowed when config is enabled
+    if (state == ContainerHealthResult.HealthState.OVER_REPLICATED &&
+        balancerConfiguration.getIncludeNonStandardContainers()) {
+      LOG.debug("Container {} is over-replicated but allowed for balancing if " +
+          "includeNonStandardContainers config is true", container);
+      return true;
+    }
+
+    LOG.debug("Excluding container {} with replicas {} as its health is {}.", container, replicas, state);
+    return false;
   }
 
   private boolean breaksMaxSizeToMoveLimit(ContainerID containerID,

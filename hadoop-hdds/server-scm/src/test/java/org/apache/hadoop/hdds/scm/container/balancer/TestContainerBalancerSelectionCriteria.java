@@ -141,12 +141,12 @@ public class TestContainerBalancerSelectionCriteria {
   }
 
   @Test
-  public void shouldIncludeClosedContainerWithNonClosedReplicas() throws Exception {
+  public void shouldIncludeNonStandardContainers() throws Exception {
     DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails dn3 = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails dn4 = MockDatanodeDetails.randomDatanodeDetails();
 
-    // Create replicas: 3 CLOSED replicas (minimum required) + 1 QUASI_CLOSED replica
+    // Over-replicated CLOSED container with 3 CLOSED + 1 QUASI_CLOSED replica
     Set<ContainerReplica> replicas = new HashSet<>();
     replicas.add(ReplicationTestUtil.createContainerReplica(containerID, 0, IN_SERVICE,
         CLOSED, 1L, OzoneConsts.GB, source, source.getID()));
@@ -157,29 +157,34 @@ public class TestContainerBalancerSelectionCriteria {
     replicas.add(ReplicationTestUtil.createContainerReplica(containerID, 0, IN_SERVICE,
         QUASI_CLOSED, 1L, OzoneConsts.GB, dn4, dn4.getID()));
 
-    // Update the mock to return the new replica set
+    // Update mocks: container is over-replicated
     when(containerManager.getContainerReplicas(containerID)).thenReturn(replicas);
+    when(replicationManager.getContainerReplicationHealth(eq(containerInfo), anySet()))
+        .thenReturn(new ContainerHealthResult.OverReplicatedHealthResult(containerInfo, 1, false));
 
-    balancerConfiguration.setIncludeClosedContainerWithNonClosedReplicas(true);
+    // Test 1: Config ENABLED - should allow balancing of over-replicated + quasi-closed
+    balancerConfiguration.setIncludeNonStandardContainers(true);
     ContainerBalancerSelectionCriteria configEnabled = new ContainerBalancerSelectionCriteria(
         balancerConfiguration, nodeManager, replicationManager,
         containerManager, findSourceStrategy, new HashMap<>());
 
-    // With config enabled, even the QUASI_CLOSED replica can be moved
-    // because the cluster has enough CLOSED replicas
+    // All replicas (including QUASI_CLOSED) can be moved because:
+    // - Config is enabled
+    // - Container has minimum 3 CLOSED replicas
+    // - Container is over-replicated (allowed by config)
     assertFalse(configEnabled.shouldBeExcluded(containerID, source, 0L));
+    assertFalse(configEnabled.shouldBeExcluded(containerID, dn2, 0L));
+    assertFalse(configEnabled.shouldBeExcluded(containerID, dn3, 0L));
     assertFalse(configEnabled.shouldBeExcluded(containerID, dn4, 0L));
 
-    // Verify behavior when config is disabled (default)
-    balancerConfiguration.setIncludeClosedContainerWithNonClosedReplicas(false);
+    // Test 2: Config DISABLED (default) - should exclude over-replicated containers
+    balancerConfiguration.setIncludeNonStandardContainers(false);
     ContainerBalancerSelectionCriteria criteriaDisabled = new ContainerBalancerSelectionCriteria(
         balancerConfiguration, nodeManager, replicationManager,
         containerManager, findSourceStrategy, new HashMap<>());
 
-    // With config disabled, the CLOSED replica can still be moved
-    assertFalse(criteriaDisabled.shouldBeExcluded(containerID, source, 0L));
-
-    // But the QUASI_CLOSED replica should be excluded when config is disabled
+    // Over-replicated containers are excluded when config is disabled
+    assertTrue(criteriaDisabled.shouldBeExcluded(containerID, source, 0L));
     assertTrue(criteriaDisabled.shouldBeExcluded(containerID, dn4, 0L));
   }
 }

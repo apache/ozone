@@ -146,12 +146,12 @@ public final class ContainerBalancerConfiguration {
           "data node is very high")
   private boolean triggerDuEnable = false;
 
-  @Config(key = "hdds.container.balancer.include.closed.container.with.non.closed.replicas", type = ConfigType.BOOLEAN,
+  @Config(key = "hdds.container.balancer.include.non.standard.containers", type = ConfigType.BOOLEAN,
       defaultValue = "false", tags = {ConfigTag.BALANCER},
-      description = "Whether to include CLOSED containers for balancing " +
-          "that have the minimum required closed replicas, even if additional " +
-          "replicas are in a non-closed state")
-  private boolean includeClosedContainerWithNonClosedReplicas = false;
+      description = "Whether to include containers in non-standard states, such as " +
+          "over-replicated CLOSED containers with additional QUASI_CLOSED replicas " +
+          "or consistent QUASI_CLOSED containers.")
+  private boolean includeNonStandardContainers = false;
 
   /**
    * Gets the threshold value for Container Balancer.
@@ -440,21 +440,21 @@ public final class ContainerBalancerConfiguration {
   }
 
   /**
-   * Get the includeClosedContainerWithNonClosedReplicas value for Container Balancer.
+   * Get the includeNonStandardContainers value for Container Balancer.
    *
-   * @return the boolean value of includeClosedContainerWithNonClosedReplicas
+   * @return the boolean value of includeNonStandardContainers
    */
-  public Boolean getIncludeClosedContainerWithNonClosedReplicas() {
-    return includeClosedContainerWithNonClosedReplicas;
+  public Boolean getIncludeNonStandardContainers() {
+    return includeNonStandardContainers;
   }
 
   /**
-   * Set the includeClosedContainerWithNonClosedReplicas value for Container Balancer.
+   * Set the includeNonStandardContainers value for Container Balancer.
    *
-   * @param enable the boolean value to be set to includeClosedContainerWithNonClosedReplicas
+   * @param enable the boolean value to be set to includeNonStandardContainers
    */
-  public void setIncludeClosedContainerWithNonClosedReplicas(boolean enable) {
-    includeClosedContainerWithNonClosedReplicas = enable;
+  public void setIncludeNonStandardContainers(boolean enable) {
+    includeNonStandardContainers = enable;
   }
 
   @Override
@@ -504,8 +504,8 @@ public final class ContainerBalancerConfiguration {
         includeNodes.equals("") ? "None" : includeNodes,
         "Datanodes Excluded from Balancing",
         excludeNodes.equals("") ? "None" : excludeNodes,
-        "Whether to include CLOSED containers with non-closed replicas for balancing",
-        includeClosedContainerWithNonClosedReplicas);
+        "Whether to include non-standard containers (over-replicated, quasi-closed) for balancing",
+        includeNonStandardContainers);
   }
 
   public ContainerBalancerConfigurationProto.Builder toProtobufBuilder() {
@@ -528,7 +528,7 @@ public final class ContainerBalancerConfiguration {
         .setMoveNetworkTopologyEnable(networkTopologyEnable)
         .setTriggerDuBeforeMoveEnable(triggerDuEnable)
         .setMoveReplicationTimeout(moveReplicationTimeout)
-        .setIncludeClosedContainerWithNonClosedReplicas(includeClosedContainerWithNonClosedReplicas);
+        .setIncludeNonStandardContainers(includeNonStandardContainers);
     return builder;
   }
 
@@ -583,8 +583,8 @@ public final class ContainerBalancerConfiguration {
     if (proto.hasMoveReplicationTimeout()) {
       config.setMoveReplicationTimeout(proto.getMoveReplicationTimeout());
     }
-    if (proto.hasIncludeClosedContainerWithNonClosedReplicas()) {
-      config.setIncludeClosedContainerWithNonClosedReplicas(proto.getIncludeClosedContainerWithNonClosedReplicas());
+    if (proto.hasIncludeNonStandardContainers()) {
+      config.setIncludeNonStandardContainers(proto.getIncludeNonStandardContainers());
     }
     return config;
   }
