@@ -129,7 +129,7 @@ public final class ScmCodecFactory {
       return get(clazz, clazz.getName());
     }
 
-    Class<?> get(Class<?> clazz, String className) throws InvalidProtocolBufferException {
+    private Class<?> get(Class<?> clazz, String className) throws InvalidProtocolBufferException {
       Objects.requireNonNull(className, "className == null");
       final Class<?> c = provided.get(className);
       if (c != null) {
