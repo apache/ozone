@@ -74,7 +74,7 @@ public class TestObjectTaggingDelete {
     // Create a key with object tags
     Mockito.when(headers.getHeaderString(TAG_HEADER)).thenReturn("tag1=value1&tag2=value2");
     Mockito.when(headers.getHeaderString(X_AMZ_CONTENT_SHA256))
-        .thenReturn("mockSignature");
+        .thenReturn("UNSIGNED-PAYLOAD");
     put(rest, BUCKET_NAME, KEY_WITH_TAG, CONTENT);
   }
 

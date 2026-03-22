@@ -32,7 +32,7 @@ import javax.servlet.http.HttpServletResponse;
 public class PrometheusServlet extends HttpServlet {
 
   public static final String SECURITY_TOKEN = "PROMETHEUS_SECURITY_TOKEN";
-  public static final String BEARER = "Bearer";
+  public static final String BEARER = "Bearer ";
 
   public PrometheusMetricsSink getPrometheusSink() {
     return
@@ -50,7 +50,7 @@ public class PrometheusServlet extends HttpServlet {
       if (authorizationHeader == null
           || !authorizationHeader.startsWith(BEARER)
           || !securityToken.equals(
-              authorizationHeader.substring(BEARER.length() + 1))) {
+              authorizationHeader.substring(BEARER.length()))) {
         resp.setStatus(HttpServletResponse.SC_FORBIDDEN);
         return;
       }

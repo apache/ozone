@@ -110,4 +110,23 @@ public class BlockInputStreamFactoryImpl implements BlockInputStreamFactory {
     return true;
   }
 
+  /**
+   * Create a new BlockInputStream for RATIS.
+   *
+   * @param blockInfo The blockInfo representing the block.
+   * @param pipeline The pipeline to be used for reading the block
+   * @param token The block Access Token
+   * @param xceiverFactory Factory to create the xceiver in the client
+   * @param refreshFunction Function to refresh the block location if needed
+   * @param config The client configuration
+   * @return BlockInputStream instance.
+   */
+  public BlockInputStream createBlockInputStream(BlockLocationInfo blockInfo,
+      Pipeline pipeline, Token<OzoneBlockTokenIdentifier> token,
+      XceiverClientFactory xceiverFactory,
+      Function<BlockID, BlockLocationInfo> refreshFunction,
+      OzoneClientConfig config) throws IOException {
+
+    return new BlockInputStream(blockInfo, pipeline, token, xceiverFactory, refreshFunction, config);
+  }
 }

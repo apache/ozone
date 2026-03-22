@@ -28,7 +28,7 @@ class TestReconfigurableConfig {
 
   @Test
   void testReconfigureProperty() {
-    ConfigurationExample subject = new InMemoryConfiguration()
+    ConfigurationExample subject = new InMemoryConfigurationForTesting()
         .getObject(ConfigurationExample.class);
 
     subject.reconfigureProperty("ozone.test.config.dynamic", "updated");

@@ -56,15 +56,21 @@ public class PendingDeletionEndpoint {
   }
 
   @GET
-  public Response getPendingDeletionByComponent(@QueryParam("component") String component) {
+  public Response getPendingDeletionByComponent(
+      @QueryParam("component")
+      String component,
+      @QueryParam("limit")
+      Integer limit
+  ) {
     if (component == null || component.isEmpty()) {
       return Response.status(Response.Status.BAD_REQUEST)
           .entity("component query parameter is required").build();
     }
+
     final String normalizedComponent = component.trim().toLowerCase();
     switch (normalizedComponent) {
     case "dn":
-      return handleDataNodeMetrics();
+      return handleDataNodeMetrics(limit);
     case "scm":
       return handleScmPendingDeletion();
     case "om":
@@ -75,8 +81,13 @@ public class PendingDeletionEndpoint {
     }
   }
 
-  private Response handleDataNodeMetrics() {
-    DataNodeMetricsServiceResponse response = dataNodeMetricsService.getCollectedMetrics();
+  private Response handleDataNodeMetrics(Integer limit) {
+    if (null != limit && limit < 1) {
+      return Response.status(Response.Status.BAD_REQUEST)
+          .entity("Limit query parameter must be at-least 1").build();
+    }
+
+    DataNodeMetricsServiceResponse response = dataNodeMetricsService.getCollectedMetrics(limit);
     if (response.getStatus() == DataNodeMetricsService.MetricCollectionStatus.FINISHED) {
       return Response.ok(response).build();
     } else {

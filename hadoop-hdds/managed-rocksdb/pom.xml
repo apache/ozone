@@ -25,11 +25,6 @@
   <name>Apache Ozone HDDS Managed RocksDB</name>
   <description>Apache Ozone Managed RocksDB library</description>
 
-  <properties>
-    <!-- no tests in this module so far -->
-    <maven.test.skip>true</maven.test.skip>
-  </properties>
-
   <dependencies>
     <dependency>
       <groupId>com.google.guava</groupId>
@@ -63,6 +58,11 @@
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
@@ -73,6 +73,18 @@
         <configuration>
           <proc>none</proc>
         </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>test-jar</id>
+            <goals>
+              <goal>test-jar</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>

@@ -186,6 +186,7 @@ public final class ContainerStateManagerImpl
     containerLifecycleSM.addTransition(CLOSING, QUASI_CLOSED, QUASI_CLOSE);
     containerLifecycleSM.addTransition(CLOSING, CLOSED, CLOSE);
     containerLifecycleSM.addTransition(QUASI_CLOSED, CLOSED, FORCE_CLOSE);
+    containerLifecycleSM.addTransition(QUASI_CLOSED, DELETING, DELETE);
     containerLifecycleSM.addTransition(CLOSED, DELETING, DELETE);
     containerLifecycleSM.addTransition(DELETING, DELETED, CLEANUP);
 
@@ -353,36 +354,53 @@ public final class ContainerStateManagerImpl
   }
 
   @Override
-  public void updateContainerState(final HddsProtos.ContainerID containerID,
-                                   final LifeCycleEvent event)
+  public void updateContainerStateWithSequenceId(final HddsProtos.ContainerID containerID,
+                                                  final LifeCycleEvent event,
+                                                  final Long sequenceId)
       throws IOException, InvalidStateTransitionException {
     // TODO: Remove the protobuf conversion after fixing ContainerStateMap.
     final ContainerID id = ContainerID.getFromProtobuf(containerID);
 
     try (AutoCloseableLock ignored = writeLock(id)) {
       if (containers.contains(id)) {
-        final ContainerInfo oldInfo = containers.getContainerInfo(id);
-        final LifeCycleState oldState = oldInfo.getState();
+        final ContainerInfo containerInfo = containers.getContainerInfo(id);
+        
+        // Synchronize sequenceId first
+        if (containerInfo.getSequenceId() < sequenceId) {
+          containerInfo.updateSequenceId(sequenceId);
+        } else if (containerInfo.getSequenceId() > sequenceId) {
+          LOG.warn("Container sequenceId is {} greater than the leader container sequenceId {}",
+              containerInfo.getSequenceId(), sequenceId);
+        }
+        
+        final LifeCycleState oldState = containerInfo.getState();
         final LifeCycleState newState = stateMachine.getNextState(
-            oldInfo.getState(), event);
+            oldState, event);
         if (newState.getNumber() > oldState.getNumber()) {
           ExecutionUtil.create(() -> {
             containers.updateState(id, oldState, newState);
             transactionBuffer.addToBuffer(containerStore, id,
                 containers.getContainerInfo(id));
           }).onException(() -> {
-            transactionBuffer.addToBuffer(containerStore, id, oldInfo);
             containers.updateState(id, newState, oldState);
+            ContainerInfo currentInfo = containers.getContainerInfo(id);
+            transactionBuffer.addToBuffer(containerStore, id, currentInfo);
+
           }).execute();
           containerStateChangeActions.getOrDefault(event, info -> { })
-              .accept(oldInfo);
+              .accept(containerInfo);
         }
       }
     }
   }
 
   @Override
-  public void transitionDeletingOrDeletedToClosedState(HddsProtos.ContainerID containerID) throws IOException {
+  public void transitionDeletingOrDeletedToTargetState(HddsProtos.ContainerID containerID,
+                                                       LifeCycleState targetState) throws IOException {
+    if (targetState != CLOSED && targetState != QUASI_CLOSED) {
+      throw new IllegalArgumentException("Target state must be CLOSED or QUASI_CLOSED, got: " + targetState);
+    }
+
     final ContainerID id = ContainerID.getFromProtobuf(containerID);
 
     try (AutoCloseableLock ignored = writeLock(id)) {
@@ -391,14 +409,14 @@ public final class ContainerStateManagerImpl
         final LifeCycleState oldState = oldInfo.getState();
         if (oldState != DELETING && oldState != DELETED) {
           throw new InvalidContainerStateException("Cannot transition container " + id + " from " + oldState +
-              " back to CLOSED. The container must be in the DELETING or DELETED state.");
+                  " back to " + targetState + ". The container must be in the DELETING or DELETED state.");
         }
         ExecutionUtil.create(() -> {
-          containers.updateState(id, oldState, CLOSED);
+          containers.updateState(id, oldState, targetState);
           transactionBuffer.addToBuffer(containerStore, id, containers.getContainerInfo(id));
         }).onException(() -> {
           transactionBuffer.addToBuffer(containerStore, id, oldInfo);
-          containers.updateState(id, CLOSED, oldState);
+          containers.updateState(id, targetState, oldState);
         }).execute();
       }
     }

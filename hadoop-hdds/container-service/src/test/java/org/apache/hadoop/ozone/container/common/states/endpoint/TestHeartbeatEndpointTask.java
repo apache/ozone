@@ -29,7 +29,7 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import com.google.protobuf.ProtoUtils;
+import com.google.protobuf.UnsafeByteOperations;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -80,7 +80,7 @@ public class TestHeartbeatEndpointTask {
     targetDns.add(MockDatanodeDetails.randomDatanodeDetails());
     ReconstructECContainersCommand cmd = new ReconstructECContainersCommand(
         1, emptyList(), targetDns,
-        ProtoUtils.unsafeByteString(new byte[]{2, 5}),
+        UnsafeByteOperations.unsafeWrap(new byte[]{2, 5}),
         new ECReplicationConfig(3, 2));
 
     when(scm.sendHeartbeat(any()))

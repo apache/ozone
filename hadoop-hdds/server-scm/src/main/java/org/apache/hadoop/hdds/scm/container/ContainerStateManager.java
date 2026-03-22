@@ -160,24 +160,27 @@ public interface ContainerStateManager {
       throws IOException;
 
   /**
-   *
+   * Updates container state with sequenceId synchronization for HA consistency.
+   * This method ensures that all SCM nodes have the same sequenceId when 
+   * state transitions occur.
    */
   @Replicate
-  void updateContainerState(HddsProtos.ContainerID id,
-                            HddsProtos.LifeCycleEvent event)
+  void updateContainerStateWithSequenceId(HddsProtos.ContainerID id,
+                                          HddsProtos.LifeCycleEvent event,
+                                          Long sequenceId)
       throws IOException, InvalidStateTransitionException;
 
 
   /**
-   * Bypasses the container state machine to change a container's state from DELETING or DELETED to CLOSED. This API was
-   * introduced to fix a bug (HDDS-11136), and should be used with care otherwise.
+   * Bypasses the container state machine to change a container's state from DELETING/DELETED to CLOSED/QUASI_CLOSED.
    *
-   * @see <a href="https://issues.apache.org/jira/browse/HDDS-11136">HDDS-11136</a>
    * @param id id of the container to transition
+   * @param targetState the target state (must be CLOSED or QUASI_CLOSED)
    * @throws IOException
    */
   @Replicate
-  void transitionDeletingOrDeletedToClosedState(HddsProtos.ContainerID id) throws IOException;
+  void transitionDeletingOrDeletedToTargetState(HddsProtos.ContainerID id, LifeCycleState targetState)
+      throws IOException;
 
   /**
    *

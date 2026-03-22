@@ -78,7 +78,6 @@ import org.apache.hadoop.ozone.container.ozoneimpl.ContainerScanError;
 import org.apache.hadoop.ozone.container.ozoneimpl.DataScanResult;
 import org.apache.hadoop.util.Time;
 import org.apache.ratis.statemachine.StateMachine;
-import org.apache.ratis.thirdparty.com.google.protobuf.ProtocolMessageEnum;
 import org.apache.ratis.thirdparty.io.grpc.stub.StreamObserver;
 import org.apache.ratis.util.UncheckedAutoCloseable;
 import org.slf4j.Logger;
@@ -110,9 +109,9 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
   private final ContainerSet containerSet;
   private final StateContext context;
   private final float containerCloseThreshold;
-  private final ProtocolMessageMetrics<ProtocolMessageEnum> protocolMetrics;
+  private final ProtocolMessageMetrics<Type> protocolMetrics;
   private OzoneProtocolMessageDispatcher<ContainerCommandRequestProto,
-      ContainerCommandResponseProto, ProtocolMessageEnum> dispatcher;
+      ContainerCommandResponseProto, Type> dispatcher;
   private String clusterId;
   private ContainerMetrics metrics;
   private final TokenVerifier tokenVerifier;
@@ -142,7 +141,7 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
         new ProtocolMessageMetrics<>(
             "HddsDispatcher",
             "HDDS dispatcher metrics",
-            Type.values());
+            Type.class);
 
     this.dispatcher =
         new OzoneProtocolMessageDispatcher<>("DatanodeClient",
@@ -400,12 +399,14 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
                   .getMessage());
         }
         // For container to be moved to unhealthy state here, the container can
-        // only be in open or closing state.
+        // only be in open, closing, or recovering state.
         State containerState = container.getContainerData().getState();
         Preconditions.checkState(
             containerState == State.OPEN
                 || containerState == State.CLOSING
-                || containerState == State.RECOVERING);
+                || containerState == State.RECOVERING,
+            "Expected container %s to be in OPEN/CLOSING/RECOVERING state but was %s",
+            containerID, containerState);
         // mark and persist the container state to be unhealthy
         try {
           ContainerScanError error = new ContainerScanError(ContainerScanError.FailureType.WRITE_FAILURE,
@@ -839,6 +840,9 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       long containerID = msg.getContainerID();
       Container container = getContainer(containerID);
       long startTime = Time.monotonicNow();
+
+      // Increment operation count metrics
+      metrics.incContainerOpsMetrics(cmdType);
 
       if (DispatcherContext.op(dispatcherContext).validateToken()) {
         validateToken(msg);

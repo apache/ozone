@@ -112,6 +112,10 @@ public final class HddsConfigKeys {
   public static final double
       HDDS_SCM_SAFEMODE_ONE_NODE_REPORTED_PIPELINE_PCT_DEFAULT = 0.90;
 
+  public static final String HDDS_SCM_SAFEMODE_LOG_INTERVAL =
+      "hdds.scm.safemode.log.interval";
+  public static final String HDDS_SCM_SAFEMODE_LOG_INTERVAL_DEFAULT = "1m";
+
   // This configuration setting is used as a fallback location by all
   // Ozone/HDDS services for their metadata. It is useful as a single
   // config point for test/PoC clusters.
@@ -332,6 +336,9 @@ public final class HddsConfigKeys {
   public static final String OZONE_SECURITY_RECONFIGURE_PROTOCOL_ACL =
       "ozone.security.reconfigure.protocol.acl";
 
+  public static final String HDDS_SECURITY_CLIENT_DATANODE_DISK_BALANCER_PROTOCOL_ACL =
+      "hdds.security.client.datanode.disk.balancer.protocol.acl";
+
   // Determines if the Container Chunk Manager will write user data to disk
   // Set to false only for specific performance tests
   public static final String HDDS_CONTAINER_PERSISTDATA =
@@ -397,6 +404,10 @@ public final class HddsConfigKeys {
 
   public static final String OZONE_DATANODE_IO_METRICS_PERCENTILES_INTERVALS_SECONDS_KEY =
       "ozone.volume.io.percentiles.intervals.seconds";
+
+  public static final String HDDS_DATANODE_DISK_BALANCER_ENABLED_KEY =
+      "hdds.datanode.disk.balancer.enabled";
+  public static final boolean HDDS_DATANODE_DISK_BALANCER_ENABLED_DEFAULT = false;
 
   public static final String HDDS_DATANODE_DNS_INTERFACE_KEY =
       "hdds.datanode.dns.interface";

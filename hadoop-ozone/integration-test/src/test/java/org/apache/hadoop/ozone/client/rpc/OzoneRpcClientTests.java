@@ -33,6 +33,7 @@ import static org.apache.hadoop.ozone.OzoneAcl.AclScope.DEFAULT;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SCM_BLOCK_SIZE_DEFAULT;
+import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL;
 import static org.apache.hadoop.ozone.OzoneConsts.DEFAULT_OM_UPDATE_ID;
 import static org.apache.hadoop.ozone.OzoneConsts.ETAG;
 import static org.apache.hadoop.ozone.OzoneConsts.GB;
@@ -166,13 +167,12 @@ import org.apache.hadoop.ozone.container.keyvalue.KeyValueContainerData;
 import org.apache.hadoop.ozone.container.keyvalue.helpers.BlockUtils;
 import org.apache.hadoop.ozone.om.OMMetadataManager;
 import org.apache.hadoop.ozone.om.OmConfig;
-import org.apache.hadoop.ozone.om.OmFailoverProxyUtil;
+import org.apache.hadoop.ozone.om.OmTestUtil;
 import org.apache.hadoop.ozone.om.OzoneManager;
 import org.apache.hadoop.ozone.om.ResolvedBucket;
 import org.apache.hadoop.ozone.om.S3SecretManager;
 import org.apache.hadoop.ozone.om.exceptions.OMException;
 import org.apache.hadoop.ozone.om.exceptions.OMException.ResultCodes;
-import org.apache.hadoop.ozone.om.ha.HadoopRpcOMFailoverProxyProvider;
 import org.apache.hadoop.ozone.om.ha.OMProxyInfo;
 import org.apache.hadoop.ozone.om.helpers.BucketLayout;
 import org.apache.hadoop.ozone.om.helpers.OmKeyArgs;
@@ -188,6 +188,7 @@ import org.apache.hadoop.ozone.om.helpers.QuotaUtil;
 import org.apache.hadoop.ozone.om.helpers.RepeatedOmKeyInfo;
 import org.apache.hadoop.ozone.om.helpers.S3SecretValue;
 import org.apache.hadoop.ozone.om.protocol.S3Auth;
+import org.apache.hadoop.ozone.om.protocolPB.OzoneManagerProtocolPB;
 import org.apache.hadoop.ozone.om.ratis.OzoneManagerStateMachine;
 import org.apache.hadoop.ozone.protocol.proto.OzoneManagerProtocolProtos;
 import org.apache.hadoop.ozone.security.acl.IAccessAuthorizer.ACLType;
@@ -211,6 +212,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -263,6 +265,7 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
     conf.setInt(OZONE_SCM_RATIS_PIPELINE_LIMIT, 10);
     conf.setTimeDuration(OZONE_BLOCK_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
     conf.setTimeDuration(OZONE_DIR_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
+    conf.setTimeDuration(OZONE_SNAPSHOT_DELETING_SERVICE_INTERVAL, 1, TimeUnit.SECONDS);
 
     ClientConfigForTesting.newBuilder(StorageUnit.MB)
         .setDataStreamMinPacketSize(1)
@@ -323,11 +326,8 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
    */
   @Test
   public void testOMClientProxyProvider() {
-
-    HadoopRpcOMFailoverProxyProvider omFailoverProxyProvider =
-        OmFailoverProxyUtil.getFailoverProxyProvider(store.getClientProxy());
-
-    List<OMProxyInfo> omProxies = omFailoverProxyProvider.getOMProxyInfos();
+    final List<OMProxyInfo<OzoneManagerProtocolPB>> omProxies
+        = OmTestUtil.getFailoverProxyProvider(store).getOMProxies();
 
     // For a non-HA OM service, there should be only one OM proxy.
     assertEquals(1, omProxies.size());
@@ -1152,6 +1152,71 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
         "\",\"deletedKeysList\":\"{key=dir1/key4, dataSize=" + valueLength +
         ", replicationConfig=RATIS/THREE}, {key=dir1/key5, dataSize=" + valueLength +
         ", replicationConfig=EC{rs-3-2-1024k}}\",\"unDeletedKeysList\"");
+  }
+
+  /**
+   * Verifies pendingDelete* fields are populated after key delete,
+   * with/without snapshot retention.
+   *
+   * @param withSnapshot whether to create a snapshot before deleting the key
+   * @throws Exception on failure
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testBucketPendingDeleteBytes(boolean withSnapshot) throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+    String snapshotName = "snap-" + UUID.randomUUID();
+    String value = "sample value";
+    int valueLength = value.getBytes(UTF_8).length;
+
+    store.createVolume(volumeName);
+    OzoneVolume volume = store.getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    writeKey(bucket, keyName, ONE, value, valueLength);
+
+    OzoneBucket bucketAfterKeyWrite = store.getVolume(volumeName)
+        .getBucket(bucketName);
+    assertThat(bucketAfterKeyWrite.getUsedBytes()).isEqualTo(valueLength);
+    assertThat(bucketAfterKeyWrite.getUsedNamespace()).isEqualTo(1);
+    assertThat(bucketAfterKeyWrite.getPendingDeleteBytes()).isEqualTo(0);
+    assertThat(bucketAfterKeyWrite.getPendingDeleteNamespace()).isEqualTo(0);
+
+    if (withSnapshot) {
+      store.createSnapshot(volumeName, bucketName, snapshotName);
+    }
+    bucket.deleteKey(keyName);
+    // After delete: usedBytes should still be totalBucketSpace.
+    OzoneBucket bucketAfterKeyDelete = store.getVolume(volumeName)
+        .getBucket(bucketName);
+    assertThat(bucketAfterKeyDelete.getUsedBytes()).isEqualTo(valueLength);
+    assertThat(bucketAfterKeyDelete.getUsedNamespace()).isEqualTo(1);
+    assertThat(bucketAfterKeyDelete.getPendingDeleteBytes()).isEqualTo(valueLength);
+    assertThat(bucketAfterKeyDelete.getPendingDeleteNamespace()).isEqualTo(1);
+
+    if (withSnapshot) {
+      // if snapshot is present bytes won't be released until snapshot is deleted.
+      store.deleteSnapshot(volumeName, bucketName, snapshotName);
+    }
+
+    GenericTestUtils.waitFor(() -> {
+      OzoneBucket buck = null;
+      try {
+        buck = store.getVolume(volumeName).getBucket(bucketName);
+      } catch (IOException e) {
+        fail("Failed to get bucket details", e);
+      }
+      return buck.getUsedBytes() == 0 && buck.getUsedNamespace() == 0;
+    }, 1000, 30000);
+    OzoneBucket bucketAfterKeyPurge = store.getVolume(volumeName)
+        .getBucket(bucketName);
+    assertThat(bucketAfterKeyPurge.getUsedBytes()).isEqualTo(0);
+    assertThat(bucketAfterKeyPurge.getUsedNamespace()).isEqualTo(0);
+    assertThat(bucketAfterKeyPurge.getPendingDeleteBytes()).isEqualTo(0);
+    assertThat(bucketAfterKeyPurge.getPendingDeleteNamespace()).isEqualTo(0);
   }
 
   protected void verifyReplication(String volumeName, String bucketName,
@@ -5269,5 +5334,57 @@ abstract class OzoneRpcClientTests extends OzoneTestBase {
 
     assertEquals(tags.size(), tagsRetrieved.size());
     assertThat(tagsRetrieved).containsAllEntriesOf(tags);
+  }
+
+  @Test
+  public void testCreateEmptyKeySkipBlockAllocation()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    getStore().createVolume(volumeName);
+    OzoneVolume volume = getStore().getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    long initialAllocatedBlocks =
+        getCluster().getStorageContainerManager().getPipelineManager()
+            .getMetrics().getTotalNumBlocksAllocated();
+    // Don't write anything - this is an empty file
+    OzoneOutputStream out = bucket.createKey(keyName, 0);
+    out.close();
+
+    // createKey should skip block allocation if data size is 0
+    long currentAllocatedBlocks =
+        getCluster().getStorageContainerManager().getPipelineManager().getMetrics().getTotalNumBlocksAllocated();
+    assertEquals(initialAllocatedBlocks, currentAllocatedBlocks);
+  }
+
+  @Test
+  public void testCreateEmptyFileNotSkipBlockAllocation()
+      throws Exception {
+    String volumeName = UUID.randomUUID().toString();
+    String bucketName = UUID.randomUUID().toString();
+    String keyName = UUID.randomUUID().toString();
+
+    getStore().createVolume(volumeName);
+    OzoneVolume volume = getStore().getVolume(volumeName);
+    volume.createBucket(bucketName);
+    OzoneBucket bucket = volume.getBucket(bucketName);
+
+    long initialAllocatedBlocks =
+        getCluster().getStorageContainerManager().getPipelineManager().getMetrics().getTotalNumBlocksAllocated();
+    // Don't write anything - this is an empty file
+    OzoneOutputStream out = bucket.createFile(keyName, 0,
+        RatisReplicationConfig.getInstance(HddsProtos.ReplicationFactor.ONE),
+        false,
+        false);
+    out.close();
+
+    // OM should call allocateBlock in OMFileCreateRequest regardless of data size
+    long currentAllocatedBlocks =
+        getCluster().getStorageContainerManager().getPipelineManager().getMetrics().getTotalNumBlocksAllocated();
+    assertEquals(initialAllocatedBlocks + 1, currentAllocatedBlocks);
   }
 }

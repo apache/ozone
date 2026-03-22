@@ -145,7 +145,7 @@ public class DatanodeStateMachine implements Closeable {
    * @param certClient - Datanode Certificate client, required if security is
    *                     enabled
    */
-  @SuppressWarnings("checkstyle:ParameterNumber")
+  @SuppressWarnings({"checkstyle:ParameterNumber", "checkstyle:methodlength"})
   public DatanodeStateMachine(HddsDatanodeService hddsDatanodeService,
                               DatanodeDetails datanodeDetails,
                               ConfigurationSource conf,
@@ -260,7 +260,7 @@ public class DatanodeStateMachine implements Closeable {
 
     // When we add new handlers just adding a new handler here should do the
     // trick.
-    commandDispatcher = CommandDispatcher.newBuilder()
+    CommandDispatcher.Builder dispatcherBuilder = CommandDispatcher.newBuilder()
         .addHandler(new CloseContainerCommandHandler(
             dnConf.getContainerCloseThreads(),
             dnConf.getCommandQueueLimit(), threadNamePrefix))
@@ -276,15 +276,25 @@ public class DatanodeStateMachine implements Closeable {
             closePipelineCommandExecutorService))
         .addHandler(new CreatePipelineCommandHandler(conf,
             createPipelineCommandExecutorService))
-        .addHandler(new SetNodeOperationalStateCommandHandler(conf,
-            supervisor::nodeStateUpdated))
         .addHandler(new FinalizeNewLayoutVersionCommandHandler())
         .addHandler(new RefreshVolumeUsageCommandHandler())
-        .addHandler(new ReconcileContainerCommandHandler(supervisor, dnClient))
+        .addHandler(new ReconcileContainerCommandHandler(supervisor, dnClient));
+
+    if (container.getDiskBalancerService() != null) {
+      dispatcherBuilder.addHandler(new SetNodeOperationalStateCommandHandler(
+          conf, supervisor::nodeStateUpdated,
+          container.getDiskBalancerService()::nodeStateUpdated));
+    } else {
+      dispatcherBuilder.addHandler(new SetNodeOperationalStateCommandHandler(
+          conf, supervisor::nodeStateUpdated, null));
+    }
+
+    dispatcherBuilder
         .setConnectionManager(connectionManager)
         .setContainer(container)
-        .setContext(context)
-        .build();
+        .setContext(context);
+
+    commandDispatcher = dispatcherBuilder.build();
 
     reportManager = ReportManager.newBuilder(conf)
         .setStateContext(context)
@@ -359,7 +369,6 @@ public class DatanodeStateMachine implements Closeable {
     reportManager.init();
     initCommandHandlerThread(conf);
 
-    upgradeFinalizer.runPrefinalizeStateActions(layoutStorage, this);
     LOG.info("Ozone container server started.");
     while (context.getState() != DatanodeStates.SHUTDOWN) {
       try {
