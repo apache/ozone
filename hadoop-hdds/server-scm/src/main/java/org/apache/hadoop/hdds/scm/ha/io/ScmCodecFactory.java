@@ -107,6 +107,16 @@ public final class ScmCodecFactory {
     throw new InvalidProtocolBufferException("Codec not found for " + resolved);
   }
 
+  public Class<?> getClass(String className)
+      throws InvalidProtocolBufferException {
+    try {
+      return Class.forName(className);
+    } catch (ClassNotFoundException e) {
+      throw new InvalidProtocolBufferException(
+          "Class not found for " + className, e);
+    }
+  }
+
   /** Resolve the codec class from a given class. */
   static class ClassResolver {
     private final Map<String, Class<?>> provided;

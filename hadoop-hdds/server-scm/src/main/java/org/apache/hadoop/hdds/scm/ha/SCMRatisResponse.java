@@ -73,9 +73,11 @@ public final class SCMRatisResponse {
       return Message.EMPTY;
     }
 
+    final Class<?> resolved = FACTORY.resolve(type.getName());
+
     final SCMRatisResponseProto response = SCMRatisResponseProto.newBuilder()
         .setType(type.getName())
-        .setValue(FACTORY.getCodec(type).serialize(result))
+        .setValue(FACTORY.getCodec(resolved).serialize(result))
         .build();
     return Message.valueOf(UnsafeByteOperations.unsafeWrap(response.toByteString().asReadOnlyByteBuffer()));
   }
