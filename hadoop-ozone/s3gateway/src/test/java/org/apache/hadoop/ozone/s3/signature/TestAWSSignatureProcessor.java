@@ -15,15 +15,26 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.s3.endpoint;
+package org.apache.hadoop.ozone.s3.signature;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+
+import org.junit.jupiter.api.Test;
 
 /**
- * Custom unmarshaller to read Tagging request body.
+ * Tests for {@link AWSSignatureProcessor}.
  */
-public class PutTaggingUnmarshaller extends MessageUnmarshaller<S3Tagging> {
+public class TestAWSSignatureProcessor {
 
-  public PutTaggingUnmarshaller() {
-    super(S3Tagging.class);
+  @Test
+  public void testLowerCaseHeaderMapRemovesKeysCaseInsensitively() {
+    AWSSignatureProcessor.LowerCaseKeyStringMap headers =
+        new AWSSignatureProcessor.LowerCaseKeyStringMap();
+    headers.put("Authorization", "AWS4-HMAC-SHA256 value");
+
+    assertEquals("AWS4-HMAC-SHA256 value",
+        headers.remove("AUTHORIZATION"));
+    assertFalse(headers.containsKey("authorization"));
   }
-
 }

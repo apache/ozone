@@ -64,12 +64,7 @@ class ScmListCodec implements ScmCodec<Object> {
   }
 
   @Override
-  public Object deserialize(Class<?> type, ByteString value)
-      throws InvalidProtocolBufferException {
-    if (!List.class.isAssignableFrom(type)) {
-      throw new InvalidProtocolBufferException(
-          "Unexpected non-list type: " + type);
-    }
+  public Object deserialize(ByteString value) throws InvalidProtocolBufferException {
     final ListArgument argument = ListArgument.parseFrom(
         value.asReadOnlyByteBuffer());
     if (!argument.hasType()) {
@@ -83,7 +78,7 @@ class ScmListCodec implements ScmCodec<Object> {
     final ScmCodec<?> elementCodec = ScmCodecFactory.getInstance().getCodec(elementType);
     final List<Object> list = new ArrayList<>();
     for (ByteString element : argument.getValueList()) {
-      list.add(elementCodec.deserialize(elementClass, element));
+      list.add(elementCodec.deserialize(element));
     }
     return list;
   }

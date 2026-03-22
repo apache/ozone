@@ -15,18 +15,17 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.ozone.s3.endpoint;
+package org.apache.hadoop.hdds.tracing;
 
-import javax.ws.rs.ext.Provider;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
- * Custom unmarshaller to read PutBucketAclRequest wo namespace.
+ * Annotation to mark methods that should be excluded from tracing.
  */
-@Provider
-public class PutBucketAclRequestUnmarshaller extends MessageUnmarshaller<S3BucketAcl> {
-
-  public PutBucketAclRequestUnmarshaller() {
-    super(S3BucketAcl.class);
-  }
-
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.METHOD)
+public @interface SkipTracing {
 }

@@ -21,6 +21,7 @@ import com.google.protobuf.Message;
 import com.google.protobuf.ProtocolMessageEnum;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -29,6 +30,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.IntFunction;
+import org.apache.commons.lang3.ClassUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
@@ -47,13 +49,9 @@ import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferExce
  */
 public final class ScmCodecFactory {
 
-  private final Map<Class<?>, ScmCodec<?>> codecs = new HashMap<>();
+  private static Map<Class<?>, ScmCodec<?>> codecs = new HashMap<>();
 
-  private final ClassResolver resolver;
-
-  private static final ScmCodecFactory INSTANCE = new ScmCodecFactory();
-
-  private ScmCodecFactory() {
+  static {
     putProto(ContainerID.getDefaultInstance());
     putProto(PipelineID.getDefaultInstance());
     putProto(Pipeline.getDefaultInstance());
@@ -76,35 +74,35 @@ public final class ScmCodecFactory {
     putEnum(NodeType.class, NodeType::forNumber);
 
     // Must be the last one
-    resolver = new ClassResolver(codecs.keySet());
+    final ClassResolver resolver = new ClassResolver(codecs.keySet());
     codecs.put(List.class, new ScmListCodec(resolver));
   }
 
-  private <T extends Message> void putProto(T proto) {
-    codecs.put(proto.getClass(),
-        new ScmNonShadedGeneratedMessageCodec<>(proto.getParserForType()));
+  static <T extends Message> void putProto(T proto) {
+    final Class<? extends Message> clazz = proto.getClass();
+    codecs.put(clazz, new ScmNonShadedGeneratedMessageCodec<>(clazz.getSimpleName(), proto.getParserForType()));
   }
 
-  private <T extends Enum<T> & ProtocolMessageEnum> void putEnum(
+  static <T extends Enum<T> & ProtocolMessageEnum> void putEnum(
       Class<T> enumClass, IntFunction<T> forNumber) {
     codecs.put(enumClass, new ScmEnumCodec<>(enumClass, forNumber));
   }
 
-  public static ScmCodecFactory getInstance() {
-    return INSTANCE;
-  }
+  private ScmCodecFactory() { }
 
-  public ScmCodec getCodec(String className)
+  public static ScmCodec getCodec(Class<?> type)
       throws InvalidProtocolBufferException {
-    final Class<?> clazz = resolver.get(className);
-
-    final ScmCodec<?> codec = codecs.get(clazz);
-    if (codec != null) {
-      return codec;
+    final List<Class<?>> classes = new ArrayList<>();
+    classes.add(type);
+    classes.addAll(ClassUtils.getAllSuperclasses(type));
+    classes.addAll(ClassUtils.getAllInterfaces(type));
+    for (Class<?> clazz : classes) {
+      if (codecs.containsKey(clazz)) {
+        return codecs.get(clazz);
+      }
     }
-
     throw new InvalidProtocolBufferException(
-        "Codec for " + className + " not found!");
+        "Codec for " + type + " not found!");
   }
 
   /** Resolve the codec class from a given class. */
@@ -126,18 +124,18 @@ public final class ScmCodecFactory {
       if (c != null) {
         return c;
       }
+      throw new InvalidProtocolBufferException("Class not found for " + className);
+    }
 
+    Class<?> get(Class<?> clazz) throws InvalidProtocolBufferException {
+      final String className = clazz.getName();
+      final Class<?> c = provided.get(className);
+      if (c != null) {
+        return c;
+      }
       final Class<?> found = resolved.get(className);
       if (found != null) {
         return found;
-      }
-
-      final Class<?> clazz;
-      try {
-        clazz = Class.forName(className);
-      } catch (ClassNotFoundException e) {
-        throw new InvalidProtocolBufferException(
-            "Class not found for " + className, e);
       }
 
       for (Class<?> base : provided.values()) {
@@ -146,8 +144,7 @@ public final class ScmCodecFactory {
           return base;
         }
       }
-
-      throw new InvalidProtocolBufferException("Failed to resolve " + className);
+      throw new InvalidProtocolBufferException("Failed to resolve " + clazz);
     }
   }
 }
