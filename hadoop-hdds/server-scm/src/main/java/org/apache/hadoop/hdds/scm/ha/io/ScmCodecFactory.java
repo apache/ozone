@@ -21,16 +21,15 @@ import com.google.protobuf.Message;
 import com.google.protobuf.ProtocolMessageEnum;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.IntFunction;
-import org.apache.commons.lang3.ClassUtils;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerID;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
@@ -49,9 +48,11 @@ import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferExce
  */
 public final class ScmCodecFactory {
 
-  private static Map<Class<?>, ScmCodec<?>> codecs = new HashMap<>();
+  private final Map<Class<?>, ScmCodec<?>> codecs = new HashMap<>();
+  private final ClassResolver resolver;
+  private static final ScmCodecFactory INSTANCE = new ScmCodecFactory();
 
-  static {
+  private ScmCodecFactory() {
     putProto(ContainerID.getDefaultInstance());
     putProto(PipelineID.getDefaultInstance());
     putProto(Pipeline.getDefaultInstance());
@@ -74,35 +75,36 @@ public final class ScmCodecFactory {
     putEnum(NodeType.class, NodeType::forNumber);
 
     // Must be the last one
-    final ClassResolver resolver = new ClassResolver(codecs.keySet());
+    resolver = new ClassResolver(codecs.keySet());
     codecs.put(List.class, new ScmListCodec(resolver));
   }
 
-  static <T extends Message> void putProto(T proto) {
+  private <T extends Message> void putProto(T proto) {
     final Class<? extends Message> clazz = proto.getClass();
     codecs.put(clazz, new ScmNonShadedGeneratedMessageCodec<>(clazz.getSimpleName(), proto.getParserForType()));
   }
 
-  static <T extends Enum<T> & ProtocolMessageEnum> void putEnum(
+  private <T extends Enum<T> & ProtocolMessageEnum> void putEnum(
       Class<T> enumClass, IntFunction<T> forNumber) {
     codecs.put(enumClass, new ScmEnumCodec<>(enumClass, forNumber));
   }
 
-  private ScmCodecFactory() { }
+  public static ScmCodecFactory getInstance() {
+    return INSTANCE;
+  }
 
-  public static ScmCodec getCodec(Class<?> type)
+  public Class<?> resolve(String className)
       throws InvalidProtocolBufferException {
-    final List<Class<?>> classes = new ArrayList<>();
-    classes.add(type);
-    classes.addAll(ClassUtils.getAllSuperclasses(type));
-    classes.addAll(ClassUtils.getAllInterfaces(type));
-    for (Class<?> clazz : classes) {
-      if (codecs.containsKey(clazz)) {
-        return codecs.get(clazz);
-      }
+    return resolver.get(className);
+  }
+
+  public ScmCodec getCodec(Class<?> resolved) throws InvalidProtocolBufferException {
+    final ScmCodec<?> codec = codecs.get(resolved);
+    if (codec != null) {
+      return codec;
     }
-    throw new InvalidProtocolBufferException(
-        "Codec for " + type + " not found!");
+
+    throw new InvalidProtocolBufferException("Codec not found for " + resolved);
   }
 
   /** Resolve the codec class from a given class. */
@@ -120,22 +122,31 @@ public final class ScmCodecFactory {
     }
 
     Class<?> get(String className) throws InvalidProtocolBufferException {
-      final Class<?> c = provided.get(className);
-      if (c != null) {
-        return c;
-      }
-      throw new InvalidProtocolBufferException("Class not found for " + className);
+      return get(null, className);
     }
 
     Class<?> get(Class<?> clazz) throws InvalidProtocolBufferException {
-      final String className = clazz.getName();
+      return get(clazz, clazz.getName());
+    }
+
+    Class<?> get(Class<?> clazz, String className) throws InvalidProtocolBufferException {
+      Objects.requireNonNull(className, "className == null");
       final Class<?> c = provided.get(className);
       if (c != null) {
         return c;
       }
+
       final Class<?> found = resolved.get(className);
       if (found != null) {
         return found;
+      }
+
+      if (clazz == null) {
+        try {
+          clazz = Class.forName(className);
+        } catch (ClassNotFoundException e) {
+          throw new InvalidProtocolBufferException("Class not found for " + className, e);
+        }
       }
 
       for (Class<?> base : provided.values()) {
@@ -144,7 +155,8 @@ public final class ScmCodecFactory {
           return base;
         }
       }
-      throw new InvalidProtocolBufferException("Failed to resolve " + clazz);
+
+      throw new InvalidProtocolBufferException("Failed to resolve " + className);
     }
   }
 }
