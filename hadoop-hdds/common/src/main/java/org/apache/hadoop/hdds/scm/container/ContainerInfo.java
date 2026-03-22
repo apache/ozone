@@ -275,7 +275,6 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
         .setUsedBytes(getUsedBytes())
         .setNumberOfKeys(getNumberOfKeys()).setState(getState())
         .setStateEnterTime(getStateEnterTime().toEpochMilli())
-        .setContainerID(getContainerID())
         .setDeleteTransactionId(getDeleteTransactionId())
         .setOwner(getOwner())
         .setSequenceId(getSequenceId())
@@ -288,8 +287,6 @@ public final class ContainerInfo implements Comparable<ContainerInfo> {
       builder.setReplicationFactor(
           ReplicationConfig.getLegacyFactor(replicationConfig));
     }
-
-    builder.setReplicationType(replicationConfig.getReplicationType());
 
     if (getPipelineID() != null) {
       builder.setPipelineID(getPipelineID().getProtobuf());

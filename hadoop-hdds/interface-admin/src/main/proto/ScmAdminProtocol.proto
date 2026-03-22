@@ -606,6 +606,8 @@ message StartContainerBalancerRequestProto {
   optional bool networkTopologyEnable = 13;
   optional string includeNodes = 14;
   optional string excludeNodes = 15;
+  optional string excludeContainers = 16;
+  optional string includeContainers = 17;
 }
 
 message StartContainerBalancerResponseProto {

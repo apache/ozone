@@ -90,8 +90,8 @@ run cp "${ROOT}/hadoop-ozone/dist/src/shell/conf/scm-audit-log4j2.properties" "e
 run cp "${ROOT}/hadoop-ozone/dist/src/shell/conf/s3g-audit-log4j2.properties" "etc/hadoop"
 run cp "${ROOT}/hadoop-ozone/dist/src/shell/conf/ozone-site.xml" "etc/hadoop"
 run cp -f "${ROOT}/hadoop-ozone/dist/src/shell/conf/log4j.properties" "etc/hadoop"
-run cp "${ROOT}/hadoop-hdds/common/src/main/resources/network-topology-default.xml" "etc/hadoop"
-run cp "${ROOT}/hadoop-hdds/common/src/main/resources/network-topology-nodegroup.xml" "etc/hadoop"
+run cp "${ROOT}/hadoop-hdds/framework/src/main/resources/network-topology-default.xml" "etc/hadoop"
+run cp "${ROOT}/hadoop-hdds/framework/src/main/resources/network-topology-nodegroup.xml" "etc/hadoop"
 
 run cp -r "${ROOT}/hadoop-ozone/dist/src/main/dockerlibexec/." "libexec/"
 

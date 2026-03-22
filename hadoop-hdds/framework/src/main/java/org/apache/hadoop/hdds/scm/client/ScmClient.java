@@ -375,7 +375,9 @@ public interface ScmClient extends Closeable {
       Optional<Integer> moveReplicationTimeout,
       Optional<Boolean> networkTopologyEnable,
       Optional<String> includeNodes,
-      Optional<String> excludeNodes) throws IOException;
+      Optional<String> excludeNodes,
+      Optional<String> excludeContainers,
+      Optional<String> includeContainers) throws IOException;
 
   /**
    * Stop ContainerBalancer.

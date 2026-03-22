@@ -17,6 +17,8 @@
 
 package org.apache.hadoop.hdds.scm.cli.datanode;
 
+import static java.util.stream.Collectors.toList;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -72,8 +74,10 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
 
     // Display error messages for failed nodes
     if (!failedNodes.isEmpty()) {
-      System.err.printf("Failed to get DiskBalancer report from nodes: [%s]%n", 
-          String.join(", ", failedNodes));
+      System.err.printf("Failed to get DiskBalancer report from nodes: [%s]%n",
+          String.join(", ", failedNodes.stream()
+              .map(this::formatDatanodeDisplayName)
+              .collect(toList())));
     }
 
     // Display consolidated report for successful nodes
@@ -91,15 +95,18 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
         Double.compare(b.getCurrentVolumeDensitySum(), a.getCurrentVolumeDensitySum()));
 
     StringBuilder formatBuilder = new StringBuilder("Report result:%n" +
-        "%-50s %s%n");
+        "%-60s %s%n");
 
     List<String> contentList = new ArrayList<>();
     contentList.add("Datanode");
     contentList.add("VolumeDensity");
 
     for (DatanodeDiskBalancerInfoProto proto : sortedProtos) {
-      formatBuilder.append("%-50s %s%n");
-      contentList.add(proto.getNode().getHostName());
+      formatBuilder.append("%-60s %s%n");
+      // Format datanode string with hostname and IP address
+      String formattedDatanode = DiskBalancerSubCommandUtil.getDatanodeHostAndIp(
+          proto.getNode());
+      contentList.add(formattedDatanode);
       contentList.add(String.valueOf(proto.getCurrentVolumeDensitySum()));
     }
 
@@ -121,7 +128,10 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
   private Map<String, Object> createReportResult(
       HddsProtos.DatanodeDiskBalancerInfoProto report) {
     Map<String, Object> result = new LinkedHashMap<>();
-    result.put("datanode", report.getNode().getHostName());
+    // Format datanode string with hostname and IP address
+    String formattedDatanode = DiskBalancerSubCommandUtil.getDatanodeHostAndIp(
+        report.getNode());
+    result.put("datanode", formattedDatanode);
     result.put("action", "report");
     result.put("status", "success");
     result.put("volumeDensity", report.getCurrentVolumeDensitySum());

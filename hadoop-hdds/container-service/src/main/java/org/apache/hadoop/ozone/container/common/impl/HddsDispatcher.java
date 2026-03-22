@@ -399,12 +399,14 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
                   .getMessage());
         }
         // For container to be moved to unhealthy state here, the container can
-        // only be in open or closing state.
+        // only be in open, closing, or recovering state.
         State containerState = container.getContainerData().getState();
         Preconditions.checkState(
             containerState == State.OPEN
                 || containerState == State.CLOSING
-                || containerState == State.RECOVERING);
+                || containerState == State.RECOVERING,
+            "Expected container %s to be in OPEN/CLOSING/RECOVERING state but was %s",
+            containerID, containerState);
         // mark and persist the container state to be unhealthy
         try {
           ContainerScanError error = new ContainerScanError(ContainerScanError.FailureType.WRITE_FAILURE,
@@ -838,6 +840,9 @@ public class HddsDispatcher implements ContainerDispatcher, Auditor {
       long containerID = msg.getContainerID();
       Container container = getContainer(containerID);
       long startTime = Time.monotonicNow();
+
+      // Increment operation count metrics
+      metrics.incContainerOpsMetrics(cmdType);
 
       if (DispatcherContext.op(dispatcherContext).validateToken()) {
         validateToken(msg);
