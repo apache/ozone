@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
   default as ReactSelect,
   Props as ReactSelectProps,
@@ -28,6 +28,7 @@ import {
 } from 'react-select';
 
 import { selectStyles } from "@/v2/constants/select.constants";
+import MultiSelectMenuList from './multiSelectMenuList';
 
 
 // ------------- Types -------------- //
@@ -51,7 +52,7 @@ interface MultiSelectProps extends ReactSelectProps<Option, true> {
   onTagClose: (arg0: string) => void;
 }
 
-// ------------- Component -------------- //
+// ------------- Module-level sub-components -------------- //
 
 const OptionComponent: React.FC<OptionProps<Option, true>> = (props) => {
   return (
@@ -73,6 +74,21 @@ const OptionComponent: React.FC<OptionProps<Option, true>> = (props) => {
   );
 };
 
+// Defined at module level so the reference is stable — no useMemo required.
+// Suppresses react-select's blur-driven menu close while the user interacts
+// with the search box inside the menu.
+// searchInteracting ref is passed through react-select's selectProps.
+const MultiSelectInput = ({ onBlur, ...inputProps }: any) => {
+  const { searchInteracting } = inputProps.selectProps ?? {};
+  const handleBlur = (e: React.FocusEvent<HTMLElement>) => {
+    if (searchInteracting?.current) return;
+    if (onBlur) onBlur(e);
+  };
+  return <input {...inputProps} onBlur={handleBlur} />;
+};
+
+// ------------- Component -------------- //
+
 const MultiSelect: React.FC<MultiSelectProps> = ({
   options = [],
   selected = [],
@@ -93,7 +109,8 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // True while the user's pointer/keyboard focus is inside the search wrapper.
-  // Read by the stable InputComponent closure to decide whether to suppress blur.
+  // Passed via selectProps so MultiSelectInput and MultiSelectMenuList can
+  // suppress react-select's blur-driven close without a stale closure.
   const searchInteracting = useRef(false);
   // Ref to the outer container div — used to detect "focus left the widget".
   const containerRef = useRef<HTMLDivElement>(null);
@@ -105,36 +122,6 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 
   const fixedOptions = options.filter((opt) => fixedKeys.includes(opt.value));
   const selectableOptions = options.filter((opt) => !fixedKeys.includes(opt.value));
-
-  // Always-current values for use inside stable useMemo components.
-  const stateRef = useRef({
-    searchTerm,
-    setSearchTerm,
-    showSearch,
-    showSelectAll,
-    selected,
-    options,
-    selectableOptions,
-    fixedOptions,
-    fixedKeys,
-    onChange,
-    setIsMenuOpen,
-    containerRef
-  });
-  stateRef.current = {
-    searchTerm,
-    setSearchTerm,
-    showSearch,
-    showSelectAll,
-    selected,
-    options,
-    selectableOptions,
-    fixedOptions,
-    fixedKeys,
-    onChange,
-    setIsMenuOpen,
-    containerRef
-  };
 
   const filteredOptions = useMemo(() => {
     if (!showSearch || !searchTerm) return selectableOptions;
@@ -161,137 +148,20 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
     );
   };
 
-  // Stable custom Input — suppresses react-select's blur-driven menu close
-  // while the user interacts with the search box inside the menu.
-  const InputComponent = useMemo(
-    () => (({ onBlur, ...inputProps }: any) => {
-      const handleBlur = (e: React.FocusEvent<HTMLElement>) => {
-        if (searchInteracting.current) return;
-        if (onBlur) onBlur(e);
-      };
-      return <input {...inputProps} onBlur={handleBlur} />;
-    }) as React.FC,
-    [] // searchInteracting captured by ref — always current
-  );
-
-  // Stable MenuList — created once, reads current values from stateRef at
-  // call time to avoid stale closures without re-creating the component type.
-  const MenuListComponent = useMemo(
-    () => ({ children, ...menuListProps }: any) => {
-      const {
-        searchTerm,
-        setSearchTerm,
-        showSearch,
-        showSelectAll,
-        selected,
-        selectableOptions,
-        fixedOptions,
-        options,
-        onChange
-      } = stateRef.current;
-
-      const allSelected = selectableOptions.length > 0 &&
-        selectableOptions.every((opt: Option) => selected.some((s: Option) => s.value === opt.value));
-
-      const handleSelectAll = () => {
-        onChange([...fixedOptions, ...selectableOptions]);
-      };
-
-      const handleUnselectAll = () => {
-        onChange(fixedOptions as Option[]);
-      };
-
-      return (
-        <components.MenuList {...menuListProps}>
-          {showSearch && (
-            <div
-              style={{ padding: '8px 12px' }}
-              onMouseDown={(e) => {
-                searchInteracting.current = true;
-                e.preventDefault();
-              }}
-              onClick={() => {
-                const input = (e: any) => e?.target?.closest('[data-search-wrapper]')?.querySelector('input');
-                const el = document.querySelector('[data-search-wrapper] input') as HTMLInputElement | null;
-                if (el) el.focus();
-              }}
-              onFocus={() => { searchInteracting.current = true; }}
-              onBlur={() => {
-                searchInteracting.current = false;
-                setTimeout(() => {
-                  const container = stateRef.current.containerRef.current;
-                  if (container && !container.contains(document.activeElement)) {
-                    stateRef.current.setIsMenuOpen(false);
-                    stateRef.current.setSearchTerm('');
-                  }
-                }, 150);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') {
-                  searchInteracting.current = false;
-                  stateRef.current.setIsMenuOpen(false);
-                  stateRef.current.setSearchTerm('');
-                }
-                e.stopPropagation();
-              }}
-              data-search-wrapper='true'
-            >
-              <input
-                type='text'
-                placeholder='Search...'
-                value={searchTerm}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
-                onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                style={{
-                  width: '100%',
-                  padding: '6px 8px',
-                  borderRadius: '4px',
-                  border: '1px solid #d9d9d9',
-                  fontSize: '14px',
-                  boxSizing: 'border-box',
-                  outline: 'none'
-                }}
-              />
-            </div>
-          )}
-          {showSelectAll && (
-            <div
-              style={{
-                padding: '6px 12px',
-                cursor: 'pointer',
-                borderBottom: '1px solid #f0f0f0',
-                display: 'flex',
-                alignItems: 'center'
-              }}
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => allSelected ? handleUnselectAll() : handleSelectAll()}
-            >
-              <input
-                type='checkbox'
-                checked={allSelected}
-                onChange={() => null}
-                style={{ marginRight: '8px', accentColor: '#1AA57A' }}
-              />
-              <label style={{ cursor: 'pointer' }}>
-                {allSelected ? 'Unselect All' : 'Select All'}
-              </label>
-            </div>
-          )}
-          {children}
-        </components.MenuList>
-      );
-    },
-    [] // Stable reference — reads current values from stateRef
-  );
-
-  // Only intercept onMenuClose when showSearch is active so we can keep
-  // the dropdown open while the user interacts with the search box.
-  const handleMenuClose = useCallback(() => {
+  // Plain function — setters and refs are stable so no useCallback is needed.
+  // Guard against closing while the user is interacting with the search box.
+  // react-select fires onMenuClose when its DummyInput blurs, which also
+  // happens when we programmatically focus the search input (step in onClick).
+  // The searchInteracting ref blocks that false-positive close.
+  // For genuine outside clicks while the search box is focused, the race
+  // condition means this guard temporarily wins, but the 150ms onBlur
+  // fallback in MultiSelectMenuList closes the menu shortly after.
+  const handleMenuClose = () => {
     if (!searchInteracting.current) {
       setIsMenuOpen(false);
       setSearchTerm('');
     }
-  }, []);
+  };
 
   const searchModeProps = showSearch
     ? {
@@ -303,10 +173,28 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
 
   const finalStyles = { ...selectStyles, ...style ?? {} };
 
+  // Extra data passed via selectProps so the module-level MultiSelectMenuList
+  // and MultiSelectInput components can read current state without closures.
+  // customOnChange is renamed to avoid shadowing react-select's own onChange.
+  const menuListProps = {
+    searchTerm,
+    setSearchTerm,
+    showSearch,
+    showSelectAll,
+    selected,
+    selectableOptions,
+    fixedOptions,
+    customOnChange: onChange,
+    searchInteracting,
+    setIsMenuOpen,
+    containerRef
+  };
+
   const select = (
     <ReactSelect
       {...props}
       {...(searchModeProps as any)}
+      {...(menuListProps as any)}
       isMulti={true}
       closeMenuOnSelect={false}
       hideSelectedOptions={false}
@@ -318,8 +206,8 @@ const MultiSelect: React.FC<MultiSelectProps> = ({
       components={{
         ValueContainer,
         Option: OptionComponent,
-        MenuList: MenuListComponent,
-        ...(showSearch ? { Input: InputComponent } : {})
+        MenuList: MultiSelectMenuList,
+        ...(showSearch ? { Input: MultiSelectInput } : {})
       }}
       menuPortalTarget={document.body}
       placeholder={placeholder}
