@@ -409,25 +409,24 @@ public class ContainerEndpoint {
     List<UnhealthyContainersSummary> summary = new ArrayList<>();
 
     try {
-      ContainerSchemaDefinition.UnHealthyContainerStates v2State = null;
+      ContainerSchemaDefinition.UnHealthyContainerStates containerState = null;
 
       if (state != null) {
-        // Convert V1 state string to V2 enum
-        v2State = ContainerSchemaDefinition.UnHealthyContainerStates.valueOf(state);
+        containerState = ContainerSchemaDefinition.UnHealthyContainerStates.valueOf(state);
       }
 
       // Get summary from UNHEALTHY_CONTAINERS table and convert to V1 format
-      List<ContainerHealthSchemaManager.UnhealthyContainersSummary> v2Summary =
+      List<ContainerHealthSchemaManager.UnhealthyContainersSummary> unhealthyContainersSummary =
           containerHealthSchemaManager.getUnhealthyContainersSummary();
-      for (ContainerHealthSchemaManager.UnhealthyContainersSummary s : v2Summary) {
+      for (ContainerHealthSchemaManager.UnhealthyContainersSummary s : unhealthyContainersSummary) {
         summary.add(new UnhealthyContainersSummary(s.getContainerState(), s.getCount()));
       }
 
       // Get containers from UNHEALTHY_CONTAINERS table
-      List<ContainerHealthSchemaManager.UnhealthyContainerRecord> v2Containers =
-          containerHealthSchemaManager.getUnhealthyContainers(v2State, minContainerId, maxContainerId, limit);
+      List<ContainerHealthSchemaManager.UnhealthyContainerRecord> unhealthyContainers =
+          containerHealthSchemaManager.getUnhealthyContainers(containerState, minContainerId, maxContainerId, limit);
 
-      unhealthyMeta = v2Containers.stream()
+      unhealthyMeta = unhealthyContainers.stream()
           .map(this::toUnhealthyMetadata)
           .collect(Collectors.toList());
     } catch (UncheckedIOException ex) {

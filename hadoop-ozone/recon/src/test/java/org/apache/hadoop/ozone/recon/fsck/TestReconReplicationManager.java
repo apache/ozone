@@ -86,7 +86,7 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
   public void setUp() throws Exception {
     dao = getDao(UnhealthyContainersDao.class);
     schemaManagerV2 = new ContainerHealthSchemaManager(
-        getSchemaDefinition(ContainerSchemaDefinition.class), dao);
+        getSchemaDefinition(ContainerSchemaDefinition.class));
 
     containerManager = mock(ContainerManager.class);
     PlacementPolicy placementPolicy = mock(PlacementPolicy.class);
@@ -463,6 +463,7 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
             stateByContainer.get(containerInfo.getContainerID());
         if (state != null) {
           reconReport.incrementAndSample(state, containerInfo);
+          containerInfo.setHealthState(state);
           return true;
         }
         return false;
@@ -478,6 +479,7 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
             stateByContainer.get(containerInfo.getContainerID());
         if (state != null) {
           reconReport.incrementAndSample(state, containerInfo);
+          containerInfo.setHealthState(state);
           return true;
         }
         return false;

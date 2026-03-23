@@ -99,7 +99,8 @@ import org.slf4j.LoggerFactory;
  *       state in pages of {@value #READ_PAGE_SIZE}, without loading all rows
  *       into the JVM heap at once.</li>
  *   <li><b>Batch DELETE throughput</b> – removes records for half the
- *       container IDs (100 K × 5 states = 500 K rows) via a single
+ *       container IDs list covering all rows
+ *       (200 K × 5 states = 1 M rows) via a single
  *       IN-clause DELETE.</li>
  * </ol>
  *
@@ -111,9 +112,9 @@ import org.slf4j.LoggerFactory;
  *       compared with PostgreSQL / MySQL numbers.</li>
  *   <li>Timing thresholds are deliberately generous (≈ 10× expected) to be
  *       stable on slow CI machines. Actual durations are always logged.</li>
- *   <li>Uses {@code @TestInstance(PER_CLASS)} so the 1 M-row dataset is
- *       inserted exactly once in {@code @BeforeAll} and shared across all
- *       {@code @Test} methods in the class.</li>
+ *   <li>Uses {@code @TestInstance(PER_CLASS)} so database/schema setup is
+ *       done once in {@code @BeforeAll}; test methods then exercise
+ *       insert/replace/delete flows explicitly.</li>
  * </ul>
  */
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -162,14 +163,13 @@ public class TestUnhealthyContainersDerbyPerformance {
    * call in the delete test.
    *
    * <p>{@code batchDeleteSCMStatesForContainers} now handles internal
-   * chunking at {@link ContainerHealthSchemaManager#MAX_DELETE_CHUNK_SIZE}
-   * ({@value ContainerHealthSchemaManager#MAX_DELETE_CHUNK_SIZE} IDs per
-   * SQL statement) to stay within Derby's 64 KB generated-bytecode limit
+   * chunking at 1,000 IDs per SQL statement to stay within Derby's
+   * 64 KB generated-bytecode limit
    * (ERROR XBCM4).  This test-level constant controls how many IDs are
    * accumulated before each call and should match that limit so the test
    * exercises exactly one SQL DELETE per call.</p>
    */
-  private static final int DELETE_CHUNK_SIZE = 1_000;   // matches MAX_DELETE_CHUNK_SIZE
+  private static final int DELETE_CHUNK_SIZE = 1_000;
 
   /**
    * Number of records returned per page in the paginated-read tests.
@@ -202,8 +202,10 @@ public class TestUnhealthyContainersDerbyPerformance {
    */
   private static final long MAX_PAGINATED_READ_SECONDS = 60;
 
-  /** Maximum acceptable time to batch-delete 500 K rows. */
-  private static final long MAX_DELETE_SECONDS = 60;
+  /** Maximum acceptable time to batch-delete 1 M rows. */
+  private static final long MAX_DELETE_SECONDS = 180;
+  /** Maximum acceptable time for one atomic delete+insert replace cycle. */
+  private static final long MAX_ATOMIC_REPLACE_SECONDS = 300;
 
   // -----------------------------------------------------------------------
   // Infrastructure (shared for the life of this test class)
@@ -218,9 +220,8 @@ public class TestUnhealthyContainersDerbyPerformance {
   // -----------------------------------------------------------------------
 
   /**
-   * Initialises the embedded Derby database, creates the Recon schema, and
-   * inserts {@value #TOTAL_RECORDS} records.  This runs exactly once for the
-   * entire test class.
+   * Initialises the embedded Derby database and creates the Recon schema.
+   * Data population is done in dedicated test methods.
    *
    * <p>The {@code @TempDir} is injected as a <em>method parameter</em> rather
    * than a class field.  With {@code @TestInstance(PER_CLASS)}, a field-level
@@ -238,7 +239,7 @@ public class TestUnhealthyContainersDerbyPerformance {
    * </ul>
    */
   @BeforeAll
-  public void setUpDatabaseAndInsertData(@TempDir Path tempDir) throws Exception {
+  public void setUpDatabase(@TempDir Path tempDir) throws Exception {
     LOG.info("=== Derby Performance Benchmark — Setup ===");
     LOG.info("Dataset: {} states × {} container IDs = {} total records",
         TESTED_STATES.size(), CONTAINER_ID_RANGE, TOTAL_RECORDS);
@@ -272,21 +273,25 @@ public class TestUnhealthyContainersDerbyPerformance {
 
     dao = injector.getInstance(UnhealthyContainersDao.class);
     schemaDefinition = injector.getInstance(ContainerSchemaDefinition.class);
-    schemaManager = new ContainerHealthSchemaManager(schemaDefinition, dao);
+    schemaManager = new ContainerHealthSchemaManager(schemaDefinition);
+  }
 
-    // ----- Insert 1 M records in small per-transaction chunks -----
-    //
-    // Why chunked?  insertUnhealthyContainerRecords wraps its entire input in
-    // a single Derby transaction.  Passing all 1 M records at once forces Derby
-    // to buffer the full WAL before committing, which exhausts its log and
-    // causes the call to hang.  Committing every CONTAINERS_PER_TX containers
-    // (= 10 K rows) keeps each transaction small and lets Derby flush the log.
+  // -----------------------------------------------------------------------
+  // Test 1 — Batch INSERT performance for 1M records
+  // -----------------------------------------------------------------------
+
+  /**
+   * Inserts 1M records via batch operations and logs total time taken.
+   */
+  @Test
+  @Order(1)
+  public void testBatchInsertOneMillionRecords() {
     int txCount = (int) Math.ceil((double) CONTAINER_ID_RANGE / CONTAINERS_PER_TX);
-    LOG.info("Starting bulk INSERT: {} records  ({} containers/tx, {} transactions)",
+    LOG.info("--- Test 1: Batch INSERT {} records ({} containers/tx, {} transactions) ---",
         TOTAL_RECORDS, CONTAINERS_PER_TX, txCount);
 
     long now = System.currentTimeMillis();
-    long insertStart = System.nanoTime();
+    long start = System.nanoTime();
 
     for (int startId = 1; startId <= CONTAINER_ID_RANGE; startId += CONTAINERS_PER_TX) {
       int endId = Math.min(startId + CONTAINERS_PER_TX - 1, CONTAINER_ID_RANGE);
@@ -294,29 +299,24 @@ public class TestUnhealthyContainersDerbyPerformance {
       schemaManager.insertUnhealthyContainerRecords(chunk);
     }
 
-    long insertElapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - insertStart);
-    double insertThroughput = (double) TOTAL_RECORDS / (insertElapsedMs / 1000.0);
-    LOG.info("INSERT complete: {} records in {} ms  ({} rec/sec, {} tx)",
-        TOTAL_RECORDS, insertElapsedMs, String.format("%.0f", insertThroughput), txCount);
+    long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+    double throughput = (double) TOTAL_RECORDS / (elapsedMs / 1000.0);
+    LOG.info("Batch INSERT complete: {} records in {} ms ({} rec/sec, {} tx)",
+        TOTAL_RECORDS, elapsedMs, String.format("%.0f", throughput), txCount);
 
-    assertTrue(insertElapsedMs <= TimeUnit.SECONDS.toMillis(MAX_INSERT_SECONDS),
+    assertTrue(elapsedMs <= TimeUnit.SECONDS.toMillis(MAX_INSERT_SECONDS),
         String.format("INSERT took %d ms, exceeded %d s threshold",
-            insertElapsedMs, MAX_INSERT_SECONDS));
+            elapsedMs, MAX_INSERT_SECONDS));
   }
 
   // -----------------------------------------------------------------------
-  // Test 1 — Verify the inserted row count
+  // Test 2 — Verify the inserted row count
   // -----------------------------------------------------------------------
 
-  /**
-   * Verifies that all {@value #TOTAL_RECORDS} rows are present using a
-   * COUNT(*) over the full table.  This is the baseline correctness check
-   * for every subsequent read test.
-   */
   @Test
-  @Order(1)
+  @Order(2)
   public void testTotalInsertedRecordCountIsOneMillion() {
-    LOG.info("--- Test 1: Verify total row count = {} ---", TOTAL_RECORDS);
+    LOG.info("--- Test 2: Verify total row count = {} ---", TOTAL_RECORDS);
 
     long countStart = System.nanoTime();
     long totalCount = dao.count();
@@ -340,9 +340,9 @@ public class TestUnhealthyContainersDerbyPerformance {
    * <p>Each state must have exactly {@value #CONTAINER_ID_RANGE} records.</p>
    */
   @Test
-  @Order(2)
+  @Order(3)
   public void testCountByStatePerformanceUsesIndex() {
-    LOG.info("--- Test 2: COUNT(*) by state (index-covered, {} records each) ---",
+    LOG.info("--- Test 3: COUNT(*) by state (index-covered, {} records each) ---",
         CONTAINER_ID_RANGE);
 
     DSLContext dsl = schemaDefinition.getDSLContext();
@@ -380,9 +380,9 @@ public class TestUnhealthyContainersDerbyPerformance {
    * {@value #CONTAINER_ID_RANGE} records.</p>
    */
   @Test
-  @Order(3)
+  @Order(4)
   public void testGroupBySummaryQueryPerformance() {
-    LOG.info("--- Test 3: GROUP BY summary over {} rows ---", TOTAL_RECORDS);
+    LOG.info("--- Test 4: GROUP BY summary over {} rows ---", TOTAL_RECORDS);
 
     long start = System.nanoTime();
     List<UnhealthyContainersSummary> summary =
@@ -425,10 +425,10 @@ public class TestUnhealthyContainersDerbyPerformance {
    * </ul>
    */
   @Test
-  @Order(4)
+  @Order(5)
   public void testPaginatedReadByStatePerformance() {
     UnHealthyContainerStates targetState = UnHealthyContainerStates.UNDER_REPLICATED;
-    LOG.info("--- Test 4: Paginated read of {} ({} records, page size {}) ---",
+    LOG.info("--- Test 5: Paginated read of {} ({} records, page size {}) ---",
         targetState, CONTAINER_ID_RANGE, READ_PAGE_SIZE);
 
     int totalRead = 0;
@@ -491,9 +491,9 @@ public class TestUnhealthyContainersDerbyPerformance {
    * This measures aggregate read throughput across the entire dataset.
    */
   @Test
-  @Order(5)
+  @Order(6)
   public void testFullDatasetReadThroughputAllStates() {
-    LOG.info("--- Test 5: Full {} M record read (all states, paged) ---",
+    LOG.info("--- Test 6: Full {} M record read (all states, paged) ---",
         TOTAL_RECORDS / 1_000_000);
 
     long totalStart = System.nanoTime();
@@ -541,40 +541,92 @@ public class TestUnhealthyContainersDerbyPerformance {
   }
 
   // -----------------------------------------------------------------------
-  // Test 6 — Batch DELETE performance
+  // Test 7 — Atomic replace (delete + insert) performance for 1M records
   // -----------------------------------------------------------------------
 
   /**
-   * Deletes records for the first half of container IDs (1 – 100,000) across
-   * all five states by passing the complete 100 K ID list in one call to
+   * Exercises the same persistence pattern used by Recon health scan chunks:
+   * delete and insert in a single transaction.
+   *
+   * <p>This validates that {@link ContainerHealthSchemaManager#replaceUnhealthyContainerRecordsAtomically}
+   * can safely replace a large chunk without changing total row count and
+   * that rewritten records are visible with the new timestamp.</p>
+   */
+  @Test
+  @Order(7)
+  public void testAtomicReplaceDeleteAndInsertInSingleTransaction() {
+    int replaceContainerCount = CONTAINER_ID_RANGE;
+    long replacementTimestamp = System.currentTimeMillis() + 10_000;
+    int expectedRowsReplaced = replaceContainerCount * STATE_COUNT;
+
+    LOG.info("--- Test 7: Atomic replace — {} IDs × {} states = {} rows in one tx ---",
+        replaceContainerCount, STATE_COUNT, expectedRowsReplaced);
+
+    List<Long> idsToReplace = new ArrayList<>(replaceContainerCount);
+    for (long id = 1; id <= replaceContainerCount; id++) {
+      idsToReplace.add(id);
+    }
+    List<UnhealthyContainerRecord> replacementRecords =
+        generateRecordsForRange(1, replaceContainerCount, replacementTimestamp);
+
+    long start = System.nanoTime();
+    schemaManager.replaceUnhealthyContainerRecordsAtomically(idsToReplace, replacementRecords);
+    long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+    LOG.info("Atomic replace completed in {} ms", elapsedMs);
+
+    assertTrue(elapsedMs <= TimeUnit.SECONDS.toMillis(MAX_ATOMIC_REPLACE_SECONDS),
+        String.format("Atomic replace took %d ms, exceeded %d s threshold",
+            elapsedMs, MAX_ATOMIC_REPLACE_SECONDS));
+
+    long totalCount = dao.count();
+    assertEquals(TOTAL_RECORDS, totalCount,
+        "Atomic replace should not change total row count");
+
+    List<ContainerHealthSchemaManager.UnhealthyContainerRecord> firstPage =
+        schemaManager.getUnhealthyContainers(
+            UnHealthyContainerStates.UNDER_REPLICATED, 0, 0, 1);
+    assertEquals(1, firstPage.size(), "Expected first under-replicated row");
+    assertEquals(1L, firstPage.get(0).getContainerId(),
+        "Expected containerId=1 as first row for UNDER_REPLICATED");
+    assertEquals(replacementTimestamp, firstPage.get(0).getInStateSince(),
+        "Replaced rows should carry the replacement timestamp");
+  }
+
+  // -----------------------------------------------------------------------
+  // Test 8 — Batch DELETE performance for 1M records
+  // -----------------------------------------------------------------------
+
+  /**
+   * Deletes records for all container IDs (1 – 200,000) across
+   * all five states by passing the complete ID list in one call to
    * {@link ContainerHealthSchemaManager#batchDeleteSCMStatesForContainers}.
    *
    * <p>{@code batchDeleteSCMStatesForContainers} now handles internal
-   * chunking at {@link ContainerHealthSchemaManager#MAX_DELETE_CHUNK_SIZE}
+   * chunking at {@value #DELETE_CHUNK_SIZE}
    * IDs per SQL statement to stay within Derby's 64 KB generated-bytecode
    * limit (JVM ERROR XBCM4).  Passing 100 K IDs in a single call is safe
-   * because the method partitions them internally into 100 statements of
+   * because the method partitions them internally into 200 statements of
    * 1,000 IDs each — matching Recon's real scan-cycle pattern for large
    * clusters.</p>
    *
-   * <p>Expected outcome: 100 K × 5 states = 500 K rows deleted, 500 K remain.</p>
+   * <p>Expected outcome: 200 K × 5 states = 1 M rows deleted, 0 remain.</p>
    *
    * <p><b>Note:</b> this test modifies the shared dataset, so it runs after
    * all read-only tests.</p>
    */
   @Test
-  @Order(6)
-  public void testBatchDeletePerformanceHalfTheContainers() {
-    int deleteCount = CONTAINER_ID_RANGE / 2;           // 100 000 container IDs
-    int expectedDeleted = deleteCount * STATE_COUNT;    // 500 000 rows
+  @Order(8)
+  public void testBatchDeletePerformanceOneMillionRecords() {
+    int deleteCount = CONTAINER_ID_RANGE;               // 200 000 container IDs
+    int expectedDeleted = deleteCount * STATE_COUNT;    // 1 000 000 rows
     int expectedRemaining = TOTAL_RECORDS - expectedDeleted;
     int internalChunks = (int) Math.ceil(
-        (double) deleteCount / ContainerHealthSchemaManager.MAX_DELETE_CHUNK_SIZE);
+        (double) deleteCount / DELETE_CHUNK_SIZE);
 
-    LOG.info("--- Test 6: Batch DELETE — {} IDs × {} states = {} rows  "
+    LOG.info("--- Test 8: Batch DELETE — {} IDs × {} states = {} rows  "
             + "({} internal SQL statements of {} IDs) ---",
         deleteCount, STATE_COUNT, expectedDeleted,
-        internalChunks, ContainerHealthSchemaManager.MAX_DELETE_CHUNK_SIZE);
+        internalChunks, DELETE_CHUNK_SIZE);
 
     long start = System.nanoTime();
 
@@ -607,19 +659,17 @@ public class TestUnhealthyContainersDerbyPerformance {
   }
 
   // -----------------------------------------------------------------------
-  // Test 7 — Re-read counts after partial delete
+  // Test 9 — Re-read counts after full delete
   // -----------------------------------------------------------------------
 
   /**
-   * After the deletion in Test 6, verifies that each state has exactly
-   * {@code CONTAINER_ID_RANGE / 2} records (100 K), confirming that the
-   * index-covered COUNT query remains accurate after a large delete.
+   * After full delete, verifies that each state has 0 records.
    */
   @Test
-  @Order(7)
-  public void testCountByStateAfterPartialDelete() {
-    int expectedPerState = CONTAINER_ID_RANGE / 2;
-    LOG.info("--- Test 7: COUNT by state after 50%% delete (expected {} each) ---",
+  @Order(9)
+  public void testCountByStateAfterFullDelete() {
+    int expectedPerState = 0;
+    LOG.info("--- Test 9: COUNT by state after full delete (expected {} each) ---",
         expectedPerState);
 
     DSLContext dsl = schemaDefinition.getDSLContext();
@@ -636,7 +686,7 @@ public class TestUnhealthyContainersDerbyPerformance {
       LOG.info("  COUNT({}) = {} rows in {} ms", state, stateCount, elapsedMs);
 
       assertEquals(expectedPerState, stateCount,
-          "After partial delete, state " + state
+          "After full delete, state " + state
               + " should have exactly " + expectedPerState + " records");
     }
   }

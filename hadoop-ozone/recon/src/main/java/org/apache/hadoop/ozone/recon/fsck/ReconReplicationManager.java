@@ -298,6 +298,7 @@ public class ReconReplicationManager extends ReplicationManager {
     final List<ContainerInfo> containers = containerManager.getContainers();
 
     LOG.info("Processing {} containers", containers.size());
+    final int logEvery = Math.max(1, containers.size() / 100);
 
     // Process each container (reuses inherited processContainer and health check chain)
     int processedCount = 0;
@@ -320,7 +321,7 @@ public class ReconReplicationManager extends ReplicationManager {
 
         processedCount++;
 
-        if (processedCount % 10000 == 0) {
+        if (processedCount % logEvery == 0 || processedCount == containers.size()) {
           LOG.info("Processed {}/{} containers", processedCount, containers.size());
         }
       } catch (ContainerNotFoundException e) {
@@ -351,21 +352,6 @@ public class ReconReplicationManager extends ReplicationManager {
     long currentTime = System.currentTimeMillis();
     ProcessingStats totalStats = new ProcessingStats();
     int totalReplicaMismatchCount = 0;
-    Set<ContainerID> missingContainers = unionAsIdSet(report,
-        ContainerHealthState.MISSING,
-        ContainerHealthState.QUASI_CLOSED_STUCK_MISSING,
-        ContainerHealthState.MISSING_UNDER_REPLICATED);
-    Set<ContainerID> underReplicatedContainers = unionAsIdSet(report,
-        ContainerHealthState.UNDER_REPLICATED,
-        ContainerHealthState.UNHEALTHY_UNDER_REPLICATED,
-        ContainerHealthState.QUASI_CLOSED_STUCK_UNDER_REPLICATED,
-        ContainerHealthState.MISSING_UNDER_REPLICATED);
-    Set<ContainerID> overReplicatedContainers = unionAsIdSet(report,
-        ContainerHealthState.OVER_REPLICATED,
-        ContainerHealthState.UNHEALTHY_OVER_REPLICATED,
-        ContainerHealthState.QUASI_CLOSED_STUCK_OVER_REPLICATED);
-    Set<ContainerID> misReplicatedContainers =
-        asIdSet(report, ContainerHealthState.MIS_REPLICATED);
     logUnmappedScmStates(report);
     Set<ContainerID> replicaMismatchContainers =
         new HashSet<>(report.getReplicaMismatchContainers());
@@ -385,25 +371,33 @@ public class ReconReplicationManager extends ReplicationManager {
         ContainerInfo container = allContainers.get(i);
         ContainerID containerId = container.containerID();
         try {
-          if (missingContainers.contains(containerId)) {
+          ContainerHealthState healthState = container.getHealthState();
+          if (healthState == ContainerHealthState.MISSING
+              || healthState == ContainerHealthState.QUASI_CLOSED_STUCK_MISSING
+              || healthState == ContainerHealthState.MISSING_UNDER_REPLICATED) {
             handleMissingContainer(containerId, currentTime, recordsToInsert,
                 chunkStats);
           }
-          if (underReplicatedContainers.contains(containerId)) {
+          if (healthState == ContainerHealthState.UNDER_REPLICATED
+              || healthState == ContainerHealthState.UNHEALTHY_UNDER_REPLICATED
+              || healthState == ContainerHealthState.QUASI_CLOSED_STUCK_UNDER_REPLICATED
+              || healthState == ContainerHealthState.MISSING_UNDER_REPLICATED) {
             chunkStats.incrementUnderRepCount();
             handleReplicaStateContainer(containerId, currentTime,
                 UnHealthyContainerStates.UNDER_REPLICATED,
                 recordsToInsert,
                 negativeSizeRecorded, chunkStats);
           }
-          if (overReplicatedContainers.contains(containerId)) {
+          if (healthState == ContainerHealthState.OVER_REPLICATED
+              || healthState == ContainerHealthState.UNHEALTHY_OVER_REPLICATED
+              || healthState == ContainerHealthState.QUASI_CLOSED_STUCK_OVER_REPLICATED) {
             chunkStats.incrementOverRepCount();
             handleReplicaStateContainer(containerId, currentTime,
                 UnHealthyContainerStates.OVER_REPLICATED,
                 recordsToInsert,
                 negativeSizeRecorded, chunkStats);
           }
-          if (misReplicatedContainers.contains(containerId)) {
+          if (healthState == ContainerHealthState.MIS_REPLICATED) {
             chunkStats.incrementMisRepCount();
             handleReplicaStateContainer(containerId, currentTime,
                 UnHealthyContainerStates.MIS_REPLICATED,
@@ -550,40 +544,13 @@ public class ReconReplicationManager extends ReplicationManager {
     }
   }
 
-  private Set<ContainerID> asIdSet(ReconReplicationManagerReport report,
-      ContainerHealthState state) {
-    List<ContainerID> containers = report.getAllContainers(state);
-    if (containers.isEmpty()) {
-      return Collections.emptySet();
-    }
-    return new HashSet<>(containers);
-  }
-
-  private Set<ContainerID> unionAsIdSet(ReconReplicationManagerReport report,
-      ContainerHealthState... states) {
-    Set<ContainerID> result = null;
-    for (ContainerHealthState state : states) {
-      List<ContainerID> containers = report.getAllContainers(state);
-      if (containers.isEmpty()) {
-        continue;
-      }
-      if (result == null) {
-        result = new HashSet<>();
-      }
-      result.addAll(containers);
-    }
-    return result == null ? Collections.emptySet() : result;
-  }
-
   private void logUnmappedScmStates(ReconReplicationManagerReport report) {
-    for (Map.Entry<ContainerHealthState, List<ContainerID>> entry :
-        report.getAllContainersByState().entrySet()) {
-      ContainerHealthState state = entry.getKey();
+    for (ContainerHealthState state : ContainerHealthState.values()) {
       if (isMappedScmState(state)) {
         continue;
       }
-      int count = entry.getValue().size();
-      if (count > 0) {
+      long count = report.getStat(state);
+      if (count > 0L) {
         LOG.warn("SCM state {} has {} containers but is not mapped to "
                 + "UNHEALTHY_CONTAINERS allowed states; skipping persistence "
                 + "for this state in this run",

@@ -24,7 +24,6 @@ import static org.jooq.impl.DSL.count;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
-import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -35,15 +34,12 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition;
 import org.apache.ozone.recon.schema.ContainerSchemaDefinition.UnHealthyContainerStates;
-import org.apache.ozone.recon.schema.generated.tables.daos.UnhealthyContainersDao;
-import org.apache.ozone.recon.schema.generated.tables.pojos.UnhealthyContainers;
 import org.apache.ozone.recon.schema.generated.tables.records.UnhealthyContainersRecord;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.OrderField;
 import org.jooq.Record;
 import org.jooq.SelectQuery;
-import org.jooq.exception.DataAccessException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,22 +66,24 @@ public class ContainerHealthSchemaManager {
    */
   static final int MAX_DELETE_CHUNK_SIZE = 1_000;
 
-  private final UnhealthyContainersDao unhealthyContainersDao;
   private final ContainerSchemaDefinition containerSchemaDefinition;
 
   @Inject
   public ContainerHealthSchemaManager(
-      ContainerSchemaDefinition containerSchemaDefinition,
-      UnhealthyContainersDao unhealthyContainersDao) {
-    this.unhealthyContainersDao = unhealthyContainersDao;
+      ContainerSchemaDefinition containerSchemaDefinition) {
     this.containerSchemaDefinition = containerSchemaDefinition;
   }
 
   /**
-   * Insert or update unhealthy container records in UNHEALTHY_CONTAINERS table using TRUE batch insert.
-   * Uses JOOQ's batch API for optimal performance (single SQL statement for all records).
-   * Falls back to individual insert-or-update if batch insert fails (e.g., duplicate keys).
+   * Insert unhealthy container records in UNHEALTHY_CONTAINERS table using
+   * true batch insert.
+   *
+   * <p>In the health-task flow, inserts are preceded by delete in the same
+   * transaction via {@link #replaceUnhealthyContainerRecordsAtomically(List, List)}.
+   * Therefore duplicate-key fallback is not expected and this method fails fast
+   * on any insert error.</p>
    */
+  @VisibleForTesting
   public void insertUnhealthyContainerRecords(List<UnhealthyContainerRecord> recs) {
     if (recs == null || recs.isEmpty()) {
       return;
@@ -104,11 +102,6 @@ public class ContainerHealthSchemaManager {
 
       LOG.debug("Batch inserted {} unhealthy container records", recs.size());
 
-    } catch (DataAccessException e) {
-      // Batch insert failed (likely duplicate key) - fall back to insert-or-update per record
-      LOG.warn("Batch insert failed, falling back to individual insert-or-update for {} records",
-          recs.size(), e);
-      fallbackInsertOrUpdate(recs);
     } catch (Exception e) {
       LOG.error("Failed to batch insert records into {}", UNHEALTHY_CONTAINERS_TABLE_NAME, e);
       throw new RuntimeException("Recon failed to insert " + recs.size() +
@@ -131,34 +124,6 @@ public class ContainerHealthSchemaManager {
     }
   }
 
-  private void fallbackInsertOrUpdate(List<UnhealthyContainerRecord> recs) {
-    try (Connection connection = containerSchemaDefinition.getDataSource().getConnection()) {
-      connection.setAutoCommit(false);
-      try {
-        for (UnhealthyContainerRecord rec : recs) {
-          UnhealthyContainers jooqRec = toJooqPojo(rec);
-          try {
-            unhealthyContainersDao.insert(jooqRec);
-          } catch (DataAccessException insertEx) {
-            // Duplicate key - update existing record
-            unhealthyContainersDao.update(jooqRec);
-          }
-        }
-        connection.commit();
-      } catch (Exception innerEx) {
-        connection.rollback();
-        LOG.error("Transaction rolled back during fallback insert", innerEx);
-        throw innerEx;
-      } finally {
-        connection.setAutoCommit(true);
-      }
-    } catch (Exception fallbackEx) {
-      LOG.error("Failed to insert {} records even with fallback", recs.size(), fallbackEx);
-      throw new RuntimeException("Recon failed to insert " + recs.size() +
-          " unhealthy container records.", fallbackEx);
-    }
-  }
-
   private UnhealthyContainersRecord toJooqRecord(DSLContext txContext,
       UnhealthyContainerRecord rec) {
     UnhealthyContainersRecord record = txContext.newRecord(UNHEALTHY_CONTAINERS);
@@ -170,17 +135,6 @@ public class ContainerHealthSchemaManager {
     record.setReplicaDelta(rec.getReplicaDelta());
     record.setReason(rec.getReason());
     return record;
-  }
-
-  private UnhealthyContainers toJooqPojo(UnhealthyContainerRecord rec) {
-    return new UnhealthyContainers(
-        rec.getContainerId(),
-        rec.getContainerState(),
-        rec.getInStateSince(),
-        rec.getExpectedReplicaCount(),
-        rec.getActualReplicaCount(),
-        rec.getReplicaDelta(),
-        rec.getReason());
   }
 
   /**
