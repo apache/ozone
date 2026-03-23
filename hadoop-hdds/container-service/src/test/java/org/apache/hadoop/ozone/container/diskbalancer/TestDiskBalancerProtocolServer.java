@@ -63,7 +63,6 @@ class TestDiskBalancerProtocolServer {
   private static final int TEST_VOLUME_INFO_COUNT = 2;
 
   private DatanodeStateMachine datanodeStateMachine;
-  private OzoneContainer ozoneContainer;
   private DiskBalancerService diskBalancerService;
   private DiskBalancerInfo diskBalancerInfo;
   private PrivilegedOperation denyAdminChecker;
@@ -72,7 +71,7 @@ class TestDiskBalancerProtocolServer {
   @BeforeEach
   void setup() throws IOException {
     datanodeStateMachine = mock(DatanodeStateMachine.class);
-    ozoneContainer = mock(OzoneContainer.class);
+    OzoneContainer ozoneContainer = mock(OzoneContainer.class);
     when(datanodeStateMachine.getContainer()).thenReturn(ozoneContainer);
     diskBalancerService = mock(DiskBalancerService.class);
     when(ozoneContainer.getDiskBalancerService()).thenReturn(diskBalancerService);

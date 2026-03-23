@@ -99,9 +99,9 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
       String dn = DiskBalancerSubCommandUtil.getDatanodeHostAndIp(p.getNode());
 
       StringBuilder header = new StringBuilder();
-      header.append("Datanode: ").append(dn).append("\n");
+      header.append("Datanode: ").append(dn).append('\n');
       header.append("Aggregate VolumeDataDensity: ").
-          append(p.getCurrentVolumeDensitySum()).append("\n");
+          append(p.getCurrentVolumeDensitySum()).append('\n');
 
       if (p.hasIdealUsage() && p.hasDiskBalancerConf()
           && p.getDiskBalancerConf().hasThreshold()) {
@@ -110,10 +110,10 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
         double lt = idealUsage - threshold / 100.0;
         double ut = idealUsage + threshold / 100.0;
         header.append("IdealUsage: ").append(idealUsage);
-        header.append(" | Threshold: ").append(threshold).append("%");
+        header.append(" | Threshold: ").append(threshold).append('%');
         header.append(" | ThresholdRange: (").append(lt);
-        header.append(", ").append(ut).append(")").append("\n\n");
-        header.append("Volume Details -:").append("\n");
+        header.append(", ").append(ut).append(')').append('\n').append('\n');
+        header.append("Volume Details -:").append('\n');
       }
       formatBuilder.append("%s%n");
       contentList.add(header.toString());

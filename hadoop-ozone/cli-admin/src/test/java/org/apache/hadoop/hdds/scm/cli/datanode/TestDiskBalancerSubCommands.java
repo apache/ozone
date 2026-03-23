@@ -761,8 +761,8 @@ public class TestDiskBalancerSubCommands {
 
     DiskBalancerConfigurationProto configProto = createConfigProto(threshold, 100L, 5, true);
 
-    long committed1 = Math.abs(random.nextLong()) % (1024L * 1024 * 1024);
-    long committed2 = Math.abs(random.nextLong()) % (1024L * 1024 * 1024);
+    long committed1 = (random.nextLong() & Long.MAX_VALUE) % (1024L * 1024 * 1024);
+    long committed2 = (random.nextLong() & Long.MAX_VALUE) % (1024L * 1024 * 1024);
     VolumeReportProto vol1 = VolumeReportProto.newBuilder()
         .setStorageId("DISK-" + hostname + "-vol1")
         .setUtilization(idealUsage + random.nextDouble() * 0.1)

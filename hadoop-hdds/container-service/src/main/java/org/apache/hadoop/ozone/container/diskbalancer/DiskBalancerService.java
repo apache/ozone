@@ -706,7 +706,7 @@ public class DiskBalancerService extends BackgroundService {
    * @throws IllegalArgumentException if volumeSet is null or empty
    */
   public static List<VolumeReportProto> buildVolumeReportProto(List<VolumeFixedUsage> volumeSet) {
-    if (volumeSet == null || volumeSet.size() < 1) {
+    if (volumeSet == null || volumeSet.isEmpty()) {
       return Collections.emptyList();
     }
 
