@@ -57,7 +57,6 @@
     <commons-compress.version>1.28.0</commons-compress.version>
     <commons-configuration2.version>2.13.0</commons-configuration2.version>
     <commons-csv.version>1.14.1</commons-csv.version>
-    <commons-daemon.version>1.4.0</commons-daemon.version>
     <commons-fileupload.version>1.6.0</commons-fileupload.version>
     <commons-io.version>2.21.0</commons-io.version>
     <commons-lang3.version>3.20.0</commons-lang3.version>
@@ -538,11 +537,6 @@
         <version>${commons-codec.version}</version>
       </dependency>
       <dependency>
-        <groupId>commons-daemon</groupId>
-        <artifactId>commons-daemon</artifactId>
-        <version>${commons-daemon.version}</version>
-      </dependency>
-      <dependency>
         <groupId>commons-fileupload</groupId>
         <artifactId>commons-fileupload</artifactId>
         <version>${commons-fileupload.version}</version>
@@ -911,6 +905,10 @@
           <exclusion>
             <groupId>com.sun.jersey</groupId>
             <artifactId>*</artifactId>
+          </exclusion>
+          <exclusion>
+            <groupId>commons-daemon</groupId>
+            <artifactId>commons-daemon</artifactId>
           </exclusion>
           <exclusion>
             <groupId>io.netty</groupId>
