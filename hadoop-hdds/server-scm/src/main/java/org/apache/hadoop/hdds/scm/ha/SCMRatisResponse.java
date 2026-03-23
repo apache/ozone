@@ -73,7 +73,7 @@ public final class SCMRatisResponse {
       return Message.EMPTY;
     }
 
-    final Class<?> resolved = FACTORY.resolve(type.getName());
+    final Class<?> resolved = FACTORY.resolve(type);
 
     final SCMRatisResponseProto response = SCMRatisResponseProto.newBuilder()
         .setType(type.getName())

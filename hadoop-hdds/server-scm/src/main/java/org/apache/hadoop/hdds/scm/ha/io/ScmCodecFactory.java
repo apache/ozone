@@ -49,6 +49,7 @@ import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferExce
 public final class ScmCodecFactory {
 
   private final Map<Class<?>, ScmCodec<?>> codecs = new HashMap<>();
+  private final Map<String, Class<?>> classes = new ConcurrentHashMap<>();
   private final ClassResolver resolver;
   private static final ScmCodecFactory INSTANCE = new ScmCodecFactory();
 
@@ -93,9 +94,12 @@ public final class ScmCodecFactory {
     return INSTANCE;
   }
 
-  public Class<?> resolve(String className)
-      throws InvalidProtocolBufferException {
+  public Class<?> resolve(String className) throws InvalidProtocolBufferException {
     return resolver.get(className);
+  }
+
+  public Class<?> resolve(Class<?> clazz) throws InvalidProtocolBufferException {
+    return resolver.get(clazz);
   }
 
   public ScmCodec getCodec(Class<?> resolved) throws InvalidProtocolBufferException {
@@ -107,14 +111,20 @@ public final class ScmCodecFactory {
     throw new InvalidProtocolBufferException("Codec not found for " + resolved);
   }
 
-  public Class<?> getClass(String className)
-      throws InvalidProtocolBufferException {
-    try {
-      return Class.forName(className);
-    } catch (ClassNotFoundException e) {
-      throw new InvalidProtocolBufferException(
-          "Class not found for " + className, e);
+  public Class<?> getClass(String className) throws InvalidProtocolBufferException {
+    final Class<?> found = classes.get(className);
+    if (found != null) {
+      return found;
     }
+
+    final Class<?> clazz;
+    try {
+      clazz = Class.forName(className);
+    } catch (ClassNotFoundException e) {
+      throw new InvalidProtocolBufferException("Class not found for " + className, e);
+    }
+    classes.put(className, clazz);
+    return clazz;
   }
 
   /** Resolve the codec class from a given class. */
@@ -152,11 +162,7 @@ public final class ScmCodecFactory {
       }
 
       if (clazz == null) {
-        try {
-          clazz = Class.forName(className);
-        } catch (ClassNotFoundException e) {
-          throw new InvalidProtocolBufferException("Class not found for " + className, e);
-        }
+        clazz = getInstance().getClass(className);
       }
 
       for (Class<?> base : provided.values()) {
