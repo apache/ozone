@@ -854,6 +854,9 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       ReplicationQueue repQueue, ReplicationManagerReport report,
       boolean readOnly) throws ContainerNotFoundException {
     synchronized (containerInfo) {
+      // Reset health state to HEALTHY before processing this container
+      report.resetContainerHealthState();
+      
       ContainerID containerID = containerInfo.containerID();
       final boolean isEC = isEC(containerInfo.getReplicationConfig());
 
@@ -878,7 +881,10 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
       if (!handled) {
         LOG.debug("Container {} had no actions after passing through the " +
             "check chain", containerInfo.containerID());
+        // Container remains HEALTHY (set at start of loop)
       }
+      // Apply final health state from report to container
+      containerInfo.setHealthState(report.getContainerHealthState());
       return handled;
     }
   }

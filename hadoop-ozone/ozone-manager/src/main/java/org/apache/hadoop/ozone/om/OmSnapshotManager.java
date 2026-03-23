@@ -284,12 +284,23 @@ public final class OmSnapshotManager implements AutoCloseable {
 
   public static boolean isSnapshotPurged(SnapshotChainManager chainManager, OMMetadataManager omMetadataManager,
       UUID snapshotId, TransactionInfo transactionInfo) throws IOException {
+    boolean purgeFlushed = transactionInfo != null &&
+        isTransactionFlushedToDisk(omMetadataManager, transactionInfo);
     String tableKey = chainManager.getTableKey(snapshotId);
     if (tableKey == null) {
-      return true;
+      // Snapshot chain is rebuilt from DB on every OM restart (loadFromSnapshotInfoTable),
+      // but entries committed to the Raft log (but not yet flushed) after the restart
+      // are applied in addToDBBatch (skipping validateAndUpdateCache), so they never call
+      // addSnapshot(). This can affect any OM (leader or follower) after a restart.
+      //
+      // Need to fall back to transactionInfo. null means no purge has been recorded. Treat as active.
+      LOG.debug("snapshotId {} has null tableKey in SnapshotChainManager. "
+              + "transactionInfo={} purgeFlushed={}. Returning {}",
+          snapshotId, transactionInfo, purgeFlushed, purgeFlushed);
+      return purgeFlushed;
     }
-    return !omMetadataManager.getSnapshotInfoTable().isExist(tableKey) && transactionInfo != null &&
-        isTransactionFlushedToDisk(omMetadataManager, transactionInfo);
+    boolean inDB = omMetadataManager.getSnapshotInfoTable().isExist(tableKey);
+    return !inDB && purgeFlushed;
   }
 
   /**
@@ -371,8 +382,12 @@ public final class OmSnapshotManager implements AutoCloseable {
           }
           try (OmSnapshotLocalDataManager.ReadableOmSnapshotLocalDataMetaProvider snapshotLocalDataProvider =
                    snapshotLocalDataManager.getOmSnapshotLocalDataMeta(snapshotInfo)) {
+            final OmSnapshotLocalDataManager.SnapshotVersionsMeta snapshotMeta = snapshotLocalDataProvider.getMeta();
+            if (snapshotMeta == null) {
+              throw new OMException("Snapshot local metadata is missing for snapshotId: " + snapshotId, FILE_NOT_FOUND);
+            }
             snapshotMetadataManager = getSnapshotOmMetadataManager(snapshotInfo,
-                snapshotLocalDataProvider.getMeta().getVersion(), maxOpenSstFilesInSnapshotDb, conf);
+                snapshotMeta.getVersion(), maxOpenSstFilesInSnapshotDb, conf);
           }
         } catch (IOException e) {
           LOG.error("Failed to retrieve snapshot: {}", snapshotTableKey, e);
@@ -830,7 +845,7 @@ public final class OmSnapshotManager implements AutoCloseable {
       return new SnapshotDiffResponse(diffReport, DONE, 0L);
     }
 
-    int index = getIndexFromToken(token);
+    String index = validateToken(token);
     if (pageSize <= 0 || pageSize > maxPageSize) {
       pageSize = maxPageSize;
     }
@@ -954,24 +969,18 @@ public final class OmSnapshotManager implements AutoCloseable {
     return inFlightSnapshotCount.get();
   }
 
-  private int getIndexFromToken(final String token) throws IOException {
+  private String validateToken(final String token) throws IOException {
     if (isBlank(token)) {
-      return 0;
+      return "";
     }
 
-    // Validate that token passed in the request is valid integer as of now.
-    // Later we can change it if we migrate to encrypted or cursor token.
-    try {
-      int index = Integer.parseInt(token);
-      if (index < 0) {
-        throw new IOException("Passed token is invalid. Resend the request " +
-            "with valid token returned in previous request.");
-      }
-      return index;
-    } catch (NumberFormatException exception) {
+    // Validate that the token passed in the request matches the expected format:
+    // <diffTypePrefix><20-digit-padded-index>. Update this logic if the token format changes in the future.
+    if (!token.matches("[0-9]+")) {
       throw new IOException("Passed token is invalid. " +
           "Resend the request with valid token returned in previous request.");
     }
+    return token;
   }
 
   private ManagedRocksDB createRocksDbForSnapshotDiff(

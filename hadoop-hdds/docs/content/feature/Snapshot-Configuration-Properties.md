@@ -33,7 +33,7 @@ These parameters, defined in `ozone-site.xml`, control how Ozone manages snapsho
 *   **General Snapshot Management**
     *   `ozone.om.fs.snapshot.max.limit`: Max snapshots per bucket (Default: 10000). Safety limit.
     *   `ozone.om.ratis.snapshot.dir`: The directory where OM Ratis snapshots are stored (Default: ratis-snapshot under OM DB dir).
-    *   `ozone.om.ratis.snapshot.max.total.sst.size`: The maximum total size of SST files to be included in a Ratis snapshot (Default: 100000000).
+    *   `ozone.om.ratis.snapshot.max.total.sst.size`: The maximum total size of SST files to be included in a Ratis snapshot (Default: 10737418240).
     *   `ozone.om.snapshot.load.native.lib`: Use native RocksDB library for snapshot operations (Default: true). Set to false as a workaround for native library issues.
     *   `ozone.om.snapshot.checkpoint.dir.creation.poll.timeout`: Timeout for polling the creation of the snapshot checkpoint directory (Default: 20s).
 
