@@ -79,8 +79,8 @@ public final class ScmCodecFactory {
   }
 
   static <T extends Message> void putProto(T proto) {
-    codecs.put(proto.getClass(),
-        new ScmNonShadedGeneratedMessageCodec<>(proto.getParserForType()));
+    final Class<? extends Message> clazz = proto.getClass();
+    codecs.put(clazz, new ScmNonShadedGeneratedMessageCodec<>(clazz.getSimpleName(), proto.getParserForType()));
   }
 
   static <T extends Enum<T> & ProtocolMessageEnum> void putEnum(

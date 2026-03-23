@@ -15,25 +15,17 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hdds.scm.ha.io;
+package org.apache.hadoop.hdds.tracing;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
-
-import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
-import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
- * {@link ScmCodec} for {@code String} objects.
+ * Annotation to mark methods that should be excluded from tracing.
  */
-public class ScmStringCodec implements ScmCodec<String> {
-  @Override
-  public ByteString serialize(String object) {
-    // getBytes returns a new array
-    return UnsafeByteOperations.unsafeWrap(object.getBytes(UTF_8));
-  }
-
-  @Override
-  public String deserialize(ByteString value) {
-    return new String(value.toByteArray(), UTF_8);
-  }
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.METHOD)
+public @interface SkipTracing {
 }

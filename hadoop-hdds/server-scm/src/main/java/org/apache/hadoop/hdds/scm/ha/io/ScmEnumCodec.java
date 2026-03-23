@@ -50,7 +50,7 @@ class ScmEnumCodec<T extends Enum<T> & ProtocolMessageEnum> implements ScmCodec<
   }
 
   @Override
-  public T deserialize(Class<?> type, ByteString value) throws InvalidProtocolBufferException {
+  public T deserialize(ByteString value) throws InvalidProtocolBufferException {
     final int n;
     try {
       n = IntegerCodec.get().fromByteArray(value.toByteArray());

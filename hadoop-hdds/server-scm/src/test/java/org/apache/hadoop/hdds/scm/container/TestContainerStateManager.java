@@ -154,10 +154,11 @@ public class TestContainerStateManager {
         any(ContainerID.class), any(ContainerReplica.class));
 
     doAnswer(invocation -> {
-      containerStateManager.transitionDeletingOrDeletedToClosedState(
-          ((ContainerID) invocation.getArgument(0)).getProtobuf());
+      containerStateManager.transitionDeletingOrDeletedToTargetState(
+          ((ContainerID) invocation.getArgument(0)).getProtobuf(), invocation.getArgument(1));
       return null;
-    }).when(containerManager).transitionDeletingOrDeletedToClosedState(any(ContainerID.class));
+    }).when(containerManager).transitionDeletingOrDeletedToTargetState(
+        any(ContainerID.class), any(HddsProtos.LifeCycleState.class));
 
   }
 
@@ -214,7 +215,7 @@ public class TestContainerStateManager {
   @ParameterizedTest
   @EnumSource(value = HddsProtos.LifeCycleState.class,
       names = {"DELETING", "DELETED"})
-  public void testTransitionDeletingOrDeletedToClosedState(HddsProtos.LifeCycleState lifeCycleState)
+  public void testTransitionDeletingOrDeletedToTargetState(HddsProtos.LifeCycleState lifeCycleState)
       throws IOException {
     HddsProtos.ContainerInfoProto.Builder builder = HddsProtos.ContainerInfoProto.newBuilder();
     builder.setContainerID(1)
@@ -228,7 +229,7 @@ public class TestContainerStateManager {
     HddsProtos.ContainerInfoProto container = builder.build();
     HddsProtos.ContainerID cid = HddsProtos.ContainerID.newBuilder().setId(container.getContainerID()).build();
     containerStateManager.addContainer(container);
-    containerStateManager.transitionDeletingOrDeletedToClosedState(cid);
+    containerStateManager.transitionDeletingOrDeletedToTargetState(cid, HddsProtos.LifeCycleState.CLOSED);
     assertEquals(HddsProtos.LifeCycleState.CLOSED, containerStateManager.getContainer(ContainerID.getFromProtobuf(cid))
         .getState());
   }
@@ -254,7 +255,7 @@ public class TestContainerStateManager {
     HddsProtos.ContainerID cid = HddsProtos.ContainerID.newBuilder().setId(container.getContainerID()).build();
     containerStateManager.addContainer(container);
     try {
-      containerStateManager.transitionDeletingOrDeletedToClosedState(cid);
+      containerStateManager.transitionDeletingOrDeletedToTargetState(cid, HddsProtos.LifeCycleState.CLOSED);
       fail("Was expecting an Exception, but did not catch any.");
     } catch (IOException e) {
       assertInstanceOf(InvalidContainerStateException.class, e.getCause().getCause());

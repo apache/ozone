@@ -27,11 +27,13 @@ import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
  * {@link ScmCodec} implementation for non-shaded
  * {@link com.google.protobuf.Message} objects.
  */
-public class ScmNonShadedGeneratedMessageCodec<T extends Message> implements ScmCodec<T> {
+class ScmNonShadedGeneratedMessageCodec<T extends Message> implements ScmCodec<T> {
 
+  private final String name;
   private final Parser<T> parser;
 
-  public ScmNonShadedGeneratedMessageCodec(Parser<T> parser) {
+  ScmNonShadedGeneratedMessageCodec(String name, Parser<T> parser) {
+    this.name = name;
     this.parser = parser;
   }
 
@@ -41,11 +43,11 @@ public class ScmNonShadedGeneratedMessageCodec<T extends Message> implements Scm
   }
 
   @Override
-  public T deserialize(Class<?> type, ByteString value) throws InvalidProtocolBufferException {
+  public T deserialize(ByteString value) throws InvalidProtocolBufferException {
     try {
       return parser.parseFrom(value.asReadOnlyByteBuffer());
     } catch (com.google.protobuf.InvalidProtocolBufferException e) {
-      throw new InvalidProtocolBufferException("Message cannot be decoded", e);
+      throw new InvalidProtocolBufferException("Failed to parse " + name, e);
     }
   }
 }

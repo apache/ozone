@@ -61,6 +61,15 @@ public class QuasiClosedStuckUnderReplicationHandler implements UnhealthyReplica
     ContainerInfo containerInfo = result.getContainerInfo();
     LOG.debug("Handling under replicated QuasiClosed Stuck Ratis container {}", containerInfo);
 
+    // Check if container is empty before attempting replication
+    // Empty containers will be deleted by EmptyContainerHandler
+    boolean allReplicasEmpty = !replicas.isEmpty() && replicas.stream().allMatch(ContainerReplica::isEmpty);
+    if (allReplicasEmpty) {
+      LOG.info("Skipping replication for empty QUASI_CLOSED stuck container {}. " +
+          "It will be deleted by EmptyContainerHandler.", containerInfo.containerID());
+      return 0;
+    }
+
     int pendingAdd = 0;
     for (ContainerReplicaOp op : pendingOps) {
       if (op.getOpType() == ContainerReplicaOp.PendingOpType.ADD) {

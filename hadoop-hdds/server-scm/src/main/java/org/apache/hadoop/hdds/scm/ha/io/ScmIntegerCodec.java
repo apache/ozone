@@ -32,7 +32,7 @@ class ScmIntegerCodec implements ScmCodec<Integer> {
   }
 
   @Override
-  public Integer deserialize(Class<?> type, ByteString value) {
+  public Integer deserialize(ByteString value) {
     return IntegerCodec.get().fromByteArray(value.toByteArray());
   }
 }

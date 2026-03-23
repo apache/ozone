@@ -153,7 +153,7 @@ public final class SCMRatisRequest {
         final Class<?> clazz = ReflectionUtil.getClass(argument.getType());
         parameterTypes[paramCounter++] = clazz;
         args.add(ScmCodecFactory.getCodec(clazz)
-            .deserialize(clazz, argument.getValue()));
+            .deserialize(argument.getValue()));
       } catch (ClassNotFoundException ex) {
         throw new InvalidProtocolBufferException(argument.getType() +
             " cannot be decoded!" + ex.getMessage());
