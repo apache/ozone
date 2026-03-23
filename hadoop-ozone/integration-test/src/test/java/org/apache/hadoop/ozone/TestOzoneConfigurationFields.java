@@ -59,6 +59,9 @@ public class TestOzoneConfigurationFields extends TestConfigurationFieldsBase {
     xmlPrefixToSkipCompare.add("ipc.client.rpc-timeout.ms");
     xmlPropsToSkipCompare.add("ozone.om.leader.election.minimum.timeout" +
         ".duration"); // Deprecated config
+    // DatanodeConfiguration is not in configurationClasses; skip its XML entries
+    xmlPropsToSkipCompare.add(
+        DatanodeConfiguration.DISK_CHECK_TIMEOUT_TOLERATED_KEY);
     // Currently replication and type configs moved to server side.
     configurationPropsToSkipCompare
         .add(OzoneConfigKeys.OZONE_REPLICATION);
