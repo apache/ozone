@@ -141,7 +141,7 @@ public class TestContainerBalancerSelectionCriteria {
   }
 
   @Test
-  public void shouldIncludeNonStandardContainers() throws Exception {
+  public void shouldIncludeOverReplicatedClosedContainers() throws Exception {
     DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails dn3 = MockDatanodeDetails.randomDatanodeDetails();
     DatanodeDetails dn4 = MockDatanodeDetails.randomDatanodeDetails();
@@ -186,5 +186,55 @@ public class TestContainerBalancerSelectionCriteria {
     // Over-replicated containers are excluded when config is disabled
     assertTrue(criteriaDisabled.shouldBeExcluded(containerID, source, 0L));
     assertTrue(criteriaDisabled.shouldBeExcluded(containerID, dn4, 0L));
+  }
+
+  @Test
+  public void shouldIncludeQuasiClosedContainers() throws Exception {
+    DatanodeDetails dn2 = MockDatanodeDetails.randomDatanodeDetails();
+    DatanodeDetails dn3 = MockDatanodeDetails.randomDatanodeDetails();
+
+    // QUASI_CLOSED container with all QUASI_CLOSED replicas
+    ContainerInfo quasiClosedContainer = ReplicationTestUtil.createContainerInfo(
+        RatisReplicationConfig.getInstance(THREE), 1L,
+        HddsProtos.LifeCycleState.QUASI_CLOSED, 1L, OzoneConsts.GB);
+    ContainerID quasiClosedContainerID = quasiClosedContainer.containerID();
+
+    Set<ContainerReplica> quasiClosedReplicas = new HashSet<>();
+    quasiClosedReplicas.add(ReplicationTestUtil.createContainerReplica(quasiClosedContainerID, 0,
+        IN_SERVICE, QUASI_CLOSED, 1L, OzoneConsts.GB, source, source.getID()));
+    quasiClosedReplicas.add(ReplicationTestUtil.createContainerReplica(quasiClosedContainerID, 0,
+        IN_SERVICE, QUASI_CLOSED, 1L, OzoneConsts.GB, dn2, dn2.getID()));
+    quasiClosedReplicas.add(ReplicationTestUtil.createContainerReplica(quasiClosedContainerID, 0,
+        IN_SERVICE, QUASI_CLOSED, 1L, OzoneConsts.GB, dn3, dn3.getID()));
+
+    when(containerManager.getContainer(quasiClosedContainerID)).thenReturn(quasiClosedContainer);
+    when(containerManager.getContainerReplicas(quasiClosedContainerID)).thenReturn(quasiClosedReplicas);
+    when(replicationManager.isContainerReplicatingOrDeleting(quasiClosedContainerID)).thenReturn(false);
+    when(replicationManager.getContainerReplicationHealth(eq(quasiClosedContainer), anySet()))
+        .thenReturn(new ContainerHealthResult.OverReplicatedHealthResult(quasiClosedContainer, 1, false));
+
+    // Test 1: Config ENABLED - should allow balancing of QUASI_CLOSED container
+    balancerConfiguration.setIncludeNonStandardContainers(true);
+    ContainerBalancerSelectionCriteria configEnabled = new ContainerBalancerSelectionCriteria(
+        balancerConfiguration, nodeManager, replicationManager,
+        containerManager, findSourceStrategy, new HashMap<>());
+
+    // All QUASI_CLOSED replicas can be moved because:
+    // - Config is enabled
+    // - Container is QUASI_CLOSED
+    // - All replicas are QUASI_CLOSED (consistent state)
+    assertFalse(configEnabled.shouldBeExcluded(quasiClosedContainerID, source, 0L));
+    assertFalse(configEnabled.shouldBeExcluded(quasiClosedContainerID, dn2, 0L));
+    assertFalse(configEnabled.shouldBeExcluded(quasiClosedContainerID, dn3, 0L));
+
+    // Test 2: Config DISABLED (default) - should exclude QUASI_CLOSED containers
+    balancerConfiguration.setIncludeNonStandardContainers(false);
+    ContainerBalancerSelectionCriteria criteriaDisabled = new ContainerBalancerSelectionCriteria(
+        balancerConfiguration, nodeManager, replicationManager,
+        containerManager, findSourceStrategy, new HashMap<>());
+
+    // QUASI_CLOSED containers are excluded when config is disabled
+    assertTrue(criteriaDisabled.shouldBeExcluded(quasiClosedContainerID, source, 0L));
+    assertTrue(criteriaDisabled.shouldBeExcluded(quasiClosedContainerID, dn2, 0L));
   }
 }

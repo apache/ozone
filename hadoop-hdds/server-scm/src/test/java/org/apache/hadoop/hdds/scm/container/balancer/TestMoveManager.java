@@ -39,6 +39,7 @@ import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaO
 import static org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaOp.PendingOpType.DELETE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyInt;
 import static org.mockito.Mockito.anyLong;
@@ -575,5 +576,110 @@ public class TestMoveManager {
         containerId, src, tgt);
     MoveManager.MoveResult actualResult = res.get();
     assertEquals(expectedResult, actualResult);
+  }
+
+  /**
+   * Test that moving an over-replicated CLOSED container fails when config is disabled.
+   */
+  @Test
+  public void testMoveOverReplicatedClosedContainerWithConfigDisabled() throws Exception {
+    setupOverReplicatedContainer();
+    
+    moveManager.setIncludeNonStandardContainers(false);
+    assertMoveFailsWith(REPLICATION_NOT_HEALTHY_BEFORE_MOVE, containerInfo.containerID());
+  }
+
+  /**
+   * Test that moving an over-replicated CLOSED container succeeds when config is enabled.
+   */
+  @Test
+  public void testMoveOverReplicatedClosedContainerWithConfigEnabled() throws Exception {
+    setupOverReplicatedContainer();
+    when(replicationManager.getPendingReplicationOps(containerInfo.containerID())).thenReturn(new ArrayList<>());
+
+    moveManager.setIncludeNonStandardContainers(true);
+    CompletableFuture<MoveManager.MoveResult> successRes =
+        moveManager.move(containerInfo.containerID(), src, tgt);
+    verify(replicationManager).sendLowPriorityReplicateContainerCommand(
+        eq(containerInfo), eq(0), eq(src), eq(tgt), anyLong());
+    completeMove(containerInfo, src, tgt, successRes);
+  }
+
+  /**
+   * Test that moving a QUASI_CLOSED container fails when config is disabled.
+   */
+  @Test
+  public void testMoveQuasiClosedContainerWithConfigDisabled() throws Exception {
+    ContainerInfo qcContainer = setupQuasiClosedContainer(1);
+    src = replicas.iterator().next().getDatanodeDetails();
+    tgt = MockDatanodeDetails.randomDatanodeDetails();
+    nodes.put(src, NodeStatus.inServiceHealthy());
+    nodes.put(tgt, NodeStatus.inServiceHealthy());
+
+    moveManager.setIncludeNonStandardContainers(false);
+    assertMoveFailsWith(REPLICATION_FAIL_CONTAINER_NOT_CLOSED, qcContainer.containerID());
+  }
+
+  /**
+   * Test that moving a QUASI_CLOSED container succeeds when config is enabled.
+   */
+  @Test
+  public void testMoveQuasiClosedContainerWithConfigEnabled() throws Exception {
+    ContainerInfo qcContainer = setupQuasiClosedContainer(2);
+    src = replicas.iterator().next().getDatanodeDetails();
+    tgt = MockDatanodeDetails.randomDatanodeDetails();
+    nodes.put(src, NodeStatus.inServiceHealthy());
+    nodes.put(tgt, NodeStatus.inServiceHealthy());
+
+    moveManager.setIncludeNonStandardContainers(true);
+    CompletableFuture<MoveManager.MoveResult> successRes =
+        moveManager.move(qcContainer.containerID(), src, tgt);
+    verify(replicationManager).sendLowPriorityReplicateContainerCommand(
+        eq(qcContainer), eq(0), eq(src), eq(tgt), anyLong());
+    completeMove(qcContainer, src, tgt, successRes);
+  }
+
+  private void setupOverReplicatedContainer() {
+    replicas.clear();
+    replicas.addAll(ReplicationTestUtil.createReplicas(containerInfo.containerID(), 0, 0, 0, 0));
+    src = replicas.iterator().next().getDatanodeDetails();
+    tgt = MockDatanodeDetails.randomDatanodeDetails();
+    nodes.put(src, NodeStatus.inServiceHealthy());
+    nodes.put(tgt, NodeStatus.inServiceHealthy());
+
+    when(replicationManager.getContainerReplicationHealth(any(), anySet()))
+        .thenReturn(new ContainerHealthResult.OverReplicatedHealthResult(containerInfo, 1, false));
+  }
+
+  private ContainerInfo setupQuasiClosedContainer(long containerId) throws Exception {
+    ContainerInfo qcContainer = ReplicationTestUtil.createContainerInfo(
+        RatisReplicationConfig.getInstance(THREE), containerId,
+        HddsProtos.LifeCycleState.QUASI_CLOSED);
+    replicas.clear();
+    replicas.addAll(ReplicationTestUtil.createReplicas(qcContainer.containerID(),
+        ContainerReplicaProto.State.QUASI_CLOSED, 0, 0, 0));
+    
+    when(containerManager.getContainer(eq(qcContainer.containerID()))).thenReturn(qcContainer);
+    when(containerManager.getContainerReplicas(qcContainer.containerID())).thenReturn(replicas);
+    when(replicationManager.getContainerReplicationHealth(eq(qcContainer), anySet()))
+        .thenReturn(new ContainerHealthResult.HealthyResult(qcContainer));
+
+    return qcContainer;
+  }
+
+  private void completeMove(ContainerInfo container, DatanodeDetails source,
+      DatanodeDetails target, CompletableFuture<MoveManager.MoveResult> moveResult) throws Exception {
+    ContainerReplicaOp addOp = new ContainerReplicaOp(
+        ADD, target, 0, null, clock.millis() + 1000, 0);
+    moveManager.opCompleted(addOp, container.containerID(), false);
+
+    verify(replicationManager).sendDeleteCommand(
+        eq(container), eq(0), eq(source), eq(true), anyLong());
+
+    ContainerReplicaOp deleteOp = new ContainerReplicaOp(
+        DELETE, source, 0, null, clock.millis() + 1000, 0);
+    moveManager.opCompleted(deleteOp, container.containerID(), false);
+
+    assertEquals(COMPLETED, moveResult.get());
   }
 }
