@@ -52,6 +52,7 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
   private final AtomicInteger containersWithMinReplicas = new AtomicInteger();
   private final Map<ContainerID, ContainerID> openContainers = new ConcurrentHashMap<>();
   private final Map<ContainerID, ContainerID> closedContainers = new ConcurrentHashMap<>();
+  private final Map<ContainerID, ContainerID> processedContainers = new ConcurrentHashMap<>();
 
   public AbstractContainerSafeModeRule(ConfigurationSource conf, SCMSafeModeManager safeModeManager,
       ContainerManager containerManager, EventQueue eventQueue) {
@@ -73,6 +74,14 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
     return openContainers;
   }
 
+  public Map<ContainerID, ContainerID> getProcessedContainers() {
+    return processedContainers;
+  }
+
+  void incrementTotalContainers() {
+    totalContainers.getAndIncrement();
+  }
+
   protected abstract ReplicationType getContainerType();
 
   protected abstract void handleReportedContainer(ContainerID containerID, DatanodeID datanodeID);
@@ -89,6 +98,7 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
     containers.clear();
     openContainers.clear();
     closedContainers.clear();
+    processedContainers.clear();
     containerManager.getContainers(getContainerType()).stream()
         .filter(c -> c.getNumberOfKeys() > 0)
         .forEach(c -> {
@@ -182,8 +192,11 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
         if (isClosed(containerInfo)) {
           addContainer(containerInfo);
           openContainers.remove(containerID);
+          closedContainers.put(containerID, containerID);
         } } catch (ContainerNotFoundException e) {
-          // log
+          SCMSafeModeManager.getLogger().debug(
+              "Container {} not found while checking open-to-closed transition, may be transient",
+              containerID);
         }
       }
       // iterate through closed containers and check if any of them have moved to deleted state
@@ -194,7 +207,9 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
           removeContainer(containerInfo);
           closedContainers.remove(containerID);
         }} catch (ContainerNotFoundException e) {
-          // log
+          SCMSafeModeManager.getLogger().debug(
+              "Container {} not found while checking closed-to-deleted transition, may be transient",
+              containerID);
         }
       }
     }
@@ -207,6 +222,7 @@ public abstract class AbstractContainerSafeModeRule extends SafeModeExitRule<Nod
     if (openContainers != null) openContainers.clear();
     if (closedContainers != null) closedContainers.clear();
     if (totalContainers != null) totalContainers.set(0);
+    if (processedContainers != null) processedContainers.clear();
   }
 
   /**

@@ -54,20 +54,24 @@ public class RatisContainerSafeModeRule extends AbstractContainerSafeModeRule {
       Preconditions.assertSame(1, minReplica, "minReplica");
       incrementContainersWithMinReplicas();
       getSafeModeMetrics().incCurrentContainersWithOneReplicaReportedCount();
-    } else {
+      getProcessedContainers().put(containerID, containerID);
+    } else if (!getProcessedContainers().containsKey(containerID)) {
       // we received a container report that SCM was unaware of when it initialized
       // check if the container state is closed/quasi-closed and if yes count it
       try {
         ContainerInfo containerInfo = getContainerManager().getContainer(containerID);
-        if (isClosed(containerInfo)) {
-          addContainer(containerInfo);
+        if (isClosed(containerInfo) && containerInfo.getNumberOfKeys() > 0) {
+          incrementTotalContainers();
           incrementContainersWithMinReplicas();
+          getProcessedContainers().put(containerID, containerID);
           getClosedContainers().put(containerID, containerID);
           getOpenContainers().remove(containerID);
           getSafeModeMetrics().incCurrentContainersWithOneReplicaReportedCount();
         }
       } catch (ContainerNotFoundException cnfe) {
-        // log it
+        SCMSafeModeManager.getLogger().debug(
+            "Container {} not found in ContainerManager : {}",
+            containerID, cnfe.getMessage());
       }
     }
   }

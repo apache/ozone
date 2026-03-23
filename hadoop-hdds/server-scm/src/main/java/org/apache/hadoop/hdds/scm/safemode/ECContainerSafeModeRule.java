@@ -58,15 +58,16 @@ public class ECContainerSafeModeRule extends AbstractContainerSafeModeRule {
 
       if (replicas.size() >= getMinReplica(containerID)) {
         getContainers().remove(containerID);
+        getProcessedContainers().put(containerID, containerID);
         incrementContainersWithMinReplicas();
         getSafeModeMetrics().incCurrentContainersWithECDataReplicaReportedCount();
       }
-    } else {
+    } else if (!getProcessedContainers().containsKey(containerID)){
       // we received a container report that SCM was unaware of when it initialized
       // check if the container state is closed/quasi-closed and if yes count it
       try {
         ContainerInfo containerInfo = getContainerManager().getContainer(containerID);
-        if (isClosed(containerInfo)) {
+        if (isClosed(containerInfo) && containerInfo.getNumberOfKeys() > 0) {
           addContainer(containerInfo);
           getClosedContainers().put(containerID,containerID);
           getOpenContainers().remove(containerID);
@@ -78,10 +79,13 @@ public class ECContainerSafeModeRule extends AbstractContainerSafeModeRule {
             getContainers().remove(containerID);
             incrementContainersWithMinReplicas();
             getSafeModeMetrics().incCurrentContainersWithECDataReplicaReportedCount();
+            getProcessedContainers().put(containerID, containerID);
           }
         }
       } catch (ContainerNotFoundException cnfe) {
-        // log it
+        SCMSafeModeManager.getLogger().debug(
+            "Container {} not found in ContainerManager : {}",
+            containerID, cnfe.getMessage());
       }
     }
   }
