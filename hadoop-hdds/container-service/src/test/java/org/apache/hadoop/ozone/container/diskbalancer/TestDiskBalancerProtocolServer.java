@@ -28,12 +28,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.UUID;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.DiskBalancerProtocolProtos.GetDiskBalancerInfoRequestProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDiskBalancerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerConfigurationProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.VolumeReportProto;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerProtocolServer.PrivilegedOperation;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
@@ -51,8 +53,17 @@ class TestDiskBalancerProtocolServer {
   private static final int TEST_THREADS = 5;
   private static final boolean TEST_STOP_AFTER_DISK_EVEN = true;
   private static final double TEST_VOLUME_DENSITY = 15.5;
+  private static final double TEST_IDEAL_USAGE = 0.6;
+  private static final String TEST_STORAGE_ID_1 = "vol1";
+  private static final String TEST_STORAGE_ID_2 = "vol2";
+  private static final double TEST_UTILIZATION_1 = 0.57;
+  private static final double TEST_UTILIZATION_2 = 0.63;
+  private static final long TEST_COMMITTED_BYTES_1 = 10L * 1024 * 1024;
+  private static final long TEST_COMMITTED_BYTES_2 = 25L * 1024 * 1024;
+  private static final int TEST_VOLUME_INFO_COUNT = 2;
 
   private DatanodeStateMachine datanodeStateMachine;
+  private OzoneContainer ozoneContainer;
   private DiskBalancerService diskBalancerService;
   private DiskBalancerInfo diskBalancerInfo;
   private PrivilegedOperation denyAdminChecker;
@@ -61,7 +72,7 @@ class TestDiskBalancerProtocolServer {
   @BeforeEach
   void setup() throws IOException {
     datanodeStateMachine = mock(DatanodeStateMachine.class);
-    OzoneContainer ozoneContainer = mock(OzoneContainer.class);
+    ozoneContainer = mock(OzoneContainer.class);
     when(datanodeStateMachine.getContainer()).thenReturn(ozoneContainer);
     diskBalancerService = mock(DiskBalancerService.class);
     when(ozoneContainer.getDiskBalancerService()).thenReturn(diskBalancerService);
@@ -80,6 +91,19 @@ class TestDiskBalancerProtocolServer {
         0L, // balancedBytes
         TEST_VOLUME_DENSITY
     );
+    diskBalancerInfo.setIdealUsage(TEST_IDEAL_USAGE);
+    diskBalancerInfo.setVolumeInfo(Arrays.asList(
+        VolumeReportProto.newBuilder()
+            .setStorageId(TEST_STORAGE_ID_1)
+            .setUtilization(TEST_UTILIZATION_1)
+            .setCommittedBytes(TEST_COMMITTED_BYTES_1)
+            .build(),
+        VolumeReportProto.newBuilder()
+            .setStorageId(TEST_STORAGE_ID_2)
+            .setUtilization(TEST_UTILIZATION_2)
+            .setCommittedBytes(TEST_COMMITTED_BYTES_2)
+            .build()));
+    
     when(ozoneContainer.getDiskBalancerInfo()).thenReturn(diskBalancerInfo);
 
     // Create datanode details
@@ -102,12 +126,21 @@ class TestDiskBalancerProtocolServer {
 
   @Test
   void testGetDiskBalancerInfoReport() throws IOException {
-    // Test REPORT type - should only return volume density
     DatanodeDiskBalancerInfoProto report = server.getDiskBalancerInfo(REQUEST_WITH_OLD_CLIENT_VERSION);
-    
+    VolumeReportProto volReport0 = report.getVolumeInfo(0);
+    VolumeReportProto volReport1 = report.getVolumeInfo(1);
+
     assertNotNull(report);
     assertNotNull(report.getNode());
     assertEquals(TEST_VOLUME_DENSITY, report.getCurrentVolumeDensitySum());
+    assertEquals(TEST_IDEAL_USAGE, report.getIdealUsage());
+    assertEquals(TEST_VOLUME_INFO_COUNT, report.getVolumeInfoCount());
+    assertEquals(TEST_STORAGE_ID_1, volReport0.getStorageId());
+    assertEquals(TEST_UTILIZATION_1, volReport0.getUtilization());
+    assertEquals(TEST_COMMITTED_BYTES_1, volReport0.getCommittedBytes());
+    assertEquals(TEST_STORAGE_ID_2, volReport1.getStorageId());
+    assertEquals(TEST_UTILIZATION_2, volReport1.getUtilization());
+    assertEquals(TEST_COMMITTED_BYTES_2, volReport1.getCommittedBytes());
   }
 
   @Test

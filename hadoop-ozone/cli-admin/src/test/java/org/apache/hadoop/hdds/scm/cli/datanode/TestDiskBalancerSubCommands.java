@@ -51,6 +51,7 @@ import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDetailsProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DatanodeDiskBalancerInfoProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerConfigurationProto;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DiskBalancerRunningStatus;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.VolumeReportProto;
 import org.apache.hadoop.hdds.scm.cli.ContainerOperationClient;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -615,6 +616,12 @@ public class TestDiskBalancerSubCommands {
       String output = outContent.toString(DEFAULT_ENCODING);
       assertTrue(output.contains("\"datanode\""));
       assertTrue(output.contains("\"volumeDensity\""));
+      assertTrue(output.contains("\"idealUsage\""));
+      assertTrue(output.contains("\"volumes\""));
+      assertTrue(output.contains("\"storageId\""));
+      assertTrue(output.contains("\"utilization\""));
+      assertTrue(output.contains("\"volumeDensity\""));
+      assertTrue(output.contains("\"pre-Allocated container bytes\""));
     }
   }
 
@@ -699,12 +706,8 @@ public class TestDiskBalancerSubCommands {
             .build())
         .build();
 
-    DiskBalancerConfigurationProto configProto = DiskBalancerConfigurationProto.newBuilder()
-        .setThreshold(threshold)
-        .setDiskBandwidthInMB(bandwidthInMB)
-        .setParallelThread(parallelThread)
-        .setStopAfterDiskEven(true)
-        .build();
+    DiskBalancerConfigurationProto configProto = createConfigProto(threshold, bandwidthInMB, parallelThread, true);
+
 
     return DatanodeDiskBalancerInfoProto.newBuilder()
         .setNode(nodeProto)
@@ -741,10 +744,12 @@ public class TestDiskBalancerSubCommands {
   /**
    * Generates a random report proto for a given hostname.
    * @param hostname the hostname
-   * @return DatanodeDiskBalancerInfoProto with random volume density
+   * @return DatanodeDiskBalancerInfoProto with random volume density and volume info
    */
   private DatanodeDiskBalancerInfoProto generateRandomReportProto(String hostname) {
     double volumeDensity = random.nextDouble() * 0.1;
+    double idealUsage = 0.1 + random.nextDouble() * 0.3;
+    double threshold = 5.0 + random.nextDouble() * 10.0;
     DatanodeDetailsProto nodeProto = DatanodeDetailsProto.newBuilder()
         .setHostName(hostname)
         .setIpAddress("127.0.0.1")
@@ -754,9 +759,38 @@ public class TestDiskBalancerSubCommands {
             .build())
         .build();
 
+    DiskBalancerConfigurationProto configProto = createConfigProto(threshold, 100L, 5, true);
+
+    long committed1 = Math.abs(random.nextLong()) % (1024L * 1024 * 1024);
+    long committed2 = Math.abs(random.nextLong()) % (1024L * 1024 * 1024);
+    VolumeReportProto vol1 = VolumeReportProto.newBuilder()
+        .setStorageId("DISK-" + hostname + "-vol1")
+        .setUtilization(idealUsage + random.nextDouble() * 0.1)
+        .setCommittedBytes(committed1)
+        .build();
+    VolumeReportProto vol2 = VolumeReportProto.newBuilder()
+        .setStorageId("DISK-" + hostname + "-vol2")
+        .setUtilization(idealUsage - random.nextDouble() * 0.1)
+        .setCommittedBytes(committed2)
+        .build();
+
     return DatanodeDiskBalancerInfoProto.newBuilder()
         .setNode(nodeProto)
         .setCurrentVolumeDensitySum(volumeDensity)
+        .setIdealUsage(idealUsage)
+        .setDiskBalancerConf(configProto)
+        .addVolumeInfo(vol1)
+        .addVolumeInfo(vol2)
+        .build();
+  }
+
+  private DiskBalancerConfigurationProto createConfigProto(double threshold, long bandwidthInMB, int parallelThread,
+      boolean stopAfterDiskEven) {
+    return DiskBalancerConfigurationProto.newBuilder()
+        .setThreshold(threshold)
+        .setDiskBandwidthInMB(bandwidthInMB)
+        .setParallelThread(parallelThread)
+        .setStopAfterDiskEven(stopAfterDiskEven)
         .build();
   }
 }
