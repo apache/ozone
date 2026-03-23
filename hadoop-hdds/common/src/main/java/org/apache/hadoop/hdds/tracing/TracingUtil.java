@@ -71,7 +71,7 @@ public final class TracingUtil {
     }
 
     try {
-      initialize(serviceName, conf);
+      initialize(serviceName);
       isInit = true;
       LOG.info("Initialized tracing service: {}", serviceName);
     } catch (Exception e) {
@@ -79,7 +79,7 @@ public final class TracingUtil {
     }
   }
 
-  private static void initialize(String serviceName, ConfigurationSource conf) {
+  private static void initialize(String serviceName) {
     String otelEndPoint = System.getenv(OTEL_EXPORTER_OTLP_ENDPOINT);
     if (otelEndPoint == null || otelEndPoint.isEmpty()) {
       otelEndPoint = OTEL_EXPORTER_OTLP_ENDPOINT_DEFAULT;
@@ -104,7 +104,7 @@ public final class TracingUtil {
     } catch (Exception ex) {
       // ignore and use the default value.
     }
-    // Pass the config to parseSpanSamplingConfig to get spans to eb sampled.
+    // Pass the config to parseSpanSamplingConfig to get spans to be sampled.
     Map<String, LoopSampler> spanMap = parseSpanSamplingConfig(spanSamplingConfig);
 
     Resource resource = Resource.create(Attributes.of(AttributeKey.stringKey("service.name"), serviceName));
@@ -202,7 +202,7 @@ public final class TracingUtil {
         ScmConfigKeys.HDDS_TRACING_ENABLED_DEFAULT);
   }
 
-  /** Function to parse span sampling config. The input is in thr form <span_name>:<sample_rate>.
+  /** Function to parse span sampling config. The input is in the form <span_name>:<sample_rate>.
    * The sample rate must be a natural number (1,2,3). Any value other than that will LOG an error.
    * */
   private static Map<String, LoopSampler> parseSpanSamplingConfig(String configStr) {
