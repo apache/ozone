@@ -105,7 +105,7 @@ public final class SCMRatisResponse {
     try {
       final Class<?> type = ReflectionUtil.getClass(responseProto.getType());
       return new SCMRatisResponse(ScmCodecFactory.getCodec(type)
-          .deserialize(type, responseProto.getValue()));
+          .deserialize(responseProto.getValue()));
     } catch (ClassNotFoundException e) {
       throw new InvalidProtocolBufferException(responseProto.getType() +
           " cannot be decoded!" + e.getMessage());

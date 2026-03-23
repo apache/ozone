@@ -83,7 +83,7 @@ public final class OzoneManagerSyncMetrics {
   }
 
   public void incrNumDeltaRequestsFailed() {
-    this.numSnapshotRequestsFailed.incr();
+    this.numDeltaRequestsFailed.incr();
   }
 
   public void incrNumUpdatesInDeltaTotal(long n) {

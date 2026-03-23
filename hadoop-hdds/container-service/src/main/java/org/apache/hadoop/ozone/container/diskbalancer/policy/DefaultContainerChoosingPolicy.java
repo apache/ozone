@@ -20,29 +20,36 @@ package org.apache.hadoop.ozone.container.diskbalancer.policy;
 import static java.util.concurrent.TimeUnit.HOURS;
 import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.computeUtilization;
 import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.getIdealUsage;
-import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.getVolumeUsages;
+import static org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.newVolumeFixedUsage;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 import org.apache.hadoop.hdds.fs.SpaceUsageSource;
 import org.apache.hadoop.hdds.scm.container.ContainerID;
 import org.apache.hadoop.ozone.container.common.impl.ContainerData;
 import org.apache.hadoop.ozone.container.common.interfaces.Container;
 import org.apache.hadoop.ozone.container.common.volume.HddsVolume;
 import org.apache.hadoop.ozone.container.common.volume.MutableVolumeSet;
+import org.apache.hadoop.ozone.container.common.volume.StorageVolume;
 import org.apache.hadoop.ozone.container.diskbalancer.DiskBalancerVolumeCalculation.VolumeFixedUsage;
 import org.apache.hadoop.ozone.container.ozoneimpl.OzoneContainer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Choose a container from specified volume, make sure it's not being balancing.
+ * First chooses a source volume and destination volume pair based on ideal utilization and threshold,
+ * then chooses a container from the source volume that can be moved to the destination without
+ * exceeding the upper threshold. Space is reserved on the destination only when a container is
+ * chosen, using the actual container size.
  */
 public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
   public static final Logger LOG = LoggerFactory.getLogger(
@@ -55,12 +62,96 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
   // for test
   private static boolean test = false;
 
+  private final ReentrantLock lock;
+
+  public DefaultContainerChoosingPolicy(ReentrantLock globalLock) {
+    this.lock = globalLock;
+  }
+
   @Override
-  public ContainerData chooseContainer(OzoneContainer ozoneContainer,
-      HddsVolume src, HddsVolume dst,
-      Set<ContainerID> inProgressContainerIDs,
-      double thresholdPercentage, MutableVolumeSet volumeSet,
-      Map<HddsVolume, Long> deltaMap) {
+  public ContainerCandidate chooseVolumesAndContainer(OzoneContainer ozoneContainer,
+      MutableVolumeSet volumeSet, Map<HddsVolume, Long> deltaMap, Set<ContainerID> inProgressContainerIDs,
+      double thresholdPercentage) {
+    lock.lock();
+    try {
+      // Create truly immutable snapshot of volumes to ensure consistency
+      final List<StorageVolume> allVolumes = volumeSet.getVolumesList();
+      if (allVolumes.size() < 2) {
+        return null; // Can't balance with less than 2 volumes.
+      }
+
+      // Calculate usages and sort in ascending order of utilization (once)
+      // Use storage ID as secondary sort for deterministic ordering when utilizations are equal
+      final List<VolumeFixedUsage> volumeUsages = allVolumes.stream()
+          .map(v -> newVolumeFixedUsage(v, deltaMap))
+          .sorted(Comparator.comparingDouble(VolumeFixedUsage::getUtilization)
+              .thenComparing(v -> v.getVolume().getStorageID()))
+          .collect(Collectors.toList());
+
+      // Calculate ideal usage and threshold range (once)
+      final double idealUsage = getIdealUsage(volumeUsages);
+      final double actualThreshold = thresholdPercentage / 100.0;
+      final double lowerThreshold = idealUsage - actualThreshold;
+      final double upperThreshold = idealUsage + actualThreshold;
+
+      if (LOG.isDebugEnabled()) {
+        logVolumeBalancingState(volumeUsages, idealUsage, thresholdPercentage,
+            lowerThreshold, upperThreshold, deltaMap);
+      }
+
+      // Get highest and lowest utilization volumes
+      final VolumeFixedUsage highestUsage = volumeUsages.get(volumeUsages.size() - 1);
+      final VolumeFixedUsage lowestUsage = volumeUsages.get(0);
+
+      // Only return null if highest is below upper threshold AND lowest is above lower threshold
+      if (highestUsage.getUtilization() < upperThreshold &&
+          lowestUsage.getUtilization() > lowerThreshold) {
+        return null;
+      }
+
+      // Determine source volume: highest utilization volume
+      final VolumeFixedUsage srcUsage = highestUsage;
+      final HddsVolume src = srcUsage.getVolume();
+
+      // Find destination volume and container: try each dest with lower utilization than source
+      for (int i = 0; i < volumeUsages.size() - 1; i++) {
+        final VolumeFixedUsage dstUsage = volumeUsages.get(i);
+        final HddsVolume dst = dstUsage.getVolume();
+
+        // Check if destination has lower utilization than source and some usable space
+        if (dstUsage.getUtilization() < srcUsage.getUtilization() &&
+            dstUsage.computeUsableSpace() > 0) {
+          ContainerData containerData = chooseContainer(ozoneContainer,
+              src, dst, dstUsage, inProgressContainerIDs, upperThreshold);
+          if (containerData != null) {
+            long containerSize = containerData.getBytesUsed();
+            dst.incCommittedBytes(containerSize);
+            LOG.debug("Chosen volume pair for disk balancing: source={} (utilization={}), "
+                    + "destination={} (utilization={})",
+                src.getStorageID(), srcUsage.getUtilization(),
+                dst.getStorageID(), dstUsage.getUtilization());
+            return new ContainerCandidate(containerData, src, dst);
+          }
+          LOG.debug("No suitable container found for destination {}, trying next volume.",
+              dst.getStorageID());
+        } else {
+          LOG.debug("Destination volume {} does not have enough space, trying next volume.",
+              dst.getStorageID());
+        }
+      }
+      LOG.debug("Failed to find appropriate destination volume and container.");
+      return null;
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  /**
+   * Choose a container from source volume that can be moved to destination volume.
+   */
+  private ContainerData chooseContainer(OzoneContainer ozoneContainer,
+      HddsVolume src, HddsVolume dst, VolumeFixedUsage dstUsage,
+      Set<ContainerID> inProgressContainerIDs, double upperThreshold) {
     final Iterator<Container<?>> itr;
     try {
       itr = CACHE.get().get(src, () -> ozoneContainer.getController().getContainers(src));
@@ -69,21 +160,26 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
       return null;
     }
 
-    // Calculate the actual threshold
-    final List<VolumeFixedUsage> volumeUsages = getVolumeUsages(volumeSet, deltaMap);
-    final double actualThreshold = getIdealUsage(volumeUsages) + thresholdPercentage / 100.0;
-
-    // Find container
-    final SpaceUsageSource.Fixed dstUsage = dst.getCurrentUsage();
+    final SpaceUsageSource.Fixed dstSpaceUsage = dstUsage.getUsage();
     final long dstCommittedBytes = dst.getCommittedBytes();
+    final long usableSpace = dstUsage.computeUsableSpace();
+
     while (itr.hasNext()) {
       ContainerData containerData = itr.next().getContainerData();
+
+      // Skip containers removed from containerSet after iterator was cached
+      if (ozoneContainer.getContainerSet().getContainer(containerData.getContainerID()) == null) {
+        continue;
+      }
+
       if (containerData.getBytesUsed() > 0 &&
           !inProgressContainerIDs.contains(ContainerID.valueOf(containerData.getContainerID())) &&
           (containerData.isClosed() || (test && containerData.isQuasiClosed()))) {
 
-        // Check if dst can accept the candidate container.
-        if (computeUtilization(dstUsage, dstCommittedBytes, containerData.getBytesUsed()) < actualThreshold) {
+        long containerSize = containerData.getBytesUsed();
+        // Check if dst has enough space and can accept the container without exceeding threshold
+        if (containerSize < usableSpace &&
+            computeUtilization(dstSpaceUsage, dstCommittedBytes, containerSize) < upperThreshold) {
           return containerData;
         }
       }
@@ -91,6 +187,29 @@ public class DefaultContainerChoosingPolicy implements ContainerChoosingPolicy {
 
     CACHE.get().invalidate(src);
     return null;
+  }
+
+  /**
+   * Logs all volume information for disk balancing investigation.
+   */
+  private void logVolumeBalancingState(List<VolumeFixedUsage> volumeUsages,
+      double idealUsage, double thresholdPercentage, double lowerThreshold,
+      double upperThreshold, Map<HddsVolume, Long> deltaMap) {
+    LOG.debug("Disk balancing state - idealUsage={}, thresholdPercentage={}%, "
+            + "thresholdRange=({}, {})",
+        String.format("%.10f", idealUsage), thresholdPercentage,
+        String.format("%.10f", lowerThreshold), String.format("%.10f", upperThreshold));
+    for (int i = 0; i < volumeUsages.size(); i++) {
+      VolumeFixedUsage vfu = volumeUsages.get(i);
+      HddsVolume vol = vfu.getVolume();
+      SpaceUsageSource.Fixed usage = vfu.getUsage();
+      long usableSpace = vfu.computeUsableSpace();
+      LOG.debug("Volume[{}] - disk={}, utilization={}, capacity={}, "
+              + "effectiveUsed={}, available={}, usableSpace={}, committedBytes={}, delta={}",
+          i, vol.getStorageID(), String.format("%.10f", vfu.getUtilization()),
+          usage.getCapacity(), vfu.getEffectiveUsed(), usage.getAvailable(),
+          usableSpace, vol.getCommittedBytes(), deltaMap.getOrDefault(vol, 0L));
+    }
   }
 
   @VisibleForTesting

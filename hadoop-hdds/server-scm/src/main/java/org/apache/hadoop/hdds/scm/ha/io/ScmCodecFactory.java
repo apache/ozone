@@ -17,31 +17,48 @@
 
 package org.apache.hadoop.hdds.scm.ha.io;
 
+import com.google.protobuf.Message;
 import com.google.protobuf.ProtocolMessageEnum;
 import java.math.BigInteger;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.IntFunction;
 import org.apache.commons.lang3.ClassUtils;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerID;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ContainerInfoProto;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.DeletedBlocksTransactionSummary;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.LifeCycleEvent;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeType;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.Pipeline;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineID;
+import org.apache.hadoop.hdds.protocol.proto.HddsProtos.PipelineState;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.DeletedBlocksTransaction;
 import org.apache.hadoop.hdds.security.symmetric.ManagedSecretKey;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
 import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
-import org.apache.ratis.thirdparty.com.google.protobuf.Message;
 
 /**
  * Maps types to the corresponding {@link ScmCodec} implementation.
  */
 public final class ScmCodecFactory {
 
-  private static Map<Class<?>, ScmCodec> codecs = new HashMap<>();
+  private static Map<Class<?>, ScmCodec<?>> codecs = new HashMap<>();
 
   static {
-    codecs.put(com.google.protobuf.Message.class, new ScmNonShadedGeneratedMessageCodec());
-    codecs.put(Message.class, new ScmGeneratedMessageCodec());
-    codecs.put(ProtocolMessageEnum.class, new ScmEnumCodec());
-    codecs.put(List.class, new ScmListCodec());
+    putProto(ContainerID.getDefaultInstance());
+    putProto(PipelineID.getDefaultInstance());
+    putProto(Pipeline.getDefaultInstance());
+    putProto(ContainerInfoProto.getDefaultInstance());
+    putProto(DeletedBlocksTransaction.getDefaultInstance());
+    putProto(DeletedBlocksTransactionSummary.getDefaultInstance());
+
     codecs.put(Integer.class, new ScmIntegerCodec());
     codecs.put(Long.class, new ScmLongCodec());
     codecs.put(String.class, new ScmStringCodec());
@@ -51,6 +68,24 @@ public final class ScmCodecFactory {
     codecs.put(com.google.protobuf.ByteString.class, new ScmNonShadedByteStringCodec());
     codecs.put(ByteString.class, new ScmByteStringCodec());
     codecs.put(ManagedSecretKey.class, new ScmManagedSecretKeyCodec());
+
+    putEnum(LifeCycleEvent.class, LifeCycleEvent::forNumber);
+    putEnum(PipelineState.class, PipelineState::forNumber);
+    putEnum(NodeType.class, NodeType::forNumber);
+
+    // Must be the last one
+    final ClassResolver resolver = new ClassResolver(codecs.keySet());
+    codecs.put(List.class, new ScmListCodec(resolver));
+  }
+
+  static <T extends Message> void putProto(T proto) {
+    final Class<? extends Message> clazz = proto.getClass();
+    codecs.put(clazz, new ScmNonShadedGeneratedMessageCodec<>(clazz.getSimpleName(), proto.getParserForType()));
+  }
+
+  static <T extends Enum<T> & ProtocolMessageEnum> void putEnum(
+      Class<T> enumClass, IntFunction<T> forNumber) {
+    codecs.put(enumClass, new ScmEnumCodec<>(enumClass, forNumber));
   }
 
   private ScmCodecFactory() { }
@@ -68,5 +103,48 @@ public final class ScmCodecFactory {
     }
     throw new InvalidProtocolBufferException(
         "Codec for " + type + " not found!");
+  }
+
+  /** Resolve the codec class from a given class. */
+  static class ClassResolver {
+    private final Map<String, Class<?>> provided;
+    private final Map<String, Class<?>> resolved = new ConcurrentHashMap<>();
+
+    ClassResolver(Collection<Class<?>> provided) {
+      final Map<String, Class<?>> map = new TreeMap<>();
+      for (Class<?> c : provided) {
+        map.put(c.getName(), c);
+      }
+      map.put(List.class.getName(), List.class);
+      this.provided = Collections.unmodifiableMap(map);
+    }
+
+    Class<?> get(String className) throws InvalidProtocolBufferException {
+      final Class<?> c = provided.get(className);
+      if (c != null) {
+        return c;
+      }
+      throw new InvalidProtocolBufferException("Class not found for " + className);
+    }
+
+    Class<?> get(Class<?> clazz) throws InvalidProtocolBufferException {
+      final String className = clazz.getName();
+      final Class<?> c = provided.get(className);
+      if (c != null) {
+        return c;
+      }
+      final Class<?> found = resolved.get(className);
+      if (found != null) {
+        return found;
+      }
+
+      for (Class<?> base : provided.values()) {
+        if (base.isAssignableFrom(clazz)) {
+          resolved.put(className, base);
+          return base;
+        }
+      }
+      throw new InvalidProtocolBufferException("Failed to resolve " + clazz);
+    }
   }
 }

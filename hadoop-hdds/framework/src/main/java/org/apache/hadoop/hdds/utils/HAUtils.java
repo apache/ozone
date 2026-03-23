@@ -23,6 +23,7 @@ import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURAT
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_INFO_WAIT_DURATION_DEFAULT;
 import static org.apache.hadoop.hdds.server.ServerUtils.getOzoneMetaDirPath;
 import static org.apache.hadoop.ozone.OzoneConsts.DB_TRANSIENT_MARKER;
+import static org.apache.hadoop.ozone.OzoneConsts.ROCKSDB_SST_SUFFIX;
 import static org.apache.hadoop.ozone.OzoneConsts.TRANSACTION_INFO_KEY;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -52,6 +53,7 @@ import org.apache.hadoop.hdds.scm.protocol.ScmBlockLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.protocolPB.ScmBlockLocationProtocolClientSideTranslatorPB;
 import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB;
+import org.apache.hadoop.hdds.scm.protocolPB.StorageContainerLocationProtocolClientSideTranslatorPB.ScmNodeTarget;
 import org.apache.hadoop.hdds.scm.proxy.SCMBlockLocationFailoverProxyProvider;
 import org.apache.hadoop.hdds.scm.proxy.SCMClientConfig;
 import org.apache.hadoop.hdds.scm.proxy.SCMContainerLocationFailoverProxyProvider;
@@ -161,6 +163,17 @@ public final class HAUtils {
     return scmContainerClient;
   }
 
+  public static StorageContainerLocationProtocol getScmContainerClientForNode(
+      ConfigurationSource conf, ScmNodeTarget targetScmNode) {
+    SCMContainerLocationFailoverProxyProvider proxyProvider =
+        new SCMContainerLocationFailoverProxyProvider(conf, null);
+    StorageContainerLocationProtocol scmContainerClient =
+        TracingUtil.createProxy(
+            new StorageContainerLocationProtocolClientSideTranslatorPB(
+                proxyProvider, targetScmNode), StorageContainerLocationProtocol.class, conf);
+    return scmContainerClient;
+  }
+
   /**
    * Replace the current DB with the new DB checkpoint.
    * (checkpoint in checkpointPath will not be deleted here)
@@ -247,7 +260,12 @@ public final class HAUtils {
       DBDefinition definition)
       throws IOException {
 
-    try (DBStore dbStore = DBStoreBuilder.newBuilder(tempConfig, definition, dbName, dbDir).build()) {
+    try (DBStore dbStore = DBStoreBuilder
+        .newBuilder(tempConfig, definition, dbName, dbDir)
+        .setOpenReadOnly(true)
+        .setCreateCheckpointDirs(false)
+        .setEnableRocksDbMetrics(false)
+        .build()) {
       // Get the table name with TransactionInfo as the value. The transaction
       // info table name are different in SCM and SCM.
 
@@ -336,6 +354,34 @@ public final class HAUtils {
               collect(Collectors.toList());
       if (LOG.isDebugEnabled()) {
         LOG.debug("Scanned files {} in {}.", sstList, db.getAbsolutePath());
+      }
+    }
+    return sstList;
+  }
+
+  /**
+   * Old Implementation i.e. when useInodeBasedCheckpoint = false,
+   * the relative paths are sent in the toExcludeFile list to the leader OM.
+   * @param db candidate OM Dir
+   * @return a list of SST File paths relative to the DB.
+   * @throws IOException in case of failure
+   */
+  public static List<String> getExistingSstFilesRelativeToDbDir(File db)
+      throws IOException {
+    List<String> sstList = new ArrayList<>();
+    if (!db.exists()) {
+      return sstList;
+    }
+
+    int truncateLength = db.toString().length() + 1;
+    // Walk the db dir and get all sst files including omSnapshot files.
+    try (Stream<Path> files = Files.walk(db.toPath())) {
+      sstList =
+          files.filter(path -> path.toString().endsWith(ROCKSDB_SST_SUFFIX)).
+              map(p -> p.toString().substring(truncateLength)).
+              collect(Collectors.toList());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Scanned SST files {} in {}.", sstList, db.getAbsolutePath());
       }
     }
     return sstList;

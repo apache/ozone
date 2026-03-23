@@ -47,7 +47,6 @@ import static org.apache.hadoop.ozone.s3.util.S3Utils.validateSignatureHeader;
 import static org.apache.hadoop.ozone.s3.util.S3Utils.wrapInQuotes;
 
 import com.google.common.collect.ImmutableMap;
-import jakarta.annotation.Nullable;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -656,7 +655,7 @@ public class ObjectEndpoint extends ObjectOperationHandler {
   Response handleDeleteRequest(ObjectRequestContext context, String keyPath)
       throws IOException, OS3Exception {
 
-    final long startNanos = context.startNanos;
+    final long startNanos = context.getStartNanos();
 
     try {
       OzoneVolume volume = context.getVolume();
@@ -1130,39 +1129,18 @@ public class ObjectEndpoint extends ObjectOperationHandler {
   }
   
   /** Request context shared among {@code ObjectOperationHandler}s. */
-  final class ObjectRequestContext {
+  final class ObjectRequestContext extends S3RequestContext {
     private final String bucketName;
-    private final long startNanos;
-    private final PerformanceStringBuilder perf;
-    private S3GAction action;
-    private OzoneVolume volume;
     private OzoneBucket bucket;
 
     /** @param action best guess on action based on request method, may be refined later by handlers */
     ObjectRequestContext(S3GAction action, String bucketName) {
-      this.action = action;
+      super(ObjectEndpoint.this, action);
       this.bucketName = bucketName;
-      this.startNanos = Time.monotonicNowNanos();
-      this.perf = new PerformanceStringBuilder();
-    }
-
-    long getStartNanos() {
-      return startNanos;
-    }
-
-    PerformanceStringBuilder getPerf() {
-      return perf;
     }
 
     String getBucketName() {
       return bucketName;
-    }
-
-    OzoneVolume getVolume() throws IOException {
-      if (volume == null) {
-        volume = ObjectEndpoint.this.getVolume();
-      }
-      return volume;
     }
 
     OzoneBucket getBucket() throws IOException {
@@ -1172,25 +1150,5 @@ public class ObjectEndpoint extends ObjectOperationHandler {
       return bucket;
     }
 
-    S3GAction getAction() {
-      return action;
-    }
-
-    void setAction(S3GAction action) {
-      this.action = action;
-    }
-
-    /**
-     * This method should be called by each handler with the {@code S3GAction} decided based on request parameters,
-     * {@code null} if it does not handle the request.  {@code action} is stored, if not null, for use in audit logging.
-     * @param a action as determined by handler
-     * @return true if handler should ignore the request (i.e. if {@code null} is passed) */
-    boolean ignore(@Nullable S3GAction a) {
-      final boolean ignore = a == null;
-      if (!ignore) {
-        setAction(a);
-      }
-      return ignore;
-    }
   }
 }
