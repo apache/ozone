@@ -87,6 +87,9 @@ public class FinalizationManagerImpl implements FinalizationManager {
       throws IOException {
     Objects.requireNonNull(context, "Cannot finalize upgrade without " +
         "first building the upgrade context.");
+    if (context.getSCMContext().isInSafeMode()) {
+      throw new IOException("Finalization is not possible while SCM is in safemode");
+    }
     return upgradeFinalizer.finalize(upgradeClientID, context);
   }
 
