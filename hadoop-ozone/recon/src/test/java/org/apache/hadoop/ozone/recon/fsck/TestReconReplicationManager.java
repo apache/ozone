@@ -20,6 +20,7 @@ package org.apache.hadoop.ozone.recon.fsck;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -33,6 +34,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.hadoop.hdds.client.ReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
@@ -409,6 +411,8 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
       long usedBytes, int requiredNodes) {
     ContainerInfo containerInfo = mock(ContainerInfo.class);
     ReplicationConfig replicationConfig = mock(ReplicationConfig.class);
+    AtomicReference<ContainerHealthState> healthStateRef =
+        new AtomicReference<>(ContainerHealthState.HEALTHY);
 
     when(containerInfo.getContainerID()).thenReturn(containerId);
     when(containerInfo.containerID()).thenReturn(ContainerID.valueOf(containerId));
@@ -416,6 +420,12 @@ public class TestReconReplicationManager extends AbstractReconSqlDBTest {
     when(containerInfo.getUsedBytes()).thenReturn(usedBytes);
     when(containerInfo.getReplicationConfig()).thenReturn(replicationConfig);
     when(containerInfo.getState()).thenReturn(HddsProtos.LifeCycleState.CLOSED);
+    when(containerInfo.getHealthState()).thenAnswer(invocation -> healthStateRef.get());
+    doAnswer(invocation -> {
+      healthStateRef.set(invocation.getArgument(0));
+      return null;
+    }).when(containerInfo).setHealthState(
+        org.mockito.ArgumentMatchers.any(ContainerHealthState.class));
     when(replicationConfig.getRequiredNodes()).thenReturn(requiredNodes);
     return containerInfo;
   }
