@@ -344,79 +344,88 @@ public class TestStorageVolumeHealthChecks {
   }
 
   /**
-   * With the default tolerance of 1, the first simulated latch timeout must
-   * NOT increment the volume's counter beyond tolerance (counter = 1 which
-   * is not > 1), so {@code recordCheckTimeout()} returns false.
+   * With the default settings (ioTestCount=3, ioFailureTolerance=1), the
+   * first simulated check timeout must be tolerated: it records one synthetic
+   * IO failure in the sliding window (count=1, which is NOT &gt; tolerance=1),
+   * so {@code recordTimeoutAsIOFailure()} returns false.
    */
   @ParameterizedTest
   @MethodSource("volumeBuilders")
   public void testFirstTimeoutIsTolerated(StorageVolume.Builder<?> builder)
       throws Exception {
-    DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
-    dnConf.setDiskCheckTimeoutTolerated(1);
-    CONF.setFromObject(dnConf);
-    builder.conf(CONF);
     StorageVolume volume = builder.build();
     volume.format(CLUSTER_ID);
     volume.createTmpDirs(CLUSTER_ID);
 
-    assertEquals(0, volume.getConsecutiveTimeoutCount());
-    // First simulated latch timeout: tolerance not exceeded.
-    assertFalse(volume.recordCheckTimeout(),
-        "First timeout should be tolerated");
-    assertEquals(1, volume.getConsecutiveTimeoutCount());
+    // First simulated check timeout: tolerance not exceeded.
+    assertFalse(volume.recordTimeoutAsIOFailure(),
+        "First timeout should be tolerated (IO failure count 1 is not > tolerance 1)");
   }
 
   /**
-   * With tolerance = 1, the second consecutive latch timeout must cause
-   * {@code recordCheckTimeout()} to return true (counter = 2 > 1).
+   * With the default settings (ioTestCount=3, ioFailureTolerance=1), the
+   * second consecutive check timeout must cause
+   * {@code recordTimeoutAsIOFailure()} to return true: count=2 which IS
+   * &gt; tolerance=1.
    */
   @ParameterizedTest
   @MethodSource("volumeBuilders")
   public void testSecondConsecutiveTimeoutFails(StorageVolume.Builder<?> builder)
       throws Exception {
-    DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
-    dnConf.setDiskCheckTimeoutTolerated(1);
-    CONF.setFromObject(dnConf);
-    builder.conf(CONF);
     StorageVolume volume = builder.build();
     volume.format(CLUSTER_ID);
     volume.createTmpDirs(CLUSTER_ID);
 
-    assertFalse(volume.recordCheckTimeout(), "First timeout should be tolerated");
-    assertTrue(volume.recordCheckTimeout(),
+    assertFalse(volume.recordTimeoutAsIOFailure(),
+        "First timeout should be tolerated");
+    assertTrue(volume.recordTimeoutAsIOFailure(),
         "Second consecutive timeout should exceed tolerance and return true");
-    assertEquals(2, volume.getConsecutiveTimeoutCount());
   }
 
   /**
-   * A successful healthy check resets the timeout counter so a subsequent
-   * single timeout is tolerated again (not combined with the earlier one).
+   * After a simulated timeout, {@code ioTestCount} healthy check() calls
+   * gradually evict the synthetic failure from the sliding window. Once
+   * evicted, the IO failure count drops back to 0 and a new single timeout
+   * is tolerated again — no separate reset API is required.
+   *
+   * <p>With the defaults (ioTestCount=3, ioFailureTolerance=1):
+   * <ol>
+   *   <li>1 timeout: window=[F], failures=1</li>
+   *   <li>3 healthy checks push T, T, T — the 4th entry evicts F:
+   *       window=[T,T,T], failures=0</li>
+   *   <li>New timeout: window=[T,T,F] (evicts oldest T), failures=1
+   *       → 1 is not &gt; 1 → tolerated again</li>
+   * </ol>
    */
   @ParameterizedTest
   @MethodSource("volumeBuilders")
-  public void testSuccessfulCheckResetsTimeoutCounter(StorageVolume.Builder<?> builder)
-      throws Exception {
-    DatanodeConfiguration dnConf = CONF.getObject(DatanodeConfiguration.class);
-    dnConf.setDiskCheckTimeoutTolerated(1);
-    CONF.setFromObject(dnConf);
-    builder.conf(CONF);
+  public void testHealthyChecksEvictTimeoutFromSlidingWindow(
+      StorageVolume.Builder<?> builder) throws Exception {
     StorageVolume volume = builder.build();
     volume.format(CLUSTER_ID);
     volume.createTmpDirs(CLUSTER_ID);
 
     // Simulate one tolerated timeout.
-    assertFalse(volume.recordCheckTimeout(), "First timeout should be tolerated");
-    assertEquals(1, volume.getConsecutiveTimeoutCount());
+    assertFalse(volume.recordTimeoutAsIOFailure(),
+        "First timeout should be tolerated");
 
-    // Simulate a successful check round — counter must reset.
-    volume.resetTimeoutCount();
-    assertEquals(0, volume.getConsecutiveTimeoutCount());
+    // Three healthy checks push TRUE entries into the sliding window,
+    // eventually evicting the synthetic FALSE.
+    DiskCheckUtil.DiskChecks alwaysPass = new DiskCheckUtil.DiskChecks() {
+      @Override
+      public boolean checkReadWrite(File storageDir, File testFileDir,
+          int numBytesToWrite) {
+        return true;
+      }
+    };
+    DiskCheckUtil.setTestImpl(alwaysPass);
+    assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
+    assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
+    assertEquals(VolumeCheckResult.HEALTHY, volume.check(false));
 
-    // A new single timeout after reset is tolerated again.
-    assertFalse(volume.recordCheckTimeout(),
-        "Timeout after successful reset should be tolerated again");
-    assertEquals(1, volume.getConsecutiveTimeoutCount());
+    // After recovery a new single timeout is tolerated again.
+    assertFalse(volume.recordTimeoutAsIOFailure(),
+        "Timeout after recovery should be tolerated again");
   }
 
   /**

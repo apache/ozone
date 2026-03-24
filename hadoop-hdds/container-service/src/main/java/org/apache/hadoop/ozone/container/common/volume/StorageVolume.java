@@ -113,16 +113,6 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
   private Queue<Boolean> ioTestSlidingWindow;
   private int healthCheckFileSize;
 
-  /*
-  Fields used to implement latch-timeout tolerance (Option C).
-  When checkAllVolumes() times out and this volume has not yet reported a
-  result, consecutiveTimeoutCount is incremented. The volume is only marked
-  FAILED by a timeout when consecutiveTimeoutCount > timeoutTolerance.
-  The counter is reset to 0 each time the volume completes a healthy check.
-   */
-  private final int timeoutTolerance;
-  private final AtomicInteger consecutiveTimeoutCount;
-
   /**
    * Type for StorageVolume.
    */
@@ -174,8 +164,6 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
       this.ioTestSlidingWindow = new LinkedList<>();
       this.currentIOFailureCount = new AtomicInteger(0);
       this.healthCheckFileSize = dnConf.getVolumeHealthCheckFileSize();
-      this.timeoutTolerance = dnConf.getDiskCheckTimeoutTolerated();
-      this.consecutiveTimeoutCount = new AtomicInteger(0);
     } else {
       storageDir = new File(b.volumeRootStr);
       volumeUsage = null;
@@ -186,8 +174,6 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
       this.ioFailureTolerance = 0;
       this.conf = null;
       this.dnConf = null;
-      this.timeoutTolerance = 0;
-      this.consecutiveTimeoutCount = new AtomicInteger(0);
     }
     this.storageDirStr = storageDir.getAbsolutePath();
   }
@@ -722,23 +708,11 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
       return VolumeCheckResult.HEALTHY;
     }
 
-    // Move the sliding window of IO test results forward 1 by adding the
-    // latest entry and removing the oldest entry from the window.
-    // Update the failure counter for the new window.
-    ioTestSlidingWindow.add(diskChecksPassed);
-    if (!diskChecksPassed) {
-      currentIOFailureCount.incrementAndGet();
-    }
-    if (ioTestSlidingWindow.size() > ioTestCount &&
-        Objects.equals(ioTestSlidingWindow.poll(), Boolean.FALSE)) {
-      currentIOFailureCount.decrementAndGet();
-    }
-
-    // If the failure threshold has been crossed, fail the volume without
-    // further scans.
-    // Once the volume is failed, it will not be checked anymore.
-    // The failure counts can be left as is.
-    if (currentIOFailureCount.get() > ioFailureTolerance) {
+    // Move the sliding window of IO test results forward 1 and check threshold.
+    if (advanceIOWindow(diskChecksPassed)) {
+      // If the failure threshold has been crossed, fail the volume without
+      // further scans. Once the volume is failed, it will not be checked
+      // anymore. The failure counts can be left as is.
       LOG.error("Failed IO test for volume {}: the last {} runs " +
               "encountered {} out of {} tolerated failures.", this,
           ioTestSlidingWindow.size(), currentIOFailureCount,
@@ -755,49 +729,62 @@ public abstract class StorageVolume implements Checkable<Boolean, VolumeCheckRes
   }
 
   /**
-   * Called by {@link StorageVolumeChecker} when {@code checkAllVolumes()}
-   * latch times out and this volume has not yet reported a result.
+   * Called by {@link StorageVolumeChecker} when a volume check times out —
+   * either because the global {@code checkAllVolumes()} latch expired before
+   * this volume's async check completed, or because the per-check timeout
+   * inside {@link ThrottledAsyncChecker} fired.
    *
-   * <p>Increments the consecutive latch-timeout counter. Returns {@code true}
-   * if the counter now exceeds the configured tolerance, meaning the volume
-   * should be added to the failed set. Returns {@code false} if the timeout
-   * is still within tolerance and the volume should be spared this round.
+   * <p>Records a synthetic IO-test failure in the existing sliding window,
+   * making latch timeouts subject to the same {@code ioFailureTolerance}
+   * threshold as genuine read/write failures.  No separate configuration key
+   * is required: the existing
+   * {@code hdds.datanode.disk.check.io.failures.tolerated} governs both.
    *
-   * @return true if the volume should be considered FAILED; false otherwise.
+   * <p>Recovery is automatic: each successful {@link #check} call records a
+   * {@code true} entry in the window, gradually evicting the synthetic
+   * failure once {@code ioTestCount} healthy results have accumulated.
+   *
+   * @return {@code true} if {@code currentIOFailureCount > ioFailureTolerance},
+   *         meaning the volume should now be marked FAILED; {@code false} if
+   *         the failure is still within tolerance this round.
    */
-  public synchronized boolean recordCheckTimeout() {
-    int count = consecutiveTimeoutCount.incrementAndGet();
-    if (count > timeoutTolerance) {
-      LOG.error("Volume {} has exceeded consecutive latch-timeout tolerance"
-              + " (count: {} > tolerance: {}). Marking FAILED.",
-          this, count, timeoutTolerance);
+  public synchronized boolean recordTimeoutAsIOFailure() {
+    if (advanceIOWindow(false)) {
+      LOG.error("Volume {} check timed out: IO-failure count ({}) exceeds"
+              + " tolerance ({}). Marking FAILED.",
+          this, currentIOFailureCount, ioFailureTolerance);
       return true;
     }
-    LOG.warn("Volume {} health check timed out (consecutive latch timeouts:"
-            + " {} / tolerance: {}). Disk I/O may be transiently saturated"
-            + " or a JVM GC burst may have contributed."
-            + " Volume will be failed if the next check also times out.",
-        this, count, timeoutTolerance);
+    LOG.warn("Volume {} check timed out. IO-failure count: {} / tolerance: {}."
+            + " Volume will not be failed until tolerance is exceeded."
+            + " Common transient causes: kernel I/O scheduler saturation"
+            + " or JVM GC pressure.",
+        this, currentIOFailureCount, ioFailureTolerance);
     return false;
   }
 
   /**
-   * Resets the consecutive latch-timeout counter to 0.
+   * Advances the IO-test sliding window by one entry and updates the rolling
+   * failure counter.
    *
-   * <p>Called by {@link StorageVolumeChecker} when a volume completes a
-   * healthy check round, indicating the transient condition has resolved.
+   * <p>Called by both {@link #check} (genuine IO test result) and
+   * {@link #recordTimeoutAsIOFailure} (synthetic failure for a check timeout),
+   * keeping the window-update logic in a single place.
+   *
+   * @param passed {@code true} if the IO test passed; {@code false} otherwise.
+   * @return {@code true} if {@code currentIOFailureCount} now exceeds
+   *         {@code ioFailureTolerance}; {@code false} if still within bounds.
    */
-  public synchronized void resetTimeoutCount() {
-    int prev = consecutiveTimeoutCount.getAndSet(0);
-    if (prev > 0 && LOG.isDebugEnabled()) {
-      LOG.debug("Volume {} completed healthy check. Consecutive"
-          + " latch-timeout counter reset from {} to 0.", this, prev);
+  private boolean advanceIOWindow(boolean passed) {
+    ioTestSlidingWindow.add(passed);
+    if (!passed) {
+      currentIOFailureCount.incrementAndGet();
     }
-  }
-
-  @VisibleForTesting
-  public int getConsecutiveTimeoutCount() {
-    return consecutiveTimeoutCount.get();
+    if (ioTestSlidingWindow.size() > ioTestCount &&
+        Objects.equals(ioTestSlidingWindow.poll(), Boolean.FALSE)) {
+      currentIOFailureCount.decrementAndGet();
+    }
+    return currentIOFailureCount.get() > ioFailureTolerance;
   }
 
   @Override

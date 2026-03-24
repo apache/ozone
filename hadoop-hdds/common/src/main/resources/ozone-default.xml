@@ -4972,24 +4972,4 @@
     <value>5m</value>
     <description>Interval for cleaning up orphan snapshot local data versions corresponding to snapshots</description>
   </property>
-
-  <property>
-    <name>hdds.datanode.disk.check.timeout.tolerated</name>
-    <value>1</value>
-    <description>
-      Number of consecutive checkAllVolumes latch timeouts that a single
-      DataNode volume may accumulate before it is marked as FAILED.
-
-      A latch timeout occurs when the volume's async health check does not
-      complete within hdds.datanode.disk.check.timeout (default 10 minutes).
-      Common transient causes include kernel I/O scheduler saturation or JVM
-      GC pressure, neither of which indicates real disk failure.
-
-      With the default value of 1: the first timeout per volume is tolerated
-      (a WARN is logged); the volume is only marked FAILED if a second
-      consecutive timeout occurs without an intervening successful check.
-
-      Minimum valid value is 1.
-    </description>
-  </property>
 </configuration>

@@ -42,6 +42,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.hadoop.hdds.conf.ConfigurationSource;
@@ -261,20 +262,18 @@ public class StorageVolumeChecker {
       // already applied its own tolerance.
       final Set<StorageVolume> result = new HashSet<>(failedVolumes);
 
-      // Volumes that completed as healthy: reset their timeout counter so a
-      // single transient timeout does not combine with an unrelated future one.
-      for (StorageVolume v : healthyVolumes) {
-        v.resetTimeoutCount();
-      }
-
       // Volumes still pending (neither healthy nor explicitly failed):
-      // these timed out. Apply per-volume consecutive-timeout tolerance.
+      // the latch expired before they reported a result. Record a synthetic
+      // IO failure in each volume's existing sliding window so latch timeouts
+      // share the same ioFailureTolerance threshold as genuine IO failures.
+      // Healthy volumes need no special action: their successful check() call
+      // already recorded TRUE in the sliding window.
       final Set<StorageVolume> pendingVolumes =
           new HashSet<>(Sets.difference(allVolumes,
               Sets.union(healthyVolumes, failedVolumes)));
 
       for (StorageVolume v : pendingVolumes) {
-        if (v.recordCheckTimeout()) {
+        if (v.recordTimeoutAsIOFailure()) {
           // Tolerance exceeded — mark as failed.
           result.add(v);
         }
@@ -400,10 +399,22 @@ public class StorageVolumeChecker {
           volume, exception);
       // If the scan was interrupted, do not count it as a volume failure.
       // This should only happen if the volume checker is being shut down.
-      if (!(t instanceof InterruptedException)) {
-        markFailed();
-        cleanup();
+      if (t instanceof InterruptedException) {
+        return;
       }
+      if (exception instanceof TimeoutException) {
+        // Per-check timeout from ThrottledAsyncChecker: apply the same
+        // IO-failure tolerance as a failed read/write test, rather than
+        // failing the volume immediately on the first timeout.
+        if (!volume.recordTimeoutAsIOFailure()) {
+          // Within tolerance this round. Still call cleanup() so numVolumes
+          // decrements correctly and the latch/callback fires on time.
+          cleanup();
+          return;
+        }
+      }
+      markFailed();
+      cleanup();
     }
 
     private void markHealthy() {
