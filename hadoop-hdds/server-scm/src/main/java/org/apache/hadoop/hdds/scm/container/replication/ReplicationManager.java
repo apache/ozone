@@ -189,8 +189,8 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   private final UnderReplicatedProcessor underReplicatedProcessor;
   private final OverReplicatedProcessor overReplicatedProcessor;
   private final HealthCheck containerCheckChain;
-  private final ReplicationQueue nullReplicationQueue =
-      new NullReplicationQueue();
+  private final ReplicationQueue noOpsReplicationQueue =
+      new MonitoringReplicationQueue();
 
   /**
    * Constructs ReplicationManager instance with the given configuration.
@@ -853,17 +853,23 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   protected boolean processContainer(ContainerInfo containerInfo,
       ReplicationQueue repQueue, ReplicationManagerReport report,
       boolean readOnly) throws ContainerNotFoundException {
+    ContainerID containerID = containerInfo.containerID();
+    Set<ContainerReplica> replicas = containerManager.getContainerReplicas(
+        containerID);
+    List<ContainerReplicaOp> pendingOps =
+        containerReplicaPendingOps.getPendingOps(containerID);
+    return processContainer(containerInfo, replicas, pendingOps, repQueue, report,
+        readOnly);
+  }
+
+  protected boolean processContainer(ContainerInfo containerInfo,
+      Set<ContainerReplica> replicas, List<ContainerReplicaOp> pendingOps,
+      ReplicationQueue repQueue, ReplicationManagerReport report,
+      boolean readOnly) throws ContainerNotFoundException {
     synchronized (containerInfo) {
       // Reset health state to HEALTHY before processing this container
       report.resetContainerHealthState();
-      
-      ContainerID containerID = containerInfo.containerID();
       final boolean isEC = isEC(containerInfo.getReplicationConfig());
-
-      Set<ContainerReplica> replicas = containerManager.getContainerReplicas(
-          containerID);
-      List<ContainerReplicaOp> pendingOps =
-          containerReplicaPendingOps.getPendingOps(containerID);
 
       ContainerCheckRequest checkRequest = new ContainerCheckRequest.Builder()
           .setContainerInfo(containerInfo)
@@ -1006,7 +1012,7 @@ public class ReplicationManager implements SCMService, ContainerReplicaPendingOp
   public boolean checkContainerStatus(ContainerInfo containerInfo,
       ReplicationManagerReport report) throws ContainerNotFoundException {
     report.increment(containerInfo.getState());
-    return processContainer(containerInfo, nullReplicationQueue, report, true);
+    return processContainer(containerInfo, noOpsReplicationQueue, report, true);
   }
 
   /**
