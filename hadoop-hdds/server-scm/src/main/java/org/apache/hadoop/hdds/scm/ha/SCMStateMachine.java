@@ -25,6 +25,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.Collection;
 import java.util.EnumMap;
 import java.util.List;
@@ -178,18 +179,19 @@ public class SCMStateMachine extends BaseStateMachine {
   }
 
   private Message process(final SCMRatisRequest request) throws Exception {
-    try {
-      final Object handler = handlers.get(request.getType());
+    return process(request, handlers.get(request.getType()));
+  }
 
+  public static Message process(final SCMRatisRequest request, Object handler) throws Exception {
+    try {
       if (handler == null) {
         throw new IOException("No handler found for request type " +
             request.getType());
       }
 
-      final Object result = handler.getClass().getMethod(
-          request.getOperation(), request.getParameterTypes())
-          .invoke(handler, request.getArguments());
-      return SCMRatisResponse.encode(result);
+      final Method method = handler.getClass().getMethod(request.getOperation(), request.getParameterTypes());
+      final Object result = method.invoke(handler, request.getArguments());
+      return SCMRatisResponse.encode(result, method.getReturnType());
     } catch (NoSuchMethodException | SecurityException ex) {
       throw new InvalidProtocolBufferException(ex.getMessage());
     } catch (InvocationTargetException e) {
@@ -303,6 +305,12 @@ public class SCMStateMachine extends BaseStateMachine {
     scm.getScmContext().updateLeaderAndTerm(true,
         currentLeaderTerm.get());
     scm.getSequenceIdGen().invalidateBatch();
+
+    try {
+      transactionBuffer.flush();
+    } catch (Exception ex) {
+      ExitUtils.terminate(1, "Failed to flush transactionBuffer", ex, StateMachine.LOG);
+    }
 
     DeletedBlockLog deletedBlockLog = scm.getScmBlockManager()
         .getDeletedBlockLog();

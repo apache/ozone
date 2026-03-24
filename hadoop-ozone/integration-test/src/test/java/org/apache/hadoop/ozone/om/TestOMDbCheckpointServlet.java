@@ -18,6 +18,7 @@
 package org.apache.hadoop.ozone.om;
 
 import static org.apache.hadoop.hdds.recon.ReconConfig.ConfigStrings.OZONE_RECON_KERBEROS_PRINCIPAL_KEY;
+import static org.apache.hadoop.hdds.security.SecurityConfig.OZONE_TEST_AUTHORIZATION_ENABLED;
 import static org.apache.hadoop.hdds.utils.HddsServerUtil.OZONE_RATIS_SNAPSHOT_COMPLETE_FLAG_NAME;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ADMINISTRATORS;
@@ -260,7 +261,7 @@ public class TestOMDbCheckpointServlet {
     doCallRealMethod().when(omDbCheckpointServletMock).initialize(
         om.getMetadataManager().getStore(),
         om.getMetrics().getDBCheckpointMetrics(),
-        om.getAclsEnabled(),
+        om.isAdminAuthorizationEnabled(),
         om.getOmAdminUsernames(),
         om.getOmAdminGroups(),
         om.isSpnegoEnabled());
@@ -300,7 +301,7 @@ public class TestOMDbCheckpointServlet {
     doCallRealMethod().when(omDbCheckpointServletMock).initialize(
         om.getMetadataManager().getStore(),
         om.getMetrics().getDBCheckpointMetrics(),
-        om.getAclsEnabled(),
+        om.isAdminAuthorizationEnabled(),
         om.getOmAdminUsernames(),
         om.getOmAdminGroups(),
         om.isSpnegoEnabled());
@@ -320,6 +321,7 @@ public class TestOMDbCheckpointServlet {
 
   @Test
   void testSpnegoEnabled() throws Exception {
+    conf.setBoolean(OZONE_TEST_AUTHORIZATION_ENABLED, true);
     conf.setBoolean(OZONE_ACL_ENABLED, true);
     conf.set(OZONE_ADMINISTRATORS, "");
     conf.set(OZONE_OM_HTTP_AUTH_TYPE, "kerberos");

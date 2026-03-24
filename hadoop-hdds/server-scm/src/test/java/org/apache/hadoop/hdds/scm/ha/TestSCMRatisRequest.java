@@ -22,15 +22,15 @@ import static org.apache.ratis.util.Preconditions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.google.protobuf.ByteString;
-import com.google.protobuf.InvalidProtocolBufferException;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol;
-import org.apache.hadoop.hdds.scm.ha.io.ListCodec;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.ratis.protocol.Message;
+import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
+import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -105,8 +105,7 @@ public class TestSCMRatisRequest {
             .build();
 
     Message msg = Message.valueOf(
-        org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFrom(
-            proto.toByteArray()));
+        UnsafeByteOperations.unsafeWrap(proto.toByteString().asReadOnlyByteBuffer()));
 
     InvalidProtocolBufferException ex = assertThrows(
         InvalidProtocolBufferException.class,
@@ -124,8 +123,7 @@ public class TestSCMRatisRequest {
             .build();
 
     Message msg = Message.valueOf(
-        org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFrom(
-            proto.toByteArray()));
+        UnsafeByteOperations.unsafeWrap(proto.toByteString().asReadOnlyByteBuffer()));
 
     InvalidProtocolBufferException ex = assertThrows(
         InvalidProtocolBufferException.class,
@@ -145,8 +143,7 @@ public class TestSCMRatisRequest {
             .build();
 
     Message msg = Message.valueOf(
-        org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFrom(
-            proto.toByteArray()));
+        UnsafeByteOperations.unsafeWrap(proto.toByteString().asReadOnlyByteBuffer()));
 
     InvalidProtocolBufferException ex = assertThrows(
         InvalidProtocolBufferException.class,
@@ -173,8 +170,7 @@ public class TestSCMRatisRequest {
             .build();
 
     Message msg = Message.valueOf(
-        org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFrom(
-            proto.toByteArray()));
+        UnsafeByteOperations.unsafeWrap(proto.toByteString().asReadOnlyByteBuffer()));
 
     InvalidProtocolBufferException ex = assertThrows(
         InvalidProtocolBufferException.class,
@@ -201,31 +197,12 @@ public class TestSCMRatisRequest {
             .build();
 
     Message msg = Message.valueOf(
-        org.apache.ratis.thirdparty.com.google.protobuf.ByteString.copyFrom(
-            proto.toByteArray()));
+        UnsafeByteOperations.unsafeWrap(proto.toByteString().asReadOnlyByteBuffer()));
 
     InvalidProtocolBufferException ex = assertThrows(
         InvalidProtocolBufferException.class,
         () -> SCMRatisRequest.decode(msg));
 
     assertTrue(ex.getMessage().contains("Missing argument value"));
-  }
-
-  @Test
-  public void testListDecodeMissingTypeShouldFail() throws Exception {
-    // ListArgument without type
-    SCMRatisProtocol.ListArgument listArg =
-        SCMRatisProtocol.ListArgument.newBuilder()
-            // no type
-            .addValue(ByteString.copyFromUtf8("x"))
-            .build();
-
-    ListCodec codec = new ListCodec();
-
-    InvalidProtocolBufferException ex = assertThrows(
-        InvalidProtocolBufferException.class,
-        () -> codec.deserialize(List.class, listArg.toByteString()));
-
-    assertTrue(ex.getMessage().contains("Missing ListArgument.type"));
   }
 }

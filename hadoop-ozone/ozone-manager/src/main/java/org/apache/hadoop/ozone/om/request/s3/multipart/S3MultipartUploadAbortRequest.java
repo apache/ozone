@@ -150,16 +150,21 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
           .get(multipartOpenKey);
       omBucketInfo = getBucketInfo(omMetadataManager, volumeName, bucketName);
 
-      // If there is no entry in openKeyTable, then there is no multipart
-      // upload initiated for this key.
       if (omKeyInfo == null) {
-        throw new OMException("Abort Multipart Upload Failed: volume: " +
-            requestedVolume + "bucket: " + requestedBucket + "key: " + keyName,
-            OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
+        // In old env, OpenKeycleanupservice may have deleted key from openKeyTable leaving behind
+        // orphan parts in multipartInfoTable.
+        LOG.warn("Entry doesn't exist in openKeyTable, bucket: {}, key: {}", bucketName, keyName);
       }
 
       multipartKeyInfo = omMetadataManager.getMultipartInfoTable()
           .get(multipartKey);
+
+      if (multipartKeyInfo == null) {
+        throw new OMException("Abort Multipart Upload Failed: volume: " +
+            requestedVolume + " bucket: " + requestedBucket + " key: " + keyName,
+            OMException.ResultCodes.NO_SUCH_MULTIPART_UPLOAD_ERROR);
+      }
+
       multipartKeyInfo = multipartKeyInfo.toBuilder()
           .setUpdateID(trxnLogIndex)
           .build();
@@ -170,7 +175,7 @@ public class S3MultipartUploadAbortRequest extends OMKeyRequest {
       for (PartKeyInfo iterPartKeyInfo : multipartKeyInfo.getPartKeyInfoMap()) {
         quotaReleased += QuotaUtil.getReplicatedSize(
             iterPartKeyInfo.getPartKeyInfo().getDataSize(),
-            omKeyInfo.getReplicationConfig());
+            multipartKeyInfo.getReplicationConfig());
       }
       omBucketInfo.incrUsedBytes(-quotaReleased);
 

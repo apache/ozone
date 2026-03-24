@@ -33,6 +33,7 @@ import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.container.ContainerManager;
 import org.apache.hadoop.hdds.scm.container.ContainerNotFoundException;
 import org.apache.hadoop.hdds.scm.container.ContainerReplica;
+import org.apache.hadoop.hdds.scm.container.replication.ContainerHealthResult;
 import org.apache.hadoop.hdds.scm.container.replication.ReplicationManager;
 import org.apache.hadoop.hdds.scm.node.NodeManager;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
@@ -53,6 +54,7 @@ public class ContainerBalancerSelectionCriteria {
   private ContainerManager containerManager;
   private Map<ContainerID, DatanodeDetails> containerToSourceMap;
   private Set<ContainerID> excludeContainers;
+  private Set<ContainerID> includeContainers;
   private Set<ContainerID> excludeContainersDueToFailure;
   private FindSourceStrategy findSourceStrategy;
   private Map<DatanodeDetails, NavigableSet<ContainerID>> setMap;
@@ -71,12 +73,14 @@ public class ContainerBalancerSelectionCriteria {
     this.containerToSourceMap = containerToSourceMap;
     excludeContainersDueToFailure = new HashSet<>();
     excludeContainers = balancerConfiguration.getExcludeContainers();
+    includeContainers = balancerConfiguration.getIncludeContainers();
     this.findSourceStrategy = findSourceStrategy;
     this.setMap = new HashMap<>();
   }
 
   /**
-   * Checks whether container is currently undergoing replication or deletion.
+   * Checks whether container is currently undergoing replication or deletion by checking if there's an add or delete
+   * scheduled for it.
    *
    * @param containerID Container to check.
    * @return true if container is replicating or deleting, otherwise false.
@@ -156,6 +160,10 @@ public class ContainerBalancerSelectionCriteria {
   public boolean shouldBeExcluded(ContainerID containerID,
       DatanodeDetails node, long sizeMovedAlready) {
     ContainerInfo container;
+    //If includeContainers is specified, exclude containers not in the include list
+    if (!includeContainers.isEmpty() && !includeContainers.contains(containerID)) {
+      return true;
+    }
     try {
       container = containerManager.getContainer(containerID);
     } catch (ContainerNotFoundException e) {
@@ -163,13 +171,28 @@ public class ContainerBalancerSelectionCriteria {
           "candidate container. Excluding it.", containerID);
       return true;
     }
-    return excludeContainers.contains(containerID) || excludeContainersDueToFailure.contains(containerID) ||
+
+    if (excludeContainers.contains(containerID) ||
+        excludeContainersDueToFailure.contains(containerID) ||
         containerToSourceMap.containsKey(containerID) ||
-        !isContainerClosed(container, node) ||
-        isContainerReplicatingOrDeleting(containerID) ||
         !findSourceStrategy.canSizeLeaveSource(node, container.getUsedBytes())
         || breaksMaxSizeToMoveLimit(container.containerID(),
-        container.getUsedBytes(), sizeMovedAlready);
+        container.getUsedBytes(), sizeMovedAlready)) {
+      return true;
+    }
+
+    Set<ContainerReplica> replicas;
+    try {
+      replicas = containerManager.getContainerReplicas(container.containerID());
+    } catch (ContainerNotFoundException e) {
+      LOG.warn("Container {} does not exist in ContainerManager. Skipping " +
+          "this container.", container.getContainerID(), e);
+      return true;
+    }
+
+    return !isContainerClosed(container, node, replicas) ||
+        !isContainerHealthyForMove(container, replicas) ||
+        isContainerReplicatingOrDeleting(containerID);
   }
 
   /**
@@ -184,20 +207,12 @@ public class ContainerBalancerSelectionCriteria {
    * specified datanode is CLOSED, else false
    */
   private boolean isContainerClosed(ContainerInfo container,
-                                    DatanodeDetails datanodeDetails) {
+                                    DatanodeDetails datanodeDetails,
+                                    Set<ContainerReplica> replicas) {
     if (!container.getState().equals(HddsProtos.LifeCycleState.CLOSED)) {
       return false;
     }
 
-    // also check that the replica on the specified DN is closed
-    Set<ContainerReplica> replicas;
-    try {
-      replicas = containerManager.getContainerReplicas(container.containerID());
-    } catch (ContainerNotFoundException e) {
-      LOG.warn("Container {} does not exist in ContainerManager. Skipping " +
-          "this container.", container.getContainerID(), e);
-      return false;
-    }
     for (ContainerReplica replica : replicas) {
       if (replica.getDatanodeDetails().equals(datanodeDetails)) {
         // don't consider replica if it's not closed
@@ -207,6 +222,24 @@ public class ContainerBalancerSelectionCriteria {
     }
 
     return false;
+  }
+
+  /**
+   * This asks replication manager whether a container is under/over/mis replicated. The intention is the same as
+   * isContainerReplicatingOrDeleting but the check is done in a different way to be doubly sure.
+   * @param container container to check
+   * @param replicas the container's replicas
+   * @return false if it should not be moved, true otherwise
+   */
+  private boolean isContainerHealthyForMove(ContainerInfo container, Set<ContainerReplica> replicas) {
+    ContainerHealthResult.HealthState state =
+        replicationManager.getContainerReplicationHealth(container, replicas).getHealthState();
+    if (state != ContainerHealthResult.HealthState.HEALTHY) {
+      LOG.debug("Excluding container {} with replicas {} as its health is {}.", container, replicas, state);
+      return false;
+    }
+
+    return true;
   }
 
   private boolean breaksMaxSizeToMoveLimit(ContainerID containerID,
@@ -236,6 +269,9 @@ public class ContainerBalancerSelectionCriteria {
         new TreeSet<>(orderContainersByUsedBytes().reversed());
     try {
       Set<ContainerID> idSet = nodeManager.getContainers(node);
+      if (includeContainers != null && !includeContainers.isEmpty()) {
+        idSet.retainAll(includeContainers);
+      }
       if (excludeContainers != null) {
         idSet.removeAll(excludeContainers);
       }

@@ -208,6 +208,10 @@ public class TestStorageVolumeChecker {
         conf.getObject(DatanodeConfiguration.class);
     dnConf.setDiskCheckMinGap(Duration.ofMillis(0));
     conf.setFromObject(dnConf);
+    File volParentDir =
+        new File(folder.toString(), UUID.randomUUID().toString());
+    conf.set(ScmConfigKeys.HDDS_DATANODE_DIR_KEY,
+        conf.get(ScmConfigKeys.HDDS_DATANODE_DIR_KEY) + "," + volParentDir.getPath());
 
     DatanodeDetails datanodeDetails =
         ContainerTestUtils.createDatanodeDetails();
@@ -218,9 +222,7 @@ public class TestStorageVolumeChecker {
 
     StorageVolumeChecker volumeChecker = volumeSet.getVolumeChecker();
     volumeChecker.setDelegateChecker(new DummyChecker());
-    File volParentDir =
-        new File(folder.toString(), UUID.randomUUID().toString());
-    volumeSet.addVolume(volParentDir.getPath());
+
     File volRootDir = new File(volParentDir, "hdds");
 
     int i = 0;

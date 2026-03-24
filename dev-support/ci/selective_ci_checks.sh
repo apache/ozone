@@ -201,6 +201,8 @@ function run_all_tests_if_environment_files_changed() {
     local ignore_array=(
         "^dev-support/ci/pr_title_check"
         "^dev-support/ci/find_test_class_project"
+        "^dev-support/ci/pr_body_config_doc.sh"
+        "^dev-support/ci/xml_to_md.py"
     )
     filter_changed_files
 
@@ -306,6 +308,8 @@ function get_count_robot_files() {
 function check_needs_build() {
     start_end::group_start "Check if build is needed"
     local pattern_array=(
+        "^.github/workflows/generate-config-doc.yml"
+        "^dev-support/ci/xml_to_md.py"
         "^hadoop-ozone/dev-support/checks/_build.sh"
         "^hadoop-ozone/dev-support/checks/build.sh"
         "^hadoop-ozone/dev-support/checks/dependency.sh"
@@ -448,6 +452,8 @@ function get_count_misc_files() {
     local pattern_array=(
         "^dev-support/ci/pr_title_check"
         "^dev-support/ci/find_test_class_project"
+        "^dev-support/ci/pr_body_config_doc.sh"
+        "^dev-support/ci/xml_to_md.py"
         "^.github"
         "^hadoop-hdds/dev-support/checkstyle"
         "^hadoop-ozone/dev-support/checks"

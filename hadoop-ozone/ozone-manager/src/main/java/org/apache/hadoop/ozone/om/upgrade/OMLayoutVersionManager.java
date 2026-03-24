@@ -99,7 +99,7 @@ public final class OMLayoutVersionManager
           OMLayoutFeature feature = annotation.feature();
           if (feature.layoutVersion() > getMetadataLayoutVersion()) {
             LOG.info("Registering Upgrade Action : {}", action.name());
-            feature.addAction(annotation.type(), action);
+            feature.addAction(action);
           }  else {
             LOG.info("Skipping Upgrade Action {} since it has been finalized" +
                 ".", action.name());

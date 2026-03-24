@@ -17,18 +17,19 @@
 
 package org.apache.hadoop.hdds.scm.ha;
 
-import com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.hadoop.hdds.protocol.proto.SCMRatisProtocol.SCMRatisResponseProto;
-import org.apache.hadoop.hdds.scm.ha.io.CodecFactory;
+import org.apache.hadoop.hdds.scm.ha.io.ScmCodecFactory;
 import org.apache.ratis.protocol.Message;
 import org.apache.ratis.protocol.RaftClientReply;
 import org.apache.ratis.thirdparty.com.google.protobuf.ByteString;
+import org.apache.ratis.thirdparty.com.google.protobuf.InvalidProtocolBufferException;
 import org.apache.ratis.thirdparty.com.google.protobuf.UnsafeByteOperations;
 
 /**
  * Represents the response from RatisServer.
  */
 public final class SCMRatisResponse {
+  static final ScmCodecFactory FACTORY =  ScmCodecFactory.getInstance();
 
   private final boolean success;
   private final Object result;
@@ -65,17 +66,18 @@ public final class SCMRatisResponse {
     return exception;
   }
 
-  public static Message encode(final Object result)
+  public static Message encode(Object result, Class<?> type)
       throws InvalidProtocolBufferException {
 
     if (result == null) {
       return Message.EMPTY;
     }
 
-    final Class<?> type = result.getClass();
+    final Class<?> resolved = FACTORY.resolve(type);
+
     final SCMRatisResponseProto response = SCMRatisResponseProto.newBuilder()
         .setType(type.getName())
-        .setValue(CodecFactory.getCodec(type).serialize(result))
+        .setValue(FACTORY.getCodec(resolved).serialize(result))
         .build();
     return Message.valueOf(UnsafeByteOperations.unsafeWrap(response.toByteString().asReadOnlyByteBuffer()));
   }
@@ -92,7 +94,7 @@ public final class SCMRatisResponse {
       return new SCMRatisResponse();
     }
 
-    final SCMRatisResponseProto responseProto = SCMRatisResponseProto.parseFrom(response.toByteArray());
+    final SCMRatisResponseProto responseProto = SCMRatisResponseProto.parseFrom(response.asReadOnlyByteBuffer());
 
     // proto2 required-equivalent checks
     if (!responseProto.hasType()) {
@@ -102,14 +104,8 @@ public final class SCMRatisResponse {
       throw new InvalidProtocolBufferException("Missing response value");
     }
 
-    try {
-      final Class<?> type = ReflectionUtil.getClass(responseProto.getType());
-      return new SCMRatisResponse(CodecFactory.getCodec(type)
-          .deserialize(type, responseProto.getValue()));
-    } catch (ClassNotFoundException e) {
-      throw new InvalidProtocolBufferException(responseProto.getType() +
-          " cannot be decoded!" + e.getMessage());
-    }
+    final Class<?> type = FACTORY.resolve(responseProto.getType());
+    return new SCMRatisResponse(FACTORY.getCodec(type).deserialize(responseProto.getValue()));
   }
 
 }
