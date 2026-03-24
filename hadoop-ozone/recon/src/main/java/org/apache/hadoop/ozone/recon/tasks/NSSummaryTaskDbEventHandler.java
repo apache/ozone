@@ -119,6 +119,39 @@ public class NSSummaryTaskDbEventHandler {
     propagateSizeUpwards(parentObjectId, keyInfo.getDataSize(), keyInfo.getReplicatedSize(), 1, nsSummaryMap);
   }
 
+  /**
+   * Handle PUT key event during reprocess operation.
+   * Does not read from DB, only works with in-memory map.
+   */
+  protected void handlePutKeyEventReprocess(OmKeyInfo keyInfo, Map<Long,
+      NSSummary> nsSummaryMap, long parentObjectId) throws IOException {
+
+    // Get from local thread map only, no DB reads during reprocess
+    NSSummary nsSummary = nsSummaryMap.get(parentObjectId);
+    if (nsSummary == null) {
+      // Create new instance if not found
+      nsSummary = new NSSummary();
+    }
+    int[] fileBucket = nsSummary.getFileSizeBucket();
+
+    // Update immediate parent's totals (includes all descendant files)
+    nsSummary.setNumOfFiles(nsSummary.getNumOfFiles() + 1);
+    nsSummary.setSizeOfFiles(nsSummary.getSizeOfFiles() + keyInfo.getDataSize());
+    // Before arithmetic operations, check for sentinel value
+    long currentReplSize = nsSummary.getReplicatedSizeOfFiles();
+    if (currentReplSize < 0) {
+      // Old data, initialize to 0 before first use
+      currentReplSize = 0;
+      nsSummary.setReplicatedSizeOfFiles(0);
+    }
+    nsSummary.setReplicatedSizeOfFiles(currentReplSize + keyInfo.getReplicatedSize());
+    int binIndex = ReconUtils.getFileSizeBinIndex(keyInfo.getDataSize());
+
+    ++fileBucket[binIndex];
+    nsSummary.setFileSizeBucket(fileBucket);
+    nsSummaryMap.put(parentObjectId, nsSummary);
+  }
+
   protected void handlePutDirEvent(OmDirectoryInfo directoryInfo,
                                    Map<Long, NSSummary> nsSummaryMap)
       throws IOException {
@@ -179,6 +212,42 @@ public class NSSummaryTaskDbEventHandler {
     } else {
       nsSummaryMap.put(parentObjectId, parentNSSummary);
     }
+  }
+
+  /**
+   * Handle PUT directory event during reprocess operation.
+   * Does not read from DB, only works with in-memory map.
+   */
+  protected void handlePutDirEventReprocess(OmDirectoryInfo directoryInfo,
+                                            Map<Long, NSSummary> nsSummaryMap)
+      throws IOException {
+    long parentObjectId = directoryInfo.getParentObjectID();
+    long objectId = directoryInfo.getObjectID();
+    // write the dir name to the current directory
+    String dirName = directoryInfo.getName();
+
+    // Get or create the directory's NSSummary (no DB reads during reprocess)
+    NSSummary curNSSummary = nsSummaryMap.get(objectId);
+    if (curNSSummary == null) {
+      curNSSummary = new NSSummary();
+    }
+
+    curNSSummary.setDirName(dirName);
+    curNSSummary.setParentId(parentObjectId);
+    nsSummaryMap.put(objectId, curNSSummary);
+
+    // Get or create the parent's NSSummary (no DB reads during reprocess)
+    NSSummary parentNSSummary = nsSummaryMap.get(parentObjectId);
+    if (parentNSSummary == null) {
+      // Create new instance if not found
+      parentNSSummary = new NSSummary();
+    }
+
+    // Add child directory to parent
+    parentNSSummary.addChildDir(objectId);
+
+    // If the directory already existed with content, update immediate parent's stats
+    nsSummaryMap.put(parentObjectId, parentNSSummary);
   }
 
   protected void handleDeleteKeyEvent(
@@ -342,7 +411,7 @@ public class NSSummaryTaskDbEventHandler {
         parentSummary.setReplicatedSizeOfFiles(parentReplSize + replicatedSizeChange);
         parentSummary.setNumOfFiles(parentSummary.getNumOfFiles() + countChange);
         nsSummaryMap.put(parentId, parentSummary);
-        
+
         // Recursively propagate to grandparents
         propagateSizeUpwards(parentId, sizeChange, replicatedSizeChange, countChange, nsSummaryMap);
       }

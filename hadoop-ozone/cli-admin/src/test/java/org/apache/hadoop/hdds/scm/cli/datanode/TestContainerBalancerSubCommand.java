@@ -71,7 +71,7 @@ class TestContainerBalancerSubCommand {
       "Key                                                Value\n" +
       "Threshold                                          10.0\n" +
       "Max Datanodes to Involve per Iteration(percent)    20\n" +
-      "Max Size to Move per Iteration                     0GB\n" +
+      "Max Size to Move per Iteration                     50GB\n" +
       "Max Size Entering Target per Iteration             26GB\n" +
       "Max Size Leaving Source per Iteration              26GB\n" +
       "Number of Iterations                               3\n" +
@@ -80,6 +80,7 @@ class TestContainerBalancerSubCommand {
       "Interval between each Iteration                    0min\n" +
       "Whether to Enable Network Topology                 false\n" +
       "Whether to Trigger Refresh Datanode Usage Info     false\n" +
+      "Container IDs to Include in Balancing              None\n" +
       "Container IDs to Exclude from Balancing            None\n" +
       "Datanodes Specified to be Balanced                 None\n" +
       "Datanodes Excluded from Balancing                  None";
@@ -449,7 +450,7 @@ class TestContainerBalancerSubCommand {
       throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.startContainerBalancer(
-        null, null, null, null, null, null, null, null, null, null, null, null))
+        null, null, null, null, null, null, null, null, null, null, null, null, null, null))
         .thenReturn(
             StorageContainerLocationProtocolProtos
                 .StartContainerBalancerResponseProto.newBuilder()
@@ -465,7 +466,7 @@ class TestContainerBalancerSubCommand {
       throws IOException {
     ScmClient scmClient = mock(ScmClient.class);
     when(scmClient.startContainerBalancer(
-        null, null, null, null, null, null, null, null, null, null, null, null))
+        null, null, null, null, null, null, null, null, null, null, null, null, null, null))
         .thenReturn(StorageContainerLocationProtocolProtos
             .StartContainerBalancerResponseProto.newBuilder()
             .setStart(false)

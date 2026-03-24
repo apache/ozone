@@ -123,7 +123,12 @@ public class OMFileCreateRequest extends OMKeyRequest {
 
     // TODO: Here we are allocating block with out any check for
     //  bucket/key/volume or not and also with out any authorization checks.
-
+    // We also allocate block even if requestedSize is 0 because unlike
+    // CreateKey which is used for S3 use case where the requested dataSize is known in advance
+    // and KeyArgs.dataSize is not going to be set for empty key
+    // File system client does not know the final file size in advance but use 0 as
+    // the placeholder for the data size. Therefore, we should at least allocate a
+    // single block and we cannot simply skip the allocate block call
     List< OmKeyLocationInfo > omKeyLocationInfoList =
         allocateBlock(ozoneManager.getScmClient(),
               ozoneManager.getBlockTokenSecretManager(), repConfig,

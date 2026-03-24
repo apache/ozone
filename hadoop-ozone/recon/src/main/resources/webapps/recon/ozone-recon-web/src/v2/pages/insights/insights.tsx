@@ -148,7 +148,7 @@ const Insights: React.FC<{}> = () => {
             : <>
               <Row gutter={20}>
                 <Col xs={24} xl={12}>
-                  <Card title='File Size Distribution' size='small'>
+                  <Card title='File Size Frequency Distribution' size='small'>
                     {plotResponse.fileCountResponse?.length > 0
                       ? <FileSizeDistribution
                           volumeOptions={state.volumeOptions}

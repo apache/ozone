@@ -127,22 +127,18 @@ public class SCMNodeInfo {
       // Following current approach of fall back to
       // OZONE_SCM_CLIENT_ADDRESS_KEY to figure out hostname.
 
-      String scmBlockClientAddress = getHostNameFromConfigKeys(conf,
-          OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY,
-          OZONE_SCM_CLIENT_ADDRESS_KEY).orElse(null);
-
       String scmClientAddress = getHostNameFromConfigKeys(conf,
-          OZONE_SCM_CLIENT_ADDRESS_KEY).orElse(null);
+          OZONE_SCM_CLIENT_ADDRESS_KEY,
+          OZONE_SCM_NAMES).orElse(null);
+      
+      String scmBlockClientAddress = getHostNameFromConfigKeys(conf,
+          OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY).orElse(scmClientAddress);
 
-      String scmSecurityClientAddress =
-          getHostNameFromConfigKeys(conf,
-              OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY,
-              OZONE_SCM_CLIENT_ADDRESS_KEY).orElse(null);
+      String scmSecurityClientAddress = getHostNameFromConfigKeys(conf,
+          OZONE_SCM_SECURITY_SERVICE_ADDRESS_KEY).orElse(scmClientAddress);
 
-      String scmDatanodeAddress =
-          getHostNameFromConfigKeys(conf,
-              OZONE_SCM_DATANODE_ADDRESS_KEY,
-              OZONE_SCM_CLIENT_ADDRESS_KEY, OZONE_SCM_NAMES).orElse(null);
+      String scmDatanodeAddress = getHostNameFromConfigKeys(conf,
+          OZONE_SCM_DATANODE_ADDRESS_KEY).orElse(scmClientAddress);
 
       int scmBlockClientPort = getPortNumberFromConfigKeys(conf,
           OZONE_SCM_BLOCK_CLIENT_ADDRESS_KEY)

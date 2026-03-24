@@ -124,7 +124,11 @@ public class VolumeUsage {
    * B) avail = fsAvail - Max(reserved - other, 0);
    */
   public SpaceUsageSource.Fixed getCurrentUsage() {
-    final SpaceUsageSource.Fixed real = realUsage();
+    return getCurrentUsage(realUsage());
+  }
+
+  // use this variant if real usage values are also needed at the caller
+  public SpaceUsageSource.Fixed getCurrentUsage(SpaceUsageSource.Fixed real) {
     return reservedInBytes == 0
         ? real
         : new SpaceUsageSource.Fixed(

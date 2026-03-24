@@ -17,9 +17,6 @@
 
 package org.apache.hadoop.ozone.recon;
 
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED;
-import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_ACL_ENABLED_DEFAULT;
-
 import com.google.inject.Injector;
 import com.google.inject.Scopes;
 import com.google.inject.servlet.ServletModule;
@@ -118,9 +115,8 @@ public class ReconRestServletModule extends ServletModule {
         LOG.debug("Added authentication filter to path {}", authPath);
       }
 
-      boolean aclEnabled = conf.getBoolean(OZONE_ACL_ENABLED,
-          OZONE_ACL_ENABLED_DEFAULT);
-      if (aclEnabled) {
+      boolean authorizationEnabled = OzoneSecurityUtil.isAuthorizationEnabled(conf);
+      if (authorizationEnabled) {
         for (String path: adminSubPaths) {
           String adminPath =
               UriBuilder.fromPath(basePath).path(path + "*").build().toString();

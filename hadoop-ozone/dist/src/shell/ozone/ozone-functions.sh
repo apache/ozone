@@ -1525,8 +1525,8 @@ function ozone_add_default_gc_opts
     if [[ ! "$OZONE_OPTS" =~ "-XX" ]] ; then
       OZONE_OPTS="${OZONE_OPTS} -XX:ParallelGCThreads=8"
       if [[ "$java_major_version" -lt 15 ]]; then
-        OZONE_OPTS="${OZONE_OPTS} -XX:+UseConcMarkSweepGC -XX:CMSInitiatingOccupancyFraction=70 -XX:+CMSParallelRemarkEnabled"
-        ozone_error "No '-XX:...' jvm parameters are set. Adding safer GC settings '-XX:ParallelGCThreads=8 -XX:+UseConcMarkSweepGC -XX:CMSInitiatingOccupancyFraction=70 -XX:+CMSParallelRemarkEnabled' to the OZONE_OPTS"
+        OZONE_OPTS="${OZONE_OPTS} -XX:+UseConcMarkSweepGC -XX:NewRatio=3 -XX:CMSInitiatingOccupancyFraction=70 -XX:+CMSParallelRemarkEnabled"
+        ozone_error "No '-XX:...' jvm parameters are set. Adding safer GC settings '-XX:ParallelGCThreads=8 -XX:+UseConcMarkSweepGC -XX:NewRatio=3 -XX:CMSInitiatingOccupancyFraction=70 -XX:+CMSParallelRemarkEnabled' to the OZONE_OPTS"
       else
         ozone_error "No '-XX:...' jvm parameters are set. Adding safer GC settings '-XX:ParallelGCThreads=8' to the OZONE_OPTS"
       fi
@@ -2939,4 +2939,33 @@ function ozone_set_deprecated_hadoop_vars
   for suffix in "$@"; do
     ozone_set_deprecated_var "HADOOP_${suffix}" "OZONE_${suffix}"
   done
+}
+
+## @description  Check if command is one that was moved from freon to vapor
+function ozone_is_freon_command_moved_to_vapor
+{
+  local opt subcommand
+
+  for opt in "${OZONE_SUBCMD_ARGS[@]}"; do
+    for subcommand in \
+        cgdn \
+        cgom \
+        cgscm \
+        cmdw chunk-manager-disk-write \
+        cr container-replicator \
+        falg follower-append-log-generator \
+        lalg leader-append-log-generator \
+        simulate-datanode \
+        stb scm-throughput-benchmark \
+        strmg streaming-generator
+    do
+      if [[ "$opt" == "$subcommand" ]]; then
+        echo "WARN: 'ozone freon $subcommand' is changed to 'ozone vapor $subcommand'." >&2
+        echo "      Please update your scripts since 'ozone freon $subcommand' may no longer" >&2
+        echo "      work in future releases." >&2
+        return 0
+      fi
+    done
+  done
+  return 1
 }

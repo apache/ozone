@@ -17,11 +17,18 @@
 
 package org.apache.hadoop.hdds.scm.container;
 
+import static org.apache.hadoop.hdds.protocol.MockDatanodeDetails.randomDatanodeDetails;
+import static org.apache.hadoop.hdds.scm.HddsTestUtils.getContainer;
+import static org.apache.hadoop.hdds.scm.HddsTestUtils.getECContainer;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.File;
@@ -32,6 +39,7 @@ import java.util.ArrayList;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.HddsConfigKeys;
+import org.apache.hadoop.hdds.client.ECReplicationConfig;
 import org.apache.hadoop.hdds.client.RatisReplicationConfig;
 import org.apache.hadoop.hdds.client.StandaloneReplicationConfig;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
@@ -39,23 +47,33 @@ import org.apache.hadoop.hdds.protocol.DatanodeDetails;
 import org.apache.hadoop.hdds.protocol.MockDatanodeDetails;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos.ReplicationFactor;
+import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos;
 import org.apache.hadoop.hdds.protocol.proto.StorageContainerDatanodeProtocolProtos.ContainerReplicaProto;
 import org.apache.hadoop.hdds.scm.container.common.helpers.InvalidContainerStateException;
 import org.apache.hadoop.hdds.scm.container.replication.ContainerReplicaPendingOps;
+import org.apache.hadoop.hdds.scm.events.SCMEvents;
+import org.apache.hadoop.hdds.scm.ha.SCMContext;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManager;
 import org.apache.hadoop.hdds.scm.ha.SCMHAManagerStub;
 import org.apache.hadoop.hdds.scm.metadata.SCMDBDefinition;
+import org.apache.hadoop.hdds.scm.node.NodeStatus;
 import org.apache.hadoop.hdds.scm.pipeline.Pipeline;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineID;
 import org.apache.hadoop.hdds.scm.pipeline.PipelineManager;
+import org.apache.hadoop.hdds.scm.server.SCMDatanodeHeartbeatDispatcher;
+import org.apache.hadoop.hdds.server.events.EventPublisher;
 import org.apache.hadoop.hdds.utils.db.DBStore;
 import org.apache.hadoop.hdds.utils.db.DBStoreBuilder;
+import org.apache.hadoop.ozone.common.statemachine.InvalidStateTransitionException;
+import org.apache.hadoop.ozone.protocol.commands.CommandForDatanode;
+import org.apache.hadoop.ozone.protocol.commands.DeleteContainerCommand;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.mockito.ArgumentCaptor;
 
 /**
  * Testing ContainerStatemanager.
@@ -67,9 +85,13 @@ public class TestContainerStateManager {
   private File testDir;
   private DBStore dbStore;
   private Pipeline pipeline;
+  private MockNodeManager nodeManager;
+  private ContainerManager containerManager;
+  private SCMContext scmContext;
+  private EventPublisher publisher;
 
   @BeforeEach
-  public void init() throws IOException, TimeoutException {
+  public void init() throws IOException, TimeoutException, InvalidStateTransitionException {
     OzoneConfiguration conf = new OzoneConfiguration();
     SCMHAManager scmhaManager = SCMHAManagerStub.getInstance(true);
     conf.set(HddsConfigKeys.OZONE_METADATA_DIRS, testDir.getAbsolutePath());
@@ -94,6 +116,49 @@ public class TestContainerStateManager {
         .setContainerReplicaPendingOps(new ContainerReplicaPendingOps(
             Clock.system(ZoneId.systemDefault()), null))
         .build();
+
+    nodeManager = new MockNodeManager(true, 10);
+    containerManager = mock(ContainerManager.class);
+    scmContext = SCMContext.emptyContext();
+    scmContext.updateLeaderAndTerm(true, 1L);
+    publisher = mock(EventPublisher.class);
+
+    when(containerManager.getContainer(any(ContainerID.class)))
+        .thenAnswer(invocation -> containerStateManager
+            .getContainer((ContainerID) invocation.getArguments()[0]));
+
+    when(containerManager.getContainerReplicas(any(ContainerID.class)))
+        .thenAnswer(invocation -> containerStateManager
+            .getContainerReplicas((ContainerID) invocation.getArguments()[0]));
+
+    doAnswer(invocation -> {
+      containerStateManager.updateContainerStateWithSequenceId(
+          ((ContainerID) invocation.getArguments()[0]).getProtobuf(),
+          (HddsProtos.LifeCycleEvent) invocation.getArguments()[1], 0L);
+      return null;
+    }).when(containerManager).updateContainerState(
+        any(ContainerID.class), any(HddsProtos.LifeCycleEvent.class));
+
+    doAnswer(invocation -> {
+      containerStateManager.updateContainerReplica(
+          (ContainerReplica) invocation.getArguments()[1]);
+      return null;
+    }).when(containerManager).updateContainerReplica(
+        any(ContainerID.class), any(ContainerReplica.class));
+
+    doAnswer(invocation -> {
+      containerStateManager.removeContainerReplica(
+          (ContainerReplica) invocation.getArguments()[1]);
+      return null;
+    }).when(containerManager).removeContainerReplica(
+        any(ContainerID.class), any(ContainerReplica.class));
+
+    doAnswer(invocation -> {
+      containerStateManager.transitionDeletingOrDeletedToTargetState(
+          ((ContainerID) invocation.getArgument(0)).getProtobuf(), invocation.getArgument(1));
+      return null;
+    }).when(containerManager).transitionDeletingOrDeletedToTargetState(
+        any(ContainerID.class), any(HddsProtos.LifeCycleState.class));
 
   }
 
@@ -150,7 +215,7 @@ public class TestContainerStateManager {
   @ParameterizedTest
   @EnumSource(value = HddsProtos.LifeCycleState.class,
       names = {"DELETING", "DELETED"})
-  public void testTransitionDeletingOrDeletedToClosedState(HddsProtos.LifeCycleState lifeCycleState)
+  public void testTransitionDeletingOrDeletedToTargetState(HddsProtos.LifeCycleState lifeCycleState)
       throws IOException {
     HddsProtos.ContainerInfoProto.Builder builder = HddsProtos.ContainerInfoProto.newBuilder();
     builder.setContainerID(1)
@@ -164,7 +229,7 @@ public class TestContainerStateManager {
     HddsProtos.ContainerInfoProto container = builder.build();
     HddsProtos.ContainerID cid = HddsProtos.ContainerID.newBuilder().setId(container.getContainerID()).build();
     containerStateManager.addContainer(container);
-    containerStateManager.transitionDeletingOrDeletedToClosedState(cid);
+    containerStateManager.transitionDeletingOrDeletedToTargetState(cid, HddsProtos.LifeCycleState.CLOSED);
     assertEquals(HddsProtos.LifeCycleState.CLOSED, containerStateManager.getContainer(ContainerID.getFromProtobuf(cid))
         .getState());
   }
@@ -190,11 +255,120 @@ public class TestContainerStateManager {
     HddsProtos.ContainerID cid = HddsProtos.ContainerID.newBuilder().setId(container.getContainerID()).build();
     containerStateManager.addContainer(container);
     try {
-      containerStateManager.transitionDeletingOrDeletedToClosedState(cid);
+      containerStateManager.transitionDeletingOrDeletedToTargetState(cid, HddsProtos.LifeCycleState.CLOSED);
       fail("Was expecting an Exception, but did not catch any.");
     } catch (IOException e) {
       assertInstanceOf(InvalidContainerStateException.class, e.getCause().getCause());
     }
+  }
+
+  /**
+   * DELETED container + CLOSED replica with BCSID <= container seqId + RATIS replication.
+   * Expected: Force delete command should be sent (force=true)
+   */
+  @Test
+  public void testDeletedContainerWithStaleClosedReplicaRatis()
+      throws IOException {
+    final ContainerInfo container = getContainer(HddsProtos.LifeCycleState.DELETED);
+    containerStateManager.addContainer(container.getProtobuf());
+    assertEquals(HddsProtos.ReplicationType.RATIS, container.getReplicationType());
+    final DatanodeDetails datanode = nodeManager.getNodes(
+        NodeStatus.inServiceHealthy()).iterator().next();
+    // Report CLOSED replica with BCSID = 10000L (equal to container's seqId)
+    DeleteContainerCommand deleteCmd = sendReportAndCaptureDeleteCommand(
+        container, datanode, 10000L, false, 0, true);
+    // Verify force delete
+    verifyForceDeleteCommand(deleteCmd, container.containerID(), true,
+        "Delete command should have force=true for stale RATIS replica");
+    verifyContainerState(container.containerID(), HddsProtos.LifeCycleState.DELETED);
+  }
+
+  /**
+   * Test: DELETED container + CLOSED replica with BCSID < container seqId + RATIS.
+   * Expected: Force delete command should be sent (BCSID is lower)
+   */
+  @Test
+  public void testDeletedContainerWithLowerBcsidStaleReplicaRatis()
+      throws IOException {
+    final ContainerInfo container = getContainer(HddsProtos.LifeCycleState.DELETED);
+    containerStateManager.addContainer(container.getProtobuf());
+    final DatanodeDetails datanode = nodeManager.getNodes(
+        NodeStatus.inServiceHealthy()).iterator().next();
+    // Report CLOSED replica with BCSID = 9000L (lower than container's 10000L)
+    DeleteContainerCommand deleteCmd = sendReportAndCaptureDeleteCommand(
+        container, datanode, 9000L, false, 0, true);
+    verifyForceDeleteCommand(deleteCmd, container.containerID(), true,
+        "Delete command should have force=true for stale RATIS replica with lower BCSID");
+  }
+
+  /**
+   * DELETED EC container in SCM.
+   * Expected: Should send force delete to DN
+   */
+  @Test
+  public void testDeletedECContainerWithStaleClosedReplicaShouldNotForceDelete()
+      throws IOException {
+    final DatanodeDetails datanode = randomDatanodeDetails();
+    nodeManager.register(datanode, null, null);
+    // Create a DELETED EC container
+    ECReplicationConfig repConfig = new ECReplicationConfig(3, 2);
+    final ContainerInfo ecContainer = getECContainer(
+        HddsProtos.LifeCycleState.DELETED,
+        PipelineID.randomId(),
+        repConfig);
+    containerStateManager.addContainer(ecContainer.getProtobuf());
+    assertEquals(HddsProtos.ReplicationType.EC, ecContainer.getReplicationType());
+
+    // Verify delete command sent
+    sendReportAndCaptureDeleteCommand(ecContainer, datanode,
+        ecContainer.getSequenceId(), false, 1, true);
+    // Container should remain as DELETED
+    verifyContainerState(ecContainer.containerID(), HddsProtos.LifeCycleState.DELETED);
+  }
+
+  private DeleteContainerCommand sendReportAndCaptureDeleteCommand(
+      ContainerInfo container, DatanodeDetails datanode,
+      long bcsId, boolean isEmpty, int replicaIndex, boolean reqCommandSend) {
+    final ContainerReportHandler reportHandler =
+        new ContainerReportHandler(nodeManager, containerManager, scmContext, null);
+    final StorageContainerDatanodeProtocolProtos.ContainerReportsProto containerReport =
+        getContainerReportsProto(container.containerID(),
+            ContainerReplicaProto.State.CLOSED,
+            datanode.getUuidString(),
+            bcsId,
+            isEmpty,
+            replicaIndex);
+    final SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode reportFromDatanode =
+        new SCMDatanodeHeartbeatDispatcher.ContainerReportFromDatanode(datanode, containerReport);
+    reportHandler.onMessage(reportFromDatanode, publisher);
+    // Capture the delete command
+    ArgumentCaptor<CommandForDatanode<?>> commandCaptor =
+        ArgumentCaptor.forClass(CommandForDatanode.class);
+    if (reqCommandSend) {
+      verify(publisher, times(1))
+          .fireEvent(eq(SCMEvents.DATANODE_COMMAND), commandCaptor.capture());
+      CommandForDatanode<?> capturedCommand = commandCaptor.getValue();
+      assertEquals(DeleteContainerCommand.class, capturedCommand.getCommand().getClass());
+      return (DeleteContainerCommand) capturedCommand.getCommand();
+    } else {
+      verify(publisher, times(0))
+          .fireEvent(eq(SCMEvents.DATANODE_COMMAND), commandCaptor.capture());
+      return null;
+    }
+  }
+
+  private void verifyForceDeleteCommand(DeleteContainerCommand deleteCmd,
+      ContainerID expectedContainerId, boolean expectedForce, String message) {
+    assertEquals(expectedForce, deleteCmd.isForce(), message);
+    assertEquals(expectedContainerId.getId(), deleteCmd.getContainerID());
+  }
+
+  /**
+   * Verifies the container is in the expected state.
+   */
+  private void verifyContainerState(ContainerID containerId,
+      HddsProtos.LifeCycleState expectedState) throws IOException {
+    assertEquals(expectedState, containerManager.getContainer(containerId).getState());
   }
 
   @Test
@@ -262,6 +436,35 @@ public class TestContainerStateManager {
 
     containerStateManager.addContainer(containerInfo.getProtobuf());
     return containerInfo;
+  }
+
+  private static StorageContainerDatanodeProtocolProtos.ContainerReportsProto getContainerReportsProto(
+      final ContainerID containerId,
+      final ContainerReplicaProto.State state,
+      final String originNodeId,
+      final long bcsId,
+      final boolean isEmpty,
+      final int replicaIndex) {
+    final StorageContainerDatanodeProtocolProtos.ContainerReportsProto.Builder crBuilder =
+        StorageContainerDatanodeProtocolProtos.ContainerReportsProto.newBuilder();
+    final ContainerReplicaProto replicaProto =
+        ContainerReplicaProto.newBuilder()
+            .setContainerID(containerId.getProtobuf().getId())
+            .setState(state)
+            .setOriginNodeId(originNodeId)
+            .setSize(5368709120L)
+            .setUsed(isEmpty ? 0L : 2000000000L)
+            .setKeyCount(isEmpty ? 0L : 100000000L)
+            .setReadCount(100000000L)
+            .setWriteCount(100000000L)
+            .setReadBytes(2000000000L)
+            .setWriteBytes(2000000000L)
+            .setBlockCommitSequenceId(bcsId)
+            .setDeleteTransactionId(0)
+            .setReplicaIndex(replicaIndex)
+            .setIsEmpty(isEmpty)
+            .build();
+    return crBuilder.addReports(replicaProto).build();
   }
 
 }

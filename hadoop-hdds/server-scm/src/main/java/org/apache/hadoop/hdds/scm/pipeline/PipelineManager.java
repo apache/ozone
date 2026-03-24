@@ -125,10 +125,6 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
 
   void incNumBlocksAllocatedMetric(PipelineID id);
 
-  int minHealthyVolumeNum(Pipeline pipeline);
-
-  int minPipelineLimit(Pipeline pipeline);
-
   /**
    * Activates a dormant pipeline.
    *
@@ -224,4 +220,11 @@ public interface PipelineManager extends Closeable, PipelineManagerMXBean {
    * containerSize, otherwise true
    */
   boolean hasEnoughSpace(Pipeline pipeline, long containerSize);
+
+  int openContainerLimit(List<DatanodeDetails> datanodes);
+
+  /**
+   * Get the pipeline metrics.
+   */
+  SCMPipelineMetrics getMetrics();
 }

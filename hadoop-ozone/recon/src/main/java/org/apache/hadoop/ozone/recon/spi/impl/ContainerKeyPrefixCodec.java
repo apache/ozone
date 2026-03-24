@@ -19,12 +19,12 @@ package org.apache.hadoop.ozone.recon.spi.impl;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-import com.google.common.primitives.Longs;
 import java.nio.ByteBuffer;
 import java.util.Objects;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.hdds.utils.db.Codec;
+import org.apache.hadoop.hdds.utils.db.LongCodec;
 import org.apache.hadoop.ozone.recon.api.types.ContainerKeyPrefix;
 
 /**
@@ -55,8 +55,7 @@ public final class ContainerKeyPrefixCodec
   public byte[] toPersistedFormat(ContainerKeyPrefix containerKeyPrefix) {
     Objects.requireNonNull(containerKeyPrefix,
             "Null object can't be converted to byte array.");
-    byte[] containerIdBytes = Longs.toByteArray(containerKeyPrefix
-        .getContainerId());
+    byte[] containerIdBytes = LongCodec.get().toByteArray(containerKeyPrefix.getContainerId());
 
     //Prefix seek can be done only with containerId. In that case, we can
     // expect the key and version to be undefined.
@@ -69,8 +68,8 @@ public final class ContainerKeyPrefixCodec
     if (containerKeyPrefix.getKeyVersion() != -1) {
       containerIdBytes = ArrayUtils.addAll(containerIdBytes, KEY_DELIMITER
           .getBytes(UTF_8));
-      containerIdBytes = ArrayUtils.addAll(containerIdBytes, Longs.toByteArray(
-          containerKeyPrefix.getKeyVersion()));
+      containerIdBytes = ArrayUtils.addAll(containerIdBytes,
+          LongCodec.get().toByteArray(containerKeyPrefix.getKeyVersion()));
     }
     return containerIdBytes;
   }

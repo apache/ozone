@@ -24,7 +24,7 @@ source "${COMPOSE_DIR}/../testlib.sh"
 
 current_version="${OZONE_CURRENT_VERSION}"
 # TODO: debug acceptance test failures for client versions 1.0.0 on secure clusters
-old_versions="1.1.0 1.2.1 1.3.0 1.4.1 2.0.0" # container is needed for each version in clients.yaml
+old_versions="1.1.0 1.2.1 1.3.0 1.4.1 2.0.0 2.1.0" # container is needed for each version in clients.yaml
 
 export SECURITY_ENABLED=true
 : ${OZONE_BUCKET_KEY_NAME:=key1}

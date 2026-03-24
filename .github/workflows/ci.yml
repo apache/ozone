@@ -28,7 +28,6 @@ on:
         required: false
 env:
   BUILD_ARGS: "-Pdist -Psrc -Dmaven.javadoc.skip=true -Drocks_tools_native"
-  # Minimum required Java version for running Ozone is defined in pom.xml (javac.version).
   TEST_JAVA_VERSION: 21 # JDK version used by CI build and tests; should match the JDK version in apache/ozone-runner image
   # MAVEN_ARGS and MAVEN_OPTS are duplicated in check.yml, please keep in sync
   MAVEN_ARGS: --batch-mode --settings ${{ github.workspace }}/dev-support/ci/maven-settings.xml
@@ -37,7 +36,7 @@ env:
 
 jobs:
   build-info:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-slim
     env:
       GITHUB_CONTEXT: ${{ toJson(github) }}
     outputs:
@@ -57,19 +56,19 @@ jobs:
       with-coverage: ${{ env.OZONE_WITH_COVERAGE }}
     steps:
       - name: "Checkout ${{ github.ref }} / ${{ github.sha }} (push)"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           persist-credentials: false
         if: github.event_name  == 'push'
       - name: "Checkout ${{ github.sha }} with its parent (pull request)"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.sha }}
           fetch-depth: 2
           persist-credentials: false
         if: github.event_name  == 'pull_request'
       - name: "Checkout ${{ inputs.ref }} given in workflow input (manual dispatch)"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ inputs.ref }}
           persist-credentials: false
@@ -124,6 +123,28 @@ jobs:
       with-coverage: ${{ fromJSON(needs.build-info.outputs.with-coverage) }}
     secrets: inherit
 
+  generate-config-doc:
+    needs:
+      - build-info
+      - build
+    if: |
+      needs.build-info.outputs.needs-build == 'true' &&
+      (github.repository != 'apache/ozone' || github.event_name == 'pull_request' ||
+       (github.event_name == 'push' && github.ref_name == 'master'))
+    uses: ./.github/workflows/generate-config-doc.yml
+    with:
+      sha: ${{ needs.build-info.outputs.sha }}
+
+  update-ozone-site-config-doc:
+    needs:
+      - generate-config-doc
+    if: |
+      github.event_name == 'push' &&
+      github.repository == 'apache/ozone' &&
+      github.ref_name == 'master'
+    uses: ./.github/workflows/update-ozone-site-config-doc.yml
+    secrets: inherit
+
   compile:
     needs:
       - build-info
@@ -134,11 +155,11 @@ jobs:
     if: needs.build-info.outputs.needs-compile == 'true'
     strategy:
       matrix:
-        java: [ 11, 17, 21 ]
+        java: [ 8, 11, 17 ]
         include:
           - os: ubuntu-24.04
-          - java: 8
-            os: macos-15-intel
+          - java: 21
+            os: macos-15
       fail-fast: false
     uses: ./.github/workflows/check.yml
     with:
@@ -147,7 +168,7 @@ jobs:
       ratis-args: ${{ inputs.ratis_args }}
       runner: ${{ matrix.os }}
       script: compile
-      script-args: "-Pdist -DskipRecon -Dmaven.javadoc.failOnWarnings=${{ matrix.java != 8 }} -Djavac.version=${{ matrix.java }}"
+      script-args: "-Pdist -DskipRecon -Dmaven.javadoc.failOnWarnings=${{ matrix.java != 8 }} -Dmaven.compiler.release=${{ matrix.java }}"
       sha: ${{ needs.build-info.outputs.sha }}
       split: ${{ matrix.java }}
       timeout-minutes: 45
@@ -203,6 +224,8 @@ jobs:
     needs:
       - build-info
       - build
+      - basic
+    if: needs.build-info.outputs.needs-compile == 'true'
     uses: ./.github/workflows/check.yml
     secrets: inherit
     with:
@@ -310,12 +333,12 @@ jobs:
       - integration
     steps:
       - name: Checkout project
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: ${{ needs.build-info.outputs.sha }}
       - name: Cache for maven dependencies
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.m2/repository/*/*/*
@@ -324,7 +347,7 @@ jobs:
           restore-keys: |
             maven-repo-
       - name: Download artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: target/artifacts
       - name: Untar binaries
@@ -332,7 +355,7 @@ jobs:
           mkdir -p hadoop-ozone/dist/target
           tar xzvf target/artifacts/ozone-bin/ozone*.tar.gz -C hadoop-ozone/dist/target
       - name: Setup java ${{ env.TEST_JAVA_VERSION }}
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: ${{ env.TEST_JAVA_VERSION }}
@@ -346,7 +369,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEVELOCITY_ACCESS_KEY: ${{ secrets.DEVELOCITY_ACCESS_KEY }}
       - name: Archive build results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: target/coverage

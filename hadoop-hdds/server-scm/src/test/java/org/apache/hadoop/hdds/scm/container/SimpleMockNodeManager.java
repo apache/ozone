@@ -365,11 +365,6 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
-  public int minHealthyVolumeNum(List<DatanodeDetails> dnList) {
-    return 0;
-  }
-
-  @Override
   public int totalHealthyVolumeCount() {
     return 0;
   }
@@ -380,8 +375,8 @@ public class SimpleMockNodeManager implements NodeManager {
   }
 
   @Override
-  public int minPipelineLimit(List<DatanodeDetails> dn) {
-    return 0;
+  public int openContainerLimit(List<DatanodeDetails> datanodes) {
+    return 9;
   }
 
   @Override

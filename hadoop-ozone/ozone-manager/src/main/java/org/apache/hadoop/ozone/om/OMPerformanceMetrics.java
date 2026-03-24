@@ -148,6 +148,12 @@ public class OMPerformanceMetrics {
   @Metric(about = "Latency of each iteration of OpenKeyCleanupService in ms")
   private MutableGaugeLong openKeyCleanupServiceLatencyMs;
 
+  @Metric(about = "Latency of the last snapshot full defragmentation operation in ms")
+  private MutableGaugeLong snapshotDefragServiceFullLatencyMs;
+
+  @Metric(about = "Latency of the last snapshot incremental defragmentation operation in ms")
+  private MutableGaugeLong snapshotDefragServiceIncLatencyMs;
+
   @Metric(about = "ResolveBucketLink and ACL check latency for createKey in nanoseconds")
   private MutableRate createKeyResolveBucketAndAclCheckLatencyNs;
   
@@ -353,5 +359,13 @@ public class OMPerformanceMetrics {
 
   public void setOpenKeyCleanupServiceLatencyMs(long latencyInMs) {
     openKeyCleanupServiceLatencyMs.set(latencyInMs);
+  }
+
+  public void setSnapshotDefragServiceFullLatencyMs(long latencyInMs) {
+    snapshotDefragServiceFullLatencyMs.set(latencyInMs);
+  }
+
+  public void setSnapshotDefragServiceIncLatencyMs(long latencyInMs) {
+    snapshotDefragServiceIncLatencyMs.set(latencyInMs);
   }
 }
