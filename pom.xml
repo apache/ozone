@@ -1961,10 +1961,6 @@
                       <excludedSourceRoot>${project.build.directory}/generated-sources/java</excludedSourceRoot>
                       <excludedSourceRoot>${project.build.directory}/generated-sources/protobuf/java</excludedSourceRoot>
                     </excludedSourceRoots>
-                    <exclusions>
-                      <exclusion>org.apache.hadoop.fs.contract.*</exclusion>
-                      <exclusion>org.apache.hadoop.tools.contract.*</exclusion>
-                    </exclusions>
                   </restrictImports>
                   <restrictImports>
                     <includeTestCode>true</includeTestCode>
