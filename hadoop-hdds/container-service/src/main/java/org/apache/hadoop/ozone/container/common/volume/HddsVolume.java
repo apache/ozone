@@ -299,7 +299,7 @@ public class HddsVolume extends StorageVolume {
     VolumeCheckResult result = super.check(unused);
 
     if (isDbLoadFailure()) {
-      LOG.warn("Volume {} failed to access RocksDB: RocksDB parent directory is null, " +
+      LOG.error("Volume {} failed to access RocksDB: RocksDB parent directory is null, " +
           "the volume might not have been loaded properly.", getStorageDir());
       return VolumeCheckResult.FAILED;
     }
@@ -312,8 +312,7 @@ public class HddsVolume extends StorageVolume {
     // Check that per-volume RocksDB is present.
     File dbFile = new File(dbParentDir, CONTAINER_DB_NAME);
     if (!dbFile.exists() || !dbFile.canRead()) {
-      LOG.warn("Volume {} failed health check. Could not access RocksDB at " +
-          "{}", getStorageDir(), dbFile);
+      LOG.error("Volume {} failed health check. Could not access RocksDB at {}", getStorageDir(), dbFile);
       return VolumeCheckResult.FAILED;
     }
 
@@ -632,7 +631,7 @@ public class HddsVolume extends StorageVolume {
     DatanodeStoreCache.getInstance().removeDB(containerDBPath);
     dbLoaded.set(false);
     dbLoadFailure.set(false);
-    LOG.warn("SchemaV3 db is stopped at {} for volume {}", containerDBPath,
+    LOG.info("SchemaV3 db is stopped at {} for volume {}", containerDBPath,
         getStorageID());
   }
 
@@ -648,7 +647,7 @@ public class HddsVolume extends StorageVolume {
       volumeInfoMetrics.dbCompactTimesNanoSecondsIncr(
           Time.monotonicNowNanos() - start);
     } catch (Exception e) {
-      LOG.error("compact rocksdb error in {}", dbFilePath, e);
+      LOG.warn("compact rocksdb error in {}", dbFilePath, e);
     }
   }
 }

@@ -412,6 +412,7 @@ public class HddsDatanodeService extends GenericCli implements Callable<Void>, S
       HddsVolume hddsVolume = (HddsVolume) storageVolume;
       boolean result = StorageVolumeUtil.checkVolume(hddsVolume, clusterId, clusterId, conf, LOG, null);
       if (!result) {
+        LOG.error("Marking volume {} as failed", hddsVolume.getStorageDir().getPath());
         volumeSet.failVolume(hddsVolume.getHddsRootDir().getPath());
       }
     }

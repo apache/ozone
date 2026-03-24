@@ -223,8 +223,7 @@ public class MutableVolumeSet implements VolumeSet {
     }
 
     if (!failedVolumes.isEmpty()) {
-      LOG.warn("checkAllVolumes got {} failed volumes - {}",
-          failedVolumes.size(), failedVolumes);
+      LOG.error("checkAllVolumes got {} failed volumes - {}", failedVolumes.size(), failedVolumes);
       handleVolumeFailures(failedVolumes);
     } else {
       LOG.debug("checkAllVolumes encountered no failures");
@@ -242,6 +241,7 @@ public class MutableVolumeSet implements VolumeSet {
       for (StorageVolume v : failedVolumes) {
         // Immediately mark the volume as failed so it is unavailable
         // for new containers.
+        LOG.error("Marking volume {} as failed", v.getStorageDir().getPath());
         failVolume(v.getStorageDir().getPath());
       }
 
@@ -337,11 +337,10 @@ public class MutableVolumeSet implements VolumeSet {
         failedVolumeMap.put(volumeRoot, volume);
         volumeHealthMetrics.decrementHealthyVolumes();
         volumeHealthMetrics.incrementFailedVolumes();
-        LOG.error("Moving Volume : {} to failed Volumes", volumeRoot);
       } else if (failedVolumeMap.containsKey(volumeRoot)) {
-        LOG.warn("Volume : {} is not active", volumeRoot);
+        LOG.warn("Unable to fail the volume: {} as it is inactive", volumeRoot);
       } else {
-        LOG.warn("Volume : {} does not exist in VolumeSet", volumeRoot);
+        LOG.warn("Unable to fail the volume: {} as it does not exist in the VolumeSet", volumeRoot);
       }
     } finally {
       this.writeUnlock();
