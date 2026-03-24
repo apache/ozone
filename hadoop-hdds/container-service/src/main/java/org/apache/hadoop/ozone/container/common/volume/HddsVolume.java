@@ -334,7 +334,8 @@ public class HddsVolume extends StorageVolume {
     final Duration maxRetryGap = getDatanodeConfig().getDiskCheckRetryGap();
     for (int attempt = 0; attempt < maxAttempts; attempt++) {
       try (ManagedOptions managedOptions = new ManagedOptions();
-           ManagedRocksDB ignored = ManagedRocksDB.openReadOnly(managedOptions, dbFile.toString())) {
+           ManagedRocksDB ignored =
+               ManagedRocksDB.openAsSecondary(managedOptions, dbFile.toString(), getTmpDir().getPath())) {
         volumeTestResultQueue.add(isVolumeTestResultHealthy);
         break;
       } catch (Exception e) {
