@@ -186,6 +186,7 @@ public final class ContainerStateManagerImpl
     containerLifecycleSM.addTransition(CLOSING, QUASI_CLOSED, QUASI_CLOSE);
     containerLifecycleSM.addTransition(CLOSING, CLOSED, CLOSE);
     containerLifecycleSM.addTransition(QUASI_CLOSED, CLOSED, FORCE_CLOSE);
+    containerLifecycleSM.addTransition(QUASI_CLOSED, DELETING, DELETE);
     containerLifecycleSM.addTransition(CLOSED, DELETING, DELETE);
     containerLifecycleSM.addTransition(DELETING, DELETED, CLEANUP);
 
@@ -401,7 +402,12 @@ public final class ContainerStateManagerImpl
   }
 
   @Override
-  public void transitionDeletingOrDeletedToClosedState(HddsProtos.ContainerID containerID) throws IOException {
+  public void transitionDeletingOrDeletedToTargetState(HddsProtos.ContainerID containerID,
+                                                       LifeCycleState targetState) throws IOException {
+    if (targetState != CLOSED && targetState != QUASI_CLOSED) {
+      throw new IllegalArgumentException("Target state must be CLOSED or QUASI_CLOSED, got: " + targetState);
+    }
+
     final ContainerID id = ContainerID.getFromProtobuf(containerID);
 
     try (AutoCloseableLock ignored = writeLock(id)) {
@@ -410,14 +416,14 @@ public final class ContainerStateManagerImpl
         final LifeCycleState oldState = oldInfo.getState();
         if (oldState != DELETING && oldState != DELETED) {
           throw new InvalidContainerStateException("Cannot transition container " + id + " from " + oldState +
-              " back to CLOSED. The container must be in the DELETING or DELETED state.");
+                  " back to " + targetState + ". The container must be in the DELETING or DELETED state.");
         }
         ExecutionUtil.create(() -> {
-          containers.updateState(id, oldState, CLOSED);
+          containers.updateState(id, oldState, targetState);
           transactionBuffer.addToBuffer(containerStore, id, containers.getContainerInfo(id));
         }).onException(() -> {
           transactionBuffer.addToBuffer(containerStore, id, oldInfo);
-          containers.updateState(id, CLOSED, oldState);
+          containers.updateState(id, targetState, oldState);
         }).execute();
       }
     }

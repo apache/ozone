@@ -151,14 +151,13 @@ public interface ContainerManager {
       throws IOException, InvalidStateTransitionException;
 
   /**
-   * Bypasses the container state machine to change a container's state from DELETING or DELETED to CLOSED. This API was
-   * introduced to fix a bug (HDDS-11136), and should be used with care otherwise.
+   * Bypasses the container state machine to change a container's state from DELETING/DELETED to CLOSED/QUASI_CLOSED.
    *
-   * @see <a href="https://issues.apache.org/jira/browse/HDDS-11136">HDDS-11136</a>
    * @param containerID id of the container to transition
+   * @param targetState the target state (must be CLOSED or QUASI_CLOSED)
    * @throws IOException
    */
-  void transitionDeletingOrDeletedToClosedState(ContainerID containerID) throws IOException;
+  void transitionDeletingOrDeletedToTargetState(ContainerID containerID, LifeCycleState targetState) throws IOException;
 
   /**
    * Returns the latest list of replicas for given containerId.
