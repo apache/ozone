@@ -42,18 +42,13 @@ public interface FinalizationManager {
   BasicUpgradeFinalizer<SCMUpgradeFinalizationContext, HDDSLayoutVersionManager>
       getUpgradeFinalizer();
 
-  FinalizationCheckpoint getCheckpoint();
-
   void buildUpgradeContext(NodeManager nodeManager,
                                   SCMContext scmContext);
 
   void reinitialize(Table<String, String> finalizationStore) throws IOException;
 
-  void onLeaderReady();
-
-  static boolean shouldTellDatanodesToFinalize(
-      FinalizationCheckpoint checkpoint) {
-    return checkpoint.hasCrossed(FinalizationCheckpoint.MLV_EQUALS_SLV);
+  static boolean shouldTellDatanodesToFinalize(HDDSLayoutVersionManager versionManager) {
+    return !versionManager.needsFinalization();
   }
 
 }

@@ -22,20 +22,17 @@ import static org.apache.hadoop.ozone.upgrade.UpgradeFinalization.Status.FINALIZ
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 import org.apache.hadoop.hdds.protocol.DatanodeDetails;
-import org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos;
 import org.apache.hadoop.hdds.protocol.proto.HddsProtos;
 import org.apache.hadoop.hdds.scm.container.ContainerInfo;
 import org.apache.hadoop.hdds.scm.node.states.NodeNotFoundException;
 import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationCheckpoint;
 import org.apache.hadoop.ozone.HddsDatanodeService;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeStateMachine;
 import org.apache.hadoop.ozone.upgrade.UpgradeFinalization;
@@ -85,20 +82,16 @@ public final class TestHddsUpgradeUtils {
    * Helper function to test Post-Upgrade conditions on the SCM
    */
   public static void testPostUpgradeConditionsSCM(
-      List<StorageContainerManager> scms, int numContainers, int numDatanodes) {
+      List<StorageContainerManager> scms, int numContainers) {
     for (StorageContainerManager scm : scms) {
       LOG.info("Testing post upgrade conditions on SCM with node ID: {}",
           scm.getSCMNodeId());
-      testPostUpgradeConditionsSCM(scm, numContainers, numDatanodes);
+      testPostUpgradeConditionsSCM(scm, numContainers);
     }
   }
 
   public static void testPostUpgradeConditionsSCM(StorageContainerManager scm,
-                                                  int numContainers, int numDatanodes) {
-
-    assertTrue(scm.getScmContext().getFinalizationCheckpoint()
-        .hasCrossed(FinalizationCheckpoint.FINALIZATION_COMPLETE));
-
+                                                  int numContainers) {
     HDDSLayoutVersionManager scmVersionManager = scm.getLayoutVersionManager();
     assertEquals(scmVersionManager.getSoftwareLayoutVersion(),
         scmVersionManager.getMetadataLayoutVersion());
@@ -132,8 +125,7 @@ public final class TestHddsUpgradeUtils {
    * Helper function to test Post-Upgrade conditions on all the DataNodes.
    */
   public static void testPostUpgradeConditionsDataNodes(
-      List<HddsDatanodeService> datanodes, int numContainers,
-      ContainerProtos.ContainerDataProto.State... validClosedContainerStates) {
+      List<HddsDatanodeService> datanodes, int numContainers) {
     try {
       GenericTestUtils.waitFor(() -> {
         for (HddsDatanodeService dataNode : datanodes) {

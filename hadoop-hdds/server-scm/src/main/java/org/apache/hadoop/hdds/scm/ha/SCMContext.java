@@ -24,7 +24,6 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.apache.hadoop.hdds.scm.safemode.SCMSafeModeManager.SafeModeStatus;
 import org.apache.hadoop.hdds.scm.server.OzoneStorageContainerManager;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationCheckpoint;
 import org.apache.ratis.protocol.exceptions.NotLeaderException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,16 +63,10 @@ public final class SCMContext {
   private final OzoneStorageContainerManager scm;
   private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
-  /**
-   * Tracks the last crossed SCM upgrade finalization checkpoint.
-   */
-  private volatile FinalizationCheckpoint finalizationCheckpoint;
-
   private SCMContext(Builder b) {
     isLeader = b.isLeader;
     term = b.term;
     safeModeStatus = b.safeModeStatus;
-    finalizationCheckpoint = b.finalizationCheckpoint;
     scm = b.scm;
     threadNamePrefix = b.threadNamePrefix;
   }
@@ -123,15 +116,6 @@ public final class SCMContext {
           isLeaderReady, true);
 
       isLeaderReady = true;
-    } finally {
-      lock.writeLock().unlock();
-    }
-  }
-
-  public void setFinalizationCheckpoint(FinalizationCheckpoint checkpoint) {
-    lock.writeLock().lock();
-    try {
-      this.finalizationCheckpoint = checkpoint;
     } finally {
       lock.writeLock().unlock();
     }
@@ -246,15 +230,6 @@ public final class SCMContext {
     }
   }
 
-  public FinalizationCheckpoint getFinalizationCheckpoint() {
-    lock.readLock().lock();
-    try {
-      return this.finalizationCheckpoint;
-    } finally {
-      lock.readLock().unlock();
-    }
-  }
-
   /**
    * @return StorageContainerManager
    */
@@ -278,7 +253,6 @@ public final class SCMContext {
     private long term = INVALID_TERM;
     private SafeModeStatus safeModeStatus = SafeModeStatus.OUT_OF_SAFE_MODE;
     private OzoneStorageContainerManager scm = null;
-    private FinalizationCheckpoint finalizationCheckpoint = FinalizationCheckpoint.FINALIZATION_COMPLETE;
     private String threadNamePrefix = "";
 
     public Builder setLeader(boolean leader) {
@@ -299,12 +273,6 @@ public final class SCMContext {
     public Builder setSCM(
         OzoneStorageContainerManager storageContainerManager) {
       this.scm = storageContainerManager;
-      return this;
-    }
-
-    public Builder setFinalizationCheckpoint(
-        FinalizationCheckpoint checkpoint) {
-      this.finalizationCheckpoint = checkpoint;
       return this;
     }
 

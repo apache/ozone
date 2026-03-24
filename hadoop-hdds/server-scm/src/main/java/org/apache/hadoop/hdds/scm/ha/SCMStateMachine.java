@@ -391,7 +391,6 @@ public class SCMStateMachine extends BaseStateMachine {
     // leader ready  in SCMContext.
     scm.getScmContext().setLeaderReady();
     scm.getSCMServiceManager().notifyStatusChanged();
-    scm.getFinalizationManager().onLeaderReady();
   }
 
   @Override

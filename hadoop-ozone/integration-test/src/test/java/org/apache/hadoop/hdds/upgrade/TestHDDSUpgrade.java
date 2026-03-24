@@ -21,7 +21,6 @@ import static java.lang.Thread.sleep;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_HEARTBEAT_INTERVAL;
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVAL;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
 import static org.apache.hadoop.hdds.protocol.proto.HddsProtos.NodeState.HEALTHY;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_DATANODE_PIPELINE_LIMIT;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
@@ -308,8 +307,7 @@ public class TestHDDSUpgrade {
 
     // Verify Post-Upgrade conditions on the SCM.
     TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
-        cluster.getStorageContainerManagersList(),
-            NUM_CONTAINERS_CREATED, NUM_DATA_NODES);
+        cluster.getStorageContainerManagersList(), NUM_CONTAINERS_CREATED);
 
     TestHddsUpgradeUtils.testDataNodesStateOnSCM(cluster.getStorageContainerManagersList(), NUM_DATA_NODES, HEALTHY);
 
@@ -317,7 +315,7 @@ public class TestHDDSUpgrade {
     // In the happy path case, no containers should have been quasi closed as
     // a result of the upgrade.
     TestHddsUpgradeUtils.testPostUpgradeConditionsDataNodes(
-        cluster.getHddsDatanodes(), NUM_CONTAINERS_CREATED, CLOSED);
+        cluster.getHddsDatanodes(), NUM_CONTAINERS_CREATED);
 
     // Test that we can use a pipeline after upgrade.
     // Will fail with exception if there are no pipelines.
@@ -861,11 +859,8 @@ public class TestHDDSUpgrade {
     // Verify Post-Upgrade conditions on the SCM.
     // With failure injection
     TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
-        cluster.getStorageContainerManagersList(), NUM_CONTAINERS_CREATED,
-        NUM_DATA_NODES);
+        cluster.getStorageContainerManagersList(), NUM_CONTAINERS_CREATED);
 
-    // All datanodes on the SCM should have moved to HEALTHY-READONLY state.
-    // Due to timing constraint also allow a "HEALTHY" state.
     loadSCMState();
     TestHddsUpgradeUtils.testDataNodesStateOnSCM(
         cluster.getStorageContainerManagersList(), NUM_DATA_NODES, HEALTHY);

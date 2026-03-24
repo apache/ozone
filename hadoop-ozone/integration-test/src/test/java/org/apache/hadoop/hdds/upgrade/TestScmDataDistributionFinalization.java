@@ -26,7 +26,6 @@ import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_PIPELINE_REPORT_INTERVA
 import static org.apache.hadoop.hdds.HddsConfigKeys.HDDS_SCM_WAIT_TIME_AFTER_SAFE_MODE_EXIT;
 import static org.apache.hadoop.hdds.client.ReplicationFactor.THREE;
 import static org.apache.hadoop.hdds.client.ReplicationType.RATIS;
-import static org.apache.hadoop.hdds.protocol.datanode.proto.ContainerProtos.ContainerDataProto.State.CLOSED;
 import static org.apache.hadoop.hdds.scm.ScmConfigKeys.OZONE_SCM_HEARTBEAT_PROCESS_INTERVAL;
 import static org.apache.hadoop.hdds.scm.block.SCMDeletedBlockTransactionStatusManager.EMPTY_SUMMARY;
 import static org.apache.hadoop.ozone.OzoneConfigKeys.OZONE_BLOCK_DELETING_SERVICE_INTERVAL;
@@ -62,7 +61,6 @@ import org.apache.hadoop.hdds.scm.protocol.StorageContainerLocationProtocol;
 import org.apache.hadoop.hdds.scm.server.SCMConfigurator;
 import org.apache.hadoop.hdds.scm.server.SCMStorageConfig;
 import org.apache.hadoop.hdds.scm.server.StorageContainerManager;
-import org.apache.hadoop.hdds.scm.server.upgrade.FinalizationCheckpoint;
 import org.apache.hadoop.hdds.scm.server.upgrade.SCMUpgradeFinalizationContext;
 import org.apache.hadoop.hdds.utils.db.CodecException;
 import org.apache.hadoop.hdds.utils.db.RocksDatabaseException;
@@ -202,9 +200,9 @@ public class TestScmDataDistributionFinalization {
         cluster.getStorageContainerManager().getLayoutVersionManager().getMetadataLayoutVersion());
 
     TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
-        cluster.getStorageContainerManagersList(), 0, NUM_DATANODES);
+        cluster.getStorageContainerManagersList(), 0);
     TestHddsUpgradeUtils.testPostUpgradeConditionsDataNodes(
-        cluster.getHddsDatanodes(), 0, CLOSED);
+        cluster.getHddsDatanodes(), 0);
     assertNotNull(cluster.getStorageContainerLocationClient().getDeletedBlockSummary());
 
     for (StorageContainerManager scm: cluster.getStorageContainerManagersList()) {
@@ -316,9 +314,9 @@ public class TestScmDataDistributionFinalization {
         cluster.getStorageContainerManager().getLayoutVersionManager().getMetadataLayoutVersion());
 
     TestHddsUpgradeUtils.testPostUpgradeConditionsSCM(
-        cluster.getStorageContainerManagersList(), 0, NUM_DATANODES);
+        cluster.getStorageContainerManagersList(), 0);
     TestHddsUpgradeUtils.testPostUpgradeConditionsDataNodes(
-        cluster.getHddsDatanodes(), 0, CLOSED);
+        cluster.getHddsDatanodes(), 0);
     assertNotNull(cluster.getStorageContainerLocationClient().getDeletedBlockSummary());
 
     for (StorageContainerManager scm: cluster.getStorageContainerManagersList()) {
@@ -450,13 +448,8 @@ public class TestScmDataDistributionFinalization {
       throws Exception {
     GenericTestUtils.waitFor(() -> !scm.isInSafeMode(), 500, 5000);
     GenericTestUtils.waitFor(() -> {
-      FinalizationCheckpoint checkpoint =
-          scm.getScmContext().getFinalizationCheckpoint();
-      LOG.info("Waiting for SCM {} (leader? {}) to finalize. Current " +
-          "finalization checkpoint is {}",
-          scm.getSCMNodeId(), scm.checkLeader(), checkpoint);
-      return checkpoint.hasCrossed(
-          FinalizationCheckpoint.FINALIZATION_COMPLETE);
+      LOG.info("Waiting for SCM {} (leader? {}) to finalize.", scm.getSCMNodeId(), scm.checkLeader());
+      return !scm.getLayoutVersionManager().needsFinalization();
     }, 2_000, 60_000);
   }
 
