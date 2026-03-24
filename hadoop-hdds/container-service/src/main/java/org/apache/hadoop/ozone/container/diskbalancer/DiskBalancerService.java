@@ -697,13 +697,12 @@ public class DiskBalancerService extends BackgroundService {
   }
 
   /**
-   * Build a list of VolumeInfoProto from a list of VolumeFixedUsage.
-   * VolumeInfoProto consists of information like StorageID,
+   * Build a list of VolumeReportProto from a list of VolumeFixedUsage.
+   * VolumeReportProto consists of information like StorageID,
    * volume utilization and committed bytes to the client.
    *
    * @param volumeSet snapshot of VolumeFixedUsage which contains the usage information of each volume
    * @return a list of VolumeReportProto which will be sent to clients for reporting volume status
-   * @throws IllegalArgumentException if volumeSet is null or empty
    */
   public static List<VolumeReportProto> buildVolumeReportProto(List<VolumeFixedUsage> volumeSet) {
     if (volumeSet == null || volumeSet.isEmpty()) {

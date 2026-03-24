@@ -175,8 +175,15 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
     result.put("status", "success");
     result.put("volumeDensity", report.getCurrentVolumeDensitySum());
 
-    if (report.hasIdealUsage()) {
+    if (report.hasIdealUsage() && report.hasDiskBalancerConf()
+        && report.getDiskBalancerConf().hasThreshold()) {
+      double idealUsage = report.getIdealUsage();
+      double threshold = report.getDiskBalancerConf().getThreshold();
+      double lt = idealUsage - threshold / 100.0;
+      double ut = idealUsage + threshold / 100.0;
       result.put("idealUsage", report.getIdealUsage());
+      result.put("threshold %", report.getDiskBalancerConf().getThreshold());
+      result.put("thresholdRange", String.format("(%.20f, %.20f)", lt, ut));
     }
 
     if (report.getVolumeInfoCount() > 0) {
