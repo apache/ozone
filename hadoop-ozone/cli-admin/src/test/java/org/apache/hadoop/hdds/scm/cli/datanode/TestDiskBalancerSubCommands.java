@@ -763,13 +763,17 @@ public class TestDiskBalancerSubCommands {
 
     long committed1 = (random.nextLong() & Long.MAX_VALUE) % (1024L * 1024 * 1024);
     long committed2 = (random.nextLong() & Long.MAX_VALUE) % (1024L * 1024 * 1024);
+    String path1 = "/data/hdds-" + hostname + "-1";
+    String path2 = "/data/hdds-" + hostname + "-2";
     VolumeReportProto vol1 = VolumeReportProto.newBuilder()
         .setStorageId("DISK-" + hostname + "-vol1")
+        .setStoragePath(path1)
         .setUtilization(idealUsage + random.nextDouble() * 0.1)
         .setCommittedBytes(committed1)
         .build();
     VolumeReportProto vol2 = VolumeReportProto.newBuilder()
         .setStorageId("DISK-" + hostname + "-vol2")
+        .setStoragePath(path2)
         .setUtilization(idealUsage - random.nextDouble() * 0.1)
         .setCommittedBytes(committed2)
         .build();

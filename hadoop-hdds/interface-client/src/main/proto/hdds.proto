@@ -581,8 +581,9 @@ enum DiskBalancerRunningStatus {
 
 message VolumeReportProto {
     optional string storageId = 1;
-    optional double utilization = 2;
-    optional uint64 committedBytes = 3;
+    optional string storagePath = 2;
+    optional double utilization = 3;
+    optional uint64 committedBytes = 4;
 }
 
 message DatanodeDiskBalancerInfoProto {

@@ -119,18 +119,20 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
       contentList.add(header.toString());
 
       if (p.getVolumeInfoCount() > 0 && p.hasIdealUsage()) {
-        formatBuilder.append("%-60s %-25s %-25s %-25s%n");
+        formatBuilder.append("%-45s %-50s %-25s %-25s %-25s%n");
         contentList.add("StorageID");
-        contentList.add("Utilization");
+        contentList.add("StoragePath");
         contentList.add("VolumeDensity");
+        contentList.add("Utilization");
         contentList.add("Pre-Allocated Container Bytes");
 
         double ideal = p.getIdealUsage();
         for (VolumeReportProto v : p.getVolumeInfoList()) {
-          formatBuilder.append("%-60s %-25s %-25s %-25s%n");
+          formatBuilder.append("%-45s %-50s %-25s %-25s %-25s%n");
           contentList.add(v.getStorageId() != null ? v.getStorageId() : "-");
-          contentList.add(String.format("%.20f", v.getUtilization()));
+          contentList.add(v.hasStoragePath() ? v.getStoragePath() : "-");
           contentList.add(String.format("%.20f", Math.abs(v.getUtilization() - ideal)));
+          contentList.add(String.format("%.20f", v.getUtilization()));
           contentList.add(String.valueOf(v.getCommittedBytes()));
         }
         formatBuilder.append("%n");
@@ -140,6 +142,17 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
         formatBuilder.append("-------%n%n");
       }
     }
+
+    formatBuilder.append("%nNote:%n");
+    formatBuilder.append("  - Aggregate VolumeDataDensity: Sum of per-volume density" +
+        " (deviation from ideal); higher means more imbalance.%n");
+    formatBuilder.append("  - IdealUsage: Target utilization ratio (0-1) when volumes" +
+        " are evenly balanced.%n");
+    formatBuilder.append("  - ThresholdRange: Acceptable deviation (percent); volumes within" +
+        " IdealUsage +/- Threshold are considered balanced.%n");
+    formatBuilder.append("  - VolumeDensity: Deviation of a particular volume's utilization from IdealUsage.%n");
+    formatBuilder.append("  - Utilization: Ratio of actual used space to capacity (0-1) for a particular volume.%n");
+    formatBuilder.append("  - Pre-Allocated Container Bytes: Space reserved for containers not yet written to disk.%n");
 
     return String.format(formatBuilder.toString(), contentList.toArray(new String[0]));
   }
@@ -172,8 +185,9 @@ public class DiskBalancerReportSubcommand extends AbstractDiskBalancerSubCommand
       for (VolumeReportProto v : report.getVolumeInfoList()) {
         Map<String, Object> vm = new LinkedHashMap<>();
         vm.put("storageId", v.getStorageId());
-        vm.put("utilization", v.getUtilization());
+        vm.put("storagePath", v.hasStoragePath() ? v.getStoragePath() : "-");
         vm.put("volumeDensity", Math.abs(v.getUtilization() - ideal));
+        vm.put("utilization", v.getUtilization());
         vm.put("pre-Allocated container bytes", v.getCommittedBytes());
         vols.add(vm);
       }

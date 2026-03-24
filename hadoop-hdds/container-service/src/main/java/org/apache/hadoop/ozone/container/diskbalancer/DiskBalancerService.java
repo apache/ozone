@@ -713,10 +713,12 @@ public class DiskBalancerService extends BackgroundService {
     List<VolumeReportProto> result = new ArrayList<>();
     for (VolumeFixedUsage v : volumeSet) {
       HddsVolume volume = v.getVolume();
+      String path = volume.getStorageDir() != null ? volume.getStorageDir().getPath() : "";
       result.add(VolumeReportProto.newBuilder()
           .setStorageId(volume.getStorageID())
           .setUtilization(v.getUtilization())
           .setCommittedBytes(volume.getCommittedBytes())
+          .setStoragePath(path)
           .build());
     }
     return result;

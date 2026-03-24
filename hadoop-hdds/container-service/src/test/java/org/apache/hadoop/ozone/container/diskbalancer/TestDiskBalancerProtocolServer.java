@@ -55,7 +55,9 @@ class TestDiskBalancerProtocolServer {
   private static final double TEST_VOLUME_DENSITY = 15.5;
   private static final double TEST_IDEAL_USAGE = 0.6;
   private static final String TEST_STORAGE_ID_1 = "vol1";
+  private static final String TEST_STORAGE_PATH_1 = "/data/hdds1";
   private static final String TEST_STORAGE_ID_2 = "vol2";
+  private static final String TEST_STORAGE_PATH_2 = "/data/hdds2";
   private static final double TEST_UTILIZATION_1 = 0.57;
   private static final double TEST_UTILIZATION_2 = 0.63;
   private static final long TEST_COMMITTED_BYTES_1 = 10L * 1024 * 1024;
@@ -94,11 +96,13 @@ class TestDiskBalancerProtocolServer {
     diskBalancerInfo.setVolumeInfo(Arrays.asList(
         VolumeReportProto.newBuilder()
             .setStorageId(TEST_STORAGE_ID_1)
+            .setStoragePath(TEST_STORAGE_PATH_1)
             .setUtilization(TEST_UTILIZATION_1)
             .setCommittedBytes(TEST_COMMITTED_BYTES_1)
             .build(),
         VolumeReportProto.newBuilder()
             .setStorageId(TEST_STORAGE_ID_2)
+            .setStoragePath(TEST_STORAGE_PATH_2)
             .setUtilization(TEST_UTILIZATION_2)
             .setCommittedBytes(TEST_COMMITTED_BYTES_2)
             .build()));
@@ -135,9 +139,11 @@ class TestDiskBalancerProtocolServer {
     assertEquals(TEST_IDEAL_USAGE, report.getIdealUsage());
     assertEquals(TEST_VOLUME_INFO_COUNT, report.getVolumeInfoCount());
     assertEquals(TEST_STORAGE_ID_1, volReport0.getStorageId());
+    assertEquals(TEST_STORAGE_PATH_1, volReport0.getStoragePath());
     assertEquals(TEST_UTILIZATION_1, volReport0.getUtilization());
     assertEquals(TEST_COMMITTED_BYTES_1, volReport0.getCommittedBytes());
     assertEquals(TEST_STORAGE_ID_2, volReport1.getStorageId());
+    assertEquals(TEST_STORAGE_PATH_2, volReport1.getStoragePath());
     assertEquals(TEST_UTILIZATION_2, volReport1.getUtilization());
     assertEquals(TEST_COMMITTED_BYTES_2, volReport1.getCommittedBytes());
   }
