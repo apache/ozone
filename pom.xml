@@ -2572,9 +2572,9 @@
       </properties>
     </profile>
     <profile>
-      <id>java9+</id>
+      <id>java11+</id>
       <activation>
-        <jdk>[9,]</jdk>
+        <jdk>[11,]</jdk>
       </activation>
       <build>
         <plugins>
