@@ -21,7 +21,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.File;
-import java.lang.reflect.Field;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
@@ -30,7 +29,6 @@ import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.hdds.conf.OzoneConfiguration;
 import org.apache.hadoop.hdds.fs.MockSpaceUsageCheckFactory;
-import org.apache.hadoop.hdds.utils.SlidingWindow;
 import org.apache.hadoop.hdfs.server.datanode.checker.VolumeCheckResult;
 import org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration;
 import org.apache.hadoop.ozone.container.common.utils.DiskCheckUtil;
@@ -52,6 +50,7 @@ public class TestStorageVolumeHealthChecks {
   private static final String DATANODE_UUID = UUID.randomUUID().toString();
   private static final String CLUSTER_ID = UUID.randomUUID().toString();
   private static final OzoneConfiguration CONF = new OzoneConfiguration();
+  private static final TestClock TEST_CLOCK = TestClock.newInstance();
 
   @TempDir
   private static Path volumePath;
@@ -61,19 +60,22 @@ public class TestStorageVolumeHealthChecks {
         new HddsVolume.Builder(volumePath.toString())
             .datanodeUuid(DATANODE_UUID)
             .conf(CONF)
-            .usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
+            .usageCheckFactory(MockSpaceUsageCheckFactory.NONE)
+            .clock(TEST_CLOCK);
 
     MetadataVolume.Builder metadataVolumeBuilder =
         new MetadataVolume.Builder(volumePath.toString())
             .datanodeUuid(DATANODE_UUID)
             .conf(CONF)
-            .usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
+            .usageCheckFactory(MockSpaceUsageCheckFactory.NONE)
+            .clock(TEST_CLOCK);
 
     DbVolume.Builder dbVolumeBuilder =
         new DbVolume.Builder(volumePath.toString())
             .datanodeUuid(DATANODE_UUID)
             .conf(CONF)
-            .usageCheckFactory(MockSpaceUsageCheckFactory.NONE);
+            .usageCheckFactory(MockSpaceUsageCheckFactory.NONE)
+            .clock(TEST_CLOCK);
 
     return Stream.of(
         Arguments.of(Named.of("HDDS Volume", hddsVolumeBuilder)),
@@ -317,14 +319,10 @@ public class TestStorageVolumeHealthChecks {
     // Sliding window protocol transitioned from count-based to a time-based system
     // Update the default failure duration of the window from 60 minutes to a shorter duration for the test
     long eventRate = 1L;
-    TestClock testClock = TestClock.newInstance();
-    Field clock = SlidingWindow.class.getDeclaredField("clock");
-    clock.setAccessible(true);
-    clock.set(volume.getIoTestSlidingWindow(), testClock);
 
     for (int i = 0; i < checkResults.length; i++) {
       // Sleep to allow entries in the sliding window to eventually timeout
-      testClock.fastForward(eventRate);
+      TEST_CLOCK.fastForward(eventRate);
       final boolean result = checkResults[i];
       final DiskCheckUtil.DiskChecks ioResult = new DiskCheckUtil.DiskChecks() {
             @Override

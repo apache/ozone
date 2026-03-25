@@ -26,6 +26,7 @@ import static org.apache.hadoop.hdds.conf.ConfigTag.STORAGE;
 import static org.apache.hadoop.ozone.container.common.statemachine.DatanodeConfiguration.CONFIG_PREFIX;
 
 import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import org.apache.hadoop.hdds.conf.Config;
 import org.apache.hadoop.hdds.conf.ConfigGroup;
 import org.apache.hadoop.hdds.conf.ConfigTag;
@@ -100,7 +101,8 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
 
   static final Duration DISK_CHECK_TIMEOUT_DEFAULT = Duration.ofMinutes(10);
 
-  static final Duration DISK_CHECK_SLIDING_WINDOW_TIMEOUT_DEFAULT = Duration.ofMinutes(60);
+  static final Duration DISK_CHECK_SLIDING_WINDOW_TIMEOUT_DEFAULT =
+      Duration.ofMinutes(PERIODIC_DISK_CHECK_INTERVAL_MINUTES_DEFAULT).plus(DISK_CHECK_TIMEOUT_DEFAULT);
 
   static final boolean CONTAINER_SCHEMA_V3_ENABLED_DEFAULT = true;
   static final long ROCKSDB_LOG_MAX_FILE_SIZE_BYTES_DEFAULT = 32 * 1024 * 1024;
@@ -408,11 +410,14 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
   private Duration diskCheckTimeout = DISK_CHECK_TIMEOUT_DEFAULT;
 
   @Config(key = "hdds.datanode.disk.check.sliding.window.timeout",
-      defaultValue = "60m",
+      defaultValue = "70m",
       type = ConfigType.TIME,
       tags = {ConfigTag.DATANODE},
       description = "Time interval after which a disk check"
           + " failure result stored in the sliding window will expire."
+          + " Do not set the window timeout period to less than or equal to the disk check interval period"
+          + " or failures can be missed across sparse checks"
+          + " e.g., every 120m interval with a 60m window rarely accumulates enough failed events"
           + " Unit could be defined with postfix (ns,ms,s,m,h,d)."
   )
   private Duration diskCheckSlidingWindowTimeout = DISK_CHECK_SLIDING_WINDOW_TIMEOUT_DEFAULT;
@@ -704,6 +709,16 @@ public class DatanodeConfiguration extends ReconfigurableConfig {
     if (diskCheckSlidingWindowTimeout.isNegative()) {
       LOG.warn("{} must be greater than zero and was set to {}. Defaulting to {}",
           DISK_CHECK_SLIDING_WINDOW_TIMEOUT_KEY, diskCheckSlidingWindowTimeout,
+          DISK_CHECK_SLIDING_WINDOW_TIMEOUT_DEFAULT);
+      diskCheckSlidingWindowTimeout = DISK_CHECK_SLIDING_WINDOW_TIMEOUT_DEFAULT;
+    }
+
+    // Do not set window timeout <= periodic disk check interval period, or failures can be missed across sparse checks
+    // e.g., every 120m interval with a 60m window rarely accumulates enough failed events
+    if (diskCheckSlidingWindowTimeout.get(ChronoUnit.MINUTES) <= periodicDiskCheckIntervalMinutes) {
+      LOG.warn("{} must be greater than or equal to {} minutes and was set to {} minutes. Defaulting to {}",
+          DISK_CHECK_SLIDING_WINDOW_TIMEOUT_KEY, periodicDiskCheckIntervalMinutes,
+          diskCheckSlidingWindowTimeout.get(ChronoUnit.MINUTES),
           DISK_CHECK_SLIDING_WINDOW_TIMEOUT_DEFAULT);
       diskCheckSlidingWindowTimeout = DISK_CHECK_SLIDING_WINDOW_TIMEOUT_DEFAULT;
     }

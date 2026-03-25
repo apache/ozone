@@ -158,7 +158,7 @@ public class SlidingWindow {
    * Implementation of Clock that uses System.nanoTime() for real usage.
    * See {@see org.apache.ozone.test.TestClock}
    */
-  private static final class MonotonicClock extends Clock {
+  public static final class MonotonicClock extends Clock {
     @Override
     public long millis() {
       return TimeUnit.NANOSECONDS.toMillis(System.nanoTime());
